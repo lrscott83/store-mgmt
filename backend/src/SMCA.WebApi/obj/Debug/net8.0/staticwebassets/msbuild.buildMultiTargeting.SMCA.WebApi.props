@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\SMCA.WebApi.props" />
-</Project>

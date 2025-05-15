@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\buildMultiTargeting\SMCA.WebApi.props" />
-</Project>
