@@ -1,0 +1,24 @@
+version: '3.4'
+
+services:
+  smca.webapi:
+    image: ${DOCKER_REGISTRY-}smcawebapi
+    container_name: smca.webapi
+    build:
+      context: .
+      dockerfile: SMCA.WebAPI/Dockerfile
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+  smca.database:
+    image: postgres:alpine3.19
+    container_name: smca.database
+    restart: always
+    environment:
+      - POSTGRES_DB=smca
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./.containers/smca-postgres-db:/var/lib/postgresql/data
+    ports:
+      - 5432:5432

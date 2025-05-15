@@ -1,0 +1,47 @@
+[
+    [
+        "1",
+        {
+            "id": "1",
+            "name": "Galletas Dulces",
+            "order": 2,
+            "isActive": true
+        }
+    ],
+    [
+        "2",
+        {
+            "id": "2",
+            "name": "Galletas Saladas",
+            "order": 4,
+            "isActive": true
+        }
+    ],
+    [
+        "3",
+        {
+            "id": "3",
+            "name": "Chupachupas",
+            "order": 3,
+            "isActive": true
+        }
+    ],
+    [
+        "4",
+        {
+            "id": "4",
+            "name": "Cervezas",
+            "order": 8,
+            "isActive": true
+        }
+    ],
+    [
+        "1c9dc1b3-f6eb-8539-2a63-059a2ed914c0",
+        {
+            "id": "1c9dc1b3-f6eb-8539-2a63-059a2ed914c0",
+            "name": "Pizzas",
+            "isActive": true,
+            "order": 1
+        }
+    ]
+]

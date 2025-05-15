@@ -1,0 +1,103 @@
+﻿using Asp.Versioning;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
+using System.Text;
+using WebApiTest.OptionsSetup;
+
+namespace WebApiTest.Extensions
+{
+    public static class ServiceExtensions
+    {
+        public static void AddLocalizationExtension(this IServiceCollection services)
+        {
+            services.AddLocalization(options => options.ResourcesPath = "Localization");
+        }
+        public static void AddJwtAuthenticationExtension(this IServiceCollection services, WebApplicationBuilder builder)
+        {
+            services.ConfigureOptions<JwtOptionsSetup>();
+
+            services.ConfigureOptions<JwtBearerOptionsSetup>();
+            //These will eventually be moved to a secrets file, but for alpha development appsettings is fine
+            var validIssuer = builder.Configuration.GetValue<string>("Jwt:Issuer");
+            var validAudience = builder.Configuration.GetValue<string>("Jwt:Audience");
+            var symmetricSecurityKey = builder.Configuration.GetValue<string>("Jwt:SecretKey");
+
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+                .AddJwtBearer(options =>
+                {
+                    options.IncludeErrorDetails = true;
+                    options.TokenValidationParameters = new TokenValidationParameters()
+                    {
+                        ClockSkew = TimeSpan.Zero,
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = validIssuer,
+                        ValidAudience = validAudience,
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(symmetricSecurityKey)),
+                    };
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnAuthenticationFailed = async (context) =>
+                        {
+                            Console.WriteLine("Printing in the delegate OnAuthFailed");
+                        },
+                        OnChallenge = async (context) =>
+                        {
+                            Console.WriteLine("Printing in the delegate OnChallenge");
+
+                            // this is a default method
+                            // the response statusCode and headers are set here
+                            context.HandleResponse();
+
+                            // AuthenticateFailure property contains 
+                            // the details about why the authentication has failed
+                            if (context.AuthenticateFailure != null)
+                            {
+                                context.Response.StatusCode = 401;
+
+                                // we can write our own custom response content here
+                                await context.HttpContext.Response.WriteAsync("Token Validation Has Failed. Request Access Denied");
+                            }
+                        }
+                    };
+                });
+        }
+
+        public static void AddApiVersioningExtension(this IServiceCollection services)
+        {
+            services.AddApiVersioning(config =>
+            {
+                // Specify the default API Version as 1.0
+                config.DefaultApiVersion = new ApiVersion(1, 0);
+                // If the client hasn't specified the API version in the request, use the default API version number 
+                config.AssumeDefaultVersionWhenUnspecified = true;
+                // Advertise the API versions supported for the particular endpoint
+                config.ReportApiVersions = true;
+            });
+        }
+
+        public static void UseLocalizationExtension(this IApplicationBuilder app)
+        {
+            var cultures = new List<CultureInfo>
+            {
+                new CultureInfo("es"),
+                new CultureInfo("en")
+            };
+
+            app.UseRequestLocalization(options =>
+            {
+                options.DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture("es");
+                options.SupportedCultures = cultures;
+                options.SupportedUICultures = cultures;
+            });
+        }
+    }
+}

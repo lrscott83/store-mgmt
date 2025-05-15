@@ -1,0 +1,35 @@
+@if (item.url && !item.external) {
+  <li [ngClass]="item.classes!" [routerLinkActive]="['active']" class="d-flex align-items-center justify-content-between">
+    <a [target]="item.target ? '_blank' : '_self'" [routerLink]="[item.url]" class="link-primary" (click)="closeOtherMenu($event)">
+      @if (item.icon) {
+        <span class="coded-micon">
+          <i antIcon type="{{ item.icon }}" theme="outline"></i>
+        </span>
+      }
+      @if (item.icon) {
+        <span class="coded-mtext">{{ item.title }}</span>
+      } @else {
+        {{ item.title }}
+      }
+    </a>
+    <a class="bg-transparent" (click)="openHelpDialog()">
+      <i class="text-success d-flex f-20" antIcon theme="outline" type="question-circle"></i>
+    </a>
+  </li>
+}
+@if (item.url && item.external) {
+  <li [ngClass]="item.classes!">
+    <a [target]="item.target ? '_blank' : '_self'" [href]="item.url" class="link-primary">
+      @if (item.icon) {
+        <span class="coded-micon">
+          <i antIcon type="{{ item.icon }}" theme="outline"></i>
+        </span>
+      }
+      @if (item.icon) {
+        <span class="coded-mtext">{{ item.title }}</span>
+      } @else {
+        {{ item.title }}
+      }
+    </a>
+  </li>
+}

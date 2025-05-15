@@ -1,0 +1,65 @@
+<div class="card card-custom">
+    <div class="card-header">
+        <div class="card-title">
+            <h3 class="card-label" [translate]="'TODAY_STATS.HEADER'"></h3>
+            <span class="label label-success font-weight-bold font-size-lg">({{getOrdersItemsCount()}})</span>
+        </div>
+        <div class="card-toolbar">
+            <span class="text-primary font-weight-bold font-size-lg">
+                {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
+            </span>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <div *ngIf="((categories$ | async).length === 0)"
+            class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+            <div class="alert-text">{{'TODAY_STATS.NO_ORDER_FOUND' | translate}}</div>
+        </div>
+
+        <app-category-stats *ngFor="let category of categories$ | async" [category]=category ></app-category-stats>
+
+        <!-- <div class="row row-cols-1 row-cols-md-3 g-4">
+            <div class="col mt-6" *ngFor="let category of categories$ | async">
+                <mat-card class="h-100">
+                    <div class="card-header-custom">
+                        <mat-card-title class="text-left w-100">
+                            <span class="w-100">
+                                {{ category.name }} ({{category.itemsCount}})
+                            </span>
+                        </mat-card-title>
+                        <div fxFlex></div>
+                        <span class="mat-card-title mr-1">
+                            {{ category.total | currency:'USD':'symbol':'1.2-2' }}
+                        </span>
+                    </div>
+                    <mat-divider inset></mat-divider>
+                    <mat-card-content>
+                        <div class="table-responsive mt-6">
+                            <table class="table table-vertical-center">
+                                <tbody>
+                                    <tr *ngFor="let product of category.productItems">
+                                        <td class="pl-0">
+                                            <span class="text-dark font-weight-bolder mb-1 font-size-lg">
+                                                {{ product.name }}
+                                            </span>
+                                        </td>
+                                        <td class="text-right">
+                                            <span class="text-dark font-weight-bolder mb-1 font-size-lg">
+                                                {{ product.itemsCount }}
+                                            </span>
+                                        </td>
+                                        <td class="text-right pr-0">
+                                            <span class="text-dark font-weight-bolder mb-1 font-size-lg">
+                                                {{ product.total | currency:'USD':'symbol':'1.2-2' }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </mat-card-content>
+                </mat-card>
+            </div>
+        </div> -->
+    </div>
+</div>

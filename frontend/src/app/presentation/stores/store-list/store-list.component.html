@@ -1,0 +1,52 @@
+<div class="row">
+    @for (store of stores$ | async; track store) {
+    <div class="col-sm-12 col-md-6 col-lg-4">
+        <div class="card card-custom gutter-b {{getStoreBackgroundColor(store)}}">
+            <div class="card-header">
+                <div class="card-title">
+                    <h3 class="card-label">{{store.name}}</h3>
+                </div>
+                <div class="card-toolbar">
+                    <button mat-mini-fab color="primary" aria-label="Acciones" [matMenuTriggerFor]="matMenu">
+                        <mat-icon>settings</mat-icon>
+                    </button>
+                    <mat-menu #matMenu="matMenu">
+                        <button mat-menu-item class="btn" routerLink="/management/stores/edit/{{store.id}}" routerLinkActive="active">
+                            <mat-icon color="primary">edit</mat-icon>
+                            <span>{{ 'GENERAL.EDIT' | translate }}</span>
+                        </button>
+                        <!-- @if (isSuperAdmin) {
+                        if (!store.approved) {
+                        <button mat-menu-item (click)="onApproved(store)" class="btn">
+                            <mat-icon color="primary">edit</mat-icon>
+                            <span>{{ 'LIST_ACTION_BUTTON.APPROVE' | translate }}</span>
+                        </button>
+                        } @else {
+                        <button mat-menu-item (click)="onDisapproved(store)" class="btn">
+                            <mat-icon color="warn">edit</mat-icon>
+                            <span>{{ 'LIST_ACTION_BUTTON.DISAPPROVE' | translate }}</span>
+                        </button>
+                        }
+                        }
+                        @if (store.isActive) {
+                        <button mat-menu-item (click)="onDeactivate(store)" class="btn">
+                            <mat-icon color="warn">delete</mat-icon>
+                            <span>{{ 'LIST_ACTION_BUTTON.DEACTIVATE' | translate }}</span>
+                        </button>
+                        } @else {
+                        <button mat-menu-item (click)="onActivate(store)" class="btn">
+                            <mat-icon color="primary">edit</mat-icon>
+                            <span>{{ 'LIST_ACTION_BUTTON.ACTIVATE' | translate }}</span>
+                        </button>
+                        } -->
+                    </mat-menu>
+                </div>
+            </div>
+            <div class="card-body">
+                <p>{{store.address}}</p>
+                <p>{{store.description}}</p>
+            </div>
+        </div>
+    </div>
+    }
+</div>

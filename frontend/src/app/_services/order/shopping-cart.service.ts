@@ -1,0 +1,143 @@
+import { Injectable, Inject } from '@angular/core';
+import { HttpClient } from "@angular/common/http";
+import { BaseService } from '../base.service';
+import { Observable, BehaviorSubject } from 'rxjs';
+import { CartItem } from '../_models/order/cart-item.model';
+import { CartData } from '../_models/order/cart-data.model';
+import { BaseResponseModel } from '../_models/base.model';
+import { Product } from 'src/app/domain/entities/products/product.model';
+import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
+import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
+import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
+import { Result } from 'src/app/domain/commons/result';
+
+@Injectable({
+    providedIn: "root"
+})
+
+export abstract class ShoppingCartService extends BaseService<CartItem> {
+
+    private _cartData$: BehaviorSubject<CartData> = new BehaviorSubject<CartData>(this.getDefaultCartData());
+
+    private getDefaultCartData(): CartData {
+        return {
+            items: [],
+            itemsCount: 0,
+            total: 0,
+        };
+    }
+
+    constructor(@Inject(HttpClient) http, private productService: ProductOfflineService, private inventoryService: InventoryOfflineService) {
+        super(http);
+    }
+
+    getCartData$(): Observable<CartData> {
+        return this._cartData$.asObservable();
+    }
+
+    getCartItems(): CartItem[] {
+        return this.getCartData().items;
+    }
+
+    private getCartData(): CartData {
+        return this._cartData$.value;
+    }
+
+    addCartItem(productId: string, quantity: number): Promise<BaseResponseModel<boolean>> {
+        return new Promise((resolve, reject) => {
+            this.productService.getProductById(productId)
+                .subscribe(response => {
+                    if (response.succeeded)
+                        resolve(this.addItem(response.data, quantity));
+                    else {
+                        resolve(this.Failure(response.errors));
+                    }
+                }, error => {
+                    resolve(this.Failure(error));
+                });
+        });
+    }
+
+    increaseCartItem(productId: string): Promise<BaseResponseModel<boolean>> {
+        return this.addCartItem(productId, 1);
+    }
+
+    decreaseCartItem(productId: string): Promise<BaseResponseModel<boolean>> {
+        return this.addCartItem(productId, -1);
+    }
+
+    private addItem(product: Product, quantity: number): BaseResponseModel<boolean> {
+        if (!product) {
+            // if (!cartItem) {
+            //     this.removeCartItem(product.id);
+            //     return this.Failure([ShoppingCartErrors.productOutOfStock(product.name)]);
+            // }
+            return this.Failure([ProductErrors.NotExists]);
+        }
+
+        const availableResult: Result = this.inventoryService.hasAvailableProductToSale(product.id, quantity);
+        if (!availableResult.succeeded)
+            return this.Failure([availableResult.errors && availableResult.errors.length > 0
+                ? availableResult.errors[0]
+                : ProductErrors.ProductNotAvailable]);
+
+        let items: CartItem[] = [...this.getCartItems()];
+        let cartItem: CartItem = this.findItem(items, product.id);
+        if (cartItem) {
+            if (cartItem.quantity + quantity > 0)
+                cartItem.quantity = cartItem.quantity + quantity;
+            else
+                return this.removeCartItem(product.id);
+        } else {
+            let qty = quantity > 0 ? quantity : 1;
+            items.push({
+                productId: product.id,
+                name: product.name,
+                quantity: qty,
+                price: product.price,
+            });
+        }
+
+        this.setNextCartData(items);
+        return this.Success(true);
+    }
+
+    private setNextCartData(items: CartItem[]) {
+        this._cartData$.next({
+            items: items,
+            itemsCount: this.getItemsCount(),
+            total: this.getCartTotal(),
+        });
+    }
+
+    private removeCartItem(productId: string): BaseResponseModel<boolean> {
+        let items: CartItem[] = this.getCartItems()
+            .filter(item => item.productId !== productId)
+        this.setNextCartData(items);
+        return this.Success(true);
+    }
+
+    private findItem(items: CartItem[], productId: string) {
+        return items.find(i => i.productId === productId);
+    }
+
+    getCartTotal(): number {
+        let totalSum: number = 0;
+        this.getCartItems().forEach(
+            (item) => (totalSum += item.price * item.quantity)
+        );
+        return totalSum;
+    }
+
+    getItemsCount(): number {
+        let itemsCount: number = 0;
+        this.getCartItems().forEach(
+            (item) => (itemsCount += item.quantity)
+        );
+        return itemsCount;
+    }
+
+    clearCart() {
+        this._cartData$.next(this.getDefaultCartData());
+    }
+}

@@ -1,0 +1,29 @@
+<div class="row">
+    <div class="card card-custom gutter-b">
+        <div class="card-header">
+            <div class="card-toolbar">
+                <button mat-fab extended color="primary" (click)="openCreateOwnerModal()">
+                    <mat-icon>add</mat-icon>
+                    {{'OWNER.ADD_OWNER' | translate}}
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            @if (isSuperAdmin) {
+            <mat-tab-group animationDuration="0ms" id="tabs">
+                <mat-tab label="{{'GENERAL.DETAILS'| translate}}">
+                    <app-edit-owner-details></app-edit-owner-details>
+                </mat-tab>
+                <mat-tab label="{{'GENERAL.STORES'| translate}}">
+                    <app-store-list></app-store-list>
+                </mat-tab>
+                <mat-tab label="{{'GENERAL.USERS'| translate}}">
+                    <app-user-list></app-user-list>
+                </mat-tab>
+            </mat-tab-group>
+            } @else {
+            <app-edit-owner-details></app-edit-owner-details>
+            }
+        </div>
+    </div>
+</div>

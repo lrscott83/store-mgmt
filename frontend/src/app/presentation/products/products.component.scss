@@ -1,0 +1,31 @@
+//@import '../../../sass/components/variables.demo';
+@import '../../../scss/components/variables.bootstrap';
+
+.card-header-success > .card.card-custom > .card-header::ng-deep {
+    background-color: $success-light !important;
+    border-radius: 0.42rem !important;
+}
+
+.card-header-success::ng-deep {
+    background-color: $success-light !important;
+    border-radius: 0.42rem !important;
+}
+
+.badge {
+    border-radius: 50%;
+    margin-left: 4px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    line-height: 1;
+    min-width: 22px;
+    height: 22px;
+}
+
+::ng-deep .mat-expansion-panel-body {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+}
+
+.mat-panel-header {
+    //background-color: $primary;
+}

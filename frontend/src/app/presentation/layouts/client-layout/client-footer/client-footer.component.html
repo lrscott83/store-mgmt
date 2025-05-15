@@ -1,0 +1,33 @@
+<footer class="pc-footer">
+    <div class="footer-wrapper container-fluid">
+        <div class="row">
+            <ul class="list-inline footer-link mb-0">
+                <li class="text-center">
+                    <a [routerLink]="['/cookies-private']" target="_blank" style="text-decoration-line: underline;">
+                        {{ 'FOOTER.COOKIES_POLICE' | translate}}
+                    </a>
+                </li>
+                <li class="text-center">
+                    <a [routerLink]="['/private-police']" target="_blank" style="text-decoration-line: underline;">
+                        {{ 'FOOTER.PRIVACY_POLICE' | translate}}
+                    </a>
+                </li>
+                <li class="text-center">
+                    <a [routerLink]="['/terms-conditions']" target="_blank" style="text-decoration-line: underline;">
+                        {{ 'FOOTER.TERMS_CONDITIONS' | translate}}
+                    </a>
+                </li>
+                <li class="text-center mt-2">
+                    <a href="javascript:" (click)="showEmailDialog()" style="display: inline-flex; align-items: center;
+                    ">
+                        <mat-icon>email</mat-icon> {{ 'FOOTER.CONTACT_US' | translate}}
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div class="row my-1 mt-2">
+            <p class="m-0 text-center">{{ 'FOOTER.COPYRIGHT1' | translate : { year: getYear() } }}</p>
+        <p class="m-0 text-center">{{ 'FOOTER.COPYRIGHT2' | translate }}</p>
+        </div>
+    </div>
+</footer>

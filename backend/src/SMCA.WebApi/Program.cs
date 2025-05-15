@@ -1,0 +1,146 @@
+using Application.Abstractions.HttpContext;
+using Application.Services.Tenants;
+using Infrastructure.Interfaces.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using SMCA.WebApi.PolicyCode;
+using SMCA.WebApi.Services;
+using Application;
+using Infrastructure;
+using Application.Abstractions.Authentication;
+using Infrastructure.Persistence.Contexts;
+using SMCA.WebApi.Authentication;
+using Microsoft.AspNetCore.Http.Features;
+using SMCA.WebApi.Extensions;
+using SMCA.WebApi.Middlewares;
+using Serilog;
+using System.Configuration;
+using Serilog.Sinks.Elasticsearch;
+using System.Reflection;
+using System;
+using SMCA.WebApi.OptionsSetup;
+
+var builder = WebApplication.CreateBuilder(args);
+
+var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+var elasticUri = builder.Configuration.GetValue<string>("ElasticConfiguration:Uri");
+string indexPrefix = $"{Assembly.GetExecutingAssembly().GetName().Name!.ToLower().Replace(".", "-")}";
+var logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(elasticUri))
+    {
+        AutoRegisterTemplate = true,
+        AutoRegisterTemplateVersion = AutoRegisterTemplateVersion.ESv6,
+        IndexFormat = $"{Assembly.GetExecutingAssembly().GetName().Name!.ToLower().Replace(".", "-")}-{environment?.ToLower().Replace(".", "-")}-{DateTime.UtcNow:yyyy-MM}"
+    })
+    .CreateLogger();
+builder.Host.UseSerilog(logger);
+
+// Add services to the container.
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<TenantIdProvider>();
+builder.Services.AddScoped<IHttpContextService, HttpContextService>();
+builder.Services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+
+//Register the Permission policy handlers
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, AuthorizationPolicyProvider>();
+builder.Services.AddSingleton<IAuthorizationHandler, FeatureTypeHandler>();
+builder.Services.AddScoped<IClaimsTransformation, ClaimsTransformerService>();
+
+builder.Services
+    .AddApplication()
+    .AddInfrastructure(builder.Configuration);
+
+builder.Services.AddScoped<IHashPasswordService, HashPasswordService>();
+
+builder.Services.Configure<TenantConnectionSettings>(options =>
+    builder.Configuration.GetSection(nameof(TenantConnectionSettings)).Bind(options));
+
+string? connectionString = builder.Configuration.GetConnectionString("Application");
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString,
+    b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+
+builder.Services.AddScoped<IJwtProvider, JwtProvider>();
+
+builder.Services.AddJwtAuthenticationExtension(builder);
+
+builder.Services.AddLocalizationExtension();
+
+builder.Services.AddCors(options => options.AddDefaultPolicy(builder =>
+{
+    builder
+    .AllowAnyMethod()
+    .AllowAnyHeader()
+    .AllowCredentials()
+    .WithOrigins("http://localhost:4200", "https://localhost:4200",
+    "http://192.168.1.103", "https://192.168.1.103");
+}));
+
+builder.Services.Configure<FormOptions>(o =>
+{
+    o.ValueLengthLimit = int.MaxValue;
+    o.MultipartBodyLengthLimit = int.MaxValue;
+    o.MemoryBufferThreshold = int.MaxValue;
+});
+
+
+builder.Services.AddRouting(options => options.LowercaseUrls = true);
+
+builder.Services.AddControllers();
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddApiVersioningExtension();
+builder.Services.AddHealthChecks();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.ApplyMigrations();
+}
+
+app.UseCors(x => 
+x.AllowAnyHeader()
+.AllowAnyMethod()
+.AllowCredentials()
+.WithOrigins("http://localhost:4200", "https://localhost:4200")
+);
+
+app.UseHttpsRedirection();
+
+app.UseStaticFiles();
+
+//Add support to logging request with SERILOG
+app.UseSerilogRequestLogging();
+
+app.UseRouting();
+
+
+//app.UseStatusCodePages();
+//app.UseStaticFiles();   
+
+app.UseAuthentication();
+
+app.UseAuthorization();
+
+app.UseMiddleware<ErrorHandlerMiddleware>();
+app.UseHealthChecks("/health");
+
+//app.MapControllers();
+
+app.UseEndpoints(endpoints =>
+{
+    endpoints.MapControllers();
+    //.RequireAuthorization()
+    //.RequireCors("AllowSpecificOrigin");
+});
+
+app.Run();

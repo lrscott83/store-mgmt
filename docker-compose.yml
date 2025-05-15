@@ -1,0 +1,123 @@
+services:
+  frontend:
+    container_name: smca_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    networks:
+      - postgres_network
+
+  api:
+    container_name: smca_backend
+    build:
+      context: ./backend/src
+      dockerfile: Dockerfile
+      args:
+        - configuration=Release
+    environment:
+      - ASPNETCORE__ENVIRONMENT=${ENVIRONMENT}
+      - AppSettings__ConnectionStrings__DefaultConnection=Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Persist Security Info=True;Include Error Detail=True
+      - AppSettings__Secret=${JWT_SECRET}
+      - AppSettings__Issuer=${JWT_ISSUER}
+      - AppSettings__Audience=${JWT_AUDIENCE}
+      - AppSettings__PasswordResetUrl=${PASSWORD_RESET_URL}
+      - SmtpSettings__SmtpServer=${SMTP_SERVER}
+      - SmtpSettings__Port=${SMTP_PORT}
+      - SmtpSettings__Username=${SMTP_USERNAME}
+      - SmtpSettings__Password=${SMTP_PASSWORD}
+      - SmtpSettings__FromEmail=${SMTP_FROM_EMAIL}
+      - SmtpSettings__EnableSsl=${SMTP_ENABLE_SSL}
+    depends_on:
+      - postgres
+    networks:
+      - postgres_network
+      
+  postgres:
+    image: postgres:16-alpine
+    container_name: smca_postgres_db
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts:/docker-entrypoint-initdb.d
+    networks:
+      - postgres_network
+  
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: smca_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
+    restart: always
+    ports:
+      - "5050:80"
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - postgres_network
+    # logging:
+    #   driver: "fluentd"
+    #   options:
+    #     fluentd-address: localhost:24224
+  
+  nginx:
+    build: loadbalancer
+    container_name: smca_nginx
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - api
+    networks:
+      - postgres_network
+
+  elasticsearch:
+    container_name: smca_elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.5
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.watcher.enabled=false
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+    mem_limit: 6g
+    ports:
+      - "9200:9200"
+    networks:
+      - postgres_network
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    restart: always
+
+  kibana:
+    container_name: smca_kibana
+    image: docker.elastic.co/kibana/kibana:8.17.5
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://smca_elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - postgres_network
+    restart: always
+
+volumes:
+  postgres_data:
+  pgadmin-data:
+  elasticsearch-data:
+
+networks:
+  postgres_network:
+    driver: bridge

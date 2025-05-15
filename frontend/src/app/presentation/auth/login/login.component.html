@@ -1,0 +1,92 @@
+<div class="auth-main">
+  <div class="auth-wrapper v3">
+    <div class="auth-form">
+      <div class="auth-header">
+        <a href="javascript:"><img src="assets/images/logo-white.png" alt="logo" /></a>
+      </div>
+      <div class="card my-5">
+        <div class="card-body">
+          <div class="card-px text-center py-20 my-10">
+            <h3 class="font-weight-bolder text-dark font-size-h4 font-size-h1-lg">{{ 'AUTH.GENERAL.WELCOME' | translate
+              }}</h3>
+            <span class="font-weight-bold font-size-h4">{{'AUTH.GENERAL.NO_ACCOUNT'| translate}}
+              <a [routerLink]="['/register']" class="link-primary" [translate]="'AUTH.GENERAL.SIGNUP_BUTTON'"></a>
+            </span>
+          </div>
+          <form class="form" [formGroup]="loginForm" novalidate="novalidate" id="kt_login_signin_form"
+            (ngSubmit)="submit()" class="mt-4">
+            @if (hasError) {
+            <div class="alert alert-custom alert-light-danger alert-dismissible text-center">
+              <div class="alert-text">{{errorMessage}}</div>
+            </div>
+            }
+            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+              <mat-label>{{'GENERAL.LOGIN'| translate}}</mat-label>
+              <input matInput formControlName="login" required autocomplete="off">
+              @if(loginForm.controls['login'].invalid && loginForm.controls['login'].touched) {
+              <mat-error>
+                {{'GENERAL.VALIDATION.INVALID'| translate : { name: 'GENERAL.LOGIN'| translate } }}
+              </mat-error>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+              <mat-label>{{'GENERAL.PASSWORD'| translate}}</mat-label>
+              <input matInput formControlName="password" required autocomplete="off"
+                [type]="showPassword ? 'text' : 'password'">
+              <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
+                <mat-icon>{{showPassword ? 'visibility' : 'visibility_off'}}</mat-icon>
+              </button>
+              <!-- @if(loginForm.controls['password'].invalid && loginForm.controls['password'].touched) {
+              <mat-error>
+                {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.PASSWORD'| translate } }}
+              </mat-error>
+              } -->
+              <mat-error *ngIf="isControlInvalid('password','required')">{{'GENERAL.VALIDATION.REQUIRED'| translate : {
+                name: 'GENERAL.PASSWORD'| translate } }}</mat-error>
+              <!-- <mat-error *ngIf="isControlInvalid('password','pattern')">{{'GENERAL.VALIDATION.PASSWORD_POLICY'|
+                translate}}</mat-error> -->
+            </mat-form-field>
+
+            <div class="row mt-4">
+              <div class="d-grid form-group">
+                <!-- <button mat-button type="button" id="kt_login_signin_submit" class="with-icon btn btn-primary">
+                <mat-icon color="m">login</mat-icon>
+                {{'AUTH.GENERAL.SIGNIN_BUTTON' | translate}}
+              </button> -->
+                <button mat-fab extended color="primary">
+                  <mat-icon>login</mat-icon>
+                  {{'AUTH.GENERAL.SIGNIN_BUTTON' | translate}}
+                </button>
+
+                <ng-container *ngIf="isLoading$ | async">
+                  <span class="spinner spinner-primary ml-4"></span>
+                </ng-container>
+              </div>
+            </div>
+          </form>
+          <!-- <div class="d-grid mt-4">
+            <button type="button" class="btn btn-primary">Login</button>
+          </div> -->
+
+
+          <!-- <div class="saprator mt-3">
+            <span>Login with</span>
+          </div>
+          <div class="row">
+            @for (item of SignInOptions; track item) {
+            <div class="col-4">
+              <div class="d-grid">
+                <button type="button" class="btn mt-2 btn-light-primary bg-light text-muted">
+                  <img src="{{ item.image }}" alt="google img" />
+                  <span class="d-none d-sm-inline-block"> {{ item.name }}</span>
+                </button>
+              </div>
+            </div>
+            }
+          </div> -->
+        </div>
+      </div>
+      <app-guest-footer></app-guest-footer>
+    </div>
+  </div>
+</div>

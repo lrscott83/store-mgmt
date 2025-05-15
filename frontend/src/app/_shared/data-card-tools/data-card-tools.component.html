@@ -1,0 +1,21 @@
+<div class="card card-custom card-collapsed" id="{{cardId}}">
+    <div class="card-header bg-light-success rounded">
+        <div class="card-title">
+            <h3 class="card-label {{cardLabelClass}}">{{cardTitle}}</h3> 
+            <span *ngIf="cardCount >= 0" class="label label-success font-weight-bold font-size-lg">{{cardCount}}</span>
+        </div>
+        <div class="card-toolbar">
+            <span *ngIf="cardTotal >= 0" class="text-success font-weight-bold font-size-lg">
+                {{cardTotal | currency:'USD':'symbol':'1.2-2'}}
+            </span>
+            <ng-content select="[card-toolbar]"></ng-content>
+            <a *ngIf="!hideToogle" class="btn btn-icon btn-sm btn-hover-light-success mr-1" data-card-tool="toggle"
+                data-toggle="tooltip" data-placement="top" title="{{toogleTitle}}">
+                <i class="ki ki-arrow-down icon-nm"></i>
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <ng-content select="[card-body]"></ng-content>
+    </div>
+</div>

@@ -1,0 +1,32 @@
+// div.scrollmenu {
+//   overflow: auto;
+//   white-space: nowrap;
+// }
+
+// div.scrollmenu button {
+//   display: inline-block;
+//   text-align: center;
+//   text-decoration: none;
+//   font-size: 16px !important;
+//   font-weight: 400 !important;
+// }
+
+.category-button {
+  padding-left: 4px;
+  padding-right: 4px;
+  margin-right: 4px; 
+  margin-bottom: 4px;
+}
+
+
+.no-scrollbar {
+  scrollbar-width: none !important;
+  overflow: -moz-scrollbars-none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0 !important;
+  display: none !important;
+}

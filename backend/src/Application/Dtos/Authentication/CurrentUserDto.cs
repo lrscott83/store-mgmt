@@ -1,0 +1,18 @@
+﻿namespace Application.Dtos.Authentication
+{
+    public sealed class CurrentUserDto
+    {
+        public Guid Id { get; set; }
+        public string Login { get; set; }
+        public string FullName { get; set; }
+        public string? CellPhone { get; set; }
+        public string? Email { get; set; }
+        public ICollection<StoreModuleFeaturesDto> Roles { get; set; }
+        public bool IsSuperAdmin { get; set; }
+        public bool IsOwnerAdmin { get; set; }
+        public bool IsReSeller { get; set; }
+        public Guid SelectedStoreId { get; set; }
+        public List<int> FeatureIds { get; set; }
+        public bool IsActive { get; set; }
+    }
+}

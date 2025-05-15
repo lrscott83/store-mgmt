@@ -1,0 +1,8 @@
+<!-- <app-loading-spinner id="loading-spinner"></app-loading-spinner> -->
+<block-ui>
+    <!-- <app-splash-screen></app-splash-screen> -->
+    <router-outlet>
+        <app-spinner></app-spinner>
+    </router-outlet>
+    <ng-http-loader [entryComponent]="spinnerComponent"></ng-http-loader>
+</block-ui>

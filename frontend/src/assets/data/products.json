@@ -1,0 +1,257 @@
+[
+    [
+        "11",
+        {
+            "id": "11",
+            "name": "Trio Chocolate",
+            "categoryId": "1",
+            "categoryName": "Galletas Dulces",
+            "price": "40",
+            "order": 1,
+            "availableToSale": true,
+            "discountFromInvantory": false,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "12",
+        {
+            "id": "12",
+            "name": "Escolar Vainilla",
+            "categoryId": "1",
+            "categoryName": "Galletas Dulces",
+            "price": 35,
+            "order": 7,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "13",
+        {
+            "id": "13",
+            "name": "Escolar Fresa",
+            "categoryId": "1",
+            "categoryName": "Galletas Dulces",
+            "price": 35,
+            "order": 8,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "14",
+        {
+            "id": "14",
+            "name": "Muuu",
+            "categoryId": "1",
+            "categoryName": "Galletas Dulces",
+            "price": 60,
+            "order": 9,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "21",
+        {
+            "id": "21",
+            "name": "Soda",
+            "categoryId": "2",
+            "categoryName": "Galletas Saladas",
+            "price": 60,
+            "order": 1,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "22",
+        {
+            "id": "22",
+            "name": "Pinocho",
+            "categoryId": "2",
+            "categoryName": "Galletas Saladas",
+            "price": 50,
+            "order": 2,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "31",
+        {
+            "id": "31",
+            "name": "BigBom Fresa",
+            "categoryId": "3",
+            "categoryName": "Chupachupas",
+            "price": 40,
+            "order": 1,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "32",
+        {
+            "id": "32",
+            "name": "BigBom Mango",
+            "categoryId": "3",
+            "categoryName": "Chupachupas",
+            "price": 40,
+            "order": 2,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "33",
+        {
+            "id": "33",
+            "name": "BigBom Chocolate",
+            "categoryId": "3",
+            "categoryName": "Chupachupas",
+            "price": 40,
+            "order": 3,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "41",
+        {
+            "id": "41",
+            "name": "Cristal",
+            "categoryId": "4",
+            "categoryName": "Cervezas",
+            "price": 250,
+            "order": 1,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "42",
+        {
+            "id": "42",
+            "name": "Bucanero",
+            "categoryId": "4",
+            "categoryName": "Cervezas",
+            "price": 200,
+            "order": 2,
+            "availableToSale": true,
+            "discountFromInvantory": true,
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T18:51:13.972Z",
+            "createdByName": "admin"
+        }
+    ],
+    [
+        "d77dd007-b7d0-7d72-b176-66f956457a4e",
+        {
+            "id": "d77dd007-b7d0-7d72-b176-66f956457a4e",
+            "name": "Pizza Queso",
+            "categoryId": "1c9dc1b3-f6eb-8539-2a63-059a2ed914c0",
+            "categoryName": "Pizzas",
+            "price": "100",
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T23:53:08.182Z",
+            "createdByName": "admin",
+            "order": 1,
+            "availableToSale": true,
+            "discountFromInvantory": false
+        }
+    ],
+    [
+        "7e58d098-3c8a-1b2d-c0c2-2c28fe7ee7ca",
+        {
+            "id": "7e58d098-3c8a-1b2d-c0c2-2c28fe7ee7ca",
+            "name": "Pizza Queso Gouda",
+            "categoryId": "1c9dc1b3-f6eb-8539-2a63-059a2ed914c0",
+            "categoryName": "Pizzas",
+            "price": "150",
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T23:55:12.658Z",
+            "createdByName": "admin",
+            "order": 3,
+            "availableToSale": true,
+            "discountFromInvantory": false
+        }
+    ],
+    [
+        "35dcf7a3-7377-8a65-d29c-1070ba2cfce0",
+        {
+            "id": "35dcf7a3-7377-8a65-d29c-1070ba2cfce0",
+            "name": "Pizza Queso Especial",
+            "categoryId": "1c9dc1b3-f6eb-8539-2a63-059a2ed914c0",
+            "categoryName": "Pizzas",
+            "price": "130",
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T23:55:43.345Z",
+            "createdByName": "admin",
+            "order": 2,
+            "availableToSale": true,
+            "discountFromInvantory": false
+        }
+    ],
+    [
+        "b03ded18-a19a-bd2e-bd4f-8e59f4a54c33",
+        {
+            "id": "b03ded18-a19a-bd2e-bd4f-8e59f4a54c33",
+            "name": "Pizza Queso Gouda Especial",
+            "categoryId": "1c9dc1b3-f6eb-8539-2a63-059a2ed914c0",
+            "categoryName": "Pizzas",
+            "price": "180",
+            "businessId": "",
+            "isActive": true,
+            "createdDate": "2025-03-13T23:56:56.028Z",
+            "createdByName": "admin",
+            "order": 4,
+            "availableToSale": true,
+            "discountFromInvantory": false
+        }
+    ]
+]

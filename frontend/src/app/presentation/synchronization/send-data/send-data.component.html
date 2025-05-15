@@ -1,0 +1,29 @@
+<div class="card card-custom gutter-b">
+    <div class="card-header">
+        <div class="card-title">
+            <h3 class="card-label" [translate]="'SYNCHRONIZATION.SEND_TITLE'"></h3>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <form class="form" [formGroup]="formGroup" novalidate="novalidate" id="send_form" (ngSubmit)="exportData()"
+            class="mt-4">
+            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                <mat-label>{{'GENERAL.PASSWORD'| translate}}</mat-label>
+                <input matInput formControlName="password" required autocomplete="off" [type]="showPassword ? 'text' : 'password'">
+                <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
+                    <mat-icon>{{showPassword ? 'visibility' : 'visibility_off'}}</mat-icon>
+                  </button>
+                <mat-error *ngIf="isControlInvalid('password','required')">{{'GENERAL.VALIDATION.REQUIRED'|
+                    translate : {name: 'GENERAL.PASSWORD'| translate } }}</mat-error>
+            </mat-form-field>
+            <div class="row mt-4">
+                <div class="d-grid form-group">
+                    <button mat-fab extended color="primary" [disabled]="formGroup.pristine">
+                        <mat-icon>file_download</mat-icon>
+                        {{'SYNCHRONIZATION.SEND_EXPORT'| translate}}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

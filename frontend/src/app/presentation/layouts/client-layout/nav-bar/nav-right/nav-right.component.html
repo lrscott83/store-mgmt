@@ -1,0 +1,254 @@
+<ul class="list-unstyled">
+  <!-- <li class="pc-h-item">
+    <a class="pc-head-link me-0 bg-gray-200">
+      <i antIcon type="github" theme="outline"></i>
+    </a>
+  </li> -->
+  <!-- <li class="dropdown pc-h-item" ngbDropdown>
+    <a class="pc-head-link dropdown-toggle arrow-none me-0 bg-gray-200" data-bs-toggle="dropdown" ngbDropdownToggle>
+      <i antIcon type="bell" theme="outline"></i>
+      <span class="badge bg-primary pc-h-badge">3</span>
+    </a>
+    <div class="dropdown-menu dropdown-notification dropdown-menu-end pc-h-dropdown" ngbDropdownMenu>
+      <div class="dropdown-header d-flex align-items-center justify-content-between">
+        <h5 class="m-0">{{ 'NOTIFICATION.TITLE' | translate}}</h5>
+        <a class="bg-transparent" (click)="openNotificationsHelpDialog()">
+          <i class="text-success d-flex f-20" antIcon theme="outline" type="question-circle"></i>
+        </a>
+      </div>
+      <div class="dropdown-divider"></div>
+      <ng-scrollbar style="min-height: 300px" visibility="hover">
+        <div class="dropdown-header px-0 text-wrap header-notification-scroll">
+          <div class="list-group list-group-flush w-100">
+            <a class="list-group-item list-group-item-action">
+              <div class="d-flex">
+                <div class="flex-shrink-0">
+                  <div class="user-avatar bg-light-success"><i class="d-flex" antIcon theme="outline" type="gift"></i>
+                  </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                  <span class="float-end text-muted">3:00 AM</span>
+                  <p class="text-body mb-0">It's <b>Cristina danny's</b> birthday today.</p>
+                  <span class="text-muted">2 min ago</span>
+                </div>
+              </div>
+            </a>
+            <a class="list-group-item list-group-item-action">
+              <div class="d-flex">
+                <div class="flex-shrink-0">
+                  <div class="user-avatar bg-light-primary"><i class="d-flex" antIcon theme="outline"
+                      type="message"></i></div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                  <span class="float-end text-muted">6:00 PM</span>
+                  <p class="text-body mb-1"><b>Aida Burg</b> commented your post.</p>
+                  <span class="text-muted">5 August</span>
+                </div>
+              </div>
+            </a>
+            <a class="list-group-item list-group-item-action">
+              <div class="d-flex">
+                <div class="flex-shrink-0">
+                  <div class="user-avatar bg-light-danger"><i class="d-flex" antIcon theme="outline" type="setting"></i>
+                  </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                  <span class="float-end text-muted">2:45 PM</span>
+                  <p class="text-body mb-1">Your Profile is Complete &nbsp;<b>60%</b></p>
+                  <span class="text-muted">7 hours ago</span>
+                </div>
+              </div>
+            </a>
+            <a class="list-group-item list-group-item-action">
+              <div class="d-flex">
+                <div class="flex-shrink-0">
+                  <div class="user-avatar bg-light-primary"><i class="d-flex" antIcon theme="outline" type="phone"></i>
+                  </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                  <span class="float-end text-muted">9:10 PM</span>
+                  <p class="text-body mb-1"><b>Cristina Danny </b> invited to join <b> Meeting.</b></p>
+                  <span class="text-muted">Daily scrum meeting time</span>
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </ng-scrollbar>
+      <div class="dropdown-divider"></div>
+      <div class="text-center py-2">
+        <a class="link-primary">View all</a>
+      </div>
+    </div>
+  </li> -->
+
+  <!-- Begin Shopping Cart -->
+
+  <li class="dropdown pc-h-item" ngbDropdown>
+    <a class="pc-head-link dropdown-toggle arrow-none me-0 bg-gray-200" data-bs-toggle="dropdown" ngbDropdownToggle>
+      <i antIcon type="shopping-cart" theme="outline"></i>
+      <span class="badge bg-primary pc-h-badge">{{getItemsCount()}}</span>
+    </a>
+    <div class="dropdown-menu dropdown-notification dropdown-menu-end pc-h-dropdown" ngbDropdownMenu>
+      <div class="dropdown-header d-flex align-items-center justify-content-between">
+        <h5 class="m-0">Carrito de compra</h5>
+        <button mat-fab extended color="primary" [disabled]="getItemsCount() === 0" (click)="createOrder()">
+          <mat-icon>payment</mat-icon>
+          {{'SHOPPING_CART.PAGAR' | translate}}
+        </button>
+      </div>
+      <div class="dropdown-divider"></div>
+      <ng-scrollbar style="min-height: 300px" visibility="hover">
+        <div class="dropdown-header px-0 text-wrap header-notification-scroll">
+          <div class="list-group list-group-flush w-100">
+            @if (getItemsCount() === 0) {
+            <div class="list-group-item">
+              <div class="alert alert-custom alert-light-primary alert-dismissible text-center">
+                <div class="alert-text" style="font-size: 14px; font-weight: 400;">
+                  {{'SHOPPING_CART.DON_NOT_PAY_EMPTY_CART' | translate}}</div>
+              </div>
+            </div>
+            }
+
+            @for (item of (cartData$ | async).items; track item) {
+            <div class="list-group-item list-group-item-action">
+              <div class="row">
+                <div class="col-6">
+                  <p class="text-body mb-0">{{item.name}} ({{item.quantity}})</p>
+                  <span class="text-muted">{{getPriceLabel()}}: {{item.price | currency:'USD':'symbol':'1.2-2'}}</span>
+                </div>
+                <div class="col-2" style="display: flex; align-items: center; position: relative; text-align: end;">
+                  <p class="mb-0 text-body">{{item.price * item.quantity | currency:'USD':'symbol':'1.2-2'}}</p>
+                </div>
+                <div class="col-4" style="text-align: end;">
+                  <button type="button" (click)="decreaseProduct(item.productId)" mat-mini-fab color="primary"
+                    style="margin-right: 6px;">
+                    <mat-icon>remove</mat-icon>
+                  </button>
+                  <button type="button" (click)="increaseProduct(item.productId)" mat-mini-fab color="primary">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div>
+            }
+
+            <!-- <div class="list-group-item list-group-item-action">
+              <div class="row">
+                <div class="col-6">
+                  <p class="text-body mb-0">Cristal 
+                    <span class="bg-primary" style="display: inline-flex;
+                    border-radius: 50%;
+                    min-width: 16px;
+                    height: 16px;
+                    align-items: center;
+                    color: white;
+                    font-weight: 500;
+                    font-size: 0.75rem;
+                    line-height: 1;
+                    place-content: center;">2</span>
+                  </p>
+                  <span class="text-muted">Precio: $200.00</span>
+                </div>
+                <div class="col-2" style="display: flex; align-items: center; position: relative; text-align: end;">
+                  <p class="mb-0 text-primary">$40000.00</p>
+                </div>
+                <div class="col-4" style="text-align: end;">
+                  <button mat-mini-fab color="primary" style="margin-right: 6px;">
+                    <mat-icon>remove</mat-icon>
+                  </button>
+                  <button mat-mini-fab color="primary">
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+              </div>
+            </div> -->
+            <!-- <div class="list-group-item list-group-item-action">
+              <div class="row">
+                <div class="col-8">
+                  <p class="text-body mb-0">Crital (2)</p>
+                  <span class="text-muted">Precio: $200.00</span>
+                </div>
+                <div class="col-4 d-flex flex-column" style="text-align: end;">
+                  <div class="text-body mb-0">$400.00</div>
+                  <div>
+                    <mat-icon color="white" fontIcon="remove" class="mr-2"
+                      style="border-radius: 35%; background-color: #673ab7; color: white;"></mat-icon>
+                    <mat-icon color="white" fontIcon="add"></mat-icon>
+                  </div>
+                </div>
+              </div>
+            </div> -->
+          </div>
+        </div>
+      </ng-scrollbar>
+    </div>
+  </li>
+
+  <li class="" style="display: flex; align-items: center; position: relative;  margin-left: 6px; margin-right: 6px;">
+    <span class="arrow-none me-0 text-primary">
+      {{getCartTotal() | currency:'USD':'symbol':'1.2-2'}}
+    </span>
+  </li>
+
+  <!-- End Shopping Cart -->
+
+  <li class="dropdown pc-h-item header-user-profile" ngbDropdown>
+    <a class="pc-head-link dropdown-toggle arrow-none me-0" ngbDropdownToggle>
+      <!-- <img src="assets/images/user/avatar-2.jpg" alt="user-image" class="user-avatar me-2" />
+      <span class="f-w-600">John Doe</span> -->
+      <i antIcon type="user" theme="outline"></i>
+    </a>
+    <div class="dropdown-menu dropdown-user-profile dropdown-menu-end pc-h-dropdown" ngbDropdownMenu>
+      <div class="dropdown-header">
+        <div class="d-flex mb-1">
+          <!-- <div class="flex-shrink-0">
+            <i antIcon type="user"  theme="outline"></i>
+          </div> -->
+          <div class="flex-grow-1 ms-3 text-start">
+            <h6 class="mb-0">{{getUserLogin()}}</h6>
+            <span>{{getUserFullName()}}</span>
+          </div>
+          <a class="bg-transparent" (click)="logout()">
+            <i class="d-flex f-20" antIcon theme="outline" type="logout"></i>
+          </a>
+        </div>
+      </div>
+      <ul ngbNav #nav="ngbNav" class="nav drp-tabs nav-fill nav-tabs">
+        <li ngbNavItem="1">
+          <a ngbNavLink><i antIcon theme="outline" type="user" class="me-2"></i>{{'GENERAL.PROFILE' | translate}}</a>
+          <ng-template ngbNavContent>
+            @for (task of profile; track task) {
+            <div>
+              <a class="dropdown-item" (click)="navigateToUrl(task.url)">
+                <i class="text-muted" antIcon theme="outline" type="{{ task.icon }}"></i>
+                <span>{{ task.title }}</span>
+              </a>
+            </div>
+            }
+            <div>
+              <a class="dropdown-item" (click)="logout()">
+                <i class="text-muted" antIcon theme="outline" type="logout"></i>
+                <span>{{'GENERAL.LOGOUT' | translate}}</span>
+              </a>
+            </div>
+          </ng-template>
+        </li>
+        <!-- <li ngbNavItem="2">
+          <a ngbNavLink><i class="me-2" antIcon theme="outline" type="setting"></i> Setting</a>
+          <ng-template ngbNavContent>
+            @for (task of setting; track task) {
+            <div>
+              <a class="dropdown-item">
+                <i class="text-muted" antIcon theme="outline" type="{{ task.icon }}"></i>
+                <span>{{ task.title }}</span>
+              </a>
+            </div>
+            }
+          </ng-template>
+        </li> -->
+      </ul>
+      <div [ngbNavOutlet]="nav"></div>
+    </div>
+  </li>
+</ul>

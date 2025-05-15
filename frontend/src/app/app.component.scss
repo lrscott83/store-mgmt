@@ -1,0 +1,55 @@
+//@import '../scss/settings/bootstrap-variables.scss';
+@import '../scss/settings/color-variables.scss';
+
+/* Hide the loading spinner by default */
+#loading-spinner {
+    display: none;
+}
+
+/* Show the loading spinner when isLoading is true */
+#loading-spinner.show {
+    display: block;
+}
+
+app-root {
+    opacity: 0;
+    height: 100%;
+
+    .grid-root {
+        height: 100%;
+    }
+}
+
+.page-loaded {
+    app-root {
+        opacity: 1;
+        transition: opacity 1s ease-in-out;
+    }
+}
+
+::ng-deep mat-mdc-form-field.mat-form-field.mat-mdc-form-field-type-mat-input.mat-form-field-appearance-outline.mat-primary.ng-star-inserted.ng-dirty.ng-valid.ng-touched {
+    color: green !important;
+}
+
+/****************************/
+/* BLOCK UI OVERRIDE STYLES */
+/****************************/
+
+/* Block UI Wrapper (Backdrop) */
+div.block-ui-wrapper {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* Spinner */
+div.block-ui-wrapper .loader {
+    border-color: #fff;
+    /* Circle color */
+    border-left-color: $indigo;
+    /* Spinning section in circle color */
+}
+
+/* Message */
+div.block-ui-spinner .message {
+    color: #fff;
+    /* Loading text color */
+}

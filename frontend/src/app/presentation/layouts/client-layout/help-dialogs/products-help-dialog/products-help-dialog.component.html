@@ -1,0 +1,16 @@
+<div class="modal-content">
+    <div class="modal-header">
+        <h4 class="modal-title">{{'HELP.MENU.PRODUCTS.TITLE' | translate}}</h4>
+        <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+    </div>
+    <div class="modal-body">
+        <p>En esta página usted podrá listar todos los productos agrupados por su categoría.</p> 
+        <p>También podrá adicionar una categoría para agrupar productos.</p>
+        <p>Además podrá adicionar, editar y eliminar un producto.</p>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-icon" id="closeModal" (click)="closeModal()">
+            {{ 'GENERAL.CLOSE' | translate}}
+        </button>
+    </div>
+</div>

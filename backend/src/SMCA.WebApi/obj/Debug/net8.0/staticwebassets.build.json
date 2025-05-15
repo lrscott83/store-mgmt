@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "qGICbrwCDv3fysRbfrwQgjAaJqnGT8HYfkuA1mQ3QR0=",
+  "Source": "SMCA.WebApi",
+  "BasePath": "_content/SMCA.WebApi",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

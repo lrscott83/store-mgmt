@@ -1,0 +1,24 @@
+.add-card {
+  height: 100% !important;
+  width: 100% !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.card-header-custom {
+  display: flex;
+  flex-direction: row;
+  height: 44px;
+  align-items: center;
+}
+
+.card-header-action-button {
+  margin-bottom: 8px;
+}
+
+::ng-deep .mat-expansion-panel-body {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}

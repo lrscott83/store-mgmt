@@ -1,0 +1,22 @@
+<div class="row">
+    <div class="card card-custom gutter-b">
+        <div class="card-header">
+            <div class="card-toolbar">
+                <button mat-fab extended color="primary" (click)="navigateToCreateReSeller()">
+                    <mat-icon>add</mat-icon>
+                    {{'RESELLER.ADD_RESELLER' | translate}}
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <mat-tab-group animationDuration="0ms" id="tabs">
+                <mat-tab label="{{'GENERAL.DETAILS'| translate}}">
+                    <app-edit-reseller-details></app-edit-reseller-details>
+                </mat-tab>
+                <!-- <mat-tab label="{{'GENERAL.OWNERS'| translate}}">
+                    <app-owner-list></app-owner-list>
+                </mat-tab> -->
+            </mat-tab-group>
+        </div>
+    </div>
+</div>

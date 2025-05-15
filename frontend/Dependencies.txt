@@ -1,0 +1,53 @@
+@ngx-translate/core
+ng-block-ui
+ngx-highlightjs
+ng-inline-svg
+ngx-mask
+sweetalert2
+guid-typescript
+moment
+
+ngx-toastr
+ngx-clipboard
+
+npm install perfect-scrollbar --force --legacy-peer-deps --loglevel silly
+npm install ngx-perfect-scrollbar --force --legacy-peer-deps --loglevel silly
+
+npm install @angular/material-moment-adapter@18.0.1 --force --legacy-peer-deps --loglevel silly
+
+npm install ngx-mask@17.0.8 --force --legacy-peer-deps --loglevel silly
+
+npm install pdfmake --force --legacy-peer-deps --loglevel silly
+
+@angular/material
+@fortawesome/fontawesome-free
+@microsoft/signalr
+@ng-bootstrap/ng-bootstrap
+@popperjs/core
+apexcharts
+bootstrap
+ng-apexcharts
+ngx-scrollbar
+axios
+npm install devextreme --force --legacy-peer-deps --loglevel silly
+devextreme-angular
+exceljs
+
+npm install jspdf --force --legacy-peer-deps --loglevel silly
+jspdf-autotable
+
+
+
+
+ng-multiselect-dropdown
+ngx-google-places-autocomplete
+ngx-observable-input
+
+object-path
+
+socicon
+
+
+file-saver
+
+dual-listbox

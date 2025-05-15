@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>Mantis Angular Dashboard Template</title>
+  <!-- HTML5 Shim and Respond.js IE11 support of HTML5 elements and media queries -->
+  <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+  <!--[if lt IE 11]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  <base href="/" />
+  <!-- Meta -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=1, minimal-ui" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="description"
+    content="Mantis angular 15+ admin template made using bootstrap 5.2.2, ng-bootstrap 14.x.x and it has huge amount of ready made feature, UI components, pages which completely fulfills any dashboard needs." />
+  <meta name="keywords"
+    content="Admin templates, Bootstrap Admin templates, angular 14+, bootstrap 5, Dashboard, Dashboard Templates, sass admin templates, html admin templates, Responsive, Bootstrap Admin templates free download, Angular6 Admin templates free download,premium Bootstrap Admin templates,premium Angular6 Admin templates download" />
+  <meta name="author" content="CodedThemes" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <!-- <link rel="icon" type="image/png" href="assets/images/favicon.png"> -->
+  <!-- font style -->
+  <!-- <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap"
+    id="main-font-link" /> -->
+
+  <!-- inline spinner styles to be able to display spinner right away -->
+  <style type="text/css">
+    body,
+    html {
+      height: 100%;
+      padding: 0;
+    }
+
+    .app-loading {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+
+    /* .app-loading .logo {
+        width: 100px;
+        height: 100px;
+        background: url(./assets/logo.png) center center no-repeat; 
+      } */
+
+    .app-loading .spinner {
+      height: 200px;
+      width: 200px;
+      animation: rotate 2s linear infinite;
+      transform-origin: center center;
+      position: relative;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      margin: auto;
+    }
+
+    .app-loading .spinner .path {
+      stroke-dasharray: 1, 200;
+      stroke-dashoffset: 0;
+      animation: dash 1.5s ease-in-out infinite;
+      stroke-linecap: round;
+      stroke: #ddd;
+    }
+
+    @keyframes rotate {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes dash {
+      0% {
+        stroke-dasharray: 1, 200;
+        stroke-dashoffset: 0;
+      }
+
+      50% {
+        stroke-dasharray: 89, 200;
+        stroke-dashoffset: -35px;
+      }
+
+      100% {
+        stroke-dasharray: 89, 200;
+        stroke-dashoffset: -124px;
+      }
+    }
+
+  </style>
+
+</head>
+
+<body part="preset-1">
+  <app-root>
+    <!-- loading layout replaced by app after startupp -->
+    <div class="app-loading">
+      <!-- <div class="logo">
+        <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iODBweCIgaGVpZ2h0PSI1NnB4IiB2aWV3Qm94PSIwIDAgODAgNTYiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayI+CiAgICA8IS0tIEdlbmVyYXRvcjogU2tldGNoIDUzLjIgKDcyNjQzKSAtIGh0dHBzOi8vc2tldGNoYXBwLmNvbSAtLT4KICAgIDx0aXRsZT5Mb2dvcy9DQSBPcmlnaW5hbC9DQSBJY290eXBlL0NBX09yaWdpbmFsPC90aXRsZT4KICAgIDxkZXNjPkNyZWF0ZWQgd2l0aCBTa2V0Y2guPC9kZXNjPgogICAgPGcgaWQ9IkxvZ29zL0NBLU9yaWdpbmFsL0NBLUljb3R5cGUvQ0FfT3JpZ2luYWwiIHN0cm9rZT0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIxIiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPgogICAgICAgIDxwYXRoIGQ9Ik03NS4yNDIwODA2LDQ5IEM3NS4yMzI0NzgxLDUwLjcxMTA5NDcgNzUuMjI4NjM3Miw1NS42Njg5ODIgNzUuMjI4NjM3Miw1NS42Njg5ODIgTDEuMDAxOTIwNDgsNTUuNjkwNDE5NCBDMS4wMTUzNjM4Nyw1My42NzUzMDMzIDEsNDkgMSw0OSBMNzUuMjQyMDgwNiw0OSBaIE02NS4yNzIwOTgsMjkgQzY1LjI3MjA5OCwyOSA2OS45OTg0MDk4LDM5Ljg4MjQwNjYgNzIuMjI4MDkyLDQ1LjA3MjIwNzYgTDYyLjI3NDIyMjEsNDUuMDUwNzcwMiBDNjEuMTIwMDExLDQ1LjA0ODgyMTMgNjAuMDM0OTM3NCw0NC4xNzc2ODMxIDU5LjY0MTIzODIsNDMuMTM4OTQzNCBDNTguNDI1NTcxNiw0MC4xMjYwMTM1IDU3LjExMzg4MDksMzcuMTc5MzQ0NiA1NiwzNC4xNjY0MTQ3IEw2NS4yNzIwOTgsMjkgWiBNNTMuMzczNDM4MSwyNS44NjYxNTM3IEM1My4zNzM0MzgxLDI1Ljg2NjE1MzcgNTAuMTUwODY1NSwxNy4zMzc5NjQgNDguNTQ1MzQwNiwxMy4yNTMxNjM4IEw0OC4zODAxNzksMTMuMjUzMTYzOCBDNDUuNzMxODMxMiwxOC4zNjUwMTA2IDQzLjY0NjE4NTMsMjMuNzE0NjE3NyA0MC45OTc4Mzc1LDI4LjgyNjQ2NDUgQzM3LjcyOTE3MzMsMzEuOTI5MDQxNyAzMy4yNDQ4NDI1LDMyLjM4ODk3MTUgMjkuMDU0MzQ1OSwzMy4zMTY2MjY1IEwyOCwzMy40NDkxNDg3IEwyOC4wMzQ1Njg3LDMyLjk0NjM0NDEgTDQyLjg5MTQzNSw0LjY3ODIwMTU2IEw0My4yODg5NzUyLDQuMDQ0ODIzNjcgTDU0LjQ5NjkyMTMsNCBDNTUuMTIyOTk5Miw1LjAwNTYwOTIxIDU1LjU4MDA3NDUsNi4xNzY4NzEwOSA1Ni4wMzkwNzAyLDcuMzE1MDAyNDQgTDYyLjI0MjIzNDQsMjEuMDQyNzM3NCBMNTMuMzczNDM4MSwyNS44NjYxNTM3IFoiIGlkPSJDb21iaW5lZC1TaGFwZSIgZmlsbD0iIzAwNzA0RSI+PC9wYXRoPgogICAgICAgIDxwYXRoIGQ9Ik01NS40NDMyMjgzLDMzLjk2ODM0ODcgQzQzLjM2NTMwMjgsMzkuODk2NzY1NyAzMS4wOTE0ODc5LDQ2LjA5NDEyNDggMTYuNDkwMDQ2MSw0NS4wNTkyODI3IEMxMC42NTc1MzU0LDQ0LjUxMTY1NDUgNC43OTYyMTczOSw0MS42ODk3MTI0IDIuMTAzNjk4NDYsMzUuOTYzOTc2MiBDLTAuODg2NDk1NTM1LDMxLjA0MTE2ODQgLTAuNTczNDU2NiwyMy42NDkxNjEyIDIuNzY0MzQ1MDQsMTkuMDQwMTE5IEM4LjA4NzkyNzQyLDExLjMyNDYwMTggMTYuMDQwNjUyNyw2LjQ1NjM2MTkgMjQuMjg3MjEyMiw0LjEzMTM3NzgyIEMyNy4xMjE4NDY5LDMuNTAzODQ2NSAzMS41NzU0NDk5LDIuMjQwOTg4NDIgMzMuNDgwNTcwMyw1LjQ4OTcyOTc5IEMzNC4yMzcyNDExLDcuNDYzOTE5OTYgMzQuODU3NTU3NSw5LjQ3MzE4OTUyIDM1LjI0NzQxNTgsMTEuNTgxODUwNyBDMjguMjkzMzQyMywxMS4zNjU1Mjc4IDIyLjI1NTMzOTgsMTQuMTk1MjY1MyAxNi43MTA5MDE3LDE3Ljg2NDk1OTQgQzEyLjM1MzMyMywyMS4wMzM3OTc3IDcuOTI2NjA2NzQsMjUuMTcxMjE3IDYuMjAzOTMyMzYsMzAuMTg1NjIxIEM1LjcwNjUyNjkzLDMxLjY5MDEzNzEgNS45NjU3OTIzMSwzMy41Mjk4NTYzIDcuMDE4MjE3NjgsMzQuNzAzMDY3IEMxMS4zNjIzNTMxLDM4LjIyNDY0ODEgMTcuOTI0NjQ3OCwzNy4zMDA4OTA4IDIzLjMzMDgxMSwzNi43NzY2NDg4IEMzMy43MTY3ODk5LDM1LjEyNzkxNzQgNDMuMjI4OTQ4NCwzMC44MjI4OTY2IDUyLjQwMTE4MTIsMjUuOTU4NTU0NCBMNjEuMjY5OTc3NiwyMS4xMzUxMzgxIEw3OS4zODc4MjYxLDExLjAwNDk4OTYgTDc5LjU4NTYzNiwxMS4wMDQ5ODk2IEw3OS41NjY0MzExLDE5LjkwMzQ2MTcgTDY0LjcxNTMyNjMsMjguODAxOTMzOSBMNTUuNDQzMjI4MywzMy45NjgzNDg3IFoiIGlkPSJGaWxsLTUiIGZpbGw9IiMwMDk1OTgiPjwvcGF0aD4KICAgICAgICA8cGF0aCBkPSJNNzkuNTI3MDYxMiw3LjMyNTc0NjE0IEw2NS4zMzY2MDMsMTUuMDU2ODU0MSBDNjQuNDQ3NDE4OCwxNS40MjMyMzg5IDYzLjMyNTg1NiwxNS40ODU2MDIyIDYyLjQ2OTMyLDE1LjAxNzg3NyBDNjAuODkwNjgxOSwxMy41NzU3MjQzIDYwLjUzMTU1MTQsMTEuNTMzMzI0MiA1OS44MDk0NDkzLDkuNjkxNjU2MTcgQzYwLjQwNDc5OTQsOS4yOTIxNDA4OCA2MS4zOTM4NDg4LDkuMjk0MDg5NzQgNjIuMTE5NzkxOCw4Ljk5Mzk2NjA2IEw2NS42ODQyMTA2LDcuMjk2NTEzMzEgTDc5LjMxMTk2NywwIEw3OS42MDc3MjE1LDAgTDc5LjUyNzA2MTIsNy4zMjU3NDYxNCBaIiBpZD0iRmlsbC0xIiBmaWxsPSIjRUQxQzIyIj48L3BhdGg+CiAgICA8L2c+Cjwvc3ZnPg==" alt="CA">
+      </div> -->
+      <svg class="spinner" viewBox="25 25 50 50">
+        <circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="2" stroke-miterlimit="10" />
+      </svg>
+    </div>
+  </app-root>
+</body>
+
+</html>

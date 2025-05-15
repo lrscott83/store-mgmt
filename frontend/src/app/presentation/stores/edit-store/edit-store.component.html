@@ -1,0 +1,136 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-label w-100 text-center" [translate]="getHeader()"></h3>
+  </div>
+  <form class="form" id="edit_store_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-8 col-lg-6 mx-auto">
+          <!--begin::Owner Form Group-->
+          <mat-form-field *ngIf="isOwnerAdmin" appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.OWNER'| translate}}</mat-label>
+            <mat-select name="Owner" formControlName="ownerId" required [disabled]="!!editStoreId">
+              <mat-option *ngFor="let owner of ownersDataSource | async" [value]="owner.id">
+                {{owner.fullName}}
+              </mat-option>
+            </mat-select>
+            <mat-error *ngIf="isControlInvalid('ownerId','required')">
+              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.OWNER'| translate } }}
+            </mat-error>
+          </mat-form-field>
+
+          <!--begin::Name Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.NAME'| translate}}</mat-label>
+            <input appTitleCase matInput formControlName="name" required autocomplete="off" />
+            <mat-error *ngIf="isControlInvalid('name','required')">
+              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
+            </mat-error>
+          </mat-form-field>
+
+          <!--begin::address Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.ADDRESS'| translate}}</mat-label>
+            <input appTitleCase matInput formControlName="address" autocomplete="off" />
+          </mat-form-field>
+
+          <!--begin::description Form Group-->
+          <mat-form-field *ngIf="isOwnerAdmin" appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.DESCRIPTION'| translate}}</mat-label>
+            <input appTitleCase matInput formControlName="description" autocomplete="off" />
+          </mat-form-field>
+
+          <!--begin::PaymentStartDate Form Group-->
+          @if (isSuperAdmin && editStoreId) {
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'STORE.PAYMENT_START_DATE'| translate}}</mat-label>
+            <input matInput [matDatepicker]="picker" formControlName="paymentStartDate" required autocomplete="off">
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+            <mat-error *ngIf="isControlInvalid('paymentStartDate','required')">
+              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'STORE.PAYMENT_START_DATE'| translate } }}
+            </mat-error>
+          </mat-form-field>
+          }
+
+          <mat-slide-toggle *ngIf="isOwnerAdmin" formControlName="approved" class="mt-2">
+            {{ 'GENERAL.APPROVED' | translate}}
+          </mat-slide-toggle>
+
+          <mat-slide-toggle *ngIf="isOwnerAdmin" formControlName="isActive" class="mt-4" style="display: block;">
+            {{ 'GENERAL.ACTIVE' | translate}}
+          </mat-slide-toggle>
+
+          <div class="col-12" style="margin-top: 18px;">
+            <h5 class="mb-3" class="text-center">{{ 'STORE.SELECT_MODULES' | translate }}</h5>
+            <div class="card tbl-card">
+              <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                  <thead>
+                    <tr>
+                      <th>
+                        <mat-checkbox (change)="selectAllModules($event.checked)"></mat-checkbox>
+                      </th>
+                      <th style="font-size: 16px;">{{ 'GENERAL.NAME' | translate }}</th>
+                      <th class="text-end" style="font-size: 16px;">{{ 'GENERAL.PRICE' | translate }}</th>
+                      <!-- <th class="text-end">{{ 'GENERAL.DISCOUNT' | translate }}</th> -->
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (module of $modules | async; track module) {
+                    <tr>
+                      <td>
+                        <mat-checkbox [checked]="module.selected" (change)="selectModule($event.checked, module.id)"
+                          [disabled]="module.priceIncluded">
+                        </mat-checkbox>
+                      </td>
+                      <td>{{ module.name }}</td>
+                      <!-- <td
+                                      ><span class="d-block"><i class="badge-circle {{ order.status_type }} f-10 m-r-5"></i>{{ order.status }}</span></td
+                                    > -->
+                      <td class="text-end">
+                        @if (module.price !== module.currentPrice) {
+                        <div class="offer-price">
+                          <span class="current-price">{{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}</span>
+                          <span class="price">{{ module.price | currency:'USD':'symbol':'1.2-2' }}</span>
+                        </div>
+                        } @else {
+                        {{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}
+                        }
+                        <!-- <i *ngIf="module.discountText && module.discountText !== ''" class="fa fa-genderless text-info icon-xl"></i> -->
+                      </td>
+                      <!-- <td class="text-end">{{ module.discountText }}</td> -->
+                    </tr>
+                    }
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th></th>
+                      <td>{{ 'GENERAL.TOTAL_PRICE' | translate }}</td>
+                      <td class="text-end">{{ getTotalPrice() | currency:'USD':'symbol':'1.2-2' }}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!--begin::Card Footer-->
+    <div class="card-footer">
+      <div class="text-center">
+        <!-- <button type="submit" class="btn btn-primary" [disabled]="formGroup.pristine">{{'GENERAL.SAVE_CHANGES'|
+                    translate}}</button> -->
+        <button mat-fab extended class="mt-2" color="primary" [disabled]="formGroup.pristine">
+          @if (!editStoreId) {
+          <mat-icon>add</mat-icon>
+          } @else {
+          <mat-icon>edit</mat-icon>
+          }
+          {{ (!editStoreId ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
+        </button>
+      </div>
+    </div>
+  </form>
+</div>

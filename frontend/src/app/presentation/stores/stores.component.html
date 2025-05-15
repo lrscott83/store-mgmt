@@ -1,0 +1,16 @@
+<div class="row">
+    <div class="card card-custom gutter-b">
+        <div class="card-header">
+            <div class="card-title">
+                <h3 class="card-label">{{ 'MENU.STORE_MGMT.STORES' | translate }}</h3>
+            </div>
+            <div class="card-toolbar">
+                <button mat-fab extended color="primary" (click)="navigateToCreateStore()">
+                    <mat-icon>add</mat-icon>
+                    {{'GENERAL.ADD' | translate}}
+                </button>
+            </div>
+        </div>
+        <app-store-list style="margin-top: 8px;"></app-store-list>
+    </div>
+</div>

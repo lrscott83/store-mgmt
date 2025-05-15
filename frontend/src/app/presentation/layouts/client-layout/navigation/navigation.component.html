@@ -1,0 +1,17 @@
+<nav>
+  <div class="navbar-wrapper">
+    <div class="m-header">
+      <a href="javascript:" class="b-brand">
+        <img src="assets/images/logo-white.png" alt="theme-logo" class="logo logo-dark logo-lg" />
+      </a>
+      @if (isMobile()) {
+        <div style="float: right;">
+          <a href="javascript:" class="pc-head-link me-0 bg-gray-200" id="mobile-collapse1" (click)="navCollapseMobile()">
+            <i antIcon type="menu-fold" theme="outline"></i>
+          </a>
+        </div>
+      }
+    </div>
+    <app-nav-content (NavCollapsedMob)="navCollapseMob()" class="scroll-div w-100 compact"></app-nav-content>
+  </div>
+</nav>

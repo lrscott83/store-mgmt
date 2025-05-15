@@ -1,0 +1,71 @@
+<div class="modal-content">
+    <div class="modal-header">
+        <h4 class="modal-title" id="modal-basic-title">
+            {{(!inventoryEntry ? 'INVENTORY_ENTRY.NEW_INVENTORY_ENTRY' : 'INVENTORY_ENTRY.EDIT_INVENTORY_ENTRY') | translate}}
+        </h4>
+        <button (click)="closeModal()" class="closeButton btn btn-transparent" type="button">
+            <i class="closeButton ki ki-close"></i>
+        </button>
+    </div>
+    <div class="modal-body">
+        <form class="form" id="product_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+            <div class="row">
+                <div class="col-md-10 col-lg-8 mx-auto">
+                    <!--begin::Product Form Group-->
+                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                        <mat-label>{{'GENERAL.PRODUCT'| translate}}</mat-label>
+                        <mat-select name="Producto" formControlName="productId" required [disabled]="true">
+                            <mat-option *ngFor="let product of products$ | async" [value]="product.id">
+                                {{product.fullName}}
+                            </mat-option>
+                        </mat-select>
+                        <mat-error *ngIf="isControlInvalid('productId','required')">
+                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.PRODUCT'| translate } }}
+                        </mat-error>
+                    </mat-form-field>
+
+                    <!--begin::quantity Form Group-->
+                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                        <mat-label>{{'GENERAL.QUANTITY'| translate}}</mat-label>
+                        <input type="number" matInput formControlName="quantity" required autocomplete="off"/>
+                        <mat-error *ngIf="isControlInvalid('quantity','required')">
+                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.QUANTITY'| translate } }}
+                        </mat-error>
+                        <mat-error *ngIf="isControlInvalid('quantity','min')">
+                            {{'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE' | translate : { name: 'GENERAL.QUANTITY'| translate } }}
+                        </mat-error>
+                        <mat-error *ngIf="isControlInvalid('quantity','pattern')">
+                            {{ 'GENERAL.VALIDATION.INVALID_INTEGER' | translate }}
+                        </mat-error>
+                    </mat-form-field>
+
+                    <!--begin::Price Form Group-->
+                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                        <mat-label>{{'GENERAL.COST_PRICE'| translate}}</mat-label>
+                        <input type="number" matInput min=0 formControlName="costPrice" required autocomplete="off"/>
+                        <mat-icon matPrefix>attach_money</mat-icon>
+                        <mat-error *ngIf="isControlInvalid('costPrice','required')">
+                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.COST_PRICE'| translate } }}
+                        </mat-error>
+                        <mat-error *ngIf="isControlInvalid('costPrice','min')">
+                            {{'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' | translate : { name: 'GENERAL.COST_PRICE'| translate } }}
+                        </mat-error>
+                        <mat-error *ngIf="isControlInvalid('costPrice','pattern')">
+                            {{ 'GENERAL.VALIDATION.INVALID_FLOAT' | translate }}
+                        </mat-error>
+                    </mat-form-field>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="with-icon btn btn-default" (click)="closeModal()">
+            <mat-icon>close</mat-icon>
+            {{ 'GENERAL.CLOSE' | translate}}
+        </button>
+        <button class="with-icon btn btn-primary" (click)="onSubmit()">
+            <mat-icon>save</mat-icon>
+            {{ (!inventoryEntry ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
+        </button>
+    </div>
+</div>

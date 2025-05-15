@@ -1,0 +1,46 @@
+<div *ngIf="products.length === 0" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+    <div class="alert-text">
+        {{'INVENTORY.CATEGORY_PRODUCT_NO_FOUND' | translate}}
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-borderless table-vertical-center">
+        <tbody>
+            <tr *ngFor="let product of products" class="border-1">
+                <td class="p-2">
+                    <span class="text-dark mb-1 font-size-lg">
+                        {{product.productName}}
+                    </span>
+                </td>
+                <!-- <span *ngIf="cardCount >= 0" class="label label-success font-weight-bold font-size-lg">{{cardCount}}</span> -->
+                <td class="p-2 text-end">
+                    <span class="label label-success font-weight-bold font-size-lg">
+                        {{product.quantity}}
+                    </span>
+                </td>
+                <td class="p-2 text-end">
+                    <span class="text-primary mb-1 font-size-lg">
+                        {{product.costPrice | currency:'USD':'symbol':'1.2-2'}}
+                    </span>
+                </td>
+                <!-- <td class="text-right pr-0">
+                    <button type="button" mat-icon-button color="success" class="icon-button-small card-header-action-button" [matMenuTriggerFor]="menuProduct"
+                        aria-label="Acciones">
+                        <i class="flaticon2-settings text-success"></i>
+                    </button>
+                    <mat-menu #menuProduct="matMenu">
+                        <button mat-menu-item (click)="openEditProductModal(product)">
+                            <mat-icon color="success">edit</mat-icon>
+                            <span>{{ 'PRODUCT.EDIT_PRODUCT' | translate }}</span>
+                        </button>
+                        <button mat-menu-item (click)="onDeleteProduct(product.id)">
+                            <mat-icon color="warn">delete</mat-icon>
+                            <span>{{ 'PRODUCT.DELETE_PRODUCT' | translate }}</span>
+                        </button>
+                    </mat-menu>
+                </td> -->
+            </tr>
+        </tbody>
+    </table>
+</div>

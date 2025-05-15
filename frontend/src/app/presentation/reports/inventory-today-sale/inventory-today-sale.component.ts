@@ -1,0 +1,411 @@
+import { Component } from '@angular/core';
+import { SharedModule } from '../../shared/shared.module';
+import { TranslationModule } from 'src/app/_modules/i18n/translation.module';
+import { TranslateService } from '@ngx-translate/core';
+import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
+import { ProductRepository } from 'src/app/application/products/product.repository';
+import { Product } from 'src/app/domain/entities/products/product.model';
+import { OrderOfflineService } from 'src/app/application/orders/order-offline.service';
+import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
+import { Order } from 'src/app/domain/entities/orders/order.model';
+import { InventoryEntry } from 'src/app/domain/entities/entries/inventory-entry.model';
+import { BaseResponseModel } from 'src/app/_services/_models/base.model';
+import { InventoryEntryView } from 'src/app/domain/entities/entries/inventory-entry-view.model';
+import { OrderItem } from 'src/app/domain/entities/orders/order-item.model';
+import { InventoryCategoryView } from 'src/app/application/entries/inventory-category.view';
+import { InventoryProductView } from 'src/app/application/entries/inventory-product-view';
+// import * as pdfMake from 'pdfmake/build/pdfmake';
+// import * as pdfFonts from 'pdfmake/build/vfs_fonts';
+
+//(pdfMake as any).vfs = (pdfFonts.pdfMake as any).vfs;
+//(pdfMake as any).default.vfs = pdfFonts.pdfMake.vfs;
+
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+@Component({
+  selector: 'app-inventory-today-sale',
+  standalone: true,
+  imports: [TranslationModule, SharedModule],
+  templateUrl: './inventory-today-sale.component.html',
+  styleUrl: './inventory-today-sale.component.scss'
+})
+
+export class InventoryTodaySaleComponent {
+
+  constructor(private translate: TranslateService, private productService: ProductRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService) {
+
+  }
+
+  generateReport() {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: 'letter'
+    });
+
+    // 🧾 Encabezado de empresa
+    const encabezado = [
+      'Empresa: _____________________       Procedencia: _____________________',
+      'Unidad: _____________________         UBA: _____  OEE: _____  D__/__/__',
+      'Departamento: ________________        Balance: _____  BAT: _____',
+      'Firma del Administrador: _____________________________________________'
+    ];
+
+    encabezado.forEach((linea, i) => {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(linea, 40, 30 + i * 14);
+    });
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
+
+    // 🧮 Cabecera de tabla
+    const headers = [[
+      'Producto', 'U.M', 'Inicio', 'Entrada', 'Disponible', 'Vendido',
+      'Precio Venta', 'Importe Venta', 'Costo Unitario', 'Costo Total',
+      'C.P Venta', 'Final', 'Importe Final'
+    ]];
+
+    const rows = this.generateProductRows();
+
+    // // 🧾 Simulación de productos
+    // const productos = [
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    //   { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+    //   { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+    //   { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+    // ];
+
+    // // 🧾 Construcción de filas
+    // const rows = productos.map(p => {
+    //   const disponible = p.inicio + p.entrada;
+    //   const importeVenta = p.precio * p.vendido;
+    //   const costoTotal = p.costo * p.vendido;
+    //   const cpVenta = p.precio - p.costo;
+    //   const final = disponible - p.vendido;
+    //   const importeFinal = final * p.precio;
+
+    //   return [
+    //     p.nombre,
+    //     p.um,
+    //     p.inicio,
+    //     p.entrada,
+    //     disponible,
+    //     p.vendido,
+    //     p.precio.toFixed(2),
+    //     importeVenta.toFixed(2),
+    //     p.costo.toFixed(2),
+    //     costoTotal.toFixed(2),
+    //     cpVenta.toFixed(2),
+    //     final,
+    //     importeFinal.toFixed(2)
+    //   ];
+    // });
+
+    // 🧾 Generar tabla
+    (doc as any).autoTable({
+      //startY: 120,
+      head: headers,
+      body: rows,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [220, 220, 220], textColor: 0 },
+      margin: { top: 120, left: 40, right: 40 },
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) {
+          // Agregar encabezado en otras páginas también
+          encabezado.forEach((linea, i) => {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text(linea, 40, 30 + i * 14);
+          });
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
+        }
+      }
+    });
+
+    // 📦 Guardar archivo
+    //doc.save('inventario_precio_venta.pdf');
+
+    // Obtener el PDF como un Blob
+    const pdfBlob = doc.output('blob');
+
+    // Crear un URL temporal para el Blob
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+
+    // Abrir el PDF en una nueva pestaña
+    window.open(pdfUrl);
+  }
+
+  generateReportWithBorder() {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: 'letter'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Función para dibujar el borde y encabezado por página
+    const drawPageFrame = () => {
+      doc.setLineWidth(3);
+      doc.rect(10, 10, pageWidth - 20, pageHeight - 20); // Borde exterior
+
+      // Encabezado institucional
+      const encabezado = [
+        'Empresa: _____________________       Procedencia: _____________________',
+        'Unidad: _____________________         UBA: _____  OEE: _____  D__/__/__',
+        'Departamento: ________________        Balance: _____  BAT: _____',
+        'Firma del Administrador: _____________________________________________'
+      ];
+
+      encabezado.forEach((linea, i) => {
+        doc.setFontSize(10);
+        doc.text(linea, 40, 30 + i * 14);
+      });
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
+    };
+
+    // Dibujar en la primera página
+    drawPageFrame();
+
+    // Simulación de productos
+    const productos = [
+      { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+      { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+      { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+      // Agregá más productos si querés probar paginación
+    ];
+
+    const headers = [[
+      'Producto', 'U.M', 'Inicio', 'Entrada', 'Disponible', 'Vendido',
+      'Precio Venta', 'Importe Venta', 'Costo Unitario', 'Costo Total',
+      'C.P Venta', 'Final', 'Importe Final'
+    ]];
+
+    const rows = productos.map(p => {
+      const disponible = p.inicio + p.entrada;
+      const importeVenta = p.precio * p.vendido;
+      const costoTotal = p.costo * p.vendido;
+      const cpVenta = p.precio - p.costo;
+      const final = disponible - p.vendido;
+      const importeFinal = final * p.precio;
+
+      return [
+        p.nombre,
+        p.um,
+        p.inicio,
+        p.entrada,
+        disponible,
+        p.vendido,
+        p.precio.toFixed(2),
+        importeVenta.toFixed(2),
+        p.costo.toFixed(2),
+        cpVenta.toFixed(2),
+        final,
+        importeFinal.toFixed(2)
+      ];
+    });
+
+    // Tabla con autoTable
+    (doc as any).autoTable({
+      startY: 120,
+      head: headers,
+      body: rows,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [220, 220, 220], textColor: 0 },
+      margin: { left: 40, right: 40 },
+      didDrawPage: () => drawPageFrame()
+    });
+
+    // Obtener el PDF como un Blob
+    const pdfBlob = doc.output('blob');
+
+    // Crear un URL temporal para el Blob
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+
+    // Abrir el PDF en una nueva pestaña
+    window.open(pdfUrl);
+  }
+
+  // Calcular resumen por producto
+  generateProductRows(): any[] {
+    const today: Date = new Date();
+    const products: Product[] = this.productService.getAvailableProducts();
+    const todayOrders: Order[] = this.orderService.getActiveOrdersInDay(today);
+    const todayEntries: BaseResponseModel<InventoryEntryView[]> = this.inventoryService.getInventoryEntriesInDay(today);
+    const inventoryCategories: BaseResponseModel<InventoryCategoryView[]> = this.inventoryService.getInventoryCategoriesView();
+    const inventoryProducts: InventoryProductView[] = inventoryCategories.succeeded
+      ? inventoryCategories.data.flatMap(c => c.products)
+      : [];
+
+    return products.map((prod) => {
+      const orderItems: OrderItem[] = todayOrders.flatMap(o => o.orderItems).filter(oi => oi.productId === prod.id);
+      const productTodayEntries = todayEntries.succeeded
+        ? todayEntries.data.filter(e => e.productId === prod.id)
+        : [];
+      const productAvailableEntries: InventoryEntry[] = this.inventoryService.getProductInventoriesByProductId(prod.id)
+        ?.filter(e => e.available && e.available > 0) ?? [];
+      const availableProduct: InventoryProductView = inventoryProducts.find(p => p.productId === prod.id);
+      const available: number = availableProduct?.quantity ?? 0;
+      const entryQuantity: number = productTodayEntries.reduce((total, e) => total + e.quantity, 0);
+      //const entradaDia = 0; // Si hay entradas ese día se pueden sumar aquí
+      const vendido: number = orderItems.reduce((total, oi) => total + oi.quantity, 0);
+      const disponible: number = available + vendido;
+      const inicio = available + vendido - entryQuantity;
+      const precioVenta = orderItems.length > 0 ? orderItems.reduce((total, oi) => total + oi.price, 0) / orderItems.length : 0;
+      const importeVenta = vendido * precioVenta;
+      let costoUnitario: number = 0;
+      if (productAvailableEntries.length > 0) {
+        costoUnitario = productAvailableEntries.reduce((total, e) => total + e.costPrice * e.quantity, 0)
+          / productAvailableEntries.reduce((total, e) => total + e.quantity, 0);
+      }
+      const costoTotal = vendido * costoUnitario;
+      //const cpVenta = precioVenta - costoUnitario;
+      const cpVenta = importeVenta > 0 ? costoTotal / importeVenta : 0;
+      const final = disponible - vendido;
+      const importeFinal = final * costoUnitario;
+
+      return [
+        prod.name,
+        "U",
+        inicio,
+        entryQuantity,
+        disponible,
+        vendido,
+        precioVenta.toFixed(2),
+        importeVenta.toFixed(2),
+        costoUnitario.toFixed(2),
+        costoTotal.toFixed(2),
+        cpVenta.toFixed(2),
+        final,
+        importeFinal.toFixed(2),
+      ];
+    });
+  }
+
+  generateReportPdfMakeWithError() {
+    const filas = this.generateProductRows();
+    const fechaHoy = new Date().toLocaleDateString();
+
+    const docDefinition: any = {
+      pageSize: 'LETTER',
+      pageOrientation: 'landscape',
+      pageMargins: [40, 120, 40, 40], // margen superior para dejar espacio al encabezado
+      header: (currentPage: number, pageCount: number) => {
+        return {
+          margin: [40, 20, 40, 0],
+          layout: 'noBorders',
+          table: {
+            widths: ['*', '*', '*', '*'],
+            body: [
+              [
+                { text: 'Empresa: _____________________', colSpan: 2, alignment: 'left' }, {},
+                { text: 'Procedencia: _____________________', colSpan: 2, alignment: 'right' }, {}
+              ],
+              [
+                { text: 'Unidad: _____________________', colSpan: 2, alignment: 'left' }, {},
+                { text: 'UBA: ______  OEE: ______  D__ / M__ / A__', colSpan: 2, alignment: 'right' }, {}
+              ],
+              [
+                { text: 'Departamento: _____________________', colSpan: 2, alignment: 'left' }, {},
+                { text: 'Balance: ______  BAT: ______', colSpan: 2, alignment: 'right' }, {}
+              ],
+              [
+                { text: '', colSpan: 3 }, {}, {},
+                { text: 'Firma del Administrador: __________________________', alignment: 'right' }
+              ],
+              [
+                { text: 'INVENTARIO A PRECIO DE VENTA', colSpan: 4, alignment: 'center', bold: true, margin: [0, 10] }, {}, {}, {}
+              ]
+            ]
+          }
+        };
+      },
+      content: [
+        {
+          layout: 'lightHorizontalLines',
+          table: {
+            headerRows: 1,
+            widths: [100, 40, 40, 40, 45, 45, 55, 60, 60, 60, 60, 40, 60],
+            body: [
+              [
+                { text: 'Producto', style: 'tableHeader' },
+                { text: 'U.M', style: 'tableHeader' },
+                { text: 'Inicio', style: 'tableHeader' },
+                { text: 'Entrada', style: 'tableHeader' },
+                { text: 'Disponible', style: 'tableHeader' },
+                { text: 'Vendido', style: 'tableHeader' },
+                { text: 'Precio Venta', style: 'tableHeader' },
+                { text: 'Importe Venta', style: 'tableHeader' },
+                { text: 'Costo Unitario', style: 'tableHeader' },
+                { text: 'Costo Total', style: 'tableHeader' },
+                { text: 'C.P Venta', style: 'tableHeader' },
+                { text: 'Final', style: 'tableHeader' },
+                { text: 'Importe Final', style: 'tableHeader' },
+              ],
+              ...filas,
+            ]
+          }
+        }
+      ],
+      styles: {
+        tableHeader: {
+          bold: true,
+          fillColor: '#eeeeee',
+          fontSize: 9,
+          alignment: 'center'
+        },
+      },
+      defaultStyle: {
+        fontSize: 9
+      }
+    };
+
+    const pdfMake = require('pdfmake/build/pdfmake');
+    const pdfFonts = require('pdfmake/build/vfs_fonts');
+    pdfMake.vfs = pdfFonts.pdfMake.vfs;
+
+    pdfMake.createPdf(docDefinition).download('inventario_precio_venta.pdf');
+  }
+}

@@ -1,0 +1,17 @@
+﻿using Domain.Common.Repositories;
+using Domain.Entities.Stores;
+
+namespace Domain.Interfaces.Repositories
+{
+    public interface IStoreRepository : IGenericRepository<Store, Guid>
+    {
+        Task<IEnumerable<Store>> GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync();
+        Task<IEnumerable<Store>> GetStoresAsync(bool includeInactive);
+        Task<bool> IsUniqueNameAsync(string name);
+        Task<Store> GetStoreByIdIgnoreQueryFiltersAsync(Guid id);
+        Task<Store> GetStoreByIdIncludingModulesIgnoreQueryFiltersAsync(Guid id);
+        Task<Store> GetStoreByIdIncludingModulesAsync(Guid id);
+        Task<IEnumerable<Store>> GetActiveStoresByUserIdAsync(Guid userId);
+        Task<IEnumerable<Store>> GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(Guid userId);
+    }
+}

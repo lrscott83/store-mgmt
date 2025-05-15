@@ -1,0 +1,8 @@
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-label w-100 text-center">{{ 'PROFILE.EDIT_PROFILE' | translate }}</h3>
+    </div>
+    <div class="card-body">
+        <app-edit-user-details [user]="currentUser" [returnUrl]="getReturnEditProfileUser()"></app-edit-user-details>
+    </div>
+</div>
