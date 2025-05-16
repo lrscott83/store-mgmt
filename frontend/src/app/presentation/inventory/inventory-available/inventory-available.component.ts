@@ -37,7 +37,7 @@ export class InventoryAvailableComponent implements OnInit {
   }
 
   getInventoryCostTotal(): number {
-    return 0;
+    return this.categories$.value.reduce((acc, cat) => acc + cat.totalCostPrice, 0);
   }
 
 }

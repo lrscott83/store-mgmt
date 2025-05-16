@@ -273,7 +273,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     private getTotalCostPrice(inventoryProducts: InventoryProductView[]): number {
         let totalSum: number = 0;
         inventoryProducts.forEach(
-            (entry) => (totalSum += entry.costPrice)
+            (entry) => (totalSum += entry.costPrice * entry.quantity)
         );
         return totalSum;
     }

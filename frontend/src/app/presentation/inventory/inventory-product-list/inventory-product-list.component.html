@@ -10,18 +10,18 @@
             <tr *ngFor="let product of products" class="border-1">
                 <td class="p-2">
                     <span class="text-dark mb-1 font-size-lg">
-                        {{product.productName}}
+                        {{product.productName}} ({{product.quantity}})
                     </span>
                 </td>
                 <!-- <span *ngIf="cardCount >= 0" class="label label-success font-weight-bold font-size-lg">{{cardCount}}</span> -->
                 <td class="p-2 text-end">
                     <span class="label label-success font-weight-bold font-size-lg">
-                        {{product.quantity}}
+                       {{product.costPrice | currency:'USD':'symbol':'1.2-2'}}
                     </span>
                 </td>
                 <td class="p-2 text-end">
                     <span class="text-primary mb-1 font-size-lg">
-                        {{product.costPrice | currency:'USD':'symbol':'1.2-2'}}
+                        {{product.costPrice * product.quantity | currency:'USD':'symbol':'1.2-2'}}
                     </span>
                 </td>
                 <!-- <td class="text-right pr-0">

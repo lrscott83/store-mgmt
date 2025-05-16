@@ -421,6 +421,9 @@ export const locale = {
       RECEIVE_IMPORT: 'Importar',
       RECEIVE_IMPORT_ERROR: 'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
       RECEIVE_IMPORT_SUCCESS: 'Los datos se importaron correctamente.',
+    },
+    REPORT: {
+      INVENTORY_TODAY_SALE: 'Inventario a precio de venta',
     }
   }
 };

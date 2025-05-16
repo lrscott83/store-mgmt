@@ -149,3 +149,4 @@ dist
 /backend/src/.vs
 /backend/src/obj
 /backend/src/bin
+/backend/src/Application/bin
