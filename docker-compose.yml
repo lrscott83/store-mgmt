@@ -10,9 +10,9 @@ services:
       - api
     restart: always
     ports:
-      - "0.0.0.0:8082:8082"
+      - "0.0.0.0:8082:8080"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost:8082"]
+      test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
       retries: 3
