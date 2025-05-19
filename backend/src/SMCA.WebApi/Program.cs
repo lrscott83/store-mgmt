@@ -77,7 +77,9 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(builder =>
     .AllowAnyHeader()
     .AllowCredentials()
     .WithOrigins("http://localhost:4200", "https://localhost:4200",
-    "http://192.168.1.103", "https://192.168.1.103");
+    "http://192.168.1.103", "https://192.168.1.103", 
+    "http://localhost:8083", "http://localhost:8082", 
+    "https://mgmtapi.playground.sceiba.net");
 }));
 
 builder.Services.Configure<FormOptions>(o =>

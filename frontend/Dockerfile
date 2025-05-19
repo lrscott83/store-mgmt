@@ -1,5 +1,5 @@
 # Create image based off of the official Node 22 image
-FROM docker.io/library/node:20 as builder
+FROM quay.io/lib/node:20 as builder
 
 # Copy dependency definitions
 COPY package*.json ./
@@ -19,7 +19,7 @@ RUN npm run build --omit=dev
 # Stage 2: Serve app with nginx server
 
 # Use official nginx image as the base image
-FROM docker.io/library/nginx:alpine
+FROM quay.io/lib/nginx:alpine
 
 # Remove default Nginx website
 RUN rm -rf /usr/share/nginx/html/*
