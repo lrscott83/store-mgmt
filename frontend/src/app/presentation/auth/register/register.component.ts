@@ -73,7 +73,7 @@ export default class RegisterComponent implements OnInit, CanComponentDeactivate
         }))
         .subscribe(async response => {
           if (response && response.succeeded) {
-            await this.loadInitData();
+            //await this.loadInitData();
             this.router.navigateByUrl('/login');
             resolve(true);
           } else {
