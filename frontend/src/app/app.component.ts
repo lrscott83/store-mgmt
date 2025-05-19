@@ -20,7 +20,7 @@ import { LoadingComponent } from './presentation/shared/components/loading/loadi
 })
 export class AppComponent {
   // public props
-  title = 'mantis-free-version';
+  title = 'vende-de-todo';
   public spinnerComponent = LoadingComponent;
 
   constructor(

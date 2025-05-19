@@ -1,11 +1,11 @@
 {
-  "name": "mantis-free-angular-admin-template",
+  "name": "vende-de-todo-app",
   "version": "4.0.0",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
-      "name": "mantis-free-angular-admin-template",
+      "name": "vende-de-todo-app",
       "version": "4.0.0",
       "license": "MIT",
       "dependencies": {

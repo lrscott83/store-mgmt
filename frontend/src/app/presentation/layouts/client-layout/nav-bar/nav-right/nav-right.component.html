@@ -1,9 +1,9 @@
 <ul class="list-unstyled">
-  <!-- <li class="pc-h-item">
-    <a class="pc-head-link me-0 bg-gray-200">
-      <i antIcon type="github" theme="outline"></i>
+  <li class="pc-h-item">
+    <a class="pc-head-link me-0 bg-gray-200" [routerLink]="['/help/tutorial']">
+      <i antIcon type="question-circle" theme="outline"></i>
     </a>
-  </li> -->
+  </li>
   <!-- <li class="dropdown pc-h-item" ngbDropdown>
     <a class="pc-head-link dropdown-toggle arrow-none me-0 bg-gray-200" data-bs-toggle="dropdown" ngbDropdownToggle>
       <i antIcon type="bell" theme="outline"></i>
@@ -91,11 +91,17 @@
     </a>
     <div class="dropdown-menu dropdown-notification dropdown-menu-end pc-h-dropdown" ngbDropdownMenu>
       <div class="dropdown-header d-flex align-items-center justify-content-between">
-        <h5 class="m-0">Carrito de compra</h5>
+        <h5 class="m-0">Venta actual</h5>
         <button mat-fab extended color="primary" [disabled]="getItemsCount() === 0" (click)="createOrder()">
           <mat-icon>payment</mat-icon>
-          {{'SHOPPING_CART.PAGAR' | translate}}
+          {{'SHOPPING_CART.REGISTER' | translate}}
         </button>
+      </div>
+      <!-- <div class="dropdown-divider"></div> -->
+      <div class="dropdown-header d-flex align-items-center justify-content-between">
+        <mat-slide-toggle class="mt-2" [(ngModel)]="mustGenerateFacture">
+          {{'SHOPPING_CART.GENERATE_FACTURE'| translate}}
+        </mat-slide-toggle>
       </div>
       <div class="dropdown-divider"></div>
       <ng-scrollbar style="min-height: 300px" visibility="hover">

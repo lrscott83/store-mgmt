@@ -198,6 +198,7 @@ export const locale = {
       NEW_PASSWORD: 'Contraseña nueva',
       SAVE: 'Salvar',
       DATA: 'Datos',
+      ENTRY: 'Entrada',
       VALIDATION: {
         INVALID: '{{name}} no es válido',
         REQUIRED: '{{name}} es requerido',
@@ -342,10 +343,12 @@ export const locale = {
       PRODUCTS_LABEL: 'productos',
       PRODUCT_LABEL: 'producto',
       PAGAR: 'Pagar',
+      REGISTER: 'Registrar',
       PRICE_LABEL: 'Precio: ',
       ORDER_CREATED: 'La venta fue creada satisfactoriamente.',
       ORDER_NOT_CREATED: 'Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
       DON_NOT_PAY_EMPTY_CART: 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
+      GENERATE_FACTURE: 'Generar Factura',
     },
     SALES: {
       NO_CATEGORY_ALERT_MESSAGE: 'No existe ninguna categoría. Usted puede adicionar categorías si da click aquí: ',
@@ -424,6 +427,9 @@ export const locale = {
     },
     REPORT: {
       INVENTORY_TODAY_SALE: 'Inventario a precio de venta',
+    },
+    TUTORIAL: {
+      TITLE: 'Ayuda General',
     }
   }
 };

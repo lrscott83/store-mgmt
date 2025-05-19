@@ -33,7 +33,7 @@ import {
   PlusCircleOutline,
   AimOutline,
   QuestionOutline,
-  
+
 } from '@ant-design/icons-angular/icons';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ToastrService } from 'ngx-toastr';
@@ -60,6 +60,7 @@ export class NavRightComponent {
   screenFull: boolean = true;
 
   cartData$: Observable<CartData>;
+  mustGenerateFacture: boolean = false;
 
   constructor(private iconService: IconService, private shoppingCartService: ShoppingCartService, private orderService: OrderOfflineService, private translate: TranslateService, private toastrService: ToastrService, private authService: AuthService, private router: Router) {
     this.windowWidth = window.innerWidth;
@@ -90,6 +91,10 @@ export class NavRightComponent {
       ]
     );
     this.cartData$ = this.shoppingCartService.getCartData$();
+  }
+
+  navigateToHelp() {
+
   }
 
   getUserLogin(): string {
@@ -123,7 +128,9 @@ export class NavRightComponent {
         this.toastrService.success(
           this.translate.instant('SHOPPING_CART.ORDER_CREATED'),
           this.translate.instant('GENERAL.RESPONSE.SUCCESS_TITLE'));
-          //this.generateFacture();
+        if (this.mustGenerateFacture) {
+          this.generateFacture();
+        }
         this.shoppingCartService.clearCart();
       } else
         this.toastrService.success(
@@ -180,7 +187,7 @@ export class NavRightComponent {
   }
 
   openNotificationsHelpDialog() {
-    
+
   }
 
   getItemsCount(): number {

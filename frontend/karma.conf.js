@@ -25,7 +25,7 @@ module.exports = function (config) {
       suppressAll: true // removes the duplicated traces
     },
     coverageReporter: {
-      dir: require('path').join(__dirname, './coverage/mantis-free-version'),
+      dir: require('path').join(__dirname, './coverage/vende-de-todo'),
       subdir: '.',
       reporters: [{ type: 'html' }, { type: 'text-summary' }]
     },
