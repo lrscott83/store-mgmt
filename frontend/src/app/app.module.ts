@@ -1,5 +1,5 @@
 // angular import
-import { APP_INITIALIZER, NgModule, importProvidersFrom } from '@angular/core';
+import { APP_INITIALIZER, NgModule, importProvidersFrom, isDevMode } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
 
@@ -22,6 +22,7 @@ import { provideRouter } from '@angular/router';
 import { AngularSlickgridModule } from 'angular-slickgrid';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
 import { ConnectionInterceptor } from './_interceptors/connection-interceptor.service';
+import { ServiceWorkerModule } from '@angular/service-worker';
 
 // function appInitializer(authService: AuthService): Promise<void> {
 //   return new Promise((resolve) => {
@@ -61,6 +62,12 @@ export function initializeApp(appInitService: AppInitService) {
       delayStart: 0,
       delayStop: 500,
       message: 'Cargando'
+    }),
+    ServiceWorkerModule.register('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      // Register the ServiceWorker as soon as the application is stable
+      // or after 30 seconds (whichever comes first).
+      registrationStrategy: 'registerWhenStable:30000'
     }), // Import BlockUIModule
     // BlockUIHttpModule.forRoot({
     //   requestFilters: [/* urls added here won't be blocked*/]

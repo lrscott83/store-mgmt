@@ -41,7 +41,9 @@
               "node_modules/ngx-toastr/toastr.css",
               "node_modules/@slickgrid-universal/common/dist/styles/css/slickgrid-theme-bootstrap.css"
             ],
-            "scripts": []
+            "scripts": [],
+            "serviceWorker": true,
+            "ngswConfigPath": "ngsw-config.json"
           },
           "configurations": {
             "production": {
