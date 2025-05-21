@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
 import { AuthService } from "../services.index";
 import { UserModel } from "../auth/_models/auth-user.model";
-import { EFeatures } from "src/app/_shared/const/enums";
+import { EFeatures, EModules } from "src/app/_shared/const/enums";
 
 @Injectable({
     providedIn: "root",
@@ -40,8 +40,15 @@ export class AuthorizationService {
             .some(r => r.storeId === currentUser.selectedStoreId && r.featureIds.some(id => f === id)));
     }
 
-    public hasInventoryAvailableFeature() {
-        return this.isUserAuthorize([EFeatures.Available]);
+    private hasModuleAvailable(moduleId: number) {
+        const currentUser: UserModel = this.authService.currentUserValue;
+        if (!currentUser)
+            return false;
+        return currentUser.storeModuleIds.some(id => id === moduleId);
+    }
+
+    public hasInventoryModuleAvailable() {
+        return this.hasModuleAvailable(EModules.Inventory);
     }
 
     public hasOwnersAvailableFeature() {

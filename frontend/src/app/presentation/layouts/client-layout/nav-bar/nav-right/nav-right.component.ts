@@ -45,6 +45,7 @@ import { OrderOfflineService } from 'src/app/application/orders/order-offline.se
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 import Swal from 'sweetalert2';
 import { AuthService } from 'src/app/_services/services.index';
+import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
 
 @Component({
   selector: 'app-nav-right',
@@ -207,11 +208,33 @@ export class NavRightComponent {
   }
 
   decreaseProduct(productId: string) {
-    this.shoppingCartService.decreaseCartItem(productId);
+    this.shoppingCartService.decreaseCartItem(productId).then(response => {
+      if (response.succeeded)
+        return;
+      const message = response.errors && response.errors.length > 0
+        ? response.errors[0].description
+        : ProductErrors.ProductNotAvailable.description;
+      Swal.fire({
+        title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
+        text: message,
+        icon: "error",
+      });
+    });
   }
 
   increaseProduct(productId: string) {
-    this.shoppingCartService.increaseCartItem(productId);
+    this.shoppingCartService.increaseCartItem(productId).then(response => {
+      if (response.succeeded)
+        return;
+      const message = response.errors && response.errors.length > 0
+        ? response.errors[0].description
+        : ProductErrors.ProductNotAvailable.description;
+      Swal.fire({
+        title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
+        text: message,
+        icon: "error",
+      });
+    });
   }
 
   getTranslation(key: string, param: string = null): Observable<string> {
