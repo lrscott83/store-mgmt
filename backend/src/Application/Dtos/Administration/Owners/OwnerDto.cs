@@ -12,6 +12,7 @@
         public bool Guest { get; set; }
         public List<OwnerStoreModuleDto> StoreModules { get; set; } = new List<OwnerStoreModuleDto>();
         public string ReSellerName { get; set; }
-         
+        public bool IsActive { get; set; }
+
     }
 }
