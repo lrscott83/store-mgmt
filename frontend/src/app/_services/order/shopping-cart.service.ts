@@ -75,7 +75,8 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
             return this.Failure([ProductErrors.NotExists]);
         }
 
-        const availableResult: Result = this.inventoryService.hasAvailableProductToSale(product.id, quantity);
+        const itemAddedQty: number = this.getCartItemQuantity(product.id);
+        const availableResult: Result = this.inventoryService.hasAvailableProductToSale(product.id, quantity + itemAddedQty);
         if (!availableResult.succeeded)
             return this.Failure([availableResult.errors && availableResult.errors.length > 0
                 ? availableResult.errors[0]
@@ -139,5 +140,15 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
 
     clearCart() {
         this._cartData$.next(this.getDefaultCartData());
+    }
+
+    getCartItemQuantity(productId: string): number {
+        let itemsCount: number = 0;
+        this.getCartItems()
+            .filter(i => i.productId === productId)
+            .forEach(
+                (item) => (itemsCount += item.quantity)
+            );
+        return itemsCount;
     }
 }

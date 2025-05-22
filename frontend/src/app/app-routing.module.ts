@@ -39,6 +39,7 @@ import { TodayOrdersComponent } from './presentation/sale/today-orders/today-ord
 import { ConfigurationsComponent } from './presentation/configurations/configurations.component';
 import { EditUserComponent } from './presentation/users/edit-user/edit-user.component';
 import { InventoryTodaySaleComponent } from './presentation/reports/inventory-today-sale/inventory-today-sale.component';
+import { TutorialComponent } from './presentation/help/tutorial/tutorial.component';
 
 const routes: Routes = [
   { path: '', redirectTo: "login", pathMatch: 'full' },
@@ -54,6 +55,13 @@ const routes: Routes = [
     path: '',
     component: ClientLayoutComponent,
     children: [
+      {
+        path: 'help/tutorial', 
+        component: TutorialComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [] }
+      },
       {
         path: '',
         redirectTo: '/sales/sale',

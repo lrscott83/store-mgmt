@@ -12,7 +12,8 @@
         public bool IsOwnerAdmin { get; set; }
         public bool IsReSeller { get; set; }
         public Guid SelectedStoreId { get; set; }
-        public List<int> FeatureIds { get; set; }
+        public List<int> FeatureIds { get; set; } = new List<int>();
+        public List<int> StoreModuleIds { get; set; } = new List<int>();
         public bool IsActive { get; set; }
     }
 }

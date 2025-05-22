@@ -13,6 +13,7 @@ export class UserModel extends AuthModel implements User {
   password: string;
   roles: StoreModuleFeatures[];
   featureIds: number[] = [];
+  storeModuleIds: number[] = [];
   isSuperAdmin: boolean = false;
   isOwnerAdmin: boolean = false;
   isReSeller: boolean = false;

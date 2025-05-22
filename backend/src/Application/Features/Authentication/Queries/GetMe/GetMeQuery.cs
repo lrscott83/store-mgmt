@@ -19,14 +19,16 @@ namespace Application.Features.Authentication.Queries.GetMe
         private readonly IUserRepository _userRepository;
         private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
         private readonly IAllowedFeaturesService _allowedFeaturesService;
+        private readonly IStoreModuleRepository _storeModuleRepositorytory;
 
         public GetMeQueryHandler(IHttpContextService httpContextService, IUserRepository userRepository, IStoreRoleFeatureRepository storeRoleFeatureRepository,
-            IAllowedFeaturesService allowedFeaturesService)
+            IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepositorytory)
         {
             _httpContextService = httpContextService;
             _userRepository = userRepository;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _allowedFeaturesService = allowedFeaturesService;
+            _storeModuleRepositorytory = storeModuleRepositorytory;
         }
 
         public async Task<ResponseResult<CurrentUserDto>> Handle(GetMeQuery request, CancellationToken cancellationToken)
@@ -58,6 +60,7 @@ namespace Application.Features.Authentication.Queries.GetMe
                     g.Select(srf => srf.Feature.Id).ToList()
             )).ToList();
             var featureIds = await _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync();
+            var storeModules = await _storeModuleRepositorytory.GetAvailableModulesByStoreIdAsync(user.SelectedStoreId);
 
             return ResponseResult.Success(new CurrentUserDto { 
                 Id = user.Id, 
@@ -71,6 +74,7 @@ namespace Application.Features.Authentication.Queries.GetMe
                 IsOwnerAdmin = _httpContextService.IsOwnerAdmin,
                 IsReSeller = _httpContextService.IsReSeller,
                 SelectedStoreId = user.SelectedStoreId,
+                StoreModuleIds = storeModules.Select(module => module.Id).ToList(),
                 IsActive = user.IsActive,
             });
         }

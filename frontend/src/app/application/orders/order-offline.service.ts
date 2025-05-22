@@ -193,14 +193,14 @@ export class OrderOfflineService extends BaseService<Order> {
         cartItems.forEach(item => {
             const product = this.productRepository.getProductById(item.productId);
             if (product) {
-                // const inventoryCosts: InventoryEntryCost[]
-                //     = product.discountFromInvantory && this.authorizationService.hasInventoryAvailableFeature()
-                //         ? this.inventoryService.getAvailableInventoryCosts(item.productId, item.quantity)
-                //         : [];
                 const inventoryCosts: InventoryEntryCost[]
-                    = product.discountFromInvantory
+                    = product.discountFromInvantory && this.authorizationService.hasInventoryModuleAvailable()
                         ? this.inventoryService.getAvailableInventoryCosts(item.productId, item.quantity)
                         : [];
+                // const inventoryCosts: InventoryEntryCost[]
+                //     = product.discountFromInvantory
+                //         ? this.inventoryService.getAvailableInventoryCosts(item.productId, item.quantity)
+                //         : [];
                 orderItems.push({
                     productId: item.productId,
                     productName: item.name,

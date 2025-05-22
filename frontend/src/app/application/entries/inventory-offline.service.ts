@@ -351,8 +351,8 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
         if (!product.availableToSale)
             return Result.Failure([ProductErrors.ProductNotAvailableToSale]);
 
-        //if (!this.authorizationService.hasInventoryAvailableFeature() || !product.discountFromInvantory)
-        if (!product.discountFromInvantory)
+        //if (!product.discountFromInvantory)
+        if (!this.authorizationService.hasInventoryModuleAvailable() || !product.discountFromInvantory)
             return Result.Success();
 
         let inventories = this.getProductInventoriesByProductId(productId);
@@ -367,7 +367,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
             );
         return available >= quantity
             ? Result.Success()
-            : Result.Failure([ProductErrors.ProductNotAvailable]);
+            : Result.Failure([ProductErrors.ProductQuantityNotAvailable]);
     }
 
     private getAvailableInventories(productId: string, quantity: number): InventoryEntry[] {
