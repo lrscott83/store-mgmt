@@ -1,5 +1,5 @@
 # Use the standard Nginx image from Docker Hub
-FROM nginx
+FROM quay.io/lib/nginx:alpine
 # Copy the main nginx.conf
 COPY nginx.conf /etc/nginx/nginx.conf
 
