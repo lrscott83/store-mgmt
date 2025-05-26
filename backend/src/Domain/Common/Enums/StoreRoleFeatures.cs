@@ -27,18 +27,22 @@ namespace Domain.Common.Enums
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.Products)]
+        [HasModule(ModuleType.Sales)]
         ProductsAdmin,
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.Sale)]
+        [HasModule(ModuleType.Sales)]
         SaleAdmin,
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.TodayOrders)]
+        [HasModule(ModuleType.Sales)]
         TodayOrdersAdmin,
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.TodayOrdersStats)]
+        [HasModule(ModuleType.Sales)]
         TodayOrdersStatsAdmin,
 
         #endregion
@@ -47,14 +51,17 @@ namespace Domain.Common.Enums
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.Available)]
+        [HasModule(ModuleType.Inventory)]
         AvailableAdmin,
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.Entries)]
+        [HasModule(ModuleType.Inventory)]
         EntriesAdmin,
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.TodayInventoryStats)]
+        [HasModule(ModuleType.Inventory)]
         TodayInventoryStatsAdmin,
 
         #endregion
@@ -63,14 +70,17 @@ namespace Domain.Common.Enums
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.Send)]
+        [HasModule(ModuleType.Synchronization)]
         SendAdmin,
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.Download)]
+        [HasModule(ModuleType.Synchronization)]
         DownloadAdmin,
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.Receive)]
+        [HasModule(ModuleType.Synchronization)]
         ReceiveAdmin,
 
         #endregion
@@ -79,6 +89,7 @@ namespace Domain.Common.Enums
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.TodayReports)]
+        [HasModule(ModuleType.Reports)]
         TodayReportsAdmin,
 
         #endregion
@@ -87,6 +98,7 @@ namespace Domain.Common.Enums
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.Dashboard)]
+        [HasModule(ModuleType.Statistics)]
         DashboardAdmin,
 
         #endregion
@@ -95,18 +107,22 @@ namespace Domain.Common.Enums
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser, RoleType.ReSeller)]
         [HasFeature(FeatureType.Profile)]
+        [HasModule(ModuleType.Management)]
         ProfileAdmin,
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.Users)]
+        [HasModule(ModuleType.Management)]
         UsersAdmin,
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.Stores)]
+        [HasModule(ModuleType.Management)]
         StoresAdmin,
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.Configurations)]
+        [HasModule(ModuleType.Management)]
         ConfigurationsAdmin,
 
         #endregion

@@ -27,5 +27,11 @@ namespace Domain.Common.Extensions
             HasFeatureAttribute hasFeatureAttribute = value.GetAttribute<HasFeatureAttribute>();
             return hasFeatureAttribute?.FeatureType;
         }
+
+        public static ModuleType? GetModuleType(this StoreRoleFeatures value)
+        {
+            HasModuleAttribute hasModuleAttribute = value.GetAttribute<HasModuleAttribute>();
+            return hasModuleAttribute?.ModuleType;
+        }
     }
 }

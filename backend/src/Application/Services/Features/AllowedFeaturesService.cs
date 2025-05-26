@@ -17,19 +17,20 @@ namespace Application.Services.Features
             _featureRepository = featureRepository;
         }
 
-        public async Task<List<int>> GetAllowedFeatureIdsForCurrentUserAsync()
+        public async Task<List<int>> GetAllowedFeatureIdsForCurrentUserAsync(List<int> storeModuleIds)
         {
             if (_httpContextService.IsReSeller)
-                return await GetAllowedFeatureIdsByRoleAsync(RoleType.ReSeller);
+                return await GetAllowedFeatureIdsByRoleAsync(RoleType.ReSeller, storeModuleIds);
             if (_httpContextService.IsOwnerAdmin)
-                return await GetAllowedFeatureIdsByRoleAsync(RoleType.OwnerAdmin);
+                return await GetAllowedFeatureIdsByRoleAsync(RoleType.OwnerAdmin, storeModuleIds);
             return [];
         }
 
-        private async Task<List<int>> GetAllowedFeatureIdsByRoleAsync(RoleType role)
+        private async Task<List<int>> GetAllowedFeatureIdsByRoleAsync(RoleType role, List<int> storeModuleIds)
         {
             List<int> allowedFeatureIds = ((StoreRoleFeatures[])Enum.GetValues(typeof(StoreRoleFeatures)))
-                        .Where(roleFeature => roleFeature.GetRoles().Any(r => r == role) && roleFeature.GetFeatureType().HasValue)
+                        .Where(roleFeature => roleFeature.GetRoles().Any(r => r == role) && roleFeature.GetFeatureType().HasValue 
+                            && roleFeature.GetModuleType().HasValue && storeModuleIds.Contains((int)roleFeature.GetModuleType().Value))
                         .Select(roleFeature => (int)roleFeature.GetFeatureType().Value)
                         .ToList();
             return await _featureRepository.FilterAvailableToStoreByIds(allowedFeatureIds);

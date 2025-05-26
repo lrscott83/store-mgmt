@@ -83,7 +83,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             IEnumerable<StoreModule> storeModulesToDelete = storeModules
                 .Where(module => module.IsActive && moduleIds.All(id => module.ModuleId != id))
                 .ToList();
-            if (!storeModulesToDelete.Any())
+            if (storeModulesToDelete.Any())
                 await _storeModuleRepository.DeleteAsync(storeModulesToDelete);
 
             foreach (var moduleId in moduleIds)
