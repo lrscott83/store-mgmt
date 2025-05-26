@@ -1,0 +1,28 @@
+﻿START TRANSACTION;
+
+UPDATE "Feature" SET "IsActive" = TRUE
+WHERE "Id" = 50;
+
+UPDATE "Role" SET "CreatedDate" = TIMESTAMPTZ '2025-05-22T17:57:34.247505+00:00'
+WHERE "Id" = 1;
+
+UPDATE "Role" SET "CreatedDate" = TIMESTAMPTZ '2025-05-22T17:57:34.247513+00:00'
+WHERE "Id" = 2;
+
+UPDATE "Role" SET "CreatedDate" = TIMESTAMPTZ '2025-05-22T17:57:34.247518+00:00'
+WHERE "Id" = 3;
+
+UPDATE "Role" SET "CreatedDate" = TIMESTAMPTZ '2025-05-22T17:57:34.247524+00:00'
+WHERE "Id" = 4;
+
+UPDATE "Tenant" SET "CreatedDate" = TIMESTAMPTZ '2025-05-22T17:57:34.24638+00:00'
+WHERE "Id" = 'b58bf718-c4ed-4ee9-a958-bb5a5db4f7e8';
+
+UPDATE "User" SET "CreatedDate" = TIMESTAMPTZ '2025-05-22T17:57:34.246659+00:00'
+WHERE "Id" = '38b96d85-bf75-41ca-bfd7-796e7fe0ebc8';
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20250522175735_Active-Report-Module', '8.0.3');
+
+COMMIT;
+
