@@ -8,6 +8,6 @@ namespace Application.Abstractions.Features
 {
     public interface IAllowedFeaturesService
     {
-        public Task<List<int>> GetAllowedFeatureIdsForCurrentUserAsync();
+        public Task<List<int>> GetAllowedFeatureIdsForCurrentUserAsync(List<int> storeModuleIds);
     }
 }

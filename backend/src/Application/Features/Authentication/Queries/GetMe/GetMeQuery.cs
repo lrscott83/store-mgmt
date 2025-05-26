@@ -50,7 +50,10 @@ namespace Application.Features.Authentication.Queries.GetMe
                 return ResponseResult.Failure<CurrentUserDto>(UserErrors.Inactive, (int)HttpStatusCode.NotFound);
             }
 
-            var storeRoleFeatures = await _storeRoleFeatureRepository.GetStoreRoleFeaturesByUserIdAsync(user.Id);
+            var storeModules = await _storeModuleRepositorytory.GetAvailableModulesByStoreIdAsync(user.SelectedStoreId);
+            List<int> storeModuleIds = storeModules.Select(module => module.Id).ToList();
+
+            var storeRoleFeatures = await _storeRoleFeatureRepository.GetStoreRoleFeaturesByUserIdAsync(user.Id, storeModuleIds);
             var storeRoleFeaturesDtos = storeRoleFeatures
                 .GroupBy(srf => new { srf.Store, srf.Feature.Module })
                 .Select(g => new StoreModuleFeaturesDto(
@@ -59,8 +62,9 @@ namespace Application.Features.Authentication.Queries.GetMe
                     g.Key.Module.Id,
                     g.Select(srf => srf.Feature.Id).ToList()
             )).ToList();
-            var featureIds = await _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync();
-            var storeModules = await _storeModuleRepositorytory.GetAvailableModulesByStoreIdAsync(user.SelectedStoreId);
+
+            var featureIds = await _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync(storeModuleIds);
+            
 
             return ResponseResult.Success(new CurrentUserDto { 
                 Id = user.Id, 
@@ -74,7 +78,7 @@ namespace Application.Features.Authentication.Queries.GetMe
                 IsOwnerAdmin = _httpContextService.IsOwnerAdmin,
                 IsReSeller = _httpContextService.IsReSeller,
                 SelectedStoreId = user.SelectedStoreId,
-                StoreModuleIds = storeModules.Select(module => module.Id).ToList(),
+                StoreModuleIds = storeModuleIds,
                 IsActive = user.IsActive,
             });
         }

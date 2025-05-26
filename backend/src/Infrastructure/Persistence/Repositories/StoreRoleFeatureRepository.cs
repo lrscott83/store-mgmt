@@ -22,10 +22,11 @@ namespace Infrastructure.Persistence.Repositories
             _storeRoleFeature = dbContext.Set<StoreRoleFeature>();
         }
 
-        public async Task<IEnumerable<StoreRoleFeature>> GetStoreRoleFeaturesByUserIdAsync(Guid userId)
+        public async Task<IEnumerable<StoreRoleFeature>> GetStoreRoleFeaturesByUserIdAsync(Guid userId, List<int> storeModuleIds)
         {
             return await _storeRoleFeature
                 .Where(srf => srf.IsActive && srf.Store.IsActive && srf.Role.IsActive && srf.Feature.IsActive
+                    && srf.Feature.Module.IsActive && storeModuleIds.Contains(srf.Feature.Module.Id)
                     && srf.Role.UserRoles.Any(ur => ur.IsActive && ur.User.IsActive && ur.UserId == userId))
                 .Include(srf => srf.Role)
                 .Include(srf => srf.Feature).ThenInclude(f => f.Module)
@@ -33,7 +34,7 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
-        public async Task<bool> HasOwnerAnyFeatureAsync(Guid userId, List<StoreRoleFeatures> roleFeatures)
+        public async Task<bool> HasOwnerAnyFeatureAsync(Guid userId, List<StoreRoleFeatures> roleFeatures, List<int> storeModuleIds)
         {
             List<int> featureIds = roleFeatures
                 .Where(rf => rf.GetFeatureType().HasValue)
@@ -41,10 +42,11 @@ namespace Infrastructure.Persistence.Repositories
             return await _storeRoleFeature
                 .AnyAsync(srf => srf.IsActive && srf.Store.IsActive && srf.Role.IsActive
                     && srf.Feature.IsActive && featureIds.Any(id => id == srf.FeatureId)
+                    && srf.Feature.Module.IsActive && storeModuleIds.Contains(srf.Feature.Module.Id)
                     && srf.Role.UserRoles.Any(ur => ur.IsActive && ur.User.IsActive && ur.UserId == userId && ur.User.Owner != null));
         }
 
-        public async Task<bool> HasUserAnyFeatureInStoreAsync(Guid userId, Guid storeId, List<StoreRoleFeatures> roleFeatures)
+        public async Task<bool> HasUserAnyFeatureInStoreAsync(Guid userId, Guid storeId, List<StoreRoleFeatures> roleFeatures, List<int> storeModuleIds)
         {
             List<int> featureIds = roleFeatures
                 .Where(rf => rf.GetFeatureType().HasValue)
@@ -52,6 +54,7 @@ namespace Infrastructure.Persistence.Repositories
             return await _storeRoleFeature
                 .AnyAsync(srf => srf.IsActive && srf.Store.IsActive && srf.Store.Id == storeId && srf.Role.IsActive 
                     && srf.Feature.IsActive && featureIds.Any(id => id == srf.FeatureId)
+                    && srf.Feature.Module.IsActive && storeModuleIds.Contains(srf.Feature.Module.Id)
                     && srf.Role.UserRoles.Any(ur => ur.IsActive && ur.User.IsActive && ur.UserId == userId));
         }
     }

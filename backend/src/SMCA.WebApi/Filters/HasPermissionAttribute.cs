@@ -24,16 +24,18 @@ namespace SMCA.WebApi.Filters
         private readonly IHttpContextService _httpContextService;
         private readonly List<StoreRoleFeatures> _storeRoleFeatures;
         private readonly IAllowedFeaturesService _allowedFeaturesService;
+        private readonly IStoreModuleRepository _storeModuleRepositorytory;
 
         public HasUserPermissionRequirementFilter(StoreRoleFeatures[] storeRoleFeatures,
             IStoreRoleFeatureRepository storeRoleFeatureRepository, IHttpContextService httpContextService,
-            IReSellerRepository reSellerRepository, IAllowedFeaturesService allowedFeaturesService)
+            IReSellerRepository reSellerRepository, IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepositorytory)
         {
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _httpContextService = httpContextService;
             _reSellerRepository = reSellerRepository;
             _storeRoleFeatures = storeRoleFeatures.ToList();
             _allowedFeaturesService = allowedFeaturesService;
+            _storeModuleRepositorytory = storeModuleRepositorytory;
         }
 
         public void OnAuthorization(AuthorizationFilterContext context)
@@ -44,9 +46,11 @@ namespace SMCA.WebApi.Filters
                 // if user is not Super Admin, find out if it has any other authorized roles
                 if (!_httpContextService.IsSuperAdmin)
                 {
+                    var storeModules = _storeModuleRepositorytory.GetAvailableModulesByStoreIdAsync(_httpContextService.StoreId.ToGuid()).Result;
+                    List<int> storeModuleIds = storeModules.Select(module => module.Id).ToList();
                     if (_httpContextService.IsOwnerAdmin || _httpContextService.IsReSeller)
                     {
-                        var featureIds = _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync().Result;
+                        var featureIds = _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync(storeModuleIds).Result;
                         var hasPermission = _storeRoleFeatures.Any(srf => srf.GetFeatureType().HasValue && featureIds.Contains((int)srf.GetFeatureType().Value)); ;
                         if (!hasPermission)
                         {
@@ -56,7 +60,7 @@ namespace SMCA.WebApi.Filters
                     else
                     {
                         var hasUserPermission = _storeRoleFeatureRepository.HasUserAnyFeatureInStoreAsync(
-                            currentUserId.ToGuid(), _httpContextService.StoreId.ToGuid(), _storeRoleFeatures).Result;
+                            currentUserId.ToGuid(), _httpContextService.StoreId.ToGuid(), _storeRoleFeatures, storeModuleIds).Result;
                         if (!hasUserPermission)
                         {
                             context.Result = new ForbidResult();
