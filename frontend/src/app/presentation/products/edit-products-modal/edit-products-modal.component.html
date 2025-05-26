@@ -1,0 +1,85 @@
+<div class="modal-content">
+    <div class="modal-header">
+        <h4 class="modal-title" id="modal-basic-title">
+            {{'PRODUCT.ADD_PRODUCTS' | translate}}
+        </h4>
+        <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+    </div>
+    <div class="modal-body">
+
+        <!-- <angular-slickgrid gridId="productGrid" [columnDefinitions]="columnDefinitions" [gridOptions]="gridOptions"
+            [dataset]="dataset" class="slickgrid-container grid1"
+            (onAngularGridCreated)="angularGridReady($event)"
+            >
+        </angular-slickgrid> -->
+
+        <div [formGroup]="form">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Precio</th>
+                    </tr>
+                </thead>
+                <tbody formArrayName="products">
+                    <tr *ngFor="let product of products.controls; let i = index" [formGroupName]="i">
+                        <td>
+                            <!-- <input formControlName="name" class="form-control" placeholder="Nombre del producto" />
+                            <div class="text-danger"
+                                *ngIf="product.get('name')?.invalid && product.get('name')?.touched">
+                                Nombre requerido
+                            </div> -->
+                            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                                <mat-label>{{'GENERAL.NAME'| translate}}</mat-label>
+                                <input appTitleCase matInput formControlName="name" required autocomplete="off" />
+                                <mat-error *ngIf="product.get('name')?.invalid && product.get('name')?.touched">
+                                    {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
+                                </mat-error>
+                            </mat-form-field>
+                        </td>
+                        <td>
+                            <!-- <input formControlName="price" class="form-control" placeholder="Precio (ej: 10.50)" />
+                            <div class="text-danger"
+                                *ngIf="product.get('price')?.errors?.['invalidFormat'] && product.get('price')?.touched">
+                                Formato inválido. Use punto como separador decimal.
+                            </div>
+                            <div class="text-danger"
+                                *ngIf="product.get('price')?.errors?.['priceTooLow'] && product.get('price')?.touched">
+                                El precio debe ser mayor que cero.
+                            </div> -->
+                            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                                <mat-label>{{'GENERAL.PRICE'| translate}}</mat-label>
+                                <input type="number" matInput min="0" formControlName="price" required
+                                    autocomplete="off" />
+                                <mat-icon matPrefix>attach_money</mat-icon>
+                                <mat-error *ngIf="product.get('price')?.errors?.['invalidFormat'] && product.get('price')?.touched || product.get('price')?.errors?.['priceTooLow'] && product.get('price')?.touched">
+                                    Precio inválido
+                                </mat-error>
+                            </mat-form-field>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="row text-end">
+                <div class="col text-end m-1">
+                    <button mat-fab extended color="primary" (click)="addProduct()">
+                        <mat-icon>add</mat-icon>
+                        {{ 'GENERAL.NEW' | translate}}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <div class="modal-footer">
+        <button mat-fab extended color="primary" (click)="closeModal()">
+            <mat-icon>close</mat-icon>
+            {{ 'GENERAL.CLOSE' | translate}}
+        </button>
+        <button mat-fab extended color="primary" (click)="onSubmit()">
+            <mat-icon>save</mat-icon>
+            {{ 'GENERAL.SAVE' | translate}}
+        </button>
+    </div>
+</div>

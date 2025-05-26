@@ -9,11 +9,12 @@ import { Product } from 'src/app/domain/entities/products/product.model';
 import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { SharedModule } from '../../shared/shared.module';
 import { EditProductCategoryModalComponent } from '../edit-product-category-modal/edit-product-category-modal.component';
+import { EditProductsModalComponent } from '../edit-products-modal/edit-products-modal.component';
 
 @Component({
   selector: 'app-category-product-list',
   standalone: true,
-  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent],
+  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, EditProductsModalComponent],
   templateUrl: './category-product-list.component.html',
   styleUrl: './category-product-list.component.scss'
 })
@@ -30,7 +31,7 @@ export class CategoryProductListComponent implements OnInit {
   }
 
   loadProductsByCategoryId(categoryId: string) {
-    this.productService.getProductsByCategoryId(categoryId).subscribe(response => {
+    this.productService.getAvailableProductsByCategoryId(categoryId).subscribe(response => {
       if (response.succeeded) {
         this.products$.next(response.data);
       } else {
@@ -57,6 +58,14 @@ export class CategoryProductListComponent implements OnInit {
     });
   }
 
+  openAddProductsModal() {
+    const modalRef = this.modalService.open(EditProductsModalComponent, { centered: true, size: "lg" });
+    modalRef.componentInstance.category = this.category;
+    modalRef.componentInstance.productUpdatedEmitter.subscribe(() => {
+      this.loadProductsByCategoryId(this.category.id);
+    });
+  }
+
   openEditProductModal(product: Product) {
     const modalRef = this.modalService.open(EditProductModalComponent, { centered: true, size: "lg" });
     modalRef.componentInstance.category = this.category;
@@ -75,20 +84,12 @@ export class CategoryProductListComponent implements OnInit {
       showCancelButton: true,
       confirmButtonColor: "#3456ff",
       cancelButtonColor: "#dc3545",
-      confirmButtonText: this.translate.instant('DEVEXTREME.Yes'),
-      cancelButtonText: this.translate.instant('DEVEXTREME.No'),
+      confirmButtonText: this.translate.instant('GENERAL.YES'),
+      cancelButtonText: this.translate.instant('GENERAL.NO'),
     }).then((result) => {
       if (result.isConfirmed) {
-        this.productService.delete(productId).subscribe(response => {
-          if (response) {
-            console.log("Product deleted with id: " + productId);
-            this.loadProductsByCategoryId(this.category.id);
-          }
-          else
-            console.log("Error deleting product with id: " + productId);
-        }, error => {
-          console.error("Error deleting product: ", error);
-        });
+        this.productService.deleteProduct(productId);
+        this.loadProductsByCategoryId(this.category.id);
       }
     });
   }

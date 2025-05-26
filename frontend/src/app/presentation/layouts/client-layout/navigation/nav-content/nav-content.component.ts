@@ -27,6 +27,7 @@ import { SharedModule } from 'src/app/presentation/shared/shared.module';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthService } from 'src/app/_services/services.index';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
+import { StoreModuleStateService } from 'src/app/_services/shared/store-module-state.service';
 
 @Component({
   selector: 'app-nav-content',
@@ -56,6 +57,7 @@ export class NavContentComponent implements OnInit {
     private translate: TranslateService,
     private authService: AuthService,
     private authorizationService: AuthorizationService,
+    private storeModuleStateService: StoreModuleStateService
   ) {
     this.iconService.addIcon(
       ...[
@@ -70,6 +72,10 @@ export class NavContentComponent implements OnInit {
         QuestionOutline
       ]
     );
+    this.filterNavigation();
+  }
+
+  filterNavigation() {
     this.navigations = NavigationItems;
     this.navigations = this.filterItems(this.navigations!);
     this.translateItems(this.navigations);
@@ -83,7 +89,7 @@ export class NavContentComponent implements OnInit {
         for (const child of group.children) {
           if (!child.feature || !child.module)
             chidren.push(child);
-          
+
           if (this.hasPermission(child))
             chidren.push(child);
         }
@@ -118,6 +124,10 @@ export class NavContentComponent implements OnInit {
     if (this.windowWidth < 1025) {
       (document.querySelector('.coded-navbar') as HTMLDivElement)?.classList.add('menupos-static');
     }
+    // this.storeModuleStateService.getModulesUpdatedObservable().subscribe(updated => {
+    //   if (updated)
+    //     this.filterNavigation();
+    // });
   }
 
   fireOutClick() {

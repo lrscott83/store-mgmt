@@ -15,6 +15,7 @@ import { EditOwnerComponent } from '../../owners/edit-owner/edit-owner.component
 import { ModuleService } from 'src/app/_services/module/module.service';
 import { Module } from 'src/app/domain/entities/modules/module.model';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
+import { StoreModuleStateService } from 'src/app/_services/shared/store-module-state.service';
 
 @Component({
   selector: 'app-edit-store',
@@ -45,7 +46,8 @@ export class EditStoreComponent {
 
   constructor(private formBuilder: FormBuilder, private storeService: StoreService,
     private authService: AuthService, private router: Router, private ownerService: OwnerService,
-    private route: ActivatedRoute, private moduleService: ModuleService, private authorizationService: AuthorizationService) { }
+    private route: ActivatedRoute, private moduleService: ModuleService, private authorizationService: AuthorizationService,
+    private storeModuleStateService: StoreModuleStateService) { }
 
   ngOnInit(): void {
     this.currentUser = this.authService.currentUserValue;
@@ -212,7 +214,10 @@ export class EditStoreComponent {
                 this.formGroup.reset();
                 this.router.navigateByUrl('/management/stores');
               } else {
-                document.location.reload();
+                this.authService.getUserByToken().subscribe(user => {
+                  document.location.reload();
+                  this.storeModuleStateService.modulesUpdated(true);
+                });
               }
             }
             else

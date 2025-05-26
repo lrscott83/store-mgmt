@@ -68,6 +68,23 @@ export class ProductRepository {
             .sort((p1, p2) => p1.order - p2.order);
     }
 
+    getAvailableProductsByCategoryId(categoryId: string): Product[] {
+        return this.getStorageProducts()
+            .filter(p => p.categoryId == categoryId && p.isActive)
+            .sort((p1, p2) => p1.order - p2.order);
+    }
+
+    public deleteProduct(id: string): boolean {
+        let product = this.getProductById(id);
+        if (!product)
+            return false;
+
+        product.isActive = false;
+        this.products = this.getStorageProductsMap();
+        this.setProductsLocalStorage(this.products);
+        return true;
+    }
+
     addProductData(id: string, categoryId: string, name: string, price: number, businessId: string, order: number,
         isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Result {
         const category = this.categoryRepository.getProductCategoryById(categoryId);

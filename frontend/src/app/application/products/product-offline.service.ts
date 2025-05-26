@@ -34,6 +34,18 @@ export class ProductOfflineService extends ProductService {
         return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
     }
 
+    createProducts(categoryId: string, items: {name, price}[]): Observable<BaseResponseModel<boolean>> {
+        let hasError: boolean = false;
+        items.forEach(item => {
+            const order: number = this.getNextOrder(categoryId);
+            let result: Result = this.productRepository.addProduct(categoryId, item.name, item.price, "", order, true, 
+            true, true);
+            if (!result.succeeded)
+                hasError = true;
+        })
+        return !hasError ? this.Success$(true) : this.Failure$([]);
+    }
+
     updateProduct(id: string, categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
         let result: Result = this.productRepository.updateProduct(id, categoryId, name, price, businessId, order, isActive,
             availableToSale, discountFromInvantory);
@@ -48,6 +60,11 @@ export class ProductOfflineService extends ProductService {
     getProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
         const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
         return products ? this.Success$(products) : this.Success$([]);
+    }
+
+    getAvailableProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
+        const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
+        return products ? this.Success$(products.filter(p => p.isActive)) : this.Success$([]);
     }
 
     getProductsToSaleByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
@@ -85,5 +102,14 @@ export class ProductOfflineService extends ProductService {
     public getMaxOrder(categoryId: string): Observable<BaseResponseModel<number>> {
         const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
         return this.Success$(Math.max(...products.map(c => c.order), 0));
+    }
+
+    private getNextOrder(categoryId: string): number {
+        const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
+        return Math.max(...products.map(c => c.order), 0) + 1;
+    }
+
+    public deleteProduct(id: string): boolean {
+        return this.productRepository.deleteProduct(id);
     }
 }

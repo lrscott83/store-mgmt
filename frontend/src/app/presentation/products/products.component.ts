@@ -76,8 +76,8 @@ export class ProductsComponent {
       showCancelButton: true,
       confirmButtonColor: "#3456ff",
       cancelButtonColor: "#dc3545",
-      confirmButtonText: this.translate.instant('DEVEXTREME.Yes'),
-      cancelButtonText: this.translate.instant('DEVEXTREME.No'),
+      confirmButtonText: this.translate.instant('GENERAL.YES'),
+      cancelButtonText: this.translate.instant('GENERAL.No'),
     }).then((result) => {
       if (result.isConfirmed) {
         this.categoryService.delete(categoryId)

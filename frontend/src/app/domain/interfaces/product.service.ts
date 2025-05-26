@@ -18,4 +18,6 @@ export abstract class ProductService extends BaseService<Product> {
     abstract updateProduct(id: string, categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>>;
 
     abstract getMaxOrder(categoryId: string): Observable<BaseResponseModel<number>>;
+
+    abstract deleteProduct(id: string): boolean;
 }
