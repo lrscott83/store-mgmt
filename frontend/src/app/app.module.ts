@@ -31,7 +31,7 @@ import { ServiceWorkerModule } from '@angular/service-worker';
 // }
 
 export function initializeApp(appInitService: AppInitService) {
-  return (): Promise<any> => { 
+  return (): Promise<any> => {
     return appInitService.Init();
   }
 }
@@ -42,7 +42,7 @@ export function initializeApp(appInitService: AppInitService) {
     BrowserModule,
     HttpClientModule,
     NgHttpLoaderModule.forRoot(),
-    AppRoutingModule, 
+    AppRoutingModule,
     SharedModule,
     BrowserAnimationsModule,
     HighlightModule,
@@ -74,14 +74,14 @@ export function initializeApp(appInitService: AppInitService) {
     // }),
   ],
   providers: [
-      //provideRouter(routes),
-      provideHttpClient(),
-      importProvidersFrom(NgHttpLoaderModule.forRoot()), //<== Always call `forRoot`
-      importProvidersFrom(AngularSlickgridModule.forRoot()),
-      AppInitService,
-      provideEnvironmentNgxMask(),
-      provideAnimations(), // required animations providers
-      provideToastr(), // Toastr providers
+    //provideRouter(routes),
+    provideHttpClient(),
+    importProvidersFrom(NgHttpLoaderModule.forRoot()), //<== Always call `forRoot`
+    importProvidersFrom(AngularSlickgridModule.forRoot()),
+    AppInitService,
+    provideEnvironmentNgxMask(),
+    provideAnimations(), // required animations providers
+    provideToastr(), // Toastr providers
     {
       provide: APP_INITIALIZER,
       useFactory: initializeApp,
@@ -123,4 +123,4 @@ export function initializeApp(appInitService: AppInitService) {
   ],
   bootstrap: [AppComponent]
 })
-export class AppModule {}
+export class AppModule { }

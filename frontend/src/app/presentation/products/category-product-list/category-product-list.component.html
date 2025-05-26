@@ -8,12 +8,16 @@
 <div class="row text-end">
     <!-- <div class="col-md-10 col-lg-8 mx-auto"> -->
     <div class="col text-start">
-        <button mat-fab extended color="primary" (click)="openEditCategoryModal()">
+        <button mat-fab extended color="primary" (click)="openEditCategoryModal()" class="m-1">
             <mat-icon>edit</mat-icon>
             {{'PRODUCT_CATEGORY.EDIT_CATEGORY'| translate}}
         </button>
     </div>
     <div class="col text-end">
+        <button mat-fab extended color="primary" (click)="openAddProductsModal()" class="m-1">
+            <mat-icon>add</mat-icon>
+            {{'PRODUCT.NEW_PRODUCTS'| translate}}
+        </button>
         <button mat-fab extended color="primary" (click)="openAddProductModal()">
             <mat-icon>add</mat-icon>
             {{'PRODUCT.NEW_PRODUCT'| translate}}

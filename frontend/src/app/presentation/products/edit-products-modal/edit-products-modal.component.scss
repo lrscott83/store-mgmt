@@ -1,0 +1,21 @@
+.ag-theme-alpine {
+    font-size: 14px;
+}
+
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.text-danger {
+    font-size: 0.85rem;
+    color: #dc3545;
+}
+
+input {
+    width: 100%;
+}
+
+::ng-deep .mat-mdc-text-field-wrapper {
+    width: 140px !important;
+}

@@ -63,6 +63,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatRadioModule } from '@angular/material/radio';
 import { DataCardToolsComponent } from 'src/app/_shared/data-card-tools/data-card-tools.component';
 import { NgxMaskDirective, NgxMaskPipe, provideNgxMask } from 'ngx-mask';
+import { AngularSlickgridModule } from 'angular-slickgrid';
 
 @NgModule({
   imports: [
@@ -119,6 +120,7 @@ import { NgxMaskDirective, NgxMaskPipe, provideNgxMask } from 'ngx-mask';
     DataCardToolsComponent,
     NgxMaskDirective, 
     NgxMaskPipe,
+    AngularSlickgridModule,
   ],
   exports: [
     CommonModule,
@@ -176,6 +178,7 @@ import { NgxMaskDirective, NgxMaskPipe, provideNgxMask } from 'ngx-mask';
     DataCardToolsComponent,
     NgxMaskDirective, 
     NgxMaskPipe,
+    AngularSlickgridModule
   ],
   declarations: [SpinnerComponent, LoadingSpinnerComponent],
   providers: [

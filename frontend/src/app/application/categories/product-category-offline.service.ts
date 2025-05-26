@@ -46,7 +46,7 @@ export class ProductCategoryOfflineService extends ProductCategoryService {
         const categories: ProductCategory[] = this.categoryRepository.getProductCategories();
         const categoriesView: ProductCategoryView[] = categories
         .map(category => {
-            const productsCount = this.productRepository.getProductsByCategoryId(category.id).length;
+            const productsCount = this.productRepository.getAvailableProductsByCategoryId(category.id).length;
             return {
                 id: category.id,
                 name: category.name,

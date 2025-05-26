@@ -199,6 +199,7 @@ export const locale = {
       SAVE: 'Salvar',
       DATA: 'Datos',
       ENTRY: 'Entrada',
+      NEW: 'Nuevo',
       VALIDATION: {
         INVALID: '{{name}} no es válido',
         REQUIRED: '{{name}} es requerido',
@@ -334,10 +335,12 @@ export const locale = {
       TEXT: 'Product',
       PRODUCTS: 'Productos',
       NEW_PRODUCT: 'Producto',
+      NEW_PRODUCTS: 'Productos',
       EDIT_PRODUCT: 'Editar Producto',
       DELETE_PRODUCT: 'Eliminar Producto',
       AVAILABLE_TO_SALE: 'Disponible para Vender',
       DISCOUNT_FROM_INVENTORY: 'Descuenta del Inventario',
+      ADD_PRODUCTS: 'Adicionar Productos',
     },
     SHOPPING_CART: {
       PRODUCTS_LABEL: 'productos',
