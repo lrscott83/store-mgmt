@@ -65,6 +65,23 @@ services:
       - ./backend/scripts:/docker-entrypoint-initdb.d
     networks:
       - postgres_network
+
+  pgadmin:
+    image: quay.io/lib/dpage/pgadmin4
+    container_name: smca_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD}
+    restart: always
+    ports:
+      - "5050:80"
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - postgres_network
   nginx:
     build: loadbalancer
     container_name: smca_nginx
@@ -78,6 +95,7 @@ services:
       - postgres_network
 volumes:
   postgres_data:
+  pgadmin-data:
 
 networks:
   postgres_network:
