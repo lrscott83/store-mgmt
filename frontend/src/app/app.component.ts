@@ -12,6 +12,7 @@ import { locale as frLang } from './_modules/i18n/vocabs/fr';
 import { Subscription } from 'rxjs';
 import { SpinnerComponent } from './presentation/shared/components/spinner/spinner.component';
 import { LoadingComponent } from './presentation/shared/components/loading/loading.component';
+import { UpdateService } from './_services/update/update.service';
 
 @Component({
   selector: 'app-root',
@@ -25,6 +26,7 @@ export class AppComponent {
 
   constructor(
     private translationService: TranslationService,
+    private updateService: UpdateService,
     //private tableService: TableExtendedService
   ) {
     // register translations
