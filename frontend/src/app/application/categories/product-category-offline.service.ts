@@ -43,7 +43,7 @@ export class ProductCategoryOfflineService extends ProductCategoryService {
     }
 
     getProductCategoriesView(): Observable<BaseResponseModel<ProductCategoryView[]>> {
-        const categories: ProductCategory[] = this.categoryRepository.getProductCategories();
+        const categories: ProductCategory[] = this.categoryRepository.getAvailableProductCategories();
         const categoriesView: ProductCategoryView[] = categories
         .map(category => {
             const productsCount = this.productRepository.getAvailableProductsByCategoryId(category.id).length;

@@ -11,11 +11,12 @@ import Swal from 'sweetalert2';
 import { EditProductCategoryModalComponent } from './edit-product-category-modal/edit-product-category-modal.component';
 import { CategoryProductListComponent } from './category-product-list/category-product-list.component';
 import { DataCardToolsComponent } from 'src/app/_shared/data-card-tools/data-card-tools.component';
+import { CsvProductImporterModalComponent } from './csv-product-importer-modal/csv-product-importer-modal.component';
 
 @Component({
   selector: 'app-products',
   standalone: true,
-  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, CategoryProductListComponent, DataCardToolsComponent],
+  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, CategoryProductListComponent, DataCardToolsComponent, CsvProductImporterModalComponent],
   templateUrl: './products.component.html',
   styleUrl: './products.component.scss'
 })
@@ -63,6 +64,13 @@ export class ProductsComponent {
     const modalRef = this.modalService.open(EditProductCategoryModalComponent, { centered: true, size: "lg" });
     modalRef.componentInstance.category = category;
     modalRef.componentInstance.productCategoryUpdatedEmitter.subscribe(() => {
+      this.loadCategories();
+    });
+  }
+
+  openImportCsvProductModal() {
+    const modalRef = this.modalService.open(CsvProductImporterModalComponent, { centered: true, size: "lg" });
+    modalRef.componentInstance.categoriesUpdatedEmitter.subscribe(() => {
       this.loadCategories();
     });
   }

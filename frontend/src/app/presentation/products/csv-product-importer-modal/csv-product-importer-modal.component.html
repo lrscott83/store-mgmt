@@ -1,0 +1,71 @@
+<div class="modal-content">
+    <div class="modal-header">
+        <h4 class="modal-title" id="modal-basic-title">
+            {{'PRODUCT_CATEGORY.IMPORT_PRODUCTS' | translate}}
+        </h4>
+        <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+    </div>
+    <div class="modal-body">
+        <div class="container mt-4">
+            <div class="card border-primary">
+                <!-- <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Ejemplo de archivo CSV</h5>
+                </div> -->
+
+                <div class="card-body">
+                    <div class="mb-3">
+                        <p class="text-muted">Estructura requerida del archivo (.csv):</p>
+                        <div class="bg-light p-3 rounded">
+                            <pre class="mb-0"><code>{{sampleData}}</code></pre>
+                        </div>
+                    </div>
+
+                    <!-- <div class="alert alert-info">
+                        <h6 class="alert-heading">📌 Requisitos del formato:</h6>
+                        <ul class="mb-0">
+                            <li>Encabezados exactos: category, name, code, price</li>
+                            <li>Primera línea debe contener los encabezados</li>
+                            <li>Valores separados por comas</li>
+                            <li>El precio debe ser un número válido</li>
+                        </ul>
+                    </div> -->
+
+                    <button mat-fab extended color="primary" (click)="downloadSample()" class="text-middle">
+                        <mat-icon>file_download</mat-icon>
+                        {{'PRODUCT_CATEGORY.DOWNLOAD_SAMPLE'| translate}}
+                    </button>
+                    <!-- <button class="btn btn-outline-secondary" (click)="downloadSample()">
+                        <i class="bi bi-download me-2"></i>
+                        Descargar Ejemplo
+                    </button> -->
+                </div>
+            </div>
+        </div>
+        <form class="form" [formGroup]="formGroup" novalidate="novalidate" id="send_form" class="mt-4">
+            <!--begin::Attach Data Form Group-->
+            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                <mat-label>{{'GENERAL.FILE'| translate}}</mat-label>
+                <button mat-icon-button matSuffix type='button' (click)="file.click()">
+                    <mat-icon>attach_file</mat-icon>
+                </button>
+                <input matInput readonly required autocomplete="off" formControlName="dataPath" />
+                <input type="file" #file placeholder="Seleccionar archivo" (change)="selectFile(file.files)"
+                    style="display:none;" accept=".csv" hidden>
+                <mat-error *ngIf="isControlInvalid('dataPath','required')">
+                    {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.FILE' | translate } }}
+                </mat-error>
+            </mat-form-field>
+        </form>
+
+    </div>
+    <div class="modal-footer">
+        <button mat-fab extended color="primary" (click)="closeModal()">
+            <mat-icon>close</mat-icon>
+            {{ 'GENERAL.CLOSE' | translate}}
+        </button>
+        <button mat-fab extended color="primary" (click)="importProducts()">
+            <mat-icon>file_download</mat-icon>
+            {{ 'GENERAL.IMPORT' | translate}}
+        </button>
+    </div>
+</div>

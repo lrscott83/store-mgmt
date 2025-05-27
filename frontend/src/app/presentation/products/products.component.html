@@ -18,6 +18,15 @@
             </div>
         </div>
 
+        <div class="row text-end">
+            <div class="col text-end m-2">
+                <button mat-fab extended color="primary" (click)="openImportCsvProductModal()">
+                    <mat-icon>attach_file</mat-icon>
+                    {{ 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' | translate}}
+                </button>
+            </div>
+        </div>
+
         <mat-accordion multi>
             <mat-expansion-panel [expanded]="false" *ngFor="let category of categories$ | async">
                 <mat-expansion-panel-header class="p-2" class="mat-panel-header">
@@ -28,7 +37,8 @@
                         </div>
                     </mat-panel-title>
                 </mat-expansion-panel-header>
-                <app-category-product-list class="p-2" [category]="category" (categoryUpdated)="updateCategory()"></app-category-product-list>
+                <app-category-product-list class="p-2" [category]="category"
+                    (categoryUpdated)="updateCategory()"></app-category-product-list>
             </mat-expansion-panel>
         </mat-accordion>
     </div>

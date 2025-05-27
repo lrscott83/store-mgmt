@@ -10,6 +10,7 @@ import { ProductCategoryRepository } from '../categories/product-category.reposi
 import { Result } from 'src/app/domain/commons/result';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import { ProductSelectView } from './product-select.view';
+import { CsvProduct } from 'src/app/_services/csv/models/csv-product.model';
 
 @Injectable({
     providedIn: "root"
@@ -29,17 +30,32 @@ export class ProductOfflineService extends ProductService {
 
     createProduct(categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean,
         availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
-        let result: Result = this.productRepository.addProduct(categoryId, name, price, businessId, order, isActive, 
+        let result: Result = this.productRepository.addProduct(categoryId, name, price, businessId, order, isActive,
             availableToSale, discountFromInvantory);
         return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
     }
 
-    createProducts(categoryId: string, items: {name, price}[]): Observable<BaseResponseModel<boolean>> {
+    createProducts(categoryId: string, items: { name, price }[]): Observable<BaseResponseModel<boolean>> {
         let hasError: boolean = false;
         items.forEach(item => {
             const order: number = this.getNextOrder(categoryId);
-            let result: Result = this.productRepository.addProduct(categoryId, item.name, item.price, "", order, true, 
-            true, true);
+            let result: Result = this.productRepository.addProduct(categoryId, item.name, item.price, "", order, true,
+                true, true);
+            if (!result.succeeded)
+                hasError = true;
+        })
+        return !hasError ? this.Success$(true) : this.Failure$([]);
+    }
+
+    createCsvProducts(csvProducts: CsvProduct[]): Observable<BaseResponseModel<boolean>> {
+        let hasError: boolean = false;
+        csvProducts.forEach(csvProduct => {
+            const category: ProductCategory = this.categoryRepository.getProductCategoryByName(csvProduct.category);
+            const categoryId: string = category
+                ? category.id
+                : this.categoryRepository.addProductCategoryByName(csvProduct.category);
+            const order: number = this.getNextOrder(categoryId);
+            let result: Result = this.productRepository.addProduct(categoryId, csvProduct.name, csvProduct.price, "", order, true, true, true);
             if (!result.succeeded)
                 hasError = true;
         })

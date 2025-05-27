@@ -200,6 +200,8 @@ export const locale = {
       DATA: 'Datos',
       ENTRY: 'Entrada',
       NEW: 'Nuevo',
+      IMPORT: 'Importar',
+      FILE: 'Fichero',
       VALIDATION: {
         INVALID: '{{name}} no es válido',
         REQUIRED: '{{name}} es requerido',
@@ -330,6 +332,8 @@ export const locale = {
       EDIT_CATEGORY: 'Categoría',
       DELETE_CATEGORY: 'Eliminar Categoría',
       ADD_PRODUCT: 'Producto',
+      IMPORT_PRODUCTS: 'Importar Productos',
+      DOWNLOAD_SAMPLE: 'Descargar Ejemplo',
     },
     PRODUCT: {
       TEXT: 'Product',

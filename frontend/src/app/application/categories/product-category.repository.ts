@@ -19,7 +19,7 @@ export class ProductCategoryRepository {
     private categories: Map<string, ProductCategory> = null;
 
     constructor(private authService: AuthService) {
-        
+
     }
 
     public updateCategories(productsMap: Map<string, ProductCategory>) {
@@ -48,8 +48,16 @@ export class ProductCategoryRepository {
         return this.getStorageCategories().find(c => c.id === id);
     }
 
+    getProductCategoryByName(name: string): ProductCategory {
+        return this.getStorageCategories().find(c => c.name === name);
+    }
+
     getProductCategories(): ProductCategory[] {
         return this.getStorageCategories().sort((c1, c2) => c1.order - c2.order);
+    }
+
+    getAvailableProductCategories(): ProductCategory[] {
+        return this.getProductCategories().filter(c => c.isActive);
     }
 
     hasAnyCategory(): boolean {
@@ -77,6 +85,17 @@ export class ProductCategoryRepository {
 
     addProductCategory(name: string, order: number, isActive: boolean): Result {
         return this.addProductCategoryData(Guid.create().toString(), name, order, isActive);
+    }
+
+    addProductCategoryByName(name: string): string {
+        const id: string = Guid.create().toString();
+        const order: number = this.getNextOrder();
+        return this.addProductCategoryData(id, name, order, true) ? id : null;
+    }
+
+    private getNextOrder(): number {
+        const categories: ProductCategory[] = this.getProductCategories();
+        return Math.max(...categories.map(c => c.order), 0) + 1;
     }
 
     addImportedProductCategory(category: ProductCategory): Result {
@@ -155,7 +174,7 @@ export class ProductCategoryRepository {
             let categoryMapJson = localStorage.getItem(this.getStorageKey());
             if (categoryMapJson && categoryMapJson !== "{}") {
                 return new Map(JSON.parse(categoryMapJson));
-            } 
+            }
             // else {
             //     categoryMapJson = localStorage.getItem(ProductCategoryRepository.CATEGORIES_KEY);
             //     if (categoryMapJson && categoryMapJson !== "{}") {
