@@ -67,7 +67,7 @@ services:
       - postgres_network
 
   pgadmin:
-    image: quay.io/lib/dpage/pgadmin4
+    image: quay.io/gpnds.uber/pgadmin4
     container_name: smca_pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
