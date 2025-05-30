@@ -77,6 +77,12 @@ namespace Infrastructure
             services.AddScoped<ISystemConfigurationRepository, SystemConfigurationRepository>();
             services.AddScoped<IReSellerRepository, ReSellerRepository>();
             services.AddScoped<IReSellerOwnerRepository, ReSellerOwnerRepository>();
+            services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IOrderItemRepository, OrderItemRepository>();
+            services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
+            services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<IInventoryEntryRepository, InventoryEntryRepository>();
+            services.AddScoped<IInventoryEntryCostRepository, InventoryEntryCostRepository>();
         }
     }
 }

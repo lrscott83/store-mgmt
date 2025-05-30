@@ -207,6 +207,9 @@
   <data name="StoreNotFound" xml:space="preserve">
     <value>Tienda no encontrada</value>
   </data>
+  <data name="StoreNotSelected" xml:space="preserve">
+    <value>El usuario {0} no tiene tienda seleccionada</value>
+  </data>
   <data name="TenantAlreadyExists" xml:space="preserve">
     <value>El tenant ya existe.</value>
   </data>

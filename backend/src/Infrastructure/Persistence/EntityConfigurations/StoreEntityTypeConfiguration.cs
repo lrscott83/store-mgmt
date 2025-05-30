@@ -39,6 +39,16 @@ namespace Infrastructure.Persistence.EntityConfigurations
              .WithOne(e => e.Store)
              .HasForeignKey(e => e.StoreId)
              .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasMany(c => c.InventoryEntries)
+             .WithOne(e => e.Store)
+             .HasForeignKey(e => e.StoreId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasMany(c => c.Orders)
+             .WithOne(e => e.Store)
+             .HasForeignKey(e => e.StoreId)
+             .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

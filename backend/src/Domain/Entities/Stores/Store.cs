@@ -5,6 +5,9 @@ using Domain.Entities.StoreModules;
 using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.StoreUsers;
 using Domain.Entities.StorePayments;
+using Domain.Entities.ProductCategories;
+using Domain.Entities.InventoryEntries;
+using Domain.Entities.Orders;
 
 namespace Domain.Entities.Stores
 {
@@ -20,6 +23,10 @@ namespace Domain.Entities.Stores
         public ICollection<StoreModule> StoreModules { get; set; }
         public ICollection<StoreRoleFeature> StoreRoleFeatures { get; set; }
         public ICollection<StorePayment> StorePayments { get; set; }
+        public ICollection<ProductCategory> ProductCategories { get; set; }
+        public ICollection<InventoryEntry> InventoryEntries { get; set; }
+        public ICollection<Order> Orders { get; set; }
+
         public Guid OwnerId { get; private set; }
         public DateOnly PaymentStartDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -37,7 +44,10 @@ namespace Domain.Entities.Stores
             StoreUsers = new List<StoreUser> ();
             StoreModules = new List<StoreModule>();
             StoreRoleFeatures = new List<StoreRoleFeature> ();
-            StorePayments = new List<StorePayment> (); 
+            StorePayments = new List<StorePayment> ();
+            ProductCategories = new List<ProductCategory> ();
+            InventoryEntries = new List<InventoryEntry> ();
+            Orders = new List<Order> ();
         }
 
         private static Store Create(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly paymentStartDate, 

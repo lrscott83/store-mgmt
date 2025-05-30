@@ -19,7 +19,7 @@ namespace Infrastructure.Persistence.Repositories
             return await _modules
                 .Where(m => m.IsActive && m.AvailableToStore
                     && m.Features.Any(f => f.IsActive && f.AvailableToStore))
-                .OrderBy(f => f.PriceIncluded).ThenBy(f => f.Order)
+                .OrderByDescending(f => f.PriceIncluded).ThenBy(f => f.Order)
                 .ToListAsync();
         }
     }
