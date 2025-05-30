@@ -7,5 +7,5 @@ export const GlobalConfig = {
     TIME_FORMAT: 'h:mm a',
     SUPER_ADMIN_EXPECTED_FEATURES: [EFeatures.Owners, EFeatures.Owners, EFeatures.Owners, EFeatures.Owners],
     RESELLER_EXPECTED_FEATURES: [EFeatures.Owners, EFeatures.Profile],
-    SIGNATURE_SERVICE_TYPE: SignatureProvider.EversingSandbox,
+    USE_ONLINE_SERVICE: false,
 }

@@ -1,10 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, catchError } from 'rxjs';
-import { ProductCategoryOfflineService } from 'src/app/application/categories/product-category-offline.service';
 import { ProductCategoryView } from 'src/app/application/categories/product-category.view';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { SharedModule } from '../shared/shared.module';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import Swal from 'sweetalert2';
@@ -12,6 +10,8 @@ import { EditProductCategoryModalComponent } from './edit-product-category-modal
 import { CategoryProductListComponent } from './category-product-list/category-product-list.component';
 import { DataCardToolsComponent } from 'src/app/_shared/data-card-tools/data-card-tools.component';
 import { CsvProductImporterModalComponent } from './csv-product-importer-modal/csv-product-importer-modal.component';
+import { ProductCategoryService } from 'src/app/application/categories/product-category.service';
+import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
   selector: 'app-products',
@@ -23,7 +23,7 @@ import { CsvProductImporterModalComponent } from './csv-product-importer-modal/c
 export class ProductsComponent {
   categories$: BehaviorSubject<ProductCategoryView[]> = new BehaviorSubject<ProductCategoryView[]>([]);
 
-  constructor(private categoryService: ProductCategoryOfflineService, private modalService: NgbModal, private productService: ProductOfflineService, private translate: TranslateService) { }
+  constructor(@Inject(PRODUCT_CATEGORY_SERVICE) private categoryService: ProductCategoryService, private modalService: NgbModal, private translate: TranslateService) { }
 
   ngOnInit(): void {
     this.loadCategories();

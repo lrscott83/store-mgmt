@@ -23,6 +23,10 @@ import { AngularSlickgridModule } from 'angular-slickgrid';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
 import { ConnectionInterceptor } from './_interceptors/connection-interceptor.service';
 import { ServiceWorkerModule } from '@angular/service-worker';
+import { ProductCategoryOnlineService } from './application/categories/product-category-online.service';
+import { ProductCategoryOfflineService } from './application/categories/product-category-offline.service';
+import { productCategoryServiceFactory } from './_services/factories/product-category-service.factory';
+import { PRODUCT_CATEGORY_SERVICE } from './_services/tokens';
 
 // function appInitializer(authService: AuthService): Promise<void> {
 //   return new Promise((resolve) => {
@@ -120,6 +124,13 @@ export function initializeApp(appInitService: AppInitService) {
       useClass: ConnectionInterceptor,
       multi: true
     },
+    ProductCategoryOnlineService,
+    ProductCategoryOfflineService,
+    {
+      provide: PRODUCT_CATEGORY_SERVICE,
+      useFactory: productCategoryServiceFactory,
+    }
+    
   ],
   bootstrap: [AppComponent]
 })

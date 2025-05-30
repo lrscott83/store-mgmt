@@ -1,12 +1,13 @@
-import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, Inject } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
-import { ProductCategoryOfflineService } from 'src/app/application/categories/product-category-offline.service';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import Swal from 'sweetalert2';
 import { SharedModule } from '../../shared/shared.module';
+import { ProductCategoryService } from 'src/app/application/categories/product-category.service';
+import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
   selector: 'app-edit-product-category-modal',
@@ -25,7 +26,7 @@ export class EditProductCategoryModalComponent implements OnInit {
   formPatterns: any;
 
   constructor(private formBuilder: FormBuilder, private modal: NgbActiveModal, private translate: TranslateService,
-    private categoryService: ProductCategoryOfflineService) { 
+    @Inject(PRODUCT_CATEGORY_SERVICE) private categoryService: ProductCategoryService) { 
       this.loadForm();
     }
 

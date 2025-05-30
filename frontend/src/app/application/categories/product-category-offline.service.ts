@@ -10,13 +10,13 @@ import { ProductCategoryErrors } from 'src/app/domain/entities/product-categorie
 import { Result } from 'src/app/domain/commons/result';
 import { ProductCategoryView } from './product-category.view';
 
-@Injectable({
-    providedIn: "root"
-})
+// @Injectable({
+//     providedIn: "root"
+// })
+
+@Injectable()
 
 export class ProductCategoryOfflineService extends ProductCategoryService {
-
-    private localStorage;
 
     constructor(@Inject(HttpClient) http, private categoryRepository: ProductCategoryRepository, private productRepository: ProductRepository) {
         super(http);
@@ -42,11 +42,17 @@ export class ProductCategoryOfflineService extends ProductCategoryService {
         return this.Success$(categories);
     }
 
-    getProductCategoriesView(): Observable<BaseResponseModel<ProductCategoryView[]>> {
+    getAvailableProductCategories(): Observable<BaseResponseModel<ProductCategory[]>> {
         const categories: ProductCategory[] = this.categoryRepository.getAvailableProductCategories();
+        return this.Success$(categories);
+    }
+
+    getProductCategoriesView(): Observable<BaseResponseModel<ProductCategoryView[]>> {
+        console.log("ProductCategoryOfflineService.getProductCategoriesView");
+        const categories: ProductCategory[] = this.categoryRepository.getProductCategories();
         const categoriesView: ProductCategoryView[] = categories
         .map(category => {
-            const productsCount = this.productRepository.getAvailableProductsByCategoryId(category.id).length;
+            const productsCount = this.productRepository.getProductsByCategoryId(category.id).length;
             return {
                 id: category.id,
                 name: category.name,

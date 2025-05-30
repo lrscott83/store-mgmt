@@ -1,13 +1,11 @@
-import { Component } from '@angular/core';
-import { FormControl, Validators } from '@angular/forms';
+import { Component, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { ProductCategoryOfflineService } from 'src/app/application/categories/product-category-offline.service';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import { SharedModule } from '../shared/shared.module';
 import { TranslateModule } from '@ngx-translate/core';
 import { SaleCategoryProductsComponent } from './sale-category-products/sale-category-products.component';
-import { DataService } from 'src/app/_services/data/data.service';
-import { Product } from 'src/app/domain/entities/products/product.model';
+import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
+import { ProductCategoryService } from 'src/app/application/categories/product-category.service';
 
 @Component({
   selector: 'app-sale',
@@ -23,14 +21,14 @@ export class SaleComponent {
 
   //storeControl = new FormControl('', Validators.required);
 
-  constructor(private categoryService: ProductCategoryOfflineService, private dataService: DataService) { }
+  constructor(@Inject(PRODUCT_CATEGORY_SERVICE) private categoryService: ProductCategoryService) { }
 
   async ngOnInit() {
     this.loadCategories();
   }
 
   loadCategories() {
-    this.categoryService.getProductCategories().subscribe(response => {
+    this.categoryService.getAvailableProductCategories().subscribe(response => {
       if (response.succeeded) {
         this.categories$.next(response.data);
         if (response.data.length > 0) {
