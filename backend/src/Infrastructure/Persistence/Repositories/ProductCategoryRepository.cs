@@ -12,5 +12,10 @@ namespace Infrastructure.Persistence.Repositories
         {
             _productCategoriess = dbContext.Set<ProductCategory>();
         }
+
+        public Task<IEnumerable<ProductCategory>> GetProductCategoriesAsync(bool includeInactive)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
