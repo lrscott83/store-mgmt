@@ -1,0 +1,24 @@
+html {
+    scroll-behavior: smooth;
+}
+
+.carousel-img {
+    max-height: 480px;
+    object-fit: contain;
+    width: 100%;
+}
+
+@media (max-width: 767px) {
+    .carousel-img {
+        max-height: 480px;
+    }
+
+    h4,
+    h5 {
+        font-size: 1.2rem;
+    }
+
+    p {
+        font-size: 0.95rem;
+    }
+}

@@ -1,0 +1,32 @@
+// styles.scss
+body {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.btn-primary {
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+}
+
+.btn-primary:hover {
+    background-color: darken(#6f42c1, 10%);
+    border-color: darken(#6f42c1, 10%);
+}
+
+.btn-purple {
+    background-color: #6f42c1;
+    color: white;
+    border: none;
+}
+
+.btn-purple:hover {
+    background-color: #5a37a6;
+}
+
+.text-purple {
+    color: #6f42c1;
+}
+
+.bi {
+    color: #6f42c1;
+}

@@ -1,0 +1,405 @@
+<header class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #0D1117;">
+    <div class="container">
+        <!-- Logo -->
+        <a class="navbar-brand d-flex align-items-center" href="#">
+            <img src="assets/icons/icon-96x96.png" alt="VendeDTo Logo" width="40" height="40" class="me-2">
+            <span class="fw-bold" style="margin-top: 3px; color: #6f42c1;">VendeDTo</span>
+        </a>
+
+        <ul class="navbar-nav ms-auto">
+            <!-- otros links -->
+            <li class="nav-item">
+                <a class="btn btn-sm btn-outline-warning ms-2" [routerLink]="['/register']">Regístrate</a>
+            </li>
+        </ul>
+
+        <ul class="navbar-nav ms-auto">
+            <!-- otros links -->
+            <li class="nav-item">
+                <a class="btn btn-sm btn-outline-warning ms-2" [routerLink]="['/login']">Autenticación</a>
+            </li>
+        </ul>
+
+        <!-- Menú hamburguesa -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Enlaces -->
+        <div class="collapse navbar-collapse" id="mainNavbar">
+            <ul class="navbar-nav ms-auto text-end text-lg-start" style="background-color: #1e252e;">
+                <li class="nav-item">
+                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#hero">Inicio</a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#caracteristicas">Características Principales</a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#como-funciona">¿Cómo funciona?</a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#capturas">Capturas de pantallas</a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#registro">Regístrate</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+
+
+<!-- Hero Section -->
+<section id="hero" class="hero d-flex align-items-center text-center text-light"
+    style="background-color: #0D1117; padding-top: 80px !important;">
+    <div class="container">
+        <h1 class="display-4 fw-bold mb-5" style="color: #FACC15;">VendeDTo</h1>
+        <div class="row">
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <p class="lead text-secondary mb-4" style="font-size: 1rem;">La forma más segura y fácil de
+                        gestionar tu punto de venta, sin depender de Internet.
+                    </p>
+                    <a [routerLink]="['/register']" class="btn btn-lg px-4"
+                        style="background-color: #6f42c1; color: white; border-radius: 0.8rem;">
+                        Regístrate gratis
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="caracteristicas" class="features py-5" style="background-color: #0D1117;">
+    <div class="container">
+        <h2 class="text-center fw-bold mb-5" style="color: #FACC15;">Características Principales</h2>
+        <div class="row g-4">
+
+            <!-- Feature Card -->
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <i class="bi bi-shield-lock mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
+                    <h5 class="text-warning">Seguridad y privacidad</h5>
+                    <p class="text-secondary">Tus datos se guardan en el teléfono. Nadie más accede a ellos.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <i class="bi bi-wifi-off mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
+                    <h5 class="text-warning">Funciona sin Internet</h5>
+                    <p class="text-secondary">Todas las funciones están disponibles sin conexión, excepto la
+                        autenticación.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <i class="bi bi-pencil-square mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
+                    <h5 class="text-warning">Registro de ventas</h5>
+                    <p class="text-secondary">Anota todas tus ventas cada día fácilmente.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <i class="bi bi-cash-stack mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
+                    <h5 class="text-warning">Cuadre de caja</h5>
+                    <p class="text-secondary">Cierra tu día en minutos con cálculos automáticos.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <i class="bi bi-box-seam mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
+                    <h5 class="text-warning">Inventario en tiempo real</h5>
+                    <p class="text-secondary">Consulta cuánto tienes y cuánto cuesta.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <i class="bi bi-graph-up mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
+                    <h5 class="text-warning">Reportes diarios</h5>
+                    <p class="text-secondary">Obtén tus ganancias del día con un clic.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4 mx-auto">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <i class="bi bi-receipt mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
+                    <h5 class="text-warning">Facturación instantánea</h5>
+                    <p class="text-secondary">Emite facturas sin demoras al registrar la venta.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- Cómo Funciona -->
+<section class="py-5" style="background-color: #0D1117;">
+    <div class="container">
+        <h2 id="como-funciona" class="text-center text-warning mb-5">¿Cómo funciona?</h2>
+
+        <div id="howItWorksCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="40000">
+            <div class="carousel-inner">
+
+                <div class="carousel-item active">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">1. Regístrate</h4>
+                            <p>Crea tu cuenta en segundos.</p>
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/how-to/1-register.png" class="img-fluid rounded carousel-img"
+                                alt="Paso 1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">2. Autentícate</h4>
+                            <p>Accede a las funcionalidades.</p>
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/how-to/2-login.png" class="img-fluid rounded carousel-img"
+                                alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">3. Configura tu punto de venta</h4>
+                            <p>Agrega productos al catálogo y entradas al inventario.</p>
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/how-to/3-menu-catalog.png" class="img-fluid rounded carousel-img"
+                                alt="Paso 3">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">4. Registra las ventas del día</h4>
+                            <p>Adiciona productos a la venta y regístrala sin complicaciones.</p>
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/how-to/4-menu-sale.png" class="img-fluid rounded carousel-img"
+                                alt="Paso 4">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">5. Consulta el cuadre y los reportes</h4>
+                            <p>Gana claridad sobre tus ventas e ingresos.</p>
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/how-to/5-menu-cuadre.png" class="img-fluid rounded carousel-img"
+                                alt="Paso 5">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Controls -->
+            <button class="carousel-control-prev" type="button" data-bs-target="#howItWorksCarousel"
+                data-bs-slide="prev">
+                <span class="carousel-control-prev-icon bg-dark rounded-circle"></span>
+                <span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#howItWorksCarousel"
+                data-bs-slide="next">
+                <span class="carousel-control-next-icon bg-dark rounded-circle"></span>
+                <span class="visually-hidden">Siguiente</span>
+            </button>
+        </div>
+    </div>
+</section>
+
+
+<!-- Capturas de Pantallas -->
+<section class="py-5" style="background-color: #0D1117;">
+    <div class="container">
+        <h2 id="capturas" class="text-center text-warning mb-5">Capturas de Pantalla</h2>
+
+        <div id="screenshotsCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="4000">
+            <div class="carousel-inner">
+
+                <div class="carousel-item active">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Catálogo de productos</h4>
+                            <!-- <p>Toca los botones para sdicionar categorías y productos.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/1-catalog.png" class="img-fluid rounded carousel-img"
+                                alt="Paso 1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Adicionar Categoría</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/2-catalog-add-category.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Importar Productos</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/3-catalog-import-products.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Adicionar varios Productos</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/4-catalog-add-products.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Adicionar un Producto</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/5-catalog-add-product.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Adicionar Entrada al Inventario</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/6-inventory-add-entry.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Adicionar Productos a la Venta Actual</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/7-sale.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Venta Actual</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/8-shopping-cart.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Disponibilidad del Inventario</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/9-inventario-pizzas.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="carousel-item">
+                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
+                        <div class="col-md-6">
+                            <h4 class="text-warning">Cuadre del día</h4>
+                            <!-- <p>Accede a las funcionalidades.</p> -->
+                        </div>
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <img src="assets/home/screenshots/10-menu-cuadre.png"
+                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Controls -->
+            <button class="carousel-control-prev" type="button" data-bs-target="#screenshotsCarousel"
+                data-bs-slide="prev">
+                <span class="carousel-control-prev-icon bg-dark rounded-circle"></span>
+                <span class="visually-hidden">Anterior</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#screenshotsCarousel"
+                data-bs-slide="next">
+                <span class="carousel-control-next-icon bg-dark rounded-circle"></span>
+                <span class="visually-hidden">Siguiente</span>
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action final -->
+<section id="registro" class="py-5" style="background-color: #0D1117;">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
+                    <p class="lead text-secondary mb-4" style="font-size: 1rem;">Empieza a vender con control y
+                        seguridad.
+                    </p>
+                    <a [routerLink]="['/register']" class="btn btn-lg px-4"
+                        style="background-color: #6f42c1; color: white; border-radius: 0.8rem;">
+                        Regístrate gratis
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

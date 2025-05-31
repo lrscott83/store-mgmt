@@ -40,9 +40,13 @@ import { ConfigurationsComponent } from './presentation/configurations/configura
 import { EditUserComponent } from './presentation/users/edit-user/edit-user.component';
 import { InventoryTodaySaleComponent } from './presentation/reports/inventory-today-sale/inventory-today-sale.component';
 import { TutorialComponent } from './presentation/help/tutorial/tutorial.component';
+import { LandingComponent } from './presentation/home/landing/landing.component';
+import { Landing2Component } from './presentation/home/landing2/landing2.component';
+import { LandingDeepComponent } from './presentation/home/landing-deep/landing-deep.component';
 
 const routes: Routes = [
-  { path: '', redirectTo: "login", pathMatch: 'full' },
+  // { path: '', redirectTo: "login", pathMatch: 'full' },
+  { path: '', component: LandingDeepComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent, 
     //canDeactivate: [CanDeactivateGuard] 

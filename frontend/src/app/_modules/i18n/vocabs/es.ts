@@ -14,7 +14,7 @@ export const locale = {
       },
       SALE_MGMT: {
         TITLE: 'VENTA',
-        PRODUCTS: 'Productos',
+        PRODUCTS: 'Catálogo Productos',
         SALE: 'Vender',
         TODAY_ORDERS: 'Ventas del día',
         TODAY_STATS: 'Cuadre del día',

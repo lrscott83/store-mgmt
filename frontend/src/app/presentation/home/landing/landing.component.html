@@ -1,0 +1,115 @@
+<!-- Hero Section -->
+<section class="container py-5 text-center">
+    <img src="assets/logo.png" alt="VendeDTo Logo" class="mb-4" style="max-height: 80px;" />
+    <h1 class="display-5 fw-bold">VendeDTo</h1>
+    <p class="lead text-muted">La forma más segura y fácil de gestionar tu punto de venta, sin depender de Internet.</p>
+    <a href="https://tusitio.com/registro" class="btn btn-lg"
+        style="background-color: #6f42c1; color: white;">Regístrate ahora</a>
+</section>
+
+<!-- Funcionalidades destacadas -->
+<section class="bg-light py-5">
+    <div class="container">
+        <h2 class="text-center mb-4">¿Qué puedes hacer con VendeDTo?</h2>
+        <div class="row text-center">
+            <div class="col-md-4 mb-4">
+                <i class="bi bi-lock-fill fs-1 text-primary"></i>
+                <h5 class="mt-3">Seguridad total</h5>
+                <p>Todos tus datos se guardan localmente en tu teléfono.</p>
+            </div>
+            <div class="col-md-4 mb-4">
+                <i class="bi bi-wifi-off fs-1" style="color: #6f42c1;"></i>
+                <h5 class="mt-3">Funciona sin Internet</h5>
+                <p>Solo necesitas conexión para iniciar sesión. El resto funciona offline.</p>
+            </div>
+            <div class="col-md-4 mb-4">
+                <i class="bi bi-cash-coin fs-1 text-primary"></i>
+                <h5 class="mt-3">Registra y controla ventas</h5>
+                <p>Registra ventas, consulta inventario, cuadrar caja y genera reportes.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Cómo funciona -->
+<section class="container py-5">
+    <h2 class="text-center mb-5">¿Cómo funciona?</h2>
+    <div class="row g-4">
+        <div class="col-md-3 text-center">
+            <i class="bi bi-person-plus fs-1" style="color: #6f42c1;"></i>
+            <h6 class="mt-2">1. Regístrate</h6>
+            <p>Crea tu cuenta en segundos.</p>
+        </div>
+        <div class="col-md-3 text-center">
+            <i class="bi bi-shop fs-1 text-primary"></i>
+            <h6 class="mt-2">2. Configura tu tienda</h6>
+            <p>Agrega productos y precios.</p>
+        </div>
+        <div class="col-md-3 text-center">
+            <i class="bi bi-cart-check fs-1" style="color: #6f42c1;"></i>
+            <h6 class="mt-2">3. Registra ventas</h6>
+            <p>Vende y lleva el control sin complicaciones.</p>
+        </div>
+        <div class="col-md-3 text-center">
+            <i class="bi bi-bar-chart-line fs-1 text-primary"></i>
+            <h6 class="mt-2">4. Consulta tus reportes</h6>
+            <p>Gana claridad sobre tus ingresos.</p>
+        </div>
+    </div>
+</section>
+
+<!-- video demo -->
+<section class="bg-light py-5">
+    <div class="container text-center">
+        <h2 class="mb-4">Mira VendeDTo en acción</h2>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <!-- Reemplaza por tu video real -->
+                <video controls class="w-100 rounded shadow">
+                    <source src="assets/demo.mp4" type="video/mp4" />
+                    Tu navegador no soporta video HTML5.
+                </video>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Capturas de pantalla -->
+<section class="py-5">
+    <div class="container">
+        <h2 class="text-center mb-4">Capturas de pantalla</h2>
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-4 col-sm-6 fade-in" *ngFor="let screen of screenshots; let i = index"
+                [ngClass]="'delay-' + i">
+                <div class="card border-0 shadow-sm hover-zoom">
+                    <img [src]="screen.image" [alt]="screen.title" class="card-img-top rounded" />
+                    <div class="card-body text-center">
+                        <h6 class="card-title">{{ screen.title }}</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+<!-- Call to Action final -->
+<section class="container py-5 text-center">
+    <h2 class="mb-3">Empieza a vender con control y seguridad</h2>
+    <a href="https://tusitio.com/registro" class="btn btn-lg"
+        style="background-color: #6f42c1; color: white;">Regístrate gratis</a>
+</section>
+
+<!-- Footer -->
+<footer class="bg-dark text-white py-4">
+    <div class="container text-center">
+        <p class="mb-1">© 2025 VendeDTo. Todos los derechos reservados.</p>
+        <div class="mt-2">
+            <!-- Agrega enlaces reales -->
+            <a href="https://facebook.com" class="text-decoration-none me-3" style="color: #1890ff;">Facebook</a>
+            <a href="https://instagram.com" class="text-decoration-none me-3" style="color: #1890ff;">Instagram</a>
+            <a href="https://twitter.com" class="text-decoration-none" style="color: #1890ff;">Twitter</a>
+        </div>
+    </div>
+</footer>
