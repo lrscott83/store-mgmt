@@ -6,22 +6,21 @@
             <span class="fw-bold" style="margin-top: 3px; color: #6f42c1;">VendeDTo</span>
         </a>
 
-        <ul class="navbar-nav ms-auto">
-            <!-- otros links -->
+        <!-- <ul class="navbar-nav ms-auto">
             <li class="nav-item">
                 <a class="btn btn-sm btn-outline-warning ms-2" [routerLink]="['/register']">Regístrate</a>
             </li>
-        </ul>
+        </ul> -->
 
         <ul class="navbar-nav ms-auto">
             <!-- otros links -->
             <li class="nav-item">
-                <a class="btn btn-sm btn-outline-warning ms-2" [routerLink]="['/login']">Autenticación</a>
+                <a class="btn btn-sm btn-outline-light ms-2" style="border: 0px;" [routerLink]="['/login']">Autenticación</a>
             </li>
         </ul>
 
         <!-- Menú hamburguesa -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" style="margin-left: 12px;">
             <span class="navbar-toggler-icon"></span>
         </button>
 
@@ -29,19 +28,20 @@
         <div class="collapse navbar-collapse" id="mainNavbar">
             <ul class="navbar-nav ms-auto text-end text-lg-start" style="background-color: #1e252e;">
                 <li class="nav-item">
-                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#hero">Inicio</a>
+                    <a class="nav-link text-light" href="#hero" style="padding-right: 10px; border: 1px;">Inicio</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#caracteristicas">Características Principales</a>
+                    <a class="nav-link text-light" href="#caracteristicas" style="padding-right: 10px;">Características
+                        Principales</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#como-funciona">¿Cómo funciona?</a>
+                    <a class="nav-link text-light" href="#como-funciona" style="padding-right: 10px;">¿Cómo funciona?</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#capturas">Capturas de pantallas</a>
+                    <a class="nav-link text-light" href="#capturas" style="padding-right: 10px;">Capturas de pantallas</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn btn-sm btn-outline-warning ms-2 m-1" href="#registro">Regístrate</a>
+                    <a class="nav-link text-light" href="#registro" style="padding-right: 10px;">Regístrate</a>
                 </li>
             </ul>
         </div>
@@ -246,7 +246,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/1-catalog.png" class="img-fluid rounded carousel-img"
-                                alt="Paso 1">
+                                alt="Pantalla 1">
                         </div>
                     </div>
                 </div>
@@ -259,7 +259,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/2-catalog-add-category.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                                class="img-fluid rounded carousel-img" alt="Pantalla 2">
                         </div>
                     </div>
                 </div>
@@ -272,7 +272,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/3-catalog-import-products.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                                class="img-fluid rounded carousel-img" alt="Pantalla 3">
                         </div>
                     </div>
                 </div>
@@ -285,7 +285,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/4-catalog-add-products.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                                class="img-fluid rounded carousel-img" alt="Pantalla 4">
                         </div>
                     </div>
                 </div>
@@ -298,7 +298,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/5-catalog-add-product.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                                class="img-fluid rounded carousel-img" alt="Pantalla 5">
                         </div>
                     </div>
                 </div>
@@ -311,7 +311,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/6-inventory-add-entry.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                                class="img-fluid rounded carousel-img" alt="Pantalla 6">
                         </div>
                     </div>
                 </div>
@@ -323,8 +323,8 @@
                             <!-- <p>Accede a las funcionalidades.</p> -->
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/7-sale.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                            <img src="assets/home/screenshots/7-sale.png" class="img-fluid rounded carousel-img"
+                                alt="Pantalla 7">
                         </div>
                     </div>
                 </div>
@@ -337,7 +337,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/8-shopping-cart.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                                class="img-fluid rounded carousel-img" alt="Pantalla 8">
                         </div>
                     </div>
                 </div>
@@ -350,7 +350,7 @@
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
                             <img src="assets/home/screenshots/9-inventario-pizzas.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                                class="img-fluid rounded carousel-img" alt="Pantalla 9">
                         </div>
                     </div>
                 </div>
@@ -362,8 +362,8 @@
                             <!-- <p>Accede a las funcionalidades.</p> -->
                         </div>
                         <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/10-menu-cuadre.png"
-                                class="img-fluid rounded carousel-img" alt="Paso 2">
+                            <img src="assets/home/screenshots/10-cuadre-dia.png" class="img-fluid rounded carousel-img"
+                                alt="Pantalla 10">
                         </div>
                     </div>
                 </div>
