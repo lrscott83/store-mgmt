@@ -28,7 +28,7 @@
             </button>
         </div>
 
-        <app-sale-category-products [category]="selectedCategory()"></app-sale-category-products>
+        <app-sale-category-products [category]="selectedCategory()" [orderType]="orderType"></app-sale-category-products>
 
         <div class="row">
             <div *ngIf="((categories$ | async).length > 0) && !(selectedCategory$ | async)" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">

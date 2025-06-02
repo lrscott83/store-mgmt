@@ -10,6 +10,7 @@ import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
 import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
 import { Result } from 'src/app/domain/commons/result';
+import { OrderType } from 'src/app/domain/entities/orders/order.model';
 
 @Injectable({
     providedIn: "root"
@@ -18,6 +19,8 @@ import { Result } from 'src/app/domain/commons/result';
 export abstract class ShoppingCartService extends BaseService<CartItem> {
 
     private _cartData$: BehaviorSubject<CartData> = new BehaviorSubject<CartData>(this.getDefaultCartData());
+    private orderType: OrderType = OrderType.Normal;
+    private orderDescription: string;
 
     private getDefaultCartData(): CartData {
         return {
@@ -31,6 +34,11 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
         super(http);
     }
 
+    updateOrderDetails(orderType: OrderType = OrderType.Normal, orderDescription:string) {
+        this.orderType = orderType;
+        this.orderDescription = orderDescription;
+    }
+
     getCartData$(): Observable<CartData> {
         return this._cartData$.asObservable();
     }
@@ -39,16 +47,24 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
         return this.getCartData().items;
     }
 
+    getOrderType(): OrderType {
+        return this.orderType;
+    }
+
+    getOrderDescription(): string {
+        return this.orderDescription;
+    }
+
     private getCartData(): CartData {
         return this._cartData$.value;
     }
 
-    addCartItem(productId: string, quantity: number): Promise<BaseResponseModel<boolean>> {
+    addCartItem(orderType: OrderType, productId: string, quantity: number, price: number): Promise<BaseResponseModel<boolean>> {
         return new Promise((resolve, reject) => {
             this.productService.getProductById(productId)
                 .subscribe(response => {
                     if (response.succeeded)
-                        resolve(this.addItem(response.data, quantity));
+                        resolve(this.addItem(orderType, response.data, quantity, price));
                     else {
                         resolve(this.Failure(response.errors));
                     }
@@ -59,14 +75,14 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
     }
 
     increaseCartItem(productId: string): Promise<BaseResponseModel<boolean>> {
-        return this.addCartItem(productId, 1);
+        return this.addCartItem(this.orderType, productId, 1, null);
     }
 
     decreaseCartItem(productId: string): Promise<BaseResponseModel<boolean>> {
-        return this.addCartItem(productId, -1);
+        return this.addCartItem(this.orderType, productId, -1, null);
     }
 
-    private addItem(product: Product, quantity: number): BaseResponseModel<boolean> {
+    private addItem(orderType: OrderType, product: Product, quantity: number, price: number): BaseResponseModel<boolean> {
         if (!product) {
             // if (!cartItem) {
             //     this.removeCartItem(product.id);
@@ -90,12 +106,14 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
             else
                 return this.removeCartItem(product.id);
         } else {
+            this.orderType = orderType;
+            // TODO. If order types are differents then confirm dialog should be shown.
             let qty = quantity > 0 ? quantity : 1;
             items.push({
                 productId: product.id,
                 name: product.name,
                 quantity: qty,
-                price: product.price,
+                price: price,
             });
         }
 
@@ -140,6 +158,8 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
 
     clearCart() {
         this._cartData$.next(this.getDefaultCartData());
+        this.orderType = OrderType.Normal;
+        this.orderDescription = "";
     }
 
     getCartItemQuantity(productId: string): number {

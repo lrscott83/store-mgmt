@@ -33,7 +33,8 @@ export enum EFeatures {
   // Inventory
   Available = 30,
   Entries = 31,
-  TodayInventoryStats = 32,
+  Egress = 32,
+  TodayInventoryStats = 33,
 
   // Synchronization
   Send = 40,

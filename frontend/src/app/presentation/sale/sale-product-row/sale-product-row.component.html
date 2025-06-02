@@ -1,13 +1,25 @@
-<td class="p-2 w-100">
-    <p class="text-dark mb-1 font-size-lg">
-        {{product.name}}
-    </p>
-    <span class="text-primary mb-1 font-size-lg">
-        {{product.price | currency:'USD':'symbol':'1.2-2'}}
-    </span>
-</td>
-<td class="text-right p-2">
-    <form class="form" id="sale_product_form_{{product.id}}" [formGroup]="formGroup">
+<form class="form" id="sale_product_form_{{product.id}}" [formGroup]="formGroup">
+    <td class="p-2 w-100">
+        <p class="text-dark mb-1 font-size-lg">
+            {{product.name}}
+        </p>
+        <!-- <span class="text-primary mb-1 font-size-lg">
+            {{product.price | currency:'USD':'symbol':'1.2-2'}}
+        </span> -->
+        <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field price">
+            <mat-label>{{'GENERAL.PRICE'| translate}}</mat-label>
+            <input type="number" matInput min="0" formControlName="price" required autocomplete="off" />
+            <!-- <mat-icon matPrefix>attach_money</mat-icon> -->
+            <mat-error *ngIf="isControlInvalid('price','required')">
+                {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.PRICE'| translate } }}
+            </mat-error>
+            <mat-error *ngIf="isControlInvalid('price','min')">
+                {{'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' | translate : { name: 'GENERAL.PRICE'|
+                translate } }}
+            </mat-error>
+        </mat-form-field>
+    </td>
+    <td class="text-right p-2">
         <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
             <mat-label>{{'GENERAL.QUANTITY'| translate}}</mat-label>
             <input type="number" matInput formControlName="quantity" required autocomplete="off" />
@@ -15,10 +27,10 @@
                 {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.QUANTITY' | translate } }}
             </mat-error>
         </mat-form-field>
-    </form>
-</td>
-<td class="text-right p-2" style="padding-right: 20px !important;">
-    <button (click)="addProductToCart(product.id)" mat-mini-fab color="primary">
-        <mat-icon>shopping_cart</mat-icon>
-    </button>
-</td>
+    </td>
+    <td class="text-right p-2" style="padding-right: 20px !important;">
+        <button (click)="addProductToCart(product.id)" mat-mini-fab color="primary">
+            <mat-icon>shopping_cart</mat-icon>
+        </button>
+    </td>
+</form>

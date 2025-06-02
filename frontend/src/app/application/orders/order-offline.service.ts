@@ -4,7 +4,7 @@ import { Observable, of } from 'rxjs';
 import { Guid } from 'guid-typescript';
 import * as _moment from 'moment';
 import { BaseService } from 'src/app/_services/base.service';
-import { Order } from 'src/app/domain/entities/orders/order.model';
+import { Order, OrderType } from 'src/app/domain/entities/orders/order.model';
 import { ProductRepository } from '../products/product.repository';
 import { AuthService } from 'src/app/_services/services.index';
 import { ProductCategoryRepository } from '../categories/product-category.repository';
@@ -35,7 +35,7 @@ export class OrderOfflineService extends BaseService<Order> {
         super(http);
     }
 
-    createOrder(cartItems: CartItem[]): Observable<BaseResponseModel<boolean>> {
+    createOrder(cartItems: CartItem[], type: OrderType, details: string): Observable<BaseResponseModel<boolean>> {
         const date: Date = new Date();
         var order: Order = {
             id: Guid.create().toString(),
@@ -43,6 +43,8 @@ export class OrderOfflineService extends BaseService<Order> {
             total: this.getItemsTotal(cartItems),
             itemsCount: this.getItemsCount(cartItems),
             date: date,
+            type: type,
+            description: details,
             isActive: true,
             createdDate: date,
             //createdByName: this.authService.currentUserValue.login,
@@ -207,7 +209,7 @@ export class OrderOfflineService extends BaseService<Order> {
                     categoryId: product.categoryId,
                     categoryName: product.categoryName,
                     name: product.name,
-                    price: product.price,
+                    price: item.price,
                     quantity: item.quantity,
                     productBusinessId: product.businessId,
                     productCosts: inventoryCosts,

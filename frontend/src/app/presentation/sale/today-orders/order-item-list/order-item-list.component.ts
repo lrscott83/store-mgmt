@@ -4,7 +4,7 @@ import { TranslationModule } from 'src/app/_modules/i18n/translation.module';
 import { ShoppingCartService } from 'src/app/_services/order/shopping-cart.service';
 import { OrderOfflineService } from 'src/app/application/orders/order-offline.service';
 import { OrderItem } from 'src/app/domain/entities/orders/order-item.model';
-import { Order } from 'src/app/domain/entities/orders/order.model';
+import { Order, OrderType } from 'src/app/domain/entities/orders/order.model';
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 import Swal from 'sweetalert2';
 
@@ -59,7 +59,7 @@ export class OrderItemListComponent implements OnInit {
 
   addOrderItemsToShoppingCart() {
     this.order.orderItems.forEach(item => {
-      this.shoppingCartService.addCartItem(item.productId, item.quantity);
+      this.shoppingCartService.addCartItem(OrderType.Normal, item.productId, item.quantity, item.price);
     });
   }
 

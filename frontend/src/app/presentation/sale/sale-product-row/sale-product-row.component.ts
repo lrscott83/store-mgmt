@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { SharedModule } from '../../shared/shared.module';
@@ -9,6 +9,7 @@ import { ShoppingCartService } from 'src/app/_services/order/shopping-cart.servi
 import { Result } from 'src/app/domain/commons/result';
 import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
 import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
+import { OrderType } from 'src/app/domain/entities/orders/order.model';
 
 @Component({
   selector: 'app-sale-product-row',
@@ -17,14 +18,32 @@ import { InventoryOfflineService } from 'src/app/application/entries/inventory-o
   templateUrl: './sale-product-row.component.html',
   styleUrl: './sale-product-row.component.scss'
 })
-export class SaleProductRowComponent {
+export class SaleProductRowComponent implements OnInit, OnChanges {
   @Input() product: Product;
+  @Input() orderType: OrderType;
 
   formGroup: FormGroup;
   formPatterns: any;
 
   constructor(private formBuilder: FormBuilder, private shoppingCartService: ShoppingCartService, private translate: TranslateService, private inventoryService: InventoryOfflineService) {
     this.loadForm();
+  }
+
+  ngOnInit(): void {
+    this.formGroup.patchValue({ quantity: 1, price: this.product.price });
+    this.enableOrDisablePriceFromControl()
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    this.enableOrDisablePriceFromControl();
+  }
+
+  enableOrDisablePriceFromControl() {
+    if (this.orderType !== OrderType.Normal) {
+      this.formGroup.get('price')?.enable();
+    } else {
+      this.formGroup.get('price')?.disable();
+    }
   }
 
   addProductToCart(productId: string) {
@@ -73,12 +92,12 @@ export class SaleProductRowComponent {
         //   }
       });
     } else
-      this.addCartItem(productId);
+      this.addCartItem(this.orderType, productId);
 
   }
 
-  addCartItem(productId: string) {
-    this.shoppingCartService.addCartItem(productId, this.formGroup.value.quantity).then(response => {
+  addCartItem(orderType: OrderType, productId: string) {
+    this.shoppingCartService.addCartItem(orderType, productId, this.formGroup.value.quantity, this.formGroup.value.price).then(response => {
       if (response.succeeded) {
         // this.toastrService.success(
         //   this.translate.instant('SALES.PRODUCT_ADDED_TO_CART'));
@@ -101,8 +120,12 @@ export class SaleProductRowComponent {
       quantity: [{ value: "", disabled: false }, Validators.compose([
         Validators.required,
         Validators.pattern(this.formPatterns.number.regex)])],
+      price: [{ value: "", disabled: false }, Validators.compose([
+        Validators.required,
+        Validators.min(0),
+        //Validators.pattern(this.formPatterns.currency.regex)
+      ])],
     });
-    this.formGroup.patchValue({ quantity: 1 });
   }
 
   loadPatterns() {

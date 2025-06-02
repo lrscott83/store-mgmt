@@ -1,5 +1,5 @@
 // angular import
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // project import
@@ -46,24 +46,32 @@ import { SharedModule } from 'src/app/presentation/shared/shared.module';
 import Swal from 'sweetalert2';
 import { AuthService } from 'src/app/_services/services.index';
 import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
+import { OrderType, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
+import { NgbDropdown, NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { EditOrderDetailsModalComponent } from '../edit-order-details-modal/edit-order-details-modal.component';
 
 @Component({
   selector: 'app-nav-right',
   standalone: true,
-  imports: [SharedModule, RouterModule, TranslateModule],
+  imports: [SharedModule, RouterModule, TranslateModule, EditOrderDetailsModalComponent],
   templateUrl: './nav-right.component.html',
   styleUrls: ['./nav-right.component.scss']
 })
 export class NavRightComponent {
   @Input() styleSelectorToggle!: boolean;
   @Output() Customize = new EventEmitter();
+
+  @ViewChild('cartDropdown', { static: false }) cartDropdown!: NgbDropdown;
+
   windowWidth: number;
   screenFull: boolean = true;
 
   cartData$: Observable<CartData>;
   mustGenerateFacture: boolean = false;
 
-  constructor(private iconService: IconService, private shoppingCartService: ShoppingCartService, private orderService: OrderOfflineService, private translate: TranslateService, private toastrService: ToastrService, private authService: AuthService, private router: Router) {
+  orderType: OrderType = OrderType.Normal;
+
+  constructor(private iconService: IconService, private shoppingCartService: ShoppingCartService, private orderService: OrderOfflineService, private translate: TranslateService, private toastrService: ToastrService, private authService: AuthService, private router: Router, private modalService: NgbModal) {
     this.windowWidth = window.innerWidth;
     this.iconService.addIcon(
       ...[
@@ -92,6 +100,10 @@ export class NavRightComponent {
       ]
     );
     this.cartData$ = this.shoppingCartService.getCartData$();
+  }
+
+  closeCartDropdown() {
+    this.cartDropdown.close();
   }
 
   navigateToHelp() {
@@ -124,7 +136,7 @@ export class NavRightComponent {
       return;
     }
 
-    this.orderService.createOrder(this.shoppingCartService.getCartItems()).subscribe(response => {
+    this.orderService.createOrder(this.shoppingCartService.getCartItems(), this.shoppingCartService.getOrderType(), this.shoppingCartService.getOrderDescription()).subscribe(response => {
       if (response.succeeded) {
         this.toastrService.success(
           this.translate.instant('SHOPPING_CART.ORDER_CREATED'),
@@ -132,12 +144,18 @@ export class NavRightComponent {
         if (this.mustGenerateFacture) {
           this.generateFacture();
         }
-        this.shoppingCartService.clearCart();
+        this.clearShoppingCart();
       } else
-        this.toastrService.success(
+        this.toastrService.error(
           this.translate.instant('SHOPPING_CART.ORDER_NOT_CREATED'),
           this.translate.instant('GENERAL.RESPONSE.ERROR'));
     });
+  }
+
+  clearShoppingCart() {
+    this.shoppingCartService.clearCart();
+    this.orderType = OrderType.Normal;
+    this.closeCartDropdown();
   }
 
   generateFacture() {
@@ -243,6 +261,17 @@ export class NavRightComponent {
 
   navigateToUrl(url: string) {
     this.router.navigateByUrl(url);
+  }
+
+  getOrderTypeText(): string {
+    return OrderTypeUtils.getOrderTypeText(this.shoppingCartService.getOrderType());
+  }
+
+  editOrderDetails() {
+    const modalRef = this.modalService.open(EditOrderDetailsModalComponent, { centered: true, size: "lg" });
+    modalRef.componentInstance.productCategoryUpdatedEmitter.subscribe(() => {
+      //this.orderType = OrderTypeUtils.getOrderTypeText(this.shoppingCartService.getOrderType());
+    });
   }
 
   profile = [

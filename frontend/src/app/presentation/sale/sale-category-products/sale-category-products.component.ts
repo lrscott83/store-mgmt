@@ -6,6 +6,7 @@ import { ProductCategory } from 'src/app/domain/entities/product-categories/prod
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { SharedModule } from '../../shared/shared.module';
 import { SaleProductRowComponent } from '../sale-product-row/sale-product-row.component';
+import { OrderType } from 'src/app/domain/entities/orders/order.model';
 
 @Component({
   selector: 'app-sale-category-products',
@@ -16,13 +17,15 @@ import { SaleProductRowComponent } from '../sale-product-row/sale-product-row.co
 })
 export class SaleCategoryProductsComponent {
   @Input() category: Observable<ProductCategory>;
+  @Input() orderType: OrderType;
 
+  editPrice: boolean;
   products$: BehaviorSubject<Product[]> = new BehaviorSubject<Product[]>([]);
 
   private unsubscribe: Subscription[] = [];
 
   constructor(private productService: ProductOfflineService) { 
-    
+    this.editPrice = this.orderType !== OrderType.Normal;
   }
 
   ngOnInit(): void {

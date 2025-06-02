@@ -24,6 +24,7 @@ export const locale = {
         AVAILABLE: 'Disponible',
         ENTRIES: 'Entradas',
         TODAY_STATS: 'Cuadre del día',
+        EGRESS: 'Salida',
       },
       SYNCHRONIZATION: {
         TITLE: 'SINCRONIZACIÓN',
@@ -356,6 +357,8 @@ export const locale = {
       ORDER_NOT_CREATED: 'Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
       DON_NOT_PAY_EMPTY_CART: 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
       GENERATE_FACTURE: 'Generar Factura',
+      CLEAR: 'Limpiar',
+      EDIT_DETAILS: 'Editar Detalles'
     },
     SALES: {
       NO_CATEGORY_ALERT_MESSAGE: 'No existe ninguna categoría. Usted puede adicionar categorías si da click aquí: ',
@@ -397,6 +400,9 @@ export const locale = {
       NEW_ENTRY: 'Adicionar Entrada',
       NO_ENTRY_FOUND: 'No existe ningún producto disponible',
       CATEGORY_PRODUCT_NO_FOUND: 'No existe ningún producto disponible en la categoría',
+    },
+    INVENTORY_EGRESS: {
+      HEADER: 'Salida',
     },
     HELP: {
       MENU: {

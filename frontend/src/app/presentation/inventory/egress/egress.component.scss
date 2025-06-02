@@ -1,0 +1,23 @@
+.category-button {
+  padding-left: 4px;
+  padding-right: 4px;
+  margin-right: 4px; 
+  margin-bottom: 4px;
+}
+
+
+.no-scrollbar {
+  scrollbar-width: none !important;
+  overflow: -moz-scrollbars-none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0 !important;
+  display: none !important;
+}
+
+::ng-deep .mat-mdc-form-field-type-mat-select > .mat-mdc-text-field-wrapper {
+  width: 200px !important;
+}

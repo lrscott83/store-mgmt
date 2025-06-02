@@ -4,7 +4,7 @@
     <table class="table table-borderless table-vertical-center">
         <tbody>
             <tr *ngFor="let item of products$ | async" class="border-1">
-                <app-sale-product-row [product]="item"></app-sale-product-row>
+                <app-sale-product-row [product]="item" [orderType]="orderType" class="p-0" style="padding: 0px;"></app-sale-product-row>
             </tr>
         </tbody>
     </table>

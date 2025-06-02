@@ -43,6 +43,7 @@ import { TutorialComponent } from './presentation/help/tutorial/tutorial.compone
 import { LandingComponent } from './presentation/home/landing/landing.component';
 import { Landing2Component } from './presentation/home/landing2/landing2.component';
 import { LandingDeepComponent } from './presentation/home/landing-deep/landing-deep.component';
+import { EgressComponent } from './presentation/inventory/egress/egress.component';
 
 const routes: Routes = [
   // { path: '', redirectTo: "login", pathMatch: 'full' },
@@ -155,12 +156,19 @@ const routes: Routes = [
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Available] }
       },
-      {
+       {
         path: 'inventory/entries', 
         component: EntriesComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Entries] }
+      },
+      {
+        path: 'inventory/egress', 
+        component: EgressComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.Egress] }
       },
       {
         path: 'synchronization/export', 

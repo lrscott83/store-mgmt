@@ -164,6 +164,18 @@ export const NavigationItems: NavigationItem[] = [
         feature: EFeatures.Entries,
         helpDialog: EntriesHelpDialogComponent,
       },
+      {
+        id: 'inventory_sale',
+        title: 'MENU.INVENTORY_MGMT.EGRESS',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/inventory/egress',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Inventory,
+        feature: null,
+        helpDialog: EntriesHelpDialogComponent,
+      },
       // {
       //   id: 'inventory_stats',
       //   title: 'MENU.INVENTORY_MGMT.TODAY_STATS',
