@@ -39,11 +39,12 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
   }
 
   enableOrDisablePriceFromControl() {
-    if (this.orderType !== OrderType.Normal) {
-      this.formGroup.get('price')?.enable();
-    } else {
-      this.formGroup.get('price')?.disable();
-    }
+    // TODO. Price undefined when a product is added.
+    // if (this.orderType !== OrderType.Normal) {
+    //   this.formGroup.get('price')?.enable();
+    // } else {
+    //   this.formGroup.get('price')?.disable();
+    // }
   }
 
   addProductToCart(productId: string) {
