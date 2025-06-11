@@ -1,17 +1,18 @@
-import { Component, EventEmitter, Input, OnInit, Output, ViewEncapsulation } from '@angular/core';
+import { Component, EventEmitter, Inject, Input, OnInit, Output, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BehaviorSubject } from 'rxjs';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
 import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { ProductSelectView } from 'src/app/application/products/product-select.view';
 import { DataResult } from 'src/app/domain/commons/result';
 import { InventoryEntryView } from 'src/app/domain/entities/entries/inventory-entry-view.model';
 import { InventoryEntry } from 'src/app/domain/entities/entries/inventory-entry.model';
 import Swal from 'sweetalert2';
 import { SharedModule } from '../../shared/shared.module';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
   selector: 'app-edit-inventory-entry-modal',
@@ -33,7 +34,7 @@ export class EditInventoryEntryModalComponent implements OnInit {
   formGroup: FormGroup;
   formPatterns: any;
 
-  constructor(private productService: ProductOfflineService, private formBuilder: FormBuilder, private modal: NgbActiveModal, private translate: TranslateService, private inventoryService: InventoryOfflineService) {
+  constructor(@Inject(PRODUCT_SERVICE) private productService: ProductService, private formBuilder: FormBuilder, private modal: NgbActiveModal, private translate: TranslateService, private inventoryService: InventoryOfflineService) {
     this.loadForm();
   }
 

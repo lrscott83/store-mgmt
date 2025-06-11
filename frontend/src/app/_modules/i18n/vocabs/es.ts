@@ -41,7 +41,7 @@ export const locale = {
       },
       STATISTICS: {
         TITLE: 'ESTADÍSTICAS',
-        DASHBOARD: 'Dashboard',
+        DASHBOARD: 'Panel de Control',
       },
       SHOPPING: 'VENTA',
       PRODUCTS: 'PRODUCTOS',
@@ -443,6 +443,9 @@ export const locale = {
     },
     TUTORIAL: {
       TITLE: 'Ayuda General',
+    },
+    DASHBOARD: {
+      HEADER: 'Panel de Control',
     }
   }
 };

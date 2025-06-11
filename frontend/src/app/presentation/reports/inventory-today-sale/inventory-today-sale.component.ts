@@ -2,7 +2,6 @@ import { Component } from '@angular/core';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslationModule } from 'src/app/_modules/i18n/translation.module';
 import { TranslateService } from '@ngx-translate/core';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { ProductRepository } from 'src/app/application/products/product.repository';
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { OrderOfflineService } from 'src/app/application/orders/order-offline.service';

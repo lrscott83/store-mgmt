@@ -26,7 +26,10 @@ import { ServiceWorkerModule } from '@angular/service-worker';
 import { ProductCategoryOnlineService } from './application/categories/product-category-online.service';
 import { ProductCategoryOfflineService } from './application/categories/product-category-offline.service';
 import { productCategoryServiceFactory } from './_services/factories/product-category-service.factory';
-import { PRODUCT_CATEGORY_SERVICE } from './_services/tokens';
+import { PRODUCT_CATEGORY_SERVICE, PRODUCT_SERVICE } from './_services/tokens';
+import { ProductOfflineService } from './application/products/product-offline.service';
+import { ProductOnlineService } from './application/products/product-online.service';
+import { productServiceFactory } from './_services/factories/product-service.factory';
 
 // function appInitializer(authService: AuthService): Promise<void> {
 //   return new Promise((resolve) => {
@@ -129,7 +132,13 @@ export function initializeApp(appInitService: AppInitService) {
     {
       provide: PRODUCT_CATEGORY_SERVICE,
       useFactory: productCategoryServiceFactory,
-    }
+    },
+    ProductOfflineService,
+    ProductOnlineService,
+    {
+      provide: PRODUCT_SERVICE,
+      useFactory: productServiceFactory,
+    },
     
   ],
   bootstrap: [AppComponent]

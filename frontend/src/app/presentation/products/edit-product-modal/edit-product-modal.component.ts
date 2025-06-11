@@ -1,14 +1,15 @@
-import { Component, OnInit, Output, EventEmitter, Input, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, Input, ViewEncapsulation, Inject } from '@angular/core';
 import { FormGroup, FormBuilder, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import { Product } from 'src/app/domain/entities/products/product.model';
 import Swal from 'sweetalert2';
 import { SharedModule } from '../../shared/shared.module';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
   selector: 'app-edit-product-modal',
@@ -29,7 +30,7 @@ export class EditProductModalComponent implements OnInit {
   formGroup: FormGroup;
   formPatterns: any;
 
-  constructor(private formBuilder: FormBuilder, private modal: NgbActiveModal, private translate: TranslateService, private productService: ProductOfflineService) { 
+  constructor(private formBuilder: FormBuilder, private modal: NgbActiveModal, private translate: TranslateService, @Inject(PRODUCT_SERVICE) private productService: ProductService) { 
     this.loadForm();
   }
 

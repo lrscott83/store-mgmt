@@ -22,10 +22,10 @@ export class ProductCategoryOfflineService extends ProductCategoryService {
         super(http);
     }
 
-    getProductCategoryById(categoryId: string): Observable<BaseResponseModel<ProductCategory>> {
-        const category = this.categoryRepository.getProductCategoryById(categoryId);
-        return category ? this.Success$(category) : this.Failure$([ProductCategoryErrors.NotExists]);
-    }
+    // getProductCategoryById(categoryId: string): Observable<BaseResponseModel<ProductCategory>> {
+    //     const category = this.categoryRepository.getProductCategoryById(categoryId);
+    //     return category ? this.Success$(category) : this.Failure$([ProductCategoryErrors.NotExists]);
+    // }
 
     createProductCategory(name: string, order: number, isActive: boolean): Observable<BaseResponseModel<boolean>> {
         let result: Result = this.categoryRepository.addProductCategory(name, order, isActive);
@@ -49,10 +49,10 @@ export class ProductCategoryOfflineService extends ProductCategoryService {
 
     getProductCategoriesView(): Observable<BaseResponseModel<ProductCategoryView[]>> {
         console.log("ProductCategoryOfflineService.getProductCategoriesView");
-        const categories: ProductCategory[] = this.categoryRepository.getProductCategories();
+        const categories: ProductCategory[] = this.categoryRepository.getAvailableProductCategories();
         const categoriesView: ProductCategoryView[] = categories
         .map(category => {
-            const productsCount = this.productRepository.getProductsByCategoryId(category.id).length;
+            const productsCount = this.productRepository.getAvailableToSaleProductsByCategoryId(category.id).length;
             return {
                 id: category.id,
                 name: category.name,

@@ -7,10 +7,11 @@ import { CartData } from '../_models/order/cart-data.model';
 import { BaseResponseModel } from '../_models/base.model';
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
 import { Result } from 'src/app/domain/commons/result';
 import { OrderType } from 'src/app/domain/entities/orders/order.model';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
+import { PRODUCT_SERVICE } from '../tokens';
 
 @Injectable({
     providedIn: "root"
@@ -30,7 +31,7 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
         };
     }
 
-    constructor(@Inject(HttpClient) http, private productService: ProductOfflineService, private inventoryService: InventoryOfflineService) {
+    constructor(@Inject(HttpClient) http, @Inject(PRODUCT_SERVICE) private productService: ProductService, private inventoryService: InventoryOfflineService) {
         super(http);
     }
 

@@ -19,6 +19,9 @@ import { InventoryEntryCost } from '../entries/inventory-item-cost.view';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
 import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 import { Result } from 'src/app/domain/commons/result';
+import { ChartData } from 'src/app/presentation/_models/chart-data,model';
+import { MatLabel } from '@angular/material/form-field';
+import { TopProduct } from 'src/app/presentation/_models/top-product.model';
 
 @Injectable({
     providedIn: "root"
@@ -47,8 +50,7 @@ export class OrderOfflineService extends BaseService<Order> {
             description: details,
             isActive: true,
             createdDate: date,
-            //createdByName: this.authService.currentUserValue.login,
-            createdByName: "admin",
+            createdByName: this.authService.currentUserValue.login,
             updatedDate: undefined,
             updatedByName: undefined,
         };
@@ -150,6 +152,132 @@ export class OrderOfflineService extends BaseService<Order> {
     //     return flatten;
     // }
 
+    private getActiveOrdersBetweenDates(startDate: Date, endDate: Date): Order[] {
+        return this.getStorageOrders()
+            .filter(order => order.isActive
+                && order.date >= startDate && order.date < endDate)
+            .sort((o1, o2) => o1.date.getTime() - o2.date.getTime());
+    }
+
+    private getActiveOrdersPriceBetweenDates(startDate: Date, endDate: Date): number {
+        return this.getActiveOrdersBetweenDates(startDate, endDate)
+            .reduce((total, order) => total + order.total, 0);
+    }
+
+    getActiveOrdersPriceToday(): number {
+        const startMoment = _moment(new Date()).startOf('day');
+        const startDate = startMoment.toDate();
+        const endDate = startMoment.add(1, 'days').toDate();
+        return this.getActiveOrdersPriceBetweenDates(startDate, endDate);;
+    }
+
+    getActiveOrdersPriceYesterday(): number {
+        const startDate = _moment().subtract(1, 'day').startOf('day').toDate();
+        const endDate = _moment().startOf('day').toDate();
+        return this.getActiveOrdersPriceBetweenDates(startDate, endDate);
+    }
+
+    getActiveOrdersProfitBetweenDates(startDate: Date, endDate: Date): number {
+        let profit = 0;
+        this.getActiveOrdersBetweenDates(startDate, endDate)
+            .flatMap(order => order.orderItems)
+            .forEach(orderItem => {
+                profit += this.getOrderItemProfit(orderItem)
+            })
+        return profit;
+    }
+
+    private getOrderItemProfit(orderItem: OrderItem) {
+        return orderItem.price * orderItem.quantity
+            - orderItem.productCosts.reduce((total, pc) => total + (pc.costPrice * pc.quantity), 0);
+    }
+
+    getActiveOrdersProfitToday(): number {
+        const startMoment = _moment(new Date()).startOf('day');
+        const startDate = startMoment.toDate();
+        const endDate = startMoment.add(1, 'days').toDate();
+        return this.getActiveOrdersProfitBetweenDates(startDate, endDate);;
+    }
+
+    getActiveOrdersProfitYesterday(): number {
+        const startDate = _moment().subtract(1, 'day').startOf('day').toDate();
+        const endDate = _moment().startOf('day').toDate();
+        return this.getActiveOrdersProfitBetweenDates(startDate, endDate);
+    }
+
+    getLastMonthSaleProfits(): ChartData[] {
+        const data: ChartData[] = [];
+        for (let i = 29; i >= 0; i--) {
+            const date: _moment.Moment = _moment().subtract(i, 'days');
+            const startDate = date.startOf('day').toDate();
+            const endDate = i > 0
+                ? _moment().subtract(i - 1, 'days').startOf('day').toDate()
+                : _moment().add(1, 'days').toDate();
+            data.push({
+                label: date,
+                value: this.getActiveOrdersProfitBetweenDates(startDate, endDate)
+            });
+        }
+        return data;
+    }
+
+    getLastMonthSales(): ChartData[] {
+        const data: ChartData[] = [];
+        for (let i = 29; i >= 0; i--) {
+            const date: _moment.Moment = _moment().subtract(i, 'days');
+            const startDate = date.startOf('day').toDate();
+            const endDate = i > 0
+                ? _moment().subtract(i - 1, 'days').startOf('day').toDate()
+                : _moment().add(1, 'days').toDate();
+            data.push({
+                label: date,
+                value: this.getActiveOrdersPriceBetweenDates(startDate, endDate)
+            });
+        }
+        return data;
+    }
+
+    private getActiveOrders(): Order[] {
+        return this.getStorageOrders()
+            .filter(order => order.isActive)
+            .sort((o1, o2) => o1.date.getTime() - o2.date.getTime());
+    }
+
+    getTopProductsProfitInLastMonth() {
+        return this.getTopProductsInLastMonth(true, 5);
+    }
+
+    getTopProductsSaleQuantityInLastMonth() {
+        return this.getTopProductsInLastMonth(false, 5);
+    }
+
+    private getTopProductsInLastMonth(calculateProfit: boolean, top: number) {
+        const today = _moment();
+        const lastMonth = _moment().subtract(29, 'days');
+
+        const monthOrders: Order[] = this.getActiveOrders()
+            .filter(order => _moment(order.date).isBetween(lastMonth, today, undefined, '[)'));
+
+        const topProductsMap: Map<string, TopProduct> = new Map<string, TopProduct>();
+        monthOrders.flatMap(order => order.orderItems)
+            .forEach(orderItem => {
+                if (!topProductsMap.has(orderItem.productId))
+                    topProductsMap.set(orderItem.productId, {
+                        id: orderItem.productId,
+                        name: orderItem.productName,
+                        value: 0
+                    })
+                const profit: number = calculateProfit
+                    ? this.getOrderItemProfit(orderItem)
+                    : orderItem.quantity;
+                topProductsMap.get(orderItem.productId).value += profit;
+            });
+
+        return Array.from(topProductsMap.values())
+            .sort((p1, p2) => p2.value - p1.value)
+            .slice(0, 5);
+    }
+
     getActiveOrdersInDay(date: Date): Order[] {
         //const momentDate = _moment(date);
         const startMoment = _moment(date).startOf('day');
@@ -157,10 +285,7 @@ export class OrderOfflineService extends BaseService<Order> {
         const endDate = startMoment.add(1, 'days').toDate();
         //const startDate = new Date(date.getFullYear(), date.getMonth() + 1, date.getDate()).getTime();
 
-        return this.getStorageOrders()
-            .filter(order => order.isActive
-                && order.date >= startDate && order.date < endDate)
-            .sort((o1, o2) => o1.date.getTime() - o2.date.getTime());
+        return this.getActiveOrdersBetweenDates(startDate, endDate);
     }
 
     getOrdersInDay(date: Date): Order[] {

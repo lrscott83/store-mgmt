@@ -12,15 +12,16 @@ import { ProductCategory } from 'src/app/domain/entities/product-categories/prod
 import { ProductSelectView } from './product-select.view';
 import { CsvProduct } from 'src/app/_services/csv/models/csv-product.model';
 
-@Injectable({
-    providedIn: "root"
-})
-
+@Injectable()
 export class ProductOfflineService extends ProductService {
 
 
     constructor(@Inject(HttpClient) http, private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository) {
         super(http);
+    }
+
+    hasAnyAvailableToSaleProduct(): Observable<BaseResponseModel<boolean>> {
+        return this.Success$(this.productRepository.hasAnyAvailableToSaleProduct());
     }
 
     getProductById(id: string): Observable<BaseResponseModel<Product>> {
@@ -84,7 +85,7 @@ export class ProductOfflineService extends ProductService {
     }
 
     getProductsToSaleByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
-        const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
+        const products: Product[] = this.productRepository.getAvailableToSaleProductsByCategoryId(categoryId);
         return products ? this.Success$(products.filter(p => p.availableToSale)) : this.Success$([]);
     }
 
@@ -125,7 +126,7 @@ export class ProductOfflineService extends ProductService {
         return Math.max(...products.map(c => c.order), 0) + 1;
     }
 
-    public deleteProduct(id: string): boolean {
-        return this.productRepository.deleteProduct(id);
+    public deleteProduct(id: string): Observable<BaseResponseModel<boolean>> {
+        return this.Success$(this.productRepository.deleteProduct(id));
     }
 }

@@ -6,7 +6,6 @@ import { Result } from 'src/app/domain/commons/result';
 import { ProductCategoryErrors } from 'src/app/domain/entities/product-categories/product-category.errors';
 import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
 import { Guid } from 'guid-typescript';
-import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 
 @Injectable({
     providedIn: "root"
@@ -68,10 +67,15 @@ export class ProductRepository {
             .sort((p1, p2) => p1.order - p2.order);
     }
 
-    getAvailableProductsByCategoryId(categoryId: string): Product[] {
+    getAvailableToSaleProductsByCategoryId(categoryId: string): Product[] {
         return this.getStorageProducts()
-            .filter(p => p.categoryId == categoryId && p.isActive)
+            .filter(p => p.categoryId == categoryId && p.isActive && p.availableToSale)
             .sort((p1, p2) => p1.order - p2.order);
+    }
+
+    hasAnyAvailableToSaleProduct(): boolean {
+        return this.categoryRepository.hasAnyAvailableCategory()
+            && this.getStorageProducts().some(p => p.isActive && p.availableToSale);
     }
 
     public deleteProduct(id: string): boolean {
@@ -105,7 +109,7 @@ export class ProductRepository {
             businessId: businessId,
             isActive: isActive,
             createdDate: new Date(),
-            createdByName: "admin",
+            createdByName: this.authService.currentUserValue.login,
             updatedDate: undefined,
             updatedByName: undefined,
             order: order,

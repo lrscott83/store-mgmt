@@ -1,0 +1,133 @@
+<div class="card card-custom gutter-b">
+    <div class="card-header">
+        <div class="card-title">
+            <h3 class="card-label" [translate]="'DASHBOARD.HEADER'"></h3>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <div class="container py-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label mb-0">Moneda:</label>
+                    <select class="form-select form-select-sm w-auto" [(ngModel)]="currency" (change)="cambiarMoneda()">
+                        <option value="CUP">CUP</option>
+                        <option value="USD">USD</option>
+                    </select>
+                    <input *ngIf="currency === 'USD'" type="number" class="form-control form-control-sm"
+                        [(ngModel)]="rate" placeholder="1 USD = ? CUP" (input)="cambiarMoneda()" />
+                </div>
+            </div>
+
+
+            <div class="row">
+                <!-- Ventas Hoy -->
+                <div class="col">
+                    <div class="card bg-light text-dark position-relative">
+                        <div class="card-body">
+                            <!-- <i class="bi bi-cart-fill position-absolute top-0 end-0 m-3 fs-3 text-success"></i> -->
+                            <h5 class="card-title" style="font-weight: 500;">Ventas Hoy</h5>
+                            <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">{{ salesToday }}</p>
+                            <small [ngClass]="getSalePriceClass()" class="fw-bold fs-7">
+                                <i [class]="getSalePriceIcon()"></i> {{ trendSalePrice() }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ganancias Hoy -->
+                <div class="col">
+                    <div class="card bg-light text-dark position-relative">
+                        <div class="card-body">
+                            <!-- <i class="bi bi-graph-up-arrow position-absolute top-0 end-0 m-3 fs-3 text-warning"></i> -->
+                            <h5 class="card-title" style="font-weight: 500;">Ganancias Hoy</h5>
+                            <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">{{ profitsToday }}</p>
+                            <small [ngClass]="getSaleProfitClass()" class="fw-bold fs-7">
+                                <i [class]="getSaleProfitIcon()"></i> {{ trendSaleProfit() }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Margen Bruto -->
+                <div class="col">
+                    <div class="card bg-light text-dark position-relative">
+                        <div class="card-body">
+                            <!-- <i
+                                class="bi bi-exclamation-circle-fill position-absolute top-0 end-0 m-3 fs-3 text-danger"></i> -->
+                            <h5 class="card-title" style="font-weight: 500;">Margen Promedio</h5>
+                            <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">12.5%</p>
+                            <small [ngClass]="getMargenBrutoClass()" class="fw-bold fs-7">
+                                <i [class]="getMargenBrutoIcon()"></i> {{ trendMargenBruto() }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventario Valorizado -->
+                <div class="col">
+                    <div class="card bg-light text-dark position-relative">
+                        <div class="card-body">
+                            <!-- <i class="bi bi-box-seam position-absolute top-0 end-0 m-3 fs-3 text-primary"></i> -->
+                            <h5 class="card-title" style="font-weight: 500;">Valor Inventario</h5>
+                            <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">{{ inventarioTotal }}</p>
+                            <small [ngClass]="getInventoryCostClass()" class="fw-bold fs-7">
+                                <i [class]="getInventoryCostIcon()"></i>  {{ trendInventoryCost() }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- <div class="card">
+                <div class="row mt-3">
+                    <div class="col">
+                        <apx-chart [series]="gananciasChartOptions.series" [chart]="gananciasChartOptions.chart"
+                            [xaxis]="gananciasChartOptions.xaxis" [title]="gananciasChartOptions.title">
+                        </apx-chart>
+                    </div>
+                </div>
+            </div> -->
+
+            <app-last-month-sale-profits></app-last-month-sale-profits>
+            <app-last-month-sales></app-last-month-sales>
+
+            <div class="row mt-5">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Productos mayor ganancias (últimos 30 días)</h5>
+                            <ul class="list-group">
+                                <li *ngFor="let product of topProfitProducts$ | async" class="list-group-item d-flex justify-content-between">
+                                    {{product.name}} 
+                                    <span>{{(product.value / divisor).toFixed(2)}} {{sufijo}}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <!-- <div class="col-md-8">
+                    <apx-chart [series]="ventasChartOptions.series" [chart]="ventasChartOptions.chart"
+                        [xaxis]="ventasChartOptions.xaxis" [stroke]="ventasChartOptions.stroke"
+                        [title]="ventasChartOptions.title">
+                    </apx-chart>
+                </div> -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Productos más vendidos (últimos 30 días)</h5>
+                            <ul class="list-group">
+                                <li *ngFor="let product of topSaleQuantityProducts$ | async" class="list-group-item d-flex justify-content-between">
+                                    {{product.name}} 
+                                    <span>{{product.value}}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

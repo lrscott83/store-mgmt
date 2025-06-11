@@ -1,12 +1,13 @@
-import { Component, Input } from '@angular/core';
+import { Component, Inject, Input } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { SharedModule } from '../../shared/shared.module';
 import { SaleProductRowComponent } from '../sale-product-row/sale-product-row.component';
 import { OrderType } from 'src/app/domain/entities/orders/order.model';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
   selector: 'app-sale-category-products',
@@ -24,7 +25,7 @@ export class SaleCategoryProductsComponent {
 
   private unsubscribe: Subscription[] = [];
 
-  constructor(private productService: ProductOfflineService) { 
+  constructor(@Inject(PRODUCT_SERVICE) private productService: ProductService) { 
     this.editPrice = this.orderType !== OrderType.Normal;
   }
 

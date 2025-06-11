@@ -22,6 +22,10 @@ export class ProductCategoryRepository {
 
     }
 
+    hasAnyAvailableCategory(): boolean {
+        return this.getStorageCategories().some(c => c.isActive);
+    }
+
     public updateCategories(productsMap: Map<string, ProductCategory>) {
         this.setProductCategoriesLocalStorage(productsMap);
         this.categories = this.getProductCategoriesFromLocalStorage();

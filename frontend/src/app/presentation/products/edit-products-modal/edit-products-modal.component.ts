@@ -1,14 +1,13 @@
-import { Component, EventEmitter, Input, OnInit, Output, ViewEncapsulation } from '@angular/core';
+import { Component, EventEmitter, Inject, Input, OnInit, Output, ViewEncapsulation } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SharedModule } from '../../shared/shared.module';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import { BehaviorSubject } from 'rxjs';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { AngularGridInstance, Column, ColumnReorderFunction, Editors, FieldType, GridOption, GridService, SlickDataView, SlickGrid } from 'angular-slickgrid';
-import { Guid } from 'guid-typescript';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import Swal from 'sweetalert2';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
   selector: 'app-edit-products-modal',
@@ -28,7 +27,7 @@ export class EditProductsModalComponent {
 
   form: FormGroup;
 
-  constructor(private fb: FormBuilder, private modal: NgbActiveModal, private productService: ProductOfflineService, private translate: TranslateService) {
+  constructor(private fb: FormBuilder, private modal: NgbActiveModal, @Inject(PRODUCT_SERVICE) private productService: ProductService, private translate: TranslateService) {
     // Empieza con una fila vacía
     //this.addRow();
     this.form = this.fb.group({

@@ -1,5 +1,5 @@
 // angular import
-import { Component, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -11,8 +11,9 @@ import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 import { ConnectionService } from 'src/app/_services/connection/connection.service';
 import { ToastrService } from 'ngx-toastr';
 import Swal from 'sweetalert2';
-import { ProductRepository } from 'src/app/application/products/product.repository';
 import { Product } from 'src/app/domain/entities/products/product.model';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
   selector: 'app-login',
@@ -40,7 +41,7 @@ export default class LoginComponent implements OnInit {
     private translate: TranslateService,
     private connectionService: ConnectionService,
     private toastrService: ToastrService,
-    private productService: ProductRepository,
+    @Inject(PRODUCT_SERVICE) private productService: ProductService,
   ) {
     this.isLoading$ = this.authService.isLoading$;
     // redirect to home if already logged in
@@ -167,11 +168,13 @@ export default class LoginComponent implements OnInit {
           || this.authService.currentUserValue.isSuperAdmin)
           this.router.navigateByUrl("/admin/owners");
         else {
-          const products: Product[] = this.productService.getAvailableProducts();
-          if (products.length > 0)
+          this.productService.hasAnyAvailableToSaleProduct().subscribe(response => {
+            if (response?.data)
             this.router.navigateByUrl("/sales/sale");
           else
             this.router.navigateByUrl("/sales/products");
+          });
+          
         }
 
       });

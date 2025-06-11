@@ -33,7 +33,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     private inventories: Map<string, InventoryEntry[]> = null;
 
     constructor(@Inject(HttpClient) http, private productRepository: ProductRepository, private authService: AuthService, private categoryRepository: ProductCategoryRepository, private authorizationService: AuthorizationService) {
-        super(http);        
+        super(http);
     }
 
     public getStorageInventoriesMap(): Map<string, InventoryEntry[]> {
@@ -209,7 +209,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
             const product: Product = this.productRepository.getProductById(productId);
             if (product) {
                 entries
-                    .filter(entry => entry.isActive 
+                    .filter(entry => entry.isActive
                         && entry.date >= startDate && entry.date < endDate)
                     .forEach(entry => {
                         inventoryEntries.push({
@@ -229,6 +229,29 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
 
     getInventoryCategoriesViewObservable(): Observable<BaseResponseModel<InventoryCategoryView[]>> {
         return of(this.getInventoryCategoriesView());
+    }
+
+    getInventoryCostTotalBefore(date: Date): number {
+        const entries: InventoryEntry[] = this.getStorageActiveInventoryEntries();
+        let totalSum: number = 0;
+        entries
+            .filter(entry => entry.date < date)
+            .forEach((entry) => {
+                totalSum += entry.available * entry.costPrice;
+            });
+        return totalSum;
+    }
+
+    getInventoryCostTotal(): number {
+        const startMoment = _moment(new Date()).startOf('day');
+        const endDate = startMoment.add(1, 'days').toDate();
+        return this.getInventoryCostTotalBefore(endDate);
+    }
+
+    getInventoryCostTotalYesterday(): number {
+        const startMoment = _moment(new Date()).startOf('day');
+        const startDate = startMoment.toDate();
+        return this.getInventoryCostTotalBefore(startDate);
     }
 
     getInventoryCategoriesView(): BaseResponseModel<InventoryCategoryView[]> {
@@ -287,7 +310,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     private getAverageCostPrice(entries: InventoryEntry[]): number {
-        let totalSum: number= 0;
+        let totalSum: number = 0;
         let totalCount: number = 0;
         entries.forEach((entry) => {
             totalSum += entry.available * entry.costPrice;
@@ -452,8 +475,8 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
                 if (currentEntry) {
                     currentEntry.available = entry.available;
                     currentEntry.isActive = entry.isActive;
-                } else 
-                currentEntries.push(entry);
+                } else
+                    currentEntries.push(entry);
             });
         } else {
             this.inventories.set(productId, entries);

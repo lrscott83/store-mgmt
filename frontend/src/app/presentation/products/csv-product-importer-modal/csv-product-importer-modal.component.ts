@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Inject, OnInit, Output } from '@angular/core';
 import { CsvProductService } from 'src/app/_services/csv/csv-product.service';
 import { CsvProduct } from 'src/app/_services/csv/models/csv-product.model';
 import { SharedModule } from '../../shared/shared.module';
@@ -6,8 +6,9 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ToastrService } from 'ngx-toastr';
 import Swal from 'sweetalert2';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
   selector: 'app-csv-product-importer-modal',
@@ -29,7 +30,7 @@ Pizzas,Pizza de Queso,150
 Pizzas,Pizza Especial,200
 Confituras,Caramelo,20`;
 
-  constructor(private csvProductService: CsvProductService, private translate: TranslateService, private formBuilder: FormBuilder, private toastrService: ToastrService, private productService: ProductOfflineService, private modal: NgbActiveModal) { }
+  constructor(private csvProductService: CsvProductService, private translate: TranslateService, private formBuilder: FormBuilder, private toastrService: ToastrService, @Inject(PRODUCT_SERVICE) private productService: ProductService, private modal: NgbActiveModal) { }
 
   ngOnInit(): void {
     this.loadForm();

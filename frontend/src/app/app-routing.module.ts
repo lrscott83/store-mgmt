@@ -44,6 +44,7 @@ import { LandingComponent } from './presentation/home/landing/landing.component'
 import { Landing2Component } from './presentation/home/landing2/landing2.component';
 import { LandingDeepComponent } from './presentation/home/landing-deep/landing-deep.component';
 import { EgressComponent } from './presentation/inventory/egress/egress.component';
+import { DashboardComponent } from './presentation/statistics/dashboard/dashboard.component';
 
 const routes: Routes = [
   // { path: '', redirectTo: "login", pathMatch: 'full' },
@@ -185,6 +186,15 @@ const routes: Routes = [
         data: { expectedFeatures: [EFeatures.Receive] }
       },
       {
+        path: 'statistics/dashboard', 
+        component: DashboardComponent,
+        //canActivate: [AdminAuthGuard],
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        //data: { expectedFeatures: [EFeatures.Dashboard] }
+        data: { expectedFeatures: [] }
+      },
+      {
         path: 'reports/today', 
         component: InventoryTodaySaleComponent,
         canActivate: [AuthGuard],
@@ -262,7 +272,8 @@ const routes: Routes = [
         path: 'dashboard/default',
         loadComponent: () => import('./demo/default/dashboard/dashboard.component').then((c) => c.DefaultComponent),
         // canActivate: [AuthGuardLogin],
-        data: { expectedFeatures: [EFeatures.Dashboard] }
+        // data: { expectedFeatures: [EFeatures.Dashboard] }
+        data: { expectedFeatures: [] }
       },
       {
         path: 'typography',

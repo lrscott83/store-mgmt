@@ -1,5 +1,5 @@
 // angular import
-import { Component, HostListener, OnInit } from '@angular/core';
+import { Component, HostListener, Inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -9,10 +9,9 @@ import { GuestFooterComponent } from '../../layouts/guest/guest-footer/guest-foo
 import { CanComponentDeactivate, CanDeactivateType } from 'src/app/_shared/guards/can-deactivate.guard';
 import { AuthHTTPService } from 'src/app/_services/auth/auth-http';
 import { DataService } from 'src/app/_services/data/data.service';
-import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
-import { Product } from 'src/app/domain/entities/products/product.model';
-import { ProductRepository } from 'src/app/application/products/product.repository';
 import { ProductCategoryRepository } from 'src/app/application/categories/product-category.repository';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
   selector: 'app-register',
@@ -31,7 +30,7 @@ export default class RegisterComponent implements OnInit, CanComponentDeactivate
 
   reSellerCode: string;
 
-  constructor(private formBuilder: FormBuilder, private translateService: TranslateService, private router: Router, private authHTTPService: AuthHTTPService, private route: ActivatedRoute, private dataService: DataService, private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository) {
+  constructor(private formBuilder: FormBuilder, private translateService: TranslateService, private router: Router, private authHTTPService: AuthHTTPService, private route: ActivatedRoute, private dataService: DataService, @Inject(PRODUCT_SERVICE) private productService: ProductService, private categoryRepository: ProductCategoryRepository) {
 
   }
 
@@ -86,10 +85,10 @@ export default class RegisterComponent implements OnInit, CanComponentDeactivate
   }
   
   async loadInitData() {
-    const categoriesMap: Map<string, ProductCategory> = await this.dataService.loadCategories();
-    const productsMap: Map<string, Product> = await this.dataService.loadProducts();
-    this.productRepository.setInitProducts(productsMap);
-    this.categoryRepository.setInitCategories(categoriesMap);
+    // const categoriesMap: Map<string, ProductCategory> = await this.dataService.loadCategories();
+    // const productsMap: Map<string, Product> = await this.dataService.loadProducts();
+    // this.productRepository.setInitProducts(productsMap);
+    // this.categoryRepository.setInitCategories(categoriesMap);
   }
 
   loadForm() {

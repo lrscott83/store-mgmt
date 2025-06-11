@@ -272,7 +272,8 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'aim',
         breadcrumbs: false,
         module: EModules.Statistics,
-        feature: EFeatures. Dashboard,
+        //feature: EFeatures. Dashboard,
+        feature: null,
         helpDialog: DashboardHelpDialogComponent,
       }
     ]

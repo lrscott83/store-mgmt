@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, Inject } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { EditProductModalComponent } from '../edit-product-modal/edit-product-modal.component';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -6,10 +6,11 @@ import Swal from 'sweetalert2';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import { Product } from 'src/app/domain/entities/products/product.model';
-import { ProductOfflineService } from 'src/app/application/products/product-offline.service';
 import { SharedModule } from '../../shared/shared.module';
 import { EditProductCategoryModalComponent } from '../edit-product-category-modal/edit-product-category-modal.component';
 import { EditProductsModalComponent } from '../edit-products-modal/edit-products-modal.component';
+import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
+import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
   selector: 'app-category-product-list',
@@ -24,7 +25,7 @@ export class CategoryProductListComponent implements OnInit {
   @Output() categoryUpdated = new EventEmitter();
   products$: BehaviorSubject<Product[]> = new BehaviorSubject<Product[]>([]);
 
-  constructor(private productService: ProductOfflineService, private modalService: NgbModal, private translate: TranslateService) { }
+  constructor(@Inject(PRODUCT_SERVICE) private productService: ProductService, private modalService: NgbModal, private translate: TranslateService) { }
 
   ngOnInit(): void {
     this.loadProductsByCategoryId(this.category.id);
@@ -88,8 +89,11 @@ export class CategoryProductListComponent implements OnInit {
       cancelButtonText: this.translate.instant('GENERAL.NO'),
     }).then((result) => {
       if (result.isConfirmed) {
-        this.productService.deleteProduct(productId);
-        this.loadProductsByCategoryId(this.category.id);
+        this.productService.deleteProduct(productId).subscribe(response => {
+          if (response && response.succeeded)
+            this.loadProductsByCategoryId(this.category.id);
+        });
+        
       }
     });
   }
