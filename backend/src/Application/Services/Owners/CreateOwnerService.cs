@@ -32,7 +32,7 @@ namespace Application.Services.Owners
         public async Task<Owner> CreateOwnerAsync(string login, string password, string fullName, string cellPhone, 
             string? email, string? description)
         {
-            Tenant tenant = Tenant.Create(login, "", "");
+            Tenant tenant = Tenant.Create(login, "", DateTime.UtcNow, "");
             await _tenantRepository.AddAsync(tenant);
 
             string passwordHashed = _hashPasswordService.HashPassword(password);

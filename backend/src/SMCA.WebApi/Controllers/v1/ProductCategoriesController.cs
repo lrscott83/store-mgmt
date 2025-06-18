@@ -1,5 +1,8 @@
 ﻿using Application.Dtos.SaleManagement;
+using Application.Features.SaleManagement.ProductCategories.Commands.CreateProductCategory;
+using Application.Features.SaleManagement.ProductCategories.Commands.UpdateProductCategory;
 using Application.Features.SaleManagement.ProductCategories.Queries.GetAllProductCategories;
+using Application.Features.SaleManagement.ProductCategories.Queries.GetMaxProductCategoryOrder;
 using Application.Features.SaleManagement.ProductCategories.Queries.GetProductCategoriesView;
 using Application.ResponseModels;
 using Asp.Versioning;
@@ -48,36 +51,36 @@ namespace SMCA.WebApi.Controllers.v1
         //    return Ok(await Sender.Send(new GetProductCategoryByIdQuery(id)));
         //}
 
-        ///// <summary>
-        ///// Add user
-        ///// </summary>
-        ///// <returns></returns>
-        //[HttpPost()]
-        //[ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        //public async Task<IActionResult> CreateProductCategoryAsync(CreateProductCategoryCommand command)
-        //{
-        //    return Ok(await Sender.Send(command));
-        //}
+        /// <summary>
+        /// Add Category
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost()]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> CreateProductCategoryAsync(CreateProductCategoryCommand command)
+        {
+            return Ok(await Sender.Send(command));
+        }
 
-        ///// <summary>
-        ///// Updated user by id
-        ///// </summary>
-        //[HttpPut("{id}")]
-        //[ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        //public async Task<IActionResult> UpdatedAsync(Guid id, [FromBody] UpdateProductCategoryCommand command)
-        //{
-        //    command.Id = id;
-        //    return Ok(await Sender.Send(command));
-        //}
+        /// <summary>
+        /// Updated user by id
+        /// </summary>
+        [HttpPut("{id}")]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> UpdatedAsync(Guid id, [FromBody] UpdateProductCategoryCommand command)
+        {
+            command.Id = id;
+            return Ok(await Sender.Send(command));
+        }
 
-        ///// <summary>
-        ///// Delete user by id
-        ///// </summary>
-        //[HttpDelete("{id}")]
-        //[ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        //public async Task<IActionResult> DeleteProductCategoryAsync(Guid id)
-        //{
-        //    return Ok(await Sender.Send(new DeleteProductCategoryCommand(id)));
-        //}
+        /// <summary>
+        /// Get max category order
+        /// </summary>
+        [HttpGet("maxOrder")]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetMaxProductCategoryOrderAsync()
+        {
+            return Ok(await Sender.Send(new GetMaxProductCategoryOrderQuery()));
+        }
     }
 }

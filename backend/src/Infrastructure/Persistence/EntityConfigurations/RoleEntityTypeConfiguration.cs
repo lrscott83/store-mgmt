@@ -32,16 +32,28 @@ namespace Infrastructure.Persistence.EntityConfigurations
              .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasData(
-                Role.Create((int)RoleType.SuperAdmin, RoleType.SuperAdmin.GetDisplayName(), RoleType.SuperAdmin.GetDisplayDescription()));
+                Role.Create((int)RoleType.SuperAdmin, 
+                RoleType.SuperAdmin.GetDisplayName(), 
+                RoleType.SuperAdmin.GetDisplayDescription(),
+                new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417))));
 
             builder.HasData(
-                Role.Create((int)RoleType.OwnerAdmin, RoleType.OwnerAdmin.GetDisplayName(), RoleType.OwnerAdmin.GetDisplayDescription()));
+                Role.Create((int)RoleType.OwnerAdmin, 
+                RoleType.OwnerAdmin.GetDisplayName(), 
+                RoleType.OwnerAdmin.GetDisplayDescription(),
+                new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417))));
 
             builder.HasData(
-                Role.Create((int)RoleType.StoreUser, RoleType.StoreUser.GetDisplayName(), RoleType.StoreUser.GetDisplayDescription()));
+                Role.Create((int)RoleType.StoreUser, 
+                RoleType.StoreUser.GetDisplayName(), 
+                RoleType.StoreUser.GetDisplayDescription(),
+                new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417))));
 
             builder.HasData(
-                Role.Create((int)RoleType.ReSeller, RoleType.ReSeller.GetDisplayName(), RoleType.ReSeller.GetDisplayDescription()));
+                Role.Create((int)RoleType.ReSeller, 
+                RoleType.ReSeller.GetDisplayName(), 
+                RoleType.ReSeller.GetDisplayDescription(),
+                new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417))));
         }
     }
 }

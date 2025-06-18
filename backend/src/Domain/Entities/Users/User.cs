@@ -22,7 +22,7 @@ namespace Domain.Entities.Users
         public Guid SelectedStoreId { get; set; }
         public Guid TenantId { get; private set; }
 
-        private User(Guid id, string login, string password, string fullName, 
+        private User(Guid id, string login, string password, string fullName,
             string? cellPhone, string? email, Guid tenantId) : base(id)
         {
             Login = login;

@@ -108,12 +108,12 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new SystemConfigurationEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new ReSellerEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new ReSellerOwnerEntityTypeConfiguration(this));
-            builder.ApplyConfiguration(new OrderItemEntityTypeConfiguration(this));
-            builder.ApplyConfiguration(new OrderEntityTypeConfiguration(this));
-            builder.ApplyConfiguration(new ProductCategoryEntityTypeConfiguration(this));
-            builder.ApplyConfiguration(new ProductEntityTypeConfiguration(this));
-            builder.ApplyConfiguration(new InventoryEntryEntityTypeConfiguration(this));
-            builder.ApplyConfiguration(new InventoryEntryCostEntityTypeConfiguration(this));
+            //builder.ApplyConfiguration(new OrderItemEntityTypeConfiguration(this));
+            //builder.ApplyConfiguration(new OrderEntityTypeConfiguration(this));
+            //builder.ApplyConfiguration(new ProductCategoryEntityTypeConfiguration(this));
+            //builder.ApplyConfiguration(new ProductEntityTypeConfiguration(this));
+            //builder.ApplyConfiguration(new InventoryEntryEntityTypeConfiguration(this));
+            //builder.ApplyConfiguration(new InventoryEntryCostEntityTypeConfiguration(this));
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -131,11 +131,11 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<StorePayment> StorePayment { get; set; }
         internal DbSet<StorePaymentStatus> StorePaymentStatus { get; set; }
         internal DbSet<SystemConfiguration> SystemConfiguration { get; set; }
-        internal DbSet<Order> Order { get; set; }
-        internal DbSet<OrderItem> OrderItem { get; set; }
-        internal DbSet<ProductCategory> ProductCategory { get; set; }
-        internal DbSet<Product> Product { get; set; }
-        internal DbSet<InventoryEntry> InventoryEntry { get; set; }
-        internal DbSet<InventoryEntryCost> InventoryEntryCost { get; set; }
+        //internal DbSet<Order> Order { get; set; }
+        //internal DbSet<OrderItem> OrderItem { get; set; }
+        //internal DbSet<ProductCategory> ProductCategory { get; set; }
+        //internal DbSet<Product> Product { get; set; }
+        //internal DbSet<InventoryEntry> InventoryEntry { get; set; }
+        //internal DbSet<InventoryEntryCost> InventoryEntryCost { get; set; }
     }
 }

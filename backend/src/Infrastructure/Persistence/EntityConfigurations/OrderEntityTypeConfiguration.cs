@@ -16,7 +16,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
 
         public void Configure(EntityTypeBuilder<Order> builder)
         {
-            builder.HasQueryFilter(x => x.TenantId == _context.TenantId);
+            builder.HasQueryFilter(x => _context.IsSuperAdmin || x.TenantId == _context.TenantId);
             builder.HasIndex(x => x.TenantId);
             builder.HasIndex(x => x.StoreId);
 

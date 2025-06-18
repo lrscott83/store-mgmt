@@ -35,7 +35,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                 .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
                 .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
                 .MustAsync(AvailableModuleIdsToStore).WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"]);
-            _moduleRepository = moduleRepository;
         }
 
         private async Task<bool> StoreExists(Guid storeId, CancellationToken cancellationToken)

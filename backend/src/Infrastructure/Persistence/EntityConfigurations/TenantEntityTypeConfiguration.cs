@@ -23,7 +23,9 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasIndex(x => x.Name).IsUnique();
 
             builder.HasData(Tenant.Create(DataUtils.DefaultTenant.Id, DataUtils.DefaultTenant.Name, 
-                "Default Tenant to create Default Store for Super Admin User", ""));
+                "Default Tenant to create Default Store for Super Admin User",
+                new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417)),
+                ""));
         }
     }
 }

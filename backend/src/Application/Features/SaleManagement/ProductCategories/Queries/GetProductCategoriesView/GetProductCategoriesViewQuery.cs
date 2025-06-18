@@ -4,6 +4,7 @@ using Application.Dtos.SaleManagement;
 using Application.Exceptions;
 using Application.ResponseModels;
 using AutoMapper;
+using Domain.Entities.ProductCategories;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -35,12 +36,9 @@ namespace Application.Features.SaleManagement.ProductCategories.Queries.GetProdu
             if (string.IsNullOrEmpty(_httpContextService.StoreId))
                 throw new ApiException(_localizer["StoreNotSelected", _httpContextService.UserExternalId], HttpStatusCode.BadRequest);
 
-            //IEnumerable<ProductCategory> productCategories = _httpContextService.IsSuperAdmin
-            //    ? await _productCategoryRepository.GetAllProductCategoriesIncludingStoreModulesAsync(query.IncludeInactive)
-            //    : await _productCategoryRepository.GetReSellerProductCategoriesIncludingStoreModulesAsync(_httpContextService.UserExternalId.ToGuid(), query.IncludeInactive);
-            //IEnumerable<ProductCategoryView> productCategoryDtos = _mapper.Map<IEnumerable<ProductCategoryView>>(productCategories).ToList();
-            IEnumerable<ProductCategoryView> productCategoryDtos = new List<ProductCategoryView>();
-            return ResponseResult.Success(productCategoryDtos);
+            IEnumerable<ProductCategory> productCategories = await _productCategoryRepository.GetProductCategoriesAsync(false);
+            IEnumerable<ProductCategoryView> productCategoryViews = _mapper.Map<IEnumerable<ProductCategoryView>>(productCategories).ToList();
+            return ResponseResult.Success(productCategoryViews);
         }
     }
 }

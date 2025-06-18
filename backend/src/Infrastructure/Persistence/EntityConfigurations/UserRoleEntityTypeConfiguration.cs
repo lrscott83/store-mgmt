@@ -22,8 +22,9 @@ namespace Infrastructure.Persistence.EntityConfigurations
 
             builder.HasKey(x => new { x.UserId, x.RoleId });
 
-            builder.HasData(
-                UserRole.Create(SuperAdminUser.Id, (int)RoleType.SuperAdmin, DefaultTenant.Id));
+            UserRole adminRole = UserRole.Create(SuperAdminUser.Id, (int)RoleType.SuperAdmin, DefaultTenant.Id);
+            adminRole.CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417));
+            builder.HasData(adminRole);
 
         }
     }

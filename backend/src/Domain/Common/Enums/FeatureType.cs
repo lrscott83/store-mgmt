@@ -38,8 +38,11 @@ namespace Domain.Common.Enums
         [Description("Entradas")]
         Entries = 31,
 
+        [Description("Salida")]
+        Egress = 32,
+
         [Description("Cuadre del día")]
-        TodayInventoryStats = 32,
+        TodayInventoryStats = 33,
 
         // Synchronization
         [Description("Enviar")]

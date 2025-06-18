@@ -195,6 +195,18 @@
   <data name="PaymentMethodNotUpdated" xml:space="preserve">
     <value>No se pudo actualizar el método de pago</value>
   </data>
+  <data name="ProductAlreadyExists" xml:space="preserve">
+    <value>El nombre '{0}' del producto ya existe.</value>
+  </data>
+  <data name="ProductCategoryAlreadyExists" xml:space="preserve">
+    <value>El nombre '{0}' de la categoría ya existe.</value>
+  </data>
+  <data name="ProductCategoryNotFound" xml:space="preserve">
+    <value>Categoría no encontrada.</value>
+  </data>
+  <data name="ProductNotFound" xml:space="preserve">
+    <value>Producto no encontrado</value>
+  </data>
   <data name="RoleAlreadyExists" xml:space="preserve">
     <value>El role ya existe</value>
   </data>

@@ -22,7 +22,7 @@ namespace Domain.Entities.Tenants
 
         public async Task<bool> CreateTenantAsync(CreateTenantRequestModel requestModel)
         {
-            Tenant tenant = Tenant.Create(requestModel.Name, requestModel.Description, requestModel.ConnectionString);
+            Tenant tenant = Tenant.Create(requestModel.Name, requestModel.Description, DateTime.UtcNow, requestModel.ConnectionString);
             await _tenantRepository.AddAsync(tenant);
 
             // Insert tenant features

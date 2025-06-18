@@ -13,16 +13,17 @@ namespace Domain.Entities.Roles
         public ICollection<UserRole> UserRoles { get; set; }
         public ICollection<StoreRoleFeature> StoreRoleFeatures { get; set; }
 
-        private Role(int id, string name, string description)
+        private Role(int id, string name, string description, DateTimeOffset createdDate)
             : base(id)
         {
             Name = name;
             Description = description;
+            CreatedDate = createdDate;
         }
 
-        public static Role Create(int id, string name, string description)
+        public static Role Create(int id, string name, string description, DateTimeOffset createdDate)
         {
-            var role = new Role(id, name, description);
+            var role = new Role(id, name, description, createdDate);
             role.Raise(new RoleCreatedDomainEvent(role.Id));
             return role;
         }

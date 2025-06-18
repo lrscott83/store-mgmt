@@ -13,7 +13,8 @@ namespace Application.Mappings.ProductCategoryManagement
 
             CreateMap<ProductCategory, ProductCategoryView>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
-                .ForMember(dest => dest.ProductsCount, opt => opt.MapFrom(src => src.Products.Count()));
+                .ForMember(dest => dest.ProductsCount, 
+                    opt => opt.MapFrom(src => src.Products.Where(p => p.IsActive && p.AvailableToSale).Count()));
 
         }
     }

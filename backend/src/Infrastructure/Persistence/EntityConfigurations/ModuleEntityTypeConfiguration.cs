@@ -68,7 +68,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     availableToStore: true,
                     true
                 ),
-                 Module.Create(
+                Module.Create(
                     (int)ModuleType.Reports,
                     ModuleType.Reports.GetDescription(),
                     40,
@@ -84,7 +84,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     priceIncluded: false,
                     2000,
                     availableToStore: true,
-                    false
+                    true
                 ),
                 Module.Create(
                     (int)ModuleType.Management,

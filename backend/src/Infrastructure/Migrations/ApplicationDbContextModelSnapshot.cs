@@ -54,7 +54,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ModuleId");
 
-                    b.ToTable("Feature");
+                    b.ToTable("Feature", (string)null);
 
                     b.HasData(
                         new
@@ -202,7 +202,7 @@ namespace Infrastructure.Migrations
                             Id = 50,
                             AvailableToStore = true,
                             Description = "Funcionalidad para los reportes del día",
-                            IsActive = true,
+                            IsActive = false,
                             ModuleId = 5,
                             Name = "Reportes del día",
                             Order = 120
@@ -294,7 +294,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Module");
+                    b.ToTable("Module", (string)null);
 
                     b.HasData(
                         new
@@ -424,7 +424,7 @@ namespace Infrastructure.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Owner");
+                    b.ToTable("Owner", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.ReSellerOwners.ReSellerOwner", b =>
@@ -468,7 +468,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("ReSellerOwner");
+                    b.ToTable("ReSellerOwner", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.ReSellers.ReSeller", b =>
@@ -518,7 +518,7 @@ namespace Infrastructure.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("ReSeller");
+                    b.ToTable("ReSeller", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Roles.Role", b =>
@@ -554,14 +554,14 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Role");
+                    b.ToTable("Role", (string)null);
 
                     b.HasData(
                         new
                         {
                             Id = 1,
                             CreatedBy = new Guid("00000000-0000-0000-0000-000000000000"),
-                            CreatedDate = new DateTimeOffset(new DateTime(2025, 5, 22, 17, 57, 34, 247, DateTimeKind.Unspecified).AddTicks(5051), new TimeSpan(0, 0, 0, 0, 0)),
+                            CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417), new TimeSpan(0, 0, 0, 0, 0)),
                             Description = "Este Role permitirá acceder a todas las funcionalidades en todos los tenants.",
                             IsActive = true,
                             Name = "Super Administrador"
@@ -570,7 +570,7 @@ namespace Infrastructure.Migrations
                         {
                             Id = 2,
                             CreatedBy = new Guid("00000000-0000-0000-0000-000000000000"),
-                            CreatedDate = new DateTimeOffset(new DateTime(2025, 5, 22, 17, 57, 34, 247, DateTimeKind.Unspecified).AddTicks(5132), new TimeSpan(0, 0, 0, 0, 0)),
+                            CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4476), new TimeSpan(0, 0, 0, 0, 0)),
                             Description = "Este Role permitirá acceder a todas las funcionalidades de la tienda.",
                             IsActive = true,
                             Name = "Administrador de tienda"
@@ -579,7 +579,7 @@ namespace Infrastructure.Migrations
                         {
                             Id = 3,
                             CreatedBy = new Guid("00000000-0000-0000-0000-000000000000"),
-                            CreatedDate = new DateTimeOffset(new DateTime(2025, 5, 22, 17, 57, 34, 247, DateTimeKind.Unspecified).AddTicks(5189), new TimeSpan(0, 0, 0, 0, 0)),
+                            CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4521), new TimeSpan(0, 0, 0, 0, 0)),
                             Description = "Este Role permitirá acceder a las funcionalidades para un usuario de la tienda.",
                             IsActive = true,
                             Name = "Usuario de tienda"
@@ -588,7 +588,7 @@ namespace Infrastructure.Migrations
                         {
                             Id = 4,
                             CreatedBy = new Guid("00000000-0000-0000-0000-000000000000"),
-                            CreatedDate = new DateTimeOffset(new DateTime(2025, 5, 22, 17, 57, 34, 247, DateTimeKind.Unspecified).AddTicks(5242), new TimeSpan(0, 0, 0, 0, 0)),
+                            CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4562), new TimeSpan(0, 0, 0, 0, 0)),
                             Description = "Este Role permitirá acceder a las funcionalidades para un usuario comercializador del servicio.",
                             IsActive = true,
                             Name = "Comercializador del servicio"
@@ -644,7 +644,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("StoreModule");
+                    b.ToTable("StoreModule", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.StorePaymentStatuses.StorePaymentStatus", b =>
@@ -661,7 +661,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("StorePaymentStatus");
+                    b.ToTable("StorePaymentStatus", (string)null);
 
                     b.HasData(
                         new
@@ -747,7 +747,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("StorePayment");
+                    b.ToTable("StorePayment", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.StoreRoleFeatures.StoreRoleFeature", b =>
@@ -787,7 +787,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("StoreRoleFeature");
+                    b.ToTable("StoreRoleFeature", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.StoreUsers.StoreUser", b =>
@@ -825,7 +825,7 @@ namespace Infrastructure.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("StoreUser");
+                    b.ToTable("StoreUser", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Stores.Store", b =>
@@ -875,7 +875,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("OwnerId");
 
-                    b.ToTable("Store");
+                    b.ToTable("Store", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.SystemConfigurations.SystemConfiguration", b =>
@@ -899,7 +899,7 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("SystemConfiguration");
+                    b.ToTable("SystemConfiguration", (string)null);
 
                     b.HasData(
                         new
@@ -953,7 +953,7 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Tenant");
+                    b.ToTable("Tenant", (string)null);
 
                     b.HasData(
                         new
@@ -961,7 +961,7 @@ namespace Infrastructure.Migrations
                             Id = new Guid("b58bf718-c4ed-4ee9-a958-bb5a5db4f7e8"),
                             ConnectionString = "",
                             CreatedBy = new Guid("00000000-0000-0000-0000-000000000000"),
-                            CreatedDate = new DateTimeOffset(new DateTime(2025, 5, 22, 17, 57, 34, 246, DateTimeKind.Unspecified).AddTicks(3805), new TimeSpan(0, 0, 0, 0, 0)),
+                            CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 486, DateTimeKind.Unspecified).AddTicks(5502), new TimeSpan(0, 0, 0, 0, 0)),
                             Description = "Default Tenant to create Default Store for Super Admin User",
                             IsActive = true,
                             Name = "Default Tenant"
@@ -1000,7 +1000,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("UserRole");
+                    b.ToTable("UserRole", (string)null);
 
                     b.HasData(
                         new
@@ -1066,7 +1066,7 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("User");
+                    b.ToTable("User", (string)null);
 
                     b.HasData(
                         new
@@ -1074,7 +1074,7 @@ namespace Infrastructure.Migrations
                             Id = new Guid("38b96d85-bf75-41ca-bfd7-796e7fe0ebc8"),
                             CellPhone = "52432968",
                             CreatedBy = new Guid("00000000-0000-0000-0000-000000000000"),
-                            CreatedDate = new DateTimeOffset(new DateTime(2025, 5, 22, 17, 57, 34, 246, DateTimeKind.Unspecified).AddTicks(6599), new TimeSpan(0, 0, 0, 0, 0)),
+                            CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 486, DateTimeKind.Unspecified).AddTicks(7709), new TimeSpan(0, 0, 0, 0, 0)),
                             Email = "lrscott83@gmail.com",
                             FullName = "Lizardo Romero",
                             IsActive = true,
@@ -1110,7 +1110,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("OutboxMessage");
+                    b.ToTable("OutboxMessage", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Features.Feature", b =>

@@ -59,6 +59,11 @@ namespace Domain.Common.Enums
         [HasModule(ModuleType.Inventory)]
         EntriesAdmin,
 
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.Egress)]
+        [HasModule(ModuleType.Inventory)]
+        EgressAdmin,
+
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.TodayInventoryStats)]
         [HasModule(ModuleType.Inventory)]

@@ -121,6 +121,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      true
                  ),
                  Feature.Create(
+                     (int)FeatureType.Egress,
+                     FeatureType.Egress.GetDescription(),
+                     "Funcionalidad para adicionar las salidas del inventario",
+                     (int)ModuleType.Inventory,
+                     71,
+                     true,
+                     true
+                 ),
+                 Feature.Create(
                      (int)FeatureType.TodayInventoryStats,
                      FeatureType.TodayInventoryStats.GetDescription(),
                      "Funcionalidad para revisar el cuadre de las entradas del día al inventario",
@@ -178,7 +187,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      (int)ModuleType.Statistics,
                      130,
                      true,
-                     false
+                     true
                  ),
 
                  // Management

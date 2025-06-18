@@ -37,9 +37,11 @@ namespace Infrastructure.Persistence.EntityConfigurations
             // .HasForeignKey<Owner>(a => a.UserId)
             // .OnDelete(DeleteBehavior.Restrict);
 
-            builder.HasData(
-                User.Create(SuperAdminUser.Id, "admin", "XwHSL3RwmY9AkQLdRIeWr/H1xHm7ulj/la+EYwkLgrA=", 
-                "Lizardo Romero", "52432968", "lrscott83@gmail.com", DefaultTenant.Id));
+            User admin = User.Create(SuperAdminUser.Id, "admin", "XwHSL3RwmY9AkQLdRIeWr/H1xHm7ulj/la+EYwkLgrA=",
+                "Lizardo Romero", "52432968", "lrscott83@gmail.com", DefaultTenant.Id);
+            admin.CreatedDate = new DateTimeOffset(new DateTime(2025, 4, 13, 18, 50, 15, 487, DateTimeKind.Unspecified).AddTicks(4417));
+
+            builder.HasData(admin);
         }
     }
 }
