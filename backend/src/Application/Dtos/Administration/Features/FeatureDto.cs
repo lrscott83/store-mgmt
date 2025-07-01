@@ -8,7 +8,6 @@
         public string DisplayName { get; set; }
         public string Description { get; set; }
         public int Order { get; set; }
-        public bool IsIncluded { get; set; }
-        public float Price { get; set; }
+        public bool AvailableToStore { get; set; }
     }
 }

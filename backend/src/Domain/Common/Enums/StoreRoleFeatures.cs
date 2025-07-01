@@ -21,6 +21,10 @@ namespace Domain.Common.Enums
         [HasFeature(FeatureType.Roles)]
         RolesAdmin,
 
+        [HasRoles(RoleType.SuperAdmin)]
+        [HasFeature(FeatureType.Features)]
+        FeaturesAdmin,
+
         #endregion
 
         #region Sales features

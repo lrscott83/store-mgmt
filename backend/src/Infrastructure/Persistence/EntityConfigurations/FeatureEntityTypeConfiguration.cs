@@ -62,6 +62,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      false,
                      true
                  ),
+                Feature.Create(
+                     (int)FeatureType.Features,
+                     FeatureType.Features.GetDescription(),
+                     "Funcionalidad para gestionar las funcionalidades",
+                     (int)ModuleType.Administration,
+                     40,
+                     false,
+                     true
+                 ),
 
                  // Sales
                  Feature.Create(

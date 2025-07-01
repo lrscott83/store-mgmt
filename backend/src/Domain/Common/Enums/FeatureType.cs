@@ -18,6 +18,9 @@ namespace Domain.Common.Enums
         [Description("Gestores")]
         ReSellers = 13,
 
+        [Description("Funcionalidades")]
+        Features = 14,
+
         // Sales
         [Description("Productos")]
         Products = 20,
@@ -39,10 +42,10 @@ namespace Domain.Common.Enums
         Entries = 31,
 
         [Description("Salida")]
-        Egress = 32,
+        Egress = 33,
 
         [Description("Cuadre del día")]
-        TodayInventoryStats = 33,
+        TodayInventoryStats = 32,
 
         // Synchronization
         [Description("Enviar")]

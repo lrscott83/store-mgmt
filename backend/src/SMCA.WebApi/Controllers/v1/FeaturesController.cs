@@ -1,4 +1,5 @@
 ﻿using Application.Dtos.Administration.Features;
+using Application.Features.Administration.Features.Commands.ActivateFeatures;
 using Application.Features.Administration.Features.Queries.GetAvailableFeaturesToStore;
 using Application.Features.ApplicationManagement.Features.Queries.GetFeatures;
 using Application.ResponseModels;
@@ -19,6 +20,13 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> GetFeaturesAsync(bool includeInactive)
         {
             return Ok(await Sender.Send(new GetFeaturesQuery(includeInactive)));
+        }
+
+        [HttpPost("activate")]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ActivateFeaturesAsync()
+        {
+            return Ok(await Sender.Send(new ActivateFeaturesCommand()));
         }
 
         [HttpGet("available")]

@@ -82,7 +82,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     ModuleType.Statistics.GetDescription(),
                     50,
                     priceIncluded: false,
-                    2000,
+                    1000,
                     availableToStore: true,
                     true
                 ),

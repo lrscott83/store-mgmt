@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Utils;
 using Domain.Entities.Modules;
 using Domain.Entities.Owners;
 using Domain.Entities.StoreModules;
@@ -89,10 +90,10 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             foreach (var moduleId in moduleIds)
             {
                 StoreModule? storeModule = storeModules.FirstOrDefault(module => module.ModuleId == moduleId);
+                Module module = await _moduleRepository.GetByIdAsync(moduleId);
                 if (storeModule == null)
                 {
                     // Insert
-                    Module module = await _moduleRepository.GetByIdAsync(moduleId);
                     storeModule = StoreModule.Create(storeId, moduleId, module.Price, module.PriceIncluded,
                         module.Price, module.DiscountPrice, module.PercentDiscountPrice, tenantId);
                     await _storeModuleRepository.AddAsync(storeModule);
@@ -101,6 +102,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                 {
                     // Update
                     storeModule.IsActive = true;
+                    storeModule.Price = module.Price;
+                    storeModule.ModulePriceIncluded = module.PriceIncluded;
+                    storeModule.ModulePrice = module.Price;
+                    storeModule.ModulePercentDiscountPrice = module.PercentDiscountPrice;
+                    storeModule.ModuleDiscountPrice = module.DiscountPrice;
+
                     await _storeModuleRepository.UpdateAsync(storeModule);
                 }
             }
