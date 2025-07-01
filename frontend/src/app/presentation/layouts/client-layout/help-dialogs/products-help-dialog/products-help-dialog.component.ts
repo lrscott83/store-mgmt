@@ -12,9 +12,9 @@ import { TranslateModule } from '@ngx-translate/core';
 })
 export class ProductsHelpDialogComponent {
 
-constructor(private modal: NgbActiveModal) {
+  constructor(private modal: NgbActiveModal) {
 
-}
+  }
 
   closeModal() {
     this.modal.close();

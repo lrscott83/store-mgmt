@@ -1,0 +1,41 @@
+<div class="modal-content">
+    <div class="modal-header">
+        <h4 class="modal-title">{{'HELP.MENU.SALES.TITLE' | translate}}</h4>
+        <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+    </div>
+    <div class="modal-body">
+        <p>En este módulo usted podrá:</p>
+        <ul>
+            <li>
+                Gestionar su catálogo de productos con sus precios para venta y agrupados por categorías
+                <a class="bg-transparent" (click)="openCatalogHelpDialog()">
+                    <i class="bi bi-question-circle fs-5 text-success"></i>
+                </a>
+            </li>
+            <li>
+                Adicionar los productos a la venta actual para después registrar esa venta
+                <a class="bg-transparent" (click)="openSaleHelpDialog()">
+                    <i class="bi bi-question-circle fs-5 text-success"></i>
+                </a>
+            </li>
+            <li>
+                Listar las ventas registradas en el día actual
+                <a class="bg-transparent" (click)="opentTodayOrdersHelpDialog()">
+                    <i class="bi bi-question-circle fs-5 text-success"></i>
+                </a>
+            </li>
+            <li>
+                Mostrar el cuadre de las ventas registradas en el día actual
+                <a class="bg-transparent" (click)="opentTodaySalesStatsHelpDialog()">
+                    <i class="bi bi-question-circle fs-5 text-success"></i>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-icon" id="closeModal" (click)="closeModal()">
+            {{ 'GENERAL.CLOSE' | translate}}
+        </button>
+    </div>
+</div>

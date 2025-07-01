@@ -45,6 +45,7 @@ import { Landing2Component } from './presentation/home/landing2/landing2.compone
 import { LandingDeepComponent } from './presentation/home/landing-deep/landing-deep.component';
 import { EgressComponent } from './presentation/inventory/egress/egress.component';
 import { DashboardComponent } from './presentation/statistics/dashboard/dashboard.component';
+import { FeaturesComponent } from './presentation/features/features.component';
 
 const routes: Routes = [
   // { path: '', redirectTo: "login", pathMatch: 'full' },
@@ -114,6 +115,13 @@ const routes: Routes = [
         canActivate: [SuperAdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.ReSellers] }
+      },
+      {
+        path: 'admin/features', 
+        component: FeaturesComponent,
+        canActivate: [SuperAdminAuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.Features] }
       },
       {
         path: 'admin/roles', 

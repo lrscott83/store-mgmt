@@ -2,7 +2,7 @@ import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/cor
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { SharedModule } from '../../shared/shared.module';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
 import Swal from 'sweetalert2';
 import { ShoppingCartService } from 'src/app/_services/order/shopping-cart.service';
@@ -36,6 +36,10 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     this.enableOrDisablePriceFromControl();
+  }
+
+  isNormalSale(): boolean {
+    return this.orderType === OrderType.Normal;
   }
 
   enableOrDisablePriceFromControl() {
@@ -98,7 +102,7 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
   }
 
   addCartItem(orderType: OrderType, productId: string) {
-    this.shoppingCartService.addCartItem(orderType, productId, this.formGroup.value.quantity, this.formGroup.value.price).then(response => {
+    this.shoppingCartService.addCartItem(orderType, productId, this.formGroup.value.quantity, this.getPrice()).then(response => {
       if (response.succeeded) {
         // this.toastrService.success(
         //   this.translate.instant('SALES.PRODUCT_ADDED_TO_CART'));
@@ -115,18 +119,27 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
     });
   }
 
+  getPrice(): number {
+    return this.isNormalSale() ? this.product.price : this.formGroup.value.price;
+  }
+
   loadForm() {
     this.loadPatterns();
     this.formGroup = this.formBuilder.group({
       quantity: [{ value: "", disabled: false }, Validators.compose([
         Validators.required,
         Validators.pattern(this.formPatterns.number.regex)])],
-      price: [{ value: "", disabled: false }, Validators.compose([
-        Validators.required,
-        Validators.min(0),
-        //Validators.pattern(this.formPatterns.currency.regex)
-      ])],
+      // price: [{ value: "", disabled: false }, Validators.compose([
+      //   Validators.required,
+      //   Validators.min(0),
+      // ])],
     });
+
+    if (!this.isNormalSale()) {
+      this.formGroup.addControl('price', new FormControl("", Validators.compose([
+        Validators.required,
+        Validators.min(0)])));
+    }
   }
 
   loadPatterns() {

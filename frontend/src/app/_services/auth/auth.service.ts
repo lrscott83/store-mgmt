@@ -85,6 +85,7 @@ export class AuthService implements OnDestroy {
 
     this.authHttpService.logout().subscribe((url: string) => {
       this.removeToken();
+      this.currentUserSubject.next(undefined);
       //document.location.reload();
       this.router.navigateByUrl("/login");
       this.isLoadingSubject.next(false);

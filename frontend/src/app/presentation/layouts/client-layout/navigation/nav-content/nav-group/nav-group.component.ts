@@ -7,6 +7,7 @@ import { NavigationItem } from '../../navigation';
 import { NavCollapseComponent } from '../nav-collapse/nav-collapse.component';
 import { NavItemComponent } from '../nav-item/nav-item.component';
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
   selector: 'app-nav-group',
@@ -22,7 +23,7 @@ export class NavGroupComponent implements OnInit {
   @Input() item!: NavigationItem;
 
   // Constructor
-  constructor(private location: Location) {}
+  constructor(private location: Location, private modalService: NgbModal) {}
 
   // Life cycle events
   ngOnInit() {
@@ -61,5 +62,10 @@ export class NavGroupComponent implements OnInit {
       }
       last_parent.classList.add('active');
     }
+  }
+
+  openHelpDialog() {
+    if (this.item.helpDialog)
+      this.modalService.open(this.item.helpDialog, { centered: true, size: "lg" });
   }
 }

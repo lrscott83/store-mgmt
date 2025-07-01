@@ -23,6 +23,7 @@ export enum EFeatures {
   Owners = 11,
   Roles = 12,
   ReSellers = 13,
+  Features = 14,
   
   // Sales
   Products = 20,
@@ -33,8 +34,8 @@ export enum EFeatures {
   // Inventory
   Available = 30,
   Entries = 31,
-  Egress = 32,
-  TodayInventoryStats = 33,
+  Egress = 33,
+  TodayInventoryStats = 32,
 
   // Synchronization
   Send = 40,

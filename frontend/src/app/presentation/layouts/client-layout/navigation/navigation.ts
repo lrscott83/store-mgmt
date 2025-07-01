@@ -18,6 +18,13 @@ import { UsersHelpDialogComponent } from "../help-dialogs/users-help-dialog/user
 import { ConfigurationsHelpDialogComponent } from "../help-dialogs/configurations-help-dialog/configurations-help-dialog.component";
 import { ResellersHelpDialogComponent } from "../help-dialogs/resellers-help-dialog/resellers-help-dialog.component";
 import { TodayReportsHelpDialogComponent } from "../help-dialogs/today-reports-help-dialog/today-reports-help-dialog.component";
+import { FeaturesHelpDialogComponent } from "../help-dialogs/features-help-dialog/features-help-dialog.component";
+import { SalesHelpDialogComponent } from "../help-dialogs/sales-help-dialog/sales-help-dialog.component";
+import { InventoryHelpDialogComponent } from "../help-dialogs/inventory-help-dialog/inventory-help-dialog.component";
+import { SynchronizationHelpDialogComponent } from "../help-dialogs/synchronization-help-dialog/synchronization-help-dialog.component";
+import { ReportsHelpDialogComponent } from "../help-dialogs/reports-help-dialog/reports-help-dialog.component";
+import { StatisticsHelpDialogComponent } from "../help-dialogs/statistics-help-dialog/statistics-help-dialog.component";
+import { StoreConfigurationsHelpDialogComponent } from "../help-dialogs/store-configurations-help-dialog/store-configurations-help-dialog.component";
 
 export interface NavigationItem {
   id: string;
@@ -49,6 +56,7 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'icon-navigation',
     module: EModules.Administration,
+    helpDialog: OwnersHelpDialogComponent,
     children: [
       {
         id: 'admin_owners',
@@ -74,6 +82,18 @@ export const NavigationItems: NavigationItem[] = [
         feature: EFeatures.ReSellers,
         helpDialog: ResellersHelpDialogComponent,
       },
+      {
+        id: 'admin_featuress',
+        title: 'MENU.ADMIN.FEATURES',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/admin/features',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Administration,
+        feature: EFeatures.Features,
+        helpDialog: FeaturesHelpDialogComponent,
+      },
     ]
   },
   {
@@ -82,6 +102,7 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'icon-navigation',
     module: EModules.Sales,
+    helpDialog: SalesHelpDialogComponent,
     children: [
       {
         id: 'sales_products',
@@ -139,6 +160,7 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'icon-navigation',
     module: EModules.Inventory,
+    helpDialog: InventoryHelpDialogComponent,
     children: [
       {
         id: 'inventory_available',
@@ -173,7 +195,7 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'aim',
         breadcrumbs: false,
         module: EModules.Inventory,
-        feature: null,
+        feature: EFeatures.Egress,
         helpDialog: EntriesHelpDialogComponent,
       },
       // {
@@ -196,6 +218,7 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'icon-navigation',
     module: EModules.Synchronization,
+    helpDialog: SynchronizationHelpDialogComponent,
     children: [
       {
         id: 'synchronization_send',
@@ -241,6 +264,7 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'icon-navigation',
     module: EModules.Reports,
+    helpDialog: ReportsHelpDialogComponent,
     children: [
       {
         id: 'reports_today',
@@ -262,6 +286,7 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'icon-navigation',
     module: EModules.Statistics,
+    helpDialog: StatisticsHelpDialogComponent,
     children: [
       {
         id: 'statistic_dashboard',
@@ -272,8 +297,7 @@ export const NavigationItems: NavigationItem[] = [
         icon: 'aim',
         breadcrumbs: false,
         module: EModules.Statistics,
-        //feature: EFeatures. Dashboard,
-        feature: null,
+        feature: EFeatures. Dashboard,
         helpDialog: DashboardHelpDialogComponent,
       }
     ]
@@ -284,6 +308,7 @@ export const NavigationItems: NavigationItem[] = [
     type: 'group',
     icon: 'icon-navigation',
     module: EModules.Management,
+    helpDialog: StoreConfigurationsHelpDialogComponent,
     children: [
       // {
       //   id: 'management_profile',

@@ -59,11 +59,11 @@
         </form>
     </div>
     <div class="modal-footer">
-        <button type="button" class="with-icon btn btn-default" (click)="closeModal()">
+        <button mat-fab extended color="primary" (click)="closeModal()">
             <mat-icon>close</mat-icon>
             {{ 'GENERAL.CLOSE' | translate}}
         </button>
-        <button class="with-icon btn btn-primary" (click)="onSubmit()">
+        <button mat-fab extended color="primary" (click)="onSubmit()">
             <mat-icon>save</mat-icon>
             {{ (!inventoryEntry ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
         </button>

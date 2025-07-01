@@ -46,7 +46,7 @@ export default class LoginComponent implements OnInit {
     this.isLoading$ = this.authService.isLoading$;
     // redirect to home if already logged in
     if (this.authService.currentUserValue) {
-      this.router.navigate(["/"]);
+      this.navigateToUserHome();
     }
 
   }
@@ -164,21 +164,25 @@ export default class LoginComponent implements OnInit {
             : this.translate.instant('AUTH.LOGIN.INVALID_ERROR', { error: response });
           return;
         }
-        if (this.authService.currentUserValue.isReSeller
-          || this.authService.currentUserValue.isSuperAdmin)
-          this.router.navigateByUrl("/admin/owners");
-        else {
-          this.productService.hasAnyAvailableToSaleProduct().subscribe(response => {
-            if (response?.data)
-            this.router.navigateByUrl("/sales/sale");
-          else
-            this.router.navigateByUrl("/sales/products");
-          });
-          
-        }
 
+        this.navigateToUserHome();
       });
     this.unsubscribe.push(loginSubscr);
+  }
+
+  navigateToUserHome() {
+    if (this.authService.currentUserValue.isReSeller
+      || this.authService.currentUserValue.isSuperAdmin)
+      this.router.navigateByUrl("/admin/owners");
+    else {
+      this.productService.hasAnyAvailableToSaleProduct().subscribe(response => {
+        if (response?.data)
+          this.router.navigateByUrl("/sales/sale");
+        else
+          this.router.navigateByUrl("/sales/products");
+      });
+
+    }
   }
 
   ngOnDestroy() {

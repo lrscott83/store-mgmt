@@ -11,6 +11,7 @@ export const locale = {
         OWNERS: 'Propietarios',
         RESELLERS: 'Gestores',
         USERS: 'Usuarios',
+        FEATURES: 'Funcionalidades',
       },
       SALE_MGMT: {
         TITLE: 'VENTA',
@@ -407,8 +408,11 @@ export const locale = {
     HELP: {
       MENU: {
         PRODUCTS: {
-          TITLE: 'Ayuda - Productos',
-        }
+          TITLE: 'Ayuda - Catálogo de Productos',
+        },
+        SALES: {
+          TITLE: 'Ayuda - Ventas',
+        },
       }
     },
     OWNER: {
@@ -446,6 +450,12 @@ export const locale = {
     },
     DASHBOARD: {
       HEADER: 'Panel de Control',
+    },
+    FEATURES: {
+      TITLE: 'Funcionalidades',
+      ACTIVATE_FEATURES: 'Activar funcionalidades',
+      UNEXPECTED_ERROR: 'Ocurrió unb error inesperado activando las funcionalidades',
+      FEATURES_ACTIVATED: 'Las funcionalidades se activaron satisfactoriamente'
     }
   }
 };

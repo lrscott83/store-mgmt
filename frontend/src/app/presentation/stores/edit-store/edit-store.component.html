@@ -95,7 +95,9 @@
                           <span class="price">{{ module.price | currency:'USD':'symbol':'1.2-2' }}</span>
                         </div>
                         } @else {
-                        {{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}
+                        <span style="font-weight: bold;">
+                          {{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}
+                        </span>
                         }
                         <!-- <i *ngIf="module.discountText && module.discountText !== ''" class="fa fa-genderless text-info icon-xl"></i> -->
                       </td>
@@ -107,7 +109,7 @@
                     <tr>
                       <th></th>
                       <td>{{ 'GENERAL.TOTAL_PRICE' | translate }}</td>
-                      <td class="text-end">{{ getTotalPrice() | currency:'USD':'symbol':'1.2-2' }}</td>
+                      <td class="text-end" style="font-weight: bold;">{{ getTotalPrice() | currency:'USD':'symbol':'1.2-2' }}</td>
                     </tr>
                   </tfoot>
                 </table>

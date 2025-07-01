@@ -210,15 +210,15 @@ export class EditStoreComponent {
           }))
           .subscribe(response => {
             if (response && response.succeeded && response.data) {
-              if (this.currentUser.isSuperAdmin) {
-                this.formGroup.reset();
-                this.router.navigateByUrl('/management/stores');
-              } else {
+              // if (this.currentUser.isSuperAdmin) {
+              //   this.formGroup.reset();
+              //   this.router.navigateByUrl('/management/stores');
+              // } else {
                 this.authService.getUserByToken().subscribe(user => {
                   document.location.reload();
                   this.storeModuleStateService.modulesUpdated(true);
                 });
-              }
+              // }
             }
             else
               console.error("Error updating store ...");

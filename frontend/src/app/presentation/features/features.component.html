@@ -1,0 +1,15 @@
+<div class="card card-custom gutter-b">
+    <div class="card-header">
+        <div class="card-title">
+            <h3 class="card-label" [translate]="'FEATURES.TITLE'"></h3>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <div class="row">
+            <button mat-fab extended color="primary" (click)="activateFeatures()">
+                <mat-icon>edit</mat-icon>
+                {{'FEATURES.ACTIVATE_FEATURES'| translate}}
+            </button>
+        </div>
+    </div>
+</div>
