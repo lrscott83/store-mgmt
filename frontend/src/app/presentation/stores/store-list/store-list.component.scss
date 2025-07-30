@@ -1,6 +1,6 @@
 @import '../../../../scss/components/variables.bootstrap';
 
-.disapproved-owner::ng-deep {
+.disapproved-store::ng-deep {
     background-color: $warning !important;
     // border-radius: 0.42rem !important;
 }
@@ -8,4 +8,23 @@
 .deactive-store::ng-deep {
     background-color: $danger !important;
     // border-radius: 0.42rem !important;
+}
+
+.settings-color {
+    color: #673ab7 !important;
+}
+
+.card-header-custom {
+    display: flex;
+    flex-direction: row;
+    height: 44px;
+    align-items: center;
+}
+
+.card-header-action-button {
+    margin-bottom: 8px;
+}
+
+mat-card-title {
+    padding-left: 16px;
 }

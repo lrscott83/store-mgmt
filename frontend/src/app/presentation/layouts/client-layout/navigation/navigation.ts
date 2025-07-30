@@ -59,6 +59,18 @@ export const NavigationItems: NavigationItem[] = [
     helpDialog: OwnersHelpDialogComponent,
     children: [
       {
+        id: 'admin_stores',
+        title: 'MENU.ADMIN.STORES',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/admin/stores',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Administration,
+        feature: EFeatures.AdminStores,
+        helpDialog: StoresHelpDialogComponent,
+      },
+      {
         id: 'admin_owners',
         title: 'MENU.ADMIN.OWNERS',
         type: 'item',

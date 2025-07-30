@@ -32,7 +32,8 @@
                             <mat-icon color="primary">edit</mat-icon>
                             <span>{{ 'GENERAL.EDIT' | translate }}</span>
                         </button>
-                        <button *ngIf="reSeller.isActive" mat-menu-item class="btn" (click)="deleteReSeller(reSeller)">
+                        <button *ngIf="reSeller.isActive" mat-menu-item class="btn"
+                            (click)="deactivateReSeller(reSeller)">
                             <mat-icon color="warn">delete</mat-icon>
                             <span>{{ 'GENERAL.DEACTIVATE' | translate }}</span>
                         </button>
@@ -40,6 +41,11 @@
                             (click)="activateReSeller(reSeller)">
                             <mat-icon color="primary">edit</mat-icon>
                             <span>{{ 'GENERAL.ACTIVATE' | translate }}</span>
+                        </button>
+                        <button mat-menu-item class="btn"
+                            (click)="deleteReSeller(reSeller)">
+                            <mat-icon color="warn">delete</mat-icon>
+                            <span>{{ 'GENERAL.DELETE' | translate }}</span>
                         </button>
                     </mat-menu>
                 </div>

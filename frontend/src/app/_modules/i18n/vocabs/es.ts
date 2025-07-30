@@ -8,6 +8,7 @@ export const locale = {
     MENU: {
       ADMIN: {
         TITLE: 'ADMINISTRACIÓN',
+        STORES: 'Tiendas',
         OWNERS: 'Propietarios',
         RESELLERS: 'Gestores',
         USERS: 'Usuarios',
@@ -443,6 +444,7 @@ export const locale = {
       RECEIVE_IMPORT_SUCCESS: 'Los datos se importaron correctamente.',
     },
     REPORT: {
+      TITLE: 'Reportes',
       INVENTORY_TODAY_SALE: 'Inventario a precio de venta',
     },
     TUTORIAL: {

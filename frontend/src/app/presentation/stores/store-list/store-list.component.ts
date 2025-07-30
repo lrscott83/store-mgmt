@@ -206,7 +206,7 @@ export class StoreListComponent implements OnInit {
   getStoreBackgroundColor(store: Store) {
     return !store.isActive 
     ? "deactive-store" 
-    : !store.approved ? "disapproved-owner" : "";
+    : !store.approved ? "disapproved-store" : "";
   }
 
 }

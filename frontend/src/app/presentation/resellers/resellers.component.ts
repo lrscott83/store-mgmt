@@ -53,6 +53,10 @@ export class ResellersComponent implements OnInit, OnDestroy {
 
   }
 
+  deactivateReSeller(reSeller: ReSeller) {
+
+  }
+
   approveReSeller(reSeller: ReSeller) {
 
   }

@@ -24,6 +24,7 @@ export enum EFeatures {
   Roles = 12,
   ReSellers = 13,
   Features = 14,
+  AdminStores = 15,
   
   // Sales
   Products = 20,

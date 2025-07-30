@@ -16,6 +16,8 @@ import { ModuleService } from 'src/app/_services/module/module.service';
 import { Module } from 'src/app/domain/entities/modules/module.model';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
 import { StoreModuleStateService } from 'src/app/_services/shared/store-module-state.service';
+import { MAT_MOMENT_DATE_ADAPTER_OPTIONS, MomentDateAdapter } from '@angular/material-moment-adapter';
+import { DateAdapter, MAT_DATE_LOCALE } from '@angular/material/core';
 
 @Component({
   selector: 'app-edit-store',
@@ -24,7 +26,8 @@ import { StoreModuleStateService } from 'src/app/_services/shared/store-module-s
   templateUrl: './edit-store.component.html',
   styleUrl: './edit-store.component.scss',
   providers: [
-
+    //{ provide: MAT_MOMENT_DATE_ADAPTER_OPTIONS, useValue: { useUtc: true } },
+    //{ provide: DateAdapter, useClass: MomentDateAdapter, deps: [MAT_DATE_LOCALE, MAT_MOMENT_DATE_ADAPTER_OPTIONS] }
   ]
 })
 export class EditStoreComponent {

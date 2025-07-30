@@ -15,6 +15,9 @@ export class AuthorizationService {
         if (!currentUser)
             return false;
         
+        if (currentUser.expiresIn < new Date())
+            return false;
+
         if (currentUser.isSuperAdmin)
             return true;
         if (currentUser.isReSeller && this.isReSellerAuthorize(currentUser, features))

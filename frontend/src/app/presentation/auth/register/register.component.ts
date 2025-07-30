@@ -45,7 +45,7 @@ export default class RegisterComponent implements OnInit, CanComponentDeactivate
   }
 
   ngOnInit(): void {
-    this.reSellerCode = this.route.snapshot.params['code'];
+    this.reSellerCode = this.route.snapshot.queryParams['code'];
     this.loadForm();
     if (this.reSellerCode)
       this.formGroup.patchValue({code: this.reSellerCode});
@@ -58,7 +58,7 @@ export default class RegisterComponent implements OnInit, CanComponentDeactivate
         return resolve(false);
       }
 
-      this.authHTTPService.registerOwner(this.formGroup.value.fullName, this.formGroup.value.login, this.formGroup.value.password, this.formGroup.value.cellPhone, this.formGroup.value.email, this.formGroup.value.storeName, this.formGroup.value.code)
+      this.authHTTPService.registerOwner(this.formGroup.value.fullName, this.formGroup.value.login, this.formGroup.value.password, this.formGroup.value.cellPhone, this.formGroup.value.email, this.formGroup.value.storeName, this.reSellerCode)
         .pipe(catchError((error) => {
           // return of({
           //   data: null,

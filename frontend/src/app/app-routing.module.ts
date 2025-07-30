@@ -75,6 +75,13 @@ const routes: Routes = [
         pathMatch: 'full'
       },
       {
+        path: 'admin/stores', 
+        component: StoresComponent,
+        canActivate: [SuperAdminAuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.AdminStores] }
+      },
+      {
         path: 'admin/owners', 
         component: OwnersComponent,
         canActivate: [ReSellerAuthGuard],
