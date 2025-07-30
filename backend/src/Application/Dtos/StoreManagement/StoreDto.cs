@@ -14,6 +14,7 @@ namespace Application.Dtos.StoreManagement
         public bool IsActive { get; set; }
         public bool Approved { get; set; }
         public DateOnly PaymentStartDate { get; set; }
+        public DateOnly NextPaymentDate { get; set; }
         public List<ModuleDto> Modules { get; set; }
     }
 }

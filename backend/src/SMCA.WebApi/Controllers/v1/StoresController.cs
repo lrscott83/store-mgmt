@@ -1,8 +1,10 @@
 ﻿using Application.Dtos.ApplicationManagement.Tenants;
 using Application.Dtos.StoreManagement;
 using Application.Features.ApplicationManagement.Tenants.Queries.GetTenantById;
+using Application.Features.StoreManagement.Stores.Commands.ApproveStore;
 using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using Application.Features.StoreManagement.Stores.Commands.DeleteStore;
+using Application.Features.StoreManagement.Stores.Commands.DisapproveStore;
 using Application.Features.StoreManagement.Stores.Commands.SetMyStore;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
@@ -76,7 +78,23 @@ namespace SMCA.WebApi.Controllers.v1
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         public async Task<IActionResult> DeleteAsync(Guid id)
         {
-            return Ok(await Sender.Send(new DeleteStoreCommand(id)));
+            return Ok(await Sender.Send(new DeactivateStoreCommand(id)));
+        }
+
+        [HttpPost("approve")]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        public async Task<IActionResult> ApproveStoreAsync(ApproveStoreCommand command)
+        {
+            return Ok(await Sender.Send(command));
+        }
+
+        [HttpPost("disapprove")]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        public async Task<IActionResult> DisapproveStoreAsync(DisapproveStoreCommand command)
+        {
+            return Ok(await Sender.Send(command));
         }
     }
 }

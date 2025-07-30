@@ -20,7 +20,7 @@ namespace Application.Services.Features
         public async Task<List<int>> GetAllowedFeatureIdsForCurrentUserAsync(List<int> storeModuleIds)
         {
             if (_httpContextService.IsReSeller)
-                return await GetAllowedFeatureIdsByRoleAsync(RoleType.ReSeller, storeModuleIds);
+                return await GetReSellerAllowedFeatureIdsByRoleAsync();
             if (_httpContextService.IsOwnerAdmin)
                 return await GetAllowedFeatureIdsByRoleAsync(RoleType.OwnerAdmin, storeModuleIds);
             return [];
@@ -34,6 +34,15 @@ namespace Application.Services.Features
                         .Select(roleFeature => (int)roleFeature.GetFeatureType().Value)
                         .ToList();
             return await _featureRepository.FilterAvailableToStoreByIds(allowedFeatureIds);
+        }
+
+        private async Task<List<int>> GetReSellerAllowedFeatureIdsByRoleAsync()
+        {
+            List<int> allowedFeatureIds = ((StoreRoleFeatures[])Enum.GetValues(typeof(StoreRoleFeatures)))
+                        .Where(roleFeature => roleFeature.GetRoles().Any(r => r == RoleType.ReSeller) && roleFeature.GetFeatureType().HasValue)
+                        .Select(roleFeature => (int)roleFeature.GetFeatureType().Value)
+                        .ToList();
+            return allowedFeatureIds;
         }
     }
 }

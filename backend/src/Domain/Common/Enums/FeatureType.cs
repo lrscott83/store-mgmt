@@ -21,6 +21,9 @@ namespace Domain.Common.Enums
         [Description("Funcionalidades")]
         Features = 14,
 
+        [Description("Tiendas")]
+        AdminStores = 15,
+
         // Sales
         [Description("Productos")]
         Products = 20,

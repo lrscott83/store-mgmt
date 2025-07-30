@@ -44,9 +44,9 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<IEnumerable<Owner>> GetReSellerOwnersIncludingStoreModulesAsync(Guid reSellerId, bool includeInactive)
         {
             return await _owners
-                .Where(o => o.ReSellerOwner != null && o.ReSellerOwner.ReSellerId == reSellerId && (includeInactive || o.IsActive))
+                .Where(o => o.ReSellerOwner != null && o.ReSellerOwner.ReSeller != null && o.ReSellerOwner.ReSeller.UserId == reSellerId && (includeInactive || o.IsActive))
                 .Include(o => o.User)
-                .Include(o => o.Stores.Where(s => s.IsActive && s.Approved)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
+                .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
                 .IgnoreQueryFilters()
                 .ToListAsync();
         }

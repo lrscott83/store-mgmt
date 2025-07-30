@@ -11,9 +11,9 @@ using System.Net;
 
 namespace Application.Features.StoreManagement.Stores.Commands.DeleteStore
 {
-    public sealed record DeleteStoreCommand (Guid Id) : ICommand<bool> { }
+    public sealed record DeactivateStoreCommand (Guid Id) : ICommand<bool> { }
 
-    public class DeleteStoreCommandHandler : ICommandHandler<DeleteStoreCommand, bool>
+    public class DeleteStoreCommandHandler : ICommandHandler<DeactivateStoreCommand, bool>
     {
         private readonly IStoreRepository _storeRepository;
         private readonly IGetStoreByIdService _storeByIdService;
@@ -36,7 +36,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.DeleteStore
         }
 
 
-        public async Task<ResponseResult<bool>> Handle(DeleteStoreCommand request, CancellationToken cancellationToken)
+        public async Task<ResponseResult<bool>> Handle(DeactivateStoreCommand request, CancellationToken cancellationToken)
         {
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);

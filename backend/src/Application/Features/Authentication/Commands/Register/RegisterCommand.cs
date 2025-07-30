@@ -7,6 +7,8 @@ using Application.UnitOfWorks;
 using Domain.Common.Results;
 using Domain.Entities.Modules;
 using Domain.Entities.Owners;
+using Domain.Entities.ReSellerOwners;
+using Domain.Entities.ReSellers;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Owners;
 using Domain.Interfaces.Services.Stores;
@@ -18,7 +20,7 @@ using System.Net;
 namespace Application.Features.Authentication.Commands.Register
 {
     public sealed record RegisterCommand(string Login, string Password, string FullName, string CellPhone, string? Email,
-        string StoreName)
+        string StoreName, string Code)
         : ICommand<bool>
     { }
 
@@ -30,6 +32,8 @@ namespace Application.Features.Authentication.Commands.Register
         private readonly ICreateOwnerService _createOwnerService;
         private readonly ICreateStoreService _createStoreService;
         private readonly IModuleRepository _moduleRepository;
+        private readonly IReSellerRepository _reSellerRepository;
+        private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
         private readonly ISender _sender;
         private readonly IStringLocalizer<I18n> _localizer;
 
@@ -41,7 +45,9 @@ namespace Application.Features.Authentication.Commands.Register
             ICreateOwnerService createOwnerService,
             ICreateStoreService createStoreService,
             IModuleRepository moduleRepository,
-            ISender sender)
+            ISender sender,
+            IReSellerRepository reSellerRepository,
+            IReSellerOwnerRepository reSellerOwnerRepository)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -51,6 +57,8 @@ namespace Application.Features.Authentication.Commands.Register
             _createStoreService = createStoreService;
             _moduleRepository = moduleRepository;
             _sender = sender;
+            _reSellerRepository = reSellerRepository;
+            _reSellerOwnerRepository = reSellerOwnerRepository;
         }
 
         public async Task<ResponseResult<bool>> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -67,6 +75,16 @@ namespace Application.Features.Authentication.Commands.Register
 
             owner.User.SelectedStoreId = store.Id;
             //await _userRepository.UpdateAsync(owner.User);
+
+            if (!string.IsNullOrEmpty(request.Code))
+            {
+                ReSeller reSeller = await _reSellerRepository.GetByUserNameAsync(request.Code);
+                if (reSeller != null)
+                {
+                    ReSellerOwner reSellerOwner = ReSellerOwner.Create(reSeller.Id, owner.Id, reSeller.DiscountPrice, reSeller.PercentDiscountPrice, owner.TenantId);
+                    await _reSellerOwnerRepository.AddAsync(reSellerOwner);
+                }
+            }
 
             bool success = await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0;
 

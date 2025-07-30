@@ -1,16 +1,15 @@
-﻿using Domain.Interfaces.Repositories;
-using Domain.Interfaces.Services.Stores;
+﻿using Domain.Interfaces.Services.Stores;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
 
-namespace Application.Features.StoreManagement.Stores.Commands.DeleteStore
+namespace Application.Features.StoreManagement.Stores.Commands.ActivateStore
 {
-    public class DeleteStoreCommandValidator : AbstractValidator<DeleteStoreCommand>
+    public class ActivateStoreCommandValidator : AbstractValidator<ActivateStoreCommand>
     {
         private readonly IGetStoreByIdService _storeByIdService;
         private readonly IStringLocalizer<I18n> _localizer;
-        public DeleteStoreCommandValidator(IStringLocalizer<I18n> localizer, IGetStoreByIdService storeByIdService)
+        public ActivateStoreCommandValidator(IStringLocalizer<I18n> localizer, IGetStoreByIdService storeByIdService)
         {
             _storeByIdService = storeByIdService;
             _localizer = localizer;

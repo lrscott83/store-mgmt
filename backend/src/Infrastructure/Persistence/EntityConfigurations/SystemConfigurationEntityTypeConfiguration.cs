@@ -27,7 +27,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
                 SystemConfigurationType.TestingPeriodInMonths.GetDisplayName(), "1"));
             builder.HasData(
                 SystemConfiguration.Create((int)SystemConfigurationType.ReSellerPercentDiscountPrice,
-                SystemConfigurationType.ReSellerPercentDiscountPrice.GetDisplayName(), "25"));
+                SystemConfigurationType.ReSellerPercentDiscountPrice.GetDisplayName(), "20"));
         }
     }
 }

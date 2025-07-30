@@ -36,6 +36,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     true
                 ),
                 Feature.Create(
+                    (int)FeatureType.AdminStores,
+                    FeatureType.AdminStores.GetDescription(),
+                    "Funcionalidad para gestionar todas las tiendas",
+                    (int)ModuleType.Administration,
+                    1,
+                    false,
+                    true
+                ),
+                Feature.Create(
                     (int)FeatureType.Owners,
                     FeatureType.Owners.GetDescription(),
                     "Funcionalidad para gestionar los propietarios",

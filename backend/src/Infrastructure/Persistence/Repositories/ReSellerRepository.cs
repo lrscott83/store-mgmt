@@ -1,8 +1,6 @@
 ﻿using Domain.Common.Enums;
 using Domain.Common.Extensions;
 using Domain.Entities.ReSellers;
-using Domain.Entities.StoreRoleFeatures;
-using Domain.Entities.Tenants;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +27,14 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<ReSeller> GetByUserIdIgnoreQueryFiltersAsync(Guid userId)
         {
             return await _reSellers.Where(r => r.UserId == userId)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<ReSeller> GetByUserNameAsync(string code)
+        {
+            return await _reSellers
+                .Where(r => r.User.Login == code)
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync();
         }
