@@ -1,5 +1,5 @@
 // angular import
-import { Component, effect, signal } from '@angular/core';
+import { Component, effect, OnInit, signal } from '@angular/core';
 import { TranslationService } from './_modules/i18n/translation.service';
 
 // language list
@@ -13,13 +13,14 @@ import { Subscription } from 'rxjs';
 import { SpinnerComponent } from './presentation/shared/components/spinner/spinner.component';
 import { LoadingComponent } from './presentation/shared/components/loading/loading.component';
 import { UpdateService } from './_services/update/update.service';
+import { StoreUsageTrackerService } from './_services/usage-tracker/store-usage-tracker.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   // public props
   title = 'vende-de-todo';
   public spinnerComponent = LoadingComponent;
@@ -27,6 +28,7 @@ export class AppComponent {
   constructor(
     private translationService: TranslationService,
     private updateService: UpdateService,
+    private storeUsageTracker: StoreUsageTrackerService
     //private tableService: TableExtendedService
   ) {
     // register translations
@@ -38,5 +40,9 @@ export class AppComponent {
       deLang,
       frLang
     );
+  }
+
+  ngOnInit() {
+    this.storeUsageTracker.cleanOldData(30); // Mantiene los últimos 30 días
   }
 }

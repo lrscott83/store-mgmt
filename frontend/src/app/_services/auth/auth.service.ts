@@ -10,6 +10,7 @@ import { StorageService } from "../storage/storage.service";
 import { Router } from '@angular/router';
 import { BaseResponseModel } from '../_models/base.model';
 import * as _moment from 'moment';
+import { StoreUsageTrackerService } from "../usage-tracker/store-usage-tracker.service";
 
 
 
@@ -63,7 +64,7 @@ export class AuthService implements OnDestroy {
           this.localStorageService.setTokenToLocalStorage(response.data.authToken);
           const todayMoment = _moment(new Date()).startOf('day');
           response.data.expiresIn = todayMoment.add(3, 'days').toDate();
-          //response.data.expiresIn = new Date(new Date().getTime() + 60000);
+          //response.data.expiresIn = new Date(new Date().getTime() + 60000);          
           const result = this.setAuthFromLocalStorage(response.data);
           return result;
         }

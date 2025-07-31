@@ -14,6 +14,7 @@ import Swal from 'sweetalert2';
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
+import { StoreUsageTrackerService } from 'src/app/_services/usage-tracker/store-usage-tracker.service';
 
 @Component({
   selector: 'app-login',
@@ -41,6 +42,7 @@ export default class LoginComponent implements OnInit {
     private translate: TranslateService,
     private connectionService: ConnectionService,
     private toastrService: ToastrService,
+    private storeUsageTracker: StoreUsageTrackerService,
     @Inject(PRODUCT_SERVICE) private productService: ProductService,
   ) {
     this.isLoading$ = this.authService.isLoading$;
@@ -164,7 +166,8 @@ export default class LoginComponent implements OnInit {
             : this.translate.instant('AUTH.LOGIN.INVALID_ERROR', { error: response });
           return;
         }
-
+        this.storeUsageTracker.stopTracking();
+        this.storeUsageTracker.startTracking();
         this.navigateToUserHome();
       });
     this.unsubscribe.push(loginSubscr);
