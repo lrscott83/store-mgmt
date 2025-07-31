@@ -8,6 +8,7 @@ using Domain.Entities.StorePayments;
 using Domain.Entities.ProductCategories;
 using Domain.Entities.InventoryEntries;
 using Domain.Entities.Orders;
+using Domain.Entities.StoreUsages;
 
 namespace Domain.Entities.Stores
 {
@@ -26,6 +27,7 @@ namespace Domain.Entities.Stores
         public ICollection<ProductCategory> ProductCategories { get; set; }
         public ICollection<InventoryEntry> InventoryEntries { get; set; }
         public ICollection<Order> Orders { get; set; }
+        public ICollection<StoreUsage> StoreUsages { get; set; } = new List<StoreUsage>();
 
         public Guid OwnerId { get; private set; }
         public DateOnly PaymentStartDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);

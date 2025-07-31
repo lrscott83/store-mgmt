@@ -17,7 +17,7 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<float> GetReSellerPercentDiscountPriceAsync()
         {
             SystemConfiguration? systemConfiguration = await _systemConfigurations.FirstOrDefaultAsync(conf => conf.Id == (int)SystemConfigurationType.ReSellerPercentDiscountPrice);
-            return systemConfiguration != null ? float.Parse(systemConfiguration.Value) : 25;
+            return systemConfiguration != null ? float.Parse(systemConfiguration.Value) : 20;
         }
 
         public async Task<SystemConfiguration> GetSystemConfigurationByIdAsync(int id)

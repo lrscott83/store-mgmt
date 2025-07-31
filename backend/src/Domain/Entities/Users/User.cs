@@ -3,6 +3,7 @@ using Domain.Common.Events;
 using Domain.Entities.Owners;
 using Domain.Entities.ReSellers;
 using Domain.Entities.Stores;
+using Domain.Entities.StoreUsages;
 using Domain.Entities.StoreUsers;
 using Domain.Entities.UserRoles;
 
@@ -16,6 +17,7 @@ namespace Domain.Entities.Users
         public string? CellPhone { get; set; }
         public string? Email { get; set; }
         public ICollection<UserRole> UserRoles { get; set; }
+        public ICollection<StoreUsage> StoreUsages { get; set; } = new List<StoreUsage>();
         public Owner? Owner { get; set; }
         public ReSeller? ReSeller { get; set; }
         public StoreUser? StoreUser { get; set; }

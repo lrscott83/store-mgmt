@@ -83,6 +83,7 @@ namespace Infrastructure
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IInventoryEntryRepository, InventoryEntryRepository>();
             services.AddScoped<IInventoryEntryCostRepository, InventoryEntryCostRepository>();
+            services.AddScoped<IStoreUsageRepository, StoreUsageRepository>();
         }
     }
 }
