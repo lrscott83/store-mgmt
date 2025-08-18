@@ -3,7 +3,8 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ShoppingCartService } from 'src/app/_services/order/shopping-cart.service';
-import { OrderType, OrderTypeData, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
+import { TypeData } from 'src/app/domain/commons/type-data';
+import { OrderType, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 
 @Component({
@@ -20,7 +21,7 @@ export class EditOrderDetailsModalComponent implements OnInit {
   formGroup: FormGroup;
 
   orderType: OrderType = this.shoppingCartService.getOrderType();
-  orderTypes: OrderTypeData[] = OrderTypeUtils.getOrderTypes();
+  orderTypes: TypeData[] = OrderTypeUtils.getOrderTypes();
 
   constructor(private formBuilder: FormBuilder, private modal: NgbActiveModal, private translate: TranslateService, private shoppingCartService: ShoppingCartService) {
     this.loadForm();

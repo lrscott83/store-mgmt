@@ -109,7 +109,18 @@
                     <tr>
                       <th></th>
                       <td>{{ 'GENERAL.TOTAL_PRICE' | translate }}</td>
-                      <td class="text-end" style="font-weight: bold;">{{ getTotalPrice() | currency:'USD':'symbol':'1.2-2' }}</td>
+                      <td class="text-end">
+                        @if (getTotalPrice() !== getTotalCurrentPrice()) {
+                        <div class="offer-price">
+                          <span class="current-price">{{ getTotalCurrentPrice() | currency:'USD':'symbol':'1.2-2' }}</span>
+                          <span class="price">{{ getTotalPrice() | currency:'USD':'symbol':'1.2-2' }}</span>
+                        </div>
+                        } @else {
+                        <span style="font-weight: bold;">
+                          {{ getTotalCurrentPrice() | currency:'USD':'symbol':'1.2-2' }}
+                        </span>
+                        }
+                      </td>
                     </tr>
                   </tfoot>
                 </table>

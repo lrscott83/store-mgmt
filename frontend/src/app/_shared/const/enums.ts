@@ -25,6 +25,7 @@ export enum EFeatures {
   ReSellers = 13,
   Features = 14,
   AdminStores = 15,
+  AdminDashboard = 16,
   
   // Sales
   Products = 20,
@@ -54,6 +55,20 @@ export enum EFeatures {
   Users = 72,
   Stores = 73,
   Configurations = 74,
+
+  //Expenses
+  TodayExpenses = 80,
+
+  //Billing
+  Billing = 90,
+
+  //Histories,
+  SalesHistory = 100,
+  EntriesHistory = 101,
+  ExpensesHistory = 102,
+
+  //Credits
+  CreditSale = 110,
 }
 
 export enum EModules {
@@ -64,6 +79,10 @@ export enum EModules {
   Reports = 5,
   Statistics = 6,
   Management = 7,
+  Expenses = 8,
+  Billing = 9,
+  Histories = 10,
+  Credits = 11
 }
 
 export enum ENotificationTemplateType {

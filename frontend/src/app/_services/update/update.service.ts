@@ -30,6 +30,11 @@ export class UpdateService {
         }
     }
 
+    public checkForUpdate() {
+        if (this.updates)
+            this.updates.checkForUpdate();
+    }
+
     private showUpdateDialog(): void {
         Swal.fire({
             title: '¡Nueva versión disponible!',

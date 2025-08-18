@@ -15,6 +15,8 @@ import { Product } from 'src/app/domain/entities/products/product.model';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { StoreUsageTrackerService } from 'src/app/_services/usage-tracker/store-usage-tracker.service';
+import { SwUpdate } from '@angular/service-worker';
+import { UpdateService } from 'src/app/_services/update/update.service';
 
 @Component({
   selector: 'app-login',
@@ -43,6 +45,7 @@ export default class LoginComponent implements OnInit {
     private connectionService: ConnectionService,
     private toastrService: ToastrService,
     private storeUsageTracker: StoreUsageTrackerService,
+    private updateService: UpdateService,
     @Inject(PRODUCT_SERVICE) private productService: ProductService,
   ) {
     this.isLoading$ = this.authService.isLoading$;
@@ -50,6 +53,7 @@ export default class LoginComponent implements OnInit {
     if (this.authService.currentUserValue) {
       this.navigateToUserHome();
     }
+    this.updateService.checkForUpdate();
 
   }
 

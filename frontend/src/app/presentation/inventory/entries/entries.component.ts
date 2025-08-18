@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, catchError, Observable, of } from 'rxjs';
 import { AuthService } from 'src/app/_services/services.index';
 import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
 import { InventoryEntryView } from 'src/app/domain/entities/entries/inventory-entry-view.model';
@@ -9,86 +9,99 @@ import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Result } from 'src/app/domain/commons/result';
 import Swal from 'sweetalert2';
+import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
+import { TypeData } from 'src/app/domain/commons/type-data';
+import { GlobalConfig } from 'src/app/_shared/configs/global.config';
+import { InventoryEntry } from 'src/app/domain/entities/entries/inventory-entry.model';
+import { EntryListComponent } from '../entry-list/entry-list.component';
+
+
+export interface DateEntry {
+  date: Date;
+  entries: InventoryEntryView[];
+  count: number;
+  total: number;
+}
 
 @Component({
   selector: 'app-entries',
   standalone: true,
-  imports: [SharedModule, TranslateModule, EditInventoryEntryModalComponent],
+  imports: [SharedModule, TranslateModule, EntryListComponent],
   templateUrl: './entries.component.html',
   styleUrl: './entries.component.scss'
 })
 export class EntriesComponent implements OnInit {
 
-  entries$: BehaviorSubject<InventoryEntryView[]> = new BehaviorSubject<InventoryEntryView[]>([]);
+  paymentType: PaymentType = null;
+  paymentTypes: TypeData[] = PaymentTypeUtils.getPaymentTypes();
 
-  constructor(private authService: AuthService, private modalService: NgbModal, private inventoryService: InventoryOfflineService, private translate: TranslateService) { }
-
-  ngOnInit(): void {
-    this.loadInventoryEntries();
-  }
-
-  loadInventoryEntries() {
-    this.inventoryService.getInventoryEntriesInDayObservable(new Date()).subscribe(response => {
-      if (response.succeeded) {
-        this.entries$.next(response.data);
-      } else {
-        console.log("Error when getInventoryEntriesInDay");
-      }
-    }, error => {
-      console.log("Error when getInventoryEntriesInDay: ", error);
-    });
-  }
-
-  openCreateEntryModal() {
-    const modalRef = this.modalService.open(EditInventoryEntryModalComponent, { centered: true, size: "lg" });
-    modalRef.componentInstance.inventoryEntryInsertedEmitter.subscribe((entry) => {
-      this.entries$.next([entry, ...this.entries$.value]);
-    });
-  }
-
-  openEditInventoryEntryModal(entry: InventoryEntryView) {
-    const modalRef = this.modalService.open(EditInventoryEntryModalComponent, { centered: true, size: "lg" });
-    modalRef.componentInstance.inventoryEntry = entry;
-    modalRef.componentInstance.inventoryEntryUpdatedEmitter.subscribe((updatedEntry) => {
-      let entries: InventoryEntryView[] = this.entries$.value;
-      let entry: InventoryEntryView = entries.find(e => e.id === updatedEntry.id);
-      if (entry) {
-        entry.productId = updatedEntry.productId;
-        entry.productName = updatedEntry.productName;
-        entry.costPrice = updatedEntry.costPrice;
-        entry.quantity = updatedEntry.quantity;
-      }
-      this.entries$.next(entries);
-    });
-  }
-
-  onDeleteInventoryEntry(productId: string, entryId: string) {
-    const soldEntryResult: Result = this.inventoryService.isNotSoldEntry(productId, entryId);
-    if (!soldEntryResult.succeeded) {
-      Swal.fire({
-        icon: 'error',
-        title: this.translate.instant('GENERAL.ERROR'),
-        text: soldEntryResult.errors[0].description,
-      });
-      return;
+  dateEntries$: BehaviorSubject<DateEntry[]> = new BehaviorSubject<DateEntry[]>([]);
+    onlyDateFormat: string = GlobalConfig.ONLY_DATE_FORMAT;
+  
+    constructor(private inventoryService: InventoryOfflineService, private translate: TranslateService) { }
+  
+    ngOnInit(): void {
+      this.loadEntries();
+    }
+  
+    getEntriesObservable(entries: InventoryEntryView[]): Observable<InventoryEntryView[]> {
+      return of(entries);
     }
 
-    Swal.fire({
-      title: this.translate.instant('GENERAL.DELETE_CONFIRM_TITLE'),
-      text: this.translate.instant('GENERAL.DELETE_CONFIRM_MESSAGE',
-        { name: this.translate.instant('INVENTORY_ENTRY.TEXT') }),
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonColor: "#3456ff",
-      cancelButtonColor: "#dc3545",
-      confirmButtonText: this.translate.instant('GENERAL.YES'),
-      cancelButtonText: this.translate.instant('GENERAL.NO'),
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.inventoryService.deleteInventoryEntry(productId, entryId);
-        this.loadInventoryEntries();
-      }
-    });
+    getPaymentTypeIcon(paymentType: PaymentType) {
+    return PaymentTypeUtils.getPaymentTypeIcon(paymentType);
   }
+  
+    getEntriesCount(): number {
+      return this.dateEntries$.value.reduce((count, entry) => count += entry.count, 0);
+    }
+  
+    getEntriesTotal(): number {
+      return this.dateEntries$.value.reduce((total, entry) => total += entry.total, 0);
+    }
+  
+    loadEntries() {
+      this.loadEntriesFiltered(null, null, null);
+    }
+  
+    loadEntriesFiltered(productId: string, startDate: Date, endDate: Date) {
+      this.inventoryService.filterInventoryEntries(productId, startDate, endDate)
+        .pipe(catchError((error) => {
+          console.log("Error when filterEntries: ", error);
+          throw error;
+        }))
+        .subscribe((response) => {
+          if (response.succeeded) {
+            const dateEntries: DateEntry[] = this.groupEntries(response.data);
+            this.dateEntries$.next(dateEntries);
+          } else {
+            console.log("Error when filterEntries");
+          }
+        });
+    }
+  
+    groupEntries(entries: InventoryEntryView[]): DateEntry[] {
+      let groups: Map<string, InventoryEntryView[]> = new Map();
+      entries.forEach(credit => {
+        const groupId = credit.date.toISOString().split("T")[0];
+        const collection = groups.get(groupId);
+        if (collection)
+          collection.push(credit);
+        else
+          groups.set(groupId, [credit]);
+      });
+  
+      const dateEntry: DateEntry[] = [];
+      Array.from(groups.values()).forEach(entries => {
+        dateEntry.push({
+          date: entries[0].date,
+          entries: entries.sort((c1, c2) => c1.date.getTime() - c2.date.getTime()),
+          count: entries.reduce((count, entry) => count += entry.quantity, 0),
+          total: entries.reduce((total, entry) => total += entry.costPrice, 0),
+        });
+      });
+  
+      return dateEntry.sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
+    }
 
 }

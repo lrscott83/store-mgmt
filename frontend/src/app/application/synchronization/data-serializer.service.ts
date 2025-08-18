@@ -5,13 +5,15 @@ import { ProductRepository } from "../products/product.repository";
 import { ProductCategoryRepository } from "../categories/product-category.repository";
 import { OrderOfflineService } from "../orders/order-offline.service";
 import { InventoryOfflineService } from "../entries/inventory-offline.service";
+import { ExpenseOfflineService } from "../expenses/expense-offline.service";
+import { SaleCreditOfflineService } from "../credits/sale-credit-offline.service";
 
 @Injectable({
     providedIn: "root"
 })
 
 export class DataSerializerService {
-    constructor(private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService) {
+    constructor(private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService, private expenseService: ExpenseOfflineService, private saleCreditService: SaleCreditOfflineService) {
 
     }
 
@@ -80,6 +82,8 @@ export class DataSerializerService {
         files.push({ name: EDataFileName.Products, content: this.productRepository.getProductsJson() });
         files.push({ name: EDataFileName.InventoryEntries, content: this.inventoryService.getInventoryEntriesJson() });
         files.push({ name: EDataFileName.Orders, content: this.orderService.getOrdersJson() });
+        files.push({ name: EDataFileName.Expenses, content: this.expenseService.getExpensesJson() });
+        files.push({ name: EDataFileName.SaleCredits, content: this.saleCreditService.getSaleCreditsJson() });
         return files;
     }
 

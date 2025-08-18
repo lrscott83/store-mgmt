@@ -1,0 +1,16 @@
+@import '../../../../scss/components/variables.bootstrap';
+
+::ng-deep .mat-expansion-panel-body {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+}
+
+.deactive-order::ng-deep {
+    background-color: $danger !important;
+    // border-radius: 0.42rem !important;
+}
+
+.credit-order::ng-deep {
+    background-color: $warning !important;
+    // border-radius: 0.42rem !important;
+}

@@ -50,11 +50,19 @@ export class AuthorizationService {
         return currentUser.storeModuleIds.some(id => id === moduleId);
     }
 
-    public hasInventoryModuleAvailable() {
+    public hasInventoryModuleAvailable(): boolean {
         return this.hasModuleAvailable(EModules.Inventory);
     }
 
-    public hasOwnersAvailableFeature() {
+    public hasOwnersAvailableFeature(): boolean {
         return this.isUserAuthorize([EFeatures.Owners]);
+    }
+
+    public hasExpensesModuleAvailable(): boolean {
+        return this.hasModuleAvailable(EModules.Expenses);
+    }
+
+    public hasCreditsModuleAvailable(): boolean {
+        return this.hasModuleAvailable(EModules.Credits);
     }
 }

@@ -20,6 +20,7 @@ import { InventoryEntryCost } from './inventory-item-cost.view';
 import * as _moment from 'moment';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
 import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
+import { OrderItem } from 'src/app/domain/entities/orders/order-item.model';
 
 @Injectable({
     providedIn: "root"
@@ -184,9 +185,27 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
         let inventories = this.getProductInventoriesByProductId(productId);
         const entry: InventoryEntry = inventories.find(e => e.id === entryId);
         entry.isActive = false;
+        entry.updatedDate = new Date();
+        entry.updatedByName = this.authService.currentUserValue.login;
         this.inventories.set(productId, inventories);
         this.setInventoriesLocalStorage(this.inventories);
 
+        return Result.Success();
+    }
+
+    public increaseQuantitiesByOrderItems(orderItems: OrderItem[]) {
+        const entries: Map<string, InventoryEntry[]> = this.getStorageInventoriesMap();
+        orderItems.forEach(orderItem => {
+            const productEntries: InventoryEntry[] = entries.get(orderItem.productId);
+            if (productEntries && orderItem.productCosts) {
+                orderItem.productCosts.forEach(cost => {
+                    const entry: InventoryEntry = productEntries.find(e => e.id === cost.inventoryId);
+                    if (entry) {
+                        entry.available += cost.quantity;
+                    }
+                });
+            }
+        });
         return Result.Success();
     }
 
@@ -196,21 +215,25 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
         return of(this.getInventoryEntriesInDay(date));
     }
 
-    getInventoryEntriesInDay(date: Date): BaseResponseModel<InventoryEntryView[]> {
-        const startMoment = _moment(date).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
+    filterInventoryEntries(productId: string, startDate: Date, endDate: Date)
+        : Observable<BaseResponseModel<InventoryEntryView[]>> {
+        const credits: InventoryEntryView[] = this.getActiveInventoryEntriesStorage()
+            .filter(entry => (!productId || productId === entry.productId)
+                && (!startDate || entry.date >= startDate)
+                && (!endDate || entry.date < endDate));
+        return of(this.Success(credits));
+    }
 
+    private getActiveInventoryEntriesStorage(): InventoryEntryView[] {
         let inventoryEntries: InventoryEntryView[] = [];
         const inventories: Map<string, InventoryEntry[]> = this.getStorageInventoriesMap();
         if (inventories.size === 0)
-            return this.Success([]);
+            return [];
         inventories.forEach((entries, productId) => {
             const product: Product = this.productRepository.getProductById(productId);
             if (product) {
                 entries
-                    .filter(entry => entry.isActive
-                        && entry.date >= startDate && entry.date < endDate)
+                    .filter(entry => entry.isActive)
                     .forEach(entry => {
                         inventoryEntries.push({
                             id: entry.id,
@@ -224,6 +247,16 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
                     });
             }
         });
+        return inventoryEntries;
+    }
+
+    getInventoryEntriesInDay(date: Date): BaseResponseModel<InventoryEntryView[]> {
+        const startMoment = _moment(date).startOf('day');
+        const startDate = startMoment.toDate();
+        const endDate = startMoment.add(1, 'days').toDate();
+
+        let inventoryEntries: InventoryEntryView[] = this.getActiveInventoryEntriesStorage()
+            .filter(entry => entry.date >= startDate && entry.date < endDate);
         return this.Success(inventoryEntries.sort((e1, e2) => e2.date.getTime() - e1.date.getTime()));
     }
 
@@ -475,6 +508,8 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
                 if (currentEntry) {
                     currentEntry.available = entry.available;
                     currentEntry.isActive = entry.isActive;
+                    currentEntry.updatedDate = entry.updatedDate;
+                    currentEntry.updatedByName = entry.updatedByName;
                 } else
                     currentEntries.push(entry);
             });

@@ -25,6 +25,12 @@ import { SynchronizationHelpDialogComponent } from "../help-dialogs/synchronizat
 import { ReportsHelpDialogComponent } from "../help-dialogs/reports-help-dialog/reports-help-dialog.component";
 import { StatisticsHelpDialogComponent } from "../help-dialogs/statistics-help-dialog/statistics-help-dialog.component";
 import { StoreConfigurationsHelpDialogComponent } from "../help-dialogs/store-configurations-help-dialog/store-configurations-help-dialog.component";
+import { ExpensesHelpDialogComponent } from "../help-dialogs/expenses-help-dialog/expenses-help-dialog.component";
+import { TodayExpenseHelpDialogComponent } from "../help-dialogs/today-expense-help-dialog/today-expense-help-dialog.component";
+import { SaleCreditsHelpDialogComponent } from "../help-dialogs/sale-credits-help-dialog/sale-credits-help-dialog.component";
+import { TodaySaleCreditsHelpDialogComponent } from "../help-dialogs/today-sale-credits-help-dialog/today-sale-credits-help-dialog.component";
+import { OrdersHelpDialogComponent } from "../help-dialogs/orders-help-dialog/orders-help-dialog.component";
+import { TodayEntriesHelpDialogComponent } from "../help-dialogs/today-entries-help-dialog/today-entries-help-dialog.component";
 
 export interface NavigationItem {
   id: string;
@@ -58,6 +64,18 @@ export const NavigationItems: NavigationItem[] = [
     module: EModules.Administration,
     helpDialog: OwnersHelpDialogComponent,
     children: [
+      {
+        id: 'admin_dashboard',
+        title: 'MENU.ADMIN.DASHBOARD',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/admin/dashboard',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Administration,
+        feature: EFeatures.AdminDashboard,
+        helpDialog: StoresHelpDialogComponent,
+      },
       {
         id: 'admin_stores',
         title: 'MENU.ADMIN.STORES',
@@ -145,12 +163,24 @@ export const NavigationItems: NavigationItem[] = [
         title: 'MENU.SALE_MGMT.TODAY_ORDERS',
         type: 'item',
         classes: 'nav-item',
-        url: '/sales/orders',
+        url: '/sales/today-orders',
         icon: 'aim',
         breadcrumbs: false,
         module: EModules.Sales,
         feature: EFeatures.TodayOrders,
         helpDialog: TodayOrdersHelpDialogComponent,
+      },
+      {
+        id: 'today_sales_credits',
+        title: 'MENU.SALE_MGMT.TODAY_SALE_CREDITS',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/sales/today-credits',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Credits,
+        feature: EFeatures.CreditSale,
+        helpDialog: TodaySaleCreditsHelpDialogComponent,
       },
       {
         id: 'sales_stats',
@@ -163,6 +193,30 @@ export const NavigationItems: NavigationItem[] = [
         module: EModules.Sales,
         feature: EFeatures.TodayOrdersStats,
         helpDialog: TodaySalesStatsHelpDialogComponent,
+      },
+      {
+        id: 'sales_credits',
+        title: 'MENU.SALE_MGMT.SALE_CREDITS_HISTORY',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/sales/credits',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Credits,
+        feature: EFeatures.CreditSale,
+        helpDialog: SaleCreditsHelpDialogComponent,
+      },
+      {
+        id: 'orders',
+        title: 'MENU.SALE_MGMT.ORDER_HISTORY',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/sales/orders',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Histories,
+        feature: EFeatures.SalesHistory,
+        helpDialog: OrdersHelpDialogComponent,
       }
     ]
   },
@@ -187,16 +241,16 @@ export const NavigationItems: NavigationItem[] = [
         helpDialog: AvailableHelpDialogComponent,
       },
       {
-        id: 'inventory_entries',
-        title: 'MENU.INVENTORY_MGMT.ENTRIES',
+        id: 'inventory_today_entries',
+        title: 'MENU.INVENTORY_MGMT.TODAY_ENTRIES',
         type: 'item',
         classes: 'nav-item',
-        url: '/inventory/entries',
+        url: '/inventory/today-entries',
         icon: 'aim',
         breadcrumbs: false,
         module: EModules.Inventory,
         feature: EFeatures.Entries,
-        helpDialog: EntriesHelpDialogComponent,
+        helpDialog: TodayEntriesHelpDialogComponent,
       },
       {
         id: 'inventory_sale',
@@ -208,6 +262,18 @@ export const NavigationItems: NavigationItem[] = [
         breadcrumbs: false,
         module: EModules.Inventory,
         feature: EFeatures.Egress,
+        helpDialog: EntriesHelpDialogComponent,
+      },
+      {
+        id: 'inventory_entries',
+        title: 'MENU.INVENTORY_MGMT.HISTORY_ENTRIES',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/inventory/entries',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Histories,
+        feature: EFeatures.EntriesHistory,
         helpDialog: EntriesHelpDialogComponent,
       },
       // {
@@ -222,6 +288,40 @@ export const NavigationItems: NavigationItem[] = [
       //   feature: EFeatures.TodayInventoryStats,
       //   helpDialog: TodayInventoryStatsHelpDialogComponent,
       // }
+    ]
+  },
+  {
+    id: 'expenses',
+    title: 'MENU.EXPENSES.TITLE',
+    type: 'group',
+    icon: 'icon-navigation',
+    module: EModules.Expenses,
+    helpDialog: ExpensesHelpDialogComponent,
+    children: [
+      {
+        id: 'today_expense',
+        title: 'MENU.EXPENSES.TODAY_EXPENSES',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/expenses/today',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Expenses,
+        feature: EFeatures.TodayExpenses,
+        helpDialog: TodayExpenseHelpDialogComponent,
+      },
+      {
+        id: 'today_expense',
+        title: 'MENU.EXPENSES.EXPENSES_HISTORY',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/expenses/expenses',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Histories,
+        feature: EFeatures.ExpensesHistory,
+        helpDialog: ExpensesHelpDialogComponent,
+      }
     ]
   },
   {

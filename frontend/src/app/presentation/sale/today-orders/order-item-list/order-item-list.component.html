@@ -1,16 +1,21 @@
-<div class="row text-end mb-2">
+<div *ngIf="!readOnly" class="row text-end mb-2">
     <div class="col text-end">
-        @if (order.isActive) {
-        <button mat-fab extended color="primary" (click)="deactivateOrder(order)">
+        <button mat-fab extended color="primary" (click)="openEditOrderModal(order)">
             <mat-icon>edit</mat-icon>
-            {{'TODAY_ORDERS.DEACTIVATE_ORDER'| translate}}
+            {{'GENERAL.EDIT'| translate}}
         </button>
-        } @else {
+        @if (order.isActive) {
+        <button mat-fab extended color="primary" (click)="deactivateOrder(order)" style="margin-left: 10px;">
+            <mat-icon color="warn">delete</mat-icon>
+            {{'GENERAL.DELETE'| translate}}
+        </button>
+        } 
+        <!-- @else {
         <button mat-fab extended color="primary" (click)="activateOrder(order)">
             <mat-icon>edit</mat-icon>
             {{'TODAY_ORDERS.ACTIVATE_ORDER'| translate}}
         </button>
-        }
+        } -->
     </div>
 </div>
 
@@ -29,7 +34,7 @@
                     </span>
                 </td>
                 <td class="text-end p-2">
-                    <span class="text-primary font-weight-bold mb-1 font-size-lg">
+                    <span class="font-weight-bold mb-1 font-size-lg">
                         {{(item.price * item.quantity) | currency:'USD':'symbol':'1.2-2'}}
                     </span>
                 </td>

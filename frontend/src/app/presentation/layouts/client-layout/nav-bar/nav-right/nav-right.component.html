@@ -106,13 +106,44 @@
       </div>
       <!-- <div class="dropdown-divider"></div> -->
       <div class="dropdown-header d-flex align-items-center justify-content-between">
-        <mat-slide-toggle class="mt-2" [(ngModel)]="mustGenerateFacture">
-          {{'SHOPPING_CART.GENERATE_FACTURE'| translate}}
+        <span style="font-size: 1rem;" class="{{getPaymentReturnClass()}}">Vuelto: {{getPaymentReturn() |
+          currency:'USD':'symbol':'1.2-2'}}</span>
+        <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field price">
+          <mat-label>{{'GENERAL.PAY'| translate}}</mat-label>
+          <input type="number" matInput min="0" autocomplete="off" [disabled]="getItemsCount() === 0"
+            [(ngModel)]="payment" />
+        </mat-form-field>
+      </div>
+      <div class="dropdown-header d-flex align-items-center justify-content-between">
+        <!-- <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field payment-type">
+          <mat-label>Forma de Pago</mat-label>
+          <mat-select name="Forma de Pago" [(value)]="paymentType">
+            <mat-option *ngFor="let type of paymentTypes" [value]="type.value">
+              {{type.label}}
+            </mat-option>
+          </mat-select>
+        </mat-form-field> -->
+        <mat-radio-group [(ngModel)]="paymentType">
+          <mat-radio-button *ngFor="let type of paymentTypes" [value]="type.value">
+            <i class="bi {{getPaymentTypeIcon(type.value)}} text-success fs-4"></i>
+            {{type.label}}
+          </mat-radio-button>
+        </mat-radio-group>
+      </div>
+      <div *ngIf="hasCreditsModuleAvailable" class="dropdown-header d-flex align-items-center">
+        <mat-slide-toggle class="mt-2" [(ngModel)]="isCredit" style="margin-top: -20px !important;">
+          {{'GENERAL.CREDIT'| translate}}
         </mat-slide-toggle>
-        <!-- <button mat-fab extended color="primary" (click)="editOrderDetails()">
-          <mat-icon>edit</mat-icon>
-          {{'SHOPPING_CART.EDIT_DETAILS' | translate}}
-        </button> -->
+        <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field client"
+          style="width: 100%; margin-left: 10px;">
+          <mat-label>{{'GENERAL.CLIENT'| translate}}</mat-label>
+          <input matInput autocomplete="off" [disabled]="!isCredit" [(ngModel)]="client" />
+        </mat-form-field>
+      </div>
+      <div class="dropdown-header d-flex align-items-center justify-content-between">
+        <mat-slide-toggle class="mt-2" [(ngModel)]="mustGenerateFacture">
+          {{'SHOPPING_CART.PRINT_INVOICE'| translate}}
+        </mat-slide-toggle>
       </div>
       <div class="dropdown-divider"></div>
       <ng-scrollbar style="min-height: 300px" visibility="hover">

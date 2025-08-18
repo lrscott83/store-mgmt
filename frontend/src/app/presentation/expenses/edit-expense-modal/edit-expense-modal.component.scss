@@ -1,0 +1,8 @@
+.cdk-global-overlay-wrapper,
+.cdk-overlay-container {
+    z-index: 99999 !important;
+}
+
+.cdk-overlay-connected-position-bounding-box {
+    z-index: 99999 !important;
+}

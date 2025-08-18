@@ -79,7 +79,7 @@ export class CategoryProductListComponent implements OnInit {
   onDeleteProduct(productId: string) {
     Swal.fire({
       title: this.translate.instant('GENERAL.DELETE_CONFIRM_TITLE'),
-      text: this.translate.instant('GENERAL.DELETE_CONFIRM_MESSAGE',
+      text: this.translate.instant('GENERAL.DELETE_CONFIRM_MESSAGE_A',
         { name: this.translate.instant('PRODUCT.TEXT') }),
       icon: "question",
       showCancelButton: true,

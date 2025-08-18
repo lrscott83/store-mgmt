@@ -12,7 +12,9 @@ export const locale = {
         OWNERS: 'Propietarios',
         RESELLERS: 'Gestores',
         USERS: 'Usuarios',
+        EMPLOYEES: 'Empleados',
         FEATURES: 'Funcionalidades',
+        DASHBOARD: 'Dashboard'
       },
       SALE_MGMT: {
         TITLE: 'VENTA',
@@ -20,13 +22,23 @@ export const locale = {
         SALE: 'Vender',
         TODAY_ORDERS: 'Ventas del día',
         TODAY_STATS: 'Cuadre del día',
+        SALE_CREDITS: 'Créditos',
+        SALE_CREDITS_HISTORY: 'Créditos',
+        TODAY_SALE_CREDITS: 'Créditos del día',
+        ORDER_HISTORY: 'Ventas',
       },
       INVENTORY_MGMT: {
         TITLE: 'INVENTARIO',
         AVAILABLE: 'Disponible',
-        ENTRIES: 'Entradas',
+        TODAY_ENTRIES: 'Entradas del día',
+        HISTORY_ENTRIES: 'Entradas',
         TODAY_STATS: 'Cuadre del día',
         EGRESS: 'Salida',
+      },
+      EXPENSES: {
+        TITLE: 'GASTOS',
+        TODAY_EXPENSES: 'Gastos del día',
+        EXPENSES_HISTORY: 'Gastos',
       },
       SYNCHRONIZATION: {
         TITLE: 'SINCRONIZACIÓN',
@@ -66,7 +78,7 @@ export const locale = {
         TITLE: 'GESTIÓN',
         PROFILE: 'Perfil',
         STORES: 'Tiendas',
-        USERS: 'Usuarios',
+        USERS: 'Empleados',
         CONFIGURATIONS: 'Configuraciones',
       }
     },
@@ -142,6 +154,7 @@ export const locale = {
       CANCEL: 'Cancelar',
       DELETE_CONFIRM_TITLE: 'Confirmación para eliminar',
       DELETE_CONFIRM_MESSAGE: '¿Está seguro que desea eliminar este {{name}}?',
+      DELETE_CONFIRM_MESSAGE_A: '¿Está seguro que desea eliminar esta {{name}}?',
       EMAIL: 'Correo',
       NAME: 'Nombre',
       FEATURES: 'Features',
@@ -205,6 +218,12 @@ export const locale = {
       NEW: 'Nuevo',
       IMPORT: 'Importar',
       FILE: 'Fichero',
+      PAY: 'Pago',
+      EXPENSE: 'Gasto',
+      TOTAL: 'Total',
+      NOTE: 'Nota',
+      CREDIT: 'Crédito',
+      CLIENT: 'Cliente',
       VALIDATION: {
         INVALID: '{{name}} no es válido',
         REQUIRED: '{{name}} es requerido',
@@ -278,11 +297,11 @@ export const locale = {
       TITLE: 'Notificaciones',
     },
     USER: {
-      ADD_USER: 'Adicionar Usuario',
+      ADD_USER: 'Adicionar Empleado',
       FULL_NAME: 'Nombre Completo',
       CELL_PHONE: 'Teléfono',
       TEXT: 'Usuario',
-      EDIT_USER: 'Editar Usuario',
+      EDIT_USER: 'Editar Empleado',
       DEACTIVATE_USER: 'Desactivar',
       ACTIVATE_USER: 'Activar',
     },
@@ -358,9 +377,12 @@ export const locale = {
       ORDER_CREATED: 'La venta fue creada satisfactoriamente.',
       ORDER_NOT_CREATED: 'Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
       DON_NOT_PAY_EMPTY_CART: 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
-      GENERATE_FACTURE: 'Generar Factura',
+      GENERATE_FACTURE: 'Generar Factura (modo prueba)',
+      PRINT_INVOICE: 'Imprimir Factura (prueba)',
       CLEAR: 'Limpiar',
-      EDIT_DETAILS: 'Editar Detalles'
+      EDIT_DETAILS: 'Editar Detalles',
+      DON_NOT_PAY_LESS_THAN_CART_TOTAL: 'Usted no puede realizar la venta porque el pago es menor que el total.',
+      DON_NOT_SALE_CREDIT_WITHOUT_CLIENT: 'Usted no puede realizar la venta por cobrar sin especificar el cliente.',
     },
     SALES: {
       NO_CATEGORY_ALERT_MESSAGE: 'No existe ninguna categoría. Usted puede adicionar categorías si da click aquí: ',
@@ -375,6 +397,7 @@ export const locale = {
     TODAY_STATS: {
       HEADER: 'Cuadre del día',
       NO_ORDER_FOUND: 'No se ha realizado ninguna venta en el día de hoy.',
+      NO_EXPENSE_FOUND: 'No se ha realizado ningun gasto en el día de hoy.',
     },
     TODAY_ORDERS: {
       HEADER: 'Ventas del día',
@@ -385,7 +408,7 @@ export const locale = {
       ERROR_DELETING_ORDER: 'Ocurrió un error eliminando la venta. {{message}}',
       EDIT_ORDER: 'Editar Venta',
       DELETE_ORDER: 'Eliminar Venta',
-      DEACTIVATE_ORDER: 'Desactivar Venta',
+      DEACTIVATE_ORDER: 'Cancelar Venta',
       ACTIVATE_ORDER: 'Activar Venta',
     },
     INVENTORY_ENTRY: {
@@ -402,6 +425,8 @@ export const locale = {
       NEW_ENTRY: 'Adicionar Entrada',
       NO_ENTRY_FOUND: 'No existe ningún producto disponible',
       CATEGORY_PRODUCT_NO_FOUND: 'No existe ningún producto disponible en la categoría',
+      ENTRIES_HISTORY: 'Historial de Entradas',
+      NO_HISTORY_ENTRY_FOUND: 'No se encontró ninguna entrada',
     },
     INVENTORY_EGRESS: {
       HEADER: 'Salida',
@@ -458,6 +483,28 @@ export const locale = {
       ACTIVATE_FEATURES: 'Activar funcionalidades',
       UNEXPECTED_ERROR: 'Ocurrió unb error inesperado activando las funcionalidades',
       FEATURES_ACTIVATED: 'Las funcionalidades se activaron satisfactoriamente'
+    },
+    EXPENSE: {
+      TODAY_EXPENSES: 'Gastos del día',
+      NO_EXPENSE_FOUND_IN_DAY: 'No existe ningún gasto en el día',
+      NEW_EXPENSE: 'Adicionar Gasto',
+      EDIT_EXPENSE: 'Editar Gatos',
+      EXPENSES_HISTORY: 'Historial de Gastos',
+      NO_EXPENSE_FOUND: 'No se enxontró ningún gasto',
+    },
+    SALE_CREDIT: {
+      TITLE: 'Créditos',
+      TODAY_CREDITS: 'Créditos del día',
+      TO_PAY: 'Pagar',
+      PAYMENT_CREDIT: 'Venta por Cobrar',
+      PAYMENT_CONFIRM_TITLE: 'Confirmación de Pago',
+      PAYMENT_CONFIRM_MESSAGE: 'Usted está segura(o) que desea pagar este crédito por venta?',
+      NO_SALE_CREDIT_FOUND_IN_DAY: 'No existe ningún crédito en el día',
+      NO_SALE_CREDIT_FOUND: 'No se encontró ningún crédito',
+    },
+    ORDERS: {
+      TITLE: 'Historial de Ventas',
+      NO_ORDERS_FOUND: 'No se encontró ninguna venta',
     }
   }
 };

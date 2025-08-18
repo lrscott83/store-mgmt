@@ -18,10 +18,13 @@ import { ProductCartItemsView } from './product-cart-items.view';
 import { InventoryEntryCost } from '../entries/inventory-item-cost.view';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
 import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
-import { Result } from 'src/app/domain/commons/result';
+import { DataResult, Result } from 'src/app/domain/commons/result';
 import { ChartData } from 'src/app/presentation/_models/chart-data,model';
 import { MatLabel } from '@angular/material/form-field';
 import { TopProduct } from 'src/app/presentation/_models/top-product.model';
+import { PaymentType } from 'src/app/domain/commons/payment-type';
+import { SaleCreditOfflineService } from '../credits/sale-credit-offline.service';
+import { ExpenseOfflineService } from '../expenses/expense-offline.service';
 
 @Injectable({
     providedIn: "root"
@@ -34,11 +37,11 @@ export class OrderOfflineService extends BaseService<Order> {
     private lastUserOrdersKey: string;
     private orders: Order[] = null;
 
-    constructor(@Inject(HttpClient) http, private productRepository: ProductRepository, private authService: AuthService, private categoryRepository: ProductCategoryRepository, private inventoryService: InventoryOfflineService, private authorizationService: AuthorizationService) {
+    constructor(@Inject(HttpClient) http, private productRepository: ProductRepository, private authService: AuthService, private categoryRepository: ProductCategoryRepository, private inventoryService: InventoryOfflineService, private authorizationService: AuthorizationService, private saleCreditService: SaleCreditOfflineService, private expenseService: ExpenseOfflineService) {
         super(http);
     }
 
-    createOrder(cartItems: CartItem[], type: OrderType, details: string): Observable<BaseResponseModel<boolean>> {
+    createOrder(cartItems: CartItem[], type: OrderType, isCredit: boolean, paymentType: PaymentType, details: string, client: string): Observable<BaseResponseModel<Order>> {
         const date: Date = new Date();
         var order: Order = {
             id: Guid.create().toString(),
@@ -47,6 +50,8 @@ export class OrderOfflineService extends BaseService<Order> {
             itemsCount: this.getItemsCount(cartItems),
             date: date,
             type: type,
+            isCredit: isCredit,
+            paymentType: paymentType,
             description: details,
             isActive: true,
             createdDate: date,
@@ -56,7 +61,9 @@ export class OrderOfflineService extends BaseService<Order> {
         };
         this.getStorageOrders().push(order);
         this.setOrdersLocalStorage(this.orders);
-        return this.Success$(true);
+        if (order.isCredit)
+            this.saleCreditService.createSaleCredit(order.id, client, order.total, "");
+        return this.Success$(order);
     }
 
     getOrderById(id: string): Order {
@@ -196,7 +203,7 @@ export class OrderOfflineService extends BaseService<Order> {
         const startMoment = _moment(new Date()).startOf('day');
         const startDate = startMoment.toDate();
         const endDate = startMoment.add(1, 'days').toDate();
-        return this.getActiveOrdersProfitBetweenDates(startDate, endDate);;
+        return this.getActiveOrdersProfitBetweenDates(startDate, endDate);
     }
 
     getActiveOrdersProfitYesterday(): number {
@@ -216,6 +223,7 @@ export class OrderOfflineService extends BaseService<Order> {
             data.push({
                 label: date,
                 value: this.getActiveOrdersProfitBetweenDates(startDate, endDate)
+                    - this.expenseService.getActiveExpensesPriceBetweenDates(startDate, endDate)
             });
         }
         return data;
@@ -278,6 +286,19 @@ export class OrderOfflineService extends BaseService<Order> {
             .slice(0, 5);
     }
 
+    getActiveTodayOrdersObservable(): Observable<BaseResponseModel<Order[]>> {
+        return this.Success$(this.getActiveOrdersInDay(new Date()));
+    }
+
+    filterOrdersObservable(isCredit: number, paymentType: PaymentType, startDate: Date, endDate: Date): Observable<BaseResponseModel<Order[]>> {
+        const orders: Order[] = this.getActiveOrders()
+            .filter(order => (isCredit === -1 || isCredit === 1 && order.isCredit || isCredit === 0 && !order.isCredit)
+                && (!paymentType || paymentType === order.paymentType)
+                && (!startDate || order.date >= startDate)
+                && (!endDate || order.date < endDate));
+        return of(this.Success(orders));
+    }
+
     getActiveOrdersInDay(date: Date): Order[] {
         //const momentDate = _moment(date);
         const startMoment = _moment(date).startOf('day');
@@ -302,7 +323,16 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     deactivateOrder(id: string): Result {
-        return this.updateOrderActive(id, false);
+        let result: Result = this.updateOrderActive(id, false);
+        if (!result.succeeded)
+            return Result.Failure([]);
+
+        result = this.saleCreditService.deactivateSaleCreditByOrderId(id);
+        if (!result.succeeded)
+            return Result.Failure([]);
+
+        const order: Order = this.getOrderById(id);
+        return this.inventoryService.increaseQuantitiesByOrderItems(order.orderItems);
     }
 
     private updateOrderActive(id: string, isActive: boolean): Result {
@@ -311,8 +341,22 @@ export class OrderOfflineService extends BaseService<Order> {
             return Result.Failure([OrderErrors.NotExists]);
 
         order.isActive = isActive;
+        order.updatedDate = new Date();
+        order.updatedByName = this.authService.currentUserValue.login;
         this.setOrdersLocalStorage(this.orders);
         return Result.Success();
+    }
+
+    public updateTodayOrder(id: string, paymentType: PaymentType): DataResult<Order> {
+        let order = this.getOrderById(id);
+        if (!order)
+            return new DataResult(undefined, false, [OrderErrors.NotExists]);
+
+        order.paymentType = paymentType;
+        order.updatedDate = new Date();
+        order.updatedByName = this.authService.currentUserValue.login;
+        this.setOrdersLocalStorage(this.orders);
+        return new DataResult(order, true, []);
     }
 
     private createOrderItems(cartItems: CartItem[]): OrderItem[] {
@@ -405,6 +449,8 @@ export class OrderOfflineService extends BaseService<Order> {
         if (order) {
             order.date = _moment(importedOrder.date).toDate();
             order.isActive = importedOrder.isActive;
+            order.updatedDate = importedOrder.updatedDate;
+            order.updatedByName = importedOrder.updatedByName;
             this.setOrdersLocalStorage(this.orders);
         }
         return Result.Success();
@@ -417,6 +463,10 @@ export class OrderOfflineService extends BaseService<Order> {
                 const orders = JSON.parse(ordersJson);
                 return orders.map(order => {
                     order.date = _moment(order.date).toDate();
+                    if (!order.isCredit)
+                        order.isCredit = false;
+                    if (!order.paymentType)
+                        order.paymentType = PaymentType.Efectivo;
                     return order;
                 });
             }

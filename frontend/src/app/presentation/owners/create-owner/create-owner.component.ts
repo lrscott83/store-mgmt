@@ -68,7 +68,7 @@ export class CreateOwnerComponent implements OnInit {
         return resolve(false);
       }
 
-      this.ownerService.createOwner(this.formGroup.value.fullName, this.formGroup.value.login, this.formGroup.value.password, this.formGroup.value.cellPhone, this.formGroup.value.email, this.formGroup.value.description, this.formGroup.value.resellerId)
+      this.ownerService.createOwner(this.formGroup.value.fullName, this.formGroup.value.login, this.formGroup.value.password, this.formGroup.value.cellPhone, this.formGroup.value.email, this.formGroup.value.description, this.formGroup.value.reSellerId)
         .pipe(catchError((error) => {
           // return of({
           //   data: null,
@@ -104,7 +104,7 @@ export class CreateOwnerComponent implements OnInit {
       description: [{ value: "", disabled: false }, Validators.compose([])],
     });
     if (this.isSuperAdmin)
-      this.formGroup.addControl('resellerId', new FormControl("", []));
+      this.formGroup.addControl('reSellerId', new FormControl("", []));
   }
 
   onShowPassword(event: MouseEvent) {

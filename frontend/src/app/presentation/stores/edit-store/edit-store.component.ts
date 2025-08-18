@@ -107,10 +107,16 @@ export class EditStoreComponent {
     this.$modules.next(modules);
   }
 
-  getTotalPrice(): number {
+  getTotalCurrentPrice(): number {
     return this.$modules.value
       .filter(module => module.selected)
       .reduce((acc, module) => acc + module.currentPrice, 0);
+  }
+
+  getTotalPrice(): number {
+    return this.$modules.value
+      .filter(module => module.selected)
+      .reduce((acc, module) => acc + module.price, 0);
   }
 
   selectAllModules(selected) {

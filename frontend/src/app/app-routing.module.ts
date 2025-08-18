@@ -46,24 +46,33 @@ import { LandingDeepComponent } from './presentation/home/landing-deep/landing-d
 import { EgressComponent } from './presentation/inventory/egress/egress.component';
 import { DashboardComponent } from './presentation/statistics/dashboard/dashboard.component';
 import { FeaturesComponent } from './presentation/features/features.component';
+import { AdminDashboardComponent } from './presentation/admin-dashboard/admin-dashboard.component';
+import { TodayExpenseHelpDialogComponent } from './presentation/layouts/client-layout/help-dialogs/today-expense-help-dialog/today-expense-help-dialog.component';
+import { ExpensesTodayComponent } from './presentation/expenses/expenses-today/expenses-today.component';
+import { SaleCreditsComponent } from './presentation/sale/sale-credits/sale-credits.component';
+import { TodaySaleCreditsComponent } from './presentation/sale/today-sale-credits/today-sale-credits.component';
+import { ExpensesComponent } from './presentation/expenses/expenses/expenses.component';
+import { OrdersComponent } from './presentation/sale/orders/orders.component';
+import { TodayEntriesComponent } from './presentation/inventory/today-entries/today-entries.component';
 
 const routes: Routes = [
   // { path: '', redirectTo: "login", pathMatch: 'full' },
   { path: '', component: LandingDeepComponent },
   { path: 'login', component: LoginComponent },
-  { path: 'register', component: RegisterComponent, 
+  {
+    path: 'register', component: RegisterComponent,
     //canDeactivate: [CanDeactivateGuard] 
   },
   { path: 'cookies-private', component: CookiesPrivateComponent },
   { path: 'private-police', component: PrivatePoliceComponent },
   { path: 'terms-conditions', component: TermsConditionsComponent },
-  
+
   {
     path: '',
     component: ClientLayoutComponent,
     children: [
       {
-        path: 'help/tutorial', 
+        path: 'help/tutorial',
         component: TutorialComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
@@ -75,133 +84,182 @@ const routes: Routes = [
         pathMatch: 'full'
       },
       {
-        path: 'admin/stores', 
+        path: 'admin/dashboard',
+        component: AdminDashboardComponent,
+        canActivate: [SuperAdminAuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.AdminDashboard] }
+      },
+      {
+        path: 'admin/stores',
         component: StoresComponent,
         canActivate: [SuperAdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.AdminStores] }
       },
       {
-        path: 'admin/owners', 
+        path: 'admin/owners',
         component: OwnersComponent,
         canActivate: [ReSellerAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Owners] }
       },
       {
-        path: 'admin/owners/create', 
+        path: 'admin/owners/create',
         component: CreateOwnerComponent,
         canActivate: [ReSellerAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Owners] }
       },
       {
-        path: 'admin/owners/edit/:id', 
+        path: 'admin/owners/edit/:id',
         component: EditOwnerComponent,
         canActivate: [ReSellerAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Owners] }
       },
       {
-        path: 'admin/resellers', 
+        path: 'admin/resellers',
         component: ResellersComponent,
         canActivate: [SuperAdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.ReSellers] }
       },
       {
-        path: 'admin/resellers/create', 
+        path: 'admin/resellers/create',
         component: CreateResellerComponent,
         canActivate: [SuperAdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.ReSellers] }
       },
       {
-        path: 'admin/resellers/edit/:id', 
+        path: 'admin/resellers/edit/:id',
         component: EditResellerComponent,
         canActivate: [SuperAdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.ReSellers] }
       },
       {
-        path: 'admin/features', 
+        path: 'admin/features',
         component: FeaturesComponent,
         canActivate: [SuperAdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Features] }
       },
       {
-        path: 'admin/roles', 
+        path: 'admin/roles',
         component: OwnersComponent,
         canActivate: [SuperAdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Roles] }
       },
       {
-        path: 'sales/products', 
+        path: 'sales/products',
         component: ProductsComponent,
         canActivate: [AuthGuard],
         //: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Products] }
       },
       {
-        path: 'sales/sale', 
+        path: 'sales/sale',
         component: SaleComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Sale] }
       },
       {
-        path: 'sales/orders', 
+        path: 'sales/today-orders',
         component: TodayOrdersComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.TodayOrders] }
       },
       {
-        path: 'sales/stats', 
+        path: 'sales/today-credits',
+        component: TodaySaleCreditsComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.CreditSale] }
+      },
+      {
+        path: 'sales/credits',
+        component: SaleCreditsComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.CreditSale] }
+      },
+      {
+        path: 'sales/orders',
+        component: OrdersComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.SalesHistory] }
+      },
+      {
+        path: 'sales/stats',
         component: TodayStatsComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Sale] }
       },
       {
-        path: 'inventory/available', 
+        path: 'expenses/today',
+        component: ExpensesTodayComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.TodayExpenses] }
+      },
+      {
+        path: 'expenses/expenses',
+        component: ExpensesComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.ExpensesHistory] }
+      },
+      {
+        path: 'inventory/available',
         component: InventoryAvailableComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Available] }
       },
-       {
-        path: 'inventory/entries', 
-        component: EntriesComponent,
+      {
+        path: 'inventory/today-entries',
+        component: TodayEntriesComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Entries] }
       },
       {
-        path: 'inventory/egress', 
+        path: 'inventory/egress',
         component: EgressComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Egress] }
       },
       {
-        path: 'synchronization/export', 
+        path: 'inventory/entries', 
+        component: EntriesComponent,
+        canActivate: [AuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.EntriesHistory] }
+      },
+      {
+        path: 'synchronization/export',
         component: SendDataComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Send] }
       },
       {
-        path: 'synchronization/import', 
+        path: 'synchronization/import',
         component: ReceiveDataComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Receive] }
       },
       {
-        path: 'statistics/dashboard', 
+        path: 'statistics/dashboard',
         component: DashboardComponent,
         //canActivate: [AdminAuthGuard],
         canActivate: [AuthGuard],
@@ -210,7 +268,7 @@ const routes: Routes = [
         data: { expectedFeatures: [] }
       },
       {
-        path: 'reports/today', 
+        path: 'reports/today',
         component: InventoryTodaySaleComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
@@ -223,61 +281,61 @@ const routes: Routes = [
       //   data: { expectedFeatures: [EFeatures.Stores] }
       // },
       {
-        path: 'management/stores', 
+        path: 'management/stores',
         component: EditStoreComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Stores] }
       },
       {
-        path: 'management/stores/create', 
-        component: EditStoreComponent,
-        canActivate: [AdminAuthGuard],
-        //canDeactivate: [CanDeactivateGuard],
-        data: { expectedFeatures: [EFeatures.Stores] }
-      },
-      {
-        path: 'management/stores/edit/:id', 
+        path: 'management/stores/create',
         component: EditStoreComponent,
         canActivate: [AdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Stores] }
       },
       {
-        path: 'management/users', 
+        path: 'management/stores/edit/:id',
+        component: EditStoreComponent,
+        canActivate: [AdminAuthGuard],
+        //canDeactivate: [CanDeactivateGuard],
+        data: { expectedFeatures: [EFeatures.Stores] }
+      },
+      {
+        path: 'management/users',
         component: UsersComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Users] }
       },
       {
-        path: 'management/users/create/:storeId', 
+        path: 'management/users/create/:storeId',
         component: CreateStoreUserComponent,
         canActivate: [AdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Users] }
       },
       {
-        path: 'management/users/edit/:id', 
+        path: 'management/users/edit/:id',
         component: EditUserComponent,
         canActivate: [AdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Users] }
       },
       {
-        path: 'management/configurations', 
+        path: 'management/configurations',
         component: ConfigurationsComponent,
         canActivate: [AdminAuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Configurations] }
       },
       {
-        path: 'profile/edit', 
+        path: 'profile/edit',
         component: EditProfileComponent,
         canActivate: [AuthGuard],
         //canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Profile] }
       },
       {
-        path: 'profile/change-password', 
+        path: 'profile/change-password',
         component: ChangePasswordComponent,
         canActivate: [AuthGuard],
         ////canDeactivate: [CanDeactivateGuard],
@@ -304,11 +362,11 @@ const routes: Routes = [
       }
     ]
   },
-  
+
 ];
 
 @NgModule({
   imports: [RouterModule.forRoot(routes)],
   exports: [RouterModule]
 })
-export class AppRoutingModule {}
+export class AppRoutingModule { }

@@ -5,10 +5,10 @@
                 <h3 class="card-label">{{ 'MENU.ADMIN.OWNERS' | translate }}</h3>
             </div>
             <div class="card-toolbar">
-                <button mat-fab extended color="primary" (click)="openCreateOwnerModal()">
+                <!-- <button mat-fab extended color="primary" (click)="openCreateOwnerModal()">
                     <mat-icon>add</mat-icon>
                     {{'GENERAL.ADD' | translate}}
-                </button>
+                </button> -->
             </div>
         </div>
         <!-- <div class="card-body"> -->
@@ -38,13 +38,17 @@
                                 <mat-icon color="accent">edit</mat-icon>
                                 <span>{{ 'OWNER.APPROVE_OWNER' | translate }}</span>
                             </button>
-                            <button *ngIf="owner.isActive" mat-menu-item class="btn" (click)="deleteOwner(owner)">
-                                <mat-icon color="warn">delete</mat-icon>
+                            <button *ngIf="owner.isActive" mat-menu-item class="btn" (click)="deactivateOwner(owner)">
+                                <mat-icon color="primary">edit</mat-icon>
                                 <span>{{ 'OWNER.DEACTIVATE_OWNER' | translate }}</span>
                             </button>
                             <button *ngIf="!owner.isActive" mat-menu-item class="btn" (click)="activateOwner(owner)">
                                 <mat-icon color="primary">edit</mat-icon>
                                 <span>{{ 'OWNER.ACTIVATE_OWNER' | translate }}</span>
+                            </button>
+                            <button mat-menu-item class="btn" (click)="deleteOwner(owner)">
+                                <mat-icon color="warn">delete</mat-icon>
+                                <span>{{ 'GENERAL.DELETE' | translate }}</span>
                             </button>
                             <!-- <button mat-menu-item 
                                     (click)="updateIsMain(address.id)">
@@ -57,9 +61,9 @@
                     <mat-divider></mat-divider>
                     <mat-card-content>
                         <p style="margin-top: 6px;">{{ getOwnerStorePrice(owner) | currency:'USD':'symbol':'1.2-2' }} {{ getOwnerStoreCountText(owner) }}</p>
-                        @if (owner.reSellerName) {
-                        <p>{{ 'GENERAL.RESELLER' | translate }}: {{owner.reSellerName}}</p>
-                        }
+                        <!-- @if (owner.reSellerName) { -->
+                        <p>{{ 'GENERAL.RESELLER' | translate }}: {{owner.reSellerName ? owner.reSellerName : 'ADMIN'}}</p>
+                        <!-- } -->
                         <p>{{owner.cellPhone}}</p>
                         <p *ngIf="owner.email">{{owner.email}}</p>
                         <p>{{owner.description}}</p>

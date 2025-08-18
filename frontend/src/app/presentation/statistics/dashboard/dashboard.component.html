@@ -34,6 +34,35 @@
                     </div>
                 </div>
 
+                <!-- Gastos Hoy -->
+                <div *ngIf="hasExpensesModuleAvailable" class="col">
+                    <div class="card bg-light text-dark position-relative">
+                        <div class="card-body">
+                            <!-- <i class="bi bi-cart-fill position-absolute top-0 end-0 m-3 fs-3 text-success"></i> -->
+                            <h5 class="card-title" style="font-weight: 500;">Gastos Hoy</h5>
+                            <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">{{ expensesToday }}</p>
+                            <small [ngClass]="getExpenseClass()" class="fw-bold fs-7">
+                                <i [class]="getExpenseIcon()"></i> {{ trendExpense() }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Créditos Hoy -->
+                <div *ngIf="hasCreditsModuleAvailable" class="col">
+                    <div class="card bg-light text-dark position-relative">
+                        <div class="card-body">
+                            <h5 class="card-title" style="font-weight: 500;">Créditos Por Cobrar</h5>
+                            <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">{{ unpaidSaleCreditsTotal }}</p>
+                            <small [ngClass]="getSaleCreditsClass()" class="fw-bold fs-7">
+                                <i [class]="getSaleCreditsIcon()"></i>  {{ trendUnpaidSaleCredits() }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Ganancias Hoy -->
                 <div class="col">
                     <div class="card bg-light text-dark position-relative">
@@ -47,15 +76,11 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="row">
                 <!-- Margen Bruto -->
-                <div class="col">
+                <!-- <div class="col">
                     <div class="card bg-light text-dark position-relative">
                         <div class="card-body">
-                            <!-- <i
-                                class="bi bi-exclamation-circle-fill position-absolute top-0 end-0 m-3 fs-3 text-danger"></i> -->
                             <h5 class="card-title" style="font-weight: 500;">Margen Promedio</h5>
                             <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">12.5%</p>
                             <small [ngClass]="getMargenBrutoClass()" class="fw-bold fs-7">
@@ -63,13 +88,12 @@
                             </small>
                         </div>
                     </div>
-                </div>
+                </div> -->
 
                 <!-- Inventario Valorizado -->
-                <div class="col">
+                <!-- <div class="col">
                     <div class="card bg-light text-dark position-relative">
                         <div class="card-body">
-                            <!-- <i class="bi bi-box-seam position-absolute top-0 end-0 m-3 fs-3 text-primary"></i> -->
                             <h5 class="card-title" style="font-weight: 500;">Valor Inventario</h5>
                             <p class="card-text fs-4 fw-bold" style="margin-bottom: 8px;">{{ inventarioTotal }}</p>
                             <small [ngClass]="getInventoryCostClass()" class="fw-bold fs-7">
@@ -77,7 +101,7 @@
                             </small>
                         </div>
                     </div>
-                </div>
+                </div> -->
 
             </div>
 

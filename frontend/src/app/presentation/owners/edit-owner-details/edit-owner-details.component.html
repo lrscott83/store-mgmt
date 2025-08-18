@@ -25,7 +25,7 @@
     <!--begin::ReSeller Form Group-->
     <mat-form-field *ngIf="isSuperAdmin" appearance="outline" floatLabel="auto" class="mat-form-field">
         <mat-label>{{'GENERAL.RESELLER'| translate}}</mat-label>
-        <mat-select name="Gestor" formControlName="resellerId">
+        <mat-select name="Gestor" formControlName="reSellerId">
             <mat-option *ngFor="let reseller of reSellersDataSource | async" [value]="reseller.id">
                 {{reseller.fullName}}
             </mat-option>

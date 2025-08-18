@@ -8,4 +8,6 @@ export enum EDataFileName {
     Categories = "categories.json",
     InventoryEntries = "inventory-entries.json",
     Orders = "orders.json",
+    Expenses = "expenses.json",
+    SaleCredits = "sale-credits.json",
 }

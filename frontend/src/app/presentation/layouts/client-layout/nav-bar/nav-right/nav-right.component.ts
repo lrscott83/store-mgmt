@@ -1,5 +1,5 @@
 // angular import
-import { Component, Input, Output, EventEmitter, ViewChild } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, ViewEncapsulation } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 
 // project import
@@ -46,16 +46,23 @@ import { SharedModule } from 'src/app/presentation/shared/shared.module';
 import Swal from 'sweetalert2';
 import { AuthService } from 'src/app/_services/services.index';
 import { ProductErrors } from 'src/app/domain/entities/products/product.errors';
-import { OrderType, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
+import { DatosVenta, Order, OrderType, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
 import { NgbDropdown, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { EditOrderDetailsModalComponent } from '../edit-order-details-modal/edit-order-details-modal.component';
+import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
+import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
+import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
+import { TypeData } from 'src/app/domain/commons/type-data';
+import * as _moment from 'moment';
+import { GlobalConfig } from 'src/app/_shared/configs/global.config';
 
 @Component({
   selector: 'app-nav-right',
   standalone: true,
   imports: [SharedModule, RouterModule, TranslateModule, EditOrderDetailsModalComponent],
   templateUrl: './nav-right.component.html',
-  styleUrls: ['./nav-right.component.scss']
+  styleUrls: ['./nav-right.component.scss'],
+  //encapsulation: ViewEncapsulation.None,
 })
 export class NavRightComponent {
   @Input() styleSelectorToggle!: boolean;
@@ -63,15 +70,25 @@ export class NavRightComponent {
 
   @ViewChild('cartDropdown', { static: false }) cartDropdown!: NgbDropdown;
 
+  currentUser: UserModel;
+  hasCreditsModuleAvailable: boolean;
+
+  paymentType: PaymentType = PaymentType.Efectivo;
+  paymentTypes: TypeData[] = PaymentTypeUtils.getPaymentTypes();
+
+  payment: number;
+
   windowWidth: number;
   screenFull: boolean = true;
 
   cartData$: Observable<CartData>;
   mustGenerateFacture: boolean = false;
+  isCredit: boolean = false;
+  client: string = "";
 
   orderType: OrderType = OrderType.Normal;
 
-  constructor(private iconService: IconService, private shoppingCartService: ShoppingCartService, private orderService: OrderOfflineService, private translate: TranslateService, private toastrService: ToastrService, private authService: AuthService, private router: Router, private modalService: NgbModal) {
+  constructor(private iconService: IconService, private shoppingCartService: ShoppingCartService, private orderService: OrderOfflineService, private translate: TranslateService, private toastrService: ToastrService, private authService: AuthService, private router: Router, private modalService: NgbModal, private authorizationService: AuthorizationService) {
     this.windowWidth = window.innerWidth;
     this.iconService.addIcon(
       ...[
@@ -100,10 +117,16 @@ export class NavRightComponent {
       ]
     );
     this.cartData$ = this.shoppingCartService.getCartData$();
+    this.currentUser = this.authService.currentUserValue;
+    this.hasCreditsModuleAvailable = this.authorizationService.hasCreditsModuleAvailable();
   }
 
   closeCartDropdown() {
     this.cartDropdown.close();
+  }
+
+  getPaymentTypeIcon(paymentType: PaymentType) {
+    return PaymentTypeUtils.getPaymentTypeIcon(paymentType);
   }
 
   navigateToHelp() {
@@ -122,6 +145,16 @@ export class NavRightComponent {
     this.authService.logout();
   }
 
+  getPaymentReturn(): number {
+    return this.payment ? this.payment - this.shoppingCartService.getCartTotal() : 0;
+  }
+
+  getPaymentReturnClass(): string {
+    if (this.getPaymentReturn() > 0)
+      return "payment-return-positive";
+    return this.getPaymentReturn() < 0 ? "payment-return-negative" : "";
+  }
+
   createOrder() {
     if (this.shoppingCartService.getItemsCount() === 0) {
       Swal.fire({
@@ -136,13 +169,40 @@ export class NavRightComponent {
       return;
     }
 
-    this.orderService.createOrder(this.shoppingCartService.getCartItems(), this.shoppingCartService.getOrderType(), this.shoppingCartService.getOrderDescription()).subscribe(response => {
-      if (response.succeeded) {
+    if (this.payment && this.payment < this.shoppingCartService.getCartTotal()) {
+      Swal.fire({
+        title: this.translate.instant('GENERAL.INFORMATION'),
+        text: this.translate.instant('SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL'),
+        icon: "info",
+        showCancelButton: false,
+        confirmButtonColor: "#3456ff",
+        cancelButtonColor: "#dc3545",
+        confirmButtonText: this.translate.instant('GENERAL.OK')
+      });
+      return;
+    }
+
+    if (this.isCredit && !this.client) {
+      Swal.fire({
+        title: this.translate.instant('GENERAL.INFORMATION'),
+        text: this.translate.instant('SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT'),
+        icon: "info",
+        showCancelButton: false,
+        confirmButtonColor: "#3456ff",
+        cancelButtonColor: "#dc3545",
+        confirmButtonText: this.translate.instant('GENERAL.OK')
+      });
+      return;
+    }
+
+    this.orderService.createOrder(this.shoppingCartService.getCartItems(), this.shoppingCartService.getOrderType(), this.isCredit, this.paymentType, this.shoppingCartService.getOrderDescription(), this.client).subscribe(response => {
+      if (response.succeeded && response.data) {
         this.toastrService.success(
           this.translate.instant('SHOPPING_CART.ORDER_CREATED'),
           this.translate.instant('GENERAL.RESPONSE.SUCCESS_TITLE'));
         if (this.mustGenerateFacture) {
-          this.generateFacture();
+          //this.generateFacture();
+          this.generateTicket(response.data);
         }
         this.clearShoppingCart();
       } else
@@ -155,7 +215,176 @@ export class NavRightComponent {
   clearShoppingCart() {
     this.shoppingCartService.clearCart();
     this.orderType = OrderType.Normal;
+    this.paymentType = PaymentType.Efectivo;
+    this.payment = null;
+    this.client = "";
+    this.isCredit = false;
     this.closeCartDropdown();
+  }
+
+  generateTicket(order: Order) {
+    // Detalles de los productos
+    const cartItems: CartItem[] = this.shoppingCartService.getCartItems();
+
+    // Calcular el total
+    const totalAmount = cartItems.reduce((acc, cartItem) => acc + cartItem.price, 0);
+
+    const doc = new jsPDF({
+      unit: 'mm',
+      format: [80, 120 + cartItems.length * 8], // altura dinámica
+    });
+
+    let y = 10;
+
+    const addText = (text: string, x = 10, fontSize = 10) => {
+      doc.setFontSize(fontSize);
+      doc.text(text, x, y);
+      y += 5;
+    };
+
+    const dateMoment = _moment(order.date);
+    addText('*** VENTA ***', 20, 12);
+    addText(`Folio: ${order.id}`);
+    addText(`Fecha: ${dateMoment.format('DD/MM/YYYY')}`);
+    addText(`Status: ${order.isCredit ? 'Por Cobrar' : 'Pagado'}`);
+    addText(`Forma de Pago: ${PaymentTypeUtils.getPaymentTypeText(order.paymentType)}`);
+    y += 3;
+    doc.line(5, y, 75, y); y += 4;
+
+    cartItems.forEach(p => {
+      addText(`${p.name}`);
+      addText(`${p.quantity} x $${this.formatoPrecio(p.price)} -> $${this.formatoPrecio(p.quantity * p.price)}`);
+      y += 2;
+    });
+
+    doc.line(5, y, 75, y); y += 4;
+    addText(`Total $: ${this.formatoPrecio(totalAmount)}`);
+    addText(`Pagos: $${this.formatoPrecio(order.isCredit ? 0 : totalAmount)}`);
+    addText(`Deuda: ${this.formatoPrecio(order.isCredit ? totalAmount : 0)}`);
+
+    // ⬇️ Imprimir automáticamente
+    //doc.autoPrint();
+
+    // Abrir en nueva pestaña para que se dispare el diálogo de impresión
+    // const printWindow = window.open('', '_blank');
+    // if (printWindow) {
+    //   printWindow.document.write(`<html><head><title>Ticket</title></head><body></body></html>`);
+    //   const pdfBlob = doc.output('blob');
+    //   const pdfUrl = URL.createObjectURL(pdfBlob);
+    //   printWindow.location.href = pdfUrl;
+    // }
+
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+
+    this.openPrintPopup(pdfUrl);
+
+    // // Abrir en popup
+    // const popup = window.open("", "_blank", "width=800,height=600");
+
+    // if (popup) {
+    //   popup.document.write(`
+    //   <html>
+    //     <head>
+    //       <title>Vista previa</title>
+    //     </head>
+    //     <body style="margin:0">
+    //       <embed src="${pdfUrl}" type="application/pdf" width="100%" height="100%" />
+    //       <script>
+    //         window.onload = function() {
+    //           setTimeout(function(){
+    //             window.print();
+    //           }, 500);
+    //           window.onafterprint = function() {
+    //             window.close();
+    //           };
+    //         };
+    //       </script>
+    //     </body>
+    //   </html>
+    // `);
+    //   popup.document.close();
+    // }
+  }
+
+  openPrintPopup(pdfUrl: string) {
+    // Crear ventana emergente
+    const printWindow = window.open('', '_blank', 'width=800,height=600,toolbar=0,location=0');
+
+    if (!printWindow) {
+      alert('Por favor permite ventanas emergentes para imprimir');
+      return;
+    }
+
+    // HTML para el popup con el PDF
+    printWindow.document.write(`
+    <html>
+      <head>
+        <title>Imprimir factura</title>
+        <style>
+          body { margin: 0; }
+          iframe { width: 100%; height: 100vh; border: none; }
+        </style>
+      </head>
+      <body>
+        <iframe src="${pdfUrl}"></iframe>
+      </body>
+    </html>
+  `);
+
+    // Esperar a que cargue el PDF
+    const iframe = printWindow.document.querySelector('iframe');
+    iframe?.addEventListener('load', () => {
+      // Abrir diálogo de impresión
+      printWindow.focus();
+      printWindow.print();
+    });
+
+    // Evento para cerrar después de imprimir
+    printWindow.addEventListener('afterprint', () => {
+      printWindow.close();
+      URL.revokeObjectURL(pdfUrl);  // Liberar memoria
+    });
+  }
+
+  // generateTicket(venta: DatosVenta) {
+  //   const doc = new jsPDF({
+  //     unit: 'mm',
+  //     format: [80, 120 + venta.productos.length * 8], // altura dinámica
+  //   });
+
+  //   let y = 10;
+
+  //   const addText = (text: string, x = 10, fontSize = 10) => {
+  //     doc.setFontSize(fontSize);
+  //     doc.text(text, x, y);
+  //     y += 5;
+  //   };
+
+  //   addText('*** VENTA ***', 20, 12);
+  //   addText(`Folio: ${venta.folio}`);
+  //   addText(`Fecha: ${venta.fecha}`);
+  //   addText(`Status: ${venta.status}`);
+  //   addText(`Forma de Pago: ${venta.formaPago}`);
+  //   y += 3;
+  //   doc.line(5, y, 75, y); y += 4;
+
+  //   venta.productos.forEach(p => {
+  //     addText(`${p.nombre}`);
+  //     addText(`${p.cantidad} x $${this.formatoPrecio(p.precioUnitario)} -> $${this.formatoPrecio(p.subtotal)}`);
+  //     y += 2;
+  //   });
+
+  //   doc.line(5, y, 75, y); y += 4;
+  //   addText(`Total $: ${this.formatoPrecio(venta.total)}`);
+  //   addText(`Pagos: $${this.formatoPrecio(venta.pagos)}`);
+  //   addText(`Deuda: ${this.formatoPrecio(venta.deuda)}`);
+
+  //   doc.save(`ticket_${venta.folio}.pdf`);
+  // }
+
+  private formatoPrecio(valor: number): string {
+    return valor.toLocaleString('es-VE', { minimumFractionDigits: 0 });
   }
 
   generateFacture() {
@@ -201,8 +430,13 @@ export class NavRightComponent {
     // Crear un URL temporal para el Blob
     const pdfUrl = URL.createObjectURL(pdfBlob);
 
-    // Abrir el PDF en una nueva pestaña
-    window.open(pdfUrl);
+    /// Abrir el PDF en una nueva pestaña (si el navegador lo permite)
+    const newTab = window.open(pdfUrl, '_blank');
+
+    // Si el navegador bloquea el popup, puedes dar una alternativa
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+      alert('El visor de PDF fue bloqueado. Por favor, permite ventanas emergentes.');
+    }
   }
 
   openNotificationsHelpDialog() {

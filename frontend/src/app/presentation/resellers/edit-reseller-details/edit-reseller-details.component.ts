@@ -146,7 +146,7 @@ export class EditResellerDetailsComponent implements OnInit {
       ])],
     });
     if (this.isSuperAdmin)
-      this.formGroup.addControl('resellerId', new FormControl("", []));
+      this.formGroup.addControl('reSellerId', new FormControl("", []));
   }
 
   loadPatterns() {

@@ -11,13 +11,17 @@ import { Product } from "src/app/domain/entities/products/product.model";
 import { ProductCategory } from "src/app/domain/entities/product-categories/product-category.model";
 import { Order } from "src/app/domain/entities/orders/order.model";
 import { InventoryEntry } from "src/app/domain/entities/entries/inventory-entry.model";
+import { Expense } from "src/app/domain/entities/expenses/expense.model";
+import { ExpenseOfflineService } from "../expenses/expense-offline.service";
+import { SaleCredit } from "src/app/domain/entities/sale-credits/sale-credit.model";
+import { SaleCreditOfflineService } from "../credits/sale-credit-offline.service";
 
 @Injectable({
     providedIn: "root"
 })
 
 export class DataSynchronizerService {
-    constructor(private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService) {
+    constructor(private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService, private expenseService: ExpenseOfflineService, private saleCreditService: SaleCreditOfflineService) {
 
     }
 
@@ -43,6 +47,16 @@ export class DataSynchronizerService {
                     break;
                 case EDataFileName.Orders:
                     result = await this.synchronizeOrders(file.content);
+                    if (!result.succeeded)
+                        errors.push(...result.errors);
+                    break;
+                case EDataFileName.Expenses:
+                    result = await this.synchronizeExpenses(file.content);
+                    if (!result.succeeded)
+                        errors.push(...result.errors);
+                    break;
+                case EDataFileName.SaleCredits:
+                    result = await this.synchronizeSaleCredits(file.content);
                     if (!result.succeeded)
                         errors.push(...result.errors);
                     break;
@@ -178,6 +192,70 @@ export class DataSynchronizerService {
             }
             // if (!result.succeeded)
             //     this.orderService.updateOrders(orders);
+            return result;
+
+        } catch (error) {
+            return Result.Failure([SynchronizerErrors.OrdersUnexpectedError]);
+        }
+    }
+
+    private async synchronizeExpenses(content: string): Promise<Result> {
+        try {
+            if (!content) {
+                console.warn("El contenido del fichero de los gastos es nulo.");
+                return Result.Success();
+            }
+
+            const importedExpenses: Expense[] = JSON.parse(content);
+            const expenses: Expense[] = this.expenseService.getStorageExpenses();
+            const expensesMap: Map<string, Expense> = new Map<string, Expense>();
+            expenses.forEach(expense => expensesMap.set(expense.id, expense));
+
+            let result: Result = Result.Success();
+            for (const expense of importedExpenses) {
+                if (!expensesMap.has(expense.id)) {
+                    expensesMap.set(expense.id, expense);
+                    result = this.expenseService.addImportedExpense(expense);
+                    if (!result.succeeded)
+                        break;
+                } else {
+                    result = this.expenseService.updateImportedExpense(expense);
+                    if (!result.succeeded)
+                        break;
+                }
+            }
+            return result;
+
+        } catch (error) {
+            return Result.Failure([SynchronizerErrors.OrdersUnexpectedError]);
+        }
+    }
+
+    private async synchronizeSaleCredits(content: string): Promise<Result> {
+        try {
+            if (!content) {
+                console.warn("El contenido del fichero de los créditos es nulo.");
+                return Result.Success();
+            }
+
+            const importedSaleCredits: SaleCredit[] = JSON.parse(content);
+            const expenses: SaleCredit[] = this.saleCreditService.getStorageSaleCredits();
+            const expensesMap: Map<string, SaleCredit> = new Map<string, SaleCredit>();
+            expenses.forEach(expense => expensesMap.set(expense.id, expense));
+
+            let result: Result = Result.Success();
+            for (const expense of importedSaleCredits) {
+                if (!expensesMap.has(expense.id)) {
+                    expensesMap.set(expense.id, expense);
+                    result = this.saleCreditService.addImportedSaleCredit(expense);
+                    if (!result.succeeded)
+                        break;
+                } else {
+                    result = this.saleCreditService.updateImportedSaleCredit(expense);
+                    if (!result.succeeded)
+                        break;
+                }
+            }
             return result;
 
         } catch (error) {

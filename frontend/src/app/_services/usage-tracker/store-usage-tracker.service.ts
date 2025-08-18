@@ -8,7 +8,7 @@ import { BaseResponseModel } from '../_models/base.model';
 import { environment } from 'src/environments/environment';
 import { DailyUsage, Usage } from './usage.model';
 
-const API_USERS_URL = `${environment.apiUrl}`;
+const API_URL = `${environment.apiUrl}`;
 
 @Injectable({ providedIn: 'root' })
 export class StoreUsageTrackerService implements OnDestroy {
@@ -78,7 +78,7 @@ export class StoreUsageTrackerService implements OnDestroy {
         const requestData = {
             activeDays: unSavedDays
         };
-        this.http.post<BaseResponseModel<DailyUsage[]>>(`${API_USERS_URL}/${environment.apiVersion}/usages/store-daily-usage`, requestData)
+        this.http.post<BaseResponseModel<DailyUsage[]>>(`${API_URL}/${environment.apiVersion}/usages/store-daily-usage`, requestData)
             .pipe(catchError((error) => {
                 this.sending = false;
                 throw error;

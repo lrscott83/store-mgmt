@@ -61,7 +61,7 @@ export function initializeApp(appInitService: AppInitService) {
     NgbModule,
     ToastrModule.forRoot({
       closeButton: true, // Muestra botón de cerrar [[2]]
-      timeOut: 3000, // Duración por defecto (3 segundos)
+      timeOut: 1000, // Duración por defecto (1 segundos)
       positionClass: 'toast-top-right', // Posición inicial [[6]]
       preventDuplicates: true // Evita mensajes duplicados
     }),

@@ -1,0 +1,20 @@
+<div class="card card-custom gutter-b">
+    <div class="card-header">
+        <div class="card-title">
+            <h3 class="card-label" [translate]="'EXPENSE.TODAY_EXPENSES'"></h3>
+        </div>
+        <div class="card-toolbar">
+            <button mat-fab extended color="primary" (click)="openCreateExpenseModal()">
+                <mat-icon>add</mat-icon>
+                {{'GENERAL.EXPENSE'| translate}}
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <div *ngIf="(expenses$ | async).length === 0" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+            <div class="alert-text">{{'EXPENSE.NO_EXPENSE_FOUND_IN_DAY' | translate}}</div>
+        </div>
+
+        <app-expense-list [expenses$]="expenses$.asObservable()" (expensesUpdatedEmitter)="loadExpenses()" [readOnly]="false"></app-expense-list>
+    </div>
+</div>

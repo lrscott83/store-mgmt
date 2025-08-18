@@ -1,0 +1,42 @@
+<div class="card card-custom gutter-b">
+    <div class="card-header">
+        <div class="card-title">
+            <h3 class="card-label" [translate]="'EXPENSE.EXPENSES_HISTORY'"></h3>
+            <span class="label label-success font-weight-bold font-size-lg">({{getExpensesCount()}})</span>
+        </div>
+        <div class="card-toolbar">
+            <span class="text-danger font-weight-bold font-size-lg">
+                {{getExpensesTotal() | currency:'USD':'symbol':'1.2-2'}}
+            </span>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <mat-radio-group [(ngModel)]="paymentType" (change)="loadExpenses()" style="margin-bottom: 10px !important;">
+            <mat-radio-button [value]="null">
+                Todas
+            </mat-radio-button>
+            <mat-radio-button *ngFor="let type of paymentTypes" [value]="type.value">
+                <i class="bi {{getPaymentTypeIcon(type.value)}} text-success fs-4"></i>
+                {{type.label}}
+            </mat-radio-button>
+        </mat-radio-group>
+
+        <div *ngIf="(dateExpenses$ | async).length === 0" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+            <div class="alert-text">{{'EXPENSE.NO_EXPENSE_FOUND' | translate}}</div>
+        </div>
+
+        <mat-accordion multi>
+            <mat-expansion-panel [expanded]="false" *ngFor="let dateExpense of dateExpenses$ | async" >
+                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+                    <mat-panel-title>
+                        <span class="w-100">{{dateExpense.date | date: onlyDateFormat : 'UTC'}} ({{dateExpense.count}})</span>
+                        <div class="w-100 text-end">
+                            <span class="text-danger">{{dateExpense.total | currency:'USD':'symbol':'1.2-2'}}</span>
+                        </div>
+                    </mat-panel-title>
+                </mat-expansion-panel-header>
+                <app-expense-list class="p-2" [expenses$]="getExpensesObservable(dateExpense.expenses)"></app-expense-list>
+            </mat-expansion-panel>
+        </mat-accordion>
+    </div>
+</div>

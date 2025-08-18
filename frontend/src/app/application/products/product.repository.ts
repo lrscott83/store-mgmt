@@ -14,7 +14,7 @@ import { Guid } from 'guid-typescript';
 export class ProductRepository {
     private static PRODUCTS_KEY: string = "lizoft.store-products";
     private static USER_PRODUCTS_KEY: string = "lizoft.store-products-";
-    
+
     private lastUserProductsKey: string;
 
     private products: Map<string, Product> = null;
@@ -34,7 +34,7 @@ export class ProductRepository {
     }
 
     public getStorageProductsMap(): Map<string, Product> {
-        if (!this.products || this.products.size === 0 
+        if (!this.products || this.products.size === 0
             || this.getCurrentStorageKey() !== this.lastUserProductsKey)
             this.products = this.getProductsFromLocalStorage();
         return this.products;
@@ -84,6 +84,8 @@ export class ProductRepository {
             return false;
 
         product.isActive = false;
+        product.updatedDate = new Date();
+        product.updatedByName = this.authService.currentUserValue.login;
         this.products = this.getStorageProductsMap();
         this.setProductsLocalStorage(this.products);
         return true;
@@ -142,7 +144,9 @@ export class ProductRepository {
             });
     }
 
-    updateProduct(id: string, categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Result {
+    updateProduct(id: string, categoryId: string, name: string, price: number, businessId: string, order: number, 
+        isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean, updatedDate: Date = new Date(),
+        updatedByName: string = this.authService.currentUserValue.login): Result {
         const category = this.categoryRepository.getProductCategoryById(categoryId);
         if (!category)
             return Result.Failure([ProductCategoryErrors.NotExists]);
@@ -165,6 +169,8 @@ export class ProductRepository {
         product.isActive = isActive;
         product.availableToSale = availableToSale;
         product.discountFromInvantory = discountFromInvantory;
+        product.updatedDate = updatedDate;
+        product.updatedByName = updatedByName;
 
         this.products = this.getStorageProductsMap();
         this.updateProductsOrderByCategory(this.products, categoryId, order);
@@ -175,7 +181,7 @@ export class ProductRepository {
     }
 
     updateImportedProduct(product: Product): Result {
-        return this.updateProduct(product.id, product.categoryId, product.name, product.price, product.businessId, product.order, product.isActive, product.availableToSale, product.discountFromInvantory);
+        return this.updateProduct(product.id, product.categoryId, product.name, product.price, product.businessId, product.order, product.isActive, product.availableToSale, product.discountFromInvantory, product.updatedDate, product.updatedByName);
     }
 
     setDiscountFromInvantory(id: string, discountFromInvantory: boolean): Result {
@@ -229,7 +235,7 @@ export class ProductRepository {
             let productMapJson = localStorage.getItem(this.getStorageKey());
             if (productMapJson && productMapJson !== "{}") {
                 return new Map(JSON.parse(productMapJson));
-            } 
+            }
             // else {
             //     productMapJson = localStorage.getItem(ProductRepository.PRODUCTS_KEY);
             //     if (productMapJson && productMapJson !== "{}") {

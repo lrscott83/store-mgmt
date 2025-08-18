@@ -98,7 +98,7 @@ export class EditOwnerDetailsComponent implements OnInit{
         return resolve(false);
       }
 
-      this.ownerService.editOwner(this.ownerId, this.formGroup.value.fullName, this.formGroup.value.cellPhone, this.formGroup.value.email, this.formGroup.value.guest, this.formGroup.value.isActive, this.formGroup.value.description, this.formGroup.value.resellerId)
+      this.ownerService.editOwner(this.ownerId, this.formGroup.value.fullName, this.formGroup.value.cellPhone, this.formGroup.value.email, this.formGroup.value.guest, this.formGroup.value.isActive, this.formGroup.value.description, this.formGroup.value.reSellerId)
         .pipe(catchError((error) => {
           // return of({
           //   data: null,
@@ -133,7 +133,7 @@ export class EditOwnerDetailsComponent implements OnInit{
       description: [{ value: "", disabled: false }, Validators.compose([])],
     });
     if (this.isSuperAdmin)
-      this.formGroup.addControl('resellerId', new FormControl("", []));
+      this.formGroup.addControl('reSellerId', new FormControl("", []));
   }
 
   onShowPassword(event: MouseEvent) {

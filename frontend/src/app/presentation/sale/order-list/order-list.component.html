@@ -1,0 +1,16 @@
+<mat-accordion multi>
+    <mat-expansion-panel [expanded]="false" *ngFor="let order of orders$ | async">
+        <mat-expansion-panel-header class="p-2" class="mat-panel-header {{getOrderBackgroundColor(order)}}">
+            <mat-panel-title>
+                <span class="w-100">{{getOrderTime(order)}} ({{getOrderItemsCount(order)}})</span>
+                <div class="w-100 text-end">
+                    <i class="bi {{getPaymentTypeIcon(order.paymentType)}} text-success fs-4"></i>
+                    <span style="margin-left: 10px;">
+                        {{getOrderTotal(order) | currency:'USD':'symbol':'1.2-2'}}
+                    </span>
+                </div>
+            </mat-panel-title>
+        </mat-expansion-panel-header>
+        <app-order-item-list class="p-2" [order]="order" [readOnly]="readOnly"></app-order-item-list>
+    </mat-expansion-panel>
+</mat-accordion>

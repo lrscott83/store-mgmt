@@ -1,0 +1,19 @@
+@import '../../../../../../scss/components/variables.bootstrap';
+
+.payment-return-negative::ng-deep {
+    color: $danger !important;
+    // border-radius: 0.42rem !important;
+}
+
+.payment-return-positive::ng-deep {
+    color: green !important;
+    // border-radius: 0.42rem !important;
+}
+
+::ng-deep .payment-type .mat-mdc-text-field-wrapper {
+  width: 90% !important;
+}
+
+::ng-deep .client .mat-mdc-text-field-wrapper {
+  width: 100% !important;
+}

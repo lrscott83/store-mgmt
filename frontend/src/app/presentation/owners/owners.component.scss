@@ -1,6 +1,11 @@
 @import '../../../scss/components/variables.bootstrap';
 
 .guest-owner::ng-deep {
+    background-color: $success !important;
+    // border-radius: 0.42rem !important;
+}
+
+.outdated-owner::ng-deep {
     background-color: $warning !important;
     // border-radius: 0.42rem !important;
 }

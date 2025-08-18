@@ -19,6 +19,11 @@ import { LastMonthSaleProfitsComponent } from './last-month-sale-profits/last-mo
 import { LastMonthSalesComponent } from './last-month-sales/last-month-sales.component';
 import { BehaviorSubject } from 'rxjs';
 import { TopProduct } from '../../_models/top-product.model';
+import { ExpenseOfflineService } from 'src/app/application/expenses/expense-offline.service';
+import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
+import { AuthService } from 'src/app/_services/services.index';
+import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
+import { SaleCreditOfflineService } from 'src/app/application/credits/sale-credit-offline.service';
 
 export type ChartOptions = {
   series: ApexAxisChartSeries;
@@ -42,17 +47,27 @@ export class DashboardComponent {
   currency: 'CUP' | 'USD';
   rate: number;
 
+  currentUser: UserModel;
+  hasExpensesModuleAvailable: boolean;
+  hasCreditsModuleAvailable: boolean;
+
   salePriceToday: number = 0;
   salePriceYesterday: number = 0;
 
   saleProfitToday: number = 0;
   saleProfitYesterday: number = 0;
 
+  expenseToday: number = 0;
+  expenseYesterday: number = 0;
+
   margenBrutoMesActual: number = 0;
   margenBrutoMesAnterior: number = 0;
 
   inventoryCostTotal: number = 0;
   inventoryCostTotalYesterday: number = 0;
+
+  unpaidSaleCreditsToday: number = 0;
+  unpaidSaleCreditsYesterday: number = 0;
 
   topProfitProducts$: BehaviorSubject<TopProduct[]> = new BehaviorSubject<TopProduct[]>([]);
   topSaleQuantityProducts$: BehaviorSubject<TopProduct[]> = new BehaviorSubject<TopProduct[]>([]);
@@ -67,7 +82,15 @@ export class DashboardComponent {
   ventasChartOptions: ChartOptions;
   gananciasChartOptions: ChartOptions;
 
-  constructor(private currencyService: CurrencyService, private inventoryService: InventoryOfflineService, private orderService: OrderOfflineService) {
+  constructor(private currencyService: CurrencyService, private inventoryService: InventoryOfflineService, private orderService: OrderOfflineService, private expenseService: ExpenseOfflineService,
+    private authService: AuthService,
+    private authorizationService: AuthorizationService,
+    private saleCreditService: SaleCreditOfflineService
+  ) {
+    this.currentUser = this.authService.currentUserValue;
+    this.hasExpensesModuleAvailable = this.authorizationService.hasExpensesModuleAvailable();
+    this.hasCreditsModuleAvailable = this.authorizationService.hasCreditsModuleAvailable();
+
     this.ventasChartOptions = this.getVentasChartOptions();
     this.gananciasChartOptions = this.getGananciasChartOptions();
     const currencyData: CurrencyData = this.currencyService.getCurrentCurrency();
@@ -77,10 +100,21 @@ export class DashboardComponent {
     this.inventoryCostTotalYesterday = this.inventoryService.getInventoryCostTotalYesterday();
     this.salePriceToday = this.orderService.getActiveOrdersPriceToday();
     this.salePriceYesterday = this.orderService.getActiveOrdersPriceYesterday();
+    this.expenseToday = this.expenseService.getActiveExpensesPriceToday();
+    this.expenseYesterday = this.expenseService.getActiveExpensesPriceYesterday();
+    this.unpaidSaleCreditsToday = this.saleCreditService.getActiveUnpaidSaleCreditsPriceToday();
+    this.unpaidSaleCreditsYesterday = this.saleCreditService.getActiveUnpaidSaleCreditsPriceYesterday();
+
     this.saleProfitToday = this.orderService.getActiveOrdersProfitToday();
     this.saleProfitYesterday = this.orderService.getActiveOrdersProfitYesterday();
+    if (this.hasExpensesModuleAvailable) {
+      this.saleProfitToday -= this.expenseToday;
+      this.saleProfitYesterday -= this.expenseYesterday
+    }
+
     this.topProfitProducts$.next(this.orderService.getTopProductsProfitInLastMonth());
     this.topSaleQuantityProducts$.next(this.orderService.getTopProductsSaleQuantityInLastMonth());
+
   }
 
   get divisor() {
@@ -138,8 +172,16 @@ export class DashboardComponent {
     return (this.saleProfitToday / this.divisor).toFixed(2);
   }
 
+  get expensesToday() {
+    return (this.expenseToday / this.divisor).toFixed(2);
+  }
+
   get inventarioTotal() {
     return (this.inventoryCostTotal / this.divisor).toFixed(2);
+  }
+
+  get unpaidSaleCreditsTotal() {
+    return (this.unpaidSaleCreditsToday / this.divisor).toFixed(2);
   }
 
   getTrendClass(actual: number, anterior: number): string {
@@ -162,12 +204,28 @@ export class DashboardComponent {
     return this.getTrendClass(this.inventoryCostTotal, this.inventoryCostTotalYesterday);
   }
 
+  getSaleCreditsIcon() {
+    return this.getTrendIcon(this.unpaidSaleCreditsToday, this.unpaidSaleCreditsYesterday);
+  }
+
+  getSaleCreditsClass() {
+    return this.getTrendClass(this.unpaidSaleCreditsToday, this.unpaidSaleCreditsYesterday);
+  }
+
   getSalePriceIcon() {
     return this.getTrendIcon(this.salePriceToday, this.salePriceYesterday);
   }
 
   getSalePriceClass() {
     return this.getTrendClass(this.salePriceToday, this.salePriceYesterday);
+  }
+
+  getExpenseIcon() {
+    return this.getTrendIcon(this.expenseToday, this.expenseYesterday);
+  }
+
+  getExpenseClass() {
+    return this.getTrendClass(this.expenseToday, this.expenseYesterday);
   }
 
   getSaleProfitIcon() {
@@ -190,6 +248,10 @@ export class DashboardComponent {
     return this.trendTexto(this.salePriceToday, this.salePriceYesterday, "vs ayer");
   }
 
+  trendExpense() {
+    return this.trendTexto(this.expenseToday, this.expenseYesterday, "vs ayer");
+  }
+
   trendSaleProfit() {
     return this.trendTexto(this.saleProfitToday, this.saleProfitYesterday, "vs ayer");
   }
@@ -200,6 +262,10 @@ export class DashboardComponent {
 
   trendInventoryCost() {
     return this.trendTexto(this.inventoryCostTotal, this.inventoryCostTotalYesterday, "vs ayer");
+  }
+
+  trendUnpaidSaleCredits() {
+    return this.trendTexto(this.unpaidSaleCreditsToday, this.unpaidSaleCreditsYesterday, "vs ayer");
   }
 
   trendTexto(actual: number, anterior: number, sufijo: string) {

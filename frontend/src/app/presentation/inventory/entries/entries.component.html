@@ -1,61 +1,48 @@
 <div class="card card-custom gutter-b">
     <div class="card-header">
         <div class="card-title">
-            <h3 class="card-label" [translate]="'INVENTORY_ENTRY.ENTRIES_IN_DAY'"></h3>
+            <h3 class="card-label" [translate]="'INVENTORY.ENTRIES_HISTORY'"></h3>
+            <span class="label label-success font-weight-bold font-size-lg">({{getEntriesCount()}})</span>
         </div>
         <div class="card-toolbar">
-            <button mat-fab extended color="primary" (click)="openCreateEntryModal()">
-                <mat-icon>add</mat-icon>
-                {{'GENERAL.ENTRY'| translate}}
-            </button>
-            <!-- <button type="button" mat-button class="with-icon btn btn-success font-weight-bold cursor-pointer" (click)="openCreateEntryModal()">
-                <mat-icon color="success">add</mat-icon>
-                {{'INVENTORY_ENTRY.NEW_ENTRY'| translate}}
-            </button> -->
+            <span class="text-danger font-weight-bold font-size-lg">
+                {{getEntriesTotal() | currency:'USD':'symbol':'1.2-2'}}
+            </span>
         </div>
     </div>
     <div class="card-body p-2">
-        <div *ngIf="(entries$ | async).length === 0" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-            <div class="alert-text">{{'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY' | translate}}</div>
+        <mat-radio-group [(ngModel)]="paymentType" (change)="loadEntries()" style="margin-bottom: 10px !important;">
+            <mat-radio-button [value]="null">
+                Todas
+            </mat-radio-button>
+            <mat-radio-button *ngFor="let type of paymentTypes" [value]="type.value">
+                <i class="bi {{getPaymentTypeIcon(type.value)}} text-success fs-4"></i>
+                {{type.label}}
+            </mat-radio-button>
+        </mat-radio-group>
+
+        <div *ngIf="(dateEntries$ | async).length === 0"
+            class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+            <div class="alert-text">{{'INVENTORY.NO_HISTORY_ENTRY_FOUND' | translate}}</div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-borderless table-vertical-center">
-                <tbody>
-                    <tr *ngFor="let entry of entries$ | async" class="border-1">
-                        <td class="p-1">
-                            <span class="text-dark mb-1 font-size-lg">
-                                {{entry.productName}}
-                            </span>
-                        </td>
-                        <td class="p-1 text-end">
-                            <span class="label label-success font-weight-bold font-size-lg">
-                                {{entry.quantity}}
-                            </span>
-                        </td>
-                        <td class="p-1 text-end">
-                            <span class="text-success mb-1 font-size-lg">
-                                {{entry.costPrice | currency:'USD':'symbol':'1.2-2'}}
-                            </span>
-                        </td>
-                        <td class="text-end p-0">
-                            <button mat-icon-button color="primary" class="card-header-action-button" [matMenuTriggerFor]="menuInventoryEntry" aria-label="Acciones">
-                                <mat-icon>settings</mat-icon>
-                            </button>
-                            <mat-menu #menuInventoryEntry="matMenu">
-                                <button mat-menu-item (click)="openEditInventoryEntryModal(entry)">
-                                    <mat-icon color="primary">edit</mat-icon>
-                                    <span>{{ 'GENERAL.EDIT' | translate }}</span>
-                                </button>
-                                <button mat-menu-item (click)="onDeleteInventoryEntry(entry.productId, entry.id)">
-                                    <mat-icon color="warn">delete</mat-icon>
-                                    <span>{{ 'GENERAL.DELETE' | translate }}</span>
-                                </button>
-                            </mat-menu>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <mat-accordion multi>
+            <mat-expansion-panel [expanded]="false" *ngFor="let dateEntry of dateEntries$ | async">
+                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+                    <mat-panel-title>
+                        <span class="w-100">{{dateEntry.date | date: onlyDateFormat : 'UTC'}}
+                            ({{dateEntry.count}})</span>
+                        <div class="w-100 text-end">
+                            <span class="text-danger">{{dateEntry.total |
+                                currency:'USD':'symbol':'1.2-2'}}</span>
+                        </div>
+                    </mat-panel-title>
+                </mat-expansion-panel-header>
+                <app-entry-list class="p-2" [entries$]="getEntriesObservable(dateEntry.entries)">
+                </app-entry-list>
+            </mat-expansion-panel>
+        </mat-accordion>
+
+
     </div>
 </div>

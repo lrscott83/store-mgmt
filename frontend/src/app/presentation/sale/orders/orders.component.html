@@ -1,0 +1,52 @@
+<div class="card card-custom gutter-b">
+    <div class="card-header">
+        <div class="card-title">
+            <h3 class="card-label" [translate]="'ORDERS.TITLE'"></h3>
+            <span class="label label-success font-weight-bold font-size-lg">({{getOrdersCount()}})</span>
+        </div>
+        <div class="card-toolbar">
+            <span class="font-weight-bold font-size-lg">
+                {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
+            </span>
+        </div>
+    </div>
+    <div class="card-body p-2">
+        <mat-radio-group [(ngModel)]="paymentType" (change)="loadOrders()" style="margin-bottom: 10px !important;">
+            <mat-radio-button [value]="null">
+                Todas
+            </mat-radio-button>
+            <mat-radio-button *ngFor="let type of paymentTypes" [value]="type.value">
+                <i class="bi {{getPaymentTypeIcon(type.value)}} text-success fs-4"></i>
+                {{type.label}}
+            </mat-radio-button>
+        </mat-radio-group>
+        <br>
+        <mat-radio-group [(ngModel)]="isCredit" (change)="loadOrders()" style="margin-bottom: 10px !important;">
+            <mat-radio-button [value]="-1">Todas</mat-radio-button>
+            <mat-radio-button [value]="0">Pagadas</mat-radio-button>
+            <mat-radio-button [value]="1"><span class="text-warning">Créditos</span></mat-radio-button>
+        </mat-radio-group>
+
+        <div *ngIf="(dateOrders$ | async).length === 0"
+            class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+            <div class="alert-text">{{'ORDERS.NO_ORDERS_FOUND' | translate}}</div>
+        </div>
+
+        <mat-accordion multi>
+            <mat-expansion-panel [expanded]="false" *ngFor="let dateOrder of dateOrders$ | async">
+                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+                    <mat-panel-title>
+                        <span class="w-100">{{dateOrder.date | date: onlyDateFormat : 'UTC'}}
+                            ({{dateOrder.count}})</span>
+                        <div class="w-100 text-end">
+                            <span>
+                                {{dateOrder.total | currency:'USD':'symbol':'1.2-2'}}
+                            </span>
+                        </div>
+                    </mat-panel-title>
+                </mat-expansion-panel-header>
+                <app-order-list class="p-2" [orders$]="getOrdersObservable(dateOrder.orders)"></app-order-list>
+            </mat-expansion-panel>
+        </mat-accordion>
+    </div>
+</div>

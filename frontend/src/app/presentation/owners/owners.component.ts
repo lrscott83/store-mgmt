@@ -21,7 +21,6 @@ import {
 import { actionFormatter } from 'src/app/_shared/formatters/action.formatter';
 import { booleanFormatter } from 'src/app/_shared/formatters/boolean.formatter';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { EditOwnerComponent } from './edit-owner/edit-owner.component';
 import { Router, RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -335,10 +334,18 @@ export class OwnersComponent implements OnInit, OnDestroy {
   }
 
   deleteOwner(owner: Owner) {
-
+    this.ownerService.deleteOwner(owner.id).subscribe(response => {
+      if (response && response.succeeded) {
+        this.loadOwners();
+      }
+    });
   }
 
   activateOwner(owner: Owner) {
+
+  }
+
+  deactivateOwner(owner: Owner) {
 
   }
 
@@ -347,7 +354,7 @@ export class OwnersComponent implements OnInit, OnDestroy {
   }
 
   getOwnerBackgroundColor(owner: Owner) {
-    return !owner.isActive ? "deactive-owner" : (owner.guest ? "guest-owner" : "");
+    return !owner.isActive ? "deactive-owner" : (!owner.approved ? "guest-owner" : "");
   }
 
   getOwnerStorePrice(owner: Owner): number {

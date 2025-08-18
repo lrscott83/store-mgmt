@@ -1,5 +1,5 @@
 import { Component, Inject } from '@angular/core';
-import { OrderType, OrderTypeData, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
+import { OrderType, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule } from '@ngx-translate/core';
 import { EditInventoryEntryModalComponent } from '../edit-inventory-entry-modal/edit-inventory-entry-modal.component';
@@ -8,6 +8,7 @@ import { ProductCategory } from 'src/app/domain/entities/product-categories/prod
 import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
 import { ProductCategoryService } from 'src/app/application/categories/product-category.service';
 import { SaleCategoryProductsComponent } from '../../sale/sale-category-products/sale-category-products.component';
+import { TypeData } from 'src/app/domain/commons/type-data';
 
 @Component({
   selector: 'app-egress',
@@ -19,7 +20,7 @@ import { SaleCategoryProductsComponent } from '../../sale/sale-category-products
 export class EgressComponent {
   orderType: OrderType = OrderType.Mayorista;
 
-  orderTypes: OrderTypeData[] = OrderTypeUtils.getOrderTypes();
+  orderTypes: TypeData[] = OrderTypeUtils.getOrderTypes();
 
   categories$: BehaviorSubject<ProductCategory[]> = new BehaviorSubject<ProductCategory[]>([]);
   selectedCategory$: BehaviorSubject<ProductCategory> = new BehaviorSubject<ProductCategory>(undefined);

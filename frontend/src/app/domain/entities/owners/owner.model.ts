@@ -10,5 +10,7 @@ export interface Owner extends AuditableBaseModel {
     description: string;
     guest: boolean;
     storeModules: OwnerStoreModule[];
+    reSellerId: string;
     reSellerName: string;
+    approved: boolean;
 }
