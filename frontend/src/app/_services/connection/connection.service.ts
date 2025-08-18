@@ -27,7 +27,7 @@ export class ConnectionService {
 
     private periodicCheck(): Observable<boolean> {
         return of(null).pipe(
-            switchMap(() => fetch(ConnectionService.API_URL + '/ping') // Endpoint de verificación [[6]]
+            switchMap(() => fetch(ConnectionService.API_URL + 'ping') // Endpoint de verificación [[6]]
                 .then(() => {
                     console.log("Connection OK");
                     return true;
