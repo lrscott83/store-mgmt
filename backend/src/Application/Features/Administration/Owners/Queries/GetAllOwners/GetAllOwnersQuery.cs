@@ -41,7 +41,7 @@ namespace Application.Features.Administration.Owners.Queries.GetAllOwners
                 ? await _ownerRepository.GetAllOwnersIncludingStoreModulesAsync(query.IncludeInactive)
                 : await _ownerRepository.GetReSellerOwnersIncludingStoreModulesAsync(_httpContextService.UserExternalId.ToGuid(), query.IncludeInactive);
             IEnumerable<OwnerDto> ownerDtos = _mapper.Map<IEnumerable<OwnerDto>>(owners).ToList();
-            return ResponseResult.Success(ownerDtos);
+            return ResponseResult.Success(ownerDtos.OrderByDescending(o => o.Approved).AsEnumerable());
         }
     }
 }

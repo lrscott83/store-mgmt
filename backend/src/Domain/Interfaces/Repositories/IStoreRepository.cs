@@ -13,5 +13,6 @@ namespace Domain.Interfaces.Repositories
         Task<Store> GetStoreByIdIncludingModulesAsync(Guid id);
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAsync(Guid userId);
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(Guid userId);
+        Task<int> GetActiveStoreCountAsync();
     }
 }

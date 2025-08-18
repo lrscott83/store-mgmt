@@ -25,5 +25,17 @@ namespace Domain.Common.Enums
 
         [Description("Gestión")]
         Management = 7,
+
+        [Description("Gastos")]
+        Expenses = 8,
+
+        [Description("Facturación")]
+        Billing = 9,
+
+        [Description("Historiales")]
+        Histories = 10,
+
+        [Description("Créditos")]
+        Credits = 11,
     }
 }

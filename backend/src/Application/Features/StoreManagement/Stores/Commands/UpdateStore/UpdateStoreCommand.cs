@@ -3,16 +3,21 @@ using Application.Abstractions.Messaging;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Enums;
 using Domain.Common.Utils;
 using Domain.Entities.Modules;
 using Domain.Entities.Owners;
+using Domain.Entities.Roles;
 using Domain.Entities.StoreModules;
+using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Stores;
+using Domain.Interfaces.Services.Tenants;
 using Microsoft.Extensions.Localization;
 using Resources;
 using System.Net;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
 {
@@ -27,6 +32,9 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
         private readonly IStoreRepository _storeRepository;
         private readonly IModuleRepository _moduleRepository;
         private readonly IStoreModuleRepository _storeModuleRepository;
+        private readonly IFeatureRepository _featureRepository;
+        private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
+        private readonly IStoreRoleFeatureGenerator _storeRoleFeaturesGenerator;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
 
@@ -37,7 +45,10 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             IStoreModuleRepository storeModuleRepository,
             IHttpContextService httpContextService,
             IStringLocalizer<I18n> localizer,
-            IGetStoreByIdService storeByIdService)
+            IGetStoreByIdService storeByIdService,
+            IFeatureRepository featureRepository,
+            IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
+            IStoreRoleFeatureRepository storeRoleFeatureRepository)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -46,6 +57,9 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             _storeModuleRepository = storeModuleRepository;
             _localizer = localizer;
             _storeByIdService = storeByIdService;
+            _featureRepository = featureRepository;
+            _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
+            _storeRoleFeatureRepository = storeRoleFeatureRepository;
         }
 
         public async Task<ResponseResult<bool>> Handle(UpdateStoreCommand request, CancellationToken cancellationToken)
@@ -85,8 +99,24 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                 .Where(module => module.IsActive && moduleIds.All(id => module.ModuleId != id))
                 .ToList();
             if (storeModulesToDelete.Any())
-                await _storeModuleRepository.DeleteAsync(storeModulesToDelete);
+            {
+                foreach (var item in storeModulesToDelete)
+                {
+                    item.IsActive = false;
+                    await _storeModuleRepository.UpdateAsync(item);
+                }
 
+                IEnumerable<StoreRoleFeature> storeRoleFeaturesToDelete = await _storeRoleFeatureRepository.GetAllActiveToStoreByStoreIdAndModuleIdsAsync(
+                    storeId, storeModulesToDelete.Select(sm => sm.ModuleId).ToList());
+                foreach (var storeRoleFeature in storeRoleFeaturesToDelete)
+                {
+                    storeRoleFeature.IsActive = false;
+                    await _storeRoleFeatureRepository.UpdateAsync(storeRoleFeature);
+                }
+            }
+
+            List<int> insertedModuleIds = new List<int>();
+            List<int> updatedModuleIds = new List<int>();
             foreach (var moduleId in moduleIds)
             {
                 StoreModule? storeModule = storeModules.FirstOrDefault(module => module.ModuleId == moduleId);
@@ -97,6 +127,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                     storeModule = StoreModule.Create(storeId, moduleId, module.Price, module.PriceIncluded,
                         module.Price, module.DiscountPrice, module.PercentDiscountPrice, tenantId);
                     await _storeModuleRepository.AddAsync(storeModule);
+                    insertedModuleIds.Add(moduleId);
                 }
                 else if (!storeModule.IsActive)
                 {
@@ -109,7 +140,40 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                     storeModule.ModuleDiscountPrice = module.DiscountPrice;
 
                     await _storeModuleRepository.UpdateAsync(storeModule);
+                    updatedModuleIds.Add(moduleId);
                 }
+            }
+
+            if (insertedModuleIds.Any())
+            {
+                List<int> featureIds = await _featureRepository.GetAvailableFeatureIdsByModuleIdsAsync(insertedModuleIds);
+                var storeRoleFeatures = await _storeRoleFeaturesGenerator.GenerateStoreRoleFeaturesAsync(storeId, tenantId, featureIds);
+                storeRoleFeatures.ForEach(async storeRoleFeature => await _storeRoleFeatureRepository.AddAsync(storeRoleFeature));
+            }
+
+            foreach (var updatedModuleId in updatedModuleIds)
+            {
+                List<int> featureIds = await _featureRepository.GetAvailableFeatureIdsByModuleIdsAsync([updatedModuleId]);
+                IEnumerable<StoreRoleFeature> storeRoleFeaturesToUpdate = await _storeRoleFeatureRepository.GetAllByStoreIdAndModuleIdAndFeatureIdsAsync(
+                    storeId, updatedModuleId, featureIds);
+
+                foreach (var featureId in featureIds)
+                {
+                    StoreRoleFeature? storeRoleFeature = storeRoleFeaturesToUpdate.FirstOrDefault(srf => srf.FeatureId == featureId);
+                    if (storeRoleFeature == null)
+                    {
+                        // Insert
+                        StoreRoleFeature newStoreRoleFeature = StoreRoleFeature.Create(storeId, (int)RoleType.StoreUser, featureId, tenantId);
+                        await _storeRoleFeatureRepository.AddAsync(newStoreRoleFeature);
+                    }
+                    else
+                    {
+                        // Update
+                        storeRoleFeature.IsActive = true;
+                        await _storeRoleFeatureRepository.UpdateAsync(storeRoleFeature);
+                    }
+                }
+
             }
         }
     }

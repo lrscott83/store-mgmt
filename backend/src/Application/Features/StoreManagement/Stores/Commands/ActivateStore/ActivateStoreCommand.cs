@@ -48,7 +48,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.ActivateStore
 
             var store = await _storeByIdService.GetStoreByIdIncludingModulesAsync(request.Id);
             store.IsActive = true;
-            await _storeRepository.DeleteAsync(store);
+            await _storeRepository.UpdateAsync(store);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }

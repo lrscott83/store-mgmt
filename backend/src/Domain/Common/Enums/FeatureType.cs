@@ -24,6 +24,9 @@ namespace Domain.Common.Enums
         [Description("Tiendas")]
         AdminStores = 15,
 
+        [Description("Dashboard")]
+        AdminDashboard = 16,
+
         // Sales
         [Description("Productos")]
         Products = 20,
@@ -80,5 +83,27 @@ namespace Domain.Common.Enums
 
         [Description("Configuraciones")]
         Configurations = 74,
+
+        //Expenses
+        [Description("Gastos del día")]
+        TodayExpenses = 80,
+
+        //Billing
+        [Description("Facturación")]
+        Billing = 90,
+
+        //Histories
+        [Description("Historial de ventas")]
+        SalesHistory = 100,
+
+        [Description("Historial de entradas")]
+        EntriesHistory = 101,
+
+        [Description("Historial de gastos")]
+        ExpensesHistory = 102,
+
+        //Credits
+        [Description("Venta a crédito")]
+        CreditSale = 110,
     }
 }

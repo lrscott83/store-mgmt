@@ -94,6 +94,50 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     0,
                     availableToStore: true,
                     true
+                ),
+                Module.Create(
+                    (int)ModuleType.Expenses,
+                    ModuleType.Expenses.GetDescription(),
+                    60,
+                    priceIncluded: false,
+                    2000,
+                    0,
+                    50,
+                    availableToStore: true,
+                    true
+                ),
+                Module.Create(
+                    (int)ModuleType.Billing,
+                    ModuleType.Billing.GetDescription(),
+                    60,
+                    priceIncluded: false,
+                    2000,
+                    0,
+                    50,
+                    availableToStore: true,
+                    true
+                ),
+                Module.Create(
+                    (int)ModuleType.Histories,
+                    ModuleType.Histories.GetDescription(),
+                    60,
+                    priceIncluded: false,
+                    2000,
+                    0,
+                    50,
+                    availableToStore: true,
+                    true
+                ),
+                Module.Create(
+                    (int)ModuleType.Credits,
+                    ModuleType.Credits.GetDescription(),
+                    60,
+                    priceIncluded: false,
+                    2000,
+                    0,
+                    50,
+                    availableToStore: true,
+                    true
                 ));
         }
     }

@@ -42,7 +42,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.DeleteStore
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
             var store = await _storeByIdService.GetStoreByIdIncludingModulesAsync(request.Id);
-            await _storeRepository.DeleteAsync(store);
+            store.IsActive = false;
+            await _storeRepository.UpdateAsync(store);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }

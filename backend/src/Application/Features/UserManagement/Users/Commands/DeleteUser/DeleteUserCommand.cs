@@ -38,7 +38,8 @@ namespace Application.Features.UserManagement.Users.Commands.DeleteUser
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
             var user = await _userRepository.GetByIdAsync(request.Id);
-            await _userRepository.DeleteAsync(user);
+            user.IsActive = false;
+            await _userRepository.UpdateAsync(user);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }

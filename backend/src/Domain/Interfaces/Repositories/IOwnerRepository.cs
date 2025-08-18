@@ -9,5 +9,6 @@ namespace Domain.Interfaces.Repositories
         Task<IEnumerable<Owner>> GetReSellerOwnersIncludingStoreModulesAsync(Guid reSellerId, bool includeInactive);
         Task<Owner> GetOwnerIncludingUserByIdAsync(Guid ownerId);
         Task<Owner> GetByUserIdIgnoreQueryFiltersAsync(Guid userId);
+        Task<Owner> GetOwnerWithAllDataToDeleteByIdAsync(Guid id);
     }
 }

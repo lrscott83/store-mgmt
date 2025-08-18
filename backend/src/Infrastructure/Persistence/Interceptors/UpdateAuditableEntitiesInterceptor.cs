@@ -44,12 +44,12 @@ namespace Infrastructure.Persistence.Interceptors
                         entry.Entity.UpdatedDate = _dateTimeProvider.UtcNow;
                         entry.Entity.UpdatedBy = _httpContextService.UserExternalId.ToGuid();
                         break;
-                    case EntityState.Deleted:
-                        entry.Entity.IsActive = false;
-                        entry.Entity.UpdatedDate = _dateTimeProvider.UtcNow;
-                        entry.Entity.UpdatedBy = _httpContextService.UserExternalId.ToGuid();
-                        entry.State = EntityState.Modified;
-                        break;
+                    //case EntityState.Deleted:
+                    //    entry.Entity.IsActive = false;
+                    //    entry.Entity.UpdatedDate = _dateTimeProvider.UtcNow;
+                    //    entry.Entity.UpdatedBy = _httpContextService.UserExternalId.ToGuid();
+                    //    entry.State = EntityState.Modified;
+                    //    break;
                 }
             }
         }

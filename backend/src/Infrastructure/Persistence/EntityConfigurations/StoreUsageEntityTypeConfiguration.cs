@@ -19,6 +19,7 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasQueryFilter(x => _context.IsSuperAdmin);
             builder.HasKey(x => x.Id);
             builder.HasIndex(x => new { x.UserId, x.StoreId });
+            builder.HasIndex(x => new { x.StoreId, x.Day });
 
             builder.HasOne(c => c.User)
              .WithMany(e => e.StoreUsages)

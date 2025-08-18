@@ -22,6 +22,23 @@ namespace Infrastructure.Persistence.Repositories
             _storeRoleFeature = dbContext.Set<StoreRoleFeature>();
         }
 
+        public async Task<IEnumerable<StoreRoleFeature>> GetAllActiveToStoreByStoreIdAndModuleIdsAsync(Guid storeId, List<int> moduleIds)
+        {
+            return await _storeRoleFeature.Where(srf => srf.IsActive && srf.StoreId == storeId && srf.Feature.AvailableToStore 
+                && moduleIds.Contains(srf.Feature.ModuleId))
+                .IgnoreQueryFilters()
+                .ToListAsync();
+
+        }
+
+        public async Task<IEnumerable<StoreRoleFeature>> GetAllByStoreIdAndModuleIdAndFeatureIdsAsync(Guid storeId, int moduleId, List<int> featureIds)
+        {
+            return await _storeRoleFeature.Where(srf => srf.StoreId == storeId && srf.Feature.AvailableToStore
+                && srf.Feature.ModuleId == moduleId && featureIds.Contains(srf.FeatureId))
+                .IgnoreQueryFilters()
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<StoreRoleFeature>> GetStoreRoleFeaturesByUserIdAsync(Guid userId, List<int> storeModuleIds)
         {
             return await _storeRoleFeature

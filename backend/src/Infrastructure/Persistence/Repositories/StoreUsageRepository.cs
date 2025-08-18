@@ -1,4 +1,5 @@
-﻿using Domain.Entities.StoreUsages;
+﻿using Application.Dtos.Management.Usages;
+using Domain.Entities.StoreUsages;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,14 @@ namespace Infrastructure.Persistence.Repositories
         public StoreUsageRepository(ApplicationDbContext dbContext) : base(dbContext)
         {
             _storeUsages = dbContext.Set<StoreUsage>();
+        }
+
+        public async Task<IEnumerable<StoreUsage>> GetStoresUsagesAfterDateAsync(DateTime day)
+        {
+            return await _storeUsages.Where(usage => usage.Day >= day && usage.Store.IsActive)
+                .GroupBy(usage => new { usage.StoreId, usage.Day })
+                .Select(group => group.First())
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<StoreUsage>> GetStoreUsageByStoreIdAndUserId(Guid storeId, Guid userId)

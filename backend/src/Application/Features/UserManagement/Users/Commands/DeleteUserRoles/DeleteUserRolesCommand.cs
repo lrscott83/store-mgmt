@@ -29,7 +29,12 @@ public class RemoveUserRolesCommandHandler : ICommandHandler<DeleteUserRolesComm
         public async Task<ResponseResult<IEnumerable<ListViewDto>>> Handle(DeleteUserRolesCommand request, CancellationToken cancellationToken)
         {
             var userRolesToDelete = await _userRoleRepository.GetActiveUserRolesByIds(request.UserId, request.RoleIds.ToHashSet());
-            await _userRoleRepository.DeleteAsync(userRolesToDelete);
+            foreach (var item in userRolesToDelete)
+            {
+                item.IsActive = false;
+                await _userRoleRepository.UpdateAsync(item);
+            }
+            
             await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
             return await _mediator.Send(new GetUserRolesByUserIdQuery(request.UserId));
         }

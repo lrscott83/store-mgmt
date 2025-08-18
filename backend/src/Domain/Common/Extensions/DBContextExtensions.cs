@@ -57,12 +57,12 @@ namespace Domain.Common.Extensions
                         entry.Entity.UpdatedDate = DateTime.UtcNow;
                         entry.Entity.UpdatedBy = userId;
                         break;
-                    case EntityState.Deleted:
-                        entry.Entity.IsActive = false;
-                        entry.Entity.UpdatedDate = DateTime.UtcNow;
-                        entry.Entity.UpdatedBy = userId;
-                        entry.State = EntityState.Modified;
-                        break;
+                    //case EntityState.Deleted:
+                    //    entry.Entity.IsActive = false;
+                    //    entry.Entity.UpdatedDate = DateTime.UtcNow;
+                    //    entry.Entity.UpdatedBy = userId;
+                    //    entry.State = EntityState.Modified;
+                    //    break;
                 }
             }
         }

@@ -75,6 +75,52 @@ namespace Domain.Common.Enums
 
         #endregion
 
+        #region Expenses features
+
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.TodayExpenses)]
+        [HasModule(ModuleType.Expenses)]
+        TodayExpensesAdmin,
+
+        #endregion
+
+        #region Expenses features
+
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.Billing)]
+        [HasModule(ModuleType.Billing)]
+        BillingAdmin,
+
+        #endregion
+
+        #region Expenses features
+
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.SalesHistory)]
+        [HasModule(ModuleType.Histories)]
+        SalesHistoryAdmin,
+
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.EntriesHistory)]
+        [HasModule(ModuleType.Histories)]
+        EntriesHistoryAdmin,
+
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.ExpensesHistory)]
+        [HasModule(ModuleType.Histories)]
+        ExpensesHistoryAdmin,
+
+        #endregion
+
+        #region Expenses features
+
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.CreditSale)]
+        [HasModule(ModuleType.Credits)]
+        CreditSaleAdmin,
+
+        #endregion
+
         #region Synchronization features
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]

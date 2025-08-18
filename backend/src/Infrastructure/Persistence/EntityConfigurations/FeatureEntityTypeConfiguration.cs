@@ -45,6 +45,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     true
                 ),
                 Feature.Create(
+                    (int)FeatureType.AdminDashboard,
+                    FeatureType.AdminDashboard.GetDescription(),
+                    "Funcionalidad para mostrar el dashboard",
+                    (int)ModuleType.Administration,
+                    2,
+                    false,
+                    true
+                ),
+                Feature.Create(
                     (int)FeatureType.Owners,
                     FeatureType.Owners.GetDescription(),
                     "Funcionalidad para gestionar los propietarios",
@@ -244,7 +253,70 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      170,
                      true,
                      true
-                 ));
+                 ),
+
+                //Expenses
+                Feature.Create(
+                     (int)FeatureType.TodayExpenses,
+                     FeatureType.TodayExpenses.GetDescription(),
+                     "Funcionalidad para gestionar los gastos del día",
+                     (int)ModuleType.Expenses,
+                     180,
+                     true,
+                     true
+                 ),
+
+                //Billing
+                Feature.Create(
+                     (int)FeatureType.Billing,
+                     FeatureType.Billing.GetDescription(),
+                     "Funcionalidad para generar facturas",
+                     (int)ModuleType.Billing,
+                     190,
+                     true,
+                     true
+                 ),
+
+                //Histories
+                Feature.Create(
+                     (int)FeatureType.SalesHistory,
+                     FeatureType.SalesHistory.GetDescription(),
+                     "Funcionalidad para listar el historial de las ventas",
+                     (int)ModuleType.Histories,
+                     200,
+                     true,
+                     true
+                 ),
+                Feature.Create(
+                     (int)FeatureType.EntriesHistory,
+                     FeatureType.EntriesHistory.GetDescription(),
+                     "Funcionalidad para listar el historial de las entradas",
+                     (int)ModuleType.Histories,
+                     210,
+                     true,
+                     true
+                 ),
+                Feature.Create(
+                     (int)FeatureType.ExpensesHistory,
+                     FeatureType.ExpensesHistory.GetDescription(),
+                     "Funcionalidad para listar el historial de los gastos",
+                     (int)ModuleType.Histories,
+                     220,
+                     true,
+                     true
+                 ),
+
+                //Credits
+                Feature.Create(
+                     (int)FeatureType.CreditSale,
+                     FeatureType.CreditSale.GetDescription(),
+                     "Funcionalidad para hacer ventas a crédito",
+                     (int)ModuleType.Credits,
+                     230,
+                     true,
+                     true
+                 )
+            );
         }
     }
 }

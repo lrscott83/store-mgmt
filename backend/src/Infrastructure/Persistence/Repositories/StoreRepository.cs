@@ -71,5 +71,10 @@ namespace Infrastructure.Persistence.Repositories
         {
             return await Task.FromResult(_stores.All(t => t.Name != name));
         }
+
+        public async Task<int> GetActiveStoreCountAsync()
+        {
+            return await _stores.Where(store => store.IsActive).CountAsync();
+        }
     }
 }

@@ -28,10 +28,15 @@ namespace Application.Features.ApplicationManagement.Tenants.Commands.DeleteTena
         public async Task<ResponseResult<bool>> Handle(DeleteTenantCommand request, CancellationToken cancellationToken)
         {
             var tenant = await _tenantRepository.GetByIdAsync(request.Id);
-            await _tenantRepository.DeleteAsync(tenant);
+            tenant.IsActive = false;
+            await _tenantRepository.UpdateAsync(tenant);
 
             var storeModules = _storeModuleRepository.Where(tm => tm.TenantId == request.Id).IgnoreQueryFilters();
-            await _storeModuleRepository.DeleteAsync(storeModules);
+            foreach (var storeModule in storeModules)
+            {
+                storeModule.IsActive = false;
+                await _storeModuleRepository.UpdateAsync(storeModule);
+            }
 
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }

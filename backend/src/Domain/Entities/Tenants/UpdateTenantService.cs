@@ -80,7 +80,8 @@ namespace Domain.Entities.Tenants
                 else if (tenantFeature != null)
                 {
                     // Delete
-                    await _tenantFeatureRepository.DeleteAsync(tenantFeature);
+                    tenantFeature.IsActive = false;
+                    await _tenantFeatureRepository.UpdateAsync(tenantFeature);
 
                     // Deactive Application Roles in this feature
                     var applicationRolesToDelete = applicationRoles.Where(r => r.HasFeature(tenantFeature.ModuleId)).ToList();
@@ -88,7 +89,10 @@ namespace Domain.Entities.Tenants
                     {
                         var role = await _roleRepository.GetRoleByNameAndTenantIdIgnoreQueryFiltersAsync(applicationRole.GetDisplayName(), requestModel.Tenant.Id);
                         if (role != null)
-                            await _roleRepository.DeleteAsync(role);
+                        {
+                            role.IsActive = false;
+                            await _roleRepository.UpdateAsync(role);
+                        }
                     }
                 }
             }
