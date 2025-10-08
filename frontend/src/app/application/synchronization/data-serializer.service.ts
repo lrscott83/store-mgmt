@@ -7,13 +7,14 @@ import { OrderOfflineService } from "../orders/order-offline.service";
 import { InventoryOfflineService } from "../entries/inventory-offline.service";
 import { ExpenseOfflineService } from "../expenses/expense-offline.service";
 import { SaleCreditOfflineService } from "../credits/sale-credit-offline.service";
+import { AuthService } from "src/app/_services/services.index";
 
 @Injectable({
     providedIn: "root"
 })
 
 export class DataSerializerService {
-    constructor(private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService, private expenseService: ExpenseOfflineService, private saleCreditService: SaleCreditOfflineService) {
+    constructor(private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService, private expenseService: ExpenseOfflineService, private saleCreditService: SaleCreditOfflineService, private authService: AuthService) {
 
     }
 
@@ -21,7 +22,7 @@ export class DataSerializerService {
         try {
             const zipReader = new ZipReader(new BlobReader(fileToUpload),
                 {
-                    password: password,
+                    password: password + this.authService.currentUserValue.selectedStoreId,
                 });
 
             // Obtener lista de entradas
@@ -52,7 +53,7 @@ export class DataSerializerService {
         try {
             const files: DataFile[] = this.getDataFiles();
             const zipWriter = new ZipWriter(new BlobWriter('application/zip'), {
-                password: password
+                password: password + this.authService.currentUserValue.selectedStoreId
             });
 
             // Añadir archivos al ZIP
