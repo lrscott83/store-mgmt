@@ -9,11 +9,10 @@ import { locale as esLang } from './_modules/i18n/vocabs/es';
 import { locale as jpLang } from './_modules/i18n/vocabs/jp';
 import { locale as deLang } from './_modules/i18n/vocabs/de';
 import { locale as frLang } from './_modules/i18n/vocabs/fr';
-import { Subscription } from 'rxjs';
-import { SpinnerComponent } from './presentation/shared/components/spinner/spinner.component';
 import { LoadingComponent } from './presentation/shared/components/loading/loading.component';
 import { UpdateService } from './_services/update/update.service';
 import { StoreUsageTrackerService } from './_services/usage-tracker/store-usage-tracker.service';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-root',
@@ -24,6 +23,9 @@ export class AppComponent implements OnInit {
   // public props
   title = 'vende-de-todo';
   public spinnerComponent = LoadingComponent;
+
+  showInstallPrompt = false;
+  deferredPrompt: any = null;
 
   constructor(
     private translationService: TranslationService,
@@ -44,5 +46,67 @@ export class AppComponent implements OnInit {
 
   ngOnInit() {
     this.storeUsageTracker.cleanOldData(30); // Mantiene los últimos 30 días
+    this.checkIfInstalled();
+    this.listenToBeforeInstallPrompt();
+  }
+
+  private checkIfInstalled(): void {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (window.navigator as any).standalone === true;
+
+    // Si NO está en modo standalone, puede ser candidata a instalación
+    if (!isStandalone) {
+      // Pero aún no mostramos el mensaje: esperamos a ver si el navegador permite instalarla
+    }
+  }
+
+  private listenToBeforeInstallPrompt(): void {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // El navegador permite instalar la PWA
+      e.preventDefault();
+      this.deferredPrompt = e;
+
+      // Verificamos que NO esté ya instalada
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || (window.navigator as any).standalone === true;
+
+      if (!isStandalone) {
+        this.showInstallPrompt = true; // Mostrar banner/mensaje
+        Swal.fire({
+          title: '¡Instalción disponible!',
+          text: 'Deseas instalar esta app en tu dispositivo?',
+          icon: 'question',
+          showConfirmButton: true,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          confirmButtonText: 'Instalar',
+          customClass: {
+            confirmButton: 'swal2-confirm swal2-styled'
+          }
+        }).then(result => {
+          if (result.isConfirmed) {
+            this.installPwa();
+          }
+        });
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      // La PWA fue instalada. Puedes ocultar el botón o enviar analytics.
+      this.deferredPrompt = null;
+    });
+  }
+
+  installPwa(): void {
+    if (this.deferredPrompt) {
+      this.deferredPrompt.prompt();
+      this.deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('Usuario instaló la PWA');
+        }
+        this.showInstallPrompt = false;
+        this.deferredPrompt = null;
+      });
+    }
   }
 }

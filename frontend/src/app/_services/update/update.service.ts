@@ -26,7 +26,7 @@ export class UpdateService {
             });
 
             // Verificar periódicamente si hay actualizaciones
-            interval(5 * 60 * 1000).subscribe(() => this.updates.checkForUpdate());
+            interval(60 * 60 * 1000).subscribe(() => this.updates.checkForUpdate());
         }
     }
 
