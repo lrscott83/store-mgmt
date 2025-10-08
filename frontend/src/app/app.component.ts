@@ -77,9 +77,11 @@ export class AppComponent implements OnInit {
           text: 'Deseas instalar esta app en tu dispositivo?',
           icon: 'question',
           showConfirmButton: true,
+          showCancelButton: true,
           allowOutsideClick: false,
           allowEscapeKey: false,
-          confirmButtonText: 'Instalar',
+          confirmButtonText: 'Si',
+          cancelButtonText: 'No',
           customClass: {
             confirmButton: 'swal2-confirm swal2-styled'
           }
