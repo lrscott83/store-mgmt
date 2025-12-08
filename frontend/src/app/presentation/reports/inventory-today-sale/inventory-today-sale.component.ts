@@ -13,11 +13,6 @@ import { InventoryEntryView } from 'src/app/domain/entities/entries/inventory-en
 import { OrderItem } from 'src/app/domain/entities/orders/order-item.model';
 import { InventoryCategoryView } from 'src/app/application/entries/inventory-category.view';
 import { InventoryProductView } from 'src/app/application/entries/inventory-product-view';
-// import * as pdfMake from 'pdfmake/build/pdfmake';
-// import * as pdfFonts from 'pdfmake/build/vfs_fonts';
-
-//(pdfMake as any).vfs = (pdfFonts.pdfMake as any).vfs;
-//(pdfMake as any).default.vfs = pdfFonts.pdfMake.vfs;
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -257,88 +252,88 @@ export class InventoryTodaySaleComponent {
     });
   }
 
-  generateReportPdfMakeWithError() {
-    const filas = this.generateProductRows();
-    const fechaHoy = new Date().toLocaleDateString();
+  // generateReportPdfMakeWithError() {
+  //   const filas = this.generateProductRows();
+  //   const fechaHoy = new Date().toLocaleDateString();
 
-    const docDefinition: any = {
-      pageSize: 'LETTER',
-      pageOrientation: 'landscape',
-      pageMargins: [40, 120, 40, 40], // margen superior para dejar espacio al encabezado
-      header: (currentPage: number, pageCount: number) => {
-        return {
-          margin: [40, 20, 40, 0],
-          layout: 'noBorders',
-          table: {
-            widths: ['*', '*', '*', '*'],
-            body: [
-              [
-                { text: 'Empresa: _____________________', colSpan: 2, alignment: 'left' }, {},
-                { text: 'Procedencia: _____________________', colSpan: 2, alignment: 'right' }, {}
-              ],
-              [
-                { text: 'Unidad: _____________________', colSpan: 2, alignment: 'left' }, {},
-                { text: 'UBA: ______  OEE: ______  D__ / M__ / A__', colSpan: 2, alignment: 'right' }, {}
-              ],
-              [
-                { text: 'Departamento: _____________________', colSpan: 2, alignment: 'left' }, {},
-                { text: 'Balance: ______  BAT: ______', colSpan: 2, alignment: 'right' }, {}
-              ],
-              [
-                { text: '', colSpan: 3 }, {}, {},
-                { text: 'Firma del Administrador: __________________________', alignment: 'right' }
-              ],
-              [
-                { text: 'INVENTARIO A PRECIO DE VENTA', colSpan: 4, alignment: 'center', bold: true, margin: [0, 10] }, {}, {}, {}
-              ]
-            ]
-          }
-        };
-      },
-      content: [
-        {
-          layout: 'lightHorizontalLines',
-          table: {
-            headerRows: 1,
-            widths: [100, 40, 40, 40, 45, 45, 55, 60, 60, 60, 60, 40, 60],
-            body: [
-              [
-                { text: 'Producto', style: 'tableHeader' },
-                { text: 'U.M', style: 'tableHeader' },
-                { text: 'Inicio', style: 'tableHeader' },
-                { text: 'Entrada', style: 'tableHeader' },
-                { text: 'Disponible', style: 'tableHeader' },
-                { text: 'Vendido', style: 'tableHeader' },
-                { text: 'Precio Venta', style: 'tableHeader' },
-                { text: 'Importe Venta', style: 'tableHeader' },
-                { text: 'Costo Unitario', style: 'tableHeader' },
-                { text: 'Costo Total', style: 'tableHeader' },
-                { text: 'C.P Venta', style: 'tableHeader' },
-                { text: 'Final', style: 'tableHeader' },
-                { text: 'Importe Final', style: 'tableHeader' },
-              ],
-              ...filas,
-            ]
-          }
-        }
-      ],
-      styles: {
-        tableHeader: {
-          bold: true,
-          fillColor: '#eeeeee',
-          fontSize: 9,
-          alignment: 'center'
-        },
-      },
-      defaultStyle: {
-        fontSize: 9
-      }
-    };
+  //   const docDefinition: any = {
+  //     pageSize: 'LETTER',
+  //     pageOrientation: 'landscape',
+  //     pageMargins: [40, 120, 40, 40], // margen superior para dejar espacio al encabezado
+  //     header: (currentPage: number, pageCount: number) => {
+  //       return {
+  //         margin: [40, 20, 40, 0],
+  //         layout: 'noBorders',
+  //         table: {
+  //           widths: ['*', '*', '*', '*'],
+  //           body: [
+  //             [
+  //               { text: 'Empresa: _____________________', colSpan: 2, alignment: 'left' }, {},
+  //               { text: 'Procedencia: _____________________', colSpan: 2, alignment: 'right' }, {}
+  //             ],
+  //             [
+  //               { text: 'Unidad: _____________________', colSpan: 2, alignment: 'left' }, {},
+  //               { text: 'UBA: ______  OEE: ______  D__ / M__ / A__', colSpan: 2, alignment: 'right' }, {}
+  //             ],
+  //             [
+  //               { text: 'Departamento: _____________________', colSpan: 2, alignment: 'left' }, {},
+  //               { text: 'Balance: ______  BAT: ______', colSpan: 2, alignment: 'right' }, {}
+  //             ],
+  //             [
+  //               { text: '', colSpan: 3 }, {}, {},
+  //               { text: 'Firma del Administrador: __________________________', alignment: 'right' }
+  //             ],
+  //             [
+  //               { text: 'INVENTARIO A PRECIO DE VENTA', colSpan: 4, alignment: 'center', bold: true, margin: [0, 10] }, {}, {}, {}
+  //             ]
+  //           ]
+  //         }
+  //       };
+  //     },
+  //     content: [
+  //       {
+  //         layout: 'lightHorizontalLines',
+  //         table: {
+  //           headerRows: 1,
+  //           widths: [100, 40, 40, 40, 45, 45, 55, 60, 60, 60, 60, 40, 60],
+  //           body: [
+  //             [
+  //               { text: 'Producto', style: 'tableHeader' },
+  //               { text: 'U.M', style: 'tableHeader' },
+  //               { text: 'Inicio', style: 'tableHeader' },
+  //               { text: 'Entrada', style: 'tableHeader' },
+  //               { text: 'Disponible', style: 'tableHeader' },
+  //               { text: 'Vendido', style: 'tableHeader' },
+  //               { text: 'Precio Venta', style: 'tableHeader' },
+  //               { text: 'Importe Venta', style: 'tableHeader' },
+  //               { text: 'Costo Unitario', style: 'tableHeader' },
+  //               { text: 'Costo Total', style: 'tableHeader' },
+  //               { text: 'C.P Venta', style: 'tableHeader' },
+  //               { text: 'Final', style: 'tableHeader' },
+  //               { text: 'Importe Final', style: 'tableHeader' },
+  //             ],
+  //             ...filas,
+  //           ]
+  //         }
+  //       }
+  //     ],
+  //     styles: {
+  //       tableHeader: {
+  //         bold: true,
+  //         fillColor: '#eeeeee',
+  //         fontSize: 9,
+  //         alignment: 'center'
+  //       },
+  //     },
+  //     defaultStyle: {
+  //       fontSize: 9
+  //     }
+  //   };
 
-    const pdfMake = require('pdfmake/build/pdfmake');
-    const pdfFonts = require('pdfmake/build/vfs_fonts');
-    pdfMake.vfs = pdfFonts.pdfMake.vfs;
+  //   const pdfMake = require('pdfmake/build/pdfmake');
+  //   const pdfFonts = require('pdfmake/build/vfs_fonts');
+  //   pdfMake.vfs = pdfFonts.pdfMake.vfs;
 
-    pdfMake.createPdf(docDefinition).download('inventario_precio_venta.pdf');
-  }
+  //   pdfMake.createPdf(docDefinition).download('inventario_precio_venta.pdf');
+  // }
 }

@@ -2,7 +2,6 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { unsubscribeAllObservables } from 'angular-slickgrid';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { AuthService } from 'src/app/_services/services.index';
 import { UserService } from 'src/app/_services/user/user.service';
@@ -16,7 +15,7 @@ import { SharedModule } from '../shared/shared.module';
   templateUrl: './users.component.html',
   styleUrl: './users.component.scss'
 })
-export class UsersComponent implements OnInit, OnDestroy {
+export class UsersComponent implements OnInit {
 
   users$: BehaviorSubject<User[]> = new BehaviorSubject<User[]>([]);
 
@@ -28,11 +27,6 @@ export class UsersComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadUsers();
-  }
-
-  ngOnDestroy() {
-    // also unsubscribe all Angular Subscriptions
-    unsubscribeAllObservables(this.subscriptions);
   }
 
   loadUsers() {

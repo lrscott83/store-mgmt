@@ -32,7 +32,7 @@ import { EditProfileComponent } from './presentation/profile/edit-profile/edit-p
 import { ChangePasswordComponent } from './presentation/profile/change-password/change-password.component';
 import { InventoryAvailableComponent } from './presentation/inventory/inventory-available/inventory-available.component';
 import { EntriesComponent } from './presentation/inventory/entries/entries.component';
-import { InventoryStatsComponent } from './presentation/inventory/inventory-stats/inventory-stats.component';
+// import { InventoryStatsComponent } from './presentation/inventory/inventory-stats/inventory-stats.component';
 import { SendDataComponent } from './presentation/synchronization/send-data/send-data.component';
 import { ReceiveDataComponent } from './presentation/synchronization/receive-data/receive-data.component';
 import { TodayOrdersComponent } from './presentation/sale/today-orders/today-orders.component';
@@ -40,8 +40,8 @@ import { ConfigurationsComponent } from './presentation/configurations/configura
 import { EditUserComponent } from './presentation/users/edit-user/edit-user.component';
 import { InventoryTodaySaleComponent } from './presentation/reports/inventory-today-sale/inventory-today-sale.component';
 import { TutorialComponent } from './presentation/help/tutorial/tutorial.component';
-import { LandingComponent } from './presentation/home/landing/landing.component';
-import { Landing2Component } from './presentation/home/landing2/landing2.component';
+// import { LandingComponent } from './presentation/home/landing/landing.component';
+// import { Landing2Component } from './presentation/home/landing2/landing2.component';
 import { LandingDeepComponent } from './presentation/home/landing-deep/landing-deep.component';
 import { EgressComponent } from './presentation/inventory/egress/egress.component';
 import { DashboardComponent } from './presentation/statistics/dashboard/dashboard.component';

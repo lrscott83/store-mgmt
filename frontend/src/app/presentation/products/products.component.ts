@@ -8,7 +8,6 @@ import { ProductCategory } from 'src/app/domain/entities/product-categories/prod
 import Swal from 'sweetalert2';
 import { EditProductCategoryModalComponent } from './edit-product-category-modal/edit-product-category-modal.component';
 import { CategoryProductListComponent } from './category-product-list/category-product-list.component';
-import { DataCardToolsComponent } from 'src/app/_shared/data-card-tools/data-card-tools.component';
 import { CsvProductImporterModalComponent } from './csv-product-importer-modal/csv-product-importer-modal.component';
 import { ProductCategoryService } from 'src/app/application/categories/product-category.service';
 import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
@@ -16,7 +15,7 @@ import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
 @Component({
   selector: 'app-products',
   standalone: true,
-  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, CategoryProductListComponent, DataCardToolsComponent, CsvProductImporterModalComponent],
+  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, CategoryProductListComponent,  CsvProductImporterModalComponent],
   templateUrl: './products.component.html',
   styleUrl: './products.component.scss'
 })

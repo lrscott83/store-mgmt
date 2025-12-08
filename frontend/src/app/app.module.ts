@@ -19,7 +19,7 @@ import { InlineSVGModule } from 'ng-inline-svg-w';
 import { provideToastr, ToastrModule } from 'ngx-toastr';
 import { NgHttpLoaderModule } from 'ng-http-loader';
 import { provideRouter } from '@angular/router';
-import { AngularSlickgridModule } from 'angular-slickgrid';
+// import { AngularSlickgridModule } from 'angular-slickgrid';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
 import { ConnectionInterceptor } from './_interceptors/connection-interceptor.service';
 import { ServiceWorkerModule } from '@angular/service-worker';
@@ -84,7 +84,7 @@ export function initializeApp(appInitService: AppInitService) {
     //provideRouter(routes),
     provideHttpClient(),
     importProvidersFrom(NgHttpLoaderModule.forRoot()), //<== Always call `forRoot`
-    importProvidersFrom(AngularSlickgridModule.forRoot()),
+    // importProvidersFrom(AngularSlickgridModule.forRoot()),
     AppInitService,
     provideEnvironmentNgxMask(),
     provideAnimations(), // required animations providers
