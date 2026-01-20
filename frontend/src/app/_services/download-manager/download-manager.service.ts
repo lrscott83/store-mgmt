@@ -59,8 +59,11 @@ export class DownloadManagerService {
   }
 
   private setupServiceWorkerEvents(): void {
+    console.log('setupServiceWorkerEvents');
     if ('serviceWorker' in navigator) {
+      console.log('serviceWorker in navigator');
       navigator.serviceWorker.addEventListener('message', (event) => {
+        console.log('navigator.serviceWorker.addEventListener(message) with event: ' + JSON.stringify(event));
         this.ngZone.run(() => {
           this.handleServiceWorkerMessage(event.data);
         });
@@ -69,6 +72,7 @@ export class DownloadManagerService {
   }
 
   private handleServiceWorkerMessage(message: any): void {
+    console.log('handleServiceWorkerMessage with message: ' +JSON.stringify(message));
     if (message.type === 'INSTALLING') {
       this.isDownloadingSubject.next(true);
       this.progressSubject.next(0);
@@ -96,18 +100,21 @@ export class DownloadManagerService {
   }
 
   startDownload(): void {
+    console.log('startDownload');
     this.isDownloadingSubject.next(true);
     this.progressSubject.next(0);
     this.downloadedSizeSubject.next(0);
   }
 
   updateProgress(progress: number): void {
+    console.log('updateProgress with progress: ' + progress);
     this.progressSubject.next(progress);
     const downloadedSize = (progress / 100) * this.estimatedTotalSize;
     this.downloadedSizeSubject.next(downloadedSize);
   }
 
   completeDownload(): void {
+    console.log('completeDownload');
     this.progressSubject.next(100);
     setTimeout(() => {
       this.isDownloadingSubject.next(false);
