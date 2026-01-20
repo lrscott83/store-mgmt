@@ -30,6 +30,8 @@ import { PRODUCT_CATEGORY_SERVICE, PRODUCT_SERVICE } from './_services/tokens';
 import { ProductOfflineService } from './application/products/product-offline.service';
 import { ProductOnlineService } from './application/products/product-online.service';
 import { productServiceFactory } from './_services/factories/product-service.factory';
+import { FileSizePipe } from './_shared/pipes/file-size/file-size.pipe';
+import { DownloadProgressComponent } from './presentation/download-progress/download-progress.component';
 
 // function appInitializer(authService: AuthService): Promise<void> {
 //   return new Promise((resolve) => {
@@ -46,6 +48,11 @@ export function initializeApp(appInitService: AppInitService) {
 @NgModule({
   declarations: [AppComponent],
   imports: [
+    ServiceWorkerModule.register('ngsw-worker.js', {
+      //enabled: !isDevMode(),
+      enabled: true,
+      registrationStrategy: 'registerWhenStable:30000'
+    }),
     BrowserModule,
     HttpClientModule,
     NgHttpLoaderModule.forRoot(),

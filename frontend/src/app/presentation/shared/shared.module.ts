@@ -63,6 +63,8 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatRadioModule } from '@angular/material/radio';
 import { NgxMaskDirective, NgxMaskPipe, provideNgxMask } from 'ngx-mask';
+import { DownloadProgressComponent } from '../download-progress/download-progress.component';
+import { FileSizePipe } from 'src/app/_shared/pipes/file-size/file-size.pipe';
 // import { AngularSlickgridModule } from 'angular-slickgrid';
 
 @NgModule({
@@ -177,8 +179,10 @@ import { NgxMaskDirective, NgxMaskPipe, provideNgxMask } from 'ngx-mask';
     NgxMaskDirective, 
     NgxMaskPipe,
     // AngularSlickgridModule
+    DownloadProgressComponent,
+    FileSizePipe
   ],
-  declarations: [SpinnerComponent, LoadingSpinnerComponent],
+  declarations: [SpinnerComponent, LoadingSpinnerComponent, DownloadProgressComponent, FileSizePipe ],
   providers: [
     {provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: {appearance: 'outline', floatLabel: 'auto'}},
     provideNgxMask(),
