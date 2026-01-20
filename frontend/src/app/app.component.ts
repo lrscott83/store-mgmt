@@ -142,6 +142,7 @@ export class AppComponent implements OnInit {
   private listenToBeforeInstallPrompt(): void {
     window.addEventListener('beforeinstallprompt', (e) => {
       // El navegador permite instalar la PWA
+      console.log('beforeinstallprompt');
       e.preventDefault();
       this.deferredPrompt = e;
 
@@ -175,6 +176,8 @@ export class AppComponent implements OnInit {
     window.addEventListener('appinstalled', () => {
       // La PWA fue instalada. Puedes ocultar el botón o enviar analytics.
       this.deferredPrompt = null;
+      console.log('Application installed');
+      this.downloadManager.startDownload();
     });
   }
 
