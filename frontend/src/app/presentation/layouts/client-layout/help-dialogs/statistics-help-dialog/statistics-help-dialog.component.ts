@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-statistics-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './statistics-help-dialog.component.html',
-  styleUrl: './statistics-help-dialog.component.scss'
+    selector: 'app-statistics-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './statistics-help-dialog.component.html',
+    styleUrl: './statistics-help-dialog.component.scss'
 })
 export class StatisticsHelpDialogComponent {
 constructor(private modal: NgbActiveModal) {

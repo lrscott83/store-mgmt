@@ -3,11 +3,10 @@ import { Component, ContentChild, ElementRef, Input, TemplateRef } from '@angula
 import { CommonModule } from '@angular/common';
 
 @Component({
-  selector: 'app-card',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './card.component.html',
-  styleUrls: ['./card.component.scss']
+    selector: 'app-card',
+    imports: [CommonModule],
+    templateUrl: './card.component.html',
+    styleUrls: ['./card.component.scss']
 })
 export class CardComponent {
   // public props

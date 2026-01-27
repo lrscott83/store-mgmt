@@ -13,11 +13,10 @@ import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
-  selector: 'app-category-product-list',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, EditProductsModalComponent],
-  templateUrl: './category-product-list.component.html',
-  styleUrl: './category-product-list.component.scss'
+    selector: 'app-category-product-list',
+    imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, EditProductsModalComponent],
+    templateUrl: './category-product-list.component.html',
+    styleUrl: './category-product-list.component.scss'
 })
 export class CategoryProductListComponent implements OnInit {
 

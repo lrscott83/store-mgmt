@@ -18,11 +18,10 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 @Component({
-  selector: 'app-inventory-today-sale',
-  standalone: true,
-  imports: [TranslationModule, SharedModule],
-  templateUrl: './inventory-today-sale.component.html',
-  styleUrl: './inventory-today-sale.component.scss'
+    selector: 'app-inventory-today-sale',
+    imports: [TranslationModule, SharedModule],
+    templateUrl: './inventory-today-sale.component.html',
+    styleUrl: './inventory-today-sale.component.scss'
 })
 
 export class InventoryTodaySaleComponent {

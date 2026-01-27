@@ -13,11 +13,10 @@ import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 import { AuthService } from 'src/app/_services/services.index';
 
 @Component({
-  selector: 'app-create-owner',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './create-owner.component.html',
-  styleUrl: './create-owner.component.scss'
+    selector: 'app-create-owner',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './create-owner.component.html',
+    styleUrl: './create-owner.component.scss'
 })
 export class CreateOwnerComponent implements OnInit {
 

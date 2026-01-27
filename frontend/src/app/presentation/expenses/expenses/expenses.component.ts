@@ -17,11 +17,10 @@ export interface DateExpense {
 }
 
 @Component({
-  selector: 'app-expenses',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, ExpenseListComponent],
-  templateUrl: './expenses.component.html',
-  styleUrl: './expenses.component.scss'
+    selector: 'app-expenses',
+    imports: [SharedModule, TranslateModule, ExpenseListComponent],
+    templateUrl: './expenses.component.html',
+    styleUrl: './expenses.component.scss'
 })
 export class ExpensesComponent implements OnInit {
   dateExpenses$: BehaviorSubject<DateExpense[]> = new BehaviorSubject<DateExpense[]>([]);

@@ -1,5 +1,5 @@
 // angular import
-import { APP_INITIALIZER, NgModule, importProvidersFrom, isDevMode } from '@angular/core';
+import { NgModule, importProvidersFrom, isDevMode, inject, provideAppInitializer } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
 
@@ -96,12 +96,10 @@ export function initializeApp(appInitService: AppInitService) {
     provideEnvironmentNgxMask(),
     provideAnimations(), // required animations providers
     provideToastr(), // Toastr providers
-    {
-      provide: APP_INITIALIZER,
-      useFactory: initializeApp,
-      multi: true,
-      deps: [AppInitService],
-    },
+    provideAppInitializer(() => {
+        const initializerFn = (initializeApp)(inject(AppInitService));
+        return initializerFn();
+      }),
     {
       provide: HIGHLIGHT_OPTIONS,
       useValue: {

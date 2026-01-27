@@ -12,12 +12,11 @@ import { TypeData } from 'src/app/domain/commons/type-data';
 import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
 
 @Component({
-  selector: 'app-edit-expense-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-expense-modal.component.html',
-  styleUrl: './edit-expense-modal.component.scss',
-  encapsulation: ViewEncapsulation.None,
+    selector: 'app-edit-expense-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-expense-modal.component.html',
+    styleUrl: './edit-expense-modal.component.scss',
+    encapsulation: ViewEncapsulation.None
 })
 export class EditExpenseModalComponent {
 

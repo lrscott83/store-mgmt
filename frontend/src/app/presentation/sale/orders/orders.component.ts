@@ -17,11 +17,10 @@ export interface DateOrder {
 }
 
 @Component({
-  selector: 'app-orders',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, OrderListComponent],
-  templateUrl: './orders.component.html',
-  styleUrl: './orders.component.scss'
+    selector: 'app-orders',
+    imports: [SharedModule, TranslateModule, OrderListComponent],
+    templateUrl: './orders.component.html',
+    styleUrl: './orders.component.scss'
 })
 export class OrdersComponent implements OnInit {
   dateOrders$: BehaviorSubject<DateOrder[]> = new BehaviorSubject<DateOrder[]>([]);

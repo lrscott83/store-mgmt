@@ -10,11 +10,10 @@ import { NavigationComponent } from './navigation/navigation.component';
 import { ClientFooterComponent } from './client-footer/client-footer.component';
 
 @Component({
-  selector: 'app-client-layout',
-  standalone: true,
-  imports: [CommonModule, SharedModule, NavigationComponent, NavBarComponent, RouterModule, ClientFooterComponent],
-  templateUrl: './client-layout.component.html',
-  styleUrls: ['./client-layout.component.scss']
+    selector: 'app-client-layout',
+    imports: [CommonModule, SharedModule, NavigationComponent, NavBarComponent, RouterModule, ClientFooterComponent],
+    templateUrl: './client-layout.component.html',
+    styleUrls: ['./client-layout.component.scss']
 })
 export class ClientLayoutComponent {
   // public props

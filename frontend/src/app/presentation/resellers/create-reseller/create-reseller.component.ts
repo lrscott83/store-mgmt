@@ -12,11 +12,10 @@ import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 import { AuthService } from 'src/app/_services/services.index';
 
 @Component({
-  selector: 'app-create-reseller',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './create-reseller.component.html',
-  styleUrl: './create-reseller.component.scss'
+    selector: 'app-create-reseller',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './create-reseller.component.html',
+    styleUrl: './create-reseller.component.scss'
 })
 export class CreateResellerComponent implements OnInit {
 

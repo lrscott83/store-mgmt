@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-users-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './users-help-dialog.component.html',
-  styleUrl: './users-help-dialog.component.scss'
+    selector: 'app-users-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './users-help-dialog.component.html',
+    styleUrl: './users-help-dialog.component.scss'
 })
 export class UsersHelpDialogComponent {
   constructor(private modal: NgbActiveModal) {

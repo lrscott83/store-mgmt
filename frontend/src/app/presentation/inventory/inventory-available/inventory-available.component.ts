@@ -8,11 +8,10 @@ import { TranslateModule } from '@ngx-translate/core';
 import { InventoryProductListComponent } from '../inventory-product-list/inventory-product-list.component';
 
 @Component({
-  selector: 'app-inventory-available',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, InventoryProductListComponent],
-  templateUrl: './inventory-available.component.html',
-  styleUrl: './inventory-available.component.scss'
+    selector: 'app-inventory-available',
+    imports: [SharedModule, TranslateModule, InventoryProductListComponent],
+    templateUrl: './inventory-available.component.html',
+    styleUrl: './inventory-available.component.scss'
 })
 export class InventoryAvailableComponent implements OnInit {
 

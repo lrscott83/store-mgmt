@@ -15,12 +15,11 @@ import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
-  selector: 'app-edit-inventory-entry-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-inventory-entry-modal.component.html',
-  styleUrl: './edit-inventory-entry-modal.component.scss',
-  encapsulation: ViewEncapsulation.None,
+    selector: 'app-edit-inventory-entry-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-inventory-entry-modal.component.html',
+    styleUrl: './edit-inventory-entry-modal.component.scss',
+    encapsulation: ViewEncapsulation.None
 })
 export class EditInventoryEntryModalComponent implements OnInit {
 

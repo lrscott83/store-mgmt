@@ -6,11 +6,10 @@ import { User } from 'src/app/domain/entities/users/user.model';
 import { EditUserCredentialsComponent } from '../../users/edit-user-credentials/edit-user-credentials.component';
 
 @Component({
-  selector: 'app-change-password',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditUserCredentialsComponent],
-  templateUrl: './change-password.component.html',
-  styleUrl: './change-password.component.scss'
+    selector: 'app-change-password',
+    imports: [SharedModule, TranslateModule, EditUserCredentialsComponent],
+    templateUrl: './change-password.component.html',
+    styleUrl: './change-password.component.scss'
 })
 export class ChangePasswordComponent implements OnInit {
   currentUserId: string;

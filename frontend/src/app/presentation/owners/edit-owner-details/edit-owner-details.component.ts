@@ -14,11 +14,10 @@ import { ReSeller } from 'src/app/domain/resellers/reseller.model';
 import { ReSellerService } from 'src/app/_services/reseller/reseller.service';
 
 @Component({
-  selector: 'app-edit-owner-details',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './edit-owner-details.component.html',
-  styleUrl: './edit-owner-details.component.scss'
+    selector: 'app-edit-owner-details',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './edit-owner-details.component.html',
+    styleUrl: './edit-owner-details.component.scss'
 })
 export class EditOwnerDetailsComponent implements OnInit{
   ownerId: string;

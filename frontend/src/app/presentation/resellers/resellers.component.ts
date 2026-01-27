@@ -12,11 +12,10 @@ import { EditResellerDetailsComponent } from './edit-reseller-details/edit-resel
 import { ReSeller } from 'src/app/domain/resellers/reseller.model';
 
 @Component({
-  selector: 'app-resellers',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditResellerDetailsComponent, RouterModule, MatMenuModule, MatIconModule],
-  templateUrl: './resellers.component.html',
-  styleUrl: './resellers.component.scss'
+    selector: 'app-resellers',
+    imports: [SharedModule, TranslateModule, EditResellerDetailsComponent, RouterModule, MatMenuModule, MatIconModule],
+    templateUrl: './resellers.component.html',
+    styleUrl: './resellers.component.scss'
 })
 export class ResellersComponent implements OnInit, OnDestroy {
 

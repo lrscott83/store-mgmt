@@ -10,11 +10,10 @@ import Swal from 'sweetalert2';
 import { ExpenseListComponent } from '../expense-list/expense-list.component';
 
 @Component({
-  selector: 'app-expenses-today',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditExpenseModalComponent, ExpenseListComponent],
-  templateUrl: './expenses-today.component.html',
-  styleUrl: './expenses-today.component.scss'
+    selector: 'app-expenses-today',
+    imports: [SharedModule, TranslateModule, EditExpenseModalComponent, ExpenseListComponent],
+    templateUrl: './expenses-today.component.html',
+    styleUrl: './expenses-today.component.scss'
 })
 export class ExpensesTodayComponent implements OnInit {
   expenses$: BehaviorSubject<Expense[]> = new BehaviorSubject<Expense[]>([]);

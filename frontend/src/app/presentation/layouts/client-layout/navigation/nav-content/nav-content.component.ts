@@ -30,11 +30,10 @@ import { AuthorizationService } from 'src/app/_services/authorization/authorizat
 import { StoreModuleStateService } from 'src/app/_services/shared/store-module-state.service';
 
 @Component({
-  selector: 'app-nav-content',
-  standalone: true,
-  imports: [SharedModule, CommonModule, RouterModule, NavCollapseComponent, NavGroupComponent, NavItemComponent],
-  templateUrl: './nav-content.component.html',
-  styleUrls: ['./nav-content.component.scss']
+    selector: 'app-nav-content',
+    imports: [SharedModule, CommonModule, RouterModule, NavCollapseComponent, NavGroupComponent, NavItemComponent],
+    templateUrl: './nav-content.component.html',
+    styleUrls: ['./nav-content.component.scss']
 })
 export class NavContentComponent implements OnInit {
   // public props

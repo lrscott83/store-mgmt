@@ -57,12 +57,10 @@ import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-ty
 import { TypeData } from 'src/app/domain/commons/type-data';
 
 @Component({
-  selector: 'app-nav-right',
-  standalone: true,
-  imports: [SharedModule, RouterModule, TranslateModule, EditOrderDetailsModalComponent],
-  templateUrl: './nav-right.component.html',
-  styleUrls: ['./nav-right.component.scss'],
-  //encapsulation: ViewEncapsulation.None,
+    selector: 'app-nav-right',
+    imports: [SharedModule, RouterModule, TranslateModule, EditOrderDetailsModalComponent],
+    templateUrl: './nav-right.component.html',
+    styleUrls: ['./nav-right.component.scss']
 })
 export class NavRightComponent {
   @Input() styleSelectorToggle!: boolean;

@@ -12,11 +12,10 @@ import { InventoryOfflineService } from 'src/app/application/entries/inventory-o
 import { OrderType } from 'src/app/domain/entities/orders/order.model';
 
 @Component({
-  selector: 'app-sale-product-row',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './sale-product-row.component.html',
-  styleUrl: './sale-product-row.component.scss'
+    selector: 'app-sale-product-row',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './sale-product-row.component.html',
+    styleUrl: './sale-product-row.component.scss'
 })
 export class SaleProductRowComponent implements OnInit, OnChanges {
   @Input() product: Product;

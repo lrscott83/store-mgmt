@@ -10,11 +10,10 @@ import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
-  selector: 'app-sale-category-products',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, SaleProductRowComponent],
-  templateUrl: './sale-category-products.component.html',
-  styleUrl: './sale-category-products.component.scss'
+    selector: 'app-sale-category-products',
+    imports: [SharedModule, TranslateModule, SaleProductRowComponent],
+    templateUrl: './sale-category-products.component.html',
+    styleUrl: './sale-category-products.component.scss'
 })
 export class SaleCategoryProductsComponent {
   @Input() category: Observable<ProductCategory>;

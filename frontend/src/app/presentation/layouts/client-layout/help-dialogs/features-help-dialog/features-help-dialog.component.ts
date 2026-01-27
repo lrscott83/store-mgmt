@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-features-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './features-help-dialog.component.html',
-  styleUrl: './features-help-dialog.component.scss'
+    selector: 'app-features-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './features-help-dialog.component.html',
+    styleUrl: './features-help-dialog.component.scss'
 })
 export class FeaturesHelpDialogComponent {
 constructor(private modal: NgbActiveModal) {

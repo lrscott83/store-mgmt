@@ -11,11 +11,10 @@ import { Result } from 'src/app/domain/commons/result';
 import { ToastrService } from 'ngx-toastr';
 
 @Component({
-  selector: 'app-receive-data',
-  standalone: true,
-  imports: [TranslationModule, SharedModule],
-  templateUrl: './receive-data.component.html',
-  styleUrl: './receive-data.component.scss'
+    selector: 'app-receive-data',
+    imports: [TranslationModule, SharedModule],
+    templateUrl: './receive-data.component.html',
+    styleUrl: './receive-data.component.scss'
 })
 export class ReceiveDataComponent {
   showPassword: boolean = false;

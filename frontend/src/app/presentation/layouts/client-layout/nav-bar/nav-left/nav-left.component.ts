@@ -9,11 +9,10 @@ import { MenuUnfoldOutline, MenuFoldOutline, SearchOutline } from '@ant-design/i
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 
 @Component({
-  selector: 'app-nav-left',
-  standalone: true,
-  imports: [SharedModule],
-  templateUrl: './nav-left.component.html',
-  styleUrls: ['./nav-left.component.scss']
+    selector: 'app-nav-left',
+    imports: [SharedModule],
+    templateUrl: './nav-left.component.html',
+    styleUrls: ['./nav-left.component.scss']
 })
 export class NavLeftComponent {
   // public props

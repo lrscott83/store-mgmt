@@ -9,11 +9,10 @@ import { ProductCategoryService } from 'src/app/application/categories/product-c
 import { OrderType } from 'src/app/domain/entities/orders/order.model';
 
 @Component({
-  selector: 'app-sale',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, SaleCategoryProductsComponent],
-  templateUrl: './sale.component.html',
-  styleUrl: './sale.component.scss'
+    selector: 'app-sale',
+    imports: [SharedModule, TranslateModule, SaleCategoryProductsComponent],
+    templateUrl: './sale.component.html',
+    styleUrl: './sale.component.scss'
 })
 export class SaleComponent {
 

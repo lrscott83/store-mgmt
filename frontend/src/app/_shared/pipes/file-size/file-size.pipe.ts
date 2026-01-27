@@ -1,8 +1,8 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
 @Pipe({
-  name: 'fileSize',
-  //standalone: true
+    name: 'fileSize',
+    standalone: false
 })
 export class FileSizePipe implements PipeTransform {
 

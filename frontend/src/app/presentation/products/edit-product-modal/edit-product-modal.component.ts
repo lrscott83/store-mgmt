@@ -12,11 +12,10 @@ import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
-  selector: 'app-edit-product-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-product-modal.component.html',
-  styleUrl: './edit-product-modal.component.scss'
+    selector: 'app-edit-product-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-product-modal.component.html',
+    styleUrl: './edit-product-modal.component.scss'
 })
 export class EditProductModalComponent implements OnInit {
 

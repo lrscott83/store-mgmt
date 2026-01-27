@@ -7,10 +7,11 @@ import { DOCUMENT } from '@angular/common';
 import { Spinkit } from './spinkits';
 
 @Component({
-  selector: 'app-spinner',
-  templateUrl: './spinner.component.html',
-  styleUrls: ['./spinner.component.scss', './spinkit-css/sk-line-material.scss'],
-  encapsulation: ViewEncapsulation.None
+    selector: 'app-spinner',
+    templateUrl: './spinner.component.html',
+    styleUrls: ['./spinner.component.scss', './spinkit-css/sk-line-material.scss'],
+    encapsulation: ViewEncapsulation.None,
+    standalone: false
 })
 export class SpinnerComponent implements OnDestroy {
   // public props

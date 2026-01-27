@@ -12,11 +12,10 @@ import Swal from 'sweetalert2';
 import { EditOrderModalComponent } from '../../edit-order-modal/edit-order-modal.component';
 
 @Component({
-  selector: 'app-order-item-list',
-  standalone: true,
-  imports: [SharedModule, TranslationModule],
-  templateUrl: './order-item-list.component.html',
-  styleUrl: './order-item-list.component.scss'
+    selector: 'app-order-item-list',
+    imports: [SharedModule, TranslationModule],
+    templateUrl: './order-item-list.component.html',
+    styleUrl: './order-item-list.component.scss'
 })
 export class OrderItemListComponent implements OnInit {
 

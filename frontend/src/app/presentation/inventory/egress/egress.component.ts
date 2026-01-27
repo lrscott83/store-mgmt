@@ -11,11 +11,10 @@ import { SaleCategoryProductsComponent } from '../../sale/sale-category-products
 import { TypeData } from 'src/app/domain/commons/type-data';
 
 @Component({
-  selector: 'app-egress',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, SaleCategoryProductsComponent],
-  templateUrl: './egress.component.html',
-  styleUrl: './egress.component.scss'
+    selector: 'app-egress',
+    imports: [SharedModule, TranslateModule, SaleCategoryProductsComponent],
+    templateUrl: './egress.component.html',
+    styleUrl: './egress.component.scss'
 })
 export class EgressComponent {
   orderType: OrderType = OrderType.Mayorista;

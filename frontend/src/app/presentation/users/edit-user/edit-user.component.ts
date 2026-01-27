@@ -9,11 +9,10 @@ import { UserService } from 'src/app/_services/user/user.service';
 import { BehaviorSubject, catchError } from 'rxjs';
 
 @Component({
-  selector: 'app-edit-user',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditUserDetailsComponent],
-  templateUrl: './edit-user.component.html',
-  styleUrl: './edit-user.component.scss'
+    selector: 'app-edit-user',
+    imports: [SharedModule, TranslateModule, EditUserDetailsComponent],
+    templateUrl: './edit-user.component.html',
+    styleUrl: './edit-user.component.scss'
 })
 export class EditUserComponent {
 

@@ -8,11 +8,10 @@ import { CanDeactivateType } from 'src/app/_shared/guards/can-deactivate.guard';
 import { StoreUserService } from 'src/app/_services/storeuser/store-user.service';
 
 @Component({
-  selector: 'app-create-store-user',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './create-store-user.component.html',
-  styleUrl: './create-store-user.component.scss'
+    selector: 'app-create-store-user',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './create-store-user.component.html',
+    styleUrl: './create-store-user.component.scss'
 })
 export class CreateStoreUserComponent implements OnInit {
   storeId: string;

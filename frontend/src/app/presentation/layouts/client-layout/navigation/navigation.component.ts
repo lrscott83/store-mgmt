@@ -7,11 +7,10 @@ import { NavContentComponent } from './nav-content/nav-content.component';
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 
 @Component({
-  selector: 'app-navigation',
-  standalone: true,
-  imports: [SharedModule, NavContentComponent, CommonModule],
-  templateUrl: './navigation.component.html',
-  styleUrls: ['./navigation.component.scss']
+    selector: 'app-navigation',
+    imports: [SharedModule, NavContentComponent, CommonModule],
+    templateUrl: './navigation.component.html',
+    styleUrls: ['./navigation.component.scss']
 })
 export class NavigationComponent {
   // media 1025 After Use Menu Open

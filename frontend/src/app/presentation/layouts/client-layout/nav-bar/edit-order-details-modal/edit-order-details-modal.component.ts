@@ -8,11 +8,10 @@ import { OrderType, OrderTypeUtils } from 'src/app/domain/entities/orders/order.
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 
 @Component({
-  selector: 'app-edit-order-details-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-order-details-modal.component.html',
-  styleUrl: './edit-order-details-modal.component.scss'
+    selector: 'app-edit-order-details-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-order-details-modal.component.html',
+    styleUrl: './edit-order-details-modal.component.scss'
 })
 export class EditOrderDetailsModalComponent implements OnInit {
 

@@ -32,16 +32,15 @@ export type ChartOptions = {
 };
 
 @Component({
-  selector: 'app-admin-dashboard',
-  standalone: true,
-  imports: [
-    CommonModule,
-    SharedModule,
-    NgApexchartsModule,
-    TranslateModule,
-  ],
-  templateUrl: './admin-dashboard.component.html',
-  styleUrl: './admin-dashboard.component.scss'
+    selector: 'app-admin-dashboard',
+    imports: [
+        CommonModule,
+        SharedModule,
+        NgApexchartsModule,
+        TranslateModule,
+    ],
+    templateUrl: './admin-dashboard.component.html',
+    styleUrl: './admin-dashboard.component.scss'
 })
 export class AdminDashboardComponent {
   public chartOptions: Partial<ChartOptions> | any;

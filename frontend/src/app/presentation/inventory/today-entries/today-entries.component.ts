@@ -12,11 +12,10 @@ import Swal from 'sweetalert2';
 import { EntryListComponent } from '../entry-list/entry-list.component';
 
 @Component({
-  selector: 'app-today-entries',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditInventoryEntryModalComponent, EntryListComponent],
-  templateUrl: './today-entries.component.html',
-  styleUrl: './today-entries.component.scss'
+    selector: 'app-today-entries',
+    imports: [SharedModule, TranslateModule, EditInventoryEntryModalComponent, EntryListComponent],
+    templateUrl: './today-entries.component.html',
+    styleUrl: './today-entries.component.scss'
 })
 export class TodayEntriesComponent implements OnInit {
 

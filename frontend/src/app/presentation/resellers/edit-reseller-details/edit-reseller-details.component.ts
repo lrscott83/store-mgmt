@@ -13,11 +13,10 @@ import { ReSeller } from 'src/app/domain/resellers/reseller.model';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
 
 @Component({
-  selector: 'app-edit-reseller-details',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './edit-reseller-details.component.html',
-  styleUrl: './edit-reseller-details.component.scss'
+    selector: 'app-edit-reseller-details',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './edit-reseller-details.component.html',
+    styleUrl: './edit-reseller-details.component.scss'
 })
 export class EditResellerDetailsComponent implements OnInit {
   reSellerId: string;

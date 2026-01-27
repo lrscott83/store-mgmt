@@ -6,11 +6,10 @@ import { AuthService } from 'src/app/_services/services.index';
 import { EditUserDetailsComponent } from '../../users/edit-user-details/edit-user-details.component';
 
 @Component({
-  selector: 'app-edit-profile',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditUserDetailsComponent],
-  templateUrl: './edit-profile.component.html',
-  styleUrl: './edit-profile.component.scss'
+    selector: 'app-edit-profile',
+    imports: [SharedModule, TranslateModule, EditUserDetailsComponent],
+    templateUrl: './edit-profile.component.html',
+    styleUrl: './edit-profile.component.scss'
 })
 export class EditProfileComponent implements OnInit {
   currentUser: User;

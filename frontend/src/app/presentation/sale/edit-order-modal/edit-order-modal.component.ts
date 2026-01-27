@@ -10,11 +10,10 @@ import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-ty
 import { TypeData } from 'src/app/domain/commons/type-data';
 
 @Component({
-  selector: 'app-edit-order-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-order-modal.component.html',
-  styleUrl: './edit-order-modal.component.scss'
+    selector: 'app-edit-order-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-order-modal.component.html',
+    styleUrl: './edit-order-modal.component.scss'
 })
 export class EditOrderModalComponent implements OnInit {
   @Input() order: Order;

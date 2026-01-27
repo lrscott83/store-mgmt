@@ -27,11 +27,10 @@ export type ChartOptions = {
 };
 
 @Component({
-  selector: 'app-last-month-sale-profits',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, NgApexchartsModule],
-  templateUrl: './last-month-sale-profits.component.html',
-  styleUrl: './last-month-sale-profits.component.scss'
+    selector: 'app-last-month-sale-profits',
+    imports: [SharedModule, TranslateModule, NgApexchartsModule],
+    templateUrl: './last-month-sale-profits.component.html',
+    styleUrl: './last-month-sale-profits.component.scss'
 })
 export class LastMonthSaleProfitsComponent implements OnInit {
   @ViewChild('chart') chart!: ChartComponent;

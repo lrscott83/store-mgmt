@@ -10,11 +10,10 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
 
 @Component({
-  selector: 'app-sale-credit-list',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditSaleCreditModalComponent, SaleCreditPaymentModalComponent],
-  templateUrl: './sale-credit-list.component.html',
-  styleUrl: './sale-credit-list.component.scss'
+    selector: 'app-sale-credit-list',
+    imports: [SharedModule, TranslateModule, EditSaleCreditModalComponent, SaleCreditPaymentModalComponent],
+    templateUrl: './sale-credit-list.component.html',
+    styleUrl: './sale-credit-list.component.scss'
 })
 export class SaleCreditListComponent {
   onlyDateFormat: string = GlobalConfig.ONLY_DATE_FORMAT;

@@ -18,11 +18,10 @@ export interface DateSaleCredit {
 }
 
 @Component({
-  selector: 'app-sale-credits',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditSaleCreditModalComponent, SaleCreditListComponent],
-  templateUrl: './sale-credits.component.html',
-  styleUrl: './sale-credits.component.scss'
+    selector: 'app-sale-credits',
+    imports: [SharedModule, TranslateModule, EditSaleCreditModalComponent, SaleCreditListComponent],
+    templateUrl: './sale-credits.component.html',
+    styleUrl: './sale-credits.component.scss'
 })
 export class SaleCreditsComponent implements OnInit {
   dateSaleCredits$: BehaviorSubject<DateSaleCredit[]> = new BehaviorSubject<DateSaleCredit[]>([]);

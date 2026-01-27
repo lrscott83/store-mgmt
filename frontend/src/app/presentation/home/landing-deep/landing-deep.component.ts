@@ -4,11 +4,10 @@ import { RouterModule } from '@angular/router';
 declare const bootstrap: any;
 
 @Component({
-  selector: 'app-landing-deep',
-  standalone: true,
-  imports: [RouterModule],
-  templateUrl: './landing-deep.component.html',
-  styleUrl: './landing-deep.component.scss'
+    selector: 'app-landing-deep',
+    imports: [RouterModule],
+    templateUrl: './landing-deep.component.html',
+    styleUrl: './landing-deep.component.scss'
 })
 export class LandingDeepComponent implements AfterViewInit{
   ngAfterViewInit(): void {

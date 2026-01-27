@@ -18,14 +18,11 @@ import { AuthorizationService } from 'src/app/_services/authorization/authorizat
 import { StoreModuleStateService } from 'src/app/_services/shared/store-module-state.service';
 
 @Component({
-  selector: 'app-edit-store',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditOwnerComponent, RouterModule],
-  templateUrl: './edit-store.component.html',
-  styleUrl: './edit-store.component.scss',
-  providers: [
-    
-  ]
+    selector: 'app-edit-store',
+    imports: [SharedModule, TranslateModule, EditOwnerComponent, RouterModule],
+    templateUrl: './edit-store.component.html',
+    styleUrl: './edit-store.component.scss',
+    providers: []
 })
 export class EditStoreComponent {
 

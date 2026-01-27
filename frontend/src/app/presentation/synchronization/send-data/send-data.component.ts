@@ -8,11 +8,10 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { DataSerializerService } from 'src/app/application/synchronization/data-serializer.service';
 
 @Component({
-  selector: 'app-send-data',
-  standalone: true,
-  imports: [TranslationModule, SharedModule],
-  templateUrl: './send-data.component.html',
-  styleUrl: './send-data.component.scss'
+    selector: 'app-send-data',
+    imports: [TranslationModule, SharedModule],
+    templateUrl: './send-data.component.html',
+    styleUrl: './send-data.component.scss'
 })
 export class SendDataComponent implements OnInit{
 

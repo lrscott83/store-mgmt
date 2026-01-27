@@ -10,12 +10,10 @@ import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
-  selector: 'app-edit-products-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-products-modal.component.html',
-  styleUrl: './edit-products-modal.component.scss',
-  //encapsulation: ViewEncapsulation.None,
+    selector: 'app-edit-products-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-products-modal.component.html',
+    styleUrl: './edit-products-modal.component.scss'
 })
 export class EditProductsModalComponent {
 

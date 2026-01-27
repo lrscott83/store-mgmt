@@ -14,11 +14,10 @@ import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
-  selector: 'app-register',
-  standalone: true,
-  imports: [RouterModule, SharedModule, TranslateModule, GuestFooterComponent],
-  templateUrl: './register.component.html',
-  styleUrls: ['./register.component.scss']
+    selector: 'app-register',
+    imports: [RouterModule, SharedModule, TranslateModule, GuestFooterComponent],
+    templateUrl: './register.component.html',
+    styleUrls: ['./register.component.scss']
 })
 export default class RegisterComponent implements OnInit, CanComponentDeactivate {
 

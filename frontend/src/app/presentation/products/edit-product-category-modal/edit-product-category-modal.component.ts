@@ -10,11 +10,10 @@ import { ProductCategoryService } from 'src/app/application/categories/product-c
 import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
-  selector: 'app-edit-product-category-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-product-category-modal.component.html',
-  styleUrl: './edit-product-category-modal.component.scss'
+    selector: 'app-edit-product-category-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-product-category-modal.component.html',
+    styleUrl: './edit-product-category-modal.component.scss'
 })
 export class EditProductCategoryModalComponent implements OnInit {
 

@@ -7,11 +7,10 @@ import { IconService } from '@ant-design/icons-angular';
 import { MenuUnfoldOutline, MenuFoldOutline, SearchOutline } from '@ant-design/icons-angular/icons';
 
 @Component({
-  selector: 'app-tutorial',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './tutorial.component.html',
-  styleUrl: './tutorial.component.scss'
+    selector: 'app-tutorial',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './tutorial.component.html',
+    styleUrl: './tutorial.component.scss'
 })
 export class TutorialComponent {
   constructor(private iconService: IconService) {

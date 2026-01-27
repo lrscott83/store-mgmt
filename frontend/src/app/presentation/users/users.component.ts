@@ -9,11 +9,10 @@ import { User } from 'src/app/domain/entities/users/user.model';
 import { SharedModule } from '../shared/shared.module';
 
 @Component({
-  selector: 'app-users',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './users.component.html',
-  styleUrl: './users.component.scss'
+    selector: 'app-users',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './users.component.html',
+    styleUrl: './users.component.scss'
 })
 export class UsersComponent implements OnInit {
 

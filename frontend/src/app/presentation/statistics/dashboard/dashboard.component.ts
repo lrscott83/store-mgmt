@@ -37,11 +37,10 @@ export type ChartOptions = {
 };
 
 @Component({
-  selector: 'app-dashboard',
-  standalone: true,
-  imports: [SharedModule, TranslationModule, NgApexchartsModule, LastMonthSaleProfitsComponent, LastMonthSalesComponent],
-  templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.scss'
+    selector: 'app-dashboard',
+    imports: [SharedModule, TranslationModule, NgApexchartsModule, LastMonthSaleProfitsComponent, LastMonthSalesComponent],
+    templateUrl: './dashboard.component.html',
+    styleUrl: './dashboard.component.scss'
 })
 export class DashboardComponent {
   currency: 'CUP' | 'USD';

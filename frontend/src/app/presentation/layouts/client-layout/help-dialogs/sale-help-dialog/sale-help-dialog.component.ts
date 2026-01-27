@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-sale-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './sale-help-dialog.component.html',
-  styleUrl: './sale-help-dialog.component.scss'
+    selector: 'app-sale-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './sale-help-dialog.component.html',
+    styleUrl: './sale-help-dialog.component.scss'
 })
 export class SaleHelpDialogComponent {
 constructor(private modal: NgbActiveModal) {

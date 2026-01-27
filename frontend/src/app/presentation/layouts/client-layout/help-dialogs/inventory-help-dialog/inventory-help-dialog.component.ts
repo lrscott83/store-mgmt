@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-inventory-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './inventory-help-dialog.component.html',
-  styleUrl: './inventory-help-dialog.component.scss'
+    selector: 'app-inventory-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './inventory-help-dialog.component.html',
+    styleUrl: './inventory-help-dialog.component.scss'
 })
 export class InventoryHelpDialogComponent {
 constructor(private modal: NgbActiveModal) {

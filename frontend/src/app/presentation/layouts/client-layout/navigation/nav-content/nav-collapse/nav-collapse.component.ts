@@ -10,20 +10,19 @@ import { NavItemComponent } from '../nav-item/nav-item.component';
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 
 @Component({
-  selector: 'app-nav-collapse',
-  standalone: true,
-  imports: [CommonModule, SharedModule, RouterModule, NavItemComponent],
-  templateUrl: './nav-collapse.component.html',
-  styleUrls: ['./nav-collapse.component.scss'],
-  animations: [
-    trigger('slideInOut', [
-      transition(':enter', [
-        style({ transform: 'translateY(-100%)', display: 'block' }),
-        animate('250ms ease-in', style({ transform: 'translateY(0%)' }))
-      ]),
-      transition(':leave', [animate('250ms ease-in', style({ transform: 'translateY(-100%)' }))])
-    ])
-  ]
+    selector: 'app-nav-collapse',
+    imports: [CommonModule, SharedModule, RouterModule, NavItemComponent],
+    templateUrl: './nav-collapse.component.html',
+    styleUrls: ['./nav-collapse.component.scss'],
+    animations: [
+        trigger('slideInOut', [
+            transition(':enter', [
+                style({ transform: 'translateY(-100%)', display: 'block' }),
+                animate('250ms ease-in', style({ transform: 'translateY(0%)' }))
+            ]),
+            transition(':leave', [animate('250ms ease-in', style({ transform: 'translateY(-100%)' }))])
+        ])
+    ]
 })
 export class NavCollapseComponent {
   // public props

@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-entries-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './entries-help-dialog.component.html',
-  styleUrl: './entries-help-dialog.component.scss'
+    selector: 'app-entries-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './entries-help-dialog.component.html',
+    styleUrl: './entries-help-dialog.component.scss'
 })
 export class EntriesHelpDialogComponent {
 constructor(private modal: NgbActiveModal) {

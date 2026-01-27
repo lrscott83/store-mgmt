@@ -10,11 +10,10 @@ import { SharedModule } from 'src/app/presentation/shared/shared.module';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
-  selector: 'app-nav-group',
-  standalone: true,
-  imports: [CommonModule, SharedModule, NavCollapseComponent, NavItemComponent],
-  templateUrl: './nav-group.component.html',
-  styleUrls: ['./nav-group.component.scss']
+    selector: 'app-nav-group',
+    imports: [CommonModule, SharedModule, NavCollapseComponent, NavItemComponent],
+    templateUrl: './nav-group.component.html',
+    styleUrls: ['./nav-group.component.scss']
 })
 export class NavGroupComponent implements OnInit {
   // public props

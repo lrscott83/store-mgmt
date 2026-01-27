@@ -11,11 +11,10 @@ import { TodayOrdersHelpDialogComponent } from '../today-orders-help-dialog/toda
 import { TodaySalesStatsHelpDialogComponent } from '../today-sales-stats-help-dialog/today-sales-stats-help-dialog.component';
 
 @Component({
-  selector: 'app-sales-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule, CommonModule],
-  templateUrl: './sales-help-dialog.component.html',
-  styleUrl: './sales-help-dialog.component.scss'
+    selector: 'app-sales-help-dialog',
+    imports: [TranslateModule, MatIconModule, CommonModule],
+    templateUrl: './sales-help-dialog.component.html',
+    styleUrl: './sales-help-dialog.component.scss'
 })
 export class SalesHelpDialogComponent {
   constructor(private modal: NgbActiveModal, private modalService: NgbModal) {

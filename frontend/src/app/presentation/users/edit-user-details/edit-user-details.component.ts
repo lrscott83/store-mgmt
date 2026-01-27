@@ -10,11 +10,10 @@ import { AuthService } from 'src/app/_services/services.index';
 import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 
 @Component({
-  selector: 'app-edit-user-details',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './edit-user-details.component.html',
-  styleUrl: './edit-user-details.component.scss'
+    selector: 'app-edit-user-details',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './edit-user-details.component.html',
+    styleUrl: './edit-user-details.component.scss'
 })
 export class EditUserDetailsComponent implements OnInit {
 

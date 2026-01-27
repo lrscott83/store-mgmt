@@ -12,11 +12,10 @@ import Swal from 'sweetalert2';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
 
 @Component({
-  selector: 'app-edit-sale-credit-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './edit-sale-credit-modal.component.html',
-  styleUrl: './edit-sale-credit-modal.component.scss'
+    selector: 'app-edit-sale-credit-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './edit-sale-credit-modal.component.html',
+    styleUrl: './edit-sale-credit-modal.component.scss'
 })
 export class EditSaleCreditModalComponent implements OnInit {
   @Input() saleCredit: SaleCredit;

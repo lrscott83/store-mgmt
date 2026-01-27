@@ -10,11 +10,10 @@ import { InventoryOfflineService } from 'src/app/application/entries/inventory-o
 import Swal from 'sweetalert2';
 
 @Component({
-  selector: 'app-entry-list',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditInventoryEntryModalComponent],
-  templateUrl: './entry-list.component.html',
-  styleUrl: './entry-list.component.scss'
+    selector: 'app-entry-list',
+    imports: [SharedModule, TranslateModule, EditInventoryEntryModalComponent],
+    templateUrl: './entry-list.component.html',
+    styleUrl: './entry-list.component.scss'
 })
 export class EntryListComponent {
   @Input() entries$: Observable<InventoryEntryView[]> = new BehaviorSubject<InventoryEntryView[]>([]).asObservable();

@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-available-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './available-help-dialog.component.html',
-  styleUrl: './available-help-dialog.component.scss'
+    selector: 'app-available-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './available-help-dialog.component.html',
+    styleUrl: './available-help-dialog.component.scss'
 })
 export class AvailableHelpDialogComponent {
 constructor(private modal: NgbActiveModal) {

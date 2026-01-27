@@ -4,11 +4,10 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-store-configurations-help-dialog',
-  standalone: true,
-  imports: [TranslateModule, MatIconModule],
-  templateUrl: './store-configurations-help-dialog.component.html',
-  styleUrl: './store-configurations-help-dialog.component.scss'
+    selector: 'app-store-configurations-help-dialog',
+    imports: [TranslateModule, MatIconModule],
+    templateUrl: './store-configurations-help-dialog.component.html',
+    styleUrl: './store-configurations-help-dialog.component.scss'
 })
 export class StoreConfigurationsHelpDialogComponent {
 constructor(private modal: NgbActiveModal) {

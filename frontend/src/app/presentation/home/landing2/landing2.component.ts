@@ -2,11 +2,10 @@ import { Component } from '@angular/core';
 import { SharedModule } from '../../shared/shared.module';
 
 @Component({
-  selector: 'app-landing2',
-  standalone: true,
-  imports: [SharedModule],
-  templateUrl: './landing2.component.html',
-  styleUrl: './landing2.component.scss'
+    selector: 'app-landing2',
+    imports: [SharedModule],
+    templateUrl: './landing2.component.html',
+    styleUrl: './landing2.component.scss'
 })
 export class Landing2Component {
   screenshots = [

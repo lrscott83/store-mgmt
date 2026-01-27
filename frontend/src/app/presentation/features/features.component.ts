@@ -6,11 +6,10 @@ import { FeatureService } from 'src/app/_services/features/feature.service';
 import { SharedModule } from '../shared/shared.module';
 
 @Component({
-  selector: 'app-features',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './features.component.html',
-  styleUrl: './features.component.scss'
+    selector: 'app-features',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './features.component.html',
+    styleUrl: './features.component.scss'
 })
 export class FeaturesComponent {
 

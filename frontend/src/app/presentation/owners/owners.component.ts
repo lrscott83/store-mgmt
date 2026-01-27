@@ -28,13 +28,12 @@ import { OwnerService } from 'src/app/_services/owner/owner.service';
 
 
 @Component({
-  selector: 'app-owners',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, OwnerDetailsComponent, RouterModule, MatMenuModule, MatIconModule,
-    // AngularSlickgridModule
-  ],
-  templateUrl: './owners.component.html',
-  styleUrl: './owners.component.scss'
+    selector: 'app-owners',
+    imports: [SharedModule, TranslateModule, OwnerDetailsComponent, RouterModule, MatMenuModule, MatIconModule,
+        // AngularSlickgridModule
+    ],
+    templateUrl: './owners.component.html',
+    styleUrl: './owners.component.scss'
 })
 export class OwnersComponent implements OnInit, OnDestroy {
 

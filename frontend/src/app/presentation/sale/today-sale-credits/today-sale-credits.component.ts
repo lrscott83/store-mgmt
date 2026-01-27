@@ -9,11 +9,10 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SaleCreditOfflineService } from 'src/app/application/credits/sale-credit-offline.service';
 
 @Component({
-  selector: 'app-today-sale-credits',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditSaleCreditModalComponent, SaleCreditListComponent],
-  templateUrl: './today-sale-credits.component.html',
-  styleUrl: './today-sale-credits.component.scss'
+    selector: 'app-today-sale-credits',
+    imports: [SharedModule, TranslateModule, EditSaleCreditModalComponent, SaleCreditListComponent],
+    templateUrl: './today-sale-credits.component.html',
+    styleUrl: './today-sale-credits.component.scss'
 })
 export class TodaySaleCreditsComponent {
   saleCredits$: BehaviorSubject<SaleCredit[]> = new BehaviorSubject<SaleCredit[]>([]);

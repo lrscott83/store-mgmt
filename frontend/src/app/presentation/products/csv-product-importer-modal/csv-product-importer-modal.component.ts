@@ -11,11 +11,10 @@ import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
-  selector: 'app-csv-product-importer-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './csv-product-importer-modal.component.html',
-  styleUrl: './csv-product-importer-modal.component.scss'
+    selector: 'app-csv-product-importer-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './csv-product-importer-modal.component.html',
+    styleUrl: './csv-product-importer-modal.component.scss'
 })
 export class CsvProductImporterModalComponent implements OnInit {
   @Output() categoriesUpdatedEmitter: EventEmitter<void> = new EventEmitter<void>();

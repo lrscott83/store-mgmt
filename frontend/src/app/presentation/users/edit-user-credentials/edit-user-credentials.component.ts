@@ -9,11 +9,10 @@ import { AuthService } from 'src/app/_services/services.index';
 import { UserService } from 'src/app/_services/user/user.service';
 
 @Component({
-  selector: 'app-edit-user-credentials',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule],
-  templateUrl: './edit-user-credentials.component.html',
-  styleUrl: './edit-user-credentials.component.scss'
+    selector: 'app-edit-user-credentials',
+    imports: [SharedModule, TranslateModule, RouterModule],
+    templateUrl: './edit-user-credentials.component.html',
+    styleUrl: './edit-user-credentials.component.scss'
 })
 export class EditUserCredentialsComponent  implements OnInit {
 

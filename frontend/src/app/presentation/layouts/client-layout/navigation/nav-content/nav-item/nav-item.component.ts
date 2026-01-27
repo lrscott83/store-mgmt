@@ -10,11 +10,10 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductsHelpDialogComponent } from '../../../help-dialogs/products-help-dialog/products-help-dialog.component';
 
 @Component({
-  selector: 'app-nav-item',
-  standalone: true,
-  imports: [CommonModule, SharedModule, RouterModule],
-  templateUrl: './nav-item.component.html',
-  styleUrls: ['./nav-item.component.scss']
+    selector: 'app-nav-item',
+    imports: [CommonModule, SharedModule, RouterModule],
+    templateUrl: './nav-item.component.html',
+    styleUrls: ['./nav-item.component.scss']
 })
 export class NavItemComponent {
   // public props

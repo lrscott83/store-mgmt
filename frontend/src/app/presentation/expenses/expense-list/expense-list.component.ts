@@ -10,11 +10,10 @@ import { ExpenseOfflineService } from 'src/app/application/expenses/expense-offl
 import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
 
 @Component({
-  selector: 'app-expense-list',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditExpenseModalComponent],
-  templateUrl: './expense-list.component.html',
-  styleUrl: './expense-list.component.scss'
+    selector: 'app-expense-list',
+    imports: [SharedModule, TranslateModule, EditExpenseModalComponent],
+    templateUrl: './expense-list.component.html',
+    styleUrl: './expense-list.component.scss'
 })
 export class ExpenseListComponent {
   @Input() expenses$: Observable<Expense[]> = new BehaviorSubject<Expense[]>([]).asObservable();

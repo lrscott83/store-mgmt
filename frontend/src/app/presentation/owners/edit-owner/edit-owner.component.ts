@@ -9,11 +9,10 @@ import { AuthService } from 'src/app/_services/services.index';
 import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 
 @Component({
-  selector: 'app-edit-owner',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditOwnerComponent, MatTabsModule, EditOwnerDetailsComponent, StoreListComponent, UserListComponent],
-  templateUrl: './edit-owner.component.html',
-  styleUrl: './edit-owner.component.scss'
+    selector: 'app-edit-owner',
+    imports: [SharedModule, TranslateModule, EditOwnerComponent, MatTabsModule, EditOwnerDetailsComponent, StoreListComponent, UserListComponent],
+    templateUrl: './edit-owner.component.html',
+    styleUrl: './edit-owner.component.scss'
 })
 export class EditOwnerComponent implements OnInit {
 

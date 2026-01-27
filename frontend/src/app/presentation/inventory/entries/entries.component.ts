@@ -24,11 +24,10 @@ export interface DateEntry {
 }
 
 @Component({
-  selector: 'app-entries',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EntryListComponent],
-  templateUrl: './entries.component.html',
-  styleUrl: './entries.component.scss'
+    selector: 'app-entries',
+    imports: [SharedModule, TranslateModule, EntryListComponent],
+    templateUrl: './entries.component.html',
+    styleUrl: './entries.component.scss'
 })
 export class EntriesComponent implements OnInit {
 

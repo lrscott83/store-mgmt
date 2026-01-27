@@ -4,11 +4,10 @@ import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-category-stats',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './category-stats.component.html',
-  styleUrl: './category-stats.component.scss'
+    selector: 'app-category-stats',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './category-stats.component.html',
+    styleUrl: './category-stats.component.scss'
 })
 export class CategoryStatsComponent {
   @Input() category: CategoryCartItemsView;

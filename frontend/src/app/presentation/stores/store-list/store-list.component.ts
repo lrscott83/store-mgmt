@@ -12,11 +12,10 @@ import { RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 
 @Component({
-  selector: 'app-store-list',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, RouterModule, MatMenuModule, MatIconModule],
-  templateUrl: './store-list.component.html',
-  styleUrl: './store-list.component.scss'
+    selector: 'app-store-list',
+    imports: [SharedModule, TranslateModule, RouterModule, MatMenuModule, MatIconModule],
+    templateUrl: './store-list.component.html',
+    styleUrl: './store-list.component.scss'
 })
 export class StoreListComponent implements OnInit {
   

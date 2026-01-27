@@ -7,11 +7,10 @@ import { NavRightComponent } from './nav-right/nav-right.component';
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 
 @Component({
-  selector: 'app-nav-bar',
-  standalone: true,
-  imports: [SharedModule, NavLeftComponent, NavRightComponent],
-  templateUrl: './nav-bar.component.html',
-  styleUrls: ['./nav-bar.component.scss']
+    selector: 'app-nav-bar',
+    imports: [SharedModule, NavLeftComponent, NavRightComponent],
+    templateUrl: './nav-bar.component.html',
+    styleUrls: ['./nav-bar.component.scss']
 })
 export class NavBarComponent {
   // public props

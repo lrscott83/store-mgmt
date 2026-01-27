@@ -12,12 +12,11 @@ import Swal from 'sweetalert2';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
 
 @Component({
-  selector: 'app-sale-credit-payment-modal',
-  standalone: true,
-  imports: [SharedModule, TranslateModule],
-  templateUrl: './sale-credit-payment-modal.component.html',
-  styleUrl: './sale-credit-payment-modal.component.scss',
-  encapsulation: ViewEncapsulation.None,
+    selector: 'app-sale-credit-payment-modal',
+    imports: [SharedModule, TranslateModule],
+    templateUrl: './sale-credit-payment-modal.component.html',
+    styleUrl: './sale-credit-payment-modal.component.scss',
+    encapsulation: ViewEncapsulation.None
 })
 export class SaleCreditPaymentModalComponent implements OnInit {
   paymentType: PaymentType = PaymentType.Efectivo;

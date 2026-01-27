@@ -18,11 +18,10 @@ import { SaleCreditOfflineService } from 'src/app/application/credits/sale-credi
 import { PaymentType } from 'src/app/domain/commons/payment-type';
 
 @Component({
-  selector: 'app-today-stats',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, CategoryStatsComponent, ExpenseListComponent, SaleCreditListComponent],
-  templateUrl: './today-stats.component.html',
-  styleUrl: './today-stats.component.scss'
+    selector: 'app-today-stats',
+    imports: [SharedModule, TranslateModule, CategoryStatsComponent, ExpenseListComponent, SaleCreditListComponent],
+    templateUrl: './today-stats.component.html',
+    styleUrl: './today-stats.component.scss'
 })
 export class TodayStatsComponent implements OnInit {
   categories$: BehaviorSubject<CategoryCartItemsView[]> = new BehaviorSubject<CategoryCartItemsView[]>([]);

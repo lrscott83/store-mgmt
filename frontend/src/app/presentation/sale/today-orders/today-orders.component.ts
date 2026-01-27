@@ -10,11 +10,10 @@ import { TypeData } from 'src/app/domain/commons/type-data';
 import { OrderListComponent } from '../order-list/order-list.component';
 
 @Component({
-  selector: 'app-today-orders',
-  standalone: true,
-  imports: [SharedModule, TranslationModule, OrderListComponent],
-  templateUrl: './today-orders.component.html',
-  styleUrl: './today-orders.component.scss'
+    selector: 'app-today-orders',
+    imports: [SharedModule, TranslationModule, OrderListComponent],
+    templateUrl: './today-orders.component.html',
+    styleUrl: './today-orders.component.scss'
 })
 export class TodayOrdersComponent implements OnInit {
   orders$: BehaviorSubject<Order[]> = new BehaviorSubject<Order[]>([]);

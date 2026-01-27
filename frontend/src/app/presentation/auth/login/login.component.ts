@@ -19,11 +19,10 @@ import { SwUpdate } from '@angular/service-worker';
 import { UpdateService } from 'src/app/_services/update/update.service';
 
 @Component({
-  selector: 'app-login',
-  standalone: true,
-  imports: [RouterModule, SharedModule, TranslateModule, GuestFooterComponent],
-  templateUrl: './login.component.html',
-  styleUrls: ['./login.component.scss']
+    selector: 'app-login',
+    imports: [RouterModule, SharedModule, TranslateModule, GuestFooterComponent],
+    templateUrl: './login.component.html',
+    styleUrls: ['./login.component.scss']
 })
 export default class LoginComponent implements OnInit {
 

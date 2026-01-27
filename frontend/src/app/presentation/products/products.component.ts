@@ -13,11 +13,10 @@ import { ProductCategoryService } from 'src/app/application/categories/product-c
 import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
-  selector: 'app-products',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, CategoryProductListComponent,  CsvProductImporterModalComponent],
-  templateUrl: './products.component.html',
-  styleUrl: './products.component.scss'
+    selector: 'app-products',
+    imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, CategoryProductListComponent, CsvProductImporterModalComponent],
+    templateUrl: './products.component.html',
+    styleUrl: './products.component.scss'
 })
 export class ProductsComponent {
   categories$: BehaviorSubject<ProductCategoryView[]> = new BehaviorSubject<ProductCategoryView[]>([]);

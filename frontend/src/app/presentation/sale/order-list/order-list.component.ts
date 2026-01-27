@@ -9,11 +9,10 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 @Component({
-  selector: 'app-order-list',
-  standalone: true,
-  imports: [SharedModule, TranslateModule, OrderItemListComponent],
-  templateUrl: './order-list.component.html',
-  styleUrl: './order-list.component.scss'
+    selector: 'app-order-list',
+    imports: [SharedModule, TranslateModule, OrderItemListComponent],
+    templateUrl: './order-list.component.html',
+    styleUrl: './order-list.component.scss'
 })
 export class OrderListComponent implements OnInit {
   @Input() orders$: Observable<Order[]>;

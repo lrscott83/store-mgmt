@@ -4,11 +4,10 @@ import { RouterModule } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-guest-footer',
-  standalone: true,
-  imports: [TranslateModule, RouterModule, MatIcon],
-  templateUrl: './guest-footer.component.html',
-  styleUrl: './guest-footer.component.scss'
+    selector: 'app-guest-footer',
+    imports: [TranslateModule, RouterModule, MatIcon],
+    templateUrl: './guest-footer.component.html',
+    styleUrl: './guest-footer.component.scss'
 })
 export class GuestFooterComponent {
   showEmailDialog() {
