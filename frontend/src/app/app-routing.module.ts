@@ -341,25 +341,25 @@ const routes: Routes = [
         ////canDeactivate: [CanDeactivateGuard],
         data: { expectedFeatures: [EFeatures.Profile] }
       },
-      {
-        path: 'dashboard/default',
-        loadComponent: () => import('./demo/default/dashboard/dashboard.component').then((c) => c.DefaultComponent),
-        // canActivate: [AuthGuardLogin],
-        // data: { expectedFeatures: [EFeatures.Dashboard] }
-        data: { expectedFeatures: [] }
-      },
-      {
-        path: 'typography',
-        loadComponent: () => import('./demo/ui-component/typography/typography.component')
-      },
-      {
-        path: 'color',
-        loadComponent: () => import('./demo/ui-component/ui-color/ui-color.component')
-      },
-      {
-        path: 'sample-page',
-        loadComponent: () => import('./demo/other/sample-page/sample-page.component')
-      }
+      // {
+      //   path: 'dashboard/default',
+      //   loadComponent: () => import('./demo/default/dashboard/dashboard.component').then((c) => c.DefaultComponent),
+      //   // canActivate: [AuthGuardLogin],
+      //   // data: { expectedFeatures: [EFeatures.Dashboard] }
+      //   data: { expectedFeatures: [] }
+      // },
+      // {
+      //   path: 'typography',
+      //   loadComponent: () => import('./demo/ui-component/typography/typography.component')
+      // },
+      // {
+      //   path: 'color',
+      //   loadComponent: () => import('./demo/ui-component/ui-color/ui-color.component')
+      // },
+      // {
+      //   path: 'sample-page',
+      //   loadComponent: () => import('./demo/other/sample-page/sample-page.component')
+      // }
     ]
   },
 

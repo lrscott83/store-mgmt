@@ -20,7 +20,6 @@
             "allowedCommonJsDependencies": [
               "bezier-easing",
               "node_modules/apexcharts/dist/apexcharts.min.js",
-              "moment",
               "guid-typescript",
               "sweetalert2",
               "jspdf-autotable",

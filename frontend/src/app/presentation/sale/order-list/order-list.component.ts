@@ -1,11 +1,12 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { Observable } from 'rxjs';
 import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
 import { Order } from 'src/app/domain/entities/orders/order.model';
-import * as _moment from 'moment';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule } from '@ngx-translate/core';
 import { OrderItemListComponent } from '../today-orders/order-item-list/order-item-list.component';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 @Component({
   selector: 'app-order-list',
@@ -29,9 +30,8 @@ export class OrderListComponent implements OnInit {
   }
 
   getOrderTime(order: Order): string {
-    const dateMoment = _moment(order.date);
     //return order.date.getHours() + ":" + order.date.getMinutes();
-    return dateMoment.format('hh:mm A');
+    return format(order.date, 'HH:mm', { locale: es });
   }
 
   getPaymentTypeIcon(paymentType: PaymentType) {

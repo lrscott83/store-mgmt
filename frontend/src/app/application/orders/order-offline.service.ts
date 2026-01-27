@@ -2,7 +2,6 @@ import { Injectable, Inject } from '@angular/core';
 import { HttpClient } from "@angular/common/http";
 import { Observable, of } from 'rxjs';
 import { Guid } from 'guid-typescript';
-import * as _moment from 'moment';
 import { BaseService } from 'src/app/_services/base.service';
 import { Order, OrderType } from 'src/app/domain/entities/orders/order.model';
 import { ProductRepository } from '../products/product.repository';
@@ -17,14 +16,13 @@ import { OrderItem } from 'src/app/domain/entities/orders/order-item.model';
 import { ProductCartItemsView } from './product-cart-items.view';
 import { InventoryEntryCost } from '../entries/inventory-item-cost.view';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
-import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 import { DataResult, Result } from 'src/app/domain/commons/result';
 import { ChartData } from 'src/app/presentation/_models/chart-data,model';
-import { MatLabel } from '@angular/material/form-field';
 import { TopProduct } from 'src/app/presentation/_models/top-product.model';
 import { PaymentType } from 'src/app/domain/commons/payment-type';
 import { SaleCreditOfflineService } from '../credits/sale-credit-offline.service';
 import { ExpenseOfflineService } from '../expenses/expense-offline.service';
+import { startOfDay, addDays, subDays } from 'date-fns';
 
 @Injectable({
     providedIn: "root"
@@ -172,15 +170,14 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     getActiveOrdersPriceToday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getActiveOrdersPriceBetweenDates(startDate, endDate);;
     }
 
     getActiveOrdersPriceYesterday(): number {
-        const startDate = _moment().subtract(1, 'day').startOf('day').toDate();
-        const endDate = _moment().startOf('day').toDate();
+        const startDate = startOfDay(subDays(new Date(), 1));
+        const endDate = startOfDay(new Date());
         return this.getActiveOrdersPriceBetweenDates(startDate, endDate);
     }
 
@@ -200,26 +197,26 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     getActiveOrdersProfitToday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getActiveOrdersProfitBetweenDates(startDate, endDate);
     }
 
     getActiveOrdersProfitYesterday(): number {
-        const startDate = _moment().subtract(1, 'day').startOf('day').toDate();
-        const endDate = _moment().startOf('day').toDate();
+        const startDate = startOfDay(subDays(new Date(), 1));
+        const endDate = startOfDay(new Date());
         return this.getActiveOrdersProfitBetweenDates(startDate, endDate);
     }
 
     getLastMonthSaleProfits(): ChartData[] {
         const data: ChartData[] = [];
+        const today = new Date();
         for (let i = 29; i >= 0; i--) {
-            const date: _moment.Moment = _moment().subtract(i, 'days');
-            const startDate = date.startOf('day').toDate();
+            const date = subDays(today, i);
+            const startDate = startOfDay(today);
             const endDate = i > 0
-                ? _moment().subtract(i - 1, 'days').startOf('day').toDate()
-                : _moment().add(1, 'days').toDate();
+                ? startOfDay(subDays(today, i - 1))
+                : addDays(today, 1);
             data.push({
                 label: date,
                 value: this.getActiveOrdersProfitBetweenDates(startDate, endDate)
@@ -231,12 +228,13 @@ export class OrderOfflineService extends BaseService<Order> {
 
     getLastMonthSales(): ChartData[] {
         const data: ChartData[] = [];
+        const today = new Date();
         for (let i = 29; i >= 0; i--) {
-            const date: _moment.Moment = _moment().subtract(i, 'days');
-            const startDate = date.startOf('day').toDate();
+            const date = subDays(today, i);
+            const startDate = startOfDay(today);
             const endDate = i > 0
-                ? _moment().subtract(i - 1, 'days').startOf('day').toDate()
-                : _moment().add(1, 'days').toDate();
+                ? startOfDay(subDays(today, i - 1))
+                : addDays(today, 1);
             data.push({
                 label: date,
                 value: this.getActiveOrdersPriceBetweenDates(startDate, endDate)
@@ -260,11 +258,10 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     private getTopProductsInLastMonth(calculateProfit: boolean, top: number) {
-        const today = _moment();
-        const lastMonth = _moment().subtract(29, 'days');
-
+        const now = new Date();
+        const lastMonth = subDays(now, 29);
         const monthOrders: Order[] = this.getActiveOrders()
-            .filter(order => _moment(order.date).isBetween(lastMonth, today, undefined, '[)'));
+            .filter(order => order.date >= lastMonth && order.date < now);
 
         const topProductsMap: Map<string, TopProduct> = new Map<string, TopProduct>();
         monthOrders.flatMap(order => order.orderItems)
@@ -300,19 +297,14 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     getActiveOrdersInDay(date: Date): Order[] {
-        //const momentDate = _moment(date);
-        const startMoment = _moment(date).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
-        //const startDate = new Date(date.getFullYear(), date.getMonth() + 1, date.getDate()).getTime();
-
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getActiveOrdersBetweenDates(startDate, endDate);
     }
 
     getOrdersInDay(date: Date): Order[] {
-        const startMoment = _moment(date).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getStorageOrders()
             .filter(order => order.date >= startDate && order.date < endDate)
             .sort((o1, o2) => o1.date.getTime() - o2.date.getTime());
@@ -437,7 +429,7 @@ export class OrderOfflineService extends BaseService<Order> {
 
     addImportedOrder(order: Order): Result {
         this.orders = this.getOrdersFromLocalStorage();
-        order.date = _moment(order.date).toDate();
+        order.date = new Date(order.date);
         this.orders.push(order);
         this.setOrdersLocalStorage(this.orders);
         return Result.Success();
@@ -447,7 +439,7 @@ export class OrderOfflineService extends BaseService<Order> {
         this.orders = this.getOrdersFromLocalStorage();
         let order: Order = this.orders.find(o => o.id === importedOrder.id);
         if (order) {
-            order.date = _moment(importedOrder.date).toDate();
+            order.date = new Date(importedOrder.date);
             order.isActive = importedOrder.isActive;
             order.updatedDate = importedOrder.updatedDate;
             order.updatedByName = importedOrder.updatedByName;
@@ -462,7 +454,7 @@ export class OrderOfflineService extends BaseService<Order> {
             if (ordersJson) {
                 const orders = JSON.parse(ordersJson);
                 return orders.map(order => {
-                    order.date = _moment(order.date).toDate();
+                    order.date = new Date(order.date);
                     if (!order.isCredit)
                         order.isCredit = false;
                     if (!order.paymentType)
@@ -475,14 +467,5 @@ export class OrderOfflineService extends BaseService<Order> {
         }
         this.setOrdersLocalStorage([]);
         return [];
-    }
-
-    private parseDate(key, value) {
-        // Date.prototype.toJSON = function(){ return moment(this).format(); }
-        //if (typeof value === "string") {
-        if (key === "date") {
-            return _moment(value).format();
-        }
-        return value;
     }
 }

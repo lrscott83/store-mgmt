@@ -6,10 +6,10 @@ import { BaseService } from 'src/app/_services/base.service';
 import { AuthService } from 'src/app/_services/services.index';
 import { DataResult, Result } from 'src/app/domain/commons/result';
 import { BaseResponseModel } from 'src/app/_services/_models/base.model';
-import * as _moment from 'moment';
 import { Expense, ExpenseType } from 'src/app/domain/entities/expenses/expense.model';
 import { ExpenseErrors } from 'src/app/domain/entities/expenses/expense.errors';
 import { PaymentType } from 'src/app/domain/commons/payment-type';
+import { startOfDay, addDays, subDays } from 'date-fns';
 
 @Injectable({
     providedIn: "root"
@@ -104,10 +104,8 @@ export class ExpenseOfflineService extends BaseService<Expense> {
         }
 
     getExpensesInDay(date: Date): BaseResponseModel<Expense[]> {
-        const startMoment = _moment(date).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
-
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         const filteredExpenses: Expense[] = this.getStorageExpenses()
             .filter(expense => expense.isActive
                 && expense.date >= startDate && expense.date < endDate)
@@ -128,17 +126,15 @@ export class ExpenseOfflineService extends BaseService<Expense> {
     }
 
     getExpensesTotal(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getExpensesTotalBefore(endDate);
     }
 
     getExpensesTotalYesterday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
+        const startDate = startOfDay(new Date());
         return this.getExpensesTotalBefore(startDate);
     }
-
 
     private getActiveExpensesBetweenDates(startDate: Date, endDate: Date): Expense[] {
         return this.getStorageExpenses()
@@ -153,15 +149,14 @@ export class ExpenseOfflineService extends BaseService<Expense> {
     }
 
     getActiveExpensesPriceToday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getActiveExpensesPriceBetweenDates(startDate, endDate);;
     }
 
     getActiveExpensesPriceYesterday(): number {
-        const startDate = _moment().subtract(1, 'day').startOf('day').toDate();
-        const endDate = _moment().startOf('day').toDate();
+        const startDate = startOfDay(subDays(new Date(), 1));
+        const endDate = startOfDay(new Date());
         return this.getActiveExpensesPriceBetweenDates(startDate, endDate);
     }
 
@@ -180,7 +175,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
 
     addImportedExpense(expense: Expense): Result {
         this.expenses = this.getExpensesFromLocalStorage();
-        expense.date = _moment(expense.date).toDate();
+        expense.date = new Date(expense.date);
         this.expenses.push(expense);
         this.setExpensesLocalStorage(this.expenses);
         return Result.Success();
@@ -190,7 +185,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
         this.expenses = this.getExpensesFromLocalStorage();
         let expense: Expense = this.expenses.find(o => o.id === importedExpense.id);
         if (expense) {
-            expense.date = _moment(importedExpense.date).toDate();
+            expense.date = new Date(importedExpense.date);
             expense.isActive = importedExpense.isActive;
             expense.total = importedExpense.total;
             expense.note = importedExpense.note;
@@ -217,7 +212,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
             if (expensesJson) {
                 const expenses = JSON.parse(expensesJson);
                 return expenses.map(expense => {
-                    expense.date = _moment(expense.date).toDate();
+                    expense.date = new Date(expense.date);
                     if (!expense.paymentType)
                         expense.paymentType = PaymentType.Efectivo;
                     return expense;

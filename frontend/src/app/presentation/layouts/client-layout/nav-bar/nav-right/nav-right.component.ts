@@ -1,6 +1,8 @@
 // angular import
 import { Component, Input, Output, EventEmitter, ViewChild, ViewEncapsulation } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 // project import
 
@@ -53,8 +55,6 @@ import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
 import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
 import { TypeData } from 'src/app/domain/commons/type-data';
-import * as _moment from 'moment';
-import { GlobalConfig } from 'src/app/_shared/configs/global.config';
 
 @Component({
   selector: 'app-nav-right',
@@ -242,10 +242,9 @@ export class NavRightComponent {
       y += 5;
     };
 
-    const dateMoment = _moment(order.date);
     addText('*** VENTA ***', 20, 12);
     addText(`Folio: ${order.id}`);
-    addText(`Fecha: ${dateMoment.format('DD/MM/YYYY')}`);
+    addText(`Fecha: ${format(order.date, 'dd/MM/yyyy', { locale: es })}`);
     addText(`Status: ${order.isCredit ? 'Por Cobrar' : 'Pagado'}`);
     addText(`Forma de Pago: ${PaymentTypeUtils.getPaymentTypeText(order.paymentType)}`);
     y += 3;

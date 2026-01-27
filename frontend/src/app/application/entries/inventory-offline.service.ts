@@ -17,10 +17,9 @@ import { InventoryCategoryView } from './inventory-category.view';
 import { InventoryProductView } from './inventory-product-view';
 import { InventoryEntriesView } from './inventory-entries.view';
 import { InventoryEntryCost } from './inventory-item-cost.view';
-import * as _moment from 'moment';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
-import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
 import { OrderItem } from 'src/app/domain/entities/orders/order-item.model';
+import { startOfDay, addDays } from 'date-fns';
 
 @Injectable({
     providedIn: "root"
@@ -251,10 +250,8 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     getInventoryEntriesInDay(date: Date): BaseResponseModel<InventoryEntryView[]> {
-        const startMoment = _moment(date).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
-
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         let inventoryEntries: InventoryEntryView[] = this.getActiveInventoryEntriesStorage()
             .filter(entry => entry.date >= startDate && entry.date < endDate);
         return this.Success(inventoryEntries.sort((e1, e2) => e2.date.getTime() - e1.date.getTime()));
@@ -276,14 +273,13 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     getInventoryCostTotal(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getInventoryCostTotalBefore(endDate);
     }
 
     getInventoryCostTotalYesterday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
+        const startDate = startOfDay(new Date());
         return this.getInventoryCostTotalBefore(startDate);
     }
 
@@ -543,7 +539,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
                 const inventoryMap: Map<string, InventoryEntry[]> = new Map(JSON.parse(inventoriesJson));
                 inventoryMap.forEach((entries, productId) => {
                     entries.map(entry => {
-                        entry.date = _moment(entry.date).toDate();
+                        entry.date = new Date(entry.date);
                         return entry;
                     });
                 });

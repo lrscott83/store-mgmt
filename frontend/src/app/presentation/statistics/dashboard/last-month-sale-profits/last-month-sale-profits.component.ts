@@ -10,7 +10,6 @@ import {
   ChartComponent,
   NgApexchartsModule
 } from 'ng-apexcharts';
-import * as moment from 'moment';
 import { SharedModule } from 'src/app/presentation/shared/shared.module';
 import { TranslateModule } from '@ngx-translate/core';
 import { OrderOfflineService } from 'src/app/application/orders/order-offline.service';

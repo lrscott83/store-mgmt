@@ -6,10 +6,10 @@ import { BaseService } from 'src/app/_services/base.service';
 import { AuthService } from 'src/app/_services/services.index';
 import { DataResult, Result } from 'src/app/domain/commons/result';
 import { BaseResponseModel } from 'src/app/_services/_models/base.model';
-import * as _moment from 'moment';
 import { SaleCredit } from 'src/app/domain/entities/sale-credits/sale-credit.model';
 import { SaleCreditErrors } from 'src/app/domain/entities/sale-credits/sale-credit.errors';
 import { PaymentType } from 'src/app/domain/commons/payment-type';
+import { startOfDay, subDays, addDays} from 'date-fns';
 
 @Injectable({
     providedIn: "root"
@@ -132,10 +132,8 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
     }
 
     getPaidSaleCreditsInDayObservable(date: Date): Observable<BaseResponseModel<SaleCredit[]>> {
-        const startMoment = _moment(date).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
-
+        const startDate = startOfDay(date);
+        const endDate = addDays(startDate, 1);
         const filteredSaleCredits: SaleCredit[] = this.getStorageSaleCredits()
             .filter(saleCredit => saleCredit.isActive && saleCredit.isPaid && saleCredit.paidDate
                 && saleCredit.paidDate >= startDate && saleCredit.paidDate < endDate)
@@ -159,10 +157,8 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
     }
 
     getSaleCreditsInDay(date: Date): BaseResponseModel<SaleCredit[]> {
-        const startMoment = _moment(date).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
-
+        const startDate = startOfDay(date);
+        const endDate = addDays(startDate, 1);
         const filteredSaleCredits: SaleCredit[] = this.getStorageSaleCredits()
             .filter(saleCredit => saleCredit.isActive
                 && saleCredit.date >= startDate && saleCredit.date < endDate)
@@ -183,14 +179,14 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
     }
 
     getSaleCreditsTotal(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getSaleCreditsTotalBefore(endDate);
     }
 
     getSaleCreditsTotalYesterday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getSaleCreditsTotalBefore(startDate);
     }
 
@@ -214,28 +210,26 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
     }
 
     getActiveUnpaidSaleCreditsPriceToday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getActiveUnpaidSaleCreditsPriceBetweenDates(startDate, endDate);
     }
 
     getActiveUnpaidSaleCreditsPriceYesterday(): number {
-        const startDate = _moment().subtract(1, 'day').startOf('day').toDate();
-        const endDate = _moment().startOf('day').toDate();
+        const startDate = startOfDay(subDays(new Date(), 1));
+        const endDate = startOfDay(new Date());
         return this.getActiveUnpaidSaleCreditsPriceBetweenDates(startDate, endDate);
     }
 
     getActiveSaleCreditsPriceToday(): number {
-        const startMoment = _moment(new Date()).startOf('day');
-        const startDate = startMoment.toDate();
-        const endDate = startMoment.add(1, 'days').toDate();
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 1);
         return this.getActiveSaleCreditsPriceBetweenDates(startDate, endDate);
     }
 
     getActiveSaleCreditsPriceYesterday(): number {
-        const startDate = _moment().subtract(1, 'day').startOf('day').toDate();
-        const endDate = _moment().startOf('day').toDate();
+        const startDate = startOfDay(subDays(new Date(), 1));
+        const endDate = startOfDay(new Date());
         return this.getActiveSaleCreditsPriceBetweenDates(startDate, endDate);
     }
 
@@ -254,7 +248,7 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
 
     addImportedSaleCredit(saleCredit: SaleCredit): Result {
         this.saleCredits = this.getSaleCreditsFromLocalStorage();
-        saleCredit.date = _moment(saleCredit.date).toDate();
+        saleCredit.date = new Date(saleCredit.date);
         this.saleCredits.push(saleCredit);
         this.setSaleCreditsLocalStorage(this.saleCredits);
         return Result.Success();
@@ -294,9 +288,9 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
             if (saleCreditsJson) {
                 const saleCredits = JSON.parse(saleCreditsJson);
                 return saleCredits.map(saleCredit => {
-                    saleCredit.date = _moment(saleCredit.date).toDate();
-                    saleCredit.paymentDate = _moment(saleCredit.paymentDate).toDate();
-                    saleCredit.paidDate = _moment(saleCredit.paidDate).toDate();
+                    saleCredit.date = new Date(saleCredit.date);
+                    saleCredit.paymentDate = new Date(saleCredit.paymentDate);
+                    saleCredit.paidDate = new Date(saleCredit.paidDate);
                     return saleCredit;
                 });
             }

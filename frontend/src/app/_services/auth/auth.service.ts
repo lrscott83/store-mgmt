@@ -9,9 +9,7 @@ import { environment } from "src/environments/environment";
 import { StorageService } from "../storage/storage.service";
 import { Router } from '@angular/router';
 import { BaseResponseModel } from '../_models/base.model';
-import * as _moment from 'moment';
-import { StoreUsageTrackerService } from "../usage-tracker/store-usage-tracker.service";
-
+import { addDays } from 'date-fns';
 
 
 @Injectable({
@@ -62,8 +60,7 @@ export class AuthService implements OnDestroy {
       map((response: BaseResponseModel<AuthModel>) => {
         if (response && response.succeeded) {
           this.localStorageService.setTokenToLocalStorage(response.data.authToken);
-          const todayMoment = _moment(new Date()).startOf('day');
-          response.data.expiresIn = todayMoment.add(3, 'days').toDate();
+          response.data.expiresIn = addDays(new Date(), 30);
           //response.data.expiresIn = new Date(new Date().getTime() + 60000);          
           const result = this.setAuthFromLocalStorage(response.data);
           return result;
@@ -148,15 +145,15 @@ export class AuthService implements OnDestroy {
       return of(undefined);
     }
     const currentUser = this.localStorageService.getCurrentUser();
-    if (currentUser && _moment(auth.expiresIn).toDate() > new Date()) {
-      currentUser.expiresIn = _moment(auth.expiresIn).toDate();
+    if (currentUser && new Date(auth.expiresIn) > new Date()) {
+      currentUser.expiresIn = new Date(auth.expiresIn);
       return of(currentUser);
     }
     this.isLoadingSubject.next(true);
     return this.authHttpService.getUserByToken(auth.authToken).pipe(
       map((response: BaseResponseModel<UserModel>) => {
         if (response && response.succeeded) {
-          response.data.expiresIn = _moment(auth.expiresIn).toDate();
+          response.data.expiresIn = new Date(auth.expiresIn);
           this.currentUserSubject = new BehaviorSubject<UserModel>(response.data);
         } else {
           this.logout();

@@ -5,7 +5,6 @@ import { Order } from 'src/app/domain/entities/orders/order.model';
 import { OrderItemListComponent } from './order-item-list/order-item-list.component';
 import { TranslationModule } from 'src/app/_modules/i18n/translation.module';
 import { SharedModule } from '../../shared/shared.module';
-import * as _moment from 'moment';
 import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-type';
 import { TypeData } from 'src/app/domain/commons/type-data';
 import { OrderListComponent } from '../order-list/order-list.component';
