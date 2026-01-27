@@ -1,93 +1,97 @@
 <div class="card card-custom ">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'TODAY_ORDERS.HEADER'"></h3>
-            <span class="label label-success font-weight-bold font-size-lg">({{getOrdersItemsCount()}})</span>
-        </div>
-        <div class="card-toolbar">
-            <span class="text-primary font-weight-bold font-size-lg">
-                {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
-            </span>
-        </div>
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label" [translate]="'TODAY_ORDERS.HEADER'"></h3>
+      <span class="label label-success font-weight-bold font-size-lg">({{getOrdersItemsCount()}})</span>
     </div>
-    <div class="card-body p-2">
-        <mat-radio-group [(ngModel)]="paymentType" (change)="loadTodayOrders()" style="margin-bottom: 10px !important;">
-            <mat-radio-button [value]="null">
-                Todas
-            </mat-radio-button>
-            <mat-radio-button *ngFor="let type of paymentTypes" [value]="type.value">
-                <i class="bi {{getPaymentTypeIcon(type.value)}} text-success fs-4"></i>
-                {{type.label}}
-            </mat-radio-button>
-        </mat-radio-group>
-        <br>
-        <mat-radio-group [(ngModel)]="isCredit" (change)="loadTodayOrders()" style="margin-bottom: 10px !important;">
-            <mat-radio-button [value]="-1">Todas</mat-radio-button>
-            <mat-radio-button [value]="0">Pagadas</mat-radio-button>
-            <mat-radio-button [value]="1"><span class="text-warning">Créditos</span></mat-radio-button>
-        </mat-radio-group>
-        <div *ngIf="((orders$ | async).length === 0)"
-            class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-            <div class="alert-text">{{'TODAY_STATS.NO_ORDER_FOUND' | translate}}</div>
-        </div>
-        <app-order-list class="p-2" [orders$]="getOrdersObservable()" [readOnly]="false"></app-order-list>
-        
-        <!-- <app-data-card-tools *ngFor="let order of orders$ | async" [cardTitle]="getOrderTime(order)" cardId="kt_card_{{order.id}}"
-            toogleTitle="{{'GENERAL.TOGGLE_CARD' | translate}}" class="mt-6 ml-2 mr-2" [cardCount]="order.itemsCount" [cardTotal]="order.total"
-            cardLabelClass="text-primary">
-            <div card-toolbar>
-                <button mat-icon-button color="success" class="btn btn-icon cursor-pointer card-header-action-button" aria-label="Acciones"
-                    [matMenuTriggerFor]="matMenu">
-                    <i class="flaticon2-settings text-success"></i>
-                </button>
-                <mat-menu #matMenu="matMenu">
-                    <button mat-menu-item (click)="sendOrderToShoppingCart(order)">
-                        <mat-icon color="success">edit</mat-icon>
-                        <span>{{ 'TODAY_ORDERS.EDIT_ORDER' | translate }}</span>
-                    </button>
-                    <button mat-menu-item (click)="onDeleteOrder(order.id)">
-                        <mat-icon color="warn">delete</mat-icon>
-                        <span>{{ 'TODAY_ORDERS.DELETE_ORDER' | translate }}</span>
-                    </button>
-                </mat-menu>
-            </div>
-            <div card-body>
-                <app-order-item-list [order]="order"></app-order-item-list>
-            </div>
-        </app-data-card-tools> -->
+    <div class="card-toolbar">
+      <span class="text-primary font-weight-bold font-size-lg">
+        {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
+      </span>
     </div>
+  </div>
+  <div class="card-body p-2">
+    <mat-radio-group [(ngModel)]="paymentType" (change)="loadTodayOrders()" style="margin-bottom: 10px !important;">
+      <mat-radio-button [value]="null">
+        Todas
+      </mat-radio-button>
+      @for (type of paymentTypes; track type) {
+        <mat-radio-button [value]="type.value">
+          <i class="bi {{getPaymentTypeIcon(type.value)}} text-success fs-4"></i>
+          {{type.label}}
+        </mat-radio-button>
+      }
+    </mat-radio-group>
+    <br>
+      <mat-radio-group [(ngModel)]="isCredit" (change)="loadTodayOrders()" style="margin-bottom: 10px !important;">
+        <mat-radio-button [value]="-1">Todas</mat-radio-button>
+        <mat-radio-button [value]="0">Pagadas</mat-radio-button>
+        <mat-radio-button [value]="1"><span class="text-warning">Créditos</span></mat-radio-button>
+      </mat-radio-group>
+      @if (((orders$ | async).length === 0)) {
+        <div
+          class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+          <div class="alert-text">{{'TODAY_STATS.NO_ORDER_FOUND' | translate}}</div>
+        </div>
+      }
+      <app-order-list class="p-2" [orders$]="getOrdersObservable()" [readOnly]="false"></app-order-list>
+
+      <!-- <app-data-card-tools *ngFor="let order of orders$ | async" [cardTitle]="getOrderTime(order)" cardId="kt_card_{{order.id}}"
+      toogleTitle="{{'GENERAL.TOGGLE_CARD' | translate}}" class="mt-6 ml-2 mr-2" [cardCount]="order.itemsCount" [cardTotal]="order.total"
+      cardLabelClass="text-primary">
+      <div card-toolbar>
+        <button mat-icon-button color="success" class="btn btn-icon cursor-pointer card-header-action-button" aria-label="Acciones"
+          [matMenuTriggerFor]="matMenu">
+          <i class="flaticon2-settings text-success"></i>
+        </button>
+        <mat-menu #matMenu="matMenu">
+          <button mat-menu-item (click)="sendOrderToShoppingCart(order)">
+            <mat-icon color="success">edit</mat-icon>
+            <span>{{ 'TODAY_ORDERS.EDIT_ORDER' | translate }}</span>
+          </button>
+          <button mat-menu-item (click)="onDeleteOrder(order.id)">
+            <mat-icon color="warn">delete</mat-icon>
+            <span>{{ 'TODAY_ORDERS.DELETE_ORDER' | translate }}</span>
+          </button>
+        </mat-menu>
+      </div>
+      <div card-body>
+        <app-order-item-list [order]="order"></app-order-item-list>
+      </div>
+    </app-data-card-tools> -->
+  </div>
 </div>
 
 <!-- <div class="card card-custom">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'TODAY_ORDERS.HEADER'"></h3>
-            <span class="label label-success font-weight-bold font-size-lg">({{getOrdersItemsCount()}})</span>
-        </div>
-        <div class="card-toolbar">
-            <span class="text-primary font-weight-bold font-size-lg">
-                {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
-            </span>
-        </div>
-    </div>
-    <div class="card-body p-2">
-        <div *ngIf="((orders$ | async).length === 0)"
-            class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-            <div class="alert-text">{{'TODAY_ORDERS.NO_ORDER_FOUND' | translate}}</div>
-        </div>
+<div class="card-header">
+  <div class="card-title">
+    <h3 class="card-label" [translate]="'TODAY_ORDERS.HEADER'"></h3>
+    <span class="label label-success font-weight-bold font-size-lg">({{getOrdersItemsCount()}})</span>
+  </div>
+  <div class="card-toolbar">
+    <span class="text-primary font-weight-bold font-size-lg">
+      {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
+    </span>
+  </div>
+</div>
+<div class="card-body p-2">
+  <div *ngIf="((orders$ | async).length === 0)"
+    class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+    <div class="alert-text">{{'TODAY_ORDERS.NO_ORDER_FOUND' | translate}}</div>
+  </div>
 
-        <mat-accordion multi>
-            <mat-expansion-panel [expanded]="false" *ngFor="let order of orders$ | async">
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">{{order.date.getT}} {{(getOrderItemsCount(order))}}</span>
-                        <div class="w-100 text-end">
-                            <span>{{getOrderTotal(order)}}</span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <app-order-product-list class="p-2" [order]="order" (orderUpdated)="updateCategory()"></app-order-product-list>
-            </mat-expansion-panel>
-        </mat-accordion>
-    </div>
+  <mat-accordion multi>
+    <mat-expansion-panel [expanded]="false" *ngFor="let order of orders$ | async">
+      <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+        <mat-panel-title>
+          <span class="w-100">{{order.date.getT}} {{(getOrderItemsCount(order))}}</span>
+          <div class="w-100 text-end">
+            <span>{{getOrderTotal(order)}}</span>
+          </div>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      <app-order-product-list class="p-2" [order]="order" (orderUpdated)="updateCategory()"></app-order-product-list>
+    </mat-expansion-panel>
+  </mat-accordion>
+</div>
 </div> -->

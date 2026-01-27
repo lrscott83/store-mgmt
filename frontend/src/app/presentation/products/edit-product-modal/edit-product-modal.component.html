@@ -1,85 +1,93 @@
 <div class="modal-content">
-    <div class="modal-header">
-        <h4 class="modal-title" id="modal-basic-title">
-            {{(!product ? 'PRODUCT.NEW_PRODUCT' : 'PRODUCT.EDIT_PRODUCT') | translate}}
-        </h4>
-        <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+  <div class="modal-header">
+    <h4 class="modal-title" id="modal-basic-title">
+      {{(!product ? 'PRODUCT.NEW_PRODUCT' : 'PRODUCT.EDIT_PRODUCT') | translate}}
+    </h4>
+    <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+  </div>
+  <div class="modal-body">
+    <form class="form" id="product_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-md-10 col-lg-8 mx-auto">
+          <!-- <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+          <mat-label>{{'GENERAL.CATEGORY'| translate}}</mat-label>
+          <mat-select name="Categoría" formControlName="categoryId" required>
+            <mat-option *ngFor="let category of categories$ | async" [value]="category.id">
+              {{category.name}}
+            </mat-option>
+          </mat-select>
+          <mat-error *ngIf="isControlInvalid('categoryId','required')">
+            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.CATEGORY'| translate } }}
+          </mat-error>
+        </mat-form-field> -->
+
+        <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+          <mat-label>{{'GENERAL.NAME'| translate}}</mat-label>
+          <input appTitleCase matInput formControlName="name" required autocomplete="off" />
+          @if (isControlInvalid('name','required')) {
+            <mat-error>
+              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+          <mat-label>{{'GENERAL.PRICE'| translate}}</mat-label>
+          <input type="number" matInput min="0" formControlName="price" required autocomplete="off"/>
+          <mat-icon matPrefix>attach_money</mat-icon>
+          @if (isControlInvalid('price','required')) {
+            <mat-error>
+              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.PRICE'| translate } }}
+            </mat-error>
+          }
+          @if (isControlInvalid('price','min')) {
+            <mat-error>
+              {{'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' | translate : { name: 'GENERAL.PRICE'|
+              translate } }}
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+          <mat-label>{{'GENERAL.ORDER'| translate}}</mat-label>
+          <input type="number" matInput formControlName="order" required autocomplete="off" />
+          @if (isControlInvalid('order','required')) {
+            <mat-error>
+              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.ORDER'| translate } }}
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <!-- <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+        <mat-label>{{'GENERAL.BUSINESS_ID'| translate}}</mat-label>
+        <input matInput formControlName="businessId" autocomplete="off" />
+      </mat-form-field> -->
+
+      <div class="row">
+        <mat-slide-toggle formControlName="isActive">{{'GENERAL.ACTIVE'| translate}}</mat-slide-toggle>
+      </div>
+      <div class="row mt-3">
+        <mat-slide-toggle formControlName="availableToSale">
+          {{'PRODUCT.AVAILABLE_TO_SALE'| translate}}
+        </mat-slide-toggle>
+      </div>
+      <div class="row mt-3">
+        <mat-slide-toggle formControlName="discountFromInvantory">
+          {{'PRODUCT.DISCOUNT_FROM_INVENTORY'| translate}}
+        </mat-slide-toggle>
+      </div>
     </div>
-    <div class="modal-body">
-        <form class="form" id="product_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
-            <div class="row">
-                <div class="col-md-10 col-lg-8 mx-auto">
-                    <!-- <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.CATEGORY'| translate}}</mat-label>
-                        <mat-select name="Categoría" formControlName="categoryId" required>
-                            <mat-option *ngFor="let category of categories$ | async" [value]="category.id">
-                                {{category.name}}
-                            </mat-option>
-                        </mat-select>
-                        <mat-error *ngIf="isControlInvalid('categoryId','required')">
-                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.CATEGORY'| translate } }}
-                        </mat-error>
-                    </mat-form-field> -->
-
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.NAME'| translate}}</mat-label>
-                        <input appTitleCase matInput formControlName="name" required autocomplete="off" />
-                        <mat-error *ngIf="isControlInvalid('name','required')">
-                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
-                        </mat-error>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.PRICE'| translate}}</mat-label>
-                        <input type="number" matInput min="0" formControlName="price" required autocomplete="off"/>
-                        <mat-icon matPrefix>attach_money</mat-icon>
-                        <mat-error *ngIf="isControlInvalid('price','required')">
-                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.PRICE'| translate } }}
-                        </mat-error>
-                        <mat-error *ngIf="isControlInvalid('price','min')">
-                            {{'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' | translate : { name: 'GENERAL.PRICE'|
-                            translate } }}
-                        </mat-error>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.ORDER'| translate}}</mat-label>
-                        <input type="number" matInput formControlName="order" required autocomplete="off" />
-                        <mat-error *ngIf="isControlInvalid('order','required')">
-                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.ORDER'| translate } }}
-                        </mat-error>
-                    </mat-form-field>
-
-                    <!-- <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.BUSINESS_ID'| translate}}</mat-label>
-                        <input matInput formControlName="businessId" autocomplete="off" />
-                    </mat-form-field> -->
-
-                    <div class="row">
-                        <mat-slide-toggle formControlName="isActive">{{'GENERAL.ACTIVE'| translate}}</mat-slide-toggle>
-                    </div>
-                    <div class="row mt-3">
-                        <mat-slide-toggle formControlName="availableToSale">
-                            {{'PRODUCT.AVAILABLE_TO_SALE'| translate}}
-                        </mat-slide-toggle>
-                    </div>
-                    <div class="row mt-3">
-                        <mat-slide-toggle formControlName="discountFromInvantory">
-                            {{'PRODUCT.DISCOUNT_FROM_INVENTORY'| translate}}
-                        </mat-slide-toggle>
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="modal-footer">
-        <button mat-fab extended color="primary" (click)="closeModal()">
-            <mat-icon>close</mat-icon>
-            {{ 'GENERAL.CLOSE' | translate}}
-        </button>
-        <button mat-fab extended color="primary" (click)="onSubmit()">
-            <mat-icon>save</mat-icon>
-            {{ (!product ? 'GENERAL.SAVE' : 'GENERAL.UPDATE') | translate}}
-        </button>
-    </div>
+  </div>
+</form>
+</div>
+<div class="modal-footer">
+  <button mat-fab extended color="primary" (click)="closeModal()">
+    <mat-icon>close</mat-icon>
+    {{ 'GENERAL.CLOSE' | translate}}
+  </button>
+  <button mat-fab extended color="primary" (click)="onSubmit()">
+    <mat-icon>save</mat-icon>
+    {{ (!product ? 'GENERAL.SAVE' : 'GENERAL.UPDATE') | translate}}
+  </button>
+</div>
 </div>

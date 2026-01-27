@@ -7,25 +7,33 @@
       <div class="row">
         <div class="col-md-8 col-lg-6 mx-auto">
           <!--begin::Owner Form Group-->
-          <mat-form-field *ngIf="isOwnerAdmin" appearance="outline" floatLabel="auto" class="mat-form-field">
-            <mat-label>{{'GENERAL.OWNER'| translate}}</mat-label>
-            <mat-select name="Owner" formControlName="ownerId" required [disabled]="!!editStoreId">
-              <mat-option *ngFor="let owner of ownersDataSource | async" [value]="owner.id">
-                {{owner.fullName}}
-              </mat-option>
-            </mat-select>
-            <mat-error *ngIf="isControlInvalid('ownerId','required')">
-              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.OWNER'| translate } }}
-            </mat-error>
-          </mat-form-field>
+          @if (isOwnerAdmin) {
+            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+              <mat-label>{{'GENERAL.OWNER'| translate}}</mat-label>
+              <mat-select name="Owner" formControlName="ownerId" required [disabled]="!!editStoreId">
+                @for (owner of ownersDataSource | async; track owner) {
+                  <mat-option [value]="owner.id">
+                    {{owner.fullName}}
+                  </mat-option>
+                }
+              </mat-select>
+              @if (isControlInvalid('ownerId','required')) {
+                <mat-error>
+                  {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.OWNER'| translate } }}
+                </mat-error>
+              }
+            </mat-form-field>
+          }
 
           <!--begin::Name Form Group-->
           <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
             <mat-label>{{'GENERAL.NAME'| translate}}</mat-label>
             <input appTitleCase matInput formControlName="name" required autocomplete="off" />
-            <mat-error *ngIf="isControlInvalid('name','required')">
-              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
-            </mat-error>
+            @if (isControlInvalid('name','required')) {
+              <mat-error>
+                {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
+              </mat-error>
+            }
           </mat-form-field>
 
           <!--begin::address Form Group-->
@@ -35,31 +43,39 @@
           </mat-form-field>
 
           <!--begin::description Form Group-->
-          <mat-form-field *ngIf="isOwnerAdmin" appearance="outline" floatLabel="auto" class="mat-form-field">
-            <mat-label>{{'GENERAL.DESCRIPTION'| translate}}</mat-label>
-            <input appTitleCase matInput formControlName="description" autocomplete="off" />
-          </mat-form-field>
+          @if (isOwnerAdmin) {
+            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+              <mat-label>{{'GENERAL.DESCRIPTION'| translate}}</mat-label>
+              <input appTitleCase matInput formControlName="description" autocomplete="off" />
+            </mat-form-field>
+          }
 
           <!--begin::PaymentStartDate Form Group-->
           @if (isSuperAdmin && editStoreId) {
-          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-            <mat-label>{{'STORE.PAYMENT_START_DATE'| translate}}</mat-label>
-            <input matInput [matDatepicker]="picker" formControlName="paymentStartDate" required autocomplete="off">
-            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-            <mat-datepicker #picker></mat-datepicker>
-            <mat-error *ngIf="isControlInvalid('paymentStartDate','required')">
-              {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'STORE.PAYMENT_START_DATE'| translate } }}
-            </mat-error>
-          </mat-form-field>
+            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+              <mat-label>{{'STORE.PAYMENT_START_DATE'| translate}}</mat-label>
+              <input matInput [matDatepicker]="picker" formControlName="paymentStartDate" required autocomplete="off">
+              <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+              <mat-datepicker #picker></mat-datepicker>
+              @if (isControlInvalid('paymentStartDate','required')) {
+                <mat-error>
+                  {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'STORE.PAYMENT_START_DATE'| translate } }}
+                </mat-error>
+              }
+            </mat-form-field>
           }
 
-          <mat-slide-toggle *ngIf="isOwnerAdmin" formControlName="approved" class="mt-2">
-            {{ 'GENERAL.APPROVED' | translate}}
-          </mat-slide-toggle>
+          @if (isOwnerAdmin) {
+            <mat-slide-toggle formControlName="approved" class="mt-2">
+              {{ 'GENERAL.APPROVED' | translate}}
+            </mat-slide-toggle>
+          }
 
-          <mat-slide-toggle *ngIf="isOwnerAdmin" formControlName="isActive" class="mt-4" style="display: block;">
-            {{ 'GENERAL.ACTIVE' | translate}}
-          </mat-slide-toggle>
+          @if (isOwnerAdmin) {
+            <mat-slide-toggle formControlName="isActive" class="mt-4" style="display: block;">
+              {{ 'GENERAL.ACTIVE' | translate}}
+            </mat-slide-toggle>
+          }
 
           <div class="col-12" style="margin-top: 18px;">
             <h5 class="mb-3" class="text-center">{{ 'STORE.SELECT_MODULES' | translate }}</h5>
@@ -78,31 +94,31 @@
                   </thead>
                   <tbody>
                     @for (module of $modules | async; track module) {
-                    <tr>
-                      <td>
-                        <mat-checkbox [checked]="module.selected" (change)="selectModule($event.checked, module.id)"
-                          [disabled]="module.priceIncluded">
-                        </mat-checkbox>
-                      </td>
-                      <td>{{ module.name }}</td>
-                      <!-- <td
-                                      ><span class="d-block"><i class="badge-circle {{ order.status_type }} f-10 m-r-5"></i>{{ order.status }}</span></td
-                                    > -->
-                      <td class="text-end">
-                        @if (module.price !== module.currentPrice) {
-                        <div class="offer-price">
-                          <span class="current-price">{{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}</span>
-                          <span class="price">{{ module.price | currency:'USD':'symbol':'1.2-2' }}</span>
-                        </div>
-                        } @else {
-                        <span style="font-weight: bold;">
-                          {{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}
-                        </span>
-                        }
-                        <!-- <i *ngIf="module.discountText && module.discountText !== ''" class="fa fa-genderless text-info icon-xl"></i> -->
-                      </td>
-                      <!-- <td class="text-end">{{ module.discountText }}</td> -->
-                    </tr>
+                      <tr>
+                        <td>
+                          <mat-checkbox [checked]="module.selected" (change)="selectModule($event.checked, module.id)"
+                            [disabled]="module.priceIncluded">
+                          </mat-checkbox>
+                        </td>
+                        <td>{{ module.name }}</td>
+                        <!-- <td
+                        ><span class="d-block"><i class="badge-circle {{ order.status_type }} f-10 m-r-5"></i>{{ order.status }}</span></td
+                        > -->
+                        <td class="text-end">
+                          @if (module.price !== module.currentPrice) {
+                            <div class="offer-price">
+                              <span class="current-price">{{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}</span>
+                              <span class="price">{{ module.price | currency:'USD':'symbol':'1.2-2' }}</span>
+                            </div>
+                          } @else {
+                            <span style="font-weight: bold;">
+                              {{ module.currentPrice | currency:'USD':'symbol':'1.2-2' }}
+                            </span>
+                          }
+                          <!-- <i *ngIf="module.discountText && module.discountText !== ''" class="fa fa-genderless text-info icon-xl"></i> -->
+                        </td>
+                        <!-- <td class="text-end">{{ module.discountText }}</td> -->
+                      </tr>
                     }
                   </tbody>
                   <tfoot>
@@ -111,14 +127,14 @@
                       <td>{{ 'GENERAL.TOTAL_PRICE' | translate }}</td>
                       <td class="text-end">
                         @if (getTotalPrice() !== getTotalCurrentPrice()) {
-                        <div class="offer-price">
-                          <span class="current-price">{{ getTotalCurrentPrice() | currency:'USD':'symbol':'1.2-2' }}</span>
-                          <span class="price">{{ getTotalPrice() | currency:'USD':'symbol':'1.2-2' }}</span>
-                        </div>
+                          <div class="offer-price">
+                            <span class="current-price">{{ getTotalCurrentPrice() | currency:'USD':'symbol':'1.2-2' }}</span>
+                            <span class="price">{{ getTotalPrice() | currency:'USD':'symbol':'1.2-2' }}</span>
+                          </div>
                         } @else {
-                        <span style="font-weight: bold;">
-                          {{ getTotalCurrentPrice() | currency:'USD':'symbol':'1.2-2' }}
-                        </span>
+                          <span style="font-weight: bold;">
+                            {{ getTotalCurrentPrice() | currency:'USD':'symbol':'1.2-2' }}
+                          </span>
                         }
                       </td>
                     </tr>
@@ -134,16 +150,16 @@
     <div class="card-footer">
       <div class="text-center">
         <!-- <button type="submit" class="btn btn-primary" [disabled]="formGroup.pristine">{{'GENERAL.SAVE_CHANGES'|
-                    translate}}</button> -->
-        <button mat-fab extended class="mt-2" color="primary">
-          @if (!editStoreId) {
+      translate}}</button> -->
+      <button mat-fab extended class="mt-2" color="primary">
+        @if (!editStoreId) {
           <mat-icon>add</mat-icon>
-          } @else {
+        } @else {
           <mat-icon>edit</mat-icon>
-          }
-          {{ (!editStoreId ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
-        </button>
-      </div>
+        }
+        {{ (!editStoreId ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
+      </button>
     </div>
-  </form>
+  </div>
+</form>
 </div>

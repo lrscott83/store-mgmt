@@ -1,69 +1,79 @@
 <div class="modal-content">
-    <div class="modal-header">
-        <h4 class="modal-title" id="modal-basic-title">
-            {{(!expense ? 'EXPENSE.NEW_EXPENSE' : 'EXPENSE.EDIT_EXPENSE') | translate}}
-        </h4>
-        <button (click)="closeModal()" class="closeButton btn btn-transparent" type="button">
-            <i class="closeButton ki ki-close"></i>
-        </button>
-    </div>
-    <div class="modal-body">
-        <form class="form" id="product_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
-            <div class="row">
-                <div class="col-md-10 col-lg-8 mx-auto">
-                    <!--begin::Product Form Group-->
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>Tipo</mat-label>
-                        <mat-select name="Tipo de Gasto" [(value)]="expenseType">
-                            <mat-option *ngFor="let type of expenseTypes" [value]="type.value">
-                                {{type.label}}
-                            </mat-option>
-                        </mat-select>
-                    </mat-form-field>
+  <div class="modal-header">
+    <h4 class="modal-title" id="modal-basic-title">
+      {{(!expense ? 'EXPENSE.NEW_EXPENSE' : 'EXPENSE.EDIT_EXPENSE') | translate}}
+    </h4>
+    <button (click)="closeModal()" class="closeButton btn btn-transparent" type="button">
+      <i class="closeButton ki ki-close"></i>
+    </button>
+  </div>
+  <div class="modal-body">
+    <form class="form" id="product_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-md-10 col-lg-8 mx-auto">
+          <!--begin::Product Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>Tipo</mat-label>
+            <mat-select name="Tipo de Gasto" [(value)]="expenseType">
+              @for (type of expenseTypes; track type) {
+                <mat-option [value]="type.value">
+                  {{type.label}}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
 
-                    <!--begin::Price Form Group-->
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.TOTAL'| translate}}</mat-label>
-                        <input type="number" matInput min=0 formControlName="total" required autocomplete="off" />
-                        <mat-icon matPrefix>attach_money</mat-icon>
-                        <mat-error *ngIf="isControlInvalid('total','required')">
-                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.COST_PRICE'| translate } }}
-                        </mat-error>
-                        <mat-error *ngIf="isControlInvalid('total','min')">
-                            {{'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' | translate : { name: 'GENERAL.COST_PRICE'|
-                            translate } }}
-                        </mat-error>
-                        <mat-error *ngIf="isControlInvalid('total','pattern')">
-                            {{ 'GENERAL.VALIDATION.INVALID_FLOAT' | translate }}
-                        </mat-error>
-                    </mat-form-field>
+          <!--begin::Price Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.TOTAL'| translate}}</mat-label>
+            <input type="number" matInput min=0 formControlName="total" required autocomplete="off" />
+            <mat-icon matPrefix>attach_money</mat-icon>
+            @if (isControlInvalid('total','required')) {
+              <mat-error>
+                {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.COST_PRICE'| translate } }}
+              </mat-error>
+            }
+            @if (isControlInvalid('total','min')) {
+              <mat-error>
+                {{'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' | translate : { name: 'GENERAL.COST_PRICE'|
+                translate } }}
+              </mat-error>
+            }
+            @if (isControlInvalid('total','pattern')) {
+              <mat-error>
+                {{ 'GENERAL.VALIDATION.INVALID_FLOAT' | translate }}
+              </mat-error>
+            }
+          </mat-form-field>
 
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>Forma de Pago</mat-label>
-                        <mat-select name="Forma de Pago" [(value)]="paymentType">
-                            <mat-option *ngFor="let type of paymentTypes" [value]="type.value">
-                                {{type.label}}
-                            </mat-option>
-                        </mat-select>
-                    </mat-form-field>
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>Forma de Pago</mat-label>
+            <mat-select name="Forma de Pago" [(value)]="paymentType">
+              @for (type of paymentTypes; track type) {
+                <mat-option [value]="type.value">
+                  {{type.label}}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
 
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.NOTE'| translate}}</mat-label>
-                        <textarea matInput appTitleCase formControlName="note" autocomplete="off"
-                            matTextareaAutosize matAutosizeMinRows="2" matAutosizeMaxRows="5"></textarea>
-                    </mat-form-field>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="modal-footer">
-        <button mat-fab extended color="primary" (click)="closeModal()">
-            <mat-icon>close</mat-icon>
-            {{ 'GENERAL.CLOSE' | translate}}
-        </button>
-        <button mat-fab extended color="primary" (click)="onSubmit()">
-            <mat-icon>save</mat-icon>
-            {{ (!expense ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
-        </button>
-    </div>
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.NOTE'| translate}}</mat-label>
+            <textarea matInput appTitleCase formControlName="note" autocomplete="off"
+            matTextareaAutosize matAutosizeMinRows="2" matAutosizeMaxRows="5"></textarea>
+          </mat-form-field>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button mat-fab extended color="primary" (click)="closeModal()">
+      <mat-icon>close</mat-icon>
+      {{ 'GENERAL.CLOSE' | translate}}
+    </button>
+    <button mat-fab extended color="primary" (click)="onSubmit()">
+      <mat-icon>save</mat-icon>
+      {{ (!expense ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
+    </button>
+  </div>
 </div>

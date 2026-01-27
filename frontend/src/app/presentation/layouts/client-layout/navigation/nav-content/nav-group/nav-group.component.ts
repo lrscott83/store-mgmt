@@ -1,6 +1,6 @@
 // Angular import
 import { Component, Input, OnInit } from '@angular/core';
-import { CommonModule, Location } from '@angular/common';
+import { Location } from '@angular/common';
 
 // project import
 import { NavigationItem } from '../../navigation';
@@ -11,7 +11,7 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
     selector: 'app-nav-group',
-    imports: [CommonModule, SharedModule, NavCollapseComponent, NavItemComponent],
+    imports: [SharedModule, NavCollapseComponent, NavItemComponent],
     templateUrl: './nav-group.component.html',
     styleUrls: ['./nav-group.component.scss']
 })

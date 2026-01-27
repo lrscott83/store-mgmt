@@ -1,45 +1,49 @@
 <div class="card card-custom gutter-b">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'PRODUCT.PRODUCTS'"></h3>
-        </div>
-        <div class="card-toolbar">
-            <button mat-fab extended color="primary" (click)="openCreateCategoryModal()">
-                <mat-icon>add</mat-icon>
-                {{'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY'| translate}}
-            </button>
-        </div>
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label" [translate]="'PRODUCT.PRODUCTS'"></h3>
     </div>
-    <div class="card-body p-2">
-        <div class="row">
-            <div *ngIf="(categories$ | async).length === 0"
-                class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-                <div class="alert-text">{{'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY_ALERT_MESSAGE' | translate}}</div>
-            </div>
-        </div>
-
-        <div class="row text-end">
-            <div class="col text-end m-2">
-                <button mat-fab extended color="primary" (click)="openImportCsvProductModal()">
-                    <mat-icon>attach_file</mat-icon>
-                    {{ 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' | translate}}
-                </button>
-            </div>
-        </div>
-
-        <mat-accordion multi>
-            <mat-expansion-panel [expanded]="false" *ngFor="let category of categories$ | async">
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">{{category.name}}</span>
-                        <div class="w-100 text-end">
-                            <span>{{category.productsCount}}</span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <app-category-product-list class="p-2" [category]="category"
-                    (categoryUpdated)="updateCategory()"></app-category-product-list>
-            </mat-expansion-panel>
-        </mat-accordion>
+    <div class="card-toolbar">
+      <button mat-fab extended color="primary" (click)="openCreateCategoryModal()">
+        <mat-icon>add</mat-icon>
+        {{'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY'| translate}}
+      </button>
     </div>
+  </div>
+  <div class="card-body p-2">
+    <div class="row">
+      @if ((categories$ | async).length === 0) {
+        <div
+          class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+          <div class="alert-text">{{'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY_ALERT_MESSAGE' | translate}}</div>
+        </div>
+      }
+    </div>
+
+    <div class="row text-end">
+      <div class="col text-end m-2">
+        <button mat-fab extended color="primary" (click)="openImportCsvProductModal()">
+          <mat-icon>attach_file</mat-icon>
+          {{ 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' | translate}}
+        </button>
+      </div>
+    </div>
+
+    <mat-accordion multi>
+      @for (category of categories$ | async; track category) {
+        <mat-expansion-panel [expanded]="false">
+          <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+            <mat-panel-title>
+              <span class="w-100">{{category.name}}</span>
+              <div class="w-100 text-end">
+                <span>{{category.productsCount}}</span>
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <app-category-product-list class="p-2" [category]="category"
+          (categoryUpdated)="updateCategory()"></app-category-product-list>
+        </mat-expansion-panel>
+      }
+    </mat-accordion>
+  </div>
 </div>

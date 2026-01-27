@@ -1,139 +1,149 @@
 <div class="card card-custom">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'TODAY_STATS.HEADER'"></h3>
-        </div>
-        <div class="card-toolbar">
-            <h3 class="font-weight-bold font-size-lg {{getTotalClassName()}}">
-                {{getTotal() | currency:'USD':'symbol':'1.2-2'}}
-            </h3>
-        </div>
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label" [translate]="'TODAY_STATS.HEADER'"></h3>
     </div>
-    <div class="card-body p-2">
-        <mat-accordion multi>
-            <mat-expansion-panel [expanded]="false">
-                <!-- BEGIN CASH  -->
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">Resumen Efectivo</span>
-                        <div class="w-100 text-end">
-                            <span class="{{getValueClassName(getCashTotal())}}">{{getCashTotal() |
-                                currency:'USD':'symbol':'1.2-2'}}</span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <div class="table-responsive">
-                    <table class="table table-borderless table-vertical-center">
-                        <tbody>
-                            <tr class="border-1">
-                                <td class="p-1">
-                                    <span class="mb-1 font-weight-bold font-size-lg text-black">
-                                        Ventas
-                                    </span>
-                                </td>
-                                <td class="p-1 text-end">
-                                    <span class="mb-1 font-weight-bold font-size-lg text-success">
-                                        {{salesCashTotal | currency:'USD':'symbol':'1.2-2'}}
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr *ngIf="hasCreditsModuleAvailable" class="border-1">
-                                <td class="p-1">
-                                    <span class="mb-1 font-weight-bold font-size-lg text-black">
-                                        Créditos Pagados
-                                    </span>
-                                </td>
-                                <td class="p-1 text-end">
-                                    <span class="mb-1 font-weight-bold font-size-lg text-success">
-                                        {{paidCreditsCashTotal | currency:'USD':'symbol':'1.2-2'}}
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr *ngIf="hasExpensesModuleAvailable" class="border-1">
-                                <td class="p-1">
-                                    <span class="mb-1 font-weight-bold font-size-lg text-black">
-                                        Gastos
-                                    </span>
-                                </td>
-                                <td class="p-1 text-end">
-                                    <span class="mb-1 font-weight-bold font-size-lg text-danger">
-                                        {{expensesCashTotal | currency:'USD':'symbol':'1.2-2'}}
-                                    </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <!-- END CASH  -->
-            </mat-expansion-panel>
-
-            <mat-expansion-panel *ngIf="hasExpensesModuleAvailable" [expanded]="false">
-                <!-- BEGIN EXPENSES  -->
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">Gastos ({{getExpensesCount()}})</span>
-                        <div class="w-100 text-end">
-                            <span class="text-danger">
-                                {{getExpensesTotal() | currency:'USD':'symbol':'1.2-2'}}
-                            </span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <app-expense-list [expenses$]="expenses$.asObservable()"></app-expense-list>
-                <!-- END EXPENSES  -->
-            </mat-expansion-panel>
-
-            <mat-expansion-panel *ngIf="hasCreditsModuleAvailable" [expanded]="false">
-                <!-- BEGIN CREDITS  -->
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">Créditos Por Cobrar ({{getCreditsCount()}})</span>
-                        <div class="w-100 text-end">
-                            <span class="text-danger">
-                                {{getCreditsTotal() | currency:'USD':'symbol':'1.2-2'}}
-                            </span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <app-sale-credit-list [saleCredits$]="saleCredits$.asObservable()">
-
-                </app-sale-credit-list>
-                <!-- END CREDITS  -->
-            </mat-expansion-panel>
-
-            <mat-expansion-panel *ngIf="hasCreditsModuleAvailable" [expanded]="false">
-                <!-- BEGIN PAID CREDITS  -->
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">Créditos Pagados ({{getPaidSaleCreditsTotal()}})</span>
-                        <div class="w-100 text-end">
-                            <span class="text-success">
-                                {{getPaidSaleCreditsTotal() | currency:'USD':'symbol':'1.2-2'}}
-                            </span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <app-sale-credit-list [saleCredits$]="paidSaleCredits$.asObservable()">
-
-                </app-sale-credit-list>
-                <!-- END PAID CREDITS  -->
-            </mat-expansion-panel>
-
-            <mat-expansion-panel [expanded]="false">
-                <!-- BEGIN SALES  -->
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">Ventas ({{getOrdersItemsCount()}} productos)</span>
-                        <div class="w-100 text-end">
-                            <span class="text-success">
-                                {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
-                            </span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <app-category-stats *ngFor="let category of categories$ | async" [category]=category></app-category-stats>
-                <!-- END SALES  -->
-            </mat-expansion-panel>
-        </mat-accordion>
+    <div class="card-toolbar">
+      <h3 class="font-weight-bold font-size-lg {{getTotalClassName()}}">
+        {{getTotal() | currency:'USD':'symbol':'1.2-2'}}
+      </h3>
     </div>
+  </div>
+  <div class="card-body p-2">
+    <mat-accordion multi>
+      <mat-expansion-panel [expanded]="false">
+        <!-- BEGIN CASH  -->
+        <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+          <mat-panel-title>
+            <span class="w-100">Resumen Efectivo</span>
+            <div class="w-100 text-end">
+              <span class="{{getValueClassName(getCashTotal())}}">{{getCashTotal() |
+              currency:'USD':'symbol':'1.2-2'}}</span>
+            </div>
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+        <div class="table-responsive">
+          <table class="table table-borderless table-vertical-center">
+            <tbody>
+              <tr class="border-1">
+                <td class="p-1">
+                  <span class="mb-1 font-weight-bold font-size-lg text-black">
+                    Ventas
+                  </span>
+                </td>
+                <td class="p-1 text-end">
+                  <span class="mb-1 font-weight-bold font-size-lg text-success">
+                    {{salesCashTotal | currency:'USD':'symbol':'1.2-2'}}
+                  </span>
+                </td>
+              </tr>
+              @if (hasCreditsModuleAvailable) {
+                <tr class="border-1">
+                  <td class="p-1">
+                    <span class="mb-1 font-weight-bold font-size-lg text-black">
+                      Créditos Pagados
+                    </span>
+                  </td>
+                  <td class="p-1 text-end">
+                    <span class="mb-1 font-weight-bold font-size-lg text-success">
+                      {{paidCreditsCashTotal | currency:'USD':'symbol':'1.2-2'}}
+                    </span>
+                  </td>
+                </tr>
+              }
+              @if (hasExpensesModuleAvailable) {
+                <tr class="border-1">
+                  <td class="p-1">
+                    <span class="mb-1 font-weight-bold font-size-lg text-black">
+                      Gastos
+                    </span>
+                  </td>
+                  <td class="p-1 text-end">
+                    <span class="mb-1 font-weight-bold font-size-lg text-danger">
+                      {{expensesCashTotal | currency:'USD':'symbol':'1.2-2'}}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <!-- END CASH  -->
+      </mat-expansion-panel>
+
+      @if (hasExpensesModuleAvailable) {
+        <mat-expansion-panel [expanded]="false">
+          <!-- BEGIN EXPENSES  -->
+          <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+            <mat-panel-title>
+              <span class="w-100">Gastos ({{getExpensesCount()}})</span>
+              <div class="w-100 text-end">
+                <span class="text-danger">
+                  {{getExpensesTotal() | currency:'USD':'symbol':'1.2-2'}}
+                </span>
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <app-expense-list [expenses$]="expenses$.asObservable()"></app-expense-list>
+          <!-- END EXPENSES  -->
+        </mat-expansion-panel>
+      }
+
+      @if (hasCreditsModuleAvailable) {
+        <mat-expansion-panel [expanded]="false">
+          <!-- BEGIN CREDITS  -->
+          <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+            <mat-panel-title>
+              <span class="w-100">Créditos Por Cobrar ({{getCreditsCount()}})</span>
+              <div class="w-100 text-end">
+                <span class="text-danger">
+                  {{getCreditsTotal() | currency:'USD':'symbol':'1.2-2'}}
+                </span>
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <app-sale-credit-list [saleCredits$]="saleCredits$.asObservable()">
+          </app-sale-credit-list>
+          <!-- END CREDITS  -->
+        </mat-expansion-panel>
+      }
+
+      @if (hasCreditsModuleAvailable) {
+        <mat-expansion-panel [expanded]="false">
+          <!-- BEGIN PAID CREDITS  -->
+          <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+            <mat-panel-title>
+              <span class="w-100">Créditos Pagados ({{getPaidSaleCreditsTotal()}})</span>
+              <div class="w-100 text-end">
+                <span class="text-success">
+                  {{getPaidSaleCreditsTotal() | currency:'USD':'symbol':'1.2-2'}}
+                </span>
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <app-sale-credit-list [saleCredits$]="paidSaleCredits$.asObservable()">
+          </app-sale-credit-list>
+          <!-- END PAID CREDITS  -->
+        </mat-expansion-panel>
+      }
+
+      <mat-expansion-panel [expanded]="false">
+        <!-- BEGIN SALES  -->
+        <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+          <mat-panel-title>
+            <span class="w-100">Ventas ({{getOrdersItemsCount()}} productos)</span>
+            <div class="w-100 text-end">
+              <span class="text-success">
+                {{getOrdersTotal() | currency:'USD':'symbol':'1.2-2'}}
+              </span>
+            </div>
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+        @for (category of categories$ | async; track category) {
+          <app-category-stats [category]=category></app-category-stats>
+        }
+        <!-- END SALES  -->
+      </mat-expansion-panel>
+    </mat-accordion>
+  </div>
 </div>

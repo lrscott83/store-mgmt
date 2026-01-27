@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { IconService } from '@ant-design/icons-angular';
@@ -12,7 +12,7 @@ import { TodaySalesStatsHelpDialogComponent } from '../today-sales-stats-help-di
 
 @Component({
     selector: 'app-sales-help-dialog',
-    imports: [TranslateModule, MatIconModule, CommonModule],
+    imports: [TranslateModule, MatIconModule],
     templateUrl: './sales-help-dialog.component.html',
     styleUrl: './sales-help-dialog.component.scss'
 })

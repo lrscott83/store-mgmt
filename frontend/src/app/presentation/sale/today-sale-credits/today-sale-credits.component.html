@@ -1,18 +1,20 @@
 <div class="card card-custom gutter-b">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'SALE_CREDIT.TODAY_CREDITS'"></h3>
-        </div>
-        <div class="card-toolbar">
-            
-        </div>
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label" [translate]="'SALE_CREDIT.TODAY_CREDITS'"></h3>
     </div>
-    <div class="card-body p-2">
-        <div *ngIf="(saleCredits$ | async).length === 0"
-            class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-            <div class="alert-text">{{'SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY' | translate}}</div>
-        </div>
+    <div class="card-toolbar">
 
-        <app-sale-credit-list [saleCredits$]="saleCredits$.asObservable()" [readOnly]="false"></app-sale-credit-list>
     </div>
+  </div>
+  <div class="card-body p-2">
+    @if ((saleCredits$ | async).length === 0) {
+      <div
+        class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+        <div class="alert-text">{{'SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY' | translate}}</div>
+      </div>
+    }
+
+    <app-sale-credit-list [saleCredits$]="saleCredits$.asObservable()" [readOnly]="false"></app-sale-credit-list>
+  </div>
 </div>

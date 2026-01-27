@@ -8,117 +8,133 @@
         <div class="card-body">
           <div class="card-px text-center py-20 my-10">
             <!-- <c-alert color="primary">
-              A simple primary alert with <a cAlertLink [routerLink]>an example link</a>. Give it a click if you like.
-            </c-aler> -->
-            <h3 class="font-weight-bolder text-dark font-size-h4 font-size-h1-lg">{{ 'REGISTRATION.WELCOME' | translate
-              }}</h3>
-            <span class="font-weight-bold font-size-h4">{{'REGISTRATION.ALREADY_ACCOUNT'| translate}}
-              <a [routerLink]="['/login']" class="link-primary" [translate]="'REGISTRATION.SIGNIN_LINK'"></a>
-            </span>
-          </div>
-          <form class="form" [formGroup]="formGroup" novalidate="novalidate" id="kt_login_signup_form"
-            (ngSubmit)="onSubmit()" class="mt-4">
-            @if (hasError) {
+            A simple primary alert with <a cAlertLink [routerLink]>an example link</a>. Give it a click if you like.
+          </c-aler> -->
+          <h3 class="font-weight-bolder text-dark font-size-h4 font-size-h1-lg">{{ 'REGISTRATION.WELCOME' | translate
+          }}</h3>
+          <span class="font-weight-bold font-size-h4">{{'REGISTRATION.ALREADY_ACCOUNT'| translate}}
+            <a [routerLink]="['/login']" class="link-primary" [translate]="'REGISTRATION.SIGNIN_LINK'"></a>
+          </span>
+        </div>
+        <form class="form" [formGroup]="formGroup" novalidate="novalidate" id="kt_login_signup_form"
+          (ngSubmit)="onSubmit()" class="mt-4">
+          @if (hasError) {
             <div class="alert alert-custom alert-light-danger alert-dismissible text-center">
               <div class="alert-text">{{errorMessage}}</div>
             </div>
+          }
+
+          <!-- Full Name -->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'USER.FULL_NAME'| translate}}</mat-label>
+            <input matInput formControlName="fullName" required autocomplete="off">
+            @if (isControlInvalid('fullName','required')) {
+              <mat-error>{{'GENERAL.VALIDATION.REQUIRED'| translate : {
+              name: 'USER.FULL_NAME'| translate } }}</mat-error>
             }
+          </mat-form-field>
 
-            <!-- Full Name -->
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'USER.FULL_NAME'| translate}}</mat-label>
-              <input matInput formControlName="fullName" required autocomplete="off">
-              <mat-error *ngIf="isControlInvalid('fullName','required')">{{'GENERAL.VALIDATION.REQUIRED'| translate : {
-                name: 'USER.FULL_NAME'| translate } }}</mat-error>
-            </mat-form-field>
-
-            <!-- Login -->
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'GENERAL.LOGIN'| translate}}</mat-label>
-              <input matInput formControlName="login" required autocomplete="off">
-              <mat-error *ngIf="isControlInvalid('login','required')">
+          <!-- Login -->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.LOGIN'| translate}}</mat-label>
+            <input matInput formControlName="login" required autocomplete="off">
+            @if (isControlInvalid('login','required')) {
+              <mat-error>
                 {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.LOGIN'| translate } }}
               </mat-error>
-            </mat-form-field>
+            }
+          </mat-form-field>
 
-            <!-- Password -->
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'GENERAL.PASSWORD'| translate}}</mat-label>
-              <input matInput formControlName="password" required autocomplete="off"
-                [type]="showPassword ? 'text' : 'password'">
-              <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
-                <mat-icon>{{showPassword ? 'visibility' : 'visibility_off'}}</mat-icon>
-              </button>
-              <mat-error *ngIf="isControlInvalid('password','required')">{{'GENERAL.VALIDATION.REQUIRED'| translate : {
-                name: 'GENERAL.PASSWORD'| translate } }}</mat-error>
-              <mat-error *ngIf="isControlInvalid('password','pattern')">{{'GENERAL.VALIDATION.PASSWORD_POLICY'|
-                translate}}</mat-error>
-            </mat-form-field>
+          <!-- Password -->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.PASSWORD'| translate}}</mat-label>
+            <input matInput formControlName="password" required autocomplete="off"
+              [type]="showPassword ? 'text' : 'password'">
+            <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
+              <mat-icon>{{showPassword ? 'visibility' : 'visibility_off'}}</mat-icon>
+            </button>
+            @if (isControlInvalid('password','required')) {
+              <mat-error>{{'GENERAL.VALIDATION.REQUIRED'| translate : {
+              name: 'GENERAL.PASSWORD'| translate } }}</mat-error>
+            }
+            @if (isControlInvalid('password','pattern')) {
+              <mat-error>{{'GENERAL.VALIDATION.PASSWORD_POLICY'|
+              translate}}</mat-error>
+            }
+          </mat-form-field>
 
-            <!--begin::Confirm Password Form Group-->
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'GENERAL.CONFIRM_PASSWORD'| translate}}</mat-label>
-              <input matInput formControlName="confirmPassword" required autocomplete="off"
-                [type]="showPassword ? 'text' : 'password'">
-              <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
-                <mat-icon>{{showPassword ? 'visibility' : 'visibility_off'}}</mat-icon>
-              </button>
-              <mat-error *ngIf="isControlInvalid('confirmPassword','required')">{{'GENERAL.VALIDATION.REQUIRED'|
-                translate : { name: 'GENERAL.CONFIRM_PASSWORD'| translate } }}</mat-error>
+          <!--begin::Confirm Password Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.CONFIRM_PASSWORD'| translate}}</mat-label>
+            <input matInput formControlName="confirmPassword" required autocomplete="off"
+              [type]="showPassword ? 'text' : 'password'">
+            <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
+              <mat-icon>{{showPassword ? 'visibility' : 'visibility_off'}}</mat-icon>
+            </button>
+            @if (isControlInvalid('confirmPassword','required')) {
+              <mat-error>{{'GENERAL.VALIDATION.REQUIRED'|
+              translate : { name: 'GENERAL.CONFIRM_PASSWORD'| translate } }}</mat-error>
+            }
+            @if (isControlInvalid('confirmPassword','passwordMatch')) {
               <mat-error
-                *ngIf="isControlInvalid('confirmPassword','passwordMatch')">{{'GENERAL.VALIDATION.INVALID_PASSWORD'|
+                >{{'GENERAL.VALIDATION.INVALID_PASSWORD'|
                 translate : { name: 'GENERAL.CONFIRM_PASSWORD'| translate
-                } }}</mat-error>
-            </mat-form-field>
+              } }}</mat-error>
+            }
+          </mat-form-field>
 
-            <!--begin::Cell Phone Form Group-->
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'GENERAL.CELL_PHONE'| translate}}</mat-label>
-              <input matInput formControlName="cellPhone" required autocomplete="off" prefix="+53 " mask="0 000-0000"
-                placeholder="+530 000-0000">
-              <!-- <span matTextPrefix>+53&nbsp;</span> -->
-              <mat-error *ngIf="isControlInvalid('cellPhone','required')">
+          <!--begin::Cell Phone Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.CELL_PHONE'| translate}}</mat-label>
+            <input matInput formControlName="cellPhone" required autocomplete="off" prefix="+53 " mask="0 000-0000"
+              placeholder="+530 000-0000">
+            <!-- <span matTextPrefix>+53&nbsp;</span> -->
+            @if (isControlInvalid('cellPhone','required')) {
+              <mat-error>
                 {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.CELL_PHONE'| translate } }}
               </mat-error>
-            </mat-form-field>
+            }
+          </mat-form-field>
 
-            <!--begin::Email Form Group-->
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'GENERAL.EMAIL'| translate}}</mat-label>
-              <input matInput formControlName="email" autocomplete="off" [placeholder]="email">
-            </mat-form-field>
+          <!--begin::Email Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.EMAIL'| translate}}</mat-label>
+            <input matInput formControlName="email" autocomplete="off" [placeholder]="email">
+          </mat-form-field>
 
-            <!--begin::Store Name Form Group-->
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'STORE.STORE_NAME'| translate}}</mat-label>
-              <input appTitleCase matInput formControlName="storeName" required autocomplete="off" />
-              <mat-error *ngIf="isControlInvalid('storeName','required')">
+          <!--begin::Store Name Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'STORE.STORE_NAME'| translate}}</mat-label>
+            <input appTitleCase matInput formControlName="storeName" required autocomplete="off" />
+            @if (isControlInvalid('storeName','required')) {
+              <mat-error>
                 {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'STORE.STORE_NAME'| translate } }}
               </mat-error>
-            </mat-form-field>
+            }
+          </mat-form-field>
 
-            <mat-slide-toggle formControlName="accept" class="mt-2">
-              {{'REGISTRATION.ACCEPT_CONDITIONS'| translate}}
-              <a target="_blank" [routerLink]="['/terminos-condiciones']" class="link-primary"
-                [translate]="'REGISTRATION.TERMS_CONDITIONS'">
-              </a>
-            </mat-slide-toggle>
+          <mat-slide-toggle formControlName="accept" class="mt-2">
+            {{'REGISTRATION.ACCEPT_CONDITIONS'| translate}}
+            <a target="_blank" [routerLink]="['/terminos-condiciones']" class="link-primary"
+              [translate]="'REGISTRATION.TERMS_CONDITIONS'">
+            </a>
+          </mat-slide-toggle>
 
-            <div class="row mt-4">
-              <div class="d-grid form-group">
-                <div class="text-center text-dark">
-                  <span>{{ 'REGISTRATION.INFO_TERMS_CONDITIONS' | translate }}</span>
-                </div>
-                <button mat-fab extended class="mt-2" color="primary" [disabled]="!formGroup.controls['accept'].value">
-                  <mat-icon>lock_open</mat-icon>
-                  {{'REGISTRATION.SIGNUP_BUTTON' | translate}}
-                </button>
+          <div class="row mt-4">
+            <div class="d-grid form-group">
+              <div class="text-center text-dark">
+                <span>{{ 'REGISTRATION.INFO_TERMS_CONDITIONS' | translate }}</span>
               </div>
+              <button mat-fab extended class="mt-2" color="primary" [disabled]="!formGroup.controls['accept'].value">
+                <mat-icon>lock_open</mat-icon>
+                {{'REGISTRATION.SIGNUP_BUTTON' | translate}}
+              </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
-      <app-guest-footer></app-guest-footer>
     </div>
+    <app-guest-footer></app-guest-footer>
   </div>
+</div>
 </div>

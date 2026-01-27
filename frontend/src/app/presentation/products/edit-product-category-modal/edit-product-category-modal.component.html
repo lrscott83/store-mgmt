@@ -1,44 +1,48 @@
 <div class="modal-content">
-    <div class="modal-header">
-        <h4 class="modal-title" id="modal-basic-title">
-            {{(!category ? 'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY' : 'PRODUCT_CATEGORY.EDIT_PRODUCT_CATEGORY') | translate}}
-        </h4>
-        <button (click)="closeModal()" type="button" class="btn btn-close"></button>
-    </div>
-    <div class="modal-body">
-        <form class="form" id="product_category_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
-            <div class="row">
-                <div class="col-md-10 col-lg-8 mx-auto">
-                    <!--begin::Name Form Group-->
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.NAME'| translate}}</mat-label>
-                        <input appTitleCase matInput formControlName="name" required autocomplete="off" />
-                        <mat-error *ngIf="isControlInvalid('name','required')">
-                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
-                        </mat-error>
-                    </mat-form-field>
-                    <!--begin::address Form Group-->
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.ORDER'| translate}}</mat-label>
-                        <input type="number" matInput formControlName="order" required autocomplete="off"/>
-                        <mat-error *ngIf="isControlInvalid('order','required')">
-                            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.ORDER' | translate } }}
-                        </mat-error>
-                    </mat-form-field>
-                    <!--begin::Active Form Group-->
-                    <mat-slide-toggle formControlName="isActive">{{'GENERAL.ACTIVE'| translate}}</mat-slide-toggle>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="modal-footer">
-        <button mat-fab extended color="primary" (click)="closeModal()">
-            <mat-icon>close</mat-icon>
-            {{ 'GENERAL.CLOSE' | translate}}
-        </button>
-        <button mat-fab extended color="primary" (click)="onSubmit()">
-            <mat-icon>save</mat-icon>
-            {{ (!category ? 'GENERAL.SAVE' : 'GENERAL.UPDATE') | translate}}
-        </button>
-    </div>
+  <div class="modal-header">
+    <h4 class="modal-title" id="modal-basic-title">
+      {{(!category ? 'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY' : 'PRODUCT_CATEGORY.EDIT_PRODUCT_CATEGORY') | translate}}
+    </h4>
+    <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+  </div>
+  <div class="modal-body">
+    <form class="form" id="product_category_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-md-10 col-lg-8 mx-auto">
+          <!--begin::Name Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.NAME'| translate}}</mat-label>
+            <input appTitleCase matInput formControlName="name" required autocomplete="off" />
+            @if (isControlInvalid('name','required')) {
+              <mat-error>
+                {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.NAME'| translate } }}
+              </mat-error>
+            }
+          </mat-form-field>
+          <!--begin::address Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.ORDER'| translate}}</mat-label>
+            <input type="number" matInput formControlName="order" required autocomplete="off"/>
+            @if (isControlInvalid('order','required')) {
+              <mat-error>
+                {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.ORDER' | translate } }}
+              </mat-error>
+            }
+          </mat-form-field>
+          <!--begin::Active Form Group-->
+          <mat-slide-toggle formControlName="isActive">{{'GENERAL.ACTIVE'| translate}}</mat-slide-toggle>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button mat-fab extended color="primary" (click)="closeModal()">
+      <mat-icon>close</mat-icon>
+      {{ 'GENERAL.CLOSE' | translate}}
+    </button>
+    <button mat-fab extended color="primary" (click)="onSubmit()">
+      <mat-icon>save</mat-icon>
+      {{ (!category ? 'GENERAL.SAVE' : 'GENERAL.UPDATE') | translate}}
+    </button>
+  </div>
 </div>

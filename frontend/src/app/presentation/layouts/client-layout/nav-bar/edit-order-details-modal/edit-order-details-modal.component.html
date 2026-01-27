@@ -1,40 +1,42 @@
 <div class="modal-content">
-    <div class="modal-header">
-        <h4 class="modal-title" id="modal-basic-title">
-            {{'SHOPPING_CART.EDIT_DETAILS' | translate}}
-        </h4>
-        <button (click)="closeModal()" type="button" class="btn btn-close"></button>
-    </div>
-    <div class="modal-body">
-        <form class="form" id="product_category_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
-            <div class="row">
-                <div class="col-md-10 col-lg-8 mx-auto">
-                    <!--begin::Order Type Form Group-->
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>Tipo de venta</mat-label>
-                        <mat-select name="Tipo de Venta" [(value)]="orderType" formControlName="orderType" required>
-                            <mat-option *ngFor="let type of orderTypes" [value]="type.value">
-                                {{type.label}}
-                            </mat-option>
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                        <mat-label>{{'GENERAL.DESCRIPTION'| translate}}</mat-label>
-                        <textarea matInput appTitleCase formControlName="description" autocomplete="off"
-                            matTextareaAutosize matAutosizeMinRows="2" matAutosizeMaxRows="5"></textarea>
-                    </mat-form-field>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="modal-footer">
-        <button mat-fab extended color="primary" (click)="closeModal()">
-            <mat-icon>close</mat-icon>
-            {{ 'GENERAL.CLOSE' | translate}}
-        </button>
-        <button mat-fab extended color="primary" (click)="onSubmit()">
-            <mat-icon>save</mat-icon>
-            {{ 'GENERAL.SAVE' | translate}}
-        </button>
-    </div>
+  <div class="modal-header">
+    <h4 class="modal-title" id="modal-basic-title">
+      {{'SHOPPING_CART.EDIT_DETAILS' | translate}}
+    </h4>
+    <button (click)="closeModal()" type="button" class="btn btn-close"></button>
+  </div>
+  <div class="modal-body">
+    <form class="form" id="product_category_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-md-10 col-lg-8 mx-auto">
+          <!--begin::Order Type Form Group-->
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>Tipo de venta</mat-label>
+            <mat-select name="Tipo de Venta" [(value)]="orderType" formControlName="orderType" required>
+              @for (type of orderTypes; track type) {
+                <mat-option [value]="type.value">
+                  {{type.label}}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+            <mat-label>{{'GENERAL.DESCRIPTION'| translate}}</mat-label>
+            <textarea matInput appTitleCase formControlName="description" autocomplete="off"
+            matTextareaAutosize matAutosizeMinRows="2" matAutosizeMaxRows="5"></textarea>
+          </mat-form-field>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button mat-fab extended color="primary" (click)="closeModal()">
+      <mat-icon>close</mat-icon>
+      {{ 'GENERAL.CLOSE' | translate}}
+    </button>
+    <button mat-fab extended color="primary" (click)="onSubmit()">
+      <mat-icon>save</mat-icon>
+      {{ 'GENERAL.SAVE' | translate}}
+    </button>
+  </div>
 </div>

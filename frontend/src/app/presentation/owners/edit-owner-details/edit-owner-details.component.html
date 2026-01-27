@@ -1,81 +1,93 @@
 <form class="form" [formGroup]="formGroup" novalidate="novalidate" id="kt_login_signup_form" (ngSubmit)="onSubmit()"
-    class="mt-4">
-    @if (hasError) {
+  class="mt-4">
+  @if (hasError) {
     <div class="alert alert-custom alert-light-danger alert-dismissible text-center">
-        <div class="alert-text">{{errorMessage}}</div>
+      <div class="alert-text">{{errorMessage}}</div>
     </div>
+  }
+
+  <!-- Login -->
+  <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+    <mat-label>{{'GENERAL.LOGIN'| translate}}</mat-label>
+    <input matInput formControlName="login" required autocomplete="off" [disabled]="true">
+  </mat-form-field>
+
+  <!-- Full Name -->
+  <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+    <mat-label>{{'USER.FULL_NAME'| translate}}</mat-label>
+    <input matInput formControlName="fullName" required autocomplete="off">
+    @if (isControlInvalid('fullName','required')) {
+      <mat-error>{{'GENERAL.VALIDATION.REQUIRED'|
+        translate :
+        {
+      name: 'USER.FULL_NAME'| translate } }}</mat-error>
     }
+  </mat-form-field>
 
-    <!-- Login -->
+  <!--begin::ReSeller Form Group-->
+  @if (isSuperAdmin) {
     <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-        <mat-label>{{'GENERAL.LOGIN'| translate}}</mat-label>
-        <input matInput formControlName="login" required autocomplete="off" [disabled]="true">
+      <mat-label>{{'GENERAL.RESELLER'| translate}}</mat-label>
+      <mat-select name="Gestor" formControlName="reSellerId">
+        @for (reseller of reSellersDataSource | async; track reseller) {
+          <mat-option [value]="reseller.id">
+            {{reseller.fullName}}
+          </mat-option>
+        }
+      </mat-select>
     </mat-form-field>
+  }
 
-    <!-- Full Name -->
-    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-        <mat-label>{{'USER.FULL_NAME'| translate}}</mat-label>
-        <input matInput formControlName="fullName" required autocomplete="off">
-        <mat-error *ngIf="isControlInvalid('fullName','required')">{{'GENERAL.VALIDATION.REQUIRED'|
-            translate :
-            {
-            name: 'USER.FULL_NAME'| translate } }}</mat-error>
-    </mat-form-field>
-
-    <!--begin::ReSeller Form Group-->
-    <mat-form-field *ngIf="isSuperAdmin" appearance="outline" floatLabel="auto" class="mat-form-field">
-        <mat-label>{{'GENERAL.RESELLER'| translate}}</mat-label>
-        <mat-select name="Gestor" formControlName="reSellerId">
-            <mat-option *ngFor="let reseller of reSellersDataSource | async" [value]="reseller.id">
-                {{reseller.fullName}}
-            </mat-option>
-        </mat-select>
-    </mat-form-field>
-
-    <mat-slide-toggle *ngIf="isSuperAdmin" formControlName="isActive" class="mb-4">
-        {{ 'GENERAL.ACTIVE' | translate}}
+  @if (isSuperAdmin) {
+    <mat-slide-toggle formControlName="isActive" class="mb-4">
+      {{ 'GENERAL.ACTIVE' | translate}}
     </mat-slide-toggle>
+  }
 
-    <!--begin::Cell Phone Form Group-->
-    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-        <mat-label>{{'GENERAL.CELL_PHONE'| translate}}</mat-label>
-        <input matInput formControlName="cellPhone" required autocomplete="off" prefix="+53 " mask="0 000-0000"
-            placeholder="+530 000-0000">
-        <!-- <span matTextPrefix>+53&nbsp;</span> -->
-        <mat-error *ngIf="isControlInvalid('cellPhone','required')">
-            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.CELL_PHONE'| translate } }}
+  <!--begin::Cell Phone Form Group-->
+  <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+    <mat-label>{{'GENERAL.CELL_PHONE'| translate}}</mat-label>
+    <input matInput formControlName="cellPhone" required autocomplete="off" prefix="+53 " mask="0 000-0000"
+      placeholder="+530 000-0000">
+      <!-- <span matTextPrefix>+53&nbsp;</span> -->
+      @if (isControlInvalid('cellPhone','required')) {
+        <mat-error>
+          {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.CELL_PHONE'| translate } }}
         </mat-error>
+      }
     </mat-form-field>
 
     <!--begin::Email Form Group-->
     <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-        <mat-label>{{'GENERAL.EMAIL'| translate}}</mat-label>
-        <input matInput formControlName="email" required autocomplete="off" [placeholder]="email">
-        <!-- <mat-error *ngIf="isControlInvalid('email','required')">
-            {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.LOGIN'| translate } }}
-        </mat-error> -->
-        <mat-error *ngIf="isControlInvalid('email','email')">
-            {{'GENERAL.VALIDATION.INVALID'| translate : { name: 'GENERAL.EMAIL'| translate } }}
-        </mat-error>
-    </mat-form-field>
+      <mat-label>{{'GENERAL.EMAIL'| translate}}</mat-label>
+      <input matInput formControlName="email" required autocomplete="off" [placeholder]="email">
+      <!-- <mat-error *ngIf="isControlInvalid('email','required')">
+      {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.LOGIN'| translate } }}
+    </mat-error> -->
+    @if (isControlInvalid('email','email')) {
+      <mat-error>
+        {{'GENERAL.VALIDATION.INVALID'| translate : { name: 'GENERAL.EMAIL'| translate } }}
+      </mat-error>
+    }
+  </mat-form-field>
 
-    <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-        <mat-label>{{'GENERAL.DESCRIPTION'| translate}}</mat-label>
-        <textarea matInput appTitleCase formControlName="description" autocomplete="off" matTextareaAutosize
-            matAutosizeMinRows="2" matAutosizeMaxRows="5"></textarea>
-    </mat-form-field>
+  <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+    <mat-label>{{'GENERAL.DESCRIPTION'| translate}}</mat-label>
+    <textarea matInput appTitleCase formControlName="description" autocomplete="off" matTextareaAutosize
+    matAutosizeMinRows="2" matAutosizeMaxRows="5"></textarea>
+  </mat-form-field>
 
-    <div class="row mt-4">
-        <div class="d-grid form-group">
-            <button mat-fab extended class="mt-2" color="primary" [disabled]="formGroup.pristine">
-                @if (!ownerId) {
-                <mat-icon>add</mat-icon>
-                } @else {
-                <mat-icon>edit</mat-icon>
-                }
-                {{ (!ownerId ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
-            </button>
-        </div>
+  <div class="row mt-4">
+    <div class="d-grid form-group">
+      <button mat-fab extended class="mt-2" color="primary" [disabled]="formGroup.pristine">
+        @if (!ownerId) {
+          <mat-icon>add</mat-icon>
+        } @else {
+          <mat-icon>edit</mat-icon>
+        }
+        {{ (!ownerId ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate}}
+      </button>
     </div>
+  </div>
 
 </form>

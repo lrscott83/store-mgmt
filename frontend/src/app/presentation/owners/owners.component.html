@@ -1,79 +1,89 @@
 <!-- <div class="row"> -->
-    <div class="card card-custom gutter-b">
-        <div class="card-header">
-            <div class="card-title">
-                <h3 class="card-label">{{ 'MENU.ADMIN.OWNERS' | translate }}</h3>
-            </div>
-            <div class="card-toolbar">
-                <!-- <button mat-fab extended color="primary" (click)="openCreateOwnerModal()">
-                    <mat-icon>add</mat-icon>
-                    {{'GENERAL.ADD' | translate}}
-                </button> -->
-            </div>
-        </div>
-        <!-- <div class="card-body"> -->
-        <div class="row row-cols-1 row-cols-md-3 g-4" style="margin-top: 2px;">
-            <div class="col mt-6" *ngFor="let owner of owners$ | async">
-                <mat-card class="h-100 {{getOwnerBackgroundColor(owner)}}">
-                    <div class="card-header-custom">
-                        <!-- <mat-card-header class="w-100"> -->
-                        <mat-card-title class="text-left w-100">
-                            <span class="w-100">
-                                {{ owner.fullName }}
-                            </span>
-                        </mat-card-title>
-                        <div fxFlex></div>
-                        <button mat-icon-button color="primary" class="card-header-action-button"
-                            [matMenuTriggerFor]="menu" aria-label="Actions">
-                            <mat-icon>settings</mat-icon>
-                        </button>
-                        <mat-menu #menu="matMenu">
-                            <button mat-menu-item class="btn" routerLink="/admin/owners/edit/{{owner.id}}"
-                                routerLinkActive="active">
-                                <mat-icon color="primary">edit</mat-icon>
-                                <span>{{ 'OWNER.EDIT_OWNER' | translate }}</span>
-                            </button>
-                            <button *ngIf="owner.isActive && owner.guest" mat-menu-item class="btn"
-                                (click)="approveOwner(owner)">
-                                <mat-icon color="accent">edit</mat-icon>
-                                <span>{{ 'OWNER.APPROVE_OWNER' | translate }}</span>
-                            </button>
-                            <button *ngIf="owner.isActive" mat-menu-item class="btn" (click)="deactivateOwner(owner)">
-                                <mat-icon color="primary">edit</mat-icon>
-                                <span>{{ 'OWNER.DEACTIVATE_OWNER' | translate }}</span>
-                            </button>
-                            <button *ngIf="!owner.isActive" mat-menu-item class="btn" (click)="activateOwner(owner)">
-                                <mat-icon color="primary">edit</mat-icon>
-                                <span>{{ 'OWNER.ACTIVATE_OWNER' | translate }}</span>
-                            </button>
-                            <button mat-menu-item class="btn" (click)="deleteOwner(owner)">
-                                <mat-icon color="warn">delete</mat-icon>
-                                <span>{{ 'GENERAL.DELETE' | translate }}</span>
-                            </button>
-                            <!-- <button mat-menu-item 
-                                    (click)="updateIsMain(address.id)">
-                                    <mat-icon color="primary">local_post_office</mat-icon>
-                                    <span>{{'CARRIER.ADDRESS.SET_AS_MAIN_BUTTON' | translate}}</span>
-                                </button> -->
-                        </mat-menu>
-                        <!-- </mat-card-header> -->
-                    </div>
-                    <mat-divider></mat-divider>
-                    <mat-card-content>
-                        <p style="margin-top: 6px;">{{ getOwnerStorePrice(owner) | currency:'USD':'symbol':'1.2-2' }} {{ getOwnerStoreCountText(owner) }}</p>
-                        <!-- @if (owner.reSellerName) { -->
-                        <p>{{ 'GENERAL.RESELLER' | translate }}: {{owner.reSellerName ? owner.reSellerName : 'ADMIN'}}</p>
-                        <!-- } -->
-                        <p>{{owner.cellPhone}}</p>
-                        <p *ngIf="owner.email">{{owner.email}}</p>
-                        <p>{{owner.description}}</p>
-                    </mat-card-content>
-                </mat-card>
-            </div>
-        </div>
-        <!-- <angular-slickgrid gridId="ownerGrid" [columnDefinitions]="columnDefinitions" [gridOptions]="gridOptions"
-                [dataset]="owners$ | async">
-            </angular-slickgrid> -->
-        <!-- </div> -->
+<div class="card card-custom gutter-b">
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label">{{ 'MENU.ADMIN.OWNERS' | translate }}</h3>
     </div>
+    <div class="card-toolbar">
+      <!-- <button mat-fab extended color="primary" (click)="openCreateOwnerModal()">
+      <mat-icon>add</mat-icon>
+      {{'GENERAL.ADD' | translate}}
+    </button> -->
+  </div>
+</div>
+<!-- <div class="card-body"> -->
+<div class="row row-cols-1 row-cols-md-3 g-4" style="margin-top: 2px;">
+  @for (owner of owners$ | async; track owner) {
+    <div class="col mt-6">
+      <mat-card class="h-100 {{getOwnerBackgroundColor(owner)}}">
+        <div class="card-header-custom">
+          <!-- <mat-card-header class="w-100"> -->
+          <mat-card-title class="text-left w-100">
+            <span class="w-100">
+              {{ owner.fullName }}
+            </span>
+          </mat-card-title>
+          <div fxFlex></div>
+          <button mat-icon-button color="primary" class="card-header-action-button"
+            [matMenuTriggerFor]="menu" aria-label="Actions">
+            <mat-icon>settings</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item class="btn" routerLink="/admin/owners/edit/{{owner.id}}"
+              routerLinkActive="active">
+              <mat-icon color="primary">edit</mat-icon>
+              <span>{{ 'OWNER.EDIT_OWNER' | translate }}</span>
+            </button>
+            @if (owner.isActive && owner.guest) {
+              <button mat-menu-item class="btn"
+                (click)="approveOwner(owner)">
+                <mat-icon color="accent">edit</mat-icon>
+                <span>{{ 'OWNER.APPROVE_OWNER' | translate }}</span>
+              </button>
+            }
+            @if (owner.isActive) {
+              <button mat-menu-item class="btn" (click)="deactivateOwner(owner)">
+                <mat-icon color="primary">edit</mat-icon>
+                <span>{{ 'OWNER.DEACTIVATE_OWNER' | translate }}</span>
+              </button>
+            }
+            @if (!owner.isActive) {
+              <button mat-menu-item class="btn" (click)="activateOwner(owner)">
+                <mat-icon color="primary">edit</mat-icon>
+                <span>{{ 'OWNER.ACTIVATE_OWNER' | translate }}</span>
+              </button>
+            }
+            <button mat-menu-item class="btn" (click)="deleteOwner(owner)">
+              <mat-icon color="warn">delete</mat-icon>
+              <span>{{ 'GENERAL.DELETE' | translate }}</span>
+            </button>
+            <!-- <button mat-menu-item
+            (click)="updateIsMain(address.id)">
+            <mat-icon color="primary">local_post_office</mat-icon>
+            <span>{{'CARRIER.ADDRESS.SET_AS_MAIN_BUTTON' | translate}}</span>
+          </button> -->
+        </mat-menu>
+      <!-- </mat-card-header> -->
+    </div>
+    <mat-divider></mat-divider>
+    <mat-card-content>
+      <p style="margin-top: 6px;">{{ getOwnerStorePrice(owner) | currency:'USD':'symbol':'1.2-2' }} {{ getOwnerStoreCountText(owner) }}</p>
+      <!-- @if (owner.reSellerName) { -->
+      <p>{{ 'GENERAL.RESELLER' | translate }}: {{owner.reSellerName ? owner.reSellerName : 'ADMIN'}}</p>
+      <!-- } -->
+      <p>{{owner.cellPhone}}</p>
+      @if (owner.email) {
+        <p>{{owner.email}}</p>
+      }
+      <p>{{owner.description}}</p>
+    </mat-card-content>
+  </mat-card>
+</div>
+}
+</div>
+<!-- <angular-slickgrid gridId="ownerGrid" [columnDefinitions]="columnDefinitions" [gridOptions]="gridOptions"
+[dataset]="owners$ | async">
+</angular-slickgrid> -->
+<!-- </div> -->
+</div>
 <!-- </div> -->

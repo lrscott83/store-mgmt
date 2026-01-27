@@ -1,60 +1,62 @@
 <div class="row row-cols-1 row-cols-md-3 g-4" style="margin-top: 2px;">
-    <div class="col mt-6" *ngFor="let store of stores$ | async">
-        <div class="col-sm-12 col-md-6 col-lg-4">
-            <mat-card class="h-100 {{getStoreBackgroundColor(store)}}">
-                <div class="card-header-custom">
-                    <mat-card-title class="text-left w-100">
-                        <span class="w-100">
-                            {{ store.name }}
-                        </span>
-                    </mat-card-title>
-                    <div fxFlex></div>
-                    <!-- 
-                <button mat-mini-fab color="primary" aria-label="Acciones" [matMenuTriggerFor]="matMenu">
-                    <mat-icon>settings</mat-icon>
-                </button> -->
-                    <button mat-icon-button color="primary" class="card-header-action-button"
-                        [matMenuTriggerFor]="matMenu" aria-label="Actions">
-                        <mat-icon>settings</mat-icon>
-                    </button>
-                    <mat-menu #matMenu="matMenu">
-                        <button mat-menu-item class="btn" routerLink="/management/stores/edit/{{store.id}}"
-                            routerLinkActive="active">
-                            <mat-icon color="primary">edit</mat-icon>
-                            <span>{{ 'GENERAL.EDIT' | translate }}</span>
-                        </button>
-                        @if (isSuperAdmin) {
-                        @if (!store.approved) {
-                        <button mat-menu-item (click)="onApproved(store)" class="btn">
-                            <mat-icon color="primary">edit</mat-icon>
-                            <span>{{ 'LIST_ACTION_BUTTON.APPROVE' | translate }}</span>
-                        </button>
-                        } @else {
-                        <button mat-menu-item (click)="onDisapproved(store)" class="btn">
-                            <mat-icon color="warn">edit</mat-icon>
-                            <span>{{ 'LIST_ACTION_BUTTON.DISAPPROVE' | translate }}</span>
-                        </button>
-                        }
-                        }
-                        <!-- @if (store.isActive) {
-                        <button mat-menu-item (click)="onDeactivate(store)" class="btn">
-                            <mat-icon color="warn">delete</mat-icon>
-                            <span>{{ 'LIST_ACTION_BUTTON.DEACTIVATE' | translate }}</span>
-                        </button>
-                        } @else {
-                        <button mat-menu-item (click)="onActivate(store)" class="btn">
-                            <mat-icon color="primary">edit</mat-icon>
-                            <span>{{ 'LIST_ACTION_BUTTON.ACTIVATE' | translate }}</span>
-                        </button>
-                        } -->
-                    </mat-menu>
-                </div>
-                <mat-divider></mat-divider>
-                <mat-card-content>
-                    <p style="margin-top: 6px;">{{store.address}}</p>
-                    <p>{{store.description}}</p>
-                </mat-card-content>
-            </mat-card>
-        </div>
+  @for (store of stores$ | async; track store) {
+    <div class="col mt-6">
+      <div class="col-sm-12 col-md-6 col-lg-4">
+        <mat-card class="h-100 {{getStoreBackgroundColor(store)}}">
+          <div class="card-header-custom">
+            <mat-card-title class="text-left w-100">
+              <span class="w-100">
+                {{ store.name }}
+              </span>
+            </mat-card-title>
+            <div fxFlex></div>
+            <!--
+            <button mat-mini-fab color="primary" aria-label="Acciones" [matMenuTriggerFor]="matMenu">
+              <mat-icon>settings</mat-icon>
+            </button> -->
+            <button mat-icon-button color="primary" class="card-header-action-button"
+              [matMenuTriggerFor]="matMenu" aria-label="Actions">
+              <mat-icon>settings</mat-icon>
+            </button>
+            <mat-menu #matMenu="matMenu">
+              <button mat-menu-item class="btn" routerLink="/management/stores/edit/{{store.id}}"
+                routerLinkActive="active">
+                <mat-icon color="primary">edit</mat-icon>
+                <span>{{ 'GENERAL.EDIT' | translate }}</span>
+              </button>
+              @if (isSuperAdmin) {
+                @if (!store.approved) {
+                  <button mat-menu-item (click)="onApproved(store)" class="btn">
+                    <mat-icon color="primary">edit</mat-icon>
+                    <span>{{ 'LIST_ACTION_BUTTON.APPROVE' | translate }}</span>
+                  </button>
+                } @else {
+                  <button mat-menu-item (click)="onDisapproved(store)" class="btn">
+                    <mat-icon color="warn">edit</mat-icon>
+                    <span>{{ 'LIST_ACTION_BUTTON.DISAPPROVE' | translate }}</span>
+                  </button>
+                }
+              }
+              <!-- @if (store.isActive) {
+              <button mat-menu-item (click)="onDeactivate(store)" class="btn">
+                <mat-icon color="warn">delete</mat-icon>
+                <span>{{ 'LIST_ACTION_BUTTON.DEACTIVATE' | translate }}</span>
+              </button>
+            } @else {
+              <button mat-menu-item (click)="onActivate(store)" class="btn">
+                <mat-icon color="primary">edit</mat-icon>
+                <span>{{ 'LIST_ACTION_BUTTON.ACTIVATE' | translate }}</span>
+              </button>
+              } -->
+            </mat-menu>
+          </div>
+          <mat-divider></mat-divider>
+          <mat-card-content>
+            <p style="margin-top: 6px;">{{store.address}}</p>
+            <p>{{store.description}}</p>
+          </mat-card-content>
+        </mat-card>
+      </div>
     </div>
+  }
 </div>

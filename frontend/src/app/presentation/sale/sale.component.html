@@ -1,41 +1,45 @@
 <div class="card card-custom gutter-b">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'SALES.HEADER'"></h3>
-        </div>
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label" [translate]="'SALES.HEADER'"></h3>
     </div>
-    <div class="card-body p-2">
-        <!-- <div class="row">
-            <div *ngIf="(categories$ | async).length === 0" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-                <div class="alert-text">{{'SALES.NO_CATEGORY_ALERT_MESSAGE' | translate}}</div>
-            </div>
-            <div class="col">
-                <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-                    <mat-label>{{'GENERAL.CATEGORY'| translate}}</mat-label>
-                    <mat-select name="Categoría" [formControl]="storeControl" required>
-                        <mat-option (onSelectionChange)="onCategorySelectionChange($event)" *ngFor="let category of categories$ | async" [value]="category">
-                            {{category.name}}
-                        </mat-option>
-                    </mat-select>
-                </mat-form-field>
-            </div>
-        </div> -->
-
-        <div class="scrollmenu no-scrollbar" style="margin-bottom: 12px;">
-            <button *ngFor="let category of categories$ | async" (click)="selectCategory(category)" type="button" color="primary" class="btn btn-primary cursor-pointer category-button">
-                <!-- <mat-icon>touch_app</mat-icon> -->
-                {{category.name}}
-            </button>
-        </div>
-
-        <app-sale-category-products [category]="selectedCategory()" [orderType]="orderType"></app-sale-category-products>
-
-        <div class="row">
-            <div *ngIf="((categories$ | async).length > 0) && !(selectedCategory$ | async)" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-                <div class="alert-text">
-                    {{ 'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE' | translate }}
-                </div>
-            </div>
-        </div>
+  </div>
+  <div class="card-body p-2">
+    <!-- <div class="row">
+    <div *ngIf="(categories$ | async).length === 0" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+      <div class="alert-text">{{'SALES.NO_CATEGORY_ALERT_MESSAGE' | translate}}</div>
     </div>
+    <div class="col">
+      <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+        <mat-label>{{'GENERAL.CATEGORY'| translate}}</mat-label>
+        <mat-select name="Categoría" [formControl]="storeControl" required>
+          <mat-option (onSelectionChange)="onCategorySelectionChange($event)" *ngFor="let category of categories$ | async" [value]="category">
+            {{category.name}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div> -->
+
+  <div class="scrollmenu no-scrollbar" style="margin-bottom: 12px;">
+    @for (category of categories$ | async; track category) {
+      <button (click)="selectCategory(category)" type="button" color="primary" class="btn btn-primary cursor-pointer category-button">
+        <!-- <mat-icon>touch_app</mat-icon> -->
+        {{category.name}}
+      </button>
+    }
+  </div>
+
+  <app-sale-category-products [category]="selectedCategory()" [orderType]="orderType"></app-sale-category-products>
+
+  <div class="row">
+    @if (((categories$ | async).length > 0) && !(selectedCategory$ | async)) {
+      <div class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+        <div class="alert-text">
+          {{ 'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE' | translate }}
+        </div>
+      </div>
+    }
+  </div>
+</div>
 </div>

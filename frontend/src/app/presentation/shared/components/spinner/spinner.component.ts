@@ -1,7 +1,7 @@
 // Angular import
-import { Component, Input, OnDestroy, Inject, ViewEncapsulation, effect, signal } from '@angular/core';
+import { Component, Input, OnDestroy, Inject, ViewEncapsulation, effect, signal, DOCUMENT } from '@angular/core';
 import { Router, NavigationStart, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
-import { DOCUMENT } from '@angular/common';
+
 
 // project import
 import { Spinkit } from './spinkits';

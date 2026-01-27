@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { Component } from '@angular/core';
 import { SharedModule } from '../shared/shared.module';
 import {
@@ -34,11 +34,10 @@ export type ChartOptions = {
 @Component({
     selector: 'app-admin-dashboard',
     imports: [
-        CommonModule,
-        SharedModule,
-        NgApexchartsModule,
-        TranslateModule,
-    ],
+    SharedModule,
+    NgApexchartsModule,
+    TranslateModule
+],
     templateUrl: './admin-dashboard.component.html',
     styleUrl: './admin-dashboard.component.scss'
 })

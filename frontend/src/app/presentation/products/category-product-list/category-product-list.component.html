@@ -1,60 +1,64 @@
-<div *ngIf="((products$ | async).length === 0)"
+@if (((products$ | async).length === 0)) {
+  <div
     class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
     <div class="alert-text">
-        {{'PRODUCT_CATEGORY.NO_PRODUCT_FOUND' | translate}}
+      {{'PRODUCT_CATEGORY.NO_PRODUCT_FOUND' | translate}}
     </div>
-</div>
+  </div>
+}
 
 <div class="row text-end">
-    <!-- <div class="col-md-10 col-lg-8 mx-auto"> -->
-    <div class="col text-start">
-        <button mat-fab extended color="primary" (click)="openEditCategoryModal()" class="m-1">
-            <mat-icon>edit</mat-icon>
-            {{'PRODUCT_CATEGORY.EDIT_CATEGORY'| translate}}
-        </button>
-    </div>
-    <div class="col text-end">
-        <button mat-fab extended color="primary" (click)="openAddProductsModal()" class="m-1">
-            <mat-icon>add</mat-icon>
-            {{'PRODUCT.NEW_PRODUCTS'| translate}}
-        </button>
-        <button mat-fab extended color="primary" (click)="openAddProductModal()">
-            <mat-icon>add</mat-icon>
-            {{'PRODUCT.NEW_PRODUCT'| translate}}
-        </button>
-    </div>
+  <!-- <div class="col-md-10 col-lg-8 mx-auto"> -->
+  <div class="col text-start">
+    <button mat-fab extended color="primary" (click)="openEditCategoryModal()" class="m-1">
+      <mat-icon>edit</mat-icon>
+      {{'PRODUCT_CATEGORY.EDIT_CATEGORY'| translate}}
+    </button>
+  </div>
+  <div class="col text-end">
+    <button mat-fab extended color="primary" (click)="openAddProductsModal()" class="m-1">
+      <mat-icon>add</mat-icon>
+      {{'PRODUCT.NEW_PRODUCTS'| translate}}
+    </button>
+    <button mat-fab extended color="primary" (click)="openAddProductModal()">
+      <mat-icon>add</mat-icon>
+      {{'PRODUCT.NEW_PRODUCT'| translate}}
+    </button>
+  </div>
 </div>
 
 <div class="table-responsive mt-4">
-    <table class="table table-borderless table-vertical-center">
-        <tbody>
-            <tr *ngFor="let product of products$ | async" class="border-1">
-                <td class="p-2">
-                    <span class="text-dark mb-1 font-size-lg">
-                        {{product.name}}
-                    </span>
-                </td>
-                <td class="p-2 text-right">
-                    <span class="text-primary mb-1 font-size-lg">
-                        {{product.price | currency:'USD':'symbol':'1.2-2'}}
-                    </span>
-                </td>
-                <td class="text-right p-2" style="text-align: right;">
-                    <button mat-icon-button color="primary" [matMenuTriggerFor]="menuProduct" aria-label="Acciones">
-                        <mat-icon>settings</mat-icon>
-                    </button>
-                    <mat-menu #menuProduct="matMenu">
-                        <button mat-menu-item (click)="openEditProductModal(product)">
-                            <mat-icon color="primary">edit</mat-icon>
-                            <span>{{ 'PRODUCT.EDIT_PRODUCT' | translate }}</span>
-                        </button>
-                        <button mat-menu-item (click)="onDeleteProduct(product.id)">
-                            <mat-icon color="warn">delete</mat-icon>
-                            <span>{{ 'PRODUCT.DELETE_PRODUCT' | translate }}</span>
-                        </button>
-                    </mat-menu>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+  <table class="table table-borderless table-vertical-center">
+    <tbody>
+      @for (product of products$ | async; track product) {
+        <tr class="border-1">
+          <td class="p-2">
+            <span class="text-dark mb-1 font-size-lg">
+              {{product.name}}
+            </span>
+          </td>
+          <td class="p-2 text-right">
+            <span class="text-primary mb-1 font-size-lg">
+              {{product.price | currency:'USD':'symbol':'1.2-2'}}
+            </span>
+          </td>
+          <td class="text-right p-2" style="text-align: right;">
+            <button mat-icon-button color="primary" [matMenuTriggerFor]="menuProduct" aria-label="Acciones">
+              <mat-icon>settings</mat-icon>
+            </button>
+            <mat-menu #menuProduct="matMenu">
+              <button mat-menu-item (click)="openEditProductModal(product)">
+                <mat-icon color="primary">edit</mat-icon>
+                <span>{{ 'PRODUCT.EDIT_PRODUCT' | translate }}</span>
+              </button>
+              <button mat-menu-item (click)="onDeleteProduct(product.id)">
+                <mat-icon color="warn">delete</mat-icon>
+                <span>{{ 'PRODUCT.DELETE_PRODUCT' | translate }}</span>
+              </button>
+            </mat-menu>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
 </div>

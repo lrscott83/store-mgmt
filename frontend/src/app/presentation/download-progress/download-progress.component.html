@@ -1,19 +1,19 @@
-<div class="download-overlay" *ngIf="show">
+@if (show) {
+  <div class="download-overlay">
     <div class="download-container">
-        <div class="download-content">
-            <h2>{{ title }}</h2>
-            <p>{{ message }}</p>
-
-            <div class="progress-container">
-                <div class="progress-bar" [style.width.%]="progress">
-                    <span class="progress-text">{{ progress }}%</span>
-                </div>
-            </div>
-
-            <div class="progress-details">
-                <span>{{ downloadedSize | fileSize }} / {{ totalSize | fileSize }}</span>
-                <span>{{ estimatedTime }}</span>
-            </div>
+      <div class="download-content">
+        <h2>{{ title }}</h2>
+        <p>{{ message }}</p>
+        <div class="progress-container">
+          <div class="progress-bar" [style.width.%]="progress">
+            <span class="progress-text">{{ progress }}%</span>
+          </div>
         </div>
+        <div class="progress-details">
+          <span>{{ downloadedSize | fileSize }} / {{ totalSize | fileSize }}</span>
+          <span>{{ estimatedTime }}</span>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
+}

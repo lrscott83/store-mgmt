@@ -1,31 +1,35 @@
 <div class="card card-custom ">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'INVENTORY.INVENTORY'"></h3>
-        </div>
-        <div class="card-toolbar">
-            <span class="text-primary font-weight-bold font-size-lg">
-                {{getInventoryCostTotal() | currency:'USD':'symbol':'1.2-2'}}
-            </span>
-        </div>
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label" [translate]="'INVENTORY.INVENTORY'"></h3>
     </div>
-    <div class="card-body p-2">
-        <div *ngIf="((categories$ | async).length === 0)" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-            <div class="alert-text">{{'INVENTORY.NO_ENTRY_FOUND' | translate}}</div>
-        </div>
+    <div class="card-toolbar">
+      <span class="text-primary font-weight-bold font-size-lg">
+        {{getInventoryCostTotal() | currency:'USD':'symbol':'1.2-2'}}
+      </span>
+    </div>
+  </div>
+  <div class="card-body p-2">
+    @if (((categories$ | async).length === 0)) {
+      <div class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+        <div class="alert-text">{{'INVENTORY.NO_ENTRY_FOUND' | translate}}</div>
+      </div>
+    }
 
-        <mat-accordion multi>
-            <mat-expansion-panel [expanded]="false" *ngFor="let category of categories$ | async" >
-                <mat-expansion-panel-header class="p-2" class="mat-panel-header">
-                    <mat-panel-title>
-                        <span class="w-100">{{category.categoryName}} ({{category.totalQuantity}})</span>
-                        <div class="w-100 text-end">
-                            <span class="text-primary">{{category.totalCostPrice | currency:'USD':'symbol':'1.2-2'}}</span>
-                        </div>
-                    </mat-panel-title>
-                </mat-expansion-panel-header>
-                <app-inventory-product-list [products]="category.products" class="p-2"></app-inventory-product-list>
-            </mat-expansion-panel>
-        </mat-accordion>
-    </div>
+    <mat-accordion multi>
+      @for (category of categories$ | async; track category) {
+        <mat-expansion-panel [expanded]="false" >
+          <mat-expansion-panel-header class="p-2" class="mat-panel-header">
+            <mat-panel-title>
+              <span class="w-100">{{category.categoryName}} ({{category.totalQuantity}})</span>
+              <div class="w-100 text-end">
+                <span class="text-primary">{{category.totalCostPrice | currency:'USD':'symbol':'1.2-2'}}</span>
+              </div>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <app-inventory-product-list [products]="category.products" class="p-2"></app-inventory-product-list>
+        </mat-expansion-panel>
+      }
+    </mat-accordion>
+  </div>
 </div>

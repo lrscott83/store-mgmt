@@ -1,40 +1,42 @@
 <div class="table-responsive">
-    <table class="table table-borderless table-vertical-center">
-        <tbody>
-            <tr style="border-color: black; border-bottom-width: thin;">
-                <td class="pl-0">
-                    <span class="text-dark font-weight-bolder mb-1 font-size-lg">
-                        {{ category.name }}
-                    </span>
-                </td>
-                <td class="text-end">
-                    <span class="label label-success font-weight-bold mb-1 font-size-lg">
-                        ({{ category.itemsCount }})
-                    </span>
-                </td>
-                <td class="text-end pr-0">
-                    <span class="text-success font-weight-bold mb-1 font-size-lg">
-                        {{ category.total | currency:'USD':'symbol':'1.2-2' }}
-                    </span>
-                </td>
-            </tr>
-            <tr *ngFor="let product of category.productItems">
-                <td class="pl-0">
-                    <span class="text-dark font-weight-bolder mb-1 font-size-lg">
-                        {{ product.name }}
-                    </span>
-                </td>
-                <td class="text-end">
-                    <span class="label label-success font-weight-bold mb-1 font-size-lg">
-                        ({{ product.itemsCount }})
-                    </span>
-                </td>
-                <td class="text-end pr-0">
-                    <span class="text-success font-weight-bold mb-1 font-size-lg">
-                        {{ product.total | currency:'USD':'symbol':'1.2-2' }}
-                    </span>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+  <table class="table table-borderless table-vertical-center">
+    <tbody>
+      <tr style="border-color: black; border-bottom-width: thin;">
+        <td class="pl-0">
+          <span class="text-dark font-weight-bolder mb-1 font-size-lg">
+            {{ category.name }}
+          </span>
+        </td>
+        <td class="text-end">
+          <span class="label label-success font-weight-bold mb-1 font-size-lg">
+            ({{ category.itemsCount }})
+          </span>
+        </td>
+        <td class="text-end pr-0">
+          <span class="text-success font-weight-bold mb-1 font-size-lg">
+            {{ category.total | currency:'USD':'symbol':'1.2-2' }}
+          </span>
+        </td>
+      </tr>
+      @for (product of category.productItems; track product) {
+        <tr>
+          <td class="pl-0">
+            <span class="text-dark font-weight-bolder mb-1 font-size-lg">
+              {{ product.name }}
+            </span>
+          </td>
+          <td class="text-end">
+            <span class="label label-success font-weight-bold mb-1 font-size-lg">
+              ({{ product.itemsCount }})
+            </span>
+          </td>
+          <td class="text-end pr-0">
+            <span class="text-success font-weight-bold mb-1 font-size-lg">
+              {{ product.total | currency:'USD':'symbol':'1.2-2' }}
+            </span>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
 </div>

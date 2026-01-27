@@ -1,27 +1,29 @@
 <div class="modal-content">
-    <div class="modal-header">
-        <h4 class="modal-title" id="modal-basic-title">
-            {{ 'SALE_CREDIT.PAYMENT_CREDIT' | translate }}
-        </h4>
-        <button (click)="closeModal()" class="closeButton btn btn-transparent" type="button">
-            <i class="closeButton ki ki-close"></i>
-        </button>
-    </div>
-    <div class="modal-body">
-        <mat-radio-group [(ngModel)]="paymentType">
-          <mat-radio-button *ngFor="let type of paymentTypes" [value]="type.value">
-              {{type.label}}
-            </mat-radio-button>
-        </mat-radio-group>
-    </div>
-    <div class="modal-footer">
-        <button mat-fab extended color="primary" (click)="closeModal()">
-            <mat-icon>close</mat-icon>
-            {{ 'GENERAL.CLOSE' | translate}}
-        </button>
-        <button mat-fab extended color="primary" (click)="onSubmit()">
-            <mat-icon>edit</mat-icon>
-            {{ 'GENERAL.UPDATE' | translate}}
-        </button>
-    </div>
+  <div class="modal-header">
+    <h4 class="modal-title" id="modal-basic-title">
+      {{ 'SALE_CREDIT.PAYMENT_CREDIT' | translate }}
+    </h4>
+    <button (click)="closeModal()" class="closeButton btn btn-transparent" type="button">
+      <i class="closeButton ki ki-close"></i>
+    </button>
+  </div>
+  <div class="modal-body">
+    <mat-radio-group [(ngModel)]="paymentType">
+      @for (type of paymentTypes; track type) {
+        <mat-radio-button [value]="type.value">
+          {{type.label}}
+        </mat-radio-button>
+      }
+    </mat-radio-group>
+  </div>
+  <div class="modal-footer">
+    <button mat-fab extended color="primary" (click)="closeModal()">
+      <mat-icon>close</mat-icon>
+      {{ 'GENERAL.CLOSE' | translate}}
+    </button>
+    <button mat-fab extended color="primary" (click)="onSubmit()">
+      <mat-icon>edit</mat-icon>
+      {{ 'GENERAL.UPDATE' | translate}}
+    </button>
+  </div>
 </div>

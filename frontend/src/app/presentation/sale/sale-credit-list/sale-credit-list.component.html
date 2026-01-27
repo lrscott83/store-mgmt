@@ -1,39 +1,47 @@
 <div class="table-responsive">
-    <table class="table table-borderless table-vertical-center">
-        <tbody>
-            <tr *ngFor="let saleCredit of saleCredits$ | async" class="border-1">
-                <td class="p-1">
-                    <span class="text-dark mb-1 font-size-lg">
-                        {{saleCredit.client}}
-                    </span>
-                </td>
-                <td class="p-1 text-end">
-                    <span class="mb-1 font-size-lg {{getSaleCreditClassName(saleCredit)}}">
-                        {{saleCredit.total | currency:'USD':'symbol':'1.2-2'}}
-                    </span>
-                </td>
-                <td class="p-1 text-end">
-                    <span *ngIf="saleCredit.isPaid" class="label label-success font-weight-bold font-size-lg">
-                        {{saleCredit.paidDate | date: onlyDateFormat : 'UTC'}}
-                    </span>
-                </td>
-                <td *ngIf="!readOnly" class="text-end p-0">
-                    <button mat-icon-button color="primary" class="card-header-action-button"
-                        [matMenuTriggerFor]="menuSaleCredit" aria-label="Acciones">
-                        <mat-icon>settings</mat-icon>
-                    </button>
-                    <mat-menu #menuSaleCredit="matMenu">
-                        <button mat-menu-item (click)="openEditSaleCreditModal(saleCredit)">
-                            <mat-icon color="primary">edit</mat-icon>
-                            <span>{{ 'GENERAL.EDIT' | translate }}</span>
-                        </button>
-                        <button *ngIf="!saleCredit.paid" mat-menu-item (click)="openToPaySaleCreditModal(saleCredit)">
-                            <mat-icon color="primary">payment</mat-icon>
-                            <span>{{ 'SALE_CREDIT.TO_PAY' | translate }}</span>
-                        </button>
-                    </mat-menu>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+  <table class="table table-borderless table-vertical-center">
+    <tbody>
+      @for (saleCredit of saleCredits$ | async; track saleCredit) {
+        <tr class="border-1">
+          <td class="p-1">
+            <span class="text-dark mb-1 font-size-lg">
+              {{saleCredit.client}}
+            </span>
+          </td>
+          <td class="p-1 text-end">
+            <span class="mb-1 font-size-lg {{getSaleCreditClassName(saleCredit)}}">
+              {{saleCredit.total | currency:'USD':'symbol':'1.2-2'}}
+            </span>
+          </td>
+          <td class="p-1 text-end">
+            @if (saleCredit.isPaid) {
+              <span class="label label-success font-weight-bold font-size-lg">
+                {{saleCredit.paidDate | date: onlyDateFormat : 'UTC'}}
+              </span>
+            }
+          </td>
+          @if (!readOnly) {
+            <td class="text-end p-0">
+              <button mat-icon-button color="primary" class="card-header-action-button"
+                [matMenuTriggerFor]="menuSaleCredit" aria-label="Acciones">
+                <mat-icon>settings</mat-icon>
+              </button>
+              <mat-menu #menuSaleCredit="matMenu">
+                <button mat-menu-item (click)="openEditSaleCreditModal(saleCredit)">
+                  <mat-icon color="primary">edit</mat-icon>
+                  <span>{{ 'GENERAL.EDIT' | translate }}</span>
+                </button>
+                @if (!saleCredit.paid) {
+                  <button mat-menu-item (click)="openToPaySaleCreditModal(saleCredit)">
+                    <mat-icon color="primary">payment</mat-icon>
+                    <span>{{ 'SALE_CREDIT.TO_PAY' | translate }}</span>
+                  </button>
+                }
+              </mat-menu>
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
 </div>

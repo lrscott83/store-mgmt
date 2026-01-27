@@ -1,24 +1,26 @@
 <div class="card card-custom gutter-b">
-    <div class="card-header">
-        <div class="card-title">
-            <h3 class="card-label" [translate]="'INVENTORY_ENTRY.ENTRIES_IN_DAY'"></h3>
-        </div>
-        <div class="card-toolbar">
-            <button mat-fab extended color="primary" (click)="openCreateEntryModal()">
-                <mat-icon>add</mat-icon>
-                {{'GENERAL.ENTRY'| translate}}
-            </button>
-            <!-- <button type="button" mat-button class="with-icon btn btn-success font-weight-bold cursor-pointer" (click)="openCreateEntryModal()">
-                <mat-icon color="success">add</mat-icon>
-                {{'INVENTORY_ENTRY.NEW_ENTRY'| translate}}
-            </button> -->
-        </div>
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label" [translate]="'INVENTORY_ENTRY.ENTRIES_IN_DAY'"></h3>
     </div>
-    <div class="card-body p-2">
-        <div *ngIf="(entries$ | async).length === 0" class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
-            <div class="alert-text">{{'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY' | translate}}</div>
-        </div>
+    <div class="card-toolbar">
+      <button mat-fab extended color="primary" (click)="openCreateEntryModal()">
+        <mat-icon>add</mat-icon>
+        {{'GENERAL.ENTRY'| translate}}
+      </button>
+      <!-- <button type="button" mat-button class="with-icon btn btn-success font-weight-bold cursor-pointer" (click)="openCreateEntryModal()">
+      <mat-icon color="success">add</mat-icon>
+      {{'INVENTORY_ENTRY.NEW_ENTRY'| translate}}
+    </button> -->
+  </div>
+</div>
+<div class="card-body p-2">
+  @if ((entries$ | async).length === 0) {
+    <div class="mb-10 alert alert-custom alert-light-primary alert-dismissible text-center">
+      <div class="alert-text">{{'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY' | translate}}</div>
+    </div>
+  }
 
-        <app-entry-list [entries$]="entries$.asObservable()" (entryDeletedEmitter)="entryDeleted()" [readOnly]="false"></app-entry-list>
-    </div>
+  <app-entry-list [entries$]="entries$.asObservable()" (entryDeletedEmitter)="entryDeleted()" [readOnly]="false"></app-entry-list>
+</div>
 </div>

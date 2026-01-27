@@ -1,6 +1,6 @@
 // Angular import
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
-import { CommonModule, Location, LocationStrategy } from '@angular/common';
+import { Location, LocationStrategy } from '@angular/common';
 import { RouterModule } from '@angular/router';
 
 // project import
@@ -31,7 +31,7 @@ import { StoreModuleStateService } from 'src/app/_services/shared/store-module-s
 
 @Component({
     selector: 'app-nav-content',
-    imports: [SharedModule, CommonModule, RouterModule, NavCollapseComponent, NavGroupComponent, NavItemComponent],
+    imports: [SharedModule, RouterModule, NavCollapseComponent, NavGroupComponent, NavItemComponent],
     templateUrl: './nav-content.component.html',
     styleUrls: ['./nav-content.component.scss']
 })
