@@ -8,7 +8,7 @@ import { Title } from '@angular/platform-browser';
 import { NavigationItem, NavigationItems } from 'src/app/presentation/layouts/client-layout/navigation/navigation';
 
 // icons
-import { IconModule, IconService } from '@ant-design/icons-angular';
+import { IconService } from '@ant-design/icons-angular';
 import { GlobalOutline, NodeExpandOutline } from '@ant-design/icons-angular/icons';
 
 
@@ -25,7 +25,7 @@ interface titleType {
 
 @Component({
     selector: 'app-breadcrumb',
-    imports: [RouterModule, IconModule],
+    imports: [RouterModule],
     templateUrl: './breadcrumb.component.html',
     styleUrls: ['./breadcrumb.component.scss']
 })

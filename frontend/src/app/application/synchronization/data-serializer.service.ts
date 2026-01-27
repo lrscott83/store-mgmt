@@ -1,5 +1,5 @@
 import { Injectable } from "@angular/core";
-import { BlobReader, BlobWriter, TextReader, TextWriter, ZipReader, ZipWriter } from "@zip.js/zip.js";
+import { BlobReader, BlobWriter, FileEntry, TextReader, TextWriter, ZipReader, ZipWriter } from "@zip.js/zip.js";
 import { DataFile, EDataFileName } from "./data.file.model";
 import { ProductRepository } from "../products/product.repository";
 import { ProductCategoryRepository } from "../categories/product-category.repository";
@@ -32,11 +32,12 @@ export class DataSerializerService {
             let files: DataFile[] = [];
             for (const entry of entries) {
                 if (!entry.directory) {
-                    const text = await entry.getData(new TextWriter());
-                    if (entry.filename === EDataFileName.Categories)
-                        files = [{name: entry.filename, content: text}, ...files];
+                    const fileEntry: FileEntry = entry as FileEntry;
+                    const text = await fileEntry.getData(new TextWriter());
+                    if (fileEntry.filename === EDataFileName.Categories)
+                        files = [{name: fileEntry.filename, content: text}, ...files];
                     else
-                        files.push({name: entry.filename, content: text});
+                        files.push({name: fileEntry.filename, content: text});
                 }
             }
 

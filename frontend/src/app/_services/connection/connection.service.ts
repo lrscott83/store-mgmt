@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { fromEvent, Observable, BehaviorSubject, merge, of } from 'rxjs';
-import { startWith, shareReplay, map, throttleTime, tap, switchMap } from 'rxjs/operators';
+import { startWith, map, throttleTime, tap, switchMap } from 'rxjs/operators';
 import { environment } from 'src/environments/environment';
 
 @Injectable({

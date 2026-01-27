@@ -19,7 +19,7 @@ import { StoreModuleStateService } from 'src/app/_services/shared/store-module-s
 
 @Component({
     selector: 'app-edit-store',
-    imports: [SharedModule, TranslateModule, EditOwnerComponent, RouterModule],
+    imports: [SharedModule, TranslateModule, RouterModule],
     templateUrl: './edit-store.component.html',
     styleUrl: './edit-store.component.scss',
     providers: []

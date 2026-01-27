@@ -10,7 +10,7 @@ import { CardComponent } from './components/card/card.component';
 
 // third party
 import { NgScrollbarModule } from 'ngx-scrollbar';
-import { IconModule } from '@ant-design/icons-angular';
+import { IconDirective } from '@ant-design/icons-angular';
 
 // bootstrap import
 import { NgbDropdownModule, NgbNavModule, NgbModule, NgbCollapseModule } from '@ng-bootstrap/ng-bootstrap';
@@ -79,7 +79,7 @@ import { FileSizePipe } from 'src/app/_shared/pipes/file-size/file-size.pipe';
     NgbCollapseModule,
     NgScrollbarModule,
     CardComponent,
-    IconModule,
+    IconDirective,
     MatSlideToggleModule,
     MatInputModule,
     MatInputModule,
@@ -135,7 +135,7 @@ import { FileSizePipe } from 'src/app/_shared/pipes/file-size/file-size.pipe';
     NgbCollapseModule,
     NgScrollbarModule,
     CardComponent,
-    IconModule,
+    IconDirective,
     LoadingSpinnerComponent,
     MatSlideToggleModule,
     MatInputModule,
