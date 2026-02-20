@@ -10,7 +10,8 @@ export class AppInitService {
     Init() {
         return new Promise<void>((resolve, reject) => {
             try {
-                this.authService.getUserByToken().subscribe().add(resolve);
+                //this.authService.getUserByToken().subscribe().add(resolve);
+                resolve();
             }
             catch (exception) {
                 console.log(JSON.stringify(exception));

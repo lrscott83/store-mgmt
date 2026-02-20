@@ -1,6 +1,6 @@
 // angular import
 import { NgModule } from '@angular/core';
-import { ActivatedRouteSnapshot, RouterModule, RouterStateSnapshot, Routes } from '@angular/router';
+import { RouterModule, Routes } from '@angular/router';
 
 // Project import
 import { ClientLayoutComponent } from './presentation/layouts/client-layout/client-layout.component';
@@ -13,7 +13,6 @@ import { AuthGuard } from './_shared/guards/auth-guard';
 import { EFeatures } from './_shared/const/enums';
 import { OwnersComponent } from './presentation/owners/owners.component';
 import { SuperAdminAuthGuard } from './_shared/guards/super-admin-auth-guard';
-import { CanDeactivateGuard } from './_shared/guards/can-deactivate.guard';
 import { StoresComponent } from './presentation/stores/stores.component';
 import { AdminAuthGuard } from './_shared/guards/admin-auth-guard';
 import { SaleComponent } from './presentation/sale/sale.component';
@@ -47,7 +46,6 @@ import { EgressComponent } from './presentation/inventory/egress/egress.componen
 import { DashboardComponent } from './presentation/statistics/dashboard/dashboard.component';
 import { FeaturesComponent } from './presentation/features/features.component';
 import { AdminDashboardComponent } from './presentation/admin-dashboard/admin-dashboard.component';
-import { TodayExpenseHelpDialogComponent } from './presentation/layouts/client-layout/help-dialogs/today-expense-help-dialog/today-expense-help-dialog.component';
 import { ExpensesTodayComponent } from './presentation/expenses/expenses-today/expenses-today.component';
 import { SaleCreditsComponent } from './presentation/sale/sale-credits/sale-credits.component';
 import { TodaySaleCreditsComponent } from './presentation/sale/today-sale-credits/today-sale-credits.component';
@@ -58,7 +56,11 @@ import { TodayEntriesComponent } from './presentation/inventory/today-entries/to
 const routes: Routes = [
   // { path: '', redirectTo: "login", pathMatch: 'full' },
   { path: '', component: LandingDeepComponent },
-  { path: 'login', component: LoginComponent },
+  { 
+    path: 'login', 
+    component: LoginComponent
+    //loadComponent: () => import('./presentation/auth/login/login.component').then(c => c.LoginComponent)
+  },
   {
     path: 'register', component: RegisterComponent,
     //canDeactivate: [CanDeactivateGuard] 

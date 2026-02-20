@@ -7,26 +7,23 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { catchError, Observable, Subscription } from 'rxjs';
 import { AuthService } from 'src/app/_services/services.index';
 import { GuestFooterComponent } from '../../layouts/guest/guest-footer/guest-footer.component';
-import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
-import { ConnectionService } from 'src/app/_services/connection/connection.service';
 import { ToastrService } from 'ngx-toastr';
 import Swal from 'sweetalert2';
-import { Product } from 'src/app/domain/entities/products/product.model';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { StoreUsageTrackerService } from 'src/app/_services/usage-tracker/store-usage-tracker.service';
-import { SwUpdate } from '@angular/service-worker';
 import { UpdateService } from 'src/app/_services/update/update.service';
 
 @Component({
     selector: 'app-login',
     imports: [RouterModule, SharedModule, TranslateModule, GuestFooterComponent],
     templateUrl: './login.component.html',
-    styleUrls: ['./login.component.scss']
+    styleUrls: ['./login.component.scss'],
+    standalone: true,
 })
 export default class LoginComponent implements OnInit {
 
-  connectionStatus$: Observable<boolean>;
+  //connectionStatus$: Observable<boolean>;
 
   loginForm: FormGroup;
   hasError: boolean;
@@ -41,7 +38,7 @@ export default class LoginComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private translate: TranslateService,
-    private connectionService: ConnectionService,
+    //private connectionService: ConnectionService,
     private toastrService: ToastrService,
     private storeUsageTracker: StoreUsageTrackerService,
     private updateService: UpdateService,
@@ -57,7 +54,7 @@ export default class LoginComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.connectionStatus$ = this.connectionService.getStatus();
+    //this.connectionStatus$ = this.connectionService.getStatus();
     // this.connectionStatus$.subscribe((status) => {
     //   if (!status) {
     //     this.toastrService.warning(

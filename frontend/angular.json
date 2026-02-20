@@ -22,8 +22,7 @@
               "node_modules/apexcharts/dist/apexcharts.min.js",
               "guid-typescript",
               "sweetalert2",
-              "jspdf-autotable",
-              "pdfmake"
+              "jspdf-autotable"
             ],
             "outputPath": {
               "base": "dist"

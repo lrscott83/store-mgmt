@@ -14,7 +14,7 @@ WORKDIR /app
 COPY . .
 
 # Build server side bundles
-RUN npm run build --configuration=production
+RUN npm run build --omit=dev
 
 # Stage 2: Serve app with nginx server
 
@@ -25,7 +25,7 @@ FROM quay.io/lib/nginx:alpine
 RUN rm -rf /usr/share/nginx/html/*
 
 # Copy the build output to replace the default nginx contents.
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist/browser /usr/share/nginx/html
 
 # Copy the nginx file to fix fallback issue on refreshing.
 COPY /nginx.conf /etc/nginx/conf.d/default.conf

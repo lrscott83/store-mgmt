@@ -9,9 +9,9 @@ import { Observable} from "rxjs";
 import { switchMap, take} from "rxjs/operators";
 import { ConnectionService } from "../_services/connection/connection.service";
 
-@Injectable({
-  providedIn: "root",
-})
+// @Injectable({
+//   providedIn: "root",
+// })
 export class ConnectionInterceptor implements HttpInterceptor {
   connectionService: any;  
   constructor(

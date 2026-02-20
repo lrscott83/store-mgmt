@@ -90,10 +90,10 @@ export function initializeApp(appInitService: AppInitService) {
     provideEnvironmentNgxMask(),
     //provideAnimations(), // required animations providers
     provideToastr(), // Toastr providers
-    provideAppInitializer(() => {
-        const initializerFn = (initializeApp)(inject(AppInitService));
-        return initializerFn();
-      }),
+    // provideAppInitializer(() => {
+    //     const initializerFn = (initializeApp)(inject(AppInitService));
+    //     return initializerFn();
+    //   }),
     {
       provide: HTTP_INTERCEPTORS,
       useClass: InterceptorService,

@@ -48,8 +48,8 @@ export class AuthService implements OnDestroy {
     this.currentUserSubject = new BehaviorSubject<UserModel>(undefined);
     this.currentUser$ = this.currentUserSubject.asObservable();
     this.isLoading$ = this.isLoadingSubject.asObservable();
-    const subscr = this.getUserByToken().subscribe();
-    this.unsubscribe.push(subscr);
+    // const subscr = this.getUserByToken().subscribe();
+    // this.unsubscribe.push(subscr);
   }
 
   // public methods
