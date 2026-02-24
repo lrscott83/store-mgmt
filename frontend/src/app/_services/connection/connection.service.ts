@@ -1,57 +1,56 @@
+import { Injectable, OnDestroy } from '@angular/core';
+import { BehaviorSubject, Observable, fromEvent, merge, Subscription } from 'rxjs';
+import { mapTo, debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
-// @Injectable({
-//     providedIn: 'root'
-// })
-export class ConnectionService {
-    // static API_URL = `${environment.apiUrl}/${environment.apiVersion}/auth/`;
-    // private connectionStatus$ = new BehaviorSubject<boolean>(navigator.onLine);
+export interface ConnectionStatus {
+  isOnline: boolean;
+  wasOffline: boolean;
+}
 
-    // constructor() {
-    //     // Escuchar eventos de conexión [[1]][[3]]
-    //     // fromEvent(window, 'online').subscribe(() => this.updateStatus(true));
-    //     // fromEvent(window, 'offline').subscribe(() => this.updateStatus(false));
+@Injectable({
+  providedIn: 'root'
+})
+export class ConnectionService implements OnDestroy {
+  private onlineSubject = new BehaviorSubject<boolean>(navigator.onLine);
+  private statusChangeSubject = new BehaviorSubject<ConnectionStatus>({
+    isOnline: navigator.onLine,
+    wasOffline: false
+  });
+  private subscriptions: Subscription[] = [];
 
-    //     merge(
-    //         fromEvent(window, 'online').pipe(map(() => true)),
-    //         fromEvent(window, 'offline').pipe(map(() => false)),
-    //         this.periodicCheck().pipe(
-    //             throttleTime(5000), // Verificar cada 5 segundos [[3]]
-    //             tap(online => this.updateStatus(online))
-    //         )
-    //     ).subscribe(online => this.updateStatus(online));
-    // }
+  isOnline$ = this.onlineSubject.asObservable();
+  statusChange$ = this.statusChangeSubject.asObservable();
 
-    // private periodicCheck(): Observable<boolean> {
-    //     return of(null).pipe(
-    //         switchMap(() => fetch(ConnectionService.API_URL + 'ping') // Endpoint de verificación [[6]]
-    //             .then(() => {
-    //                 console.log("Connection OK");
-    //                 return true;
-    //             })
-    //             .catch(() => {
-    //                 console.log("Connection Error");
-    //                 return false;
-    //             })
-    //         )
-    //     );
-    // }
+  get isOnline(): boolean {
+    return this.onlineSubject.value;
+  }
 
-    // private updateStatus(status: boolean) {
-    //     this.connectionStatus$.next(status);
-    // }
+  constructor() {
+    this.setupNetworkStatusListeners();
+  }
 
-    // getStatus(): Observable<boolean> {
-    //     // return this.connectionStatus$.asObservable().pipe(
-    //     //     startWith(navigator.onLine), // Estado inicial [[6]]
-    //     //     shareReplay(1) // Compartir última emisión [[3]]
-    //     // );
+  private setupNetworkStatusListeners(): void {
+    const online$ = fromEvent(window, 'online').pipe(mapTo(true));
+    const offline$ = fromEvent(window, 'offline').pipe(mapTo(false));
 
-    //     return this.connectionStatus$.asObservable().pipe(
-    //         startWith(navigator.onLine)
-    //     );
-    // }
+    const networkStatus$ = merge(online$, offline$).pipe(debounceTime(100), distinctUntilChanged());
 
-    // get currentStatusValue(): boolean {
-    //     return this.connectionStatus$.value;
-    // }
+    const sub = networkStatus$.subscribe((isOnline: boolean) => {
+      const previousStatus = this.onlineSubject.value;
+      this.onlineSubject.next(isOnline);
+
+      if (!previousStatus && isOnline) {
+        this.statusChangeSubject.next({
+          isOnline: true,
+          wasOffline: true
+        });
+      }
+    });
+
+    this.subscriptions.push(sub);
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.forEach((sub) => sub.unsubscribe());
+  }
 }

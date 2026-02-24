@@ -1,19 +1,18 @@
-import { Injectable, OnDestroy } from "@angular/core";
-import { Observable, BehaviorSubject, of, Subscription, throwError } from "rxjs";
-import { map, catchError, switchMap, finalize } from "rxjs/operators";
-import { UserModel } from "./_models/auth-user.model";
-import { AuthModel } from "./_models/auth.model";
-import { AuthHTTPService } from "./auth-http";
-import { environment } from "src/environments/environment";
+import { Injectable, OnDestroy } from '@angular/core';
+import { Observable, BehaviorSubject, of, Subscription, throwError } from 'rxjs';
+import { map, catchError, switchMap, finalize } from 'rxjs/operators';
+import { UserModel } from './_models/auth-user.model';
+import { AuthModel } from './_models/auth.model';
+import { AuthHTTPService } from './auth-http';
+import { environment } from 'src/environments/environment';
 
-import { StorageService } from "../storage/storage.service";
+import { StorageService } from '../storage/storage.service';
 import { Router } from '@angular/router';
 import { BaseResponseModel } from '../_models/base.model';
 import { addDays } from 'date-fns';
 
-
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root'
 })
 export class AuthService implements OnDestroy {
   // private fields
@@ -61,13 +60,13 @@ export class AuthService implements OnDestroy {
         if (response && response.succeeded) {
           this.localStorageService.setTokenToLocalStorage(response.data.authToken);
           response.data.expiresIn = addDays(new Date(), 30);
-          //response.data.expiresIn = new Date(new Date().getTime() + 60000);          
+          //response.data.expiresIn = new Date(new Date().getTime() + 60000);
           const result = this.setAuthFromLocalStorage(response.data);
           return result;
         }
         return response.errors && response.errors.length > 0
           ? response.errors[0].description
-          : "El usuario no pudo entrar porque el nombre de usuario o la contraseña no es correcta";
+          : 'El usuario no pudo entrar porque el nombre de usuario o la contraseña no es correcta';
       }),
       switchMap((response) => {
         return typeof response === 'string' ? of(response.toString()) : this.getUserByToken();
@@ -84,17 +83,20 @@ export class AuthService implements OnDestroy {
     this.isLoadingSubject.next(true);
     this.removeToken();
 
-    this.authHttpService.logout().subscribe((url: string) => {
-      this.removeToken();
-      this.currentUserSubject.next(undefined);
-      //document.location.reload();
-      this.router.navigateByUrl("/login");
-      this.isLoadingSubject.next(false);
-    }, error => {
-      console.log(error);
-      this.isLoadingSubject.next(false);
-      throw error;
-    })
+    this.authHttpService.logout().subscribe(
+      (url: string) => {
+        this.removeToken();
+        this.currentUserSubject.next(undefined);
+        //document.location.reload();
+        this.router.navigateByUrl('/login');
+        this.isLoadingSubject.next(false);
+      },
+      (error) => {
+        console.log(error);
+        this.isLoadingSubject.next(false);
+        throw error;
+      }
+    );
 
     // this.authHttpService
     //   .logout()
@@ -122,7 +124,7 @@ export class AuthService implements OnDestroy {
       }),
       switchMap(() => this.getUserByToken()),
       catchError((err) => {
-        console.error("err", err);
+        console.error('err', err);
         return of(undefined);
       }),
       finalize(() => this.isLoadingSubject.next(false))
@@ -144,11 +146,25 @@ export class AuthService implements OnDestroy {
     if (!auth || !auth.authToken || !auth.expiresIn) {
       return of(undefined);
     }
+
+    const now = new Date();
+    const expiresIn = new Date(auth.expiresIn);
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
     const currentUser = this.localStorageService.getCurrentUser();
-    if (currentUser && new Date(auth.expiresIn) > new Date()) {
+
+    if (currentUser && expiresIn > now && expiresIn <= thirtyDaysFromNow) {
       currentUser.expiresIn = new Date(auth.expiresIn);
       return of(currentUser);
     }
+
+    if (expiresIn <= now) {
+      this.logout();
+      this.router.navigateByUrl('/login');
+      return of(undefined);
+    }
+
     this.isLoadingSubject.next(true);
     return this.authHttpService.getUserByToken(auth.authToken).pipe(
       map((response: BaseResponseModel<UserModel>) => {
@@ -156,10 +172,21 @@ export class AuthService implements OnDestroy {
           response.data.expiresIn = new Date(auth.expiresIn);
           this.currentUserSubject = new BehaviorSubject<UserModel>(response.data);
         } else {
+          const offlineUser = this.localStorageService.getCurrentUser();
+          if (offlineUser && new Date(auth.expiresIn) > new Date()) {
+            return offlineUser;
+          }
           this.logout();
-          this.router.navigateByUrl("/login");
+          this.router.navigateByUrl('/login');
         }
-        return response.data;
+        return response?.data;
+      }),
+      catchError((err) => {
+        const offlineUser = this.localStorageService.getCurrentUser();
+        if (offlineUser && new Date(auth.expiresIn) > new Date()) {
+          return of(offlineUser);
+        }
+        return of(undefined);
       }),
       finalize(() => this.isLoadingSubject.next(false))
     );
@@ -174,7 +201,7 @@ export class AuthService implements OnDestroy {
       }),
       switchMap(() => this.login(user.login, user.password)),
       catchError((err) => {
-        console.error("err", err);
+        console.error('err', err);
         return of(undefined);
       }),
       finalize(() => this.isLoadingSubject.next(false))
@@ -183,17 +210,12 @@ export class AuthService implements OnDestroy {
 
   forgotPassword(email: string): Observable<boolean> {
     this.isLoadingSubject.next(true);
-    return this.authHttpService
-      .forgotPassword(email)
-      .pipe(finalize(() => this.isLoadingSubject.next(false)));
+    return this.authHttpService.forgotPassword(email).pipe(finalize(() => this.isLoadingSubject.next(false)));
   }
 
   getCurrentUserDefaultUrl() {
-    if (!this.currentUserValue)
-      return "/";
-    return this.currentUserValue.isReSeller || this.currentUserValue.isSuperAdmin
-      ? "/admin/owners"
-      : "/sales/sale";
+    if (!this.currentUserValue) return '/';
+    return this.currentUserValue.isReSeller || this.currentUserValue.isSuperAdmin ? '/admin/owners' : '/sales/sale';
   }
 
   // private methods
@@ -208,9 +230,7 @@ export class AuthService implements OnDestroy {
 
   private getAuthFromLocalStorage(): AuthModel {
     try {
-      const authData = JSON.parse(
-        localStorage.getItem(this.authLocalStorageToken)
-      );
+      const authData = JSON.parse(localStorage.getItem(this.authLocalStorageToken));
       return authData;
     } catch (error) {
       console.error(error);

@@ -1,123 +1,115 @@
-import { Injectable, Injector } from "@angular/core";
-import {
-  HttpRequest,
-  HttpHandler,
-  HttpEvent,
-  HttpInterceptor,
-} from "@angular/common/http";
-import { Observable, throwError } from "rxjs";
-import { catchError, timeout} from "rxjs/operators";
+import { Injectable, Injector } from '@angular/core';
+import { HttpRequest, HttpHandler, HttpEvent, HttpInterceptor } from '@angular/common/http';
+import { Observable, throwError, of } from 'rxjs';
+import { catchError, timeout, delay } from 'rxjs/operators';
 import { Router } from '@angular/router';
-import { AuthService } from "src/app/_services/auth/auth.service";
-import { ToastrService } from "ngx-toastr";
-import { TranslateService } from "@ngx-translate/core";
-import Swal from "sweetalert2";
-import { MatSnackBar } from "@angular/material/snack-bar";
+import { AuthService } from 'src/app/_services/auth/auth.service';
+import { ToastrService } from 'ngx-toastr';
+import { TranslateService } from '@ngx-translate/core';
+import Swal from 'sweetalert2';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ConnectionService } from 'src/app/_services/connection/connection.service';
 
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root'
 })
 export class ErrorInterceptor implements HttpInterceptor {
-  authService: any;  
+  authService: any;
   translate: any;
   toastrService: any;
+  private isOffline = false;
+
   constructor(
     private readonly injector: Injector,
     public router: Router,
-    private snackBar: MatSnackBar     
-  ) {}
+    private snackBar: MatSnackBar,
+    private connectionService: ConnectionService
+  ) {
+    this.connectionService.isOnline$.subscribe((isOnline) => {
+      this.isOffline = !isOnline;
+    });
+  }
 
-  intercept(
-    request: HttpRequest<any>,
-    next: HttpHandler
-  ): Observable<HttpEvent<any>> {
+  private getAuthService(): AuthService {
     try {
-      this.translate = this.injector.get(TranslateService);
-      this.toastrService = this.injector.get(ToastrService);
-      this.authService = this.injector.get(AuthService);
+      return this.injector.get(AuthService);
     } catch {
-       console.log('auth service is not yet available');
+      return null;
     }
-    return next.handle(request).pipe(       
+  }
+
+  private getTranslate(): TranslateService {
+    try {
+      return this.injector.get(TranslateService);
+    } catch {
+      return null;
+    }
+  }
+
+  private getToastr(): ToastrService {
+    try {
+      return this.injector.get(ToastrService);
+    } catch {
+      return null;
+    }
+  }
+
+  intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    if (this.isOffline) {
+      return throwError(() => new Error('offline'));
+    }
+
+    return next.handle(request).pipe(
       timeout(30000),
       catchError((err) => {
-        switch (err.status) {          
+        if (!navigator.onLine || err.status === 0 || err.status === 503) {
+          this.showOfflineMessage();
+          return throwError(() => new Error('offline'));
+        }
+
+        switch (err.status) {
           case 401: {
-            this.authService.logout();
-            //this.router.navigate(['error/401']);
-            // Swal.fire({
-            //   icon: "error",
-            //   title: "Oops...",
-            //   text: "err",
-            // });
-            //break;
-            return throwError(() => err);            
+            const authService = this.getAuthService();
+            authService?.logout();
+            return throwError(() => err);
           }
           case 400: {
-            // Review Validation Error?
-            
-            //this.authService.logout();
-            //this.router.navigate(['error/401']);
-            // Swal.fire({
-            //   icon: "error",
-            //   title: "Oops...",
-            //   text: "err",
-            // });
-            //break;    
             return throwError(() => err);
           }
           case 403: {
-            this.authService.logout();
-            //this.router.navigate(['error/403']);
-            // Swal.fire({
-            //   icon: "error",
-            //   title: "Oops...",
-            //   text: "Something went wrong",
-            // });
+            const authService = this.getAuthService();
+            authService?.logout();
             return throwError(() => err);
-            //break;    
           }
           case 404: {
-            //this.authService.logout();
-            //this.router.navigate(['error/403']);
-            // Swal.fire({
-            //   icon: "error",
-            //   title: "Oops...",
-            //   text: "Something went wrong",
-            // });
-            
-            
-            // this.toastrService.warn(            
-            //   this.translate.instant('GENERAL.RESPONSE.ERROR404_MESSAGE'),
-            //   this.translate.instant('GENERAL.RESPONSE.WARNING_TITLE'));
             return throwError(() => err);
-            //break;    
           }
           case 500: {
-            //this.router.navigate(['error/500']);
+            const translate = this.getTranslate();
             Swal.fire({
-              icon: "error",
-              title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
-              text: this.translate.instant('GENERAL.RESPONSE.ERROR500_MESSAGE'),
+              icon: 'error',
+              title: translate?.instant('GENERAL.RESPONSE.ERROR_TITLE') || 'Error',
+              text: translate?.instant('GENERAL.RESPONSE.ERROR500_MESSAGE') || 'Error interno del servidor'
             });
             return throwError(() => err);
-            //break;    
           }
           default: {
-            // Swal.fire({
-            //   icon: "error",
-            //   title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
-            //   text: this.translate.instant('GENERAL.RESPONSE.ERROR500_MESSAGE'),
-            // });
-            //this.snackBar.open('Error!', '', { duration: 2000 });
-            // this.toastrService.error(            
-            //     this.translate.instant('GENERAL.RESPONSE.ERROR500_MESSAGE'),
-            //     this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'));
             return throwError(() => err);
           }
         }
       })
     );
+  }
+
+  private showOfflineMessage(): void {
+    const translate = this.getTranslate();
+    const message = translate?.instant('ERROR.OFFLINE') || 'Sin conexión. Los datos se guardarán localmente.';
+    this.snackBar.open(message, '', {
+      duration: 5000,
+      horizontalPosition: 'end',
+      verticalPosition: 'bottom',
+      panelClass: ['offline-snackbar']
+    });
   }
 }
 /* return next.handle(request).pipe(timeout(30000), catchError(err => {
