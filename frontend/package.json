@@ -7,11 +7,13 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:optimized": "ng build && node scripts/purge-css.js",
     "build-prod": "ng build --configuration production --base-href /angular/free/",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "lint-fix": "ng lint --fix"
+    "lint-fix": "ng lint --fix",
+    "optimize:images": "node scripts/optimize-images.js"
   },
   "private": false,
   "dependencies": {
@@ -64,6 +66,7 @@
     "@angular/build": "^21.1.1",
     "@angular/cli": "~21.1.1",
     "@angular/compiler-cli": "^21.1.1",
+    "@fullhuman/postcss-purgecss": "^8.0.0",
     "@types/jasmine": "~5.1.4",
     "@types/node": "^20.12.7",
     "@typescript-eslint/eslint-plugin": "7.11.0",
@@ -77,6 +80,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "prettier": "3.2.5",
+    "sharp": "^0.34.5",
     "source-map-explorer": "^2.5.3",
     "typescript": "5.9.3"
   }
