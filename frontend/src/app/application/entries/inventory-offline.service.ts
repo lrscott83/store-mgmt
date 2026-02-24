@@ -107,7 +107,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
         if (!this.productRepository.getAvailableProductById(newProductId))
             return new DataResult(undefined, false, [InventoryErrors.ProductNotAvailable]);
 
-        let newInventories = this.getProductInventoriesByProductId(newProductId);
+        const newInventories = this.getProductInventoriesByProductId(newProductId);
         let entry: InventoryEntry = newInventories.find(e => e.id === entryId);
         if (oldProductId !== newProductId) {
             let oldInventories = this.getProductInventoriesByProductId(newProductId);
@@ -181,7 +181,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
         if (!isNotSoldEntryResult.succeeded)
             return isNotSoldEntryResult;
 
-        let inventories = this.getProductInventoriesByProductId(productId);
+        const inventories = this.getProductInventoriesByProductId(productId);
         const entry: InventoryEntry = inventories.find(e => e.id === entryId);
         entry.isActive = false;
         entry.updatedDate = new Date();
@@ -224,7 +224,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     private getActiveInventoryEntriesStorage(): InventoryEntryView[] {
-        let inventoryEntries: InventoryEntryView[] = [];
+        const inventoryEntries: InventoryEntryView[] = [];
         const inventories: Map<string, InventoryEntry[]> = this.getStorageInventoriesMap();
         if (inventories.size === 0)
             return [];
@@ -252,7 +252,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     getInventoryEntriesInDay(date: Date): BaseResponseModel<InventoryEntryView[]> {
         const startDate = startOfDay(new Date());
         const endDate = addDays(startDate, 1);
-        let inventoryEntries: InventoryEntryView[] = this.getActiveInventoryEntriesStorage()
+        const inventoryEntries: InventoryEntryView[] = this.getActiveInventoryEntriesStorage()
             .filter(entry => entry.date >= startDate && entry.date < endDate);
         return this.Success(inventoryEntries.sort((e1, e2) => e2.date.getTime() - e1.date.getTime()));
     }
@@ -284,7 +284,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     getInventoryCategoriesView(): BaseResponseModel<InventoryCategoryView[]> {
-        let inventoryCategories: InventoryCategoryView[] = [];
+        const inventoryCategories: InventoryCategoryView[] = [];
         const storageCategoriesMap = this.categoryRepository.getStorageCategoriesMap();
         const storageProductsMap = this.productRepository.getStorageProductsMap();
         const inventoryEntries: InventoryEntry[] = this.getStorageActiveInventoryEntries();
@@ -353,7 +353,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     private groupBy<TItem>(items: TItem[], key: string): Map<string, TItem[]> {
-        let groups: Map<string, TItem[]> = new Map();
+        const groups: Map<string, TItem[]> = new Map();
         items.forEach(item => {
             const groupId = item[key];
             const collection = groups.get(groupId);
@@ -366,7 +366,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     getInventoryEntriesView(): Observable<BaseResponseModel<InventoryEntriesView[]>> {
-        let inventoryEntries: InventoryEntriesView[] = [];
+        const inventoryEntries: InventoryEntriesView[] = [];
         const inventories: Map<string, InventoryEntry[]> = this.getStorageInventoriesMap();
         inventories.forEach((entries, productId) => {
             const product: Product = this.productRepository.getProductById(productId);
@@ -407,7 +407,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
         if (!this.authorizationService.hasInventoryModuleAvailable() || !product.discountFromInvantory)
             return Result.Success();
 
-        let inventories = this.getProductInventoriesByProductId(productId);
+        const inventories = this.getProductInventoriesByProductId(productId);
         if (!inventories || inventories.length === 0)
             return Result.Failure([ProductErrors.ProductNotAvailable]);
 
@@ -427,11 +427,11 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
         if (!availableResult.succeeded)
             return [];
 
-        let inventories = this.getProductInventoriesByProductId(productId)
+        const inventories = this.getProductInventoriesByProductId(productId)
             .filter(i => i.available > 0 && i.isActive)
             .sort((i1, i2) => i1.order - i2.order);
 
-        let availableInventories: InventoryEntry[] = [];
+        const availableInventories: InventoryEntry[] = [];
         let total = quantity;
         inventories.forEach(i => {
             if (total > 0) {
@@ -443,8 +443,8 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     getAvailableInventoryCosts(productId: string, quantity: number): InventoryEntryCost[] {
-        let inventoryItemCosts: InventoryEntryCost[] = [];
-        let availableInventories = this.getAvailableInventories(productId, quantity);
+        const inventoryItemCosts: InventoryEntryCost[] = [];
+        const availableInventories = this.getAvailableInventories(productId, quantity);
         let total = quantity;
         availableInventories.forEach(i => {
             inventoryItemCosts.push({
@@ -461,7 +461,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     updateAvailableInventories(productId: string, quantity: number): boolean {
-        let inventories = this.getAvailableInventories(productId, quantity)
+        const inventories = this.getAvailableInventories(productId, quantity)
         if (!inventories || inventories.length === 0)
             return false;
 
@@ -524,7 +524,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
     }
 
     private setInventoriesLocalStorage(inventories: Map<string, InventoryEntry[]>) {
-        let entriesMapJson = JSON.stringify(Array.from(inventories.entries()));
+        const entriesMapJson = JSON.stringify(Array.from(inventories.entries()));
         localStorage.setItem(this.getStorageKey(), entriesMapJson);
     }
 
@@ -534,7 +534,7 @@ export class InventoryOfflineService extends BaseService<InventoryEntry> {
 
     private getInventoriesFromLocalStorage(): Map<string, InventoryEntry[]> {
         try {
-            let inventoriesJson = localStorage.getItem(this.getStorageKey());
+            const inventoriesJson = localStorage.getItem(this.getStorageKey());
             if (inventoriesJson && inventoriesJson !== "{}") {
                 const inventoryMap: Map<string, InventoryEntry[]> = new Map(JSON.parse(inventoriesJson));
                 inventoryMap.forEach((entries, productId) => {

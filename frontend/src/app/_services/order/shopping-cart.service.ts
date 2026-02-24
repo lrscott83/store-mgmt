@@ -99,8 +99,8 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
                 ? availableResult.errors[0]
                 : ProductErrors.ProductNotAvailable]);
 
-        let items: CartItem[] = [...this.getCartItems()];
-        let cartItem: CartItem = this.findItem(items, product.id);
+        const items: CartItem[] = [...this.getCartItems()];
+        const cartItem: CartItem = this.findItem(items, product.id);
         if (cartItem) {
             if (cartItem.quantity + quantity > 0)
                 cartItem.quantity = cartItem.quantity + quantity;
@@ -109,7 +109,7 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
         } else {
             this.orderType = orderType;
             // TODO. If order types are differents then confirm dialog should be shown.
-            let qty = quantity > 0 ? quantity : 1;
+            const qty = quantity > 0 ? quantity : 1;
             items.push({
                 productId: product.id,
                 name: product.name,
@@ -131,7 +131,7 @@ export abstract class ShoppingCartService extends BaseService<CartItem> {
     }
 
     private removeCartItem(productId: string): BaseResponseModel<boolean> {
-        let items: CartItem[] = this.getCartItems()
+        const items: CartItem[] = this.getCartItems()
             .filter(item => item.productId !== productId)
         this.setNextCartData(items);
         return this.Success(true);

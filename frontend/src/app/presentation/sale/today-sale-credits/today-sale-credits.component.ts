@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { SaleCreditListComponent } from '../sale-credit-list/sale-credit-list.component';
 import { EditSaleCreditModalComponent } from '../edit-sale-credit-modal/edit-sale-credit-modal.component';
 import { TranslateModule } from '@ngx-translate/core';
@@ -14,7 +14,7 @@ import { SaleCreditOfflineService } from 'src/app/application/credits/sale-credi
     templateUrl: './today-sale-credits.component.html',
     styleUrl: './today-sale-credits.component.scss'
 })
-export class TodaySaleCreditsComponent {
+export class TodaySaleCreditsComponent implements OnInit {
   saleCredits$: BehaviorSubject<SaleCredit[]> = new BehaviorSubject<SaleCredit[]>([]);
 
   constructor(private modalService: NgbModal, private saleCreditService: SaleCreditOfflineService) { }

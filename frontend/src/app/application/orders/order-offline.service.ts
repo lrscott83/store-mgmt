@@ -41,7 +41,7 @@ export class OrderOfflineService extends BaseService<Order> {
 
     createOrder(cartItems: CartItem[], type: OrderType, isCredit: boolean, paymentType: PaymentType, details: string, client: string): Observable<BaseResponseModel<Order>> {
         const date: Date = new Date();
-        var order: Order = {
+        const order: Order = {
             id: Guid.create().toString(),
             orderItems: this.createOrderItems(cartItems),
             total: this.getItemsTotal(cartItems),
@@ -77,7 +77,7 @@ export class OrderOfflineService extends BaseService<Order> {
         // TODO. Que pasa si hay distinto precio y distinto categoryId ??
         // Quizas hacer los groupBy por todos los campos por si hay algun cambio.
         const storageCategories = this.categoryRepository.getProductCategories();
-        let categoryItemsView: CategoryCartItemsView[] = [];
+        const categoryItemsView: CategoryCartItemsView[] = [];
         const orderItemsArray = this.getActiveOrdersInDay(date).map(order => order.orderItems);
         const orderItems: OrderItem[] = this.flatMap(orderItemsArray);
         const categoryGroups: Map<string, OrderItem[]> = this.groupBy(orderItems, "categoryId");
@@ -125,7 +125,7 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     private groupBy<TItem>(items: TItem[], key: string): Map<string, TItem[]> {
-        let groups: Map<string, TItem[]> = new Map();
+        const groups: Map<string, TItem[]> = new Map();
         items.forEach(item => {
             const groupId = item[key];
             const collection = groups.get(groupId);
@@ -172,7 +172,7 @@ export class OrderOfflineService extends BaseService<Order> {
     getActiveOrdersPriceToday(): number {
         const startDate = startOfDay(new Date());
         const endDate = addDays(startDate, 1);
-        return this.getActiveOrdersPriceBetweenDates(startDate, endDate);;
+        return this.getActiveOrdersPriceBetweenDates(startDate, endDate);
     }
 
     getActiveOrdersPriceYesterday(): number {
@@ -328,7 +328,7 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     private updateOrderActive(id: string, isActive: boolean): Result {
-        let order = this.getOrderById(id);
+        const order = this.getOrderById(id);
         if (!order)
             return Result.Failure([OrderErrors.NotExists]);
 
@@ -340,7 +340,7 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     public updateTodayOrder(id: string, paymentType: PaymentType): DataResult<Order> {
-        let order = this.getOrderById(id);
+        const order = this.getOrderById(id);
         if (!order)
             return new DataResult(undefined, false, [OrderErrors.NotExists]);
 
@@ -352,7 +352,7 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     private createOrderItems(cartItems: CartItem[]): OrderItem[] {
-        let orderItems: OrderItem[] = [];
+        const orderItems: OrderItem[] = [];
         cartItems.forEach(item => {
             const product = this.productRepository.getProductById(item.productId);
             if (product) {
@@ -418,7 +418,7 @@ export class OrderOfflineService extends BaseService<Order> {
     }
 
     private setOrdersLocalStorage(orders: Order[]) {
-        let ordersJson = JSON.stringify(orders);
+        const ordersJson = JSON.stringify(orders);
         localStorage.setItem(this.getStorageKey(), ordersJson);
     }
 
@@ -437,7 +437,7 @@ export class OrderOfflineService extends BaseService<Order> {
 
     updateImportedOrder(importedOrder: Order): Result {
         this.orders = this.getOrdersFromLocalStorage();
-        let order: Order = this.orders.find(o => o.id === importedOrder.id);
+        const order: Order = this.orders.find(o => o.id === importedOrder.id);
         if (order) {
             order.date = new Date(importedOrder.date);
             order.isActive = importedOrder.isActive;
@@ -450,7 +450,7 @@ export class OrderOfflineService extends BaseService<Order> {
 
     private getOrdersFromLocalStorage(): Order[] {
         try {
-            let ordersJson = localStorage.getItem(this.getStorageKey());
+            const ordersJson = localStorage.getItem(this.getStorageKey());
             if (ordersJson) {
                 const orders = JSON.parse(ordersJson);
                 return orders.map(order => {

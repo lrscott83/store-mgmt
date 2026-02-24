@@ -66,7 +66,7 @@ export class SaleCreditsComponent implements OnInit {
   }
 
   groupSaleCredits(saleCredits: SaleCredit[]): DateSaleCredit[] {
-    let groups: Map<string, SaleCredit[]> = new Map();
+    const groups: Map<string, SaleCredit[]> = new Map();
     saleCredits.forEach(credit => {
       const groupId = credit.date.toISOString().split("T")[0];
       const collection = groups.get(groupId);

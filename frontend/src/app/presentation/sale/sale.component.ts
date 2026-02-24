@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
 import { SharedModule } from '../shared/shared.module';
@@ -14,7 +14,7 @@ import { OrderType } from 'src/app/domain/entities/orders/order.model';
     templateUrl: './sale.component.html',
     styleUrl: './sale.component.scss'
 })
-export class SaleComponent {
+export class SaleComponent implements OnInit {
 
   categories$: BehaviorSubject<ProductCategory[]> = new BehaviorSubject<ProductCategory[]>([]);
   selectedCategory$: BehaviorSubject<ProductCategory> = new BehaviorSubject<ProductCategory>(undefined);

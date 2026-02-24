@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BehaviorSubject, catchError } from 'rxjs';
@@ -18,7 +18,7 @@ import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
     templateUrl: './products.component.html',
     styleUrl: './products.component.scss'
 })
-export class ProductsComponent {
+export class ProductsComponent implements OnInit {
   categories$: BehaviorSubject<ProductCategoryView[]> = new BehaviorSubject<ProductCategoryView[]>([]);
 
   constructor(@Inject(PRODUCT_CATEGORY_SERVICE) private categoryService: ProductCategoryService, private modalService: NgbModal, private translate: TranslateService) { }

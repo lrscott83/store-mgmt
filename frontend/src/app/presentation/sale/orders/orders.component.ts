@@ -74,7 +74,7 @@ export class OrdersComponent implements OnInit {
   }
 
   groupOrders(orders: Order[]): DateOrder[] {
-    let groups: Map<string, Order[]> = new Map();
+    const groups: Map<string, Order[]> = new Map();
     orders.forEach(credit => {
       const groupId = credit.date.toISOString().split("T")[0];
       const collection = groups.get(groupId);

@@ -46,7 +46,7 @@ export class AuthHTTPService {
   }
  */
   logout(): Observable<string | {}> {
-    let localUrl = `${API_USERS_URL}/v1/auth/logout`;
+    const localUrl = `${API_USERS_URL}/v1/auth/logout`;
 
     //if (environment.production) {
     return this.http.get<string>(localUrl).pipe(
@@ -68,7 +68,7 @@ export class AuthHTTPService {
   ///api/v1/auth/google-auth-url
 
   signInGoogle(): Observable<string> {
-    let localUrl = `${API_USERS_URL}/v1/auth/google-auth-url`;
+    const localUrl = `${API_USERS_URL}/v1/auth/google-auth-url`;
 
     /*   if (environment.production) {
       return this.http.get<string>(localUrl);
@@ -80,7 +80,7 @@ export class AuthHTTPService {
     if (environment.production) {
       return this.http.get<string>(localUrl);
     } else {
-      let params = new HttpParams().set(
+      const params = new HttpParams().set(
         "forcedAudience",
         "http://localhost:4200/login"
       );
@@ -99,7 +99,7 @@ export class AuthHTTPService {
   //google_auth_url
 
   getSocialToken(code: string): Observable<AuthModel> {
-    let localUrl = `${API_USERS_URL}/v1/auth/get-social-token`;
+    const localUrl = `${API_USERS_URL}/v1/auth/get-social-token`;
     if (environment.production) {
       return this.http.post<AuthModel>(localUrl, code);
     } else {

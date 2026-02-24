@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { OwnerService } from 'src/app/_services/owner/owner.service';
 import { GlobalConfig } from 'src/app/_shared/configs/global.config';
@@ -10,7 +10,7 @@ import { Owner } from 'src/app/domain/entities/owners/owner.model';
     templateUrl: './owner-details.component.html',
     styleUrl: './owner-details.component.scss'
 })
-export class OwnerDetailsComponent {
+export class OwnerDetailsComponent implements OnInit {
 
   @Input() key: string;
   @Output() contentUpdatedEvent = new EventEmitter();

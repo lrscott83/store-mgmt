@@ -1,5 +1,5 @@
 // angular import
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -21,7 +21,7 @@ import { UpdateService } from 'src/app/_services/update/update.service';
     styleUrls: ['./login.component.scss'],
     standalone: true,
 })
-export default class LoginComponent implements OnInit {
+export default class LoginComponent implements OnInit, OnDestroy {
 
   //connectionStatus$: Observable<boolean>;
 

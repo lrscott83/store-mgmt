@@ -28,12 +28,12 @@ export class ProductCategoryOfflineService extends ProductCategoryService {
     // }
 
     createProductCategory(name: string, order: number, isActive: boolean): Observable<BaseResponseModel<boolean>> {
-        let result: Result = this.categoryRepository.addProductCategory(name, order, isActive);
+        const result: Result = this.categoryRepository.addProductCategory(name, order, isActive);
         return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
     }
 
     updateProductCategory(id: string, name: string, order: number, isActive: boolean): Observable<BaseResponseModel<boolean>> {
-        let result: Result = this.categoryRepository.updateProductCategory(id, name, order, isActive);
+        const result: Result = this.categoryRepository.updateProductCategory(id, name, order, isActive);
         return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
     }
 

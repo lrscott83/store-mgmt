@@ -69,7 +69,7 @@ export class ProductCategoryRepository {
     }
 
     addProductCategoryData(id: string, name: string, order: number, isActive: boolean): Result {
-        let category: ProductCategory = this.getStorageCategories().find(c => c.name === name);
+        const category: ProductCategory = this.getStorageCategories().find(c => c.name === name);
         if (category)
             return Result.Failure([ProductCategoryErrors.NameExists]);
 
@@ -119,11 +119,11 @@ export class ProductCategoryRepository {
     }
 
     updateProductCategory(id: string, name: string, order: number, isActive: boolean): Result {
-        let category: ProductCategory = this.getProductCategoryById(id);
+        const category: ProductCategory = this.getProductCategoryById(id);
         if (!category)
             return Result.Failure([ProductCategoryErrors.NotExists]);
 
-        let otherCategoryWithSameName = this.getStorageCategories().find(c => c.name === name && c.id !== id);
+        const otherCategoryWithSameName = this.getStorageCategories().find(c => c.name === name && c.id !== id);
         if (otherCategoryWithSameName)
             return Result.Failure([ProductCategoryErrors.NameExists]);
 
@@ -137,7 +137,7 @@ export class ProductCategoryRepository {
     }
 
     private updateProductCategoryActive(id: string, isActive: boolean): Result {
-        let category: ProductCategory = this.getProductCategoryById(id);
+        const category: ProductCategory = this.getProductCategoryById(id);
         if (!category)
             return Result.Failure([ProductCategoryErrors.NotExists]);
 
@@ -165,7 +165,7 @@ export class ProductCategoryRepository {
     }
 
     private setProductCategoriesLocalStorage(categories: Map<string, ProductCategory>) {
-        let categoryMapJson = JSON.stringify(Array.from(categories.entries()));
+        const categoryMapJson = JSON.stringify(Array.from(categories.entries()));
         localStorage.setItem(this.getStorageKey(), categoryMapJson);
     }
 
@@ -175,7 +175,7 @@ export class ProductCategoryRepository {
 
     private getProductCategoriesFromLocalStorage(): Map<string, ProductCategory> {
         try {
-            let categoryMapJson = localStorage.getItem(this.getStorageKey());
+            const categoryMapJson = localStorage.getItem(this.getStorageKey());
             if (categoryMapJson && categoryMapJson !== "{}") {
                 return new Map(JSON.parse(categoryMapJson));
             }

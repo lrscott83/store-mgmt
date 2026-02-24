@@ -59,7 +59,7 @@ export class AuthHTTPService {
     }
 
     respondeAuthChallenge(user: UserModel): Observable<any> {
-        var userChallenge = {
+        const userChallenge = {
             userName :user.login,
             newPassword : user.password,
             sessionId : user.challenge.sessionId,

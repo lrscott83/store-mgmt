@@ -61,7 +61,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
 
     updateExpense(expenseId: string, expenseType: ExpenseType, total: number, note: string, date: Date, paymentType: PaymentType): DataResult<Expense> {
         this.expenses = this.getStorageExpenses();
-        let expense = this.expenses.find(e => e.id === expenseId);
+        const expense = this.expenses.find(e => e.id === expenseId);
         if (!expense)
             return new DataResult(undefined, false, [ExpenseErrors.NotExists]);
 
@@ -78,7 +78,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
 
     deleteExpense(expenseId: string): Result {
         this.expenses = this.getStorageExpenses();
-        let expense = this.expenses.find(e => e.id === expenseId);
+        const expense = this.expenses.find(e => e.id === expenseId);
         if (!expense)
             return Result.Failure([ExpenseErrors.NotExists]);
         expense.isActive = false;
@@ -151,7 +151,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
     getActiveExpensesPriceToday(): number {
         const startDate = startOfDay(new Date());
         const endDate = addDays(startDate, 1);
-        return this.getActiveExpensesPriceBetweenDates(startDate, endDate);;
+        return this.getActiveExpensesPriceBetweenDates(startDate, endDate);
     }
 
     getActiveExpensesPriceYesterday(): number {
@@ -183,7 +183,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
 
     updateImportedExpense(importedExpense: Expense): Result {
         this.expenses = this.getExpensesFromLocalStorage();
-        let expense: Expense = this.expenses.find(o => o.id === importedExpense.id);
+        const expense: Expense = this.expenses.find(o => o.id === importedExpense.id);
         if (expense) {
             expense.date = new Date(importedExpense.date);
             expense.isActive = importedExpense.isActive;
@@ -198,7 +198,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
     }
 
     private setExpensesLocalStorage(expenses: Expense[]) {
-        let expensesMapJson = JSON.stringify(expenses);
+        const expensesMapJson = JSON.stringify(expenses);
         localStorage.setItem(this.getStorageKey(), expensesMapJson);
     }
 
@@ -208,7 +208,7 @@ export class ExpenseOfflineService extends BaseService<Expense> {
 
     private getExpensesFromLocalStorage(): Expense[] {
         try {
-            let expensesJson = localStorage.getItem(this.getStorageKey());
+            const expensesJson = localStorage.getItem(this.getStorageKey());
             if (expensesJson) {
                 const expenses = JSON.parse(expensesJson);
                 return expenses.map(expense => {

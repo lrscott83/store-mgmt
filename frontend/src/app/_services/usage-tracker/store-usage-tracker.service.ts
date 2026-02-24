@@ -92,7 +92,7 @@ export class StoreUsageTrackerService implements OnDestroy {
                     this.setUsageData(usageData);
                 }
                 this.sending = false;
-            });;
+            });
     }
 
     private wasUsedToday(usage: Usage): boolean {

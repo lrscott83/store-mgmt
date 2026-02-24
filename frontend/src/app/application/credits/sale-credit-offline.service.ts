@@ -66,7 +66,7 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
 
     updateSaleCredit(saleCreditId: string, client: string, note: string): DataResult<SaleCredit> {
         this.saleCredits = this.getStorageSaleCredits();
-        let saleCredit = this.saleCredits.find(e => e.id === saleCreditId);
+        const saleCredit = this.saleCredits.find(e => e.id === saleCreditId);
         if (!saleCredit)
             return new DataResult(undefined, false, [SaleCreditErrors.NotExists]);
 
@@ -80,7 +80,7 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
 
     paidSaleCredit(saleCreditId: string, paidType: PaymentType, note: string): DataResult<SaleCredit> {
         this.saleCredits = this.getStorageSaleCredits();
-        let saleCredit = this.saleCredits.find(e => e.id === saleCreditId);
+        const saleCredit = this.saleCredits.find(e => e.id === saleCreditId);
         if (!saleCredit)
             return new DataResult(undefined, false, [SaleCreditErrors.NotExists]);
 
@@ -98,7 +98,7 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
 
     deleteSaleCredit(saleCreditId: string): Result {
         this.saleCredits = this.getStorageSaleCredits();
-        let saleCredit = this.saleCredits.find(e => e.id === saleCreditId);
+        const saleCredit = this.saleCredits.find(e => e.id === saleCreditId);
         if (!saleCredit)
             return Result.Failure([SaleCreditErrors.NotExists]);
         saleCredit.isActive = false;
@@ -256,7 +256,7 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
 
     updateImportedSaleCredit(importedSaleCredit: SaleCredit): Result {
         this.saleCredits = this.getSaleCreditsFromLocalStorage();
-        let saleCredit: SaleCredit = this.saleCredits.find(o => o.id === importedSaleCredit.id);
+        const saleCredit: SaleCredit = this.saleCredits.find(o => o.id === importedSaleCredit.id);
         if (saleCredit) {
             saleCredit.isActive = importedSaleCredit.isActive;
             saleCredit.client = importedSaleCredit.client;
@@ -274,7 +274,7 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
     }
 
     private setSaleCreditsLocalStorage(saleCredits: SaleCredit[]) {
-        let saleCreditsMapJson = JSON.stringify(saleCredits);
+        const saleCreditsMapJson = JSON.stringify(saleCredits);
         localStorage.setItem(this.getStorageKey(), saleCreditsMapJson);
     }
 
@@ -284,7 +284,7 @@ export class SaleCreditOfflineService extends BaseService<SaleCredit> {
 
     private getSaleCreditsFromLocalStorage(): SaleCredit[] {
         try {
-            let saleCreditsJson = localStorage.getItem(this.getStorageKey());
+            const saleCreditsJson = localStorage.getItem(this.getStorageKey());
             if (saleCreditsJson) {
                 const saleCredits = JSON.parse(saleCreditsJson);
                 return saleCredits.map(saleCredit => {

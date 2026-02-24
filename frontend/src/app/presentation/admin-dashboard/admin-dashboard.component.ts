@@ -1,5 +1,5 @@
 
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { SharedModule } from '../shared/shared.module';
 import {
   ApexNonAxisChartSeries,
@@ -41,7 +41,7 @@ export type ChartOptions = {
     templateUrl: './admin-dashboard.component.html',
     styleUrl: './admin-dashboard.component.scss'
 })
-export class AdminDashboardComponent {
+export class AdminDashboardComponent implements OnInit {
   public chartOptions: Partial<ChartOptions> | any;
   public viewType: '7days' | '30days' = '7days';
   public totalTiendas = 1000; // Total de tiendas del sistema
@@ -151,7 +151,7 @@ export class AdminDashboardComponent {
 
   loadData(): void {
     let categories: string[] = [];
-    let data: number[] = [];
+    const data: number[] = [];
 
     if (this.viewType === '7days') {
       categories = this.getDiasSemana();

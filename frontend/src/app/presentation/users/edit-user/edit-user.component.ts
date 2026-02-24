@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { AuthService } from 'src/app/_services/services.index';
 import { User } from 'src/app/domain/entities/users/user.model';
 import { SharedModule } from '../../shared/shared.module';
@@ -14,7 +14,7 @@ import { BehaviorSubject, catchError } from 'rxjs';
     templateUrl: './edit-user.component.html',
     styleUrl: './edit-user.component.scss'
 })
-export class EditUserComponent {
+export class EditUserComponent implements OnInit {
 
   userId: string;
   user$: BehaviorSubject<User> = new BehaviorSubject<User>(undefined);

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { DataSerializerService } from 'src/app/application/synchronization/data-serializer.service';
@@ -16,7 +16,7 @@ import { ToastrService } from 'ngx-toastr';
     templateUrl: './receive-data.component.html',
     styleUrl: './receive-data.component.scss'
 })
-export class ReceiveDataComponent {
+export class ReceiveDataComponent implements OnInit {
   showPassword: boolean = false;
   formGroup: FormGroup;
 
@@ -83,7 +83,7 @@ export class ReceiveDataComponent {
   isControlInvalid(controlName: string, validator: string): boolean {
     const control = this.formGroup.controls[controlName];
     if (validator === "passwordMatch") {
-      var pass = this.formGroup.get('password');
+      const pass = this.formGroup.get('password');
       if (control.value && pass.value !== control.value) {
         control.setErrors({});
         return true;

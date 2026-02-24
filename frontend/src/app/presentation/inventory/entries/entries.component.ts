@@ -80,7 +80,7 @@ export class EntriesComponent implements OnInit {
     }
   
     groupEntries(entries: InventoryEntryView[]): DateEntry[] {
-      let groups: Map<string, InventoryEntryView[]> = new Map();
+      const groups: Map<string, InventoryEntryView[]> = new Map();
       entries.forEach(credit => {
         const groupId = credit.date.toISOString().split("T")[0];
         const collection = groups.get(groupId);

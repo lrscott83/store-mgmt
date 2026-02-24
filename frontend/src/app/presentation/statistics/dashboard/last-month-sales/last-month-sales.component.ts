@@ -32,7 +32,7 @@ export type ChartOptions = {
     templateUrl: './last-month-sales.component.html',
     styleUrl: './last-month-sales.component.scss'
 })
-export class LastMonthSalesComponent {
+export class LastMonthSalesComponent implements OnInit {
   @ViewChild('chart') chart!: ChartComponent;
     public chartOptions!: Partial<ChartOptions>;
   

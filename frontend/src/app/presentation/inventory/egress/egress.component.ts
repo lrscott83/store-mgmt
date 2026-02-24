@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { OrderType, OrderTypeUtils } from 'src/app/domain/entities/orders/order.model';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslateModule } from '@ngx-translate/core';
@@ -16,7 +16,7 @@ import { TypeData } from 'src/app/domain/commons/type-data';
     templateUrl: './egress.component.html',
     styleUrl: './egress.component.scss'
 })
-export class EgressComponent {
+export class EgressComponent implements OnInit {
   orderType: OrderType = OrderType.Mayorista;
 
   orderTypes: TypeData[] = OrderTypeUtils.getOrderTypes();

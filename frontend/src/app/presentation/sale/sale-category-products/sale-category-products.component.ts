@@ -1,4 +1,4 @@
-import { Component, Inject, Input } from '@angular/core';
+import { Component, Inject, Input, OnInit, OnDestroy } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import { ProductCategory } from 'src/app/domain/entities/product-categories/product-category.model';
@@ -15,7 +15,7 @@ import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
     templateUrl: './sale-category-products.component.html',
     styleUrl: './sale-category-products.component.scss'
 })
-export class SaleCategoryProductsComponent {
+export class SaleCategoryProductsComponent implements OnInit, OnDestroy {
   @Input() category: Observable<ProductCategory>;
   @Input() orderType: OrderType;
 

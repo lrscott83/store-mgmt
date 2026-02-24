@@ -79,7 +79,7 @@ export class ProductRepository {
     }
 
     public deleteProduct(id: string): boolean {
-        let product = this.getProductById(id);
+        const product = this.getProductById(id);
         if (!product)
             return false;
 
@@ -98,7 +98,7 @@ export class ProductRepository {
             return Result.Failure([ProductCategoryErrors.NotExists]);
 
         // TODO. Filter by category
-        let product = this.getStorageProducts().find(p => p.categoryId === categoryId && p.name === name);
+        const product = this.getStorageProducts().find(p => p.categoryId === categoryId && p.name === name);
         if (product)
             return Result.Failure([ProductErrors.NameExists]);
 
@@ -151,11 +151,11 @@ export class ProductRepository {
         if (!category)
             return Result.Failure([ProductCategoryErrors.NotExists]);
 
-        let product = this.getProductById(id);
+        const product = this.getProductById(id);
         if (!product)
             return Result.Failure([ProductErrors.NotExists]);
 
-        let otherProductWithSameName = this.getStorageProducts()
+        const otherProductWithSameName = this.getStorageProducts()
             .find(p => p.categoryId === categoryId && p.name === name && p.id !== id);
         if (otherProductWithSameName)
             return Result.Failure([ProductErrors.NameExists]);
@@ -185,7 +185,7 @@ export class ProductRepository {
     }
 
     setDiscountFromInvantory(id: string, discountFromInvantory: boolean): Result {
-        let product = this.getProductById(id);
+        const product = this.getProductById(id);
         if (!product)
             return Result.Failure([ProductErrors.NotExists]);
 
@@ -195,7 +195,7 @@ export class ProductRepository {
     }
 
     private updateProductActive(id: string, isActive: boolean): Result {
-        let product = this.getProductById(id);
+        const product = this.getProductById(id);
         if (!product)
             return Result.Failure([ProductErrors.NotExists]);
 
@@ -213,7 +213,7 @@ export class ProductRepository {
     }
 
     private setProductsLocalStorage(products: Map<string, Product>) {
-        let productMapJson = JSON.stringify(Array.from(products.entries()));
+        const productMapJson = JSON.stringify(Array.from(products.entries()));
         localStorage.setItem(this.getStorageKey(), productMapJson);
     }
 
@@ -232,7 +232,7 @@ export class ProductRepository {
 
     private getProductsFromLocalStorage(): Map<string, Product> {
         try {
-            let productMapJson = localStorage.getItem(this.getStorageKey());
+            const productMapJson = localStorage.getItem(this.getStorageKey());
             if (productMapJson && productMapJson !== "{}") {
                 return new Map(JSON.parse(productMapJson));
             }

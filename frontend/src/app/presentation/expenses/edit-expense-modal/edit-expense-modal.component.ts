@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ViewEncapsulation, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -18,7 +18,7 @@ import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-ty
     styleUrl: './edit-expense-modal.component.scss',
     encapsulation: ViewEncapsulation.None
 })
-export class EditExpenseModalComponent {
+export class EditExpenseModalComponent implements OnInit {
 
   expenseType: ExpenseType = ExpenseType.Salario;
   expenseTypes: TypeData[] = ExpenseTypeUtils.getExpenseTypes();

@@ -1,4 +1,4 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { BehaviorSubject, Observable, Subscription, catchError } from 'rxjs';
@@ -24,7 +24,7 @@ import { StoreModuleStateService } from 'src/app/_services/shared/store-module-s
     styleUrl: './edit-store.component.scss',
     providers: []
 })
-export class EditStoreComponent {
+export class EditStoreComponent implements OnInit, OnDestroy {
 
   editStoreId: string;
   currentUser: UserModel;

@@ -104,7 +104,7 @@ Confituras,Caramelo,20`;
   isControlInvalid(controlName: string, validator: string): boolean {
     const control = this.formGroup.controls[controlName];
     if (validator === "passwordMatch") {
-      var pass = this.formGroup.get('password');
+      const pass = this.formGroup.get('password');
       if (control.value && pass.value !== control.value) {
         control.setErrors({});
         return true;

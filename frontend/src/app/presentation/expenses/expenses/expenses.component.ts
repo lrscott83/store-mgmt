@@ -75,7 +75,7 @@ export class ExpensesComponent implements OnInit {
   }
 
   groupExpenses(expenses: Expense[]): DateExpense[] {
-    let groups: Map<string, Expense[]> = new Map();
+    const groups: Map<string, Expense[]> = new Map();
     expenses.forEach(credit => {
       const groupId = credit.date.toISOString().split("T")[0];
       const collection = groups.get(groupId);

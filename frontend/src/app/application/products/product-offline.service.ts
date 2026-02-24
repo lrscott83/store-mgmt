@@ -31,7 +31,7 @@ export class ProductOfflineService extends ProductService {
 
     createProduct(categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean,
         availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
-        let result: Result = this.productRepository.addProduct(categoryId, name, price, businessId, order, isActive,
+        const result: Result = this.productRepository.addProduct(categoryId, name, price, businessId, order, isActive,
             availableToSale, discountFromInvantory);
         return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
     }
@@ -40,7 +40,7 @@ export class ProductOfflineService extends ProductService {
         let hasError: boolean = false;
         items.forEach(item => {
             const order: number = this.getNextOrder(categoryId);
-            let result: Result = this.productRepository.addProduct(categoryId, item.name, item.price, "", order, true,
+            const result: Result = this.productRepository.addProduct(categoryId, item.name, item.price, "", order, true,
                 true, true);
             if (!result.succeeded)
                 hasError = true;
@@ -56,7 +56,7 @@ export class ProductOfflineService extends ProductService {
                 ? category.id
                 : this.categoryRepository.addProductCategoryByName(csvProduct.category);
             const order: number = this.getNextOrder(categoryId);
-            let result: Result = this.productRepository.addProduct(categoryId, csvProduct.name, csvProduct.price, "", order, true, true, true);
+            const result: Result = this.productRepository.addProduct(categoryId, csvProduct.name, csvProduct.price, "", order, true, true, true);
             if (!result.succeeded)
                 hasError = true;
         })
@@ -64,13 +64,13 @@ export class ProductOfflineService extends ProductService {
     }
 
     updateProduct(id: string, categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
-        let result: Result = this.productRepository.updateProduct(id, categoryId, name, price, businessId, order, isActive,
+        const result: Result = this.productRepository.updateProduct(id, categoryId, name, price, businessId, order, isActive,
             availableToSale, discountFromInvantory);
         return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
     }
 
     setDiscountFromInvantory(id: string, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
-        let result: Result = this.productRepository.setDiscountFromInvantory(id, discountFromInvantory);
+        const result: Result = this.productRepository.setDiscountFromInvantory(id, discountFromInvantory);
         return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
     }
 

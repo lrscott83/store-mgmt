@@ -1,12 +1,12 @@
 export default class DownloadLinkUtils {
   static createAndOpenLink(fileContents: any, contentType: string) {
-    var byteCharacters = atob(fileContents);
-    var byteNumbers = new Array(byteCharacters.length);
-    for (var i = 0; i < byteCharacters.length; i++) {
+    const byteCharacters = atob(fileContents);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
       byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
-    var byteArray = new Uint8Array(byteNumbers);
-    let binaryData = [];
+    const byteArray = new Uint8Array(byteNumbers);
+    const binaryData = [];
     binaryData.push(byteArray);
     const downloadedFile = new Blob(binaryData, { type: contentType });
 
