@@ -44,7 +44,7 @@
       "cacheConfig": {
         "strategy": "freshness",
         "maxSize": 1,
-        "maxAge": "30d"
+        "maxAge": "35d"
       }
     },
     {
@@ -53,7 +53,7 @@
       "cacheConfig": {
         "strategy": "performance",
         "maxSize": 50,
-        "maxAge": "30d"
+        "maxAge": "35d"
       }
     }
   ]

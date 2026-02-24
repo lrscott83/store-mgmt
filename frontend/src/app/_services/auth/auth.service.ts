@@ -10,6 +10,7 @@ import { StorageService } from '../storage/storage.service';
 import { Router } from '@angular/router';
 import { BaseResponseModel } from '../_models/base.model';
 import { addDays } from 'date-fns';
+import { AppConfig } from '../../config/app.config';
 
 @Injectable({
   providedIn: 'root'
@@ -59,7 +60,7 @@ export class AuthService implements OnDestroy {
       map((response: BaseResponseModel<AuthModel>) => {
         if (response && response.succeeded) {
           this.localStorageService.setTokenToLocalStorage(response.data.authToken);
-          response.data.expiresIn = addDays(new Date(), 30);
+          response.data.expiresIn = addDays(new Date(), AppConfig.offline.maxDaysOffline);
           //response.data.expiresIn = new Date(new Date().getTime() + 60000);
           const result = this.setAuthFromLocalStorage(response.data);
           return result;
@@ -149,12 +150,12 @@ export class AuthService implements OnDestroy {
 
     const now = new Date();
     const expiresIn = new Date(auth.expiresIn);
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const maxOfflineDate = new Date();
+    maxOfflineDate.setDate(maxOfflineDate.getDate() + AppConfig.offline.maxDaysOffline);
 
     const currentUser = this.localStorageService.getCurrentUser();
 
-    if (currentUser && expiresIn > now && expiresIn <= thirtyDaysFromNow) {
+    if (currentUser && expiresIn > now && expiresIn <= maxOfflineDate) {
       currentUser.expiresIn = new Date(auth.expiresIn);
       return of(currentUser);
     }
