@@ -1,0 +1,57 @@
+<div class="quick-scanner-overlay" *ngIf="isOpen" (click)="close()">
+  <div class="quick-scanner-container" (click)="$event.stopPropagation()">
+    <div class="scanner-header">
+      <h5>{{ 'BARCODE_SCANNER.QUICK_SCAN' | translate }}</h5>
+      <button type="button" class="btn-close" (click)="close()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="scanner-body">
+      <div class="video-container" *ngIf="hasPermission">
+        <video #videoElement playsinline autoplay muted class="scanner-video" [class.hidden]="!isScanning"> </video>
+
+        <div class="scanner-overlay" *ngIf="isScanning">
+          <div class="scanner-frame">
+            <span class="scanner-hint">{{ 'BARCODE_SCANNER.POINT_CAMERA' | translate }}</span>
+          </div>
+        </div>
+
+        <div class="scanner-placeholder" *ngIf="!isScanning" (click)="startScanning()">
+          <i class="fas fa-camera"></i>
+          <p>{{ 'BARCODE_SCANNER.TAP_TO_START' | translate }}</p>
+        </div>
+      </div>
+
+      <div class="error-message" *ngIf="!hasPermission">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>{{ errorMessage || 'Camera permission required' }}</p>
+        <button class="btn btn-primary" (click)="getAvailableCameras()">
+          {{ 'BARCODE_SCANNER.RETRY' | translate }}
+        </button>
+      </div>
+    </div>
+
+    <div class="scanner-footer">
+      <div class="camera-controls" *ngIf="availableCameras.length > 1">
+        <button class="btn btn-secondary btn-sm" (click)="switchCamera()" [disabled]="!isScanning">
+          <i class="fas fa-camera-rotate"></i>
+        </button>
+      </div>
+
+      <button class="btn btn-danger" (click)="close()">
+        <i class="fas fa-stop"></i>
+        {{ 'BARCODE_SCANNER.CLOSE_SCANNER' | translate }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<button
+  class="floating-scanner-btn"
+  *ngIf="!isOpen"
+  (click)="isOpen = true; startScanning()"
+  [title]="'BARCODE_SCANNER.SCAN_PRODUCT' | translate"
+>
+  <i class="fas fa-barcode"></i>
+</button>

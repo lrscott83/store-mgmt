@@ -1,0 +1,45 @@
+<div class="scanner-container">
+  <div class="scanner-header">
+    <h5>{{ 'BARCODE_SCANNER.TITLE' | translate }}</h5>
+    <button type="button" class="btn-close" (click)="close()"></button>
+  </div>
+
+  <div class="scanner-body">
+    <div class="video-container" *ngIf="hasPermission">
+      <video #videoElement playsinline autoplay muted class="scanner-video" [class.hidden]="!isScanning"> </video>
+
+      <div class="scanner-overlay" *ngIf="isScanning">
+        <div class="scanner-frame"></div>
+      </div>
+
+      <div class="scanner-placeholder" *ngIf="!isScanning">
+        <i class="fas fa-camera"></i>
+        <p>{{ 'BARCODE_SCANNER.CLICK_TO_START' | translate }}</p>
+        <button class="btn btn-primary" (click)="startScanning()">
+          {{ 'BARCODE_SCANNER.START_SCANNING' | translate }}
+        </button>
+      </div>
+    </div>
+
+    <div class="error-message" *ngIf="!hasPermission">
+      <i class="fas fa-exclamation-triangle"></i>
+      <p>{{ errorMessage || 'Camera permission required' }}</p>
+      <button class="btn btn-primary" (click)="getAvailableCameras()">
+        {{ 'BARCODE_SCANNER.RETRY' | translate }}
+      </button>
+    </div>
+  </div>
+
+  <div class="scanner-footer">
+    <div class="camera-controls" *ngIf="availableCameras.length > 1">
+      <button class="btn btn-secondary btn-sm" (click)="switchCamera()" [disabled]="!isScanning">
+        <i class="fas fa-camera-rotate"></i>
+        {{ 'BARCODE_SCANNER.SWITCH_CAMERA' | translate }}
+      </button>
+    </div>
+
+    <button class="btn btn-danger" (click)="close()" *ngIf="isScanning">
+      {{ 'BARCODE_SCANNER.CLOSE' | translate }}
+    </button>
+  </div>
+</div>

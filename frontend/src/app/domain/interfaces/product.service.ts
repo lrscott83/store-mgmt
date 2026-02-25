@@ -10,22 +10,41 @@ import { CsvProduct } from 'src/app/_services/csv/models/csv-product.model';
 // })
 
 export abstract class ProductService extends BaseService<Product> {
+  abstract hasAnyAvailableToSaleProduct(): Observable<BaseResponseModel<boolean>>;
+  abstract getProductById(id: string): Observable<BaseResponseModel<Product>>;
+  abstract getProductByBarcode(barcode: string): Observable<BaseResponseModel<Product>>;
+  abstract getProductsToSelect(): Observable<BaseResponseModel<ProductSelectView[]>>;
+  abstract getAvailableProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>>;
+  abstract deleteProduct(id: string): Observable<BaseResponseModel<boolean>>;
+  abstract createCsvProducts(csvProducts: CsvProduct[]): Observable<BaseResponseModel<boolean>>;
 
-    abstract hasAnyAvailableToSaleProduct(): Observable<BaseResponseModel<boolean>>;
-    abstract getProductById(id: string): Observable<BaseResponseModel<Product>>;
-    abstract getProductsToSelect(): Observable<BaseResponseModel<ProductSelectView[]>>;
-    abstract getAvailableProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>>;
-    abstract deleteProduct(id: string): Observable<BaseResponseModel<boolean>>;
-    abstract createCsvProducts(csvProducts: CsvProduct[]): Observable<BaseResponseModel<boolean>>;
+  abstract getProductsToSaleByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>>;
 
-    abstract getProductsToSaleByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>>;
+  abstract createProduct(
+    categoryId: string,
+    name: string,
+    price: number,
+    businessId: string,
+    order: number,
+    isActive: boolean,
+    availableToSale: boolean,
+    discountFromInvantory: boolean,
+    barcode?: string
+  ): Observable<BaseResponseModel<boolean>>;
 
-    abstract createProduct(categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>>;
+  abstract updateProduct(
+    id: string,
+    categoryId: string,
+    name: string,
+    price: number,
+    businessId: string,
+    order: number,
+    isActive: boolean,
+    availableToSale: boolean,
+    discountFromInvantory: boolean,
+    barcode?: string
+  ): Observable<BaseResponseModel<boolean>>;
 
-    abstract updateProduct(id: string, categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>>;
-
-    abstract getMaxOrder(categoryId: string): Observable<BaseResponseModel<number>>;
-    abstract createProducts(categoryId: string, items: { name, price }[]): Observable<BaseResponseModel<boolean>>;
-
-    
+  abstract getMaxOrder(categoryId: string): Observable<BaseResponseModel<number>>;
+  abstract createProducts(categoryId: string, items: { name; price }[]): Observable<BaseResponseModel<boolean>>;
 }

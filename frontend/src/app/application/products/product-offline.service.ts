@@ -14,119 +14,159 @@ import { CsvProduct } from 'src/app/_services/csv/models/csv-product.model';
 
 @Injectable()
 export class ProductOfflineService extends ProductService {
+  constructor(
+    @Inject(HttpClient) http,
+    private productRepository: ProductRepository,
+    private categoryRepository: ProductCategoryRepository
+  ) {
+    super(http);
+  }
 
+  hasAnyAvailableToSaleProduct(): Observable<BaseResponseModel<boolean>> {
+    return this.Success$(this.productRepository.hasAnyAvailableToSaleProduct());
+  }
 
-    constructor(@Inject(HttpClient) http, private productRepository: ProductRepository, private categoryRepository: ProductCategoryRepository) {
-        super(http);
-    }
+  getProductById(id: string): Observable<BaseResponseModel<Product>> {
+    const product = this.productRepository.getProductById(id);
+    return product ? this.Success$(product) : this.Failure$([ProductErrors.NotExists]);
+  }
 
-    hasAnyAvailableToSaleProduct(): Observable<BaseResponseModel<boolean>> {
-        return this.Success$(this.productRepository.hasAnyAvailableToSaleProduct());
-    }
+  getProductByBarcode(barcode: string): Observable<BaseResponseModel<Product>> {
+    const product = this.productRepository.getProductByBarcode(barcode);
+    return product ? this.Success$(product) : this.Failure$([ProductErrors.NotExists]);
+  }
 
-    getProductById(id: string): Observable<BaseResponseModel<Product>> {
-        const product = this.productRepository.getProductById(id);
-        return product ? this.Success$(product) : this.Failure$([ProductErrors.NotExists]);
-    }
+  createProduct(
+    categoryId: string,
+    name: string,
+    price: number,
+    businessId: string,
+    order: number,
+    isActive: boolean,
+    availableToSale: boolean,
+    discountFromInvantory: boolean,
+    barcode?: string
+  ): Observable<BaseResponseModel<boolean>> {
+    const result: Result = this.productRepository.addProduct(
+      categoryId,
+      name,
+      price,
+      businessId,
+      order,
+      isActive,
+      availableToSale,
+      discountFromInvantory,
+      barcode
+    );
+    return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
+  }
 
-    createProduct(categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean,
-        availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
-        const result: Result = this.productRepository.addProduct(categoryId, name, price, businessId, order, isActive,
-            availableToSale, discountFromInvantory);
-        return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
-    }
+  createProducts(categoryId: string, items: { name; price }[]): Observable<BaseResponseModel<boolean>> {
+    let hasError: boolean = false;
+    items.forEach((item) => {
+      const order: number = this.getNextOrder(categoryId);
+      const result: Result = this.productRepository.addProduct(categoryId, item.name, item.price, '', order, true, true, true);
+      if (!result.succeeded) hasError = true;
+    });
+    return !hasError ? this.Success$(true) : this.Failure$([]);
+  }
 
-    createProducts(categoryId: string, items: { name, price }[]): Observable<BaseResponseModel<boolean>> {
-        let hasError: boolean = false;
-        items.forEach(item => {
-            const order: number = this.getNextOrder(categoryId);
-            const result: Result = this.productRepository.addProduct(categoryId, item.name, item.price, "", order, true,
-                true, true);
-            if (!result.succeeded)
-                hasError = true;
-        })
-        return !hasError ? this.Success$(true) : this.Failure$([]);
-    }
+  createCsvProducts(csvProducts: CsvProduct[]): Observable<BaseResponseModel<boolean>> {
+    let hasError: boolean = false;
+    csvProducts.forEach((csvProduct) => {
+      const category: ProductCategory = this.categoryRepository.getProductCategoryByName(csvProduct.category);
+      const categoryId: string = category ? category.id : this.categoryRepository.addProductCategoryByName(csvProduct.category);
+      const order: number = this.getNextOrder(categoryId);
+      const result: Result = this.productRepository.addProduct(categoryId, csvProduct.name, csvProduct.price, '', order, true, true, true);
+      if (!result.succeeded) hasError = true;
+    });
+    return !hasError ? this.Success$(true) : this.Failure$([]);
+  }
 
-    createCsvProducts(csvProducts: CsvProduct[]): Observable<BaseResponseModel<boolean>> {
-        let hasError: boolean = false;
-        csvProducts.forEach(csvProduct => {
-            const category: ProductCategory = this.categoryRepository.getProductCategoryByName(csvProduct.category);
-            const categoryId: string = category
-                ? category.id
-                : this.categoryRepository.addProductCategoryByName(csvProduct.category);
-            const order: number = this.getNextOrder(categoryId);
-            const result: Result = this.productRepository.addProduct(categoryId, csvProduct.name, csvProduct.price, "", order, true, true, true);
-            if (!result.succeeded)
-                hasError = true;
-        })
-        return !hasError ? this.Success$(true) : this.Failure$([]);
-    }
+  updateProduct(
+    id: string,
+    categoryId: string,
+    name: string,
+    price: number,
+    businessId: string,
+    order: number,
+    isActive: boolean,
+    availableToSale: boolean,
+    discountFromInvantory: boolean,
+    barcode?: string
+  ): Observable<BaseResponseModel<boolean>> {
+    const result: Result = this.productRepository.updateProduct(
+      id,
+      categoryId,
+      name,
+      price,
+      businessId,
+      order,
+      isActive,
+      availableToSale,
+      discountFromInvantory,
+      barcode
+    );
+    return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
+  }
 
-    updateProduct(id: string, categoryId: string, name: string, price: number, businessId: string, order: number, isActive: boolean, availableToSale: boolean, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
-        const result: Result = this.productRepository.updateProduct(id, categoryId, name, price, businessId, order, isActive,
-            availableToSale, discountFromInvantory);
-        return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
-    }
+  setDiscountFromInvantory(id: string, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
+    const result: Result = this.productRepository.setDiscountFromInvantory(id, discountFromInvantory);
+    return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
+  }
 
-    setDiscountFromInvantory(id: string, discountFromInvantory: boolean): Observable<BaseResponseModel<boolean>> {
-        const result: Result = this.productRepository.setDiscountFromInvantory(id, discountFromInvantory);
-        return result.succeeded ? this.Success$(true) : this.Failure$(result.errors);
-    }
+  getProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
+    const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
+    return products ? this.Success$(products) : this.Success$([]);
+  }
 
-    getProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
-        const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
-        return products ? this.Success$(products) : this.Success$([]);
-    }
+  getAvailableProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
+    const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
+    return products ? this.Success$(products.filter((p) => p.isActive)) : this.Success$([]);
+  }
 
-    getAvailableProductsByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
-        const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
-        return products ? this.Success$(products.filter(p => p.isActive)) : this.Success$([]);
-    }
+  getProductsToSaleByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
+    const products: Product[] = this.productRepository.getAvailableToSaleProductsByCategoryId(categoryId);
+    return products ? this.Success$(products.filter((p) => p.availableToSale)) : this.Success$([]);
+  }
 
-    getProductsToSaleByCategoryId(categoryId: string): Observable<BaseResponseModel<Product[]>> {
-        const products: Product[] = this.productRepository.getAvailableToSaleProductsByCategoryId(categoryId);
-        return products ? this.Success$(products.filter(p => p.availableToSale)) : this.Success$([]);
-    }
+  getProductsToSelect(): Observable<BaseResponseModel<ProductSelectView[]>> {
+    const categories: ProductCategory[] = this.categoryRepository.getProductCategories();
+    const categoryProductsMap: Map<string, Product[]> = new Map<string, Product[]>();
+    const products: Product[] = this.productRepository.getAvailableProducts();
+    products.forEach((product) => {
+      if (!categoryProductsMap.has(product.categoryId)) categoryProductsMap.set(product.categoryId, [product]);
+      else categoryProductsMap.get(product.categoryId).push(product);
+    });
+    const productsToSelect: ProductSelectView[] = [];
+    categories.forEach((category) => {
+      if (categoryProductsMap.has(category.id)) {
+        categoryProductsMap
+          .get(category.id)
+          .sort((p1, p2) => p1.order - p2.order)
+          .map((product) => {
+            return {
+              id: product.id,
+              fullName: product.categoryName + ' - ' + product.name
+            };
+          })
+          .forEach((product) => productsToSelect.push(product));
+      }
+    });
+    return this.Success$(productsToSelect);
+  }
 
-    getProductsToSelect(): Observable<BaseResponseModel<ProductSelectView[]>> {
-        const categories: ProductCategory[] = this.categoryRepository.getProductCategories();
-        const categoryProductsMap: Map<string, Product[]> = new Map<string, Product[]>();
-        const products: Product[] = this.productRepository.getAvailableProducts();
-        products.forEach(product => {
-            if (!categoryProductsMap.has(product.categoryId))
-                categoryProductsMap.set(product.categoryId, [product]);
-            else
-                categoryProductsMap.get(product.categoryId).push(product);
-        });
-        const productsToSelect: ProductSelectView[] = [];
-        categories.forEach(category => {
-            if (categoryProductsMap.has(category.id)) {
-                categoryProductsMap.get(category.id)
-                    .sort((p1, p2) => p1.order - p2.order)
-                    .map(product => {
-                        return {
-                            id: product.id,
-                            fullName: product.categoryName + " - " + product.name
-                        }
-                    })
-                    .forEach(product => productsToSelect.push(product));
-            }
-        })
-        return this.Success$(productsToSelect);
-    }
+  public getMaxOrder(categoryId: string): Observable<BaseResponseModel<number>> {
+    const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
+    return this.Success$(Math.max(...products.map((c) => c.order), 0));
+  }
 
-    public getMaxOrder(categoryId: string): Observable<BaseResponseModel<number>> {
-        const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
-        return this.Success$(Math.max(...products.map(c => c.order), 0));
-    }
+  private getNextOrder(categoryId: string): number {
+    const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
+    return Math.max(...products.map((c) => c.order), 0) + 1;
+  }
 
-    private getNextOrder(categoryId: string): number {
-        const products: Product[] = this.productRepository.getProductsByCategoryId(categoryId);
-        return Math.max(...products.map(c => c.order), 0) + 1;
-    }
-
-    public deleteProduct(id: string): Observable<BaseResponseModel<boolean>> {
-        return this.Success$(this.productRepository.deleteProduct(id));
-    }
+  public deleteProduct(id: string): Observable<BaseResponseModel<boolean>> {
+    return this.Success$(this.productRepository.deleteProduct(id));
+  }
 }
