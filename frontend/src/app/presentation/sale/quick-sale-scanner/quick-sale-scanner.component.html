@@ -47,11 +47,6 @@
   </div>
 </div>
 
-<button
-  class="floating-scanner-btn"
-  *ngIf="!isOpen"
-  (click)="isOpen = true; startScanning()"
-  [title]="'BARCODE_SCANNER.SCAN_PRODUCT' | translate"
->
-  <i class="fas fa-barcode"></i>
+<button class="floating-scanner-btn" *ngIf="!isOpen" (click)="openScanner()" [title]="'BARCODE_SCANNER.SCAN_PRODUCT' | translate">  
+   <mat-icon>qr_code_scanner</mat-icon>
 </button>

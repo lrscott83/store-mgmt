@@ -9,36 +9,39 @@ export const AuthGuard = (route: ActivatedRouteSnapshot, state: RouterStateSnaps
   const authService = inject(AuthService);
   const authorizationService = inject(AuthorizationService);
   const currentUser = authService.currentUserValue;
+  console.log('[AuthGuard] currentUserValue:', currentUser);
+  console.log('[AuthGuard] currentUserSubject value:', authService.currentUserSubject?.value);
 
   if (currentUser) {
-    // logged in so check if it has access to the route
+    console.log('[AuthGuard] User is authenticated');
     return isUserAuthorized(authService, route, currentUser, authorizationService);
   }
 
-  // not logged in so redirect to login page with the return url
+  console.log('[AuthGuard] User NOT authenticated, logging out');
   authService.logout();
   return false;
-}
+};
 
 // export function AuthGuardLogin(): CanActivateFn {
 //   return (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
-//     
+//
 //   };
 // }
 
-function isUserAuthorized(authService: AuthService, route: ActivatedRouteSnapshot, currentUser: UserModel, 
-  authorizationService: AuthorizationService): boolean {
+function isUserAuthorized(
+  authService: AuthService,
+  route: ActivatedRouteSnapshot,
+  currentUser: UserModel,
+  authorizationService: AuthorizationService
+): boolean {
   // this will be passed from the route config
   // on the data property
-  
 
   // Validate Application Management module
-  if (currentUser.isSuperAdmin || currentUser.isOwnerAdmin)
-    return true;
+  if (currentUser.isSuperAdmin || currentUser.isOwnerAdmin) return true;
 
-  const expectedFeatures = route.data["expectedFeatures"];
-  if (expectedFeatures && authorizationService.isUserAuthorize(expectedFeatures))
-    return true;
+  const expectedFeatures = route.data['expectedFeatures'];
+  if (expectedFeatures && authorizationService.isUserAuthorize(expectedFeatures)) return true;
 
   authService.logout();
   return false;

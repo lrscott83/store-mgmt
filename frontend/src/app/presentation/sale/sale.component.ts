@@ -69,10 +69,13 @@ export class SaleComponent implements OnInit {
   }
 
   onBarcodeScanned(barcode: string): void {
+    console.log('[SaleComponent] Barcode scanned:', barcode);
     this.productService.getProductByBarcode(barcode).subscribe((response) => {
+      console.log('[SaleComponent] Product search response:', response);
       if (response.succeeded && response.data) {
         this.addProductToCart(response.data);
       } else {
+        console.log('[SaleComponent] Product not found for barcode:', barcode);
         Swal.fire({
           icon: 'warning',
           title: this.translate.instant('GENERAL.WARNING'),
@@ -87,7 +90,9 @@ export class SaleComponent implements OnInit {
   }
 
   private addProductToCart(product: Product): void {
+    console.log('[SaleComponent] Adding product to cart:', product.name);
     this.shoppingCartService.addCartItem(this.orderType, product.id, 1, product.price).then((response) => {
+      console.log('[SaleComponent] Add to cart response:', response);
       if (response.succeeded) {
         Swal.fire({
           icon: 'success',
@@ -110,9 +115,12 @@ export class SaleComponent implements OnInit {
 
   onScannerClosed(): void {
     this.isScannerOpen = false;
+    console.log('Scanner closed.');
   }
 
   toggleScanner(): void {
+    console.log('[SaleComponent] toggleScanner called, current isScannerOpen:', this.isScannerOpen);
     this.isScannerOpen = !this.isScannerOpen;
+    console.log('[SaleComponent] isScannerOpen changed to:', this.isScannerOpen);
   }
 }

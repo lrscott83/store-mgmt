@@ -4,16 +4,32 @@ import { TranslateModule } from '@ngx-translate/core';
 import { BarcodeFormat, BrowserMultiFormatReader } from '@zxing/browser';
 import { Result } from '@zxing/library';
 import { Subscription } from 'rxjs';
+import { SharedModule } from '../../shared/shared.module';
 
 @Component({
   selector: 'app-quick-sale-scanner',
   standalone: true,
-  imports: [CommonModule, TranslateModule],
+  imports: [SharedModule, TranslateModule],
   templateUrl: './quick-sale-scanner.component.html',
   styleUrl: './quick-sale-scanner.component.scss'
 })
 export class QuickSaleScannerComponent implements OnInit, OnDestroy {
-  @Input() isOpen = false;
+  private _isOpen = false;
+  @Input()
+  get isOpen(): boolean {
+    return this._isOpen;
+  }
+  set isOpen(value: boolean) {
+    console.log('[QuickSaleScanner] isOpen setter called, value:', value);
+    this._isOpen = value;
+    if (value && !this.isScanning) {
+      console.log('[QuickSaleScanner] Calling startScanning from setter');
+      setTimeout(() => {
+        console.log('[QuickSaleScanner] setTimeout fired, calling startScanning');
+        this.startScanning();
+      }, 100);
+    }
+  }
   @Output() barcodeScanned = new EventEmitter<string>();
   @Output() closed = new EventEmitter<void>();
 
@@ -30,10 +46,12 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
   private stream: MediaStream | null = null;
 
   constructor() {
+    console.log('[QuickSaleScanner] Constructor called');
     this.codeReader = new BrowserMultiFormatReader();
   }
 
   ngOnInit(): void {
+    console.log('[QuickSaleScanner] ngOnInit called');
     this.getAvailableCameras();
   }
 
@@ -66,11 +84,21 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
   }
 
   async startScanning(): Promise<void> {
-    if (!this.videoElementRef?.nativeElement) return;
+    console.log('[QuickSaleScanner] >>> startScanning START <<<');
+    console.log('[QuickSaleScanner] isOpen:', this.isOpen);
+    console.log('[QuickSaleScanner] videoElement exists:', !!this.videoElementRef?.nativeElement);
+    console.log('[QuickSaleScanner] isScanning:', this.isScanning);
+    console.log('[QuickSaleScanner] selectedCamera:', this.selectedCamera);
+
+    if (!this.videoElementRef?.nativeElement) {
+      console.log('[QuickSaleScanner] Video element NOT ready');
+      return;
+    }
 
     const videoElement = this.videoElementRef.nativeElement;
     this.isScanning = true;
     this.errorMessage = '';
+    console.log('[QuickSaleScanner] Starting camera...');
 
     try {
       const constraints: MediaStreamConstraints = this.selectedCamera
@@ -90,13 +118,18 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
             }
           };
 
+      console.log('[QuickSaleScanner] Requesting getUserMedia...');
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('[QuickSaleScanner] getUserMedia SUCCESS');
+
       videoElement.srcObject = this.stream;
       videoElement.play();
 
+      console.log('[QuickSaleScanner] Calling continuousScan...');
       this.continuousScan();
+      console.log('[QuickSaleScanner] >>> startScanning END <<<');
     } catch (err: any) {
-      console.error('Error starting camera:', err);
+      console.error('[QuickSaleScanner] Error starting camera:', err);
       this.isScanning = false;
       if (err.name === 'NotAllowedError') {
         this.hasPermission = false;
@@ -112,19 +145,35 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
 
     const videoElement = this.videoElementRef.nativeElement;
     const deviceId = this.selectedCamera?.deviceId;
+    console.log('[QuickSaleScanner] Starting continuous scan with deviceId:', deviceId);
 
-    this.codeReader.decodeFromVideoDevice(deviceId, videoElement, (result: Result | null, error: any) => {
-      if (result) {
-        const code = result.getText();
-        if (code && code !== this.lastScannedCode) {
-          this.lastScannedCode = code;
-          this.onBarcodeDetected(code);
+    if (deviceId) {
+      this.codeReader.decodeFromVideoDevice(deviceId, videoElement, (result: Result | null, error: any) => {
+        if (result) {
+          const code = result.getText();
+          console.log('[QuickSaleScanner] Code read:', code, 'lastScannedCode:', this.lastScannedCode);
+          if (code && code !== this.lastScannedCode) {
+            this.lastScannedCode = code;
+            this.onBarcodeDetected(code);
+          }
         }
-      }
-    });
+      });
+    } else {
+      this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result: Result | null, error: any) => {
+        if (result) {
+          const code = result.getText();
+          console.log('[QuickSaleScanner] Code read:', code, 'lastScannedCode:', this.lastScannedCode);
+          if (code && code !== this.lastScannedCode) {
+            this.lastScannedCode = code;
+            this.onBarcodeDetected(code);
+          }
+        }
+      });
+    }
   }
 
   private onBarcodeDetected(code: string): void {
+    console.log('[QuickSaleScanner] Barcode detected:', code);
     if ('vibrate' in navigator) {
       navigator.vibrate(200);
     }
@@ -145,6 +194,15 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
     }
   }
 
+  async openScanner(): Promise<void> {
+    console.log('[QuickSaleScanner] openScanner called');
+    this.isOpen = true;
+    setTimeout(() => {
+      console.log('[QuickSaleScanner] Calling startScanning after timeout');
+      this.startScanning();
+    }, 100);
+  }
+
   async switchCamera(): Promise<void> {
     if (this.availableCameras.length <= 1) return;
 
@@ -159,6 +217,7 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
   }
 
   close(): void {
+    this.isOpen = false;
     this.stopScanning();
     this.closed.emit();
   }

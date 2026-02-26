@@ -30,6 +30,6 @@
 <app-quick-sale-scanner [isOpen]="isScannerOpen" (barcodeScanned)="onBarcodeScanned($event)" (closed)="onScannerClosed()">
 </app-quick-sale-scanner>
 
-<button class="floating-scanner-btn" (click)="toggleScanner()" [attr.aria-label]="'BARCODE_SCANNER.SCAN_PRODUCT' | translate">
-  <i class="fas fa-barcode"></i>
-</button>
+<!-- <button class="floating-scanner-btn" color="primary" (click)="toggleScanner()" [attr.aria-label]="'BARCODE_SCANNER.SCAN_PRODUCT' | translate" color="primary">
+    <mat-icon>qr_code_scanner</mat-icon>
+</button> -->

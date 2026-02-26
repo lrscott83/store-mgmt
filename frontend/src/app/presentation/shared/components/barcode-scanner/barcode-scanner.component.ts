@@ -66,16 +66,20 @@ export class BarcodeScannerComponent implements OnDestroy {
   }
 
   async startScanning(): Promise<void> {
+    console.log('[BarcodeScanner] startScanning called');
     if (!this.videoElementRef?.nativeElement) {
+      console.log('[BarcodeScanner] Video element not ready');
       this.errorMessage = 'Video element not ready';
       return;
     }
 
     if (this.availableCameras.length === 0) {
+      console.log('[BarcodeScanner] No cameras found, calling getAvailableCameras');
       await this.getAvailableCameras();
     }
 
     if (!this.selectedCamera) {
+      console.log('[BarcodeScanner] No selectedCamera');
       this.errorMessage = 'No camera available';
       return;
     }
@@ -83,8 +87,10 @@ export class BarcodeScannerComponent implements OnDestroy {
     const videoElement = this.videoElementRef.nativeElement;
     this.isScanning = true;
     this.errorMessage = '';
+    console.log('[BarcodeScanner] Starting camera, selectedCamera:', this.selectedCamera);
 
     try {
+      console.log('[BarcodeScanner] Requesting getUserMedia');
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: {
           deviceId: this.selectedCamera.deviceId,
@@ -97,9 +103,10 @@ export class BarcodeScannerComponent implements OnDestroy {
       videoElement.srcObject = this.stream;
       videoElement.play();
 
+      console.log('[BarcodeScanner] Calling continuousScan');
       this.continuousScan();
     } catch (err: any) {
-      console.error('Error starting camera:', err);
+      console.error('[BarcodeScanner] Error starting camera:', err);
       this.isScanning = false;
       if (err.name === 'NotAllowedError') {
         this.hasPermission = false;
@@ -111,20 +118,44 @@ export class BarcodeScannerComponent implements OnDestroy {
   }
 
   private continuousScan(): void {
-    if (!this.isScanning || !this.videoElementRef?.nativeElement) return;
+    console.log('[BarcodeScanner] continuousScan called');
+    if (!this.isScanning || !this.videoElementRef?.nativeElement) {
+      console.log(
+        '[BarcodeScanner] continuousScan early return, isScanning:',
+        this.isScanning,
+        'videoElement:',
+        !!this.videoElementRef?.nativeElement
+      );
+      return;
+    }
 
     const videoElement = this.videoElementRef.nativeElement;
     const deviceId = this.selectedCamera?.deviceId;
+    console.log('[BarcodeScanner] deviceId:', deviceId);
 
-    this.codeReader.decodeFromVideoDevice(deviceId, videoElement, (result: Result | null, error: any) => {
-      if (result) {
-        const code = result.getText();
-        if (code && code !== this.lastScannedCode) {
-          this.lastScannedCode = code;
-          this.onBarcodeDetected(code);
+    if (deviceId) {
+      this.codeReader.decodeFromVideoDevice(deviceId, videoElement, (result: Result | null, error: any) => {
+        if (result) {
+          const code = result.getText();
+          console.log('[BarcodeScanner] Code read:', code);
+          if (code && code !== this.lastScannedCode) {
+            this.lastScannedCode = code;
+            this.onBarcodeDetected(code);
+          }
         }
-      }
-    });
+      });
+    } else {
+      this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result: Result | null, error: any) => {
+        if (result) {
+          const code = result.getText();
+          console.log('[BarcodeScanner] Code read:', code);
+          if (code && code !== this.lastScannedCode) {
+            this.lastScannedCode = code;
+            this.onBarcodeDetected(code);
+          }
+        }
+      });
+    }
   }
 
   private onBarcodeDetected(code: string): void {
