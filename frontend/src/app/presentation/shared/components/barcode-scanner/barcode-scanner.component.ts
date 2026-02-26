@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormsModule } from '@angular/forms';
@@ -13,7 +13,7 @@ import { Result } from '@zxing/library';
   templateUrl: './barcode-scanner.component.html',
   styleUrl: './barcode-scanner.component.scss'
 })
-export class BarcodeScannerComponent implements OnDestroy {
+export class BarcodeScannerComponent implements OnDestroy, AfterViewInit {
   @Input() modalReference: any;
   @Output() barcodeScanned: EventEmitter<string> = new EventEmitter<string>();
   @ViewChild('videoElement') videoElementRef!: ElementRef<HTMLVideoElement>;
@@ -32,8 +32,13 @@ export class BarcodeScannerComponent implements OnDestroy {
     this.codeReader = new BrowserMultiFormatReader();
   }
 
-  async ngOnInit(): Promise<void> {
-    await this.getAvailableCameras();
+  async ngAfterViewInit(): Promise<void> {
+    setTimeout(async () => {
+      await this.getAvailableCameras();
+      if (this.hasPermission && this.selectedCamera) {
+        await this.startScanning();
+      }
+    }, 500);
   }
 
   async getAvailableCameras(): Promise<void> {

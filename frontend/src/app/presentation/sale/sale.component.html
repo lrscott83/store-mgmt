@@ -3,6 +3,12 @@
     <div class="card-title">
       <h3 class="card-label" [translate]="'SALES.HEADER'"></h3>
     </div>
+    <div class="card-toolbar">
+      <button class="btn btn-primary" (click)="openBarcodeScanner()">
+        <i class="fas fa-qrcode"></i>
+        {{ 'BARCODE_SCANNER.SCAN_PRODUCT' | translate }}
+      </button>
+    </div>
   </div>
   <div class="card-body p-2">
     <div class="scrollmenu no-scrollbar" style="margin-bottom: 12px">
@@ -26,10 +32,3 @@
     </div>
   </div>
 </div>
-
-<app-quick-sale-scanner [isOpen]="isScannerOpen" (barcodeScanned)="onBarcodeScanned($event)" (closed)="onScannerClosed()">
-</app-quick-sale-scanner>
-
-<!-- <button class="floating-scanner-btn" color="primary" (click)="toggleScanner()" [attr.aria-label]="'BARCODE_SCANNER.SCAN_PRODUCT' | translate" color="primary">
-    <mat-icon>qr_code_scanner</mat-icon>
-</button> -->

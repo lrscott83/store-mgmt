@@ -4,7 +4,6 @@ import { ProductCategory } from 'src/app/domain/entities/product-categories/prod
 import { SharedModule } from '../shared/shared.module';
 import { TranslateModule } from '@ngx-translate/core';
 import { SaleCategoryProductsComponent } from './sale-category-products/sale-category-products.component';
-import { QuickSaleScannerComponent } from './quick-sale-scanner/quick-sale-scanner.component';
 import { PRODUCT_CATEGORY_SERVICE } from 'src/app/_services/tokens';
 import { ProductCategoryService } from 'src/app/application/categories/product-category.service';
 import { OrderType } from 'src/app/domain/entities/orders/order.model';
@@ -12,12 +11,14 @@ import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { ShoppingCartService } from 'src/app/_services/order/shopping-cart.service';
 import { Product } from 'src/app/domain/entities/products/product.model';
-import Swal from 'sweetalert2';
 import { TranslateService } from '@ngx-translate/core';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { BarcodeScannerComponent } from '../shared/components/barcode-scanner/barcode-scanner.component';
+import { ToastrService } from 'ngx-toastr';
 
 @Component({
   selector: 'app-sale',
-  imports: [SharedModule, TranslateModule, SaleCategoryProductsComponent, QuickSaleScannerComponent],
+  imports: [SharedModule, TranslateModule, SaleCategoryProductsComponent],
   templateUrl: './sale.component.html',
   styleUrl: './sale.component.scss'
 })
@@ -26,13 +27,14 @@ export class SaleComponent implements OnInit {
   selectedCategory$: BehaviorSubject<ProductCategory> = new BehaviorSubject<ProductCategory>(undefined);
 
   orderType: OrderType = OrderType.Normal;
-  isScannerOpen = false;
 
   constructor(
     @Inject(PRODUCT_CATEGORY_SERVICE) private categoryService: ProductCategoryService,
     @Inject(PRODUCT_SERVICE) private productService: ProductService,
     private shoppingCartService: ShoppingCartService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private modalService: NgbModal,
+    private toastr: ToastrService
   ) {}
 
   async ngOnInit() {
@@ -70,21 +72,19 @@ export class SaleComponent implements OnInit {
 
   onBarcodeScanned(barcode: string): void {
     console.log('[SaleComponent] Barcode scanned:', barcode);
-    this.productService.getProductByBarcode(barcode).subscribe((response) => {
-      console.log('[SaleComponent] Product search response:', response);
-      if (response.succeeded && response.data) {
-        this.addProductToCart(response.data);
-      } else {
-        console.log('[SaleComponent] Product not found for barcode:', barcode);
-        Swal.fire({
-          icon: 'warning',
-          title: this.translate.instant('GENERAL.WARNING'),
-          text: 'Producto no encontrado con código: ' + barcode,
-          timer: 3000,
-          showConfirmButton: false,
-          toast: true,
-          position: 'top-end'
-        });
+    this.productService.getProductByBarcode(barcode).subscribe({
+      next: (response) => {
+        console.log('[SaleComponent] Product search response:', response);
+        if (response.succeeded && response.data) {
+          this.addProductToCart(response.data);
+        } else {
+          console.log('[SaleComponent] Product not found for barcode:', barcode);
+          this.toastr.warning('Producto no encontrado con código: ' + barcode, this.translate.instant('GENERAL.WARNING'));
+        }
+      },
+      error: (err) => {
+        console.error('[SaleComponent] Error searching product:', err);
+        this.toastr.error('Error al buscar producto', this.translate.instant('GENERAL.ERROR'));
       }
     });
   }
@@ -94,33 +94,28 @@ export class SaleComponent implements OnInit {
     this.shoppingCartService.addCartItem(this.orderType, product.id, 1, product.price).then((response) => {
       console.log('[SaleComponent] Add to cart response:', response);
       if (response.succeeded) {
-        Swal.fire({
-          icon: 'success',
-          title: this.translate.instant('GENERAL.SUCCESS'),
-          text: product.name + ' agregado al carrito',
-          timer: 3000,
-          showConfirmButton: false,
-          toast: true,
-          position: 'top-end'
-        });
+        this.toastr.success(product.name + ' agregado al carrito', this.translate.instant('GENERAL.SUCCESS'));
       } else {
-        Swal.fire({
-          icon: 'error',
-          title: this.translate.instant('GENERAL.ERROR'),
-          text: response.errors?.[0]?.description || 'Error al agregar producto'
-        });
+        this.toastr.error(response.errors?.[0]?.description || 'Error al agregar producto', this.translate.instant('GENERAL.ERROR'));
       }
     });
   }
 
   onScannerClosed(): void {
-    this.isScannerOpen = false;
     console.log('Scanner closed.');
   }
 
-  toggleScanner(): void {
-    console.log('[SaleComponent] toggleScanner called, current isScannerOpen:', this.isScannerOpen);
-    this.isScannerOpen = !this.isScannerOpen;
-    console.log('[SaleComponent] isScannerOpen changed to:', this.isScannerOpen);
+  openBarcodeScanner(): void {
+    const modalRef = this.modalService.open(BarcodeScannerComponent, {
+      centered: true,
+      size: 'lg',
+      windowClass: 'barcode-scanner-modal'
+    });
+
+    modalRef.componentInstance.modalReference = modalRef;
+    modalRef.componentInstance.barcodeScanned.subscribe((barcode: string) => {
+      this.onBarcodeScanned(barcode);
+      modalRef.close();
+    });
   }
 }

@@ -169,3 +169,77 @@ export interface Product extends AuditableBaseModel {
   // ... other fields
 }
 ```
+
+## Modal Dialogs Pattern
+
+All modal dialogs must use `NgbModal` from `@ng-bootstrap/ng-bootstrap` with the following pattern:
+
+### Component Implementation
+
+```typescript
+import { Component, Input, Output, EventEmitter, Inject } from '@angular/core';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { SharedModule } from '../../shared/shared.module';
+import { BarcodeScannerComponent } from '../../shared/components/barcode-scanner/barcode-scanner.component';
+
+@Component({
+  selector: 'app-your-modal',
+  imports: [SharedModule, TranslateModule, BarcodeScannerComponent],
+  templateUrl: './your-modal.component.html',
+  styleUrl: './your-modal.component.scss'
+})
+export class YourModalComponent implements OnInit {
+  @Input() someInput: SomeType;
+  @Output() someEmitter: EventEmitter<void> = new EventEmitter<void>();
+
+  constructor(
+    private modal: NgbActiveModal,
+    private translate: TranslateService,
+    private ngbModal: NgbModal
+  ) {}
+
+  closeModal() {
+    this.modal.close();
+  }
+
+  // Example: Opening a barcode scanner modal from within this modal
+  openBarcodeScanner() {
+    const modalRef = this.ngbModal.open(BarcodeScannerComponent, {
+      centered: true,
+      size: 'lg',
+      windowClass: 'barcode-scanner-modal'
+    });
+
+    modalRef.componentInstance.modalReference = modalRef;
+    modalRef.componentInstance.barcodeScanned.subscribe((barcode: string) => {
+      // Handle barcode
+      modalRef.close();
+    });
+  }
+}
+```
+
+### Opening Modal from Parent Component
+
+```typescript
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { YourModalComponent } from './your-modal/your-modal.component';
+
+@Component({...})
+export class ParentComponent {
+  constructor(private modalService: NgbModal) {}
+
+  openModal() {
+    const modalRef = this.modalService.open(YourModalComponent, {
+      centered: true,
+      size: 'lg'  // 'sm', 'lg', 'xl' or 'full'
+    });
+    modalRef.componentInstance.someInput = someValue;
+    modalRef.componentInstance.someEmitter.subscribe(() => {
+      // Handle refresh/update
+    });
+  }
+}
+```

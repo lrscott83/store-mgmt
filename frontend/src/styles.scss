@@ -25,7 +25,7 @@
 
 @import './app/_shared/material-input.scss';
 
-@import "./scss/deeppurple-amber.css";
+@import './scss/deeppurple-amber.css';
 //@import "./scss/bootstrap-icons.css";
 
 // theme
@@ -37,13 +37,24 @@
 
 @import 'scss/themes/preset-style.scss';
 
-@import "scss/material/mixin/svg-icon";
+@import 'scss/material/mixin/svg-icon';
 
-@import "scss/functions";
-@import "scss/components/variables.bootstrap";
+@import 'scss/functions';
+@import 'scss/components/variables.bootstrap';
 @import 'scss/components/card';
 @import 'scss/components/alert';
 
 // regular style toast
 @import 'ngx-toastr/toastr';
 @import 'ngx-toastr/toastr-bs5-alert';
+
+.barcode-scanner-modal {
+  .modal-content {
+    background: transparent;
+    border: none;
+  }
+
+  .modal-body {
+    padding: 0;
+  }
+}
