@@ -18,6 +18,11 @@ import { LandingDeepComponent } from './presentation/home/landing-deep/landing-d
 
 const routes: Routes = [
   { path: '', component: LandingDeepComponent },
+  {
+    path: 'scanner',
+    loadComponent: () =>
+      import('./presentation/shared/components/html5-scanner/html5-scanner.component').then((m) => m.Html5ScannerComponent)
+  },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'cookies-private', component: CookiesPrivateComponent },

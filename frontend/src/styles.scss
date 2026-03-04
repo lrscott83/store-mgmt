@@ -49,12 +49,21 @@
 @import 'ngx-toastr/toastr-bs5-alert';
 
 .barcode-scanner-modal {
+  .modal-dialog {
+    max-width: 500px;
+    width: 90%;
+  }
+
   .modal-content {
     background: transparent;
     border: none;
+    box-shadow: none;
   }
 
   .modal-body {
     padding: 0;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
   }
 }

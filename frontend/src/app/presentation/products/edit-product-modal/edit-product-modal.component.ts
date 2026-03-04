@@ -10,12 +10,11 @@ import Swal from 'sweetalert2';
 import { SharedModule } from '../../shared/shared.module';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
-import { BarcodeScannerComponent } from '../../shared/components/barcode-scanner/barcode-scanner.component';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
   selector: 'app-edit-product-modal',
-  imports: [SharedModule, TranslateModule, BarcodeScannerComponent],
+  imports: [SharedModule, TranslateModule],
   templateUrl: './edit-product-modal.component.html',
   styleUrl: './edit-product-modal.component.scss'
 })
@@ -54,19 +53,29 @@ export class EditProductModalComponent implements OnInit {
     this.modal.close();
   }
 
-  openBarcodeScanner() {
-    const modalRef = this.ngbModal.open(BarcodeScannerComponent, {
-      centered: true,
-      size: 'lg',
-      windowClass: 'barcode-scanner-modal'
-    });
+  // openBarcodeScanner() {
+  //   const modalRef = this.ngbModal.open(BarcodeScannerComponent, {
+  //     centered: true,
+  //     size: 'lg',
+  //     windowClass: 'barcode-scanner-modal'
+  //   });
 
-    modalRef.componentInstance.modalReference = modalRef;
-    modalRef.componentInstance.barcodeScanned.subscribe((barcode: string) => {
-      this.formGroup.patchValue({ barcode: barcode });
-      modalRef.close();
-    });
-  }
+  //   modalRef.componentInstance.modalReference = modalRef;
+  //   modalRef.componentInstance.barcodeScanned.subscribe((barcode: string) => {
+  //     this.formGroup.patchValue({ barcode: barcode });
+  //     modalRef.close();
+  //   });
+
+  //   const closeScanner = () => {
+  //     console.log('[EditProductModal] Closing scanner');
+  //     if (modalRef.componentInstance) {
+  //       modalRef.componentInstance.stopScanning();
+  //     }
+  //   };
+
+  //   modalRef.dismissed.subscribe(closeScanner);
+  //   modalRef.hidden.subscribe(closeScanner);
+  // }
 
   onSubmit() {
     if (!this.formGroup.valid) {
@@ -134,7 +143,7 @@ export class EditProductModalComponent implements OnInit {
     this.loadPatterns();
     this.formGroup = this.formBuilder.group({
       name: [{ value: '', disabled: false }, Validators.compose([Validators.required])],
-      barcode: [{ value: '', disabled: false }, Validators.compose([])],
+      // barcode: [{ value: '', disabled: false }, Validators.compose([])],
       price: [{ value: '', disabled: false }, Validators.compose([Validators.required, Validators.min(0)])],
       order: [
         { value: '', disabled: false },

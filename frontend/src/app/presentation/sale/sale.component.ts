@@ -13,8 +13,6 @@ import { ShoppingCartService } from 'src/app/_services/order/shopping-cart.servi
 import { Product } from 'src/app/domain/entities/products/product.model';
 import { TranslateService } from '@ngx-translate/core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { BarcodeScannerComponent } from '../shared/components/barcode-scanner/barcode-scanner.component';
-import { ToastrService } from 'ngx-toastr';
 
 @Component({
   selector: 'app-sale',
@@ -33,8 +31,7 @@ export class SaleComponent implements OnInit {
     @Inject(PRODUCT_SERVICE) private productService: ProductService,
     private shoppingCartService: ShoppingCartService,
     private translate: TranslateService,
-    private modalService: NgbModal,
-    private toastr: ToastrService
+    private modalService: NgbModal
   ) {}
 
   async ngOnInit() {
@@ -70,33 +67,31 @@ export class SaleComponent implements OnInit {
     return this.selectedCategory$.asObservable();
   }
 
-  onBarcodeScanned(barcode: string): void {
-    console.log('[SaleComponent] Barcode scanned:', barcode);
-    this.productService.getProductByBarcode(barcode).subscribe({
-      next: (response) => {
-        console.log('[SaleComponent] Product search response:', response);
-        if (response.succeeded && response.data) {
-          this.addProductToCart(response.data);
-        } else {
-          console.log('[SaleComponent] Product not found for barcode:', barcode);
-          this.toastr.warning('Producto no encontrado con código: ' + barcode, this.translate.instant('GENERAL.WARNING'));
-        }
-      },
-      error: (err) => {
-        console.error('[SaleComponent] Error searching product:', err);
-        this.toastr.error('Error al buscar producto', this.translate.instant('GENERAL.ERROR'));
-      }
-    });
-  }
+  // onBarcodeScanned(barcode: string): void {
+  //   console.log('[SaleComponent] Barcode scanned:', barcode);
+  //   this.productService.getProductByBarcode(barcode).subscribe({
+  //     next: (response) => {
+  //       console.log('[SaleComponent] Product search response:', response);
+  //       if (response.succeeded && response.data) {
+  //         this.addProductToCart(response.data);
+  //       } else {
+  //         console.log('[SaleComponent] Product not found for barcode:', barcode);
+  //       }
+  //     },
+  //     error: (err) => {
+  //       console.error('[SaleComponent] Error searching product:', err);
+  //     }
+  //   });
+  // }
 
   private addProductToCart(product: Product): void {
     console.log('[SaleComponent] Adding product to cart:', product.name);
     this.shoppingCartService.addCartItem(this.orderType, product.id, 1, product.price).then((response) => {
       console.log('[SaleComponent] Add to cart response:', response);
       if (response.succeeded) {
-        this.toastr.success(product.name + ' agregado al carrito', this.translate.instant('GENERAL.SUCCESS'));
+        console.log('[SaleComponent] Product added:', product.name);
       } else {
-        this.toastr.error(response.errors?.[0]?.description || 'Error al agregar producto', this.translate.instant('GENERAL.ERROR'));
+        console.log('[SaleComponent] Error adding product:', response.errors);
       }
     });
   }
@@ -105,17 +100,28 @@ export class SaleComponent implements OnInit {
     console.log('Scanner closed.');
   }
 
-  openBarcodeScanner(): void {
-    const modalRef = this.modalService.open(BarcodeScannerComponent, {
-      centered: true,
-      size: 'lg',
-      windowClass: 'barcode-scanner-modal'
-    });
+//   openBarcodeScanner(): void {
+//     console.log('[SaleComponent] openBarcodeScanner called');
+//     const modalRef = this.modalService.open(BarcodeScannerComponent, {
+//       centered: true,
+//       size: 'lg',
+//       windowClass: 'barcode-scanner-modal'
+//     });
 
-    modalRef.componentInstance.modalReference = modalRef;
-    modalRef.componentInstance.barcodeScanned.subscribe((barcode: string) => {
-      this.onBarcodeScanned(barcode);
-      modalRef.close();
-    });
-  }
+//     modalRef.componentInstance.modalReference = modalRef;
+//     modalRef.componentInstance.barcodeScanned.subscribe((barcode: string) => {
+//       console.log('[SaleComponent] Barcode received from scanner:', barcode);
+//       this.onBarcodeScanned(barcode);
+//     });
+
+//     const closeScanner = () => {
+//       console.log('[SaleComponent] Closing scanner');
+//       if (modalRef.componentInstance) {
+//         modalRef.componentInstance.stopScanning();
+//       }
+//     };
+
+//     modalRef.dismissed.subscribe(closeScanner);
+//     modalRef.hidden.subscribe(closeScanner);
+//   }
 }

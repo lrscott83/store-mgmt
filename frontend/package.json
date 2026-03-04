@@ -1,7 +1,7 @@
 {
   "name": "vende-de-todo-app",
   "version": "4.0.0",
-  "author": "CodedThemes",
+  "author": "AutoBusinessPro",
   "license": "MIT",
   "scripts": {
     "ng": "ng",
@@ -33,12 +33,11 @@
     "@ngx-translate/core": "^15.0.0",
     "@popperjs/core": "^2.11.8",
     "@zip.js/zip.js": "^2.7.57",
-    "@zxing/browser": "^0.1.5",
-    "@zxing/ngx-scanner": "^21.0.0",
     "apexcharts": "^5.3.6",
     "bootstrap": "^5.3.2",
     "date-fns": "^4.1.0",
     "guid-typescript": "^1.0.9",
+    "html5-qrcode": "^2.3.8",
     "install": "^0.13.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",

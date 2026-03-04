@@ -13,16 +13,16 @@ import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { StoreUsageTrackerService } from 'src/app/_services/usage-tracker/store-usage-tracker.service';
 import { UpdateService } from 'src/app/_services/update/update.service';
+import { PreloadingService } from 'src/app/_services/preloading.service';
 
 @Component({
-    selector: 'app-login',
-    imports: [RouterModule, SharedModule, TranslateModule, GuestFooterComponent],
-    templateUrl: './login.component.html',
-    styleUrls: ['./login.component.scss'],
-    standalone: true,
+  selector: 'app-login',
+  imports: [RouterModule, SharedModule, TranslateModule, GuestFooterComponent],
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.scss'],
+  standalone: true
 })
 export default class LoginComponent implements OnInit, OnDestroy {
-
   //connectionStatus$: Observable<boolean>;
 
   loginForm: FormGroup;
@@ -33,7 +33,8 @@ export default class LoginComponent implements OnInit, OnDestroy {
 
   private unsubscribe: Subscription[] = [];
 
-  constructor(private formBuilder: FormBuilder,
+  constructor(
+    private formBuilder: FormBuilder,
     private authService: AuthService,
     private route: ActivatedRoute,
     private router: Router,
@@ -42,7 +43,8 @@ export default class LoginComponent implements OnInit, OnDestroy {
     private toastrService: ToastrService,
     private storeUsageTracker: StoreUsageTrackerService,
     private updateService: UpdateService,
-    @Inject(PRODUCT_SERVICE) private productService: ProductService,
+    private preloadingService: PreloadingService,
+    @Inject(PRODUCT_SERVICE) private productService: ProductService
   ) {
     this.isLoading$ = this.authService.isLoading$;
     // redirect to home if already logged in
@@ -50,7 +52,6 @@ export default class LoginComponent implements OnInit, OnDestroy {
       this.navigateToUserHome();
     }
     this.updateService.checkForUpdate();
-
   }
 
   ngOnInit(): void {
@@ -58,17 +59,16 @@ export default class LoginComponent implements OnInit, OnDestroy {
     // this.connectionStatus$.subscribe((status) => {
     //   if (!status) {
     //     this.toastrService.warning(
-    //       this.translate.instant('AUTH.LOGIN.OFFLINE_MESSAGE'), 
+    //       this.translate.instant('AUTH.LOGIN.OFFLINE_MESSAGE'),
     //       this.translate.instant('AUTH.LOGIN.OFFLINE_TITLE'));
     //   } else {
     //     this.toastrService.success(
-    //       this.translate.instant('AUTH.LOGIN.ONLINE_MESSAGE'), 
+    //       this.translate.instant('AUTH.LOGIN.ONLINE_MESSAGE'),
     //       this.translate.instant('AUTH.LOGIN.ONLINE_TITLE'));
     //   }
     // });
     this.initForm();
   }
-
 
   // public method
   // SignInOptions = [
@@ -93,25 +93,26 @@ export default class LoginComponent implements OnInit, OnDestroy {
 
   initForm() {
     this.loginForm = this.formBuilder.group({
-      login: ['',
+      login: [
+        '',
         Validators.compose([
-          Validators.required,
+          Validators.required
           // https://stackoverflow.com/questions/386294/what-is-the-maximum-length-of-a-valid-email-address
-        ]),
+        ])
       ],
       password: [
         '',
         Validators.compose([
-          Validators.required,
+          Validators.required
           //Validators.pattern('(?=\\D*\\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}'),
-        ]),
-      ],
+        ])
+      ]
     });
   }
 
   isControlInvalid(controlName: string, validator: string): boolean {
     const control = this.loginForm.controls[controlName];
-    if (validator == "") {
+    if (validator == '') {
       return control.hasError('required') && (control.dirty || control.touched);
     } else {
       return control.hasError(validator) && (control.dirty || control.touched);
@@ -127,37 +128,39 @@ export default class LoginComponent implements OnInit, OnDestroy {
     this.hasError = false;
     const loginSubscr = this.authService
       .login(this.loginForm.controls['login'].value, this.loginForm.controls['password'].value)
-      .pipe(catchError((error) => {
-        // return of({
-        //   data: null,
-        //   succeeded: false,
-        //   message: "",
-        //   actionCode: 400,
-        //   errors: [this.translateService.instant('REGISTRATION.UNEXPECTED_ERROR')],
-        // });
-        if (error.status === 0) {
-          // Error de red
-          Swal.fire({
-            icon: "error",
-            title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
-            text: this.translate.instant('AUTH.LOGIN.OFFLINE_MESSAGE'),
-          });
-        } else {
-          Swal.fire({
-            icon: "error",
-            title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
-            text: this.translate.instant('AUTH.LOGIN.UNEXPECTED_ERROR'),
-          });
-        }
-        //this.toastrService.warning(this.translate.instant('AUTH.LOGIN.UNEXPECTED_ERROR'));
+      .pipe(
+        catchError((error) => {
+          // return of({
+          //   data: null,
+          //   succeeded: false,
+          //   message: "",
+          //   actionCode: 400,
+          //   errors: [this.translateService.instant('REGISTRATION.UNEXPECTED_ERROR')],
+          // });
+          if (error.status === 0) {
+            // Error de red
+            Swal.fire({
+              icon: 'error',
+              title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
+              text: this.translate.instant('AUTH.LOGIN.OFFLINE_MESSAGE')
+            });
+          } else {
+            Swal.fire({
+              icon: 'error',
+              title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
+              text: this.translate.instant('AUTH.LOGIN.UNEXPECTED_ERROR')
+            });
+          }
+          //this.toastrService.warning(this.translate.instant('AUTH.LOGIN.UNEXPECTED_ERROR'));
 
-        // if (!this.connectionService.currentStatusValue) {
-        //   this.toastrService.error(            
-        //     this.translate.instant('GENERAL.RESPONSE.OFFLINE_MESSAGE'),
-        //     this.translate.instant('GENERAL.RESPONSE.OFFLINE_TITLE'));
-        // }
-        throw error;
-      }))
+          // if (!this.connectionService.currentStatusValue) {
+          //   this.toastrService.error(
+          //     this.translate.instant('GENERAL.RESPONSE.OFFLINE_MESSAGE'),
+          //     this.translate.instant('GENERAL.RESPONSE.OFFLINE_TITLE'));
+          // }
+          throw error;
+        })
+      )
       .subscribe((response) => {
         if (typeof response === 'string' || response instanceof String) {
           this.hasError = true;
@@ -174,17 +177,17 @@ export default class LoginComponent implements OnInit, OnDestroy {
   }
 
   navigateToUserHome() {
-    if (this.authService.currentUserValue.isReSeller
-      || this.authService.currentUserValue.isSuperAdmin)
-      this.router.navigateByUrl("/admin/owners");
-    else {
-      this.productService.hasAnyAvailableToSaleProduct().subscribe(response => {
-        if (response?.data)
-          this.router.navigateByUrl("/sales/sale");
-        else
-          this.router.navigateByUrl("/sales/products");
-      });
+    console.log('[Login] Navigating to user home, starting preloading...');
 
+    this.preloadingService.preloadHeavyChunks();
+
+    if (this.authService.currentUserValue.isReSeller || this.authService.currentUserValue.isSuperAdmin)
+      this.router.navigateByUrl('/admin/owners');
+    else {
+      this.productService.hasAnyAvailableToSaleProduct().subscribe((response) => {
+        if (response?.data) this.router.navigateByUrl('/sales/sale');
+        else this.router.navigateByUrl('/sales/products');
+      });
     }
   }
 
