@@ -84,6 +84,7 @@ export class EditStoreComponent implements OnInit, OnDestroy {
       }))
       .subscribe(response => {
         if (response && response.succeeded) {
+          console.log(JSON.stringify(response.data));
           this.displayModules(response.data);
         } else {
           console.error("Error loading modules to store ...");

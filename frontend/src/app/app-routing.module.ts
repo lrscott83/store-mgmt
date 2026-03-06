@@ -36,7 +36,6 @@ const routes: Routes = [
       {
         path: 'help/tutorial',
         loadComponent: () => import('./presentation/help/tutorial/tutorial.component').then((c) => c.TutorialComponent),
-        canActivate: [AuthGuard],
         data: { expectedFeatures: [] }
       },
       {

@@ -34,7 +34,6 @@
             "assets": ["src/favicon.png", "src/assets"],
             "styles": ["node_modules/bootstrap/dist/css/bootstrap.min.css", "src/styles.scss", "node_modules/ngx-toastr/toastr.css"],
             "scripts": ["node_modules/@popperjs/core/dist/umd/popper.min.js", "node_modules/bootstrap/dist/js/bootstrap.min.js"],
-            "serviceWorker": "ngsw-config.json",
             "browser": "src/main.ts",
             "stylePreprocessorOptions": {
               "includePaths": ["."]
@@ -60,6 +59,7 @@
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
+              "serviceWorker": "ngsw-config.json",
               "optimization": true,
               "sourceMap": false,
               "namedChunks": false,

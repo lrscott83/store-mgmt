@@ -182,6 +182,7 @@ export class AuthService implements OnDestroy {
         console.log('[Auth] Server response:', response);
         if (response && response.succeeded) {
           response.data.expiresIn = new Date(auth.expiresIn);
+          response.data.authToken = auth.authToken;
           this.localStorageService.setCurrentUser(response.data);
           this.currentUserSubject.next(response.data);
           console.log('[Auth] User saved from server response');
