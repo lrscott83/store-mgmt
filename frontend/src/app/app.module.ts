@@ -7,7 +7,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { SharedModule } from './presentation/shared/shared.module';
-import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { BlockUIModule } from 'ng-block-ui';
 import { TranslateModule } from '@ngx-translate/core';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
@@ -16,7 +16,7 @@ import { ErrorInterceptor } from './_interceptors/error-interceptor.service';
 import { AppInitService } from './_services/app-init.service';
 import { InlineSVGModule } from 'ng-inline-svg-w';
 import { provideToastr, ToastrModule } from 'ngx-toastr';
-import { NgHttpLoaderComponent, pendingRequestsInterceptor$ } from 'ng-http-loader';
+import { NgHttpLoaderComponent } from 'ng-http-loader';
 // import { AngularSlickgridModule } from 'angular-slickgrid';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
 //import { ConnectionInterceptor } from './_interceptors/connection-interceptor.service';
@@ -66,7 +66,7 @@ export function initializeApp(appInitService: AppInitService) {
   providers: [
     //provideRouter(routes),
     //provideHttpClient(),
-    provideHttpClient(withInterceptors([pendingRequestsInterceptor$])),
+    provideHttpClient(withInterceptorsFromDi()),
     // importProvidersFrom(AngularSlickgridModule.forRoot()),
     AppInitService,
     provideEnvironmentNgxMask(),

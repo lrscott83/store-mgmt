@@ -159,14 +159,16 @@ export class AuthService implements OnDestroy {
     console.log('[Auth] currentUser from storage:', currentUser);
     console.log('[Auth] expiresIn:', expiresIn, 'now:', now, 'maxOfflineDate:', maxOfflineDate);
 
-    if (currentUser && expiresIn > now && expiresIn <= maxOfflineDate) {
+    if (currentUser && auth.authToken === currentUser.authToken
+      && expiresIn > now && expiresIn <= maxOfflineDate) {
       console.log('[Auth] Using offline user (valid)');
       currentUser.expiresIn = new Date(auth.expiresIn);
       this.currentUserSubject.next(currentUser);
       return of(currentUser);
     }
 
-    if (expiresIn <= now) {
+    if (currentUser && auth.authToken === currentUser.authToken 
+      && expiresIn <= now) {
       console.log('[Auth] Token expired, logging out');
       this.logout();
       this.router.navigateByUrl('/login');
