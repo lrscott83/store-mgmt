@@ -81,36 +81,20 @@ export class AuthService implements OnDestroy {
   }
 
   logout() {
+    console.log('[Auth] Logging out...');
     this.isLoadingSubject.next(true);
     this.removeToken();
 
-    this.authHttpService.logout().subscribe(
-      (url: string) => {
-        this.removeToken();
-        this.currentUserSubject.next(undefined);
-        //document.location.reload();
-        this.router.navigateByUrl('/login');
-        this.isLoadingSubject.next(false);
-      },
-      (error) => {
-        console.log(error);
-        this.isLoadingSubject.next(false);
-        throw error;
-      }
-    );
+    this.currentUserSubject.next(undefined);
 
-    // this.authHttpService
-    //   .logout()
-    //   .pipe(finalize(() => this.isLoadingSubject.next(false)))
-    //   .subscribe((url: string) => {
-    //     this.removeToken();
-    //     document.location.reload();
-    //     //this.router.navigateByUrl("/login");
-    //   }),
-    //   error => {
-    //     console.log(error);
-    //     throw error;
-    //   };
+    const currentUrl = window.location.pathname;
+    if (currentUrl !== '/login' && currentUrl !== '/') {
+      console.log('[Auth] Redirecting to login');
+      this.router.navigateByUrl('/login');
+    } else {
+      console.log('[Auth] Already on login page, not redirecting');
+    }
+    this.isLoadingSubject.next(false);
   }
 
   // public methods
@@ -145,6 +129,7 @@ export class AuthService implements OnDestroy {
   getUserByToken(): Observable<UserModel> {
     const auth = this.getAuthFromLocalStorage();
     console.log('[Auth] getUserByToken - auth from localStorage:', auth);
+
     if (!auth || !auth.authToken || !auth.expiresIn) {
       console.log('[Auth] No auth token or expiresIn, returning undefined');
       return of(undefined);
@@ -152,30 +137,31 @@ export class AuthService implements OnDestroy {
 
     const now = new Date();
     const expiresIn = new Date(auth.expiresIn);
-    const maxOfflineDate = new Date();
-    maxOfflineDate.setDate(maxOfflineDate.getDate() + AppConfig.offline.maxDaysOffline);
 
-    const currentUser = this.localStorageService.getCurrentUser();
-    console.log('[Auth] currentUser from storage:', currentUser);
-    console.log('[Auth] expiresIn:', expiresIn, 'now:', now, 'maxOfflineDate:', maxOfflineDate);
+    console.log('[Auth] Token expiresIn:', expiresIn, 'now:', now);
 
-    if (currentUser && auth.authToken === currentUser.authToken
-      && expiresIn > now && expiresIn <= maxOfflineDate) {
-      console.log('[Auth] Using offline user (valid)');
-      currentUser.expiresIn = new Date(auth.expiresIn);
-      this.currentUserSubject.next(currentUser);
-      return of(currentUser);
-    }
-
-    if (currentUser && auth.authToken === currentUser.authToken 
-      && expiresIn <= now) {
-      console.log('[Auth] Token expired, logging out');
+    if (expiresIn <= now) {
+      console.log('[Auth] Token EXPIRED, logging out');
       this.logout();
-      this.router.navigateByUrl('/login');
       return of(undefined);
     }
 
-    console.log('[Auth] Calling server to validate token');
+    const currentUser = this.localStorageService.getCurrentUser();
+    console.log('[Auth] currentUser from storage:', currentUser);
+
+    if (currentUser && auth.authToken === currentUser.authToken) {
+      console.log('[Auth] User found in localStorage, setting current user');
+      currentUser.expiresIn = new Date(auth.expiresIn);
+      currentUser.authToken = auth.authToken;
+      this.currentUserSubject.next(currentUser);
+
+      console.log('[Auth] Attempting to validate with server (background)...');
+      this.validateTokenWithServer(auth.authToken, currentUser);
+
+      return of(currentUser);
+    }
+
+    console.log('[Auth] No user in localStorage, calling server to validate token');
     this.isLoadingSubject.next(true);
     return this.authHttpService.getUserByToken(auth.authToken).pipe(
       map((response: BaseResponseModel<UserModel>) => {
@@ -187,28 +173,38 @@ export class AuthService implements OnDestroy {
           this.currentUserSubject.next(response.data);
           console.log('[Auth] User saved from server response');
         } else {
-          const offlineUser = this.localStorageService.getCurrentUser();
-          if (offlineUser && new Date(auth.expiresIn) > new Date()) {
-            console.log('[Auth] Using offline user (fallback)');
-            return offlineUser;
-          }
-          console.log('[Auth] Server response failed, logging out');
-          this.logout();
-          this.router.navigateByUrl('/login');
+          console.log('[Auth] Server response failed');
         }
         return response?.data;
       }),
       catchError((err) => {
         console.log('[Auth] Error calling server:', err);
-        const offlineUser = this.localStorageService.getCurrentUser();
-        if (offlineUser && new Date(auth.expiresIn) > new Date()) {
-          console.log('[Auth] Using offline user (error fallback)');
-          return of(offlineUser);
-        }
         return of(undefined);
       }),
       finalize(() => this.isLoadingSubject.next(false))
     );
+  }
+
+  private validateTokenWithServer(authToken: string, offlineUser: UserModel): void {
+    this.authHttpService
+      .getUserByToken(authToken)
+      .pipe(
+        catchError((err) => {
+          console.log('[Auth] Background token validation failed:', err);
+          return of(null);
+        })
+      )
+      .subscribe((response: BaseResponseModel<UserModel> | null) => {
+        if (response && response.succeeded) {
+          console.log('[Auth] Background validation successful, updating user data');
+          response.data.expiresIn = offlineUser.expiresIn;
+          response.data.authToken = authToken;
+          this.localStorageService.setCurrentUser(response.data);
+          this.currentUserSubject.next(response.data);
+        } else {
+          console.log('[Auth] Background validation failed or invalid, keeping offline user');
+        }
+      });
   }
 
   // need create new user then login
