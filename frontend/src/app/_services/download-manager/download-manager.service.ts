@@ -1,6 +1,6 @@
 import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { SwUpdate } from '@angular/service-worker';
+// import { SwUpdate } from '@angular/service-worker';
 
 @Injectable({
   providedIn: 'root'
@@ -20,7 +20,9 @@ export class DownloadManagerService {
   private downloadedFiles = 0;
   private estimatedTotalSize = 0;
 
-  constructor(private swUpdate: SwUpdate, private ngZone: NgZone) {
+  constructor(
+    // private swUpdate: SwUpdate, 
+    private ngZone: NgZone) {
     this.setupServiceWorkerEvents();
     this.calculateAppSize();
   }

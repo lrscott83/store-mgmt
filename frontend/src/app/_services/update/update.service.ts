@@ -5,7 +5,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { interval } from 'rxjs';
 import Swal from 'sweetalert2';
 
-@Injectable({ providedIn: 'root' })
+// @Injectable({ providedIn: 'root' })
 export class UpdateService {
     constructor(private updates: SwUpdate, private snackbar: MatSnackBar) {
         if (this.updates.isEnabled) {

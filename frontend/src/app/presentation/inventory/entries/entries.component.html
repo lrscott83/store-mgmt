@@ -5,7 +5,7 @@
       <span class="label label-success font-weight-bold font-size-lg">({{getEntriesCount()}})</span>
     </div>
     <div class="card-toolbar">
-      <span class="text-danger font-weight-bold font-size-lg">
+      <span class="text-primary font-weight-bold font-size-lg">
         {{getEntriesTotal() | currency:'USD':'symbol':'1.2-2'}}
       </span>
     </div>
@@ -36,9 +36,9 @@
           <mat-expansion-panel-header class="p-2" class="mat-panel-header">
             <mat-panel-title>
               <span class="w-100">{{dateEntry.date | date: onlyDateFormat : 'UTC'}}
-              ({{dateEntry.count}})</span>
+              ({{dateEntry.total}})</span>
               <div class="w-100 text-end">
-                <span class="text-danger">{{dateEntry.total |
+                <span class="text-primary">{{dateEntry.total |
                 currency:'USD':'symbol':'1.2-2'}}</span>
               </div>
             </mat-panel-title>

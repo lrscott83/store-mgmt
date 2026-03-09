@@ -70,7 +70,7 @@ export class EntriesComponent implements OnInit {
           throw error;
         }))
         .subscribe((response) => {
-          if (response.succeeded) {
+          if (response && response.succeeded) {
             const dateEntries: DateEntry[] = this.groupEntries(response.data);
             this.dateEntries$.next(dateEntries);
           } else {
@@ -96,7 +96,7 @@ export class EntriesComponent implements OnInit {
           date: entries[0].date,
           entries: entries.sort((c1, c2) => c1.date.getTime() - c2.date.getTime()),
           count: entries.reduce((count, entry) => count += entry.quantity, 0),
-          total: entries.reduce((total, entry) => total += entry.costPrice, 0),
+          total: entries.reduce((total, entry) => total += entry.costPrice * entry.quantity, 0),
         });
       });
   

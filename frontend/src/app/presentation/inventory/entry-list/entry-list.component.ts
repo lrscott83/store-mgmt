@@ -8,6 +8,8 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { Result } from 'src/app/domain/commons/result';
 import { InventoryOfflineService } from 'src/app/application/entries/inventory-offline.service';
 import Swal from 'sweetalert2';
+import { UserModel } from 'src/app/_services/auth/_models/auth-user.model';
+import { AuthService } from 'src/app/_services/services.index';
 
 @Component({
     selector: 'app-entry-list',
@@ -21,8 +23,14 @@ export class EntryListComponent {
 
   @Output() entryDeletedEmitter = new EventEmitter();
 
-  constructor(private modalService: NgbModal, private inventoryService: InventoryOfflineService, private translate: TranslateService) {
+  currentUser: UserModel;
 
+  constructor(private modalService: NgbModal, private inventoryService: InventoryOfflineService, private translate: TranslateService, private authService: AuthService) {
+    this.currentUser = this.authService.currentUserValue;
+  }
+
+  isOwnerAdmin() {
+    return this.currentUser.isOwnerAdmin;
   }
 
   openEditInventoryEntryModal(entry: InventoryEntryView) {

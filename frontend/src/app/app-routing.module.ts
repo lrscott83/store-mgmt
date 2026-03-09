@@ -202,7 +202,7 @@ const routes: Routes = [
         path: 'statistics/dashboard',
         loadComponent: () => import('./presentation/statistics/dashboard/dashboard.component').then((c) => c.DashboardComponent),
         canActivate: [AuthGuard],
-        data: { expectedFeatures: [] }
+        data: { expectedFeatures: [EFeatures.Dashboard] }
       },
       {
         path: 'reports/today',

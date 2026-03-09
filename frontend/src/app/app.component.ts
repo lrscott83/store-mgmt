@@ -10,7 +10,7 @@ import { locale as jpLang } from './_modules/i18n/vocabs/jp';
 import { locale as deLang } from './_modules/i18n/vocabs/de';
 import { locale as frLang } from './_modules/i18n/vocabs/fr';
 import { LoadingComponent } from './presentation/shared/components/loading/loading.component';
-import { UpdateService } from './_services/update/update.service';
+//import { UpdateService } from './_services/update/update.service';
 import { StoreUsageTrackerService } from './_services/usage-tracker/store-usage-tracker.service';
 import Swal from 'sweetalert2';
 import { SwUpdate } from '@angular/service-worker';
@@ -39,10 +39,10 @@ export class AppComponent implements OnInit {
 
   constructor(
     private translationService: TranslationService,
-    private updateService: UpdateService,
+    // private updateService: UpdateService,
     private storeUsageTracker: StoreUsageTrackerService,
     private downloadManager: DownloadManagerService,
-    private swUpdate: SwUpdate
+    //private swUpdate: SwUpdate
     //private tableService: TableExtendedService
   ) {
     // register translations
@@ -64,14 +64,14 @@ export class AppComponent implements OnInit {
     this.setupProgressTracking();
     
     // Verificar actualizaciones del service worker
-    if (this.swUpdate.isEnabled) {
-      this.swUpdate.versionUpdates
-        .pipe(filter(evt => evt.type === 'VERSION_READY'))
-        .subscribe(() => {
-          this.downloadManager.startDownload();
-          setTimeout(() => this.downloadManager.completeDownload(), 2000);
-        });
-    }
+    // if (this.swUpdate.isEnabled) {
+    //   this.swUpdate.versionUpdates
+    //     .pipe(filter(evt => evt.type === 'VERSION_READY'))
+    //     .subscribe(() => {
+    //       this.downloadManager.startDownload();
+    //       setTimeout(() => this.downloadManager.completeDownload(), 2000);
+    //     });
+    // }
   }
 
   private checkFirstVisit(): void {

@@ -2,41 +2,43 @@
   <table class="table table-borderless table-vertical-center">
     <tbody>
       @for (entry of entries$ | async; track entry) {
-        <tr class="border-1">
-          <td class="p-1">
-            <span class="text-dark mb-1 font-size-lg">
-              {{entry.productName}}
-            </span>
-          </td>
-          <td class="p-1 text-end">
-            <span class="label label-success font-weight-bold font-size-lg">
-              {{entry.quantity}}
-            </span>
-          </td>
-          <td class="p-1 text-end">
-            <span class="text-success mb-1 font-size-lg">
-              {{entry.costPrice | currency:'USD':'symbol':'1.2-2'}}
-            </span>
-          </td>
-          @if (!readOnly) {
-            <td class="text-end p-0">
-              <button mat-icon-button color="primary" class="card-header-action-button"
-                [matMenuTriggerFor]="menuInventoryEntry" aria-label="Acciones">
-                <mat-icon>settings</mat-icon>
-              </button>
-              <mat-menu #menuInventoryEntry="matMenu">
-                <button mat-menu-item (click)="openEditInventoryEntryModal(entry)">
-                  <mat-icon color="primary">edit</mat-icon>
-                  <span>{{ 'GENERAL.EDIT' | translate }}</span>
-                </button>
-                <button mat-menu-item (click)="onDeleteInventoryEntry(entry.productId, entry.id)">
-                  <mat-icon color="warn">delete</mat-icon>
-                  <span>{{ 'GENERAL.DELETE' | translate }}</span>
-                </button>
-              </mat-menu>
-            </td>
-          }
-        </tr>
+      <tr class="border-1">
+        <td class="p-1">
+          <span class="text-dark mb-1 font-size-lg">
+            {{entry.productName}}
+          </span>
+        </td>
+        <td class="p-1 text-end">
+          <span class="label label-success font-weight-bold font-size-lg">
+            {{entry.quantity}}
+          </span>
+        </td>
+        @if (isOwnerAdmin()) {
+        <td class="p-1 text-end">
+          <span class="text-success mb-1 font-size-lg">
+            {{entry.costPrice | currency:'USD':'symbol':'1.2-2'}}
+          </span>
+        </td>
+        }
+        @if (!readOnly) {
+        <td class="text-end p-0">
+          <button mat-icon-button color="primary" class="card-header-action-button"
+            [matMenuTriggerFor]="menuInventoryEntry" aria-label="Acciones">
+            <mat-icon>settings</mat-icon>
+          </button>
+          <mat-menu #menuInventoryEntry="matMenu">
+            <button mat-menu-item (click)="openEditInventoryEntryModal(entry)">
+              <mat-icon color="primary">edit</mat-icon>
+              <span>{{ 'GENERAL.EDIT' | translate }}</span>
+            </button>
+            <button mat-menu-item (click)="onDeleteInventoryEntry(entry.productId, entry.id)">
+              <mat-icon color="warn">delete</mat-icon>
+              <span>{{ 'GENERAL.DELETE' | translate }}</span>
+            </button>
+          </mat-menu>
+        </td>
+        }
+      </tr>
       }
     </tbody>
   </table>
