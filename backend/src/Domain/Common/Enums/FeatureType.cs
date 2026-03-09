@@ -53,6 +53,12 @@ namespace Domain.Common.Enums
         [Description("Cuadre del día")]
         TodayInventoryStats = 32,
 
+        [Description("Cantidades del día")]
+        InventoryTodayQuantities = 34,
+
+        [Description("Ganancias del día")]
+        InventoryTodaySaleProfit = 35,
+
         // Synchronization
         [Description("Enviar")]
         Send = 40,
@@ -101,6 +107,9 @@ namespace Domain.Common.Enums
 
         [Description("Historial de gastos")]
         ExpensesHistory = 102,
+
+        [Description("Historial de créditos")]
+        CreditsHistory = 103,
 
         //Credits
         [Description("Venta a crédito")]

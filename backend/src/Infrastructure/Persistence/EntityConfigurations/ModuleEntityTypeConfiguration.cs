@@ -45,6 +45,8 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     10,
                     priceIncluded: true,
                     0,
+                    discountPrice: 0,
+                    percentDiscountPrice: 0,
                     availableToStore: true,
                     true
                 ),
@@ -54,6 +56,8 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     20,
                     priceIncluded: true,
                     0,
+                    discountPrice: 0,
+                    percentDiscountPrice: 0,
                     availableToStore: true,
                     true
                 ),
@@ -63,6 +67,8 @@ namespace Infrastructure.Persistence.EntityConfigurations
                     30,
                     priceIncluded: true,
                     0,
+                    discountPrice: 0,
+                    percentDiscountPrice: 0,
                     availableToStore: true,
                     true
                 ),

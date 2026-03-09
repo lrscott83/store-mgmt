@@ -165,6 +165,24 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      true,
                      true
                  ),
+                 Feature.Create(
+                     (int)FeatureType.InventoryTodayQuantities,
+                     FeatureType.InventoryTodayQuantities.GetDescription(),
+                     "Funcionalidad para revisar las entradas y ventas del día",
+                     (int)ModuleType.Inventory,
+                     81,
+                     true,
+                     true
+                 ),
+                 Feature.Create(
+                     (int)FeatureType.InventoryTodaySaleProfit,
+                     FeatureType.InventoryTodaySaleProfit.GetDescription(),
+                     "Funcionalidad para revisar las ganancias de las ventas del día",
+                     (int)ModuleType.Inventory,
+                     81,
+                     true,
+                     true
+                 ),
 
                  // Synchronization
                  Feature.Create(
@@ -300,6 +318,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      (int)FeatureType.ExpensesHistory,
                      FeatureType.ExpensesHistory.GetDescription(),
                      "Funcionalidad para listar el historial de los gastos",
+                     (int)ModuleType.Histories,
+                     220,
+                     true,
+                     true
+                 ),
+                Feature.Create(
+                     (int)FeatureType.CreditsHistory,
+                     FeatureType.CreditsHistory.GetDescription(),
+                     "Funcionalidad para listar el historial de los créditos",
                      (int)ModuleType.Histories,
                      220,
                      true,

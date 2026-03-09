@@ -73,18 +73,28 @@ namespace Domain.Common.Enums
         [HasModule(ModuleType.Inventory)]
         TodayInventoryStatsAdmin,
 
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.InventoryTodayQuantities)]
+        [HasModule(ModuleType.Inventory)]
+        InventoryTodayQuantitiesAdmin,
+
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.InventoryTodaySaleProfit)]
+        [HasModule(ModuleType.Inventory)]
+        InventoryTodaySaleProfitAdmin,
+
         #endregion
 
         #region Expenses features
 
-        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.TodayExpenses)]
         [HasModule(ModuleType.Expenses)]
         TodayExpensesAdmin,
 
         #endregion
 
-        #region Expenses features
+        #region Billing features
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.Billing)]
@@ -93,7 +103,7 @@ namespace Domain.Common.Enums
 
         #endregion
 
-        #region Expenses features
+        #region Histories features
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.SalesHistory)]
@@ -105,14 +115,19 @@ namespace Domain.Common.Enums
         [HasModule(ModuleType.Histories)]
         EntriesHistoryAdmin,
 
-        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.ExpensesHistory)]
         [HasModule(ModuleType.Histories)]
         ExpensesHistoryAdmin,
 
+        [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
+        [HasFeature(FeatureType.SalesHistory)]
+        [HasModule(ModuleType.Histories)]
+        CreditsHistoryAdmin,
+
         #endregion
 
-        #region Expenses features
+        #region Credits features
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
         [HasFeature(FeatureType.CreditSale)]
