@@ -20,7 +20,7 @@
           </span>
         </td>
         }
-        @if (!readOnly) {
+        @if (isOwnerAdmin() && !readOnly) {
         <td class="text-end p-0">
           <button mat-icon-button color="primary" class="card-header-action-button"
             [matMenuTriggerFor]="menuInventoryEntry" aria-label="Acciones">

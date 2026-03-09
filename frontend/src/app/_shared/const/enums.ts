@@ -38,6 +38,8 @@ export enum EFeatures {
   Entries = 31,
   Egress = 33,
   TodayInventoryStats = 32,
+  InventoryTodayQuantities = 34,
+  InventoryTodaySaleProfit = 35,
 
   // Synchronization
   Send = 40,
@@ -66,6 +68,7 @@ export enum EFeatures {
   SalesHistory = 100,
   EntriesHistory = 101,
   ExpensesHistory = 102,
+  CreditsHistory = 103,
 
   //Credits
   CreditSale = 110,

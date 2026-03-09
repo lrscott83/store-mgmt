@@ -31,6 +31,8 @@ import { SaleCreditsHelpDialogComponent } from "../help-dialogs/sale-credits-hel
 import { TodaySaleCreditsHelpDialogComponent } from "../help-dialogs/today-sale-credits-help-dialog/today-sale-credits-help-dialog.component";
 import { OrdersHelpDialogComponent } from "../help-dialogs/orders-help-dialog/orders-help-dialog.component";
 import { TodayEntriesHelpDialogComponent } from "../help-dialogs/today-entries-help-dialog/today-entries-help-dialog.component";
+import { InventoryTodayQuantitiesHelpDialogComponent } from "../help-dialogs/inventory-today-quantities-help-dialog/inventory-today-quantities-help-dialog.component";
+import { InventoryTodaySalesProfitHelpDialogComponent } from "../help-dialogs/inventory-today-sales-profit-help-dialog/inventory-today-sales-profit-help-dialog.component";
 
 export interface NavigationItem {
   id: string;
@@ -251,6 +253,30 @@ export const NavigationItems: NavigationItem[] = [
         module: EModules.Inventory,
         feature: EFeatures.Entries,
         helpDialog: TodayEntriesHelpDialogComponent,
+      },
+      {
+        id: 'inventory_today_quantities',
+        title: 'MENU.INVENTORY_MGMT.TODAY_QUANTITIES',
+        type: 'item',
+        classes: 'nav-item',
+        url: 'inventory/today-quantities',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Inventory,
+        feature: EFeatures.InventoryTodayQuantities,
+        helpDialog: InventoryTodayQuantitiesHelpDialogComponent,
+      },
+      {
+        id: 'inventory_today_sales_profit',
+        title: 'MENU.INVENTORY_MGMT.TODAY_SALES_PROFIT',
+        type: 'item',
+        classes: 'nav-item',
+        url: '/inventory/today-sales-profit',
+        icon: 'aim',
+        breadcrumbs: false,
+        module: EModules.Inventory,
+        feature: EFeatures.InventoryTodaySaleProfit,
+        helpDialog: InventoryTodaySalesProfitHelpDialogComponent,
       },
       {
         id: 'inventory_sale',

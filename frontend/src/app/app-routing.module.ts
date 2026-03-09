@@ -174,6 +174,18 @@ const routes: Routes = [
         data: { expectedFeatures: [EFeatures.Entries] }
       },
       {
+        path: 'inventory/today-quantities',
+        loadComponent: () => import('./presentation/inventory/inventory-today-quantities/inventory-today-quantities.component').then((c) => c.InventoryTodayQuantitiesComponent),
+        canActivate: [AuthGuard],
+        data: { expectedFeatures: [EFeatures.InventoryTodayQuantities] }
+      },
+      {
+        path: 'inventory/today-sales-profit',
+        loadComponent: () => import('./presentation/inventory/inventory-today-sales-profit/inventory-today-sales-profit.component').then((c) => c.InventoryTodaySalesProfitComponent),
+        canActivate: [AuthGuard],
+        data: { expectedFeatures: [EFeatures.InventoryTodaySaleProfit] }
+      },
+      {
         path: 'inventory/egress',
         loadComponent: () => import('./presentation/inventory/egress/egress.component').then((c) => c.EgressComponent),
         canActivate: [AuthGuard],
