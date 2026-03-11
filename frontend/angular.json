@@ -59,7 +59,7 @@
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
-              // "serviceWorker": "ngsw-config.json",  // Desactivado temporalmente
+              "serviceWorker": "ngsw-config.json",
               "optimization": true,
               "sourceMap": false,
               "namedChunks": false,

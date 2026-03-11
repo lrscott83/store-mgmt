@@ -27,7 +27,7 @@ import { PRODUCT_CATEGORY_SERVICE, PRODUCT_SERVICE } from './_services/tokens';
 import { ProductOfflineService } from './application/products/product-offline.service';
 import { ProductOnlineService } from './application/products/product-online.service';
 import { productServiceFactory } from './_services/factories/product-service.factory';
-// import { ServiceWorkerModule } from '@angular/service-worker';
+import { ServiceWorkerModule } from '@angular/service-worker';
 
 export function initializeApp(appInitService: AppInitService) {
   return (): Promise<any> => {
@@ -57,10 +57,10 @@ export function initializeApp(appInitService: AppInitService) {
       delayStop: 500,
       message: 'Cargando'
     }),
-    // ServiceWorkerModule.register('ngsw-worker.js', {
-    //   enabled: !isDevMode(),
-    //   registrationStrategy: 'registerWhenStable:30000'
-    // }),
+    ServiceWorkerModule.register('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000'
+    }),
     NgHttpLoaderComponent
   ],
   providers: [
