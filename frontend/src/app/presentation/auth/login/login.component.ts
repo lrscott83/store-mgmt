@@ -42,7 +42,7 @@ export default class LoginComponent implements OnInit, OnDestroy {
     //private connectionService: ConnectionService,
     private toastrService: ToastrService,
     private storeUsageTracker: StoreUsageTrackerService,
-    // private updateService: UpdateService,
+    private updateService: UpdateService,
     private preloadingService: PreloadingService,
     @Inject(PRODUCT_SERVICE) private productService: ProductService
   ) {
@@ -51,7 +51,7 @@ export default class LoginComponent implements OnInit, OnDestroy {
     if (this.authService.currentUserValue) {
       this.navigateToUserHome();
     }
-    // this.updateService.checkForUpdate();
+    this.updateService.checkForUpdate();
   }
 
   ngOnInit(): void {
