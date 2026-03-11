@@ -1,5 +1,5 @@
 // angular import
-import { NgModule, isDevMode, inject, provideAppInitializer } from '@angular/core';
+import { NgModule, inject, provideAppInitializer } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 // import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
 
@@ -58,7 +58,7 @@ export function initializeApp(appInitService: AppInitService) {
       message: 'Cargando'
     }),
     ServiceWorkerModule.register('ngsw-worker.js', {
-      enabled: !isDevMode(),
+      enabled: true,
       registrationStrategy: 'registerWhenStable:30000'
     }),
     NgHttpLoaderComponent

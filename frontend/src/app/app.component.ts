@@ -18,10 +18,10 @@ import { DownloadManagerService } from './_services/download-manager/download-ma
 import { filter } from 'rxjs';
 
 @Component({
-    selector: 'app-root',
-    templateUrl: './app.component.html',
-    styleUrls: ['./app.component.scss'],
-    standalone: false
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss'],
+  standalone: false
 })
 export class AppComponent implements OnInit {
   // public props
@@ -30,6 +30,7 @@ export class AppComponent implements OnInit {
 
   showInstallPrompt = false;
   deferredPrompt: any = null;
+  canInstall = false;
 
   isDownloading$ = this.downloadManager.isDownloading$;
   progress$ = this.downloadManager.progress$;
@@ -41,68 +42,75 @@ export class AppComponent implements OnInit {
     private translationService: TranslationService,
     // private updateService: UpdateService,
     private storeUsageTracker: StoreUsageTrackerService,
-    private downloadManager: DownloadManagerService,
+    private downloadManager: DownloadManagerService
     //private swUpdate: SwUpdate
     //private tableService: TableExtendedService
   ) {
     // register translations
-    this.translationService.loadTranslations(
-      esLang,
-      enLang,
-      chLang,
-      jpLang,
-      deLang,
-      frLang
-    );
+    this.translationService.loadTranslations(esLang, enLang, chLang, jpLang, deLang, frLang);
   }
 
   ngOnInit() {
-    this.storeUsageTracker.cleanOldData(30); // Mantiene los últimos 30 días
+    this.storeUsageTracker.cleanOldData(30);
     this.checkIfInstalled();
     this.listenToBeforeInstallPrompt();
     this.checkFirstVisit();
     this.setupProgressTracking();
-    
-    // Verificar actualizaciones del service worker
-    // if (this.swUpdate.isEnabled) {
-    //   this.swUpdate.versionUpdates
-    //     .pipe(filter(evt => evt.type === 'VERSION_READY'))
-    //     .subscribe(() => {
-    //       this.downloadManager.startDownload();
-    //       setTimeout(() => this.downloadManager.completeDownload(), 2000);
-    //     });
-    // }
+    this.checkPWAStatus();
+  }
+
+  pwaStatus = '';
+
+  private checkPWAStatus(): void {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    const swSupported = 'serviceWorker' in navigator;
+
+    this.pwaStatus = `Mode: ${isStandalone ? 'standalone' : 'browser'} | SW: ${swSupported ? 'supported' : 'not supported'}`;
+
+    console.log('[PWA] === PWA Status Check ===');
+    console.log('[PWA] Display mode:', isStandalone ? 'standalone' : 'browser');
+    console.log('[PWA] Navigator.standalone:', (window.navigator as any).standalone);
+    console.log('[PWA] Service Worker supported:', swSupported);
+
+    if (swSupported) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        console.log('[PWA] Service Worker registrations:', registrations.length);
+        registrations.forEach((reg) => {
+          console.log('[PWA] SW Scope:', reg.scope);
+          console.log('[PWA] SW State:', reg.active ? 'active' : 'inactive');
+        });
+      });
+    }
   }
 
   private checkFirstVisit(): void {
     const hasVisited = localStorage.getItem('app_has_visited');
-    
+
     if (!hasVisited && this.isPWAInstalled()) {
       this.downloadManager.startDownload();
-      
+
       // Simular progreso para primera descarga
       this.simulateDownloadProgress();
-      
+
       localStorage.setItem('app_has_visited', 'true');
     }
   }
 
   private isPWAInstalled(): boolean {
-    return window.matchMedia('(display-mode: standalone)').matches || 
-           (window.navigator as any).standalone === true;
+    return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
   }
 
   private simulateDownloadProgress(): void {
     let progress = 0;
     const interval = setInterval(() => {
       progress += Math.random() * 10;
-      
+
       if (progress >= 100) {
         progress = 100;
         clearInterval(interval);
         setTimeout(() => this.downloadManager.completeDownload(), 500);
       }
-      
+
       this.downloadManager.updateProgress(progress);
       this.calculateEstimatedTime(progress);
     }, 300);
@@ -113,10 +121,10 @@ export class AppComponent implements OnInit {
       this.estimatedTime = 'Calculando...';
       return;
     }
-    
+
     const elapsedSeconds = (progress / 100) * 10; // Simulación
     const remainingSeconds = (100 - progress) * (elapsedSeconds / progress);
-    
+
     if (remainingSeconds < 60) {
       this.estimatedTime = `${Math.ceil(remainingSeconds)} seg`;
     } else {
@@ -125,14 +133,13 @@ export class AppComponent implements OnInit {
   }
 
   private setupProgressTracking(): void {
-    this.progress$.subscribe(progress => {
+    this.progress$.subscribe((progress) => {
       this.calculateEstimatedTime(progress);
     });
   }
 
   private checkIfInstalled(): void {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-      || (window.navigator as any).standalone === true;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
 
     // Si NO está en modo standalone, puede ser candidata a instalación
     if (!isStandalone) {
@@ -141,21 +148,26 @@ export class AppComponent implements OnInit {
   }
 
   private listenToBeforeInstallPrompt(): void {
-    console.log('listenToBeforeInstallPrompt');
+    console.log('[PWA] Listening for beforeinstallprompt');
+
+    if (!('BeforeInstallPromptEvent' in window)) {
+      console.log('[PWA] beforeinstallprompt NOT supported in this browser');
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
-      // El navegador permite instalar la PWA
-      console.log('beforeinstallprompt');
+      console.log('[PWA] beforeinstallprompt fired', e);
       e.preventDefault();
       this.deferredPrompt = e;
+      this.canInstall = true;
 
-      // Verificamos que NO esté ya instalada
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-        || (window.navigator as any).standalone === true;
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+
+      console.log('[PWA] isStandalone:', isStandalone);
 
       if (!isStandalone) {
-        this.showInstallPrompt = true; // Mostrar banner/mensaje
+        this.showInstallPrompt = true;
         Swal.fire({
-          title: '¡Instalción disponible!',
+          title: '¡Instalación disponible!',
           text: 'Deseas instalar esta app en tu dispositivo?',
           icon: 'question',
           showConfirmButton: true,
@@ -167,7 +179,7 @@ export class AppComponent implements OnInit {
           customClass: {
             confirmButton: 'swal2-confirm swal2-styled'
           }
-        }).then(result => {
+        }).then((result) => {
           if (result.isConfirmed) {
             this.installPwa();
           }
@@ -176,9 +188,9 @@ export class AppComponent implements OnInit {
     });
 
     window.addEventListener('appinstalled', () => {
-      // La PWA fue instalada. Puedes ocultar el botón o enviar analytics.
       this.deferredPrompt = null;
-      console.log('Application installed');
+      this.canInstall = false;
+      console.log('[PWA] Application installed');
     });
   }
 
