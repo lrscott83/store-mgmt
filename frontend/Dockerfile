@@ -14,7 +14,7 @@ WORKDIR /app
 COPY . .
 
 # Build server side bundles
-RUN npm run build --omit=dev
+RUN npm run build
 
 # Stage 2: Serve app with nginx server
 
