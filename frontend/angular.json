@@ -31,7 +31,7 @@
             "polyfills": ["src/polyfills.ts"],
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
-            "assets": ["src/favicon.png", "src/assets"],
+            "assets": ["src/favicon.png", "src/assets", "src/ngsw.json", "src/ngsw-worker.js"],
             "styles": ["node_modules/bootstrap/dist/css/bootstrap.min.css", "src/styles.scss", "node_modules/ngx-toastr/toastr.css"],
             "scripts": ["node_modules/@popperjs/core/dist/umd/popper.min.js", "node_modules/bootstrap/dist/js/bootstrap.min.js"],
             "browser": "src/main.ts",
@@ -71,7 +71,8 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true,
-              "namedChunks": true
+              "namedChunks": true,
+              "serviceWorker": "ngsw-config.json"
             }
           },
           "defaultConfiguration": "production"
@@ -102,7 +103,7 @@
             "tsConfig": "tsconfig.spec.json",
             "karmaConfig": "karma.conf.js",
             "inlineStyleLanguage": "scss",
-            "assets": ["src/favicon.png", "src/assets"],
+            "assets": ["src/favicon.png", "src/assets", "src/ngsw.json", "src/ngsw-worker.js"],
             "styles": ["src/styles.scss"],
             "scripts": ["node_modules/@popperjs/core/dist/umd/popper.min.js", "node_modules/bootstrap/dist/js/bootstrap.min.js"]
           }

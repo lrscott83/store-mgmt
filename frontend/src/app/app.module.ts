@@ -57,9 +57,9 @@ export function initializeApp(appInitService: AppInitService) {
       delayStop: 500,
       message: 'Cargando'
     }),
-    ServiceWorkerModule.register('ngsw-worker.js', {
+    ServiceWorkerModule.register('/ngsw-worker.js', {
       enabled: true,
-      registrationStrategy: 'registerWhenStable:30000'
+      registrationStrategy: 'registerImmediately'
     }),
     NgHttpLoaderComponent
   ],

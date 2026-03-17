@@ -65,21 +65,40 @@ export class AppComponent implements OnInit {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
     const swSupported = 'serviceWorker' in navigator;
 
-    this.pwaStatus = `Mode: ${isStandalone ? 'standalone' : 'browser'} | SW: ${swSupported ? 'supported' : 'not supported'}`;
+    this.pwaStatus = `Mode: ${isStandalone ? 'standalone' : 'browser'} | SW: ${swSupported ? 'OK' : 'no'}`;
+
+    if (swSupported && !isStandalone) {
+      this.canInstall = true;
+    }
 
     console.log('[PWA] === PWA Status Check ===');
     console.log('[PWA] Display mode:', isStandalone ? 'standalone' : 'browser');
-    console.log('[PWA] Navigator.standalone:', (window.navigator as any).standalone);
     console.log('[PWA] Service Worker supported:', swSupported);
+    console.log('[PWA] Can install:', this.canInstall);
 
     if (swSupported) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        console.log('[PWA] Service Worker registrations:', registrations.length);
-        registrations.forEach((reg) => {
-          console.log('[PWA] SW Scope:', reg.scope);
-          console.log('[PWA] SW State:', reg.active ? 'active' : 'inactive');
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => {
+          console.log('[PWA] Service Worker registrations:', registrations.length);
+          if (registrations.length > 0) {
+            registrations.forEach((reg) => {
+              console.log('[PWA] SW Scope:', reg.scope);
+              console.log('[PWA] SW State:', reg.active ? 'active' : reg.installing ? 'installing' : reg.waiting ? 'waiting' : 'unknown');
+            });
+          }
+        })
+        .catch((err) => {
+          console.error('[PWA] Error getting registrations:', err);
         });
-      });
+
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          console.log('[PWA] Service Worker ready:', registration);
+        })
+        .catch((err) => {
+          console.error('[PWA] Service Worker ready error:', err);
+        });
     }
   }
 
@@ -154,56 +173,74 @@ export class AppComponent implements OnInit {
       console.log('[PWA] beforeinstallprompt NOT supported in this browser');
     }
 
-    window.addEventListener('beforeinstallprompt', (e) => {
+    const beforeInstallHandler = (e: Event) => {
       console.log('[PWA] beforeinstallprompt fired', e);
       e.preventDefault();
       this.deferredPrompt = e;
       this.canInstall = true;
+    };
 
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    window.addEventListener('beforeinstallprompt', beforeInstallHandler);
 
-      console.log('[PWA] isStandalone:', isStandalone);
-
-      if (!isStandalone) {
-        this.showInstallPrompt = true;
-        Swal.fire({
-          title: '¡Instalación disponible!',
-          text: 'Deseas instalar esta app en tu dispositivo?',
-          icon: 'question',
-          showConfirmButton: true,
-          showCancelButton: true,
-          allowOutsideClick: false,
-          allowEscapeKey: false,
-          confirmButtonText: 'Si',
-          cancelButtonText: 'No',
-          customClass: {
-            confirmButton: 'swal2-confirm swal2-styled'
-          }
-        }).then((result) => {
-          if (result.isConfirmed) {
-            this.installPwa();
-          }
-        });
-      }
-    });
+    setTimeout(() => {
+      window.removeEventListener('beforeinstallprompt', beforeInstallHandler);
+      console.log('[PWA] Removed beforeinstallprompt listener');
+    }, 60000);
 
     window.addEventListener('appinstalled', () => {
       this.deferredPrompt = null;
       this.canInstall = false;
       console.log('[PWA] Application installed');
+      Swal.fire({
+        title: '¡PWA instalada!',
+        text: 'La aplicación se ha instalado correctamente.',
+        icon: 'success',
+        confirmButtonText: 'OK'
+      });
     });
   }
 
   installPwa(): void {
+    console.log('[PWA] installPwa called, deferredPrompt:', this.deferredPrompt);
+
     if (this.deferredPrompt) {
       this.deferredPrompt.prompt();
       this.deferredPrompt.userChoice.then((choiceResult: any) => {
         if (choiceResult.outcome === 'accepted') {
-          console.log('Usuario instaló la PWA');
+          console.log('[PWA] Usuario instaló la PWA');
         }
         this.showInstallPrompt = false;
         this.deferredPrompt = null;
       });
+    } else {
+      this.showManualInstallInstructions();
     }
+  }
+
+  private showManualInstallInstructions(): void {
+    const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+
+    let instructions = `
+      <div style="text-align: left; padding: 10px;">
+        <p><strong>Para instalar la PWA:</strong></p>
+        <ol>
+          <li>Haz clic en los <strong>3 puntos</strong> (arriba derecha del navegador)</li>
+          <li>Busca la opción <strong>"Instalar Vende De Todo"</strong></li>
+        </ol>
+        <hr/>
+        <p><strong>O prueba:</strong></p>
+        <ul>
+          <li>Arrastra la pestaña a tu escritorio</li>
+          <li>Busca el icono de install en la barra de direcciones</li>
+        </ul>
+      </div>
+    `;
+
+    Swal.fire({
+      title: 'Cómo instalar la PWA',
+      html: instructions,
+      icon: 'info',
+      confirmButtonText: 'Entendido'
+    });
   }
 }
