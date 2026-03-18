@@ -1,5 +1,5 @@
 # Create image based off of the official Node 22 image
-FROM quay.io/lib/node:20 as builder
+FROM quay.io/lib/node:22 as builder
 
 # Copy dependency definitions
 COPY package*.json ./
