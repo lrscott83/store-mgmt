@@ -1,5 +1,5 @@
 # Create image based off of the official Node 22 image
-FROM quay.io/lib/node:22 as builder
+FROM node:22 as builder
 RUN apt update && apt install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency definitions
