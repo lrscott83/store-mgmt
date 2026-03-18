@@ -10,12 +10,12 @@ services:
       - api
     restart: always
 
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+    # healthcheck:
+    #   test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 60s
     networks:
       - postgres_network
 
@@ -40,12 +40,12 @@ services:
       - SmtpSettings__Password=${SMTP_PASSWORD}
       - SmtpSettings__FromEmail=${SMTP_FROM_EMAIL}
       - SmtpSettings__EnableSsl=${SMTP_ENABLE_SSL}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 60s
     depends_on:
       - postgres
     restart: always
