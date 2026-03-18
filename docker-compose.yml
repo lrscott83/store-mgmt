@@ -10,12 +10,12 @@ services:
       - api
     restart: always
 
-    # healthcheck:
-    #   test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 5
-    #   start_period: 60s
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--tries=1", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - postgres_network
 
@@ -44,7 +44,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 60s
     depends_on:
       - postgres
     restart: always
