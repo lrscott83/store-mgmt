@@ -7,10 +7,14 @@
       "installMode": "prefetch",
       "resources": {
         "files": [
-          "/assets/favicon.png",
+          "/favicon.png",
           "/index.csr.html",
           "/index.html",
           "/assets/manifest.webmanifest",
+          "/assets/favicon.png",
+          "/assets/icons/*",
+          "/assets/images/*",
+          "/assets/data/*",
           "/*.css",
           "/*.js"
         ]
@@ -21,7 +25,7 @@
       "installMode": "lazy",
       "updateMode": "prefetch",
       "resources": {
-        "files": ["/**/*.(svg|cur|jpg|jpeg|png|apng|webp|avif|gif|otf|ttf|woff|woff2)"]
+        "files": ["/assets/**/*"]
       }
     }
   ],
