@@ -40,6 +40,7 @@ namespace Application.Services.Owners
             await _userRepository.AddAsync(user);
 
             var owner = Owner.Create(user.Id, false, tenant.Id, description ?? "");
+            owner.User = user; // Assign navigation property for proper entity tracking
             await _ownerRepository.AddAsync(owner);
 
             var userRole = UserRole.Create(user.Id, (int)RoleType.OwnerAdmin, tenant.Id);
