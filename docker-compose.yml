@@ -14,8 +14,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      start_period: 120s
     networks:
       - postgres_network
 
@@ -44,8 +44,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 6
+      start_period: 120s
     depends_on:
       - postgres
     restart: always

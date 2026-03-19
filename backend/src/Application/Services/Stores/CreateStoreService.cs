@@ -53,7 +53,8 @@ namespace Application.Services.Stores
 
             List<int> featureIds = await _featureRepository.GetAvailableFeatureIdsByModuleIdsAsync(moduleIds);
             var storeRoleFeatures = await _storeRoleFeaturesGenerator.GenerateStoreRoleFeaturesAsync(store.Id, tenantId, featureIds);
-            storeRoleFeatures.ForEach(async storeRoleFeature => await _storeRoleFeatureRepository.AddAsync(storeRoleFeature));
+            await Task.WhenAll(storeRoleFeatures.Select(srf => 
+                _storeRoleFeatureRepository.AddAsync(srf)));
 
             return store;
         }

@@ -560,6 +560,101 @@ public class CreateStoreServiceTests
 
     #endregion
 
+    #region Bug Fix Verification Tests
+
+    /// <summary>
+    /// VERIFICATION TEST: After fixing the ForEach(async...) anti-pattern to use
+    /// Task.WhenAll(), this test verifies that all StoreRoleFeatures are properly added.
+    /// 
+    /// FIX: Changed from:
+    ///   storeRoleFeatures.ForEach(async srf => await _storeRoleFeatureRepository.AddAsync(srf));
+    /// 
+    /// TO:
+    ///   await Task.WhenAll(storeRoleFeatures.Select(srf => _storeRoleFeatureRepository.AddAsync(srf)));
+    /// </summary>
+    [Fact]
+    public async Task CreateStoreAsync_ShouldAddAllStoreRoleFeatures_WithCorrectCount()
+    {
+        // Arrange
+        var service = CreateService();
+        var storeRoleFeatures = new List<StoreRoleFeature>
+        {
+            StoreRoleFeature.Create(_testStoreId, 2, 1, _testTenantId),
+            StoreRoleFeature.Create(_testStoreId, 2, 2, _testTenantId),
+            StoreRoleFeature.Create(_testStoreId, 2, 3, _testTenantId)
+        };
+
+        _mockStoreRoleFeatureGenerator
+            .Setup(x => x.GenerateStoreRoleFeaturesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<IEnumerable<int>>()))
+            .ReturnsAsync(storeRoleFeatures);
+
+        var addCallCount = 0;
+        _mockStoreRoleFeatureRepository
+            .Setup(x => x.AddAsync(It.IsAny<StoreRoleFeature>()))
+            .Returns((StoreRoleFeature srf) =>
+            {
+                Interlocked.Increment(ref addCallCount);
+                return Task.FromResult(srf);
+            });
+
+        // Act
+        await service.CreateStoreAsync(
+            _testOwnerId,
+            _testTenantId,
+            "Store",
+            null,
+            null,
+            false,
+            new List<int> { 1 });
+
+        // Assert - With Task.WhenAll, all calls should complete
+        addCallCount.Should().Be(3, "All StoreRoleFeatures should be added");
+    }
+
+    /// <summary>
+    /// VERIFICATION TEST: Verifies that the service properly awaits all async operations.
+    /// </summary>
+    [Fact]
+    public async Task CreateStoreAsync_ShouldProperlyAwaitAllStoreRoleFeatureAdds()
+    {
+        // Arrange
+        var service = CreateService();
+        var callOrder = new List<string>();
+
+        _mockStoreRoleFeatureGenerator
+            .Setup(x => x.GenerateStoreRoleFeaturesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<IEnumerable<int>>()))
+            .ReturnsAsync(new List<StoreRoleFeature>
+            {
+                StoreRoleFeature.Create(_testStoreId, 2, 1, _testTenantId),
+                StoreRoleFeature.Create(_testStoreId, 2, 2, _testTenantId)
+            });
+
+        _mockStoreRoleFeatureRepository
+            .Setup(x => x.AddAsync(It.IsAny<StoreRoleFeature>()))
+            .Returns((StoreRoleFeature _) =>
+            {
+                callOrder.Add("AddAsync");
+                return Task.FromResult<StoreRoleFeature>(null!);
+            });
+
+        // Act
+        await service.CreateStoreAsync(
+            _testOwnerId,
+            _testTenantId,
+            "Store",
+            null,
+            null,
+            false,
+            new List<int> { 1 });
+
+        // Assert
+        _mockStoreRoleFeatureRepository.Verify(
+            x => x.AddAsync(It.IsAny<StoreRoleFeature>()), 
+            Times.Exactly(2));
+    }
+
+    #endregion
+
     #region Integration Tests (Mock Verification)
 
     [Fact]

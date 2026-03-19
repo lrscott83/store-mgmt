@@ -1,4 +1,5 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
+import { NgIf } from '@angular/common';
 import {
   ApexAxisChartSeries,
   ApexChart,
@@ -27,10 +28,10 @@ export type ChartOptions = {
 };
 
 @Component({
-    selector: 'app-last-month-sale-profits',
-    imports: [SharedModule, TranslateModule, NgApexchartsModule],
-    templateUrl: './last-month-sale-profits.component.html',
-    styleUrl: './last-month-sale-profits.component.scss'
+  selector: 'app-last-month-sale-profits',
+  imports: [SharedModule, TranslateModule, NgApexchartsModule, NgIf],
+  templateUrl: './last-month-sale-profits.component.html',
+  styleUrl: './last-month-sale-profits.component.scss'
 })
 export class LastMonthSaleProfitsComponent implements OnInit {
   @ViewChild('chart') chart!: ChartComponent;
@@ -43,34 +44,36 @@ export class LastMonthSaleProfitsComponent implements OnInit {
     const data: number[] = [];
 
     const chartData: ChartData[] = this.orderService.getLastMonthSaleProfits();
-    chartData.forEach(chart => {
-      labels.push(chart.label.format('DD'));
+    chartData.forEach((chart) => {
+      labels.push(new Date(chart.label).getDate().toString());
       data.push(chart.value);
-    })
+    });
 
     const total = data.reduce((acc, val) => acc + val, 0);
 
     this.chartOptions = {
-      series: [{
-        name: 'Ganancia diaria',
-        data: data,
-      }],
+      series: [
+        {
+          name: 'Ganancia diaria',
+          data: data
+        }
+      ],
       chart: {
         height: 350,
         type: 'line',
-        zoom: { enabled: false },
+        zoom: { enabled: false }
       },
       dataLabels: {
-        enabled: false,
+        enabled: false
       },
       stroke: {
         curve: 'smooth',
-        width: 3,
+        width: 3
       },
       title: {
         text: 'Ganancias - Últimos 30 Días',
         align: 'left',
-        style: { fontSize: '16px', color: '#333' },
+        style: { fontSize: '16px', color: '#333' }
       },
       subtitle: {
         text: `Total: ${total.toFixed(2)} Promedio: ${(total / 30).toFixed(2)}`,
@@ -88,11 +91,11 @@ export class LastMonthSaleProfitsComponent implements OnInit {
             // Mostrar solo cada 3ro
             return Number.parseInt(value) % 3 === 0 ? value : '';
           }
-        },
+        }
       },
       tooltip: {
         y: {
-          formatter: (val: number) => `$${val} CUP`,
+          formatter: (val: number) => `$${val} CUP`
         }
       }
     };

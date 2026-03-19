@@ -121,7 +121,7 @@ namespace Domain.Common.Enums
         ExpensesHistoryAdmin,
 
         [HasRoles(RoleType.OwnerAdmin, RoleType.StoreUser)]
-        [HasFeature(FeatureType.SalesHistory)]
+        [HasFeature(FeatureType.CreditsHistory)]
         [HasModule(ModuleType.Histories)]
         CreditsHistoryAdmin,
 

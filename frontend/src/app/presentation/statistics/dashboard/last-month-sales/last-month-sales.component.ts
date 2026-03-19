@@ -1,4 +1,5 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
+import { NgIf } from '@angular/common';
 import {
   ApexAxisChartSeries,
   ApexChart,
@@ -27,74 +28,76 @@ export type ChartOptions = {
 };
 
 @Component({
-    selector: 'app-last-month-sales',
-    imports: [SharedModule, TranslateModule, NgApexchartsModule],
-    templateUrl: './last-month-sales.component.html',
-    styleUrl: './last-month-sales.component.scss'
+  selector: 'app-last-month-sales',
+  imports: [SharedModule, TranslateModule, NgApexchartsModule, NgIf],
+  templateUrl: './last-month-sales.component.html',
+  styleUrl: './last-month-sales.component.scss'
 })
 export class LastMonthSalesComponent implements OnInit {
   @ViewChild('chart') chart!: ChartComponent;
-    public chartOptions!: Partial<ChartOptions>;
-  
-    constructor(private orderService: OrderOfflineService) {}
-  
-    ngOnInit(): void {
-      const labels: string[] = [];
-      const data: number[] = [];
-  
-      const chartData: ChartData[] = this.orderService.getLastMonthSales();
-      chartData.forEach(chart => {
-        labels.push(chart.label.format('DD'));
-        data.push(chart.value);
-      })
-  
-      const total = data.reduce((acc, val) => acc + val, 0);
-  
-      this.chartOptions = {
-        series: [{
+  public chartOptions!: Partial<ChartOptions>;
+
+  constructor(private orderService: OrderOfflineService) {}
+
+  ngOnInit(): void {
+    const labels: string[] = [];
+    const data: number[] = [];
+
+    const chartData: ChartData[] = this.orderService.getLastMonthSales();
+    chartData.forEach((chart) => {
+      labels.push(new Date(chart.label).getDate().toString());
+      data.push(chart.value);
+    });
+
+    const total = data.reduce((acc, val) => acc + val, 0);
+
+    this.chartOptions = {
+      series: [
+        {
           name: 'Venta diaria',
-          data: data,
-        }],
-        chart: {
-          height: 350,
-          type: 'line',
-          zoom: { enabled: false },
-        },
-        dataLabels: {
-          enabled: false,
-        },
-        stroke: {
-          curve: 'smooth',
-          width: 3,
-        },
-        title: {
-          text: 'Ventas - Últimos 30 Días',
-          align: 'left',
-          style: { fontSize: '16px', color: '#333' },
-        },
-        subtitle: {
-          text: `Total: ${total.toFixed(2)} Promedio: ${(total / 30).toFixed(2)}`,
-          style: {
-            fontSize: '14px',
-            color: '#6c757d',
-            fontWeight: '500'
-          }
-        },
-        xaxis: {
-          categories: labels,
-          labels: {
-            // rotate: -45,
-            formatter: (value: string) => {
-              // Mostrar solo cada 3ro
-              return Number.parseInt(value) % 3 === 0 ? value : '';
-            }
-          },
-        },
-        tooltip: {
-          y: {
-            formatter: (val: number) => `$${val} CUP`,
+          data: data
+        }
+      ],
+      chart: {
+        height: 350,
+        type: 'line',
+        zoom: { enabled: false }
+      },
+      dataLabels: {
+        enabled: false
+      },
+      stroke: {
+        curve: 'smooth',
+        width: 3
+      },
+      title: {
+        text: 'Ventas - Últimos 30 Días',
+        align: 'left',
+        style: { fontSize: '16px', color: '#333' }
+      },
+      subtitle: {
+        text: `Total: ${total.toFixed(2)} Promedio: ${(total / 30).toFixed(2)}`,
+        style: {
+          fontSize: '14px',
+          color: '#6c757d',
+          fontWeight: '500'
+        }
+      },
+      xaxis: {
+        categories: labels,
+        labels: {
+          // rotate: -45,
+          formatter: (value: string) => {
+            // Mostrar solo cada 3ro
+            return Number.parseInt(value) % 3 === 0 ? value : '';
           }
         }
-      };
-    }
+      },
+      tooltip: {
+        y: {
+          formatter: (val: number) => `$${val} CUP`
+        }
+      }
+    };
+  }
 }
