@@ -1,21 +1,24 @@
-import { Injectable } from "@angular/core";
-import { Observable, of } from "rxjs";
-import { HttpClient, HttpHeaders, HttpParams, HttpResponse } from "@angular/common/http";
+import { Injectable } from '@angular/core';
+import { Observable, of } from 'rxjs';
+import { HttpClient, HttpHeaders, HttpParams, HttpResponse } from '@angular/common/http';
 import { catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
-import { AuthModel } from "../_models/auth.model";
-import { BaseResponseModel } from "../../_models/base.model";
-import { environment } from "src/environments/environment";
-import { UserModel } from "../_models/auth-user.model";
+import { AuthModel } from '../_models/auth.model';
+import { BaseResponseModel } from '../../_models/base.model';
+import { environment } from 'src/environments/environment';
+import { UserModel } from '../_models/auth-user.model';
 
 const API_USERS_URL = `${environment.apiUrl}`;
 // const params = new HttpParams();
 
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root'
 })
 export class AuthHTTPService {
-  constructor(private http: HttpClient, private router: Router) { }
+  constructor(
+    private http: HttpClient,
+    private router: Router
+  ) {}
 
   // public methods
   login(login: string, password: string): Observable<BaseResponseModel<AuthModel>> {
@@ -26,16 +29,29 @@ export class AuthHTTPService {
     });
   }
 
-  registerOwner(fullName: string, login: string, password: string, cellPhone: string, email: string, storeName: string, code: string): Observable<BaseResponseModel<boolean>> {
-    const requestData = {
+  registerOwner(
+    fullName: string,
+    login: string,
+    password: string,
+    cellPhone: string,
+    email: string,
+    storeName: string,
+    code: string
+  ): Observable<BaseResponseModel<boolean>> {
+    const requestData: any = {
       fullName: fullName,
       login: login,
       password: password,
       cellPhone: cellPhone,
       email: email,
-      storeName: storeName,
-      code: code
+      storeName: storeName
     };
+
+    // Only add code if it's not empty
+    if (code && code.trim() !== '') {
+      requestData.code = code;
+    }
+
     return this.http.post<BaseResponseModel<boolean>>(`${API_USERS_URL}/v1/auth/register`, requestData);
   }
 
@@ -80,10 +96,7 @@ export class AuthHTTPService {
     if (environment.production) {
       return this.http.get<string>(localUrl);
     } else {
-      const params = new HttpParams().set(
-        "forcedAudience",
-        "http://localhost:4200/login"
-      );
+      const params = new HttpParams().set('forcedAudience', 'http://localhost:4200/login');
       return this.http.get<string>(`${localUrl}?${params.toString()}`);
     }
 
@@ -103,13 +116,10 @@ export class AuthHTTPService {
     if (environment.production) {
       return this.http.post<AuthModel>(localUrl, code);
     } else {
-      return this.http.post<AuthModel>(
-        `${API_USERS_URL}/v1/auth/get-social-token`,
-        {
-          code,
-          forcedAudience: "http://localhost:4200/login",
-        }
-      );
+      return this.http.post<AuthModel>(`${API_USERS_URL}/v1/auth/get-social-token`, {
+        code,
+        forcedAudience: 'http://localhost:4200/login'
+      });
     }
 
     ///www.trucksolutionsapp.com/portal/apiapi/v1/auth/get-social-token
@@ -124,16 +134,16 @@ export class AuthHTTPService {
   // Your server should check email => If email exists send link to the user and return true | If email doesn't exist return false
   forgotPassword(email: string): Observable<boolean> {
     return this.http.post<boolean>(`${API_USERS_URL}/forgot-password`, {
-      email,
+      email
     });
   }
 
   getUserByToken(token): Observable<BaseResponseModel<UserModel>> {
     const httpHeaders = new HttpHeaders({
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${token}`
     });
     return this.http.get<BaseResponseModel<UserModel>>(`${API_USERS_URL}/v1/auth/me`, {
-      headers: httpHeaders,
+      headers: httpHeaders
     });
   }
 }

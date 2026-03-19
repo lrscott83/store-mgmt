@@ -20,7 +20,7 @@ using System.Net;
 namespace Application.Features.Authentication.Commands.Register
 {
     public sealed record RegisterCommand(string Login, string Password, string FullName, string CellPhone, string? Email,
-        string StoreName, string Code)
+        string StoreName, string? Code)
         : ICommand<bool>
     { }
 
