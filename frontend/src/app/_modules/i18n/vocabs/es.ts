@@ -34,6 +34,8 @@ export const locale = {
         HISTORY_ENTRIES: 'Entradas',
         TODAY_STATS: 'Cuadre del día',
         EGRESS: 'Salida',
+        TODAY_QUANTITIES: 'Cantidades del día',
+        TODAY_SALES_PROFIT: 'Ganancias del día',
       },
       EXPENSES: {
         TITLE: 'GASTOS',

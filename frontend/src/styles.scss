@@ -21,7 +21,8 @@
 
 //@import 'node_modules/material-icons/iconfont/material-icons.css';
 @import './scss/fonts/material-icons.css';
-@import 'node_modules/material-icons/css/material-icons.css';
+// CDN de Google ya carga material-icons en index.html - eliminado duplicado
+// @import 'node_modules/material-icons/css/material-icons.css';
 
 @import './app/_shared/material-input.scss';
 

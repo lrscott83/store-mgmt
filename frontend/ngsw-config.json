@@ -27,6 +27,14 @@
       "resources": {
         "files": ["/assets/**/*"]
       }
+    },
+    {
+      "name": "fonts",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": ["/assets/fonts/**/*", "/*.woff2", "/*.woff"]
+      }
     }
   ],
   "dataGroups": [
@@ -34,9 +42,19 @@
       "name": "api-freshness",
       "urls": ["/api/**"],
       "cacheConfig": {
-        "strategy": "performance",
+        "strategy": "freshness",
         "maxSize": 100,
-        "maxAge": "35d"
+        "maxAge": "1d",
+        "timeout": "10s"
+      }
+    },
+    {
+      "name": "api-performance",
+      "urls": ["/api/categories/**", "/api/products/list/**", "/api/stores/**"],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 200,
+        "maxAge": "7d"
       }
     }
   ]

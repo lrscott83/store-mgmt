@@ -59,7 +59,7 @@ export function initializeApp(appInitService: AppInitService) {
     }),
     ServiceWorkerModule.register('/ngsw-worker.js', {
       enabled: true,
-      registrationStrategy: 'registerImmediately'
+      registrationStrategy: 'registerWithDelay:5000'
     }),
     NgHttpLoaderComponent
   ],

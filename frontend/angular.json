@@ -32,7 +32,7 @@
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": ["src/favicon.png", "src/assets", "src/ngsw.json", "src/ngsw-worker.js"],
-            "styles": ["node_modules/bootstrap/dist/css/bootstrap.min.css", "src/styles.scss", "node_modules/ngx-toastr/toastr.css"],
+            "styles": ["src/styles.scss", "node_modules/ngx-toastr/toastr.css"],
             "scripts": ["node_modules/@popperjs/core/dist/umd/popper.min.js", "node_modules/bootstrap/dist/js/bootstrap.min.js"],
             "browser": "src/main.ts",
             "stylePreprocessorOptions": {
@@ -44,8 +44,8 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "4mb",
-                  "maximumError": "5mb"
+                  "maximumWarning": "2.5mb",
+                  "maximumError": "3mb"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -62,7 +62,8 @@
               "serviceWorker": "ngsw-config.json",
               "optimization": true,
               "sourceMap": false,
-              "namedChunks": false,
+              "namedChunks": true,
+              "statsJson": true,
               "aot": true,
               "extractLicenses": false,
               "outputHashing": "all"

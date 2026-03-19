@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Angular 21 application with TypeScript, SCSS, and Jasmine/Karma testing. Uses Angular Material and ng-zorro-antd UI libraries.
+Angular 21 application with TypeScript, SCSS, and Jasmine/Karma testing. Uses Angular Material UI library and @ant-design/icons-angular for navigation/glyph icons.
 
 ## Build/Lint/Test Commands
 
@@ -86,7 +86,7 @@ npm run lint-fix       # Run ESLint with auto-fix
 
 - Use SCSS with variables and mixins from existing patterns
 - Follow BEM-like naming for custom CSS classes
-- Use Angular Material/ng-zorro components when available
+- Use Angular Material components when available
 - Keep component styles scoped (use `::ng-deep` sparingly, only for overriding third-party styles)
 
 ### State Management

@@ -16,56 +16,56 @@ import { IconDirective } from '@ant-design/icons-angular';
 import { NgbDropdownModule, NgbNavModule, NgbModule, NgbCollapseModule } from '@ng-bootstrap/ng-bootstrap';
 import { LoadingSpinnerComponent } from './components/loading-spinner/loading-spinner.component';
 
-// import { MAT_MOMENT_DATE_ADAPTER_OPTIONS, MAT_MOMENT_DATE_FORMATS, MomentDateAdapter, provideMomentDateAdapter } from '@angular/material-moment-adapter';
+// Angular Material core
+import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
 
-import {
-  MatRippleModule,
-  MatNativeDateModule,
-  MAT_DATE_LOCALE,
-  DateAdapter,
-  MAT_DATE_FORMATS,
-} from '@angular/material/core';
-import { MatDialogModule } from '@angular/material/dialog';
-import { MatIconRegistry, MatIconModule } from '@angular/material/icon';
-import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+// Angular Material - Form Controls (USED: 87+ form-fields, 11+ selects, 12+ toggles, 2+ checkboxes, 16+ radio-buttons, 2 datepickers)
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MAT_FORM_FIELD_DEFAULT_OPTIONS, MatFormFieldModule } from '@angular/material/form-field';
-import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatRadioModule } from '@angular/material/radio';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+
+// Angular Material - Layout & Display (USED: 14 cards, 10 menus, 4 dividers, 28+ expansion-panels, 10 accordions)
 import { MatCardModule } from '@angular/material/card';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTableModule } from '@angular/material/table';
-import { MatListModule } from '@angular/material/list';
-import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatSliderModule } from '@angular/material/slider';
-import { MatGridListModule } from '@angular/material/grid-list';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatTreeModule } from '@angular/material/tree';
-import { MatPaginatorModule } from '@angular/material/paginator';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatStepperModule } from '@angular/material/stepper';
-import { MatSortModule } from '@angular/material/sort';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import {
-  MatBottomSheetModule,
-  MatBottomSheetRef,
-  MAT_BOTTOM_SHEET_DATA,
-} from '@angular/material/bottom-sheet';
-import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatRadioModule } from '@angular/material/radio';
+import { MatExpansionModule } from '@angular/material/expansion';
+
+// Angular Material - Icons (USED: 133+ icons)
+import { MatIconModule } from '@angular/material/icon';
+
+// Angular Material - Buttons & Indicators (USED: buttons in forms)
+import { MatButtonModule } from '@angular/material/button';
+
+// Angular Material - NOT USED - removed for tree-shaking:
+// - MatDialogModule (NgbModal used instead)
+// - MatSnackBarModule
+// - MatTooltipModule
+// - MatProgressBarModule
+// - MatProgressSpinnerModule
+// - MatTabsModule
+// - MatSidenavModule
+// - MatListModule
+// - MatToolbarModule
+// - MatAutocompleteModule
+// - MatSliderModule
+// - MatGridListModule
+// - MatButtonToggleModule
+// - MatTreeModule
+// - MatPaginatorModule
+// - MatSortModule
+// - MatTableModule
+// - MatChipsModule
+// - MatStepperModule
+// - MatBottomSheetModule
+// - MatRippleModule
+
 import { NgxMaskDirective, NgxMaskPipe, provideNgxMask } from 'ngx-mask';
 import { DownloadProgressComponent } from '../download-progress/download-progress.component';
 import { FileSizePipe } from 'src/app/_shared/pipes/file-size/file-size.pipe';
-// import { AngularSlickgridModule } from 'angular-slickgrid';
 
 @NgModule({
   imports: [
@@ -80,48 +80,26 @@ import { FileSizePipe } from 'src/app/_shared/pipes/file-size/file-size.pipe';
     NgScrollbarModule,
     CardComponent,
     IconDirective,
-    MatSlideToggleModule,
-    MatInputModule,
-    MatInputModule,
+    // Form Controls
     MatFormFieldModule,
-    MatDatepickerModule,
-    MatAutocompleteModule,
-    MatListModule,
-    MatSliderModule,
-    MatCardModule,
+    MatInputModule,
     MatSelectModule,
-    MatButtonModule,
-    MatIconModule,
-    MatNativeDateModule,
     MatSlideToggleModule,
     MatCheckboxModule,
-    MatMenuModule,
-    MatTabsModule,
-    MatTooltipModule,
-    MatSidenavModule,
-    MatProgressBarModule,
-    MatProgressSpinnerModule,
-    MatSnackBarModule,
-    MatTableModule,
-    MatGridListModule,
-    MatToolbarModule,
-    MatBottomSheetModule,
-    MatExpansionModule,
-    MatDividerModule,
-    MatSortModule,
-    MatStepperModule,
-    MatChipsModule,
-    MatPaginatorModule,
-    MatDialogModule,
-    MatRippleModule,
     MatRadioModule,
-    MatTreeModule,
-    MatButtonToggleModule,
-    FormsModule,
-    ReactiveFormsModule,
-    NgxMaskDirective, 
-    NgxMaskPipe,
-    // AngularSlickgridModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
+    // Layout & Display
+    MatCardModule,
+    MatMenuModule,
+    MatDividerModule,
+    MatExpansionModule,
+    // Icons & Buttons
+    MatIconModule,
+    MatButtonModule,
+    // Mask
+    NgxMaskDirective,
+    NgxMaskPipe
   ],
   exports: [
     CommonModule,
@@ -137,65 +115,31 @@ import { FileSizePipe } from 'src/app/_shared/pipes/file-size/file-size.pipe';
     CardComponent,
     IconDirective,
     LoadingSpinnerComponent,
-    MatSlideToggleModule,
-    MatInputModule,
-    MatInputModule,
+    // Form Controls
     MatFormFieldModule,
-    MatDatepickerModule,
-    MatAutocompleteModule,
-    MatListModule,
-    MatSliderModule,
-    MatCardModule,
+    MatInputModule,
     MatSelectModule,
-    MatButtonModule,
-    MatIconModule,
-    MatNativeDateModule,
     MatSlideToggleModule,
     MatCheckboxModule,
-    MatMenuModule,
-    MatTabsModule,
-    MatTooltipModule,
-    MatSidenavModule,
-    MatProgressBarModule,
-    MatProgressSpinnerModule,
-    MatSnackBarModule,
-    MatTableModule,
-    MatGridListModule,
-    MatToolbarModule,
-    MatBottomSheetModule,
-    MatExpansionModule,
-    MatDividerModule,
-    MatSortModule,
-    MatStepperModule,
-    MatChipsModule,
-    MatPaginatorModule,
-    MatDialogModule,
-    MatRippleModule,
     MatRadioModule,
-    MatTreeModule,
-    MatButtonToggleModule,
-    FormsModule,
-    ReactiveFormsModule,
-    NgxMaskDirective, 
+    MatDatepickerModule,
+    MatNativeDateModule,
+    // Layout & Display
+    MatCardModule,
+    MatMenuModule,
+    MatDividerModule,
+    MatExpansionModule,
+    // Icons & Buttons
+    MatIconModule,
+    MatButtonModule,
+    // Mask
+    NgxMaskDirective,
     NgxMaskPipe,
-    // AngularSlickgridModule
+    // Components & Pipes
     DownloadProgressComponent,
     FileSizePipe
   ],
-  declarations: [SpinnerComponent, LoadingSpinnerComponent, DownloadProgressComponent, FileSizePipe ],
-  providers: [
-    {provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: {appearance: 'outline', floatLabel: 'auto'}},
-    provideNgxMask(),
-    // { provide: MAT_MOMENT_DATE_ADAPTER_OPTIONS, useValue: { useUtc: true } },
-    // { provide: DateAdapter, useClass: MomentDateAdapter, deps: [MAT_DATE_LOCALE, MAT_MOMENT_DATE_ADAPTER_OPTIONS] }
-    { provide: MAT_DATE_LOCALE, useValue: 'es-ES' },
-    // {
-    //   provide: DateAdapter,
-    //   useClass: MomentDateAdapter,
-    //   deps: [MAT_DATE_LOCALE, MAT_MOMENT_DATE_ADAPTER_OPTIONS]
-    // },
-    // { provide: MAT_DATE_FORMATS, useValue: MAT_MOMENT_DATE_FORMATS }, 
-    // { provide: MAT_MOMENT_DATE_ADAPTER_OPTIONS, useValue: { useUtc: true } }
-  ]
+  declarations: [SpinnerComponent, LoadingSpinnerComponent, DownloadProgressComponent, FileSizePipe],
+  providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-ES' }, provideNgxMask()]
 })
 export class SharedModule {}
