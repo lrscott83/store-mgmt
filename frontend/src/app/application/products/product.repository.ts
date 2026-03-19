@@ -56,6 +56,10 @@ export class ProductRepository {
     return this.getStorageProductsMap().get(id);
   }
 
+  getProductByName(name: string): Product {
+    return this.getStorageProducts().find((p) => p.name === name) || null;
+  }
+
   getProductByBarcode(barcode: string): Product {
     if (!barcode) return null;
     return this.getStorageProducts().find((p) => p.barcode === barcode) || null;

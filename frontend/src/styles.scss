@@ -1,8 +1,13 @@
-// main framework
-@import 'node_modules/bootstrap/scss/functions';
-@import 'node_modules/bootstrap/scss/variables';
-@import 'node_modules/bootstrap/scss/variables-dark';
+// Bootstrap (using @import for compatibility)
+@import 'bootstrap/scss/functions';
+@import 'bootstrap/scss/variables';
+@import 'bootstrap/scss/variables-dark';
+@import 'bootstrap/scss/maps';
+@import 'bootstrap/scss/mixins';
+@import 'bootstrap/scss/root';
+@import 'bootstrap/scss/reboot';
 
+// custom settings antes de bootstrap
 @import 'scss/settings/color-variables';
 @import 'scss/settings/theme-variables';
 @import 'scss/settings/bootstrap-variables';
@@ -10,42 +15,40 @@
 // bootstrap import
 @import 'scss/bootstrap/bootstrap.scss';
 
-@import 'node_modules/bootstrap/scss/utilities';
-@import 'node_modules/bootstrap/scss/utilities/api';
+// Bootstrap utilities
+@import 'bootstrap/scss/utilities';
+@import 'bootstrap/scss/utilities/api';
 
 // main framework
 @import 'scss/themes/generic.scss';
 @import 'scss/themes/general.scss';
-
 @import 'scss/themes/components/components.scss';
 
-//@import 'node_modules/material-icons/iconfont/material-icons.css';
+// Material icons
 @import './scss/fonts/material-icons.css';
-// CDN de Google ya carga material-icons en index.html - eliminado duplicado
-// @import 'node_modules/material-icons/css/material-icons.css';
 
+// custom inputs
 @import './app/_shared/material-input.scss';
 
-@import './scss/deeppurple-amber.css';
-//@import "./scss/bootstrap-icons.css";
-
 // theme
+@import './scss/deeppurple-amber.css';
 @import 'scss/themes/layouts/menu/sidebar.scss';
 @import 'scss/themes/layouts/navbar/navbar.scss';
 @import 'scss/themes/layouts/pc-common.scss';
 @import 'scss/themes/layouts/breadcrumb/breadcrumb.scss';
 @import 'scss/themes/layouts/footer/footer.scss';
-
 @import 'scss/themes/preset-style.scss';
 
+// Material mixins
 @import 'scss/material/mixin/svg-icon';
 
+// functions and components
 @import 'scss/functions';
 @import 'scss/components/variables.bootstrap';
 @import 'scss/components/card';
 @import 'scss/components/alert';
 
-// regular style toast
+// Toast notifications
 @import 'ngx-toastr/toastr';
 @import 'ngx-toastr/toastr-bs5-alert';
 

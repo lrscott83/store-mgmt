@@ -36,7 +36,7 @@
             "scripts": ["node_modules/@popperjs/core/dist/umd/popper.min.js", "node_modules/bootstrap/dist/js/bootstrap.min.js"],
             "browser": "src/main.ts",
             "stylePreprocessorOptions": {
-              "includePaths": ["."]
+              "includePaths": [".", "node_modules"]
             }
           },
           "configurations": {
@@ -106,7 +106,8 @@
             "inlineStyleLanguage": "scss",
             "assets": ["src/favicon.png", "src/assets", "src/ngsw.json", "src/ngsw-worker.js"],
             "styles": ["src/styles.scss"],
-            "scripts": ["node_modules/@popperjs/core/dist/umd/popper.min.js", "node_modules/bootstrap/dist/js/bootstrap.min.js"]
+            "scripts": ["node_modules/@popperjs/core/dist/umd/popper.min.js", "node_modules/bootstrap/dist/js/bootstrap.min.js"],
+            "include": ["src/**/*.spec.ts"]
           }
         },
         "lint": {
