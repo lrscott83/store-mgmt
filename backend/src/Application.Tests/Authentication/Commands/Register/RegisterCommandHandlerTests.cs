@@ -287,21 +287,19 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
         // Assert
         result.Succeeded.Should().BeFalse();
         result.Errors.Should().NotBeEmpty();
-        result.Errors.First().Code.Should().Be("Register.Unknown");
+        result.Errors.First().Code.Should().Be("Register.FailedToSave");
     }
 
     [Fact]
-    public async Task Handle_ShouldReturnFailure_WhenLoginAfterRegistrationFails()
+    public async Task Handle_ShouldReturnFailure_WhenSaveChangesFails()
     {
         // Arrange
         var handler = CreateHandler();
         var command = CreateValidCommand();
 
-        MockMediatrSender
-            .Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResponseResult.Failure<AuthDto>(
-                new Error("Login.Failed", "Invalid credentials"),
-                400));
+        MockUnitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0); // Simulate save failure
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -309,6 +307,7 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
         // Assert
         result.Succeeded.Should().BeFalse();
         result.Errors.Should().NotBeEmpty();
+        result.Errors.First().Code.Should().Be("Register.FailedToSave");
     }
 
     [Fact]
@@ -467,7 +466,7 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
     }
 
     [Fact]
-    public async Task Handle_ShouldSendLoginCommand_WithCorrectCredentials()
+    public async Task Handle_ShouldGenerateToken_WithCorrectUserCredentials()
     {
         // Arrange
         var handler = CreateHandler();
@@ -476,12 +475,10 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
         // Act
         await handler.Handle(command, CancellationToken.None);
 
-        // Assert
-        MockMediatrSender.Verify(x => x.Send(
-            It.Is<LoginCommand>(lc => 
-                lc.Login == command.Login && 
-                lc.Password == command.Password),
-            It.IsAny<CancellationToken>()),
+        // Assert - Verify IJwtProvider was called with correct parameters
+        MockJwtProvider.Verify(x => x.GenerateToken(
+            TestUserId,
+            command.Login),
             Times.Once);
     }
 

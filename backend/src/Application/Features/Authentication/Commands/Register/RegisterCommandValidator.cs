@@ -21,7 +21,9 @@ namespace Application.Features.Authentication.Commands.Register
 
             RuleFor(x => x.Password)
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-              .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
+              .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
+              .MinimumLength(8).WithMessage(_localizer["PasswordMinLength", "{PropertyName}", 8])
+              .Must(password => !string.IsNullOrEmpty(password) && password.Any(char.IsUpper)).WithMessage(_localizer["PasswordRequiresUppercase", "{PropertyName}"]);
 
             RuleFor(x => x.FullName)
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
@@ -38,7 +40,7 @@ namespace Application.Features.Authentication.Commands.Register
 
             RuleFor(x => x.StoreName)
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-              .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]); ;
+              .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
 
         }
 

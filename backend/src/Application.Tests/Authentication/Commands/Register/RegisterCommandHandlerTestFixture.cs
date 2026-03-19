@@ -1,6 +1,6 @@
+using Application.Abstractions.Authentication;
 using Application.Abstractions.HttpContext;
 using Application.Dtos.Authentication;
-using Application.Features.Authentication.Commands.Login;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Results;
@@ -14,7 +14,6 @@ using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Owners;
 using Domain.Interfaces.Services.Stores;
 using FluentAssertions;
-using MediatR;
 using Microsoft.Extensions.Localization;
 using Moq;
 using Application.Features.Authentication.Commands.Register;
@@ -36,7 +35,7 @@ public abstract class RegisterCommandHandlerTestFixture
     protected readonly Mock<IModuleRepository> MockModuleRepository;
     protected readonly Mock<IReSellerRepository> MockReSellerRepository;
     protected readonly Mock<IReSellerOwnerRepository> MockReSellerOwnerRepository;
-    protected readonly Mock<ISender> MockMediatrSender;
+    protected readonly Mock<IJwtProvider> MockJwtProvider;
     protected readonly Mock<IStringLocalizer<I18n>> MockLocalizer;
 
     // Test data
@@ -61,8 +60,13 @@ public abstract class RegisterCommandHandlerTestFixture
         MockModuleRepository = new Mock<IModuleRepository>();
         MockReSellerRepository = new Mock<IReSellerRepository>();
         MockReSellerOwnerRepository = new Mock<IReSellerOwnerRepository>();
-        MockMediatrSender = new Mock<ISender>();
+        MockJwtProvider = new Mock<IJwtProvider>();
         MockLocalizer = new Mock<IStringLocalizer<I18n>>();
+
+        // Setup JWT provider to return a mock token
+        MockJwtProvider
+            .Setup(x => x.GenerateToken(It.IsAny<Guid>(), It.IsAny<string>()))
+            .Returns("mock-jwt-token");
 
         // Initialize test entities
         TestUser = CreateTestUser();
@@ -87,7 +91,7 @@ public abstract class RegisterCommandHandlerTestFixture
             MockCreateOwnerService.Object,
             MockCreateStoreService.Object,
             MockModuleRepository.Object,
-            MockMediatrSender.Object,
+            MockJwtProvider.Object,
             MockReSellerRepository.Object,
             MockReSellerOwnerRepository.Object);
     }
@@ -130,10 +134,10 @@ public abstract class RegisterCommandHandlerTestFixture
             .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        // Login command succeeds
-        MockMediatrSender
-            .Setup(x => x.Send(It.IsAny<LoginCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ResponseResult.Success(new AuthDto("test", "token", "refresh", DateTime.UtcNow)));
+        // JWT provider returns token directly
+        MockJwtProvider
+            .Setup(x => x.GenerateToken(It.IsAny<Guid>(), It.IsAny<string>()))
+            .Returns("mock-jwt-token-for-testing");
     }
 
     private User CreateTestUser()

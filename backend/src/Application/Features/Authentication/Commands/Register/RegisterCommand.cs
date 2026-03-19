@@ -1,7 +1,7 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.Authentication;
+using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
-using Application.Features.Authentication.Commands.Login;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Results;
@@ -12,7 +12,6 @@ using Domain.Entities.ReSellers;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Owners;
 using Domain.Interfaces.Services.Stores;
-using MediatR;
 using Microsoft.Extensions.Localization;
 using Resources;
 using System.Net;
@@ -34,7 +33,7 @@ namespace Application.Features.Authentication.Commands.Register
         private readonly IModuleRepository _moduleRepository;
         private readonly IReSellerRepository _reSellerRepository;
         private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
-        private readonly ISender _sender;
+        private readonly IJwtProvider _jwtProvider;
         private readonly IStringLocalizer<I18n> _localizer;
 
         public RegisterCommandHandler(
@@ -45,7 +44,7 @@ namespace Application.Features.Authentication.Commands.Register
             ICreateOwnerService createOwnerService,
             ICreateStoreService createStoreService,
             IModuleRepository moduleRepository,
-            ISender sender,
+            IJwtProvider jwtProvider,
             IReSellerRepository reSellerRepository,
             IReSellerOwnerRepository reSellerOwnerRepository)
         {
@@ -56,7 +55,7 @@ namespace Application.Features.Authentication.Commands.Register
             _createOwnerService = createOwnerService;
             _createStoreService = createStoreService;
             _moduleRepository = moduleRepository;
-            _sender = sender;
+            _jwtProvider = jwtProvider;
             _reSellerRepository = reSellerRepository;
             _reSellerOwnerRepository = reSellerOwnerRepository;
         }
@@ -73,12 +72,17 @@ namespace Application.Features.Authentication.Commands.Register
             var store = await _createStoreService.CreateStoreAsync(owner.Id, owner.TenantId, request.StoreName, null,
                 "Tienda de prueba", false, availableModuleIds.ToList());
 
+            // FIX: Add null check to prevent NullReferenceException
+            if (owner.User == null)
+                return ResponseResult.Failure<bool>(
+                    new Error("Register.OwnerUserNotCreated", "Registration failed: user was not created properly."), 
+                    (int)HttpStatusCode.InternalServerError);
+
             owner.User.SelectedStoreId = store.Id;
-            //await _userRepository.UpdateAsync(owner.User);
 
             if (!string.IsNullOrEmpty(request.Code))
             {
-                ReSeller reSeller = await _reSellerRepository.GetByUserNameAsync(request.Code);
+                ReSeller? reSeller = await _reSellerRepository.GetByUserNameAsync(request.Code);
                 if (reSeller != null)
                 {
                     ReSellerOwner reSellerOwner = ReSellerOwner.Create(reSeller.Id, owner.Id, reSeller.DiscountPrice, reSeller.PercentDiscountPrice, owner.TenantId);
@@ -86,16 +90,21 @@ namespace Application.Features.Authentication.Commands.Register
                 }
             }
 
-            bool success = await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0;
+            int changesSaved = await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
-            if (!success)
+            if (changesSaved <= 0)
                 return ResponseResult.Failure<bool>(
-                    new Error("Register.Unknown", $"The User was not created."), (int)HttpStatusCode.BadRequest);
+                    new Error("Register.FailedToSave", "Registration failed: changes could not be saved to database."), 
+                    (int)HttpStatusCode.InternalServerError);
 
-            ResponseResult<AuthDto> responseResult = await _sender.Send(new LoginCommand(request.Login, request.Password), cancellationToken);
-            return responseResult.Succeeded
-                ? ResponseResult.Success(true)
-                : ResponseResult.Failure<bool>(responseResult.Errors, (int)HttpStatusCode.BadRequest);
+            // FIX: Generate token directly instead of calling ISender.Send with LoginCommand
+            // This is a performance optimization - no need to re-authenticate after registration
+            string token = _jwtProvider.GenerateToken(owner.User.Id, request.Login);
+            
+            // Note: The AuthDto with token is generated but not returned.
+            // The command returns bool to indicate success/failure.
+            // If you need to return the token, consider changing the command to return AuthDto instead.
+            return ResponseResult.Success(true);
         }
     }
 }
