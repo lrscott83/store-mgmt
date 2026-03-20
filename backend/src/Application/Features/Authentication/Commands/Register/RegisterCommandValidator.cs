@@ -35,7 +35,7 @@ namespace Application.Features.Authentication.Commands.Register
 
             When(x => !string.IsNullOrEmpty(x.Email), () =>
             {
-                RuleFor(x => x.Email).EmailAddress().WithMessage(_localizer["EmailFormatInvalid", "{PropertyName}"]);
+                RuleFor(x => x.Email!).EmailAddress().WithMessage(_localizer["EmailFormatInvalid", "{PropertyName}"]);
             });
 
             RuleFor(x => x.StoreName)

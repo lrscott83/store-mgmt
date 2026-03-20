@@ -67,7 +67,17 @@ namespace Application.Features.Authentication.Commands.Register
                 request.CellPhone, request.Email, "Nombre de la tienda: " + request.StoreName);
 
             // Create Store
-            IEnumerable<Module> availableModules = await _moduleRepository.GetAvailableModulesToStore();
+            IEnumerable<Module> availableModules;
+            try
+            {
+                availableModules = await _moduleRepository.GetAvailableModulesToStore();
+            }
+            catch (Exception ex)
+            {
+                return ResponseResult.Failure<bool>(
+                    new Error("Register.ModuleLoadFailed", "Failed to load available modules: " + ex.Message),
+                    (int)HttpStatusCode.InternalServerError);
+            }
             HashSet<int> availableModuleIds = availableModules.Select(f => f.Id).ToHashSet();
             var store = await _createStoreService.CreateStoreAsync(owner.Id, owner.TenantId, request.StoreName, null,
                 "Tienda de prueba", false, availableModuleIds.ToList());
@@ -82,11 +92,30 @@ namespace Application.Features.Authentication.Commands.Register
 
             if (!string.IsNullOrEmpty(request.Code))
             {
-                ReSeller? reSeller = await _reSellerRepository.GetByUserNameAsync(request.Code);
+                ReSeller? reSeller = null;
+                try
+                {
+                    reSeller = await _reSellerRepository.GetByUserNameAsync(request.Code);
+                }
+                catch (Exception)
+                {
+                    // ReSeller lookup failure is optional - registration continues
+                    reSeller = null;
+                }
+
                 if (reSeller != null)
                 {
-                    ReSellerOwner reSellerOwner = ReSellerOwner.Create(reSeller.Id, owner.Id, reSeller.DiscountPrice, reSeller.PercentDiscountPrice, owner.TenantId);
-                    await _reSellerOwnerRepository.AddAsync(reSellerOwner);
+                    try
+                    {
+                        ReSellerOwner reSellerOwner = ReSellerOwner.Create(reSeller.Id, owner.Id, reSeller.DiscountPrice, reSeller.PercentDiscountPrice, owner.TenantId);
+                        await _reSellerOwnerRepository.AddAsync(reSellerOwner);
+                    }
+                    catch (Exception)
+                    {
+                        return ResponseResult.Failure<bool>(
+                            new Error("Register.ReSellerAssociationFailed", "Failed to associate with reseller."),
+                            (int)HttpStatusCode.InternalServerError);
+                    }
                 }
             }
 
