@@ -1,401 +1,358 @@
-<header class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #0D1117;">
+<div class="landing-wrapper">
+  <!-- NAVBAR -->
+  <nav class="landing-nav" [class.scrolled]="isScrolled" #navEl>
     <div class="container">
-        <!-- Logo -->
-        <a class="navbar-brand d-flex align-items-center" href="#">
-            <!-- <img src="assets/icon-96x96-transparent.png" alt="VendeDTo Logo" width="40" height="40" class="me-2"> -->
-            <span class="fw-bold" style="margin-top: 3px; color: #6f42c1;">VendeDTo</span>
-        </a>
+      <div class="d-flex align-items-center justify-content-between">
+        <a class="nav-brand" href="#hero">VendeDTo</a>
 
-        <!-- <ul class="navbar-nav ms-auto">
-            <li class="nav-item">
-                <a class="btn btn-sm btn-outline-warning ms-2" [routerLink]="['/register']">Regístrate</a>
-            </li>
-        </ul> -->
+        <div class="d-none d-lg-flex align-items-center gap-4">
+          <a class="nav-auth-link" href="#caracteristicas">Características</a>
+          <a class="nav-auth-link" href="#como-funciona">Cómo funciona</a>
+          <a class="btn-primary-amber" [routerLink]="['/register']">
+            Comenzar
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </a>
+        </div>
 
-        <ul class="navbar-nav ms-auto">
-            <!-- otros links -->
-            <li class="nav-item">
-                <a class="btn btn-sm btn-outline-light ms-2" style="border: 0px;" [routerLink]="['/login']">Autenticación</a>
-            </li>
-        </ul>
-
-        <!-- Menú hamburguesa -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" style="margin-left: 12px;">
-            <span class="navbar-toggler-icon"></span>
+        <button class="d-lg-none nav-toggler" [class.open]="menuOpen" (click)="menuOpen = !menuOpen" aria-label="Menu">
+          <span></span>
+          <span></span>
+          <span></span>
         </button>
+      </div>
 
-        <!-- Enlaces -->
-        <div class="collapse navbar-collapse" id="mainNavbar">
-            <ul class="navbar-nav ms-auto text-end text-lg-start" style="background-color: #1e252e;">
-                <li class="nav-item">
-                    <a class="nav-link text-light" href="#hero" style="padding-right: 10px; border: 1px;">Inicio</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-light" href="#caracteristicas" style="padding-right: 10px;">Características
-                        Principales</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-light" href="#como-funciona" style="padding-right: 10px;">¿Cómo funciona?</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-light" href="#capturas" style="padding-right: 10px;">Capturas de pantallas</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-light" href="#registro" style="padding-right: 10px;">Regístrate</a>
-                </li>
-            </ul>
-        </div>
+      <div class="nav-dropdown" [class.show]="menuOpen">
+        <a class="nav-dropdown-item" href="#hero" (click)="menuOpen = false">Inicio</a>
+        <a class="nav-dropdown-item" href="#caracteristicas" (click)="menuOpen = false">Características</a>
+        <a class="nav-dropdown-item" href="#como-funciona" (click)="menuOpen = false">Cómo funciona</a>
+        <a class="nav-dropdown-item" [routerLink]="['/login']" (click)="menuOpen = false">Iniciar sesión</a>
+        <a class="nav-dropdown-item" [routerLink]="['/register']" (click)="menuOpen = false" style="color: #f5b026; font-weight: 600"
+          >Comenzar gratis</a
+        >
+      </div>
     </div>
-</header>
+  </nav>
 
+  <!-- HERO -->
+  <section id="hero" class="hero-section">
+    <div class="hero-bg-grid"></div>
+    <div class="hero-bg-glow"></div>
 
+    <div class="container position-relative">
+      <div class="row align-items-center g-5">
+        <!-- Left: Copy -->
+        <div class="col-lg-6">
+          <p class="hero-eyebrow">Punto de venta offline</p>
+          <h1 class="hero-title">
+            Vende más.<br />
+            Controla <span class="accent">todo.</span>
+          </h1>
+          <p class="hero-sub">
+            Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y reportes — siempre disponibles en tu
+            dispositivo.
+          </p>
+          <div class="hero-actions">
+            <a [routerLink]="['/register']" class="btn-primary-amber">
+              Prueba gratis
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </a>
+            <a href="#caracteristicas" class="btn-ghost">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" />
+                <path d="M6.5 5.5l4 2.5-4 2.5v-5z" fill="currentColor" />
+              </svg>
+              Ver características
+            </a>
+          </div>
+        </div>
 
-<!-- Hero Section -->
-<section id="hero" class="hero d-flex align-items-center text-center text-light"
-    style="background-color: #0D1117; padding-top: 80px !important;">
+        <!-- Right: Stats card -->
+        <div class="col-lg-5 offset-lg-1">
+          <div class="hero-card">
+            <div class="hero-card-stat">
+              <span class="hero-card-number">24</span>
+              <span class="hero-card-label">hrs sin conexión</span>
+            </div>
+            <div class="hero-card-stat">
+              <span class="hero-card-number">100%</span>
+              <span class="hero-card-label">de tus datos</span>
+            </div>
+            <div class="hero-card-stat">
+              <span class="hero-card-number">0</span>
+              <span class="hero-card-label">costo mensual</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="caracteristicas" class="features-section">
     <div class="container">
-        <h1 class="display-4 fw-bold mb-5" style="color: #FACC15;">VendeDTo</h1>
-        <div class="row">
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <p class="lead text-secondary mb-4" style="font-size: 1rem;">La forma más segura y fácil de
-                        gestionar tu punto de venta, sin depender de Internet.
-                    </p>
-                    <a [routerLink]="['/register']" class="btn btn-lg px-4"
-                        style="background-color: #6f42c1; color: white; border-radius: 0.8rem;">
-                        Regístrate gratis
-                    </a>
-                </div>
-            </div>
+      <div class="row mb-5 pb-3">
+        <div class="col-lg-6">
+          <p class="section-eyebrow">Lo que necesitas</p>
+          <h2 class="section-title">Todo para gestionar<br />tu negocio</h2>
         </div>
-    </div>
-</section>
+        <div class="col-lg-5 offset-lg-1 d-flex align-items-end">
+          <p class="section-subtitle"> Una herramienta completa que crece contigo. Sin suscripciones, sin complicaciones, sin internet. </p>
+        </div>
+      </div>
 
-<!-- Features Section -->
-<section id="caracteristicas" class="features py-5" style="background-color: #0D1117;">
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M14 2L4 6v8c0 5.5 4.3 10.7 10 12 5.7-1.3 10-6.5 10-12V6L14 2z"
+                  stroke="#f5b026"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                />
+                <rect x="9" y="12" width="10" height="8" rx="1.5" stroke="#f5b026" stroke-width="1.5" />
+                <path d="M12 12v-2a2 2 0 0 1 4 0v2" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <circle cx="14" cy="16" r="1" fill="#f5b026" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Seguridad total</h3>
+            <p class="feature-desc">Tus datos se guardan en el teléfono. Nadie más accede a ellos, nunca.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 20c4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6 3.6 6 8 6z" stroke="#f5b026" stroke-width="1.5" />
+                <path d="M10 14c1.7-1 3.4-1.5 4-1.5s2.3.5 4 1.5" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M4 20V8" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M24 20V8" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="6" y1="6" x2="22" y2="22" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Funciona sin Internet</h3>
+            <p class="feature-desc">Todas las funciones disponibles sin conexión. Solo la autenticación requiere red.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M15.5 3L8 15h7l-1.5 10L22 13h-7l1-7L15.5 3z"
+                  stroke="#f5b026"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                />
+                <circle cx="15.5" cy="13" r="2" fill="#f5b026" fill-opacity="0.2" stroke="#f5b026" stroke-width="1" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Registro instantáneo</h3>
+            <p class="feature-desc">Anota cada venta en segundos. Sin papel, sin cálculos manuales.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="8" width="22" height="15" rx="2" stroke="#f5b026" stroke-width="1.5" />
+                <path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" stroke="#f5b026" stroke-width="1.5" />
+                <line x1="3" y1="14" x2="25" y2="14" stroke="#f5b026" stroke-width="1.5" />
+                <rect x="7" y="17" width="4" height="3" rx="0.5" fill="#f5b026" fill-opacity="0.3" stroke="#f5b026" stroke-width="0.75" />
+                <rect x="13" y="17" width="4" height="3" rx="0.5" fill="#f5b026" fill-opacity="0.3" stroke="#f5b026" stroke-width="0.75" />
+                <path d="M19 17v3M22 18.5h.01" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Cuadre de caja rápido</h3>
+            <p class="feature-desc">Cierra tu día en minutos con totales y diferencias calculadas automáticamente.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 8l10-4 10 4v4l-10 4-10-4V8z" stroke="#f5b026" stroke-width="1.5" stroke-linejoin="round" />
+                <path d="M4 12l10 4 10-4M14 16v8" stroke="#f5b026" stroke-width="1.5" stroke-linejoin="round" />
+                <path d="M14 20l-10-4M14 20l10-4" stroke="#f5b026" stroke-width="1.5" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Inventario en tiempo real</h3>
+            <p class="feature-desc">Consulta cuánto tienes y cuánto vale tu stock al instante.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <line x1="5" y1="22" x2="5" y2="14" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="10" y1="22" x2="10" y2="9" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="15" y1="22" x2="15" y2="5" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="20" y1="22" x2="20" y2="12" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="25" y1="22" x2="25" y2="17" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="3" y1="22" x2="27" y2="22" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M15 5l4-2M19 3l-4 2" stroke="#f5b026" stroke-width="1" stroke-linecap="round" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Reportes claros</h3>
+            <p class="feature-desc">Ganancias del día, productos más vendidos y tendencias — con un clic.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="5" y="3" width="18" height="22" rx="2" stroke="#f5b026" stroke-width="1.5" />
+                <line x1="9" y1="9" x2="19" y2="9" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="9" y1="13" x2="19" y2="13" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="9" y1="17" x2="15" y2="17" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <circle cx="20" cy="21" r="6" fill="#0a0a0a" stroke="#f5b026" stroke-width="1.5" />
+                <path d="M18 21l1.5 1.5L22 19.5" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Facturación integrada</h3>
+            <p class="feature-desc">Emite facturas PDF al registrar cada venta, sin pasos extra.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="22" height="22" rx="2" stroke="#f5b026" stroke-width="1.5" />
+                <path d="M3 9h22" stroke="#f5b026" stroke-width="1.5" />
+                <path d="M8 9V20a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="#f5b026" stroke-width="1.25" />
+                <path d="M14 9v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="#f5b026" stroke-width="1.25" />
+                <path d="M20 9v4a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="#f5b026" stroke-width="1.25" />
+                <line x1="6" y1="12" x2="11" y2="12" stroke="#f5b026" stroke-width="1" stroke-linecap="round" stroke-dasharray="1.5 1.5" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Panel de decisiones</h3>
+            <p class="feature-desc">Visualiza datos clave para planificar mejor y vender más.</p>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M5 12a3 3 0 0 1 3-3h4l3-3h5a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1"
+                  stroke="#f5b026"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+                <path d="M23 12v4a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-4" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M14 10v4a3 3 0 0 0 3 3h1" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" />
+                <line x1="5" y1="8" x2="14" y2="8" stroke="#f5b026" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 2" />
+              </svg>
+            </div>
+            <h3 class="feature-title">Sincronización flexible</h3>
+            <p class="feature-desc">Sube y descarga tus datos cuando lo necesites, sin perder información.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="como-funciona" class="features-section" style="border-top: 1px solid rgba(245, 176, 66, 0.06)">
     <div class="container">
-        <h2 class="text-center fw-bold mb-5" style="color: #FACC15;">Características Principales</h2>
-        <div class="row g-4">
+      <div class="text-center mb-5 pb-3">
+        <p class="section-eyebrow" style="justify-content: center">
+          <span style="display: block; width: 24px; height: 1px; background: #f5b026"></span>
+          En tres pasos
+        </p>
+        <h2 class="section-title" style="margin-left: auto; margin-right: auto">Así de simple</h2>
+      </div>
 
-            <!-- Feature Card -->
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-shield-lock mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Seguridad y privacidad</h5>
-                    <p class="text-secondary">Tus datos se guardan en el teléfono. Nadie más accede a ellos.</p>
-                </div>
+      <div class="row g-5">
+        <div class="col-md-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap" style="margin-bottom: 1.5rem">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 1.6rem; font-weight: 700; color: #f5b026; line-height: 1"
+                >01</span
+              >
             </div>
-
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-wifi-off mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Funciona sin Internet</h5>
-                    <p class="text-secondary">Todas las funciones están disponibles sin conexión, excepto la
-                        autenticación.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-pencil-square mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Registro de ventas</h5>
-                    <p class="text-secondary">Anota todas tus ventas cada día fácilmente, sin papel.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-cash-stack mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Cuadre de caja</h5>
-                    <p class="text-secondary">Cierra tu día en minutos con cálculos automáticos.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-box-seam mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Inventario en tiempo real</h5>
-                    <p class="text-secondary">Consulta cuánto tienes y cuánto cuesta.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-graph-up mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Reportes diarios</h5>
-                    <p class="text-secondary">Obtén tus ganancias del día con un clic.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4 mx-auto">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-receipt mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Facturación instantánea</h5>
-                    <p class="text-secondary">Emite facturas sin demoras al registrar la venta.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4 mx-auto">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <i class="bi bi-receipt mb-3" style="font-size: 3.5rem; color: #FACC15;"></i>
-                    <h5 class="text-warning">Panel de Control</h5>
-                    <p class="text-secondary">Datos útiles para la toma de decisiones.</p>
-                </div>
-            </div>
-
+            <h3 class="feature-title">Regístrate</h3>
+            <p class="feature-desc">Crea tu cuenta en segundos. Solo necesitas un correo y una contraseña.</p>
+          </div>
         </div>
-    </div>
-</section>
 
-<!-- Cómo Funciona -->
-<!-- <section class="py-5" style="background-color: #0D1117;">
+        <div class="col-md-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap" style="margin-bottom: 1.5rem">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 1.6rem; font-weight: 700; color: #f5b026; line-height: 1"
+                >02</span
+              >
+            </div>
+            <h3 class="feature-title">Configura tu punto</h3>
+            <p class="feature-desc">Agrega productos al catálogo y registra tu inventario inicial.</p>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="feature-card" #featureCard>
+            <div class="feature-icon-wrap" style="margin-bottom: 1.5rem">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 1.6rem; font-weight: 700; color: #f5b026; line-height: 1"
+                >03</span
+              >
+            </div>
+            <h3 class="feature-title">Empieza a vender</h3>
+            <p class="feature-desc">Registra cada venta, consulta tu cuadre y reportes. Así de fácil.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="registro" class="cta-section">
+    <div class="cta-bg-element"></div>
     <div class="container">
-        <h2 id="como-funciona" class="text-center text-warning mb-5">¿Cómo funciona?</h2>
-
-        <div id="howItWorksCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="40000">
-            <div class="carousel-inner">
-
-                <div class="carousel-item active">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">1. Regístrate</h4>
-                            <p>Crea tu cuenta en segundos.</p>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/how-to/1-register.png" class="img-fluid rounded carousel-img"
-                                alt="Paso 1">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">2. Autentícate</h4>
-                            <p>Accede a las funcionalidades.</p>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/how-to/2-login.png" class="img-fluid rounded carousel-img"
-                                alt="Paso 2">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">3. Configura tu punto de venta</h4>
-                            <p>Agrega productos al catálogo y entradas al inventario.</p>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/how-to/3-menu-catalog.png" class="img-fluid rounded carousel-img"
-                                alt="Paso 3">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">4. Registra las ventas del día</h4>
-                            <p>Adiciona productos a la venta y regístrala sin complicaciones.</p>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/how-to/4-menu-sale.png" class="img-fluid rounded carousel-img"
-                                alt="Paso 4">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">5. Consulta el cuadre y los reportes</h4>
-                            <p>Gana claridad sobre tus ventas e ingresos.</p>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/how-to/5-menu-cuadre.png" class="img-fluid rounded carousel-img"
-                                alt="Paso 5">
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <button class="carousel-control-prev" type="button" data-bs-target="#howItWorksCarousel"
-                data-bs-slide="prev">
-                <span class="carousel-control-prev-icon bg-dark rounded-circle"></span>
-                <span class="visually-hidden">Anterior</span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#howItWorksCarousel"
-                data-bs-slide="next">
-                <span class="carousel-control-next-icon bg-dark rounded-circle"></span>
-                <span class="visually-hidden">Siguiente</span>
-            </button>
-        </div>
+      <div class="cta-inner">
+        <p class="section-eyebrow" style="justify-content: center; margin-bottom: 1.5rem">
+          <span style="display: block; width: 24px; height: 1px; background: #f5b026"></span>
+          Empieza hoy
+        </p>
+        <h2 class="cta-title"> Tu negocio merece<br />las mejores herramientas </h2>
+        <p class="cta-sub"> Únete a cientos de emprendedores que ya gestionan sus ventas con control y seguridad. </p>
+        <a [routerLink]="['/register']" class="btn-primary-amber" style="font-size: 1rem; padding: 1rem 2.5rem">
+          Crear cuenta gratis
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </a>
+        <p
+          style="
+            margin-top: 1.25rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.75rem;
+            color: rgba(245, 240, 235, 0.3);
+            letter-spacing: 0.04em;
+          "
+        >
+          Sin tarjeta de crédito · Sin suscripciones mensuales
+        </p>
+      </div>
     </div>
-</section> -->
+  </section>
 
-
-<!-- Capturas de Pantallas -->
-<!-- <section class="py-5" style="background-color: #0D1117;">
+  <!-- FOOTER -->
+  <footer class="footer">
     <div class="container">
-        <h2 id="capturas" class="text-center text-warning mb-5">Capturas de Pantalla</h2>
-
-        <div id="screenshotsCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="4000">
-            <div class="carousel-inner">
-
-                <div class="carousel-item active">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Catálogo de productos</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/1-catalog.png" class="img-fluid rounded carousel-img"
-                                alt="Pantalla 1">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Adicionar Categoría</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/2-catalog-add-category.png"
-                                class="img-fluid rounded carousel-img" alt="Pantalla 2">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Importar Productos</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/3-catalog-import-products.png"
-                                class="img-fluid rounded carousel-img" alt="Pantalla 3">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Adicionar varios Productos</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/4-catalog-add-products.png"
-                                class="img-fluid rounded carousel-img" alt="Pantalla 4">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Adicionar un Producto</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/5-catalog-add-product.png"
-                                class="img-fluid rounded carousel-img" alt="Pantalla 5">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Adicionar Entrada al Inventario</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/6-inventory-add-entry.png"
-                                class="img-fluid rounded carousel-img" alt="Pantalla 6">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Adicionar Productos a la Venta Actual</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/7-sale.png" class="img-fluid rounded carousel-img"
-                                alt="Pantalla 7">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Venta Actual</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/8-shopping-cart.png"
-                                class="img-fluid rounded carousel-img" alt="Pantalla 8">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Disponibilidad del Inventario</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/9-inventario-pizzas.png"
-                                class="img-fluid rounded carousel-img" alt="Pantalla 9">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="carousel-item">
-                    <div class="row align-items-center justify-content-center text-light text-center text-md-start">
-                        <div class="col-md-6">
-                            <h4 class="text-warning">Cuadre del día</h4>
-                        </div>
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <img src="assets/home/screenshots/10-cuadre-dia.png" class="img-fluid rounded carousel-img"
-                                alt="Pantalla 10">
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <button class="carousel-control-prev" type="button" data-bs-target="#screenshotsCarousel"
-                data-bs-slide="prev">
-                <span class="carousel-control-prev-icon bg-dark rounded-circle"></span>
-                <span class="visually-hidden">Anterior</span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#screenshotsCarousel"
-                data-bs-slide="next">
-                <span class="carousel-control-next-icon bg-dark rounded-circle"></span>
-                <span class="visually-hidden">Siguiente</span>
-            </button>
-        </div>
+      <p class="footer-text mb-0"> &copy; 2026 VendeDTo · Desarrollado con ♥ para emprendedores </p>
     </div>
-</section> -->
-
-<!-- Call to Action final -->
-<section id="registro" class="py-5" style="background-color: #0D1117;">
-    <div class="container">
-        <div class="row">
-            <div class="col-md-6 col-lg-4">
-                <div class="p-4 rounded-4 text-center" style="background-color: #1e252e;">
-                    <p class="lead text-secondary mb-4" style="font-size: 1rem;">Empieza a vender con control y
-                        seguridad.
-                    </p>
-                    <a [routerLink]="['/register']" class="btn btn-lg px-4"
-                        style="background-color: #6f42c1; color: white; border-radius: 0.8rem;">
-                        Regístrate gratis
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+  </footer>
+</div>

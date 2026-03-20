@@ -7,18 +7,23 @@
 </div>
 <div class="card">
   <div class="card-body">
-    <div id="chart">
-      <apx-chart
-        [series]="chartOptions.series"
-        [chart]="chartOptions.chart"
-        [dataLabels]="chartOptions.dataLabels"
-        [xaxis]="chartOptions.xaxis"
-        [colors]="chartOptions.colors"
-        [stroke]="chartOptions.stroke"
-        [yaxis]="chartOptions.yaxis"
-        [grid]="chartOptions.grid"
-        [theme]="chartOptions.theme"
-      ></apx-chart>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Page Views</th>
+            <th>Sessions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let cat of categories; let i = index">
+            <td>{{ cat }}</td>
+            <td>{{ pageViewsData[i] || 0 }}</td>
+            <td>{{ sessionsData[i] || 0 }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

@@ -2,16 +2,20 @@
 <app-card [showHeader]="false">
   <h6 class="mb-2 f-w-400 text-muted">This Week Statistics</h6>
   <h3 class="mb-3">$7,650</h3>
-  <apx-chart
-    [series]="chartOptions.series"
-    [chart]="chartOptions.chart"
-    [plotOptions]="chartOptions.plotOptions"
-    [dataLabels]="chartOptions.dataLabels"
-    [xaxis]="chartOptions.xaxis"
-    [colors]="chartOptions.colors"
-    [stroke]="chartOptions.stroke"
-    [yaxis]="chartOptions.yaxis"
-    [grid]="chartOptions.grid"
-    [tooltip]="chartOptions.tooltip"
-  ></apx-chart>
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let cat of categories; let i = index">
+          <td>{{ cat }}</td>
+          <td>{{ data[i] || 0 }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </app-card>

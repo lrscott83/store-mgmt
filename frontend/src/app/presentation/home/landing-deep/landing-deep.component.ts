@@ -1,25 +1,42 @@
-import { AfterViewInit, Component } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, ViewChild, ViewChildren, QueryList } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-declare const bootstrap: any;
-
 @Component({
-    selector: 'app-landing-deep',
-    imports: [RouterModule],
-    templateUrl: './landing-deep.component.html',
-    styleUrl: './landing-deep.component.scss'
+  selector: 'app-landing-deep',
+  imports: [RouterModule],
+  templateUrl: './landing-deep.component.html',
+  styleUrl: './landing-deep.component.scss'
 })
-export class LandingDeepComponent implements AfterViewInit{
-  ngAfterViewInit(): void {
-    const navLinks = document.querySelectorAll('.navbar-collapse .nav-link');
-    const navbarCollapse = document.querySelector('.navbar-collapse');
+export class LandingDeepComponent implements AfterViewInit {
+  isScrolled = false;
+  menuOpen = false;
 
-    navLinks.forEach(link => {
-      link.addEventListener('click', () => {
-        if (navbarCollapse && navbarCollapse.classList.contains('show')) {
-          new bootstrap.Collapse(navbarCollapse).toggle();
-        }
-      });
+  @ViewChild('navEl') navEl!: ElementRef<HTMLElement>;
+  @ViewChildren('featureCard') featureCards!: QueryList<ElementRef<HTMLElement>>;
+
+  ngAfterViewInit(): void {
+    this.setupScrollObserver();
+  }
+
+  @HostListener('window:scroll')
+  onScroll(): void {
+    this.isScrolled = window.scrollY > 40;
+  }
+
+  private setupScrollObserver(): void {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    this.featureCards.forEach((card) => {
+      observer.observe(card.nativeElement);
     });
   }
 }

@@ -1,5 +1,82 @@
 # AGENTS.md - Store Management Frontend
 
+## 🚨 CRITICAL RULE — INViolable Performance Strategy
+
+### LAZY LOADING DE DEPENDENCIAS PESADAS (OBLIGATORIO)
+
+**ESTO ES INVIOLABLE. NO NEGOCIABLE. SIEMPRE.**
+
+#### dependencias que SONlazy load (se cargan DESPUÉS de autenticación):
+
+1. **ApexCharts** (~500-900 kB) — Solo para dashboard/charts
+2. **html5-scanner** (~80-150 kB) — Solo para scanner de ventas
+3. **html2canvas** (~150-200 kB) — Solo para generar PDFs
+4. **jspdf** + **jspdf-autotable** (~200-300 kB) — Solo para exportación PDF
+
+#### Flujo de carga:
+
+```
+REGISTRO/LOGIN:
+├── Angular core (~182 kB)
+├── Polyfills (~35 kB)
+├── Bootstrap (~374 kB CSS)
+├── Material Icons (subsetted)
+├── App shell
+└── ✅ NO ApexCharts
+└── ✅ NO html5-scanner
+└── ✅ NO html2canvas/jspdf
+
+DESPUÉS DE AUTENTICACIÓN (solo cuando el usuario entra al dashboard):
+├── Precache TODO (incluyendo estas 3 deps)
+└── ApexCharts + html5-scanner + jspdf cargados
+```
+
+#### Cómo asegurar lazy loading:
+
+1. **NUNCA importar directamente en componentes de auth/login/register:**
+
+   ```typescript
+   // ❌ MAL - No hacer esto
+   import { NgApexchartsModule } from 'ng-apexcharts';
+
+   // ✅ BIEN - Usar lazy routes
+   // La ruta /dashboard se carga lazy
+   ```
+
+2. **Usar Dynamic Imports para libs pesadas:**
+
+   ```typescript
+   // ✅ CORRECTO - Cargar solo cuando se necesita
+   const loadApexCharts = () => import('ng-apexcharts');
+
+   // En el componente
+   loadApexCharts().then(({ NgApexchartsModule }) => {
+     // Usar aquí
+   });
+   ```
+
+3. **Verificar en Network tab:**
+
+   - Página de register/login: NO debe haber requests a ApexCharts, html5-scanner, o jspdf
+   - Solo después de navegar a dashboard/sale debe aparecer
+
+4. **ngsw-config.json precache:**
+   - NO incluir estos chunks en precache de la página de login
+   - SÍ incluirlos después de autenticación
+
+#### Si necesitas debuggear:
+
+```bash
+# Ver qué chunks se cargan en register
+# Network tab → filtrar por .js → should NOT see:
+# - apexcharts
+# - html5-scanner
+# - html2canvas
+# - jspdf
+```
+
+---
+
 ## Project Overview
 
 Angular 21 application with TypeScript, SCSS, and Jasmine/Karma testing. Uses Angular Material UI library and @ant-design/icons-angular for navigation/glyph icons.

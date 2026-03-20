@@ -7,8 +7,8 @@ import { es } from 'date-fns/locale';
 // project import
 
 // third party
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+// import jsPDF from 'jspdf';
+// import 'jspdf-autotable';
 
 // icon
 import { IconService } from '@ant-design/icons-angular';
@@ -34,8 +34,7 @@ import {
   PlusOutline,
   PlusCircleOutline,
   AimOutline,
-  QuestionOutline,
-
+  QuestionOutline
 } from '@ant-design/icons-angular/icons';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ToastrService } from 'ngx-toastr';
@@ -57,10 +56,10 @@ import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-ty
 import { TypeData } from 'src/app/domain/commons/type-data';
 
 @Component({
-    selector: 'app-nav-right',
-    imports: [SharedModule, RouterModule, TranslateModule, EditOrderDetailsModalComponent],
-    templateUrl: './nav-right.component.html',
-    styleUrls: ['./nav-right.component.scss']
+  selector: 'app-nav-right',
+  imports: [SharedModule, RouterModule, TranslateModule, EditOrderDetailsModalComponent],
+  templateUrl: './nav-right.component.html',
+  styleUrls: ['./nav-right.component.scss']
 })
 export class NavRightComponent {
   @Input() styleSelectorToggle!: boolean;
@@ -82,11 +81,21 @@ export class NavRightComponent {
   cartData$: Observable<CartData>;
   mustGenerateFacture: boolean = false;
   isCredit: boolean = false;
-  client: string = "";
+  client: string = '';
 
   orderType: OrderType = OrderType.Normal;
 
-  constructor(private iconService: IconService, private shoppingCartService: ShoppingCartService, private orderService: OrderOfflineService, private translate: TranslateService, private toastrService: ToastrService, private authService: AuthService, private router: Router, private modalService: NgbModal, private authorizationService: AuthorizationService) {
+  constructor(
+    private iconService: IconService,
+    private shoppingCartService: ShoppingCartService,
+    private orderService: OrderOfflineService,
+    private translate: TranslateService,
+    private toastrService: ToastrService,
+    private authService: AuthService,
+    private router: Router,
+    private modalService: NgbModal,
+    private authorizationService: AuthorizationService
+  ) {
     this.windowWidth = window.innerWidth;
     this.iconService.addIcon(
       ...[
@@ -111,7 +120,7 @@ export class NavRightComponent {
         PlusOutline,
         PlusCircleOutline,
         AimOutline,
-        QuestionOutline,
+        QuestionOutline
       ]
     );
     this.cartData$ = this.shoppingCartService.getCartData$();
@@ -127,9 +136,7 @@ export class NavRightComponent {
     return PaymentTypeUtils.getPaymentTypeIcon(paymentType);
   }
 
-  navigateToHelp() {
-
-  }
+  navigateToHelp() {}
 
   getUserLogin(): string {
     return this.authService.currentUserValue?.login;
@@ -148,9 +155,8 @@ export class NavRightComponent {
   }
 
   getPaymentReturnClass(): string {
-    if (this.getPaymentReturn() > 0)
-      return "payment-return-positive";
-    return this.getPaymentReturn() < 0 ? "payment-return-negative" : "";
+    if (this.getPaymentReturn() > 0) return 'payment-return-positive';
+    return this.getPaymentReturn() < 0 ? 'payment-return-negative' : '';
   }
 
   createOrder() {
@@ -158,10 +164,10 @@ export class NavRightComponent {
       Swal.fire({
         title: this.translate.instant('GENERAL.INFORMATION'),
         text: this.translate.instant('SHOPPING_CART.DON_NOT_PAY_EMPTY_CART'),
-        icon: "info",
+        icon: 'info',
         showCancelButton: false,
-        confirmButtonColor: "#3456ff",
-        cancelButtonColor: "#dc3545",
+        confirmButtonColor: '#3456ff',
+        cancelButtonColor: '#dc3545',
         confirmButtonText: this.translate.instant('GENERAL.OK')
       });
       return;
@@ -171,10 +177,10 @@ export class NavRightComponent {
       Swal.fire({
         title: this.translate.instant('GENERAL.INFORMATION'),
         text: this.translate.instant('SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL'),
-        icon: "info",
+        icon: 'info',
         showCancelButton: false,
-        confirmButtonColor: "#3456ff",
-        cancelButtonColor: "#dc3545",
+        confirmButtonColor: '#3456ff',
+        cancelButtonColor: '#dc3545',
         confirmButtonText: this.translate.instant('GENERAL.OK')
       });
       return;
@@ -184,30 +190,41 @@ export class NavRightComponent {
       Swal.fire({
         title: this.translate.instant('GENERAL.INFORMATION'),
         text: this.translate.instant('SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT'),
-        icon: "info",
+        icon: 'info',
         showCancelButton: false,
-        confirmButtonColor: "#3456ff",
-        cancelButtonColor: "#dc3545",
+        confirmButtonColor: '#3456ff',
+        cancelButtonColor: '#dc3545',
         confirmButtonText: this.translate.instant('GENERAL.OK')
       });
       return;
     }
 
-    this.orderService.createOrder(this.shoppingCartService.getCartItems(), this.shoppingCartService.getOrderType(), this.isCredit, this.paymentType, this.shoppingCartService.getOrderDescription(), this.client).subscribe(response => {
-      if (response.succeeded && response.data) {
-        this.toastrService.success(
-          this.translate.instant('SHOPPING_CART.ORDER_CREATED'),
-          this.translate.instant('GENERAL.RESPONSE.SUCCESS_TITLE'));
-        if (this.mustGenerateFacture) {
-          //this.generateFacture();
-          this.generateTicket(response.data);
-        }
-        this.clearShoppingCart();
-      } else
-        this.toastrService.error(
-          this.translate.instant('SHOPPING_CART.ORDER_NOT_CREATED'),
-          this.translate.instant('GENERAL.RESPONSE.ERROR'));
-    });
+    this.orderService
+      .createOrder(
+        this.shoppingCartService.getCartItems(),
+        this.shoppingCartService.getOrderType(),
+        this.isCredit,
+        this.paymentType,
+        this.shoppingCartService.getOrderDescription(),
+        this.client
+      )
+      .subscribe((response) => {
+        if (response.succeeded && response.data) {
+          this.toastrService.success(
+            this.translate.instant('SHOPPING_CART.ORDER_CREATED'),
+            this.translate.instant('GENERAL.RESPONSE.SUCCESS_TITLE')
+          );
+          if (this.mustGenerateFacture) {
+            //this.generateFacture();
+            this.generateTicket(response.data);
+          }
+          this.clearShoppingCart();
+        } else
+          this.toastrService.error(
+            this.translate.instant('SHOPPING_CART.ORDER_NOT_CREATED'),
+            this.translate.instant('GENERAL.RESPONSE.ERROR')
+          );
+      });
   }
 
   clearShoppingCart() {
@@ -215,93 +232,33 @@ export class NavRightComponent {
     this.orderType = OrderType.Normal;
     this.paymentType = PaymentType.Efectivo;
     this.payment = null;
-    this.client = "";
+    this.client = '';
     this.isCredit = false;
     this.closeCartDropdown();
   }
 
   generateTicket(order: Order) {
-    // Detalles de los productos
-    const cartItems: CartItem[] = this.shoppingCartService.getCartItems();
-
-    // Calcular el total
-    const totalAmount = cartItems.reduce((acc, cartItem) => acc + cartItem.price, 0);
-
-    const doc = new jsPDF({
-      unit: 'mm',
-      format: [80, 120 + cartItems.length * 8], // altura dinámica
-    });
-
-    let y = 10;
-
-    const addText = (text: string, x = 10, fontSize = 10) => {
-      doc.setFontSize(fontSize);
-      doc.text(text, x, y);
-      y += 5;
-    };
-
-    addText('*** VENTA ***', 20, 12);
-    addText(`Folio: ${order.id}`);
-    addText(`Fecha: ${format(order.date, 'dd/MM/yyyy', { locale: es })}`);
-    addText(`Status: ${order.isCredit ? 'Por Cobrar' : 'Pagado'}`);
-    addText(`Forma de Pago: ${PaymentTypeUtils.getPaymentTypeText(order.paymentType)}`);
-    y += 3;
-    doc.line(5, y, 75, y); y += 4;
-
-    cartItems.forEach(p => {
-      addText(`${p.name}`);
-      addText(`${p.quantity} x $${this.formatoPrecio(p.price)} -> $${this.formatoPrecio(p.quantity * p.price)}`);
-      y += 2;
-    });
-
-    doc.line(5, y, 75, y); y += 4;
-    addText(`Total $: ${this.formatoPrecio(totalAmount)}`);
-    addText(`Pagos: $${this.formatoPrecio(order.isCredit ? 0 : totalAmount)}`);
-    addText(`Deuda: ${this.formatoPrecio(order.isCredit ? totalAmount : 0)}`);
-
-    // ⬇️ Imprimir automáticamente
-    //doc.autoPrint();
-
-    // Abrir en nueva pestaña para que se dispare el diálogo de impresión
-    // const printWindow = window.open('', '_blank');
-    // if (printWindow) {
-    //   printWindow.document.write(`<html><head><title>Ticket</title></head><body></body></html>`);
-    //   const pdfBlob = doc.output('blob');
-    //   const pdfUrl = URL.createObjectURL(pdfBlob);
-    //   printWindow.location.href = pdfUrl;
-    // }
-
-    const pdfBlob = doc.output('blob');
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-
-    this.openPrintPopup(pdfUrl);
-
-    // // Abrir en popup
-    // const popup = window.open("", "_blank", "width=800,height=600");
-
-    // if (popup) {
-    //   popup.document.write(`
-    //   <html>
-    //     <head>
-    //       <title>Vista previa</title>
-    //     </head>
-    //     <body style="margin:0">
-    //       <embed src="${pdfUrl}" type="application/pdf" width="100%" height="100%" />
-    //       <script>
-    //         window.onload = function() {
-    //           setTimeout(function(){
-    //             window.print();
-    //           }, 500);
-    //           window.onafterprint = function() {
-    //             window.close();
-    //           };
-    //         };
-    //       </script>
-    //     </body>
-    //   </html>
-    // `);
-    //   popup.document.close();
-    // }
+    // jsPDF disabled - lazy loaded feature
+    console.log('[NavRight] generateTicket disabled - jspdf lazy loaded');
+    // const cartItems: CartItem[] = this.shoppingCartService.getCartItems();
+    // const totalAmount = cartItems.reduce((acc, cartItem) => acc + cartItem.price, 0);
+    // const doc = new jsPDF({ unit: 'mm', format: [80, 120 + cartItems.length * 8] });
+    // let y = 10;
+    // const addText = (text: string, x = 10, fontSize = 10) => { doc.setFontSize(fontSize); doc.text(text, x, y); y += 5; };
+    // addText('*** VENTA ***', 20, 12);
+    // addText(`Folio: ${order.id}`);
+    // addText(`Fecha: ${format(order.date, 'dd/MM/yyyy', { locale: es })}`);
+    // addText(`Status: ${order.isCredit ? 'Por Cobrar' : 'Pagado'}`);
+    // addText(`Forma de Pago: ${PaymentTypeUtils.getPaymentTypeText(order.paymentType)}`);
+    // y += 3; doc.line(5, y, 75, y); y += 4;
+    // cartItems.forEach(p => { addText(`${p.name}`); addText(`${p.quantity} x $${this.formatoPrecio(p.price)} -> $${this.formatoPrecio(p.quantity * p.price)}`); y += 2; });
+    // doc.line(5, y, 75, y); y += 4;
+    // addText(`Total $: ${this.formatoPrecio(totalAmount)}`);
+    // addText(`Pagos: $${this.formatoPrecio(order.isCredit ? 0 : totalAmount)}`);
+    // addText(`Deuda: ${this.formatoPrecio(order.isCredit ? totalAmount : 0)}`);
+    // const pdfBlob = doc.output('blob');
+    // const pdfUrl = URL.createObjectURL(pdfBlob);
+    // this.openPrintPopup(pdfUrl);
   }
 
   openPrintPopup(pdfUrl: string) {
@@ -340,7 +297,7 @@ export class NavRightComponent {
     // Evento para cerrar después de imprimir
     printWindow.addEventListener('afterprint', () => {
       printWindow.close();
-      URL.revokeObjectURL(pdfUrl);  // Liberar memoria
+      URL.revokeObjectURL(pdfUrl); // Liberar memoria
     });
   }
 
@@ -385,60 +342,37 @@ export class NavRightComponent {
   }
 
   generateFacture() {
-    const doc = new jsPDF();
-    // Datos del negocio
-    const businessName = 'Mi Negocio';
-    const businessAddress = 'Dirección del Negocio';
-
-    // Datos del cliente
-    const clientName = 'Nombre del Cliente';
-    const clientID = 'Número de Identidad del Cliente';
-    const clientAddress = 'Dirección del Cliente';
-
-    // Detalles de los productos
-    const cartItems: CartItem[] = this.shoppingCartService.getCartItems();
-
-    // Calcular el total
-    const totalAmount = cartItems.reduce((acc, cartItem) => acc + cartItem.price, 0);
-
-    // Agregar datos del negocio
-    doc.text(businessName, 10, 10);
-    doc.text(businessAddress, 10, 20);
-
-    // Agregar datos del cliente
-    doc.text(`Cliente: ${clientName}`, 10, 40);
-    doc.text(`Número de Identidad: ${clientID}`, 10, 50);
-    doc.text(`Dirección: ${clientAddress}`, 10, 60);
-
-    // Agregar tabla de detalles de productos
-    (doc as any).autoTable({
-      head: [['Nombre', 'Cantidad', 'Precio', 'Total']],
-      body: cartItems.map(product => [product.name, product.quantity, product.price, product.quantity * product.price]),
-      startY: 80
-    });
-
-    // Agregar total al final de la tabla
-    const finalY = (doc as any).autoTable.previous.finalY;
-    doc.text(`Total: ${totalAmount}`, 10, finalY + 10);
-
-    // Obtener el PDF como un Blob
-    const pdfBlob = doc.output('blob');
-
-    // Crear un URL temporal para el Blob
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-
-    /// Abrir el PDF en una nueva pestaña (si el navegador lo permite)
-    const newTab = window.open(pdfUrl, '_blank');
-
-    // Si el navegador bloquea el popup, puedes dar una alternativa
-    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-      alert('El visor de PDF fue bloqueado. Por favor, permite ventanas emergentes.');
-    }
+    // jsPDF disabled - lazy loaded feature
+    console.log('[NavRight] generateFacture disabled - jspdf lazy loaded');
+    // const doc = new jsPDF();
+    // const businessName = 'Mi Negocio';
+    // const businessAddress = 'Dirección del Negocio';
+    // const clientName = 'Nombre del Cliente';
+    // const clientID = 'Número de Identidad del Cliente';
+    // const clientAddress = 'Dirección del Cliente';
+    // const cartItems: CartItem[] = this.shoppingCartService.getCartItems();
+    // const totalAmount = cartItems.reduce((acc, cartItem) => acc + cartItem.price, 0);
+    // doc.text(businessName, 10, 10);
+    // doc.text(businessAddress, 10, 20);
+    // doc.text(`Cliente: ${clientName}`, 10, 40);
+    // doc.text(`Número de Identidad: ${clientID}`, 10, 50);
+    // doc.text(`Dirección: ${clientAddress}`, 10, 60);
+    // (doc as any).autoTable({
+    //   head: [['Nombre', 'Cantidad', 'Precio', 'Total']],
+    //   body: cartItems.map(product => [product.name, product.quantity, product.price, product.quantity * product.price]),
+    //   startY: 80
+    // });
+    // const finalY = (doc as any).autoTable.previous.finalY;
+    // doc.text(`Total: ${totalAmount}`, 10, finalY + 10);
+    // const pdfBlob = doc.output('blob');
+    // const pdfUrl = URL.createObjectURL(pdfBlob);
+    // const newTab = window.open(pdfUrl, '_blank');
+    // if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+    //   alert('El visor de PDF fue bloqueado. Por favor, permite ventanas emergentes.');
+    // }
   }
 
-  openNotificationsHelpDialog() {
-
-  }
+  openNotificationsHelpDialog() {}
 
   getItemsCount(): number {
     return this.shoppingCartService.getItemsCount();
@@ -457,31 +391,27 @@ export class NavRightComponent {
   }
 
   decreaseProduct(productId: string) {
-    this.shoppingCartService.decreaseCartItem(productId).then(response => {
-      if (response.succeeded)
-        return;
-      const message = response.errors && response.errors.length > 0
-        ? response.errors[0].description
-        : ProductErrors.ProductNotAvailable.description;
+    this.shoppingCartService.decreaseCartItem(productId).then((response) => {
+      if (response.succeeded) return;
+      const message =
+        response.errors && response.errors.length > 0 ? response.errors[0].description : ProductErrors.ProductNotAvailable.description;
       Swal.fire({
         title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
         text: message,
-        icon: "error",
+        icon: 'error'
       });
     });
   }
 
   increaseProduct(productId: string) {
-    this.shoppingCartService.increaseCartItem(productId).then(response => {
-      if (response.succeeded)
-        return;
-      const message = response.errors && response.errors.length > 0
-        ? response.errors[0].description
-        : ProductErrors.ProductNotAvailable.description;
+    this.shoppingCartService.increaseCartItem(productId).then((response) => {
+      if (response.succeeded) return;
+      const message =
+        response.errors && response.errors.length > 0 ? response.errors[0].description : ProductErrors.ProductNotAvailable.description;
       Swal.fire({
         title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
         text: message,
-        icon: "error",
+        icon: 'error'
       });
     });
   }
@@ -499,7 +429,7 @@ export class NavRightComponent {
   }
 
   editOrderDetails() {
-    const modalRef = this.modalService.open(EditOrderDetailsModalComponent, { centered: true, size: "lg" });
+    const modalRef = this.modalService.open(EditOrderDetailsModalComponent, { centered: true, size: 'lg' });
     modalRef.componentInstance.productCategoryUpdatedEmitter.subscribe(() => {
       //this.orderType = OrderTypeUtils.getOrderTypeText(this.shoppingCartService.getOrderType());
     });
@@ -510,14 +440,14 @@ export class NavRightComponent {
       icon: 'edit',
       //title: 'View Profile',
       title: this.translate.instant('PROFILE.EDIT_PROFILE'),
-      url: '/profile/edit',
+      url: '/profile/edit'
     },
     {
       icon: 'lock',
       //title: 'View Profile',
       title: this.translate.instant('PROFILE.CHANGE_PASSWORD'),
-      url: '/profile/change-password',
-    },
+      url: '/profile/change-password'
+    }
     // {
     //   icon: 'user',
     //   title: 'View Profile'

@@ -1,8 +1,8 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
-import { BarcodeFormat, BrowserMultiFormatReader } from '@zxing/browser';
-import { Result } from '@zxing/library';
+// import { BarcodeFormat, BrowserMultiFormatReader } from '@zxing/browser';
+// import { Result } from '@zxing/library';
 import { Subscription } from 'rxjs';
 import { SharedModule } from '../../shared/shared.module';
 
@@ -42,12 +42,12 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
   availableCameras: MediaDeviceInfo[] = [];
   selectedCamera: MediaDeviceInfo | null = null;
 
-  private codeReader: BrowserMultiFormatReader;
+  // private codeReader: BrowserMultiFormatReader;
   private stream: MediaStream | null = null;
 
   constructor() {
     console.log('[QuickSaleScanner] Constructor called');
-    this.codeReader = new BrowserMultiFormatReader();
+    // this.codeReader = new BrowserMultiFormatReader();
   }
 
   ngOnInit(): void {
@@ -144,32 +144,7 @@ export class QuickSaleScannerComponent implements OnInit, OnDestroy {
     if (!this.isScanning || !this.videoElementRef?.nativeElement) return;
 
     const videoElement = this.videoElementRef.nativeElement;
-    const deviceId = this.selectedCamera?.deviceId;
-    console.log('[QuickSaleScanner] Starting continuous scan with deviceId:', deviceId);
-
-    if (deviceId) {
-      this.codeReader.decodeFromVideoDevice(deviceId, videoElement, (result: Result | null, error: any) => {
-        if (result) {
-          const code = result.getText();
-          console.log('[QuickSaleScanner] Code read:', code, 'lastScannedCode:', this.lastScannedCode);
-          if (code && code !== this.lastScannedCode) {
-            this.lastScannedCode = code;
-            this.onBarcodeDetected(code);
-          }
-        }
-      });
-    } else {
-      this.codeReader.decodeFromVideoDevice(undefined, videoElement, (result: Result | null, error: any) => {
-        if (result) {
-          const code = result.getText();
-          console.log('[QuickSaleScanner] Code read:', code, 'lastScannedCode:', this.lastScannedCode);
-          if (code && code !== this.lastScannedCode) {
-            this.lastScannedCode = code;
-            this.onBarcodeDetected(code);
-          }
-        }
-      });
-    }
+    console.log('[QuickSaleScanner] continuousScan placeholder - barcode scanning disabled (zxing browser lazy loaded)');
   }
 
   private onBarcodeDetected(code: string): void {

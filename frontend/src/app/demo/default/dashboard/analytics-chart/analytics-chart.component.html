@@ -9,18 +9,21 @@
     </a>
   </div>
   <div class="card-body px-2">
-    <div class="chart">
-      <apx-chart
-        [series]="chartOptions.series"
-        [chart]="chartOptions.chart"
-        [plotOptions]="chartOptions.plotOptions"
-        [xaxis]="chartOptions.xaxis"
-        [colors]="chartOptions.colors"
-        [stroke]="chartOptions.stroke"
-        [yaxis]="chartOptions.yaxis"
-        [grid]="chartOptions.grid"
-        [tooltip]="chartOptions.tooltip"
-      ></apx-chart>
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of data; let i = index">
+            <td>{{ categories[i] | slice: 0 : 10 }}</td>
+            <td>{{ item }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

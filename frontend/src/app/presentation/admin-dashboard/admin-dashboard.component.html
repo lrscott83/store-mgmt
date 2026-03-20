@@ -10,43 +10,27 @@
 
       <!-- Botones de selección -->
       <div class="button-group">
-        <button [class.active]="viewType === '7days'" (click)="changeView('7days')" class="btn">
-          Últimos 7 días
-        </button>
-        <button [class.active]="viewType === '30days'" (click)="changeView('30days')" class="btn">
-          Últimos 30 días
-        </button>
+        <button [class.active]="viewType === '7days'" (click)="changeView('7days')" class="btn"> Últimos 7 días </button>
+        <button [class.active]="viewType === '30days'" (click)="changeView('30days')" class="btn"> Últimos 30 días </button>
       </div>
 
-      <!-- Gráfico -->
-      @if (!!chartOptions) {
-        <div class="chart-container">
-          <apx-chart [series]="chartOptions.series" [chart]="chartOptions.chart" [xaxis]="chartOptions.xaxis"
-            [yaxis]="chartOptions.yaxis" [dataLabels]="chartOptions.dataLabels"
-            [plotOptions]="chartOptions.plotOptions" [stroke]="chartOptions.stroke"
-            [tooltip]="chartOptions.tooltip" [fill]="chartOptions.fill">
-          </apx-chart>
-        </div>
-      }
-
-      <!-- Estadísticas resumidas -->
-      <!-- <div class="stats-container">
-      <div class="stat-card">
-        <h3>Promedio Diario</h3>
-        <p class="stat-value">{{ getAverageTiendas() | number:'1.0-0' }}</p>
-        <p class="stat-label">tiendas ({{ getPorcentajePromedio() | number:'1.1-1' }}%)</p>
+      <!-- Datos tabulares -->
+      <div class="table-responsive mt-3">
+        <table class="table table-sm table-striped">
+          <thead>
+            <tr>
+              <th>Categoría</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let cat of categories; let i = index">
+              <td>{{ cat }}</td>
+              <td>{{ data[i] || 0 }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <div class="stat-card">
-        <h3>Máximo Alcanzado</h3>
-        <p class="stat-value">{{ getMaxTiendas() | number:'1.0-0' }}</p>
-        <p class="stat-label">tiendas ({{ getPorcentajeMaximo() | number:'1.1-1' }}%)</p>
-      </div>
-      <div class="stat-card">
-        <h3>Total Período</h3>
-        <p class="stat-value">{{ getTotalTiendas() | number:'1.0-0' }}</p>
-        <p class="stat-label">tiendas en total</p>
-      </div>
-    </div> -->
+    </div>
   </div>
-</div>
 </div>

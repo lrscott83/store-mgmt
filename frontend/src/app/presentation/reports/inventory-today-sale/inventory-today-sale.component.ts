@@ -14,188 +14,165 @@ import { OrderItem } from 'src/app/domain/entities/orders/order-item.model';
 import { InventoryCategoryView } from 'src/app/application/entries/inventory-category.view';
 import { InventoryProductView } from 'src/app/application/entries/inventory-product-view';
 
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+// import jsPDF from 'jspdf';
+// import 'jspdf-autotable';
 
 @Component({
-    selector: 'app-inventory-today-sale',
-    imports: [TranslationModule, SharedModule],
-    templateUrl: './inventory-today-sale.component.html',
-    styleUrl: './inventory-today-sale.component.scss'
+  selector: 'app-inventory-today-sale',
+  imports: [TranslationModule, SharedModule],
+  templateUrl: './inventory-today-sale.component.html',
+  styleUrl: './inventory-today-sale.component.scss'
 })
-
 export class InventoryTodaySaleComponent {
-
-  constructor(private translate: TranslateService, private productService: ProductRepository, private orderService: OrderOfflineService, private inventoryService: InventoryOfflineService) {
-
-  }
-
   generateReport() {
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'pt',
-      format: 'letter'
-    });
-
-    // 🧾 Encabezado de empresa
-    const encabezado = [
-      'Empresa: _____________________       Procedencia: _____________________',
-      'Unidad: _____________________         UBA: _____  OEE: _____  D__/__/__',
-      'Departamento: ________________        Balance: _____  BAT: _____',
-      'Firma del Administrador: _____________________________________________'
-    ];
-
-    encabezado.forEach((linea, i) => {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text(linea, 40, 30 + i * 14);
-    });
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
-
-    // 🧮 Cabecera de tabla
-    const headers = [[
-      'Producto', 'U.M', 'Inicio', 'Entrada', 'Disponible', 'Vendido',
-      'Precio Venta', 'Importe Venta', 'Costo Unitario', 'Costo Total',
-      'C.P Venta', 'Final', 'Importe Final'
-    ]];
-
-    const rows = this.generateProductRows();
-
-    // 🧾 Generar tabla
-    (doc as any).autoTable({
-      //startY: 120,
-      head: headers,
-      body: rows,
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [220, 220, 220], textColor: 0 },
-      margin: { top: 120, left: 40, right: 40 },
-      didDrawPage: (data) => {
-        if (data.pageNumber > 1) {
-          // Agregar encabezado en otras páginas también
-          encabezado.forEach((linea, i) => {
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
-            doc.text(linea, 40, 30 + i * 14);
-          });
-          doc.setFontSize(12);
-          doc.setFont('helvetica', 'bold');
-          doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
-        }
-      }
-    });
-
-    // 📦 Guardar archivo
-    //doc.save('inventario_precio_venta.pdf');
-
-    // Obtener el PDF como un Blob
-    const pdfBlob = doc.output('blob');
-
-    // Crear un URL temporal para el Blob
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-
-    // Abrir el PDF en una nueva pestaña
-    window.open(pdfUrl);
+    console.log('[InventoryTodaySale] generateReport disabled - jspdf lazy loaded');
+    // jspdf lazy loaded - PDF generation disabled
   }
 
   generateReportWithBorder() {
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'pt',
-      format: 'letter'
-    });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    // Función para dibujar el borde y encabezado por página
-    const drawPageFrame = () => {
-      doc.setLineWidth(3);
-      doc.rect(10, 10, pageWidth - 20, pageHeight - 20); // Borde exterior
-
-      // Encabezado institucional
-      const encabezado = [
-        'Empresa: _____________________       Procedencia: _____________________',
-        'Unidad: _____________________         UBA: _____  OEE: _____  D__/__/__',
-        'Departamento: ________________        Balance: _____  BAT: _____',
-        'Firma del Administrador: _____________________________________________'
-      ];
-
-      encabezado.forEach((linea, i) => {
-        doc.setFontSize(10);
-        doc.text(linea, 40, 30 + i * 14);
-      });
-
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
-    };
-
-    // Dibujar en la primera página
-    drawPageFrame();
-
-    // Simulación de productos
-    const productos = [
-      { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
-      { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
-      { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
-      // Agregá más productos si querés probar paginación
-    ];
-
-    const headers = [[
-      'Producto', 'U.M', 'Inicio', 'Entrada', 'Disponible', 'Vendido',
-      'Precio Venta', 'Importe Venta', 'Costo Unitario', 'Costo Total',
-      'C.P Venta', 'Final', 'Importe Final'
-    ]];
-
-    const rows = productos.map(p => {
-      const disponible = p.inicio + p.entrada;
-      const importeVenta = p.precio * p.vendido;
-      const costoTotal = p.costo * p.vendido;
-      const cpVenta = p.precio - p.costo;
-      const final = disponible - p.vendido;
-      const importeFinal = final * p.precio;
-
-      return [
-        p.nombre,
-        p.um,
-        p.inicio,
-        p.entrada,
-        disponible,
-        p.vendido,
-        p.precio.toFixed(2),
-        importeVenta.toFixed(2),
-        p.costo.toFixed(2),
-        cpVenta.toFixed(2),
-        final,
-        importeFinal.toFixed(2)
-      ];
-    });
-
-    // Tabla con autoTable
-    (doc as any).autoTable({
-      startY: 120,
-      head: headers,
-      body: rows,
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [220, 220, 220], textColor: 0 },
-      margin: { left: 40, right: 40 },
-      didDrawPage: () => drawPageFrame()
-    });
-
-    // Obtener el PDF como un Blob
-    const pdfBlob = doc.output('blob');
-
-    // Crear un URL temporal para el Blob
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-
-    // Abrir el PDF en una nueva pestaña
-    window.open(pdfUrl);
+    console.log('[InventoryTodaySale] generateReportWithBorder disabled - jspdf lazy loaded');
+    // jspdf lazy loaded - PDF generation disabled
   }
 
-  // Calcular resumen por producto
+  constructor(
+    private translate: TranslateService,
+    private productService: ProductRepository,
+    private orderService: OrderOfflineService,
+    private inventoryService: InventoryOfflineService
+  ) {}
+
+  // generateReport() {
+  //   const doc = new jsPDF({
+  //     orientation: 'landscape',
+  //     unit: 'pt',
+  //     format: 'letter'
+  //   });
+
+  //   const encabezado = [
+  //     'Empresa: _____________________       Procedencia: _____________________',
+  //     'Unidad: _____________________         UBA: _____  OEE: _____  D__/__/__',
+  //     'Departamento: ________________        Balance: _____  BAT: _____',
+  //     'Firma del Administrador: _____________________________________________'
+  //   ];
+
+  //   encabezado.forEach((linea, i) => {
+  //     doc.setFontSize(10);
+  //     doc.setFont('helvetica', 'bold');
+  //     doc.text(linea, 40, 30 + i * 14);
+  //   });
+
+  //   doc.setFontSize(12);
+  //   doc.setFont('helvetica', 'bold');
+  //   doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
+
+  //   const headers = [[
+  //     'Producto', 'U.M', 'Inicio', 'Entrada', 'Disponible', 'Vendido',
+  //     'Precio Venta', 'Importe Venta', 'Costo Unitario', 'Costo Total',
+  //     'C.P Venta', 'Final', 'Importe Final'
+  //   ]];
+
+  //   const rows = this.generateProductRows();
+
+  //   (doc as any).autoTable({
+  //     head: headers,
+  //     body: rows,
+  //     styles: { fontSize: 8, cellPadding: 3 },
+  //     headStyles: { fillColor: [220, 220, 220], textColor: 0 },
+  //     margin: { top: 120, left: 40, right: 40 },
+  //     didDrawPage: (data) => {
+  //       if (data.pageNumber > 1) {
+  //         encabezado.forEach((linea, i) => {
+  //           doc.setFontSize(10);
+  //           doc.setFont('helvetica', 'bold');
+  //           doc.text(linea, 40, 30 + i * 14);
+  //         });
+  //         doc.setFontSize(12);
+  //         doc.setFont('helvetica', 'bold');
+  //         doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
+  //       }
+  //     }
+  //   });
+
+  //   const pdfBlob = doc.output('blob');
+  //   const pdfUrl = URL.createObjectURL(pdfBlob);
+  //   window.open(pdfUrl);
+  // }
+
+  // generateReportWithBorder() {
+  //   const doc = new jsPDF({
+  //     orientation: 'landscape',
+  //     unit: 'pt',
+  //     format: 'letter'
+  //   });
+
+  //   const pageWidth = doc.internal.pageSize.getWidth();
+  //   const pageHeight = doc.internal.pageSize.getHeight();
+
+  //   const drawPageFrame = () => {
+  //     doc.setLineWidth(3);
+  //     doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+
+  //     const encabezado = [
+  //       'Empresa: _____________________       Procedencia: _____________________',
+  //       'Unidad: _____________________         UBA: _____  OEE: _____  D__/__/__',
+  //       'Departamento: ________________        Balance: _____  BAT: _____',
+  //       'Firma del Administrador: _____________________________________________'
+  //     ];
+
+  //     encabezado.forEach((linea, i) => {
+  //       doc.setFontSize(10);
+  //       doc.text(linea, 40, 30 + i * 14);
+  //     });
+
+  //     doc.setFontSize(12);
+  //     doc.setFont('helvetica', 'bold');
+  //     doc.text('INVENTARIO A PRECIO DE VENTA', 300, 100);
+  //   };
+
+  //   drawPageFrame();
+
+  //   const productos = [
+  //     { nombre: 'Producto A', um: 'Und', inicio: 10, entrada: 5, vendido: 3, precio: 50, costo: 30 },
+  //     { nombre: 'Producto B', um: 'Caja', inicio: 20, entrada: 0, vendido: 10, precio: 40, costo: 25 },
+  //     { nombre: 'Producto C', um: 'Lata', inicio: 30, entrada: 10, vendido: 5, precio: 20, costo: 15 },
+  //   ];
+
+  //   const headers = [[
+  //     'Producto', 'U.M', 'Inicio', 'Entrada', 'Disponible', 'Vendido',
+  //     'Precio Venta', 'Importe Venta', 'Costo Unitario', 'Costo Total',
+  //     'C.P Venta', 'Final', 'Importe Final'
+  //   ]];
+
+  //   const rows = productos.map(p => {
+  //     const disponible = p.inicio + p.entrada;
+  //     const importeVenta = p.precio * p.vendido;
+  //     const costoTotal = p.costo * p.vendido;
+  //     const cpVenta = p.precio - p.costo;
+  //     const final = disponible - p.vendido;
+  //     const importeFinal = final * p.precio;
+
+  //     return [
+  //       p.nombre, p.um, p.inicio, p.entrada, disponible, p.vendido,
+  //       p.precio.toFixed(2), importeVenta.toFixed(2), p.costo.toFixed(2),
+  //       cpVenta.toFixed(2), final, importeFinal.toFixed(2)
+  //     ];
+  //   });
+
+  //   (doc as any).autoTable({
+  //     startY: 120,
+  //     head: headers,
+  //     body: rows,
+  //     styles: { fontSize: 8, cellPadding: 3 },
+  //     headStyles: { fillColor: [220, 220, 220], textColor: 0 },
+  //     margin: { left: 40, right: 40 },
+  //     didDrawPage: () => drawPageFrame()
+  //   });
+
+  //   const pdfBlob = doc.output('blob');
+  //   const pdfUrl = URL.createObjectURL(pdfBlob);
+  //   window.open(pdfUrl);
+  // }
+
   generateProductRows(): any[] {
     const today: Date = new Date();
     const products: Product[] = this.productService.getAvailableProducts();
@@ -203,20 +180,17 @@ export class InventoryTodaySaleComponent {
     const todayEntries: BaseResponseModel<InventoryEntryView[]> = this.inventoryService.getInventoryEntriesInDay(today);
     const inventoryCategories: BaseResponseModel<InventoryCategoryView[]> = this.inventoryService.getInventoryCategoriesView();
     const inventoryProducts: InventoryProductView[] = inventoryCategories.succeeded
-      ? inventoryCategories.data.flatMap(c => c.products)
+      ? inventoryCategories.data.flatMap((c) => c.products)
       : [];
 
     return products.map((prod) => {
-      const orderItems: OrderItem[] = todayOrders.flatMap(o => o.orderItems).filter(oi => oi.productId === prod.id);
-      const productTodayEntries = todayEntries.succeeded
-        ? todayEntries.data.filter(e => e.productId === prod.id)
-        : [];
-      const productAvailableEntries: InventoryEntry[] = this.inventoryService.getProductInventoriesByProductId(prod.id)
-        ?.filter(e => e.available && e.available > 0) ?? [];
-      const availableProduct: InventoryProductView = inventoryProducts.find(p => p.productId === prod.id);
+      const orderItems: OrderItem[] = todayOrders.flatMap((o) => o.orderItems).filter((oi) => oi.productId === prod.id);
+      const productTodayEntries = todayEntries.succeeded ? todayEntries.data.filter((e) => e.productId === prod.id) : [];
+      const productAvailableEntries: InventoryEntry[] =
+        this.inventoryService.getProductInventoriesByProductId(prod.id)?.filter((e) => e.available && e.available > 0) ?? [];
+      const availableProduct: InventoryProductView = inventoryProducts.find((p) => p.productId === prod.id);
       const available: number = availableProduct?.quantity ?? 0;
       const entryQuantity: number = productTodayEntries.reduce((total, e) => total + e.quantity, 0);
-      //const entradaDia = 0; // Si hay entradas ese día se pueden sumar aquí
       const vendido: number = orderItems.reduce((total, oi) => total + oi.quantity, 0);
       const disponible: number = available + vendido;
       const inicio = available + vendido - entryQuantity;
@@ -224,18 +198,18 @@ export class InventoryTodaySaleComponent {
       const importeVenta = vendido * precioVenta;
       let costoUnitario: number = 0;
       if (productAvailableEntries.length > 0) {
-        costoUnitario = productAvailableEntries.reduce((total, e) => total + e.costPrice * e.quantity, 0)
-          / productAvailableEntries.reduce((total, e) => total + e.quantity, 0);
+        costoUnitario =
+          productAvailableEntries.reduce((total, e) => total + e.costPrice * e.quantity, 0) /
+          productAvailableEntries.reduce((total, e) => total + e.quantity, 0);
       }
       const costoTotal = vendido * costoUnitario;
-      //const cpVenta = precioVenta - costoUnitario;
       const cpVenta = importeVenta > 0 ? costoTotal / importeVenta : 0;
       const final = disponible - vendido;
       const importeFinal = final * costoUnitario;
 
       return [
         prod.name,
-        "U",
+        'U',
         inicio,
         entryQuantity,
         disponible,
@@ -246,7 +220,7 @@ export class InventoryTodaySaleComponent {
         costoTotal.toFixed(2),
         cpVenta.toFixed(2),
         final,
-        importeFinal.toFixed(2),
+        importeFinal.toFixed(2)
       ];
     });
   }

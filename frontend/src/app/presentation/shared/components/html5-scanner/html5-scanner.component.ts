@@ -1,5 +1,5 @@
 import { Component, AfterViewInit, OnDestroy } from '@angular/core';
-import { Html5Qrcode } from 'html5-qrcode';
+// import { Html5Qrcode } from 'html5-qrcode';
 
 @Component({
   selector: 'app-html5-scanner',
@@ -9,28 +9,36 @@ import { Html5Qrcode } from 'html5-qrcode';
 })
 export class Html5ScannerComponent implements AfterViewInit, OnDestroy {
   barcode: string | null = null;
-  private html5QrCode!: Html5Qrcode;
+  // private html5QrCode!: Html5Qrcode;
+
+  // ngAfterViewInit() {
+  //   this.html5QrCode = new Html5Qrcode('reader');
+
+  //   this.html5QrCode.start(
+  //     { facingMode: 'environment' },
+  //     { fps: 10, qrbox: 250 },
+  //     (decodedText) => {
+  //       this.barcode = decodedText;
+  //       this.html5QrCode.stop();
+  //     },
+  //     (errorMessage, error) => {
+  //       this.barcode = errorMessage;
+  //       console.warn('Error scanning: ' + errorMessage);
+  //     }
+  //   );
+  // }
 
   ngAfterViewInit() {
-    this.html5QrCode = new Html5Qrcode('reader');
-
-    this.html5QrCode.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: 250 },
-      (decodedText) => {
-        this.barcode = decodedText;
-        this.html5QrCode.stop();
-      },
-      (errorMessage, error) => {
-        this.barcode = errorMessage;
-        console.warn('Error scanning: ' + errorMessage);
-      }
-    );
+    console.log('[Html5Scanner] Scanner disabled - html5-qrcode lazy loaded');
   }
 
+  // ngOnDestroy() {
+  //   if (this.html5QrCode) {
+  //     this.html5QrCode.stop();
+  //   }
+  // }
+
   ngOnDestroy() {
-    if (this.html5QrCode) {
-      this.html5QrCode.stop();
-    }
+    // Cleanup placeholder
   }
 }

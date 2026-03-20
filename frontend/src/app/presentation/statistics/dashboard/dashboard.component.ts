@@ -1,15 +1,15 @@
 import { Component } from '@angular/core';
-import {
-  ApexAxisChartSeries,
-  ApexChart,
-  ApexXAxis,
-  ApexDataLabels,
-  ApexStroke,
-  ApexTitleSubtitle,
-  ApexTooltip,
-  ApexYAxis,
-  NgApexchartsModule
-} from 'ng-apexcharts';
+// import {
+//   ApexAxisChartSeries,
+//   ApexChart,
+//   ApexXAxis,
+//   ApexDataLabels,
+//   ApexStroke,
+//   ApexTitleSubtitle,
+//   ApexTooltip,
+//   ApexYAxis,
+//   NgApexchartsModule
+// } from 'ng-apexcharts';
 import { SharedModule } from '../../shared/shared.module';
 import { TranslationModule } from 'src/app/_modules/i18n/translation.module';
 import { CurrencyData, CurrencyService } from 'src/app/application/entries/currency.service';
@@ -25,22 +25,22 @@ import { AuthService } from 'src/app/_services/services.index';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
 import { SaleCreditOfflineService } from 'src/app/application/credits/sale-credit-offline.service';
 
-export type ChartOptions = {
-  series: ApexAxisChartSeries;
-  chart: ApexChart;
-  xaxis: ApexXAxis;
-  dataLabels?: ApexDataLabels;
-  stroke?: ApexStroke;
-  title?: ApexTitleSubtitle;
-  tooltip?: ApexTooltip;
-  yaxis?: ApexYAxis;
-};
+// export type ChartOptions = {
+//   series: ApexAxisChartSeries;
+//   chart: ApexChart;
+//   xaxis: ApexXAxis;
+//   dataLabels?: ApexDataLabels;
+//   stroke?: ApexStroke;
+//   title?: ApexTitleSubtitle;
+//   tooltip?: ApexTooltip;
+//   yaxis?: ApexYAxis;
+// };
 
 @Component({
-    selector: 'app-dashboard',
-    imports: [SharedModule, TranslationModule, NgApexchartsModule, LastMonthSaleProfitsComponent, LastMonthSalesComponent],
-    templateUrl: './dashboard.component.html',
-    styleUrl: './dashboard.component.scss'
+  selector: 'app-dashboard',
+  imports: [SharedModule, TranslationModule, LastMonthSaleProfitsComponent, LastMonthSalesComponent],
+  templateUrl: './dashboard.component.html',
+  styleUrl: './dashboard.component.scss'
 })
 export class DashboardComponent {
   currency: 'CUP' | 'USD';
@@ -78,10 +78,14 @@ export class DashboardComponent {
     ventasSemana: [350, 400, 560, 480, 600, 700, 360]
   };
 
-  ventasChartOptions: ChartOptions;
-  gananciasChartOptions: ChartOptions;
+  // ventasChartOptions: ChartOptions;
+  // gananciasChartOptions: ChartOptions;
 
-  constructor(private currencyService: CurrencyService, private inventoryService: InventoryOfflineService, private orderService: OrderOfflineService, private expenseService: ExpenseOfflineService,
+  constructor(
+    private currencyService: CurrencyService,
+    private inventoryService: InventoryOfflineService,
+    private orderService: OrderOfflineService,
+    private expenseService: ExpenseOfflineService,
     private authService: AuthService,
     private authorizationService: AuthorizationService,
     private saleCreditService: SaleCreditOfflineService
@@ -90,8 +94,8 @@ export class DashboardComponent {
     this.hasExpensesModuleAvailable = this.authorizationService.hasExpensesModuleAvailable();
     this.hasCreditsModuleAvailable = this.authorizationService.hasCreditsModuleAvailable();
 
-    this.ventasChartOptions = this.getVentasChartOptions();
-    this.gananciasChartOptions = this.getGananciasChartOptions();
+    // this.ventasChartOptions = this.getVentasChartOptions();
+    // this.gananciasChartOptions = this.getGananciasChartOptions();
     const currencyData: CurrencyData = this.currencyService.getCurrentCurrency();
     this.rate = currencyData.rate;
     this.currency = currencyData.currency;
@@ -108,12 +112,11 @@ export class DashboardComponent {
     this.saleProfitYesterday = this.orderService.getActiveOrdersProfitYesterday();
     if (this.hasExpensesModuleAvailable) {
       this.saleProfitToday -= this.expenseToday;
-      this.saleProfitYesterday -= this.expenseYesterday
+      this.saleProfitYesterday -= this.expenseYesterday;
     }
 
     this.topProfitProducts$.next(this.orderService.getTopProductsProfitInLastMonth());
     this.topSaleQuantityProducts$.next(this.orderService.getTopProductsSaleQuantityInLastMonth());
-
   }
 
   get divisor() {
@@ -126,42 +129,46 @@ export class DashboardComponent {
 
   cambiarMoneda() {
     this.saveCurrency();
-    this.updateCharts();
+    // this.updateCharts();
   }
 
   saveCurrency() {
     this.currencyService.setCurrency({ rate: this.rate, currency: this.currency });
   }
 
-  updateCharts() {
-    this.ventasChartOptions = this.getVentasChartOptions();
-    this.gananciasChartOptions = this.getGananciasChartOptions();
-  }
+  // updateCharts() {
+  //   this.ventasChartOptions = this.getVentasChartOptions();
+  //   this.gananciasChartOptions = this.getGananciasChartOptions();
+  // }
 
-  getVentasChartOptions(): ChartOptions {
-    return {
-      series: [{
-        name: `Ventas (${this.sufijo})`,
-        data: this.valores.ventasSemana.map(v => +(v / this.divisor).toFixed(2))
-      }],
-      chart: { type: 'line', height: 300 },
-      title: { text: 'Ventas Últimos 7 Días' },
-      xaxis: { categories: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] },
-      stroke: { curve: 'smooth' }
-    };
-  }
+  // getVentasChartOptions(): ChartOptions {
+  //   return {
+  //     series: [
+  //       {
+  //         name: `Ventas (${this.sufijo})`,
+  //         data: this.valores.ventasSemana.map((v) => +(v / this.divisor).toFixed(2))
+  //       }
+  //     ],
+  //     chart: { type: 'line', height: 300 },
+  //     title: { text: 'Ventas Últimos 7 Días' },
+  //     xaxis: { categories: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] },
+  //     stroke: { curve: 'smooth' }
+  //   };
+  // }
 
-  getGananciasChartOptions(): ChartOptions {
-    return {
-      series: [{
-        name: `Ganancia promedio (${this.sufijo})`,
-        data: this.valores.ganancias.map(g => +(g / this.divisor).toFixed(2))
-      }],
-      chart: { type: 'bar', height: 300 },
-      title: { text: 'Ganancias Promedio (últimos días)' },
-      xaxis: { categories: ['7 días', '30 días', '90 días', '365 días'] }
-    };
-  }
+  // getGananciasChartOptions(): ChartOptions {
+  //   return {
+  //     series: [
+  //       {
+  //         name: `Ganancia promedio (${this.sufijo})`,
+  //         data: this.valores.ganancias.map((g) => +(g / this.divisor).toFixed(2))
+  //       }
+  //     ],
+  //     chart: { type: 'bar', height: 300 },
+  //     title: { text: 'Ganancias Promedio (últimos días)' },
+  //     xaxis: { categories: ['7 días', '30 días', '90 días', '365 días'] }
+  //   };
+  // }
 
   get salesToday() {
     return (this.salePriceToday / this.divisor).toFixed(2);
@@ -184,14 +191,12 @@ export class DashboardComponent {
   }
 
   getTrendClass(actual: number, anterior: number): string {
-    if (actual === anterior)
-      return 'text-secondary';
+    if (actual === anterior) return 'text-secondary';
     return actual >= anterior ? 'text-success' : 'text-danger';
   }
 
   getTrendIcon(actual: number, anterior: number): string {
-    if (actual === anterior)
-      return 'bi bi-dash-lg';
+    if (actual === anterior) return 'bi bi-dash-lg';
     return actual >= anterior ? 'bi bi-caret-up-fill' : 'bi bi-caret-down-fill';
   }
 
@@ -244,32 +249,31 @@ export class DashboardComponent {
   }
 
   trendSalePrice() {
-    return this.trendTexto(this.salePriceToday, this.salePriceYesterday, "vs ayer");
+    return this.trendTexto(this.salePriceToday, this.salePriceYesterday, 'vs ayer');
   }
 
   trendExpense() {
-    return this.trendTexto(this.expenseToday, this.expenseYesterday, "vs ayer");
+    return this.trendTexto(this.expenseToday, this.expenseYesterday, 'vs ayer');
   }
 
   trendSaleProfit() {
-    return this.trendTexto(this.saleProfitToday, this.saleProfitYesterday, "vs ayer");
+    return this.trendTexto(this.saleProfitToday, this.saleProfitYesterday, 'vs ayer');
   }
 
   trendMargenBruto() {
-    return this.trendTexto(this.margenBrutoMesActual, this.margenBrutoMesAnterior, "vs mes pasado");
+    return this.trendTexto(this.margenBrutoMesActual, this.margenBrutoMesAnterior, 'vs mes pasado');
   }
 
   trendInventoryCost() {
-    return this.trendTexto(this.inventoryCostTotal, this.inventoryCostTotalYesterday, "vs ayer");
+    return this.trendTexto(this.inventoryCostTotal, this.inventoryCostTotalYesterday, 'vs ayer');
   }
 
   trendUnpaidSaleCredits() {
-    return this.trendTexto(this.unpaidSaleCreditsToday, this.unpaidSaleCreditsYesterday, "vs ayer");
+    return this.trendTexto(this.unpaidSaleCreditsToday, this.unpaidSaleCreditsYesterday, 'vs ayer');
   }
 
   trendTexto(actual: number, anterior: number, sufijo: string) {
     const diferencia = Math.abs(actual - anterior);
     return diferencia !== 0 ? `${(diferencia / this.divisor).toFixed(2)} ${sufijo}` : `0 ${sufijo}`;
   }
-
 }
