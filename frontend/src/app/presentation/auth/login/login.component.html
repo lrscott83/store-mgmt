@@ -1,94 +1,112 @@
 <div class="auth-main">
-  <div class="auth-wrapper v3">
-    <div class="auth-form">
-      <div class="auth-header">
-        <a [routerLink]="['/']"><img src="assets/images/logo-white.png" alt="logo" /></a>
-      </div>
-      <div class="card my-5">
-        <div class="card-body">
-          <div class="card-px text-center py-20 my-10">
-            <h3 class="font-weight-bolder text-dark font-size-h4 font-size-h1-lg">{{ 'AUTH.GENERAL.WELCOME' | translate
-            }}</h3>
-            <span class="font-weight-bold font-size-h4">{{'AUTH.GENERAL.NO_ACCOUNT'| translate}}
-              <a [routerLink]="['/register']" class="link-primary" [translate]="'AUTH.GENERAL.SIGNUP_BUTTON'"></a>
-            </span>
-          </div>
-          <form class="form" [formGroup]="loginForm" novalidate="novalidate" id="kt_login_signin_form"
-            (ngSubmit)="submit()" class="mt-4">
-            @if (hasError) {
-              <div class="alert alert-custom alert-light-danger alert-dismissible text-center">
-                <div class="alert-text">{{errorMessage}}</div>
-              </div>
-            }
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'GENERAL.LOGIN'| translate}}</mat-label>
-              <input matInput formControlName="login" required autocomplete="off">
-              @if(loginForm.controls['login'].invalid && loginForm.controls['login'].touched) {
-                <mat-error>
-                  {{'GENERAL.VALIDATION.INVALID'| translate : { name: 'GENERAL.LOGIN'| translate } }}
-                </mat-error>
-              }
-            </mat-form-field>
-            <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-              <mat-label>{{'GENERAL.PASSWORD'| translate}}</mat-label>
-              <input matInput formControlName="password" required autocomplete="off"
-                [type]="showPassword ? 'text' : 'password'">
-              <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
-                <mat-icon>{{showPassword ? 'visibility' : 'visibility_off'}}</mat-icon>
-              </button>
-              <!-- @if(loginForm.controls['password'].invalid && loginForm.controls['password'].touched) {
-              <mat-error>
-                {{'GENERAL.VALIDATION.REQUIRED'| translate : { name: 'GENERAL.PASSWORD'| translate } }}
-              </mat-error>
-              } -->
-              @if (isControlInvalid('password','required')) {
-                <mat-error>{{'GENERAL.VALIDATION.REQUIRED'| translate : {
-                name: 'GENERAL.PASSWORD'| translate } }}</mat-error>
-              }
-              <!-- <mat-error *ngIf="isControlInvalid('password','pattern')">{{'GENERAL.VALIDATION.PASSWORD_POLICY'|
-            translate}}</mat-error> -->
-          </mat-form-field>
-
-          <div class="row mt-4">
-            <div class="d-grid form-group">
-              <!-- <button mat-button type="button" id="kt_login_signin_submit" class="with-icon btn btn-primary">
-              <mat-icon color="m">login</mat-icon>
-              {{'AUTH.GENERAL.SIGNIN_BUTTON' | translate}}
-            </button> -->
-            <button mat-fab extended color="primary">
-              <mat-icon>login</mat-icon>
-              {{'AUTH.GENERAL.SIGNIN_BUTTON' | translate}}
-            </button>
-
-            @if (isLoading$ | async) {
-              <span class="spinner spinner-primary ml-4"></span>
-            }
-          </div>
-        </div>
-      </form>
-      <!-- <div class="d-grid mt-4">
-      <button type="button" class="btn btn-primary">Login</button>
-    </div> -->
-
-
-    <!-- <div class="saprator mt-3">
-    <span>Login with</span>
+  <div class="bg-decoration" aria-hidden="true">
+    <svg class="bg-shape bg-shape--1" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="200" cy="200" r="200" stroke="#f5b026" stroke-width="0.5" opacity="0.15" />
+      <circle cx="200" cy="200" r="150" stroke="#f5b026" stroke-width="0.3" opacity="0.1" />
+      <circle cx="200" cy="200" r="100" stroke="#f5b026" stroke-width="0.3" opacity="0.08" />
+    </svg>
+    <svg class="bg-shape bg-shape--2" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0.5" y="0.5" width="299" height="299" stroke="#f5b026" stroke-width="0.5" opacity="0.12" transform="rotate(15 150 150)" />
+      <rect x="30.5" y="30.5" width="239" height="239" stroke="#f5b026" stroke-width="0.3" opacity="0.08" transform="rotate(15 150 150)" />
+    </svg>
+    <svg class="bg-shape bg-shape--3" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="100,5 195,50 195,150 100,195 5,150 5,50" stroke="#f5b026" stroke-width="0.5" opacity="0.1" />
+    </svg>
   </div>
-  <div class="row">
-    @for (item of SignInOptions; track item) {
-      <div class="col-4">
-        <div class="d-grid">
-          <button type="button" class="btn mt-2 btn-light-primary bg-light text-muted">
-            <img src="{{ item.image }}" alt="google img" />
-            <span class="d-none d-sm-inline-block"> {{ item.name }}</span>
-          </button>
+
+  <div class="auth-wrapper v3">
+    <div class="auth-header">
+      <a [routerLink]="['/']" class="brand-logo">VendeDTo</a>
+      <div class="header-divider"></div>
+      <span class="header-tagline">Automatiza tu Negocio</span>
+    </div>
+
+    <div class="auth-form">
+      <div class="login-card">
+        <div class="login-card__header">
+          <div class="header-ornament" aria-hidden="true">
+            <svg width="40" height="2" viewBox="0 0 40 2" fill="none">
+              <line x1="0" y1="1" x2="40" y2="1" stroke="#f5b026" stroke-width="2" />
+            </svg>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="#f5b026" stroke-width="1" />
+            </svg>
+            <svg width="40" height="2" viewBox="0 0 40 2" fill="none">
+              <line x1="0" y1="1" x2="40" y2="1" stroke="#f5b026" stroke-width="2" />
+            </svg>
+          </div>
+          <h2 class="login-card__title">{{ 'AUTH.GENERAL.WELCOME' | translate }}</h2>
+          <p class="login-card__subtitle">
+            {{ 'AUTH.GENERAL.NO_ACCOUNT' | translate }}
+            <a [routerLink]="['/register']" class="link-accent" [translate]="'AUTH.GENERAL.SIGNUP_BUTTON'"></a>
+          </p>
         </div>
+
+        <form class="login-form" [formGroup]="loginForm" novalidate="novalidate" id="kt_login_signin_form" (ngSubmit)="submit()">
+          @if (hasError) {
+            <div class="alert-custom">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>{{ errorMessage }}</span>
+            </div>
+          }
+
+          <div class="form-grid">
+            <div class="form-field-row">
+              <label class="field-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                  <polyline points="10 17 15 12 10 7" />
+                  <line x1="15" y1="12" x2="3" y2="12" />
+                </svg>
+              </label>
+              <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                <mat-label>{{ 'GENERAL.LOGIN' | translate }}</mat-label>
+                <input matInput formControlName="login" required autocomplete="off" />
+                @if (loginForm.controls['login'].invalid && loginForm.controls['login'].touched) {
+                  <mat-error>{{ 'GENERAL.VALIDATION.INVALID' | translate: { name: 'GENERAL.LOGIN' | translate } }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+
+            <div class="form-field-row">
+              <label class="field-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </label>
+              <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
+                <mat-label>{{ 'GENERAL.PASSWORD' | translate }}</mat-label>
+                <input matInput formControlName="password" required autocomplete="off" [type]="showPassword ? 'text' : 'password'" />
+                <button type="button" mat-icon-button matSuffix (click)="onShowPassword($event)">
+                  <mat-icon>{{ showPassword ? 'visibility' : 'visibility_off' }}</mat-icon>
+                </button>
+                @if (isControlInvalid('password', 'required')) {
+                  <mat-error>{{ 'GENERAL.VALIDATION.REQUIRED' | translate: { name: 'GENERAL.PASSWORD' | translate } }}</mat-error>
+                }
+              </mat-form-field>
+            </div>
+          </div>
+
+          <div class="submit-section">
+            <button mat-fab extended class="submit-btn" color="primary" type="submit">
+              <mat-icon>login</mat-icon>
+              {{ 'AUTH.GENERAL.SIGNIN_BUTTON' | translate }}
+            </button>
+            @if (isLoading$ | async) {
+              <span class="spinner-inline" aria-label="Loading"></span>
+            }
+          </div>
+        </form>
       </div>
-    }
-  </div> -->
-</div>
-</div>
-<app-guest-footer></app-guest-footer>
-</div>
-</div>
+    </div>
+
+    <div class="auth-footer">
+      <app-guest-footer></app-guest-footer>
+    </div>
+  </div>
 </div>
