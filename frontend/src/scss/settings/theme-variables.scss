@@ -3,44 +3,31 @@
 // =======================================
 :root {
   // body
-  --#{$variable-prefix}body-bg: #{$dark-bg};
-  --bs-body-bg-rgb: #{to-rgb($dark-bg)};
+  --#{$variable-prefix}body-bg: #{$body-bg};
+  --bs-body-bg-rgb: #{to-rgb($body-bg)};
 
-  --pc-heading-color: #{$dark-text};
-  --pc-active-background: #{$dark-accent};
+  --pc-heading-color: #{$gray-800};
+  --pc-active-background: #{$gray-200};
 
   // Navbar
-  --pc-sidebar-background: #{$dark-bg};
-  --pc-sidebar-color: #{$dark-text};
-  --pc-sidebar-color-rgb: #{to-rgb($dark-text)};
-  --pc-sidebar-active-color: #{$dark-accent};
+  --pc-sidebar-background: #{$white};
+  --pc-sidebar-color: #262626;
+  --pc-sidebar-color-rgb: #{to-rgb(#262626)};
+  --pc-sidebar-active-color: var(--bs-primary);
   --pc-sidebar-shadow: none;
-  --pc-sidebar-caption-color: #{$dark-text-muted};
+  --pc-sidebar-caption-color: #{$gray-700};
 
   // header
-  --pc-header-background: #{$dark-bg};
-  --pc-header-color: #{$dark-text};
-  --pc-header-shadow: 0 1px 0 0px rgba(245, 176, 38, 0.08);
+  --pc-header-background: #{$white};
+  --pc-header-color: #262626;
+  --pc-header-shadow: 0 1px 0 0px rgb(240 240 240);
 
   // card
   --pc-card-box-shadow: none;
 
   // horizontal menu
-  --pc-header-submenu-background: #{$dark-bg};
-  --pc-header-submenu-color: #{$dark-text-muted};
-
-  // Dark theme specific
-  --color-bg: #{$dark-bg};
-  --color-surface: #{$dark-surface};
-  --color-border: #{$dark-border};
-  --color-border-strong: #{$dark-border-strong};
-  --color-accent: #{$dark-accent};
-  --color-text: #{$dark-text};
-  --color-text-muted: #{$dark-text-muted};
-  --color-text-subtle: rgba(232, 228, 220, 0.3);
-  --color-error: #ff6b6b;
-  --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI Display', system-ui, sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --pc-header-submenu-background: #{$white};
+  --pc-header-submenu-color: #{$gray-600};
 }
 
 $header-height: 60px;

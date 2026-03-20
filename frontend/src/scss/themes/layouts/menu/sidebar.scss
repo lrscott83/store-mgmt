@@ -10,15 +10,11 @@
   display: block;
   height: 100vh;
   color: var(--pc-sidebar-color);
-  border-right: 1px solid rgba(245, 176, 38, 0.15);
+  border-right: 1px solid rgb(240, 240, 240);
 
   a {
-    color: var(--color-text);
+    color: #262626;
     cursor: pointer;
-
-    &:hover {
-      color: var(--color-accent);
-    }
   }
 
   .navbar-wrapper {
@@ -34,6 +30,7 @@
 
   .m-header {
     height: $header-height;
+    // display: flex;
     align-items: center;
     padding: 16px 24px;
     position: relative;
@@ -53,13 +50,13 @@
       width: 40px;
       height: 40px;
       border-radius: $border-radius;
-      color: var(--color-text);
+      color: var(--pc-header-color);
       overflow: hidden;
 
       &.dropdown-toggle::after {
         display: none;
       }
-
+  
       &::before {
         content: '';
         position: absolute;
@@ -68,12 +65,12 @@
         right: 0;
         bottom: 0;
         z-index: 1;
-        background: rgba(245, 176, 38, 0.12);
+        background: var(--pc-active-background);
         border-radius: 50%;
         transform: scale(0);
         transition: all 0.08s cubic-bezier(0.37, 0.24, 0.53, 0.99);
       }
-
+  
       > img,
       > span,
       > svg,
@@ -82,45 +79,59 @@
         z-index: 5;
         transition: all 0.08s cubic-bezier(0.37, 0.24, 0.53, 0.99);
       }
-
+  
       > i {
-        color: var(--color-text);
+        color: var(--pc-header-color);
         font-size: 24px;
       }
-
+  
       > svg {
         width: 24px;
         height: 24px;
       }
-
+  
       &.active,
       &:active,
       &:focus,
       &:hover {
         text-decoration: none;
-        color: var(--color-accent);
-
+        color: var(--pc-header-color);
+  
         > svg,
         > i {
-          color: var(--color-accent);
+          color: var(--pc-header-color);
         }
-
+  
         &::before {
           border-radius: 0;
           transform: scale(1);
+        }
+  
+        .hamburger {
+          .hamburger-inner {
+            background-color: $secondary;
+  
+            &::after,
+            &::before {
+              background-color: $secondary;
+            }
+          }
+        }
+  
+        i.material-icons-two-tone {
+          background-color: $secondary;
         }
       }
     }
   }
 
   .nav-card {
-    background: rgba(245, 176, 38, 0.05);
+    background: $gray-100;
   }
 
   .user-profile-section {
     padding: 10px 24px;
-    border-top: 2px solid rgba(245, 176, 38, 0.08);
-
+    border-top: 2px solid rgb(240, 240, 240);
     .dropdown-toggle::after {
       display: none;
     }
@@ -170,7 +181,6 @@
       }
     }
   }
-
   .navbar-content {
     position: relative;
     height: calc(100vh - 60px);
@@ -199,7 +209,6 @@
               top: 11px;
               right: 20px;
               transition: 0.3s ease-in-out;
-              color: var(--color-text-muted);
             }
           }
 
@@ -207,7 +216,9 @@
             opacity: 0;
             visibility: hidden;
             transform-origin: 50% 50%;
-            transition: transform 0.3s, opacity 0.3s;
+            transition:
+              transform 0.3s,
+              opacity 0.3s;
             transform-style: preserve-3d;
             transform: rotateX(-90deg);
             position: absolute;
@@ -238,7 +249,6 @@
                 margin: 0;
                 display: block;
               }
-
               .coded-submenu > {
                 app-nav-item li {
                   > a {
@@ -271,7 +281,7 @@
           padding: 12px 24px 12px;
           text-transform: capitalize;
           position: relative;
-          color: var(--color-text-muted);
+          color: $gray-600;
 
           &.first-group {
             padding: 0px 24px 12px;
@@ -284,8 +294,6 @@
           align-items: center;
           border-radius: 5px;
           position: relative;
-          color: var(--color-text);
-          transition: all 0.2s ease;
 
           .coded-mtext {
             position: relative;
@@ -297,8 +305,6 @@
             height: 16px;
             display: inline-block;
             text-align: center;
-            color: var(--color-text-muted);
-            transition: color 0.2s;
 
             i {
               display: flex;
@@ -308,15 +314,6 @@
               position: relative;
               vertical-align: middle;
               text-align: center;
-            }
-          }
-
-          &:hover {
-            background: rgba(245, 176, 38, 0.05);
-            color: var(--color-accent);
-
-            > .coded-micon {
-              color: var(--color-accent);
             }
           }
         }
@@ -335,7 +332,6 @@
       > app-nav-group > app-nav-item {
         li {
           position: relative;
-
           &:before {
             content: '';
             position: absolute;
@@ -362,10 +358,9 @@
       padding-left: 8px;
       padding-right: 8px;
       white-space: nowrap;
-      background-color: rgba(245, 176, 38, 0.05);
-      color: var(--color-text-muted);
+      background-color: rgb(250, 250, 250);
+      color: rgb(158, 158, 158);
       border-radius: 16px;
-      border: 1px solid rgba(245, 176, 38, 0.1);
     }
   }
 }
@@ -373,23 +368,18 @@
 @media (min-width: 1025px) {
   .pc-sidebar {
     transition: width 0.15s ease;
-
     ~ .pc-header {
       transition: left 0.15s ease;
     }
-
     ~ .pc-footer,
     ~ .pc-container {
       transition: margin-left 0.15s ease;
     }
-
     &.pc-sidebar-hide {
       width: 0;
-
       ~ .pc-header {
         left: 0;
       }
-
       ~ .pc-footer,
       ~ .pc-container {
         margin-left: 0px;
@@ -399,11 +389,9 @@
 }
 
 @media (max-width: 1024px) {
-
   .pc-header .pc-h-item.pc-sidebar-collapse {
     display: none;
   }
-
   .pc-sidebar {
     left: -#{$sidebar-width};
     box-shadow: none;
@@ -412,7 +400,6 @@
 
     &.mob-open {
       left: 0;
-      box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
 
       .navbar-wrapper {
         position: relative;
