@@ -1,40 +1,43 @@
-// src/app/services/update.service.ts
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
 import { SwUpdate } from '@angular/service-worker';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { interval } from 'rxjs';
+import { interval, Subscription } from 'rxjs';
 import Swal from 'sweetalert2';
 
 @Injectable({ providedIn: 'root' })
 export class UpdateService {
+  private versionSubscription: Subscription | null = null;
+  private checkSubscription: Subscription | null = null;
+  private readonly CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
   constructor(
     private updates: SwUpdate,
-    private snackbar: MatSnackBar
-  ) {
-    if (this.updates.isEnabled) {
-      // Escuchar cuando haya una nueva versión disponible
-      this.updates.versionUpdates.subscribe((event) => {
-        if (event.type === 'VERSION_READY') {
-          this.showUpdateDialog();
-          // const snack = this.snackbar.open(
-          //     'Hay una nueva versión disponible',
-          //     'Actualizar',
-          //     { duration: 6000 }
-          // );
+    private zone: NgZone
+  ) {}
 
-          // snack.onAction().subscribe(() => {
-          //     this.updates.activateUpdate().then(() => location.reload());
-          // });
-        }
+  init(): void {
+    if (!this.updates.isEnabled) return;
+
+    this.zone.runOutsideAngular(() => {
+      this.updates.versionUpdates.subscribe({
+        next: (event) => {
+          if (event.type === 'VERSION_READY') {
+            this.zone.run(() => this.showUpdateDialog());
+          }
+        },
+        error: () => {}
       });
 
-      // Verificar periódicamente si hay actualizaciones
-      interval(60 * 60 * 1000).subscribe(() => this.updates.checkForUpdate());
-    }
+      this.checkSubscription = interval(this.CHECK_INTERVAL_MS).subscribe({
+        next: () => {
+          this.updates.checkForUpdate().catch(() => {});
+        }
+      });
+    });
   }
 
-  public checkForUpdate() {
-    if (this.updates) this.updates.checkForUpdate();
+  checkForUpdate(): void {
+    if (!this.updates.isEnabled) return;
+    this.updates.checkForUpdate().catch(() => {});
   }
 
   private showUpdateDialog(): void {
@@ -51,7 +54,10 @@ export class UpdateService {
       }
     }).then((result) => {
       if (result.isConfirmed) {
-        this.updates.activateUpdate().then(() => location.reload());
+        this.updates
+          .activateUpdate()
+          .then(() => location.reload())
+          .catch(() => {});
       }
     });
   }

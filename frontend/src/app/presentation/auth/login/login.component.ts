@@ -12,7 +12,6 @@ import Swal from 'sweetalert2';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { StoreUsageTrackerService } from 'src/app/_services/usage-tracker/store-usage-tracker.service';
-import { UpdateService } from 'src/app/_services/update/update.service';
 import { PreloadingService } from 'src/app/_services/preloading.service';
 
 @Component({
@@ -42,7 +41,6 @@ export default class LoginComponent implements OnInit, OnDestroy {
     //private connectionService: ConnectionService,
     private toastrService: ToastrService,
     private storeUsageTracker: StoreUsageTrackerService,
-    private updateService: UpdateService,
     private preloadingService: PreloadingService,
     @Inject(PRODUCT_SERVICE) private productService: ProductService
   ) {
@@ -51,7 +49,6 @@ export default class LoginComponent implements OnInit, OnDestroy {
     if (this.authService.currentUserValue) {
       this.navigateToUserHome();
     }
-    this.updateService.checkForUpdate();
   }
 
   ngOnInit(): void {
