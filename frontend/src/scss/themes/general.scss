@@ -8,15 +8,21 @@
   }
 }
 
+body {
+  color: #e8e4dc;
+  background-color: #0a0a0a;
+}
+
 .accordion {
-  --#{$prefix}accordion-color: #{$body-color};
+  --#{$prefix}accordion-color: #e8e4dc;
 }
 
 a {
-  color: $black;
+  color: #f5b026;
   &:hover {
     outline: none;
     text-decoration: none;
+    color: #f7c84d;
   }
 
   &:not([href]) {
@@ -26,6 +32,28 @@ a {
 
 p {
   font-size: 14px;
+  color: #e8e4dc;
+}
+
+h6,
+.h6,
+h5,
+.h5,
+h4,
+.h4,
+h3,
+.h3,
+h2,
+.h2,
+h1,
+.h1 {
+  color: #e8e4dc;
+}
+
+b,
+strong {
+  font-weight: 600;
+  color: #e8e4dc;
 }
 
 h6,

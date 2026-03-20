@@ -1,0 +1,105 @@
+:host {
+  display: block;
+
+  --color-accent: #f5b026;
+  --color-text: #e8e4dc;
+  --color-text-muted: rgba(232, 228, 220, 0.5);
+  --color-bg: #0a0a0a;
+}
+
+li {
+  position: relative;
+
+  > a {
+    padding: 10px 16px 10px 28px;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    position: relative;
+    color: var(--color-text);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    margin: 2px 12px;
+    cursor: pointer;
+
+    &:after {
+      content: '\e844';
+      font-family: 'feather';
+      font-size: 15px;
+      border: none;
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      transition: transform 0.3s ease;
+      color: var(--color-text-muted);
+    }
+
+    .coded-micon {
+      font-size: 16px;
+      margin-right: 12px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--color-text-muted);
+      transition: color 0.2s;
+
+      i {
+        display: flex;
+      }
+    }
+
+    .coded-mtext {
+      position: relative;
+      font-size: 0.875rem;
+    }
+
+    &:hover {
+      background: rgba(245, 176, 38, 0.05);
+      color: var(--color-accent);
+
+      .coded-micon {
+        color: var(--color-accent);
+      }
+
+      &:after {
+        color: var(--color-accent);
+      }
+    }
+  }
+
+  &.coded-trigger {
+    > a {
+      &:after {
+        transform: translateY(-50%) rotate(90deg);
+      }
+    }
+  }
+}
+
+.coded-submenu {
+  background: var(--color-bg);
+  border: 1px solid rgba(245, 176, 38, 0.08);
+  border-radius: 6px;
+  margin: 4px 12px;
+  padding: 4px 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+
+  li {
+    > a {
+      padding-left: 44px;
+      font-size: 0.85rem;
+
+      .coded-micon {
+        display: none;
+      }
+    }
+
+    &.active,
+    &:hover {
+      > a {
+        background: rgba(245, 176, 38, 0.05);
+      }
+    }
+  }
+}

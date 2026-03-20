@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 export class UpdateService {
   private versionSubscription: Subscription | null = null;
   private checkSubscription: Subscription | null = null;
-  private readonly CHECK_INTERVAL_MS = 60 * 60 * 1000;
+  private readonly CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
   constructor(
     private updates: SwUpdate,

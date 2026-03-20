@@ -1,8 +1,10 @@
+@import '../../../../scss/components/variables.bootstrap';
+
 .pc-header {
   background: var(--pc-header-background);
   color: var(--pc-header-color);
   min-height: $header-height;
-  border-bottom: 1px solid rgb(240, 240, 240);
+  border-bottom: 1px solid rgba(245, 176, 38, 0.08);
   position: fixed;
   left: $sidebar-width;
   right: 0;
@@ -89,8 +91,11 @@
     width: 40px;
     height: 40px;
     border-radius: $border-radius;
-    color: var(--pc-header-color);
+    color: var(--color-text);
     overflow: hidden;
+    background: rgba(245, 176, 38, 0.05);
+    border: 1px solid rgba(245, 176, 38, 0.1);
+    transition: all 0.2s ease;
 
     &.dropdown-toggle::after {
       display: none;
@@ -104,7 +109,7 @@
       right: 0;
       bottom: 0;
       z-index: 1;
-      background: var(--pc-active-background);
+      background: rgba(245, 176, 38, 0.12);
       border-radius: 50%;
       transform: scale(0);
       transition: all 0.08s cubic-bezier(0.37, 0.24, 0.53, 0.99);
@@ -120,13 +125,14 @@
     }
 
     > i {
-      color: var(--pc-header-color);
+      color: var(--color-accent);
       font-size: 24px;
     }
 
     > svg {
       width: 24px;
       height: 24px;
+      color: var(--color-accent);
     }
 
     &.active,
@@ -134,31 +140,18 @@
     &:focus,
     &:hover {
       text-decoration: none;
-      color: var(--pc-header-color);
+      color: var(--color-accent);
+      border-color: rgba(245, 176, 38, 0.3);
+      background: rgba(245, 176, 38, 0.1);
 
       > svg,
       > i {
-        color: var(--pc-header-color);
+        color: var(--color-accent);
       }
 
       &::before {
         border-radius: 0;
         transform: scale(1);
-      }
-
-      .hamburger {
-        .hamburger-inner {
-          background-color: $secondary;
-
-          &::after,
-          &::before {
-            background-color: $secondary;
-          }
-        }
-      }
-
-      i.material-icons-two-tone {
-        background-color: $secondary;
       }
     }
 
@@ -179,6 +172,8 @@
       right: 0px;
       border-radius: 50%;
       z-index: 9;
+      background: var(--color-accent);
+      color: #0a0a0a;
 
       &.dots {
         width: 9px;
@@ -210,7 +205,7 @@
         weight: 400;
       }
 
-      color: var(--pc-header-color);
+      color: var(--color-text-muted);
     }
 
     .settings {
@@ -221,6 +216,10 @@
   .pc-h-dropdown {
     transform: none !important;
     top: 100% !important;
+    background: var(--color-surface) !important;
+    border: 1px solid rgba(245, 176, 38, 0.15) !important;
+    backdrop-filter: blur(20px) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
 
     &.dropdown-menu-end {
       right: 0 !important;
@@ -235,16 +234,28 @@
   .user-avatar {
     width: 40px;
     border-radius: 50%;
+    background: rgba(245, 176, 38, 0.1);
+    border: 1px solid rgba(245, 176, 38, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    i {
+      color: var(--color-accent);
+    }
   }
 
   .header-user-profile {
     .pc-head-link {
       width: auto;
       padding: 7px;
+      background: transparent;
+      border-color: transparent;
 
       > span > i {
         font-size: 22px;
         margin-right: 8px;
+        color: var(--color-accent);
       }
 
       .user-avatar {
@@ -269,30 +280,37 @@
   .dropdown-user-profile {
     min-width: 290px;
     max-width: 100%;
+
     .drp-tabs {
       border-bottom: 0;
       display: flex;
       margin-bottom: 10px;
+
       .nav-item {
         margin-bottom: -0px;
+
         .nav-link {
           position: relative;
           padding: 0.7rem;
           font-weight: 500;
-          color: $body-color;
+          color: var(--color-text-muted);
           display: flex;
           align-items: center;
           justify-content: center;
+
           i {
             font-size: 18px;
             margin: 0 4px;
+            color: var(--color-text-muted);
           }
+
           .material-icons-two-tone {
             font-size: 20px;
           }
+
           &:after {
             content: '';
-            background: $primary;
+            background: var(--color-accent);
             position: absolute;
             transition: all 0.3s ease-in-out;
             left: 50%;
@@ -306,34 +324,52 @@
 
       .nav-link:hover {
         border-color: transparent;
-        color: $primary;
+        color: var(--color-accent);
+
         .material-icons-two-tone {
-          background-color: $primary;
+          background-color: var(--color-accent);
         }
       }
 
       .nav-item.show .nav-link,
       .nav-link.active {
         border-color: transparent;
-        color: $primary;
+        color: var(--color-accent);
+
         .material-icons-two-tone {
-          background-color: $primary;
+          background-color: var(--color-accent);
         }
+
         &:after {
           left: 0;
           right: 0;
         }
       }
     }
+
     .tab-content {
       .dropdown-item {
+        color: var(--color-text);
+        transition: all 0.2s ease;
+
         i {
           font-size: 14px;
+          color: var(--color-text-muted);
         }
+
         svg {
           margin-right: 0px;
           width: 14px;
           height: 14px;
+        }
+
+        &:hover {
+          background: rgba(245, 176, 38, 0.05);
+          color: var(--color-accent);
+
+          i {
+            color: var(--color-accent);
+          }
         }
       }
     }
@@ -342,12 +378,25 @@
   .dropdown-notification {
     min-width: 420px;
     max-width: 100%;
+    padding: 1rem;
+
+    .dropdown-header {
+      color: var(--color-text);
+      border-bottom: 1px solid rgba(245, 176, 38, 0.1);
+      padding-bottom: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .dropdown-divider {
+      border-color: rgba(245, 176, 38, 0.08);
+    }
 
     .list-group-item-action {
       &:active,
       &:hover,
       &:focus {
-        background: shift-color($primary, $soft-bg-level);
+        background: rgba(245, 176, 38, 0.05);
+        color: var(--color-accent);
       }
 
       .user-avatar,
@@ -356,33 +405,7 @@
       }
     }
 
-    .badge {
-      font-size: 0.8125rem;
-      padding: 0.43em 1em;
-    }
-
-    .user-avatar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 40px;
-      height: 40px;
-      font-size: 20px;
-    }
-
-    .notification-file {
-      display: flex;
-      align-items: center;
-
-      i {
-        font-size: 20px;
-        margin-right: 16px;
-      }
-    }
-    @media (max-width: 575.98px) {
-      min-width: 100%;
-    }
-  }
+}
 }
 
 @keyframes anim-rotate {

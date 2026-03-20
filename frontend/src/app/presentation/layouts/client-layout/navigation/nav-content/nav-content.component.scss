@@ -1,0 +1,38 @@
+:host {
+  display: block;
+
+  --color-bg: #0a0a0a;
+  --color-border: rgba(245, 176, 38, 0.15);
+  --color-accent: #f5b026;
+  --color-text: #e8e4dc;
+  --color-text-muted: rgba(232, 228, 220, 0.5);
+}
+
+.scroll-div {
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(245, 176, 38, 0.2);
+    border-radius: 2px;
+
+    &:hover {
+      background: rgba(245, 176, 38, 0.3);
+    }
+  }
+}
+
+.coded-inner-navbar {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}

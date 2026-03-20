@@ -1,5 +1,5 @@
 body {
-  background-color: $white;
+  background-color: $dark-bg;
 }
 
 .pc-container {
@@ -8,7 +8,7 @@ body {
   top: $header-height;
   margin-left: $sidebar-width;
   min-height: calc(100vh - #{$temp});
-  background: rgb(250, 250, 251);
+  background: $dark-bg;
 
   .coded-content {
     padding-left: 48px;

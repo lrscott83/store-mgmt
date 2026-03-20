@@ -1,0 +1,30 @@
+:host {
+  display: block;
+
+  --color-text-muted: rgba(232, 228, 220, 0.5);
+  --color-accent: #f5b026;
+}
+
+.coded-menu-caption {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 16px 24px 8px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: '';
+    display: block;
+    width: 16px;
+    height: 1px;
+    background: rgba(245, 176, 38, 0.3);
+  }
+
+  &:first-child {
+    padding-top: 8px;
+  }
+}
