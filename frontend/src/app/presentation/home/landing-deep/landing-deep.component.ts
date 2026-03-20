@@ -14,6 +14,12 @@ export class LandingDeepComponent implements AfterViewInit {
   @ViewChild('navEl') navEl!: ElementRef<HTMLElement>;
   @ViewChildren('featureCard') featureCards!: QueryList<ElementRef<HTMLElement>>;
 
+  closeMenu(): void {
+    setTimeout(() => {
+      this.menuOpen = false;
+    }, 10);
+  }
+
   ngAfterViewInit(): void {
     this.setupScrollObserver();
   }

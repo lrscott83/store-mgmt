@@ -8,7 +8,7 @@
         <div class="d-none d-lg-flex align-items-center gap-4">
           <a class="nav-auth-link" href="#caracteristicas">Características</a>
           <a class="nav-auth-link" href="#como-funciona">Cómo funciona</a>
-          <a class="btn-primary-amber" [routerLink]="['/register']">
+          <a class="btn-primary-amber" href="#registro">
             Comenzar
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -24,13 +24,11 @@
       </div>
 
       <div class="nav-dropdown" [class.show]="menuOpen">
-        <a class="nav-dropdown-item" href="#hero" (click)="menuOpen = false">Inicio</a>
-        <a class="nav-dropdown-item" href="#caracteristicas" (click)="menuOpen = false">Características</a>
-        <a class="nav-dropdown-item" href="#como-funciona" (click)="menuOpen = false">Cómo funciona</a>
-        <a class="nav-dropdown-item" [routerLink]="['/login']" (click)="menuOpen = false">Iniciar sesión</a>
-        <a class="nav-dropdown-item" [routerLink]="['/register']" (click)="menuOpen = false" style="color: #f5b026; font-weight: 600"
-          >Comenzar gratis</a
-        >
+        <a class="nav-dropdown-item" href="#hero" (click)="closeMenu()">Inicio</a>
+        <a class="nav-dropdown-item" href="#caracteristicas" (click)="closeMenu()">Características</a>
+        <a class="nav-dropdown-item" href="#como-funciona" (click)="closeMenu()">Cómo funciona</a>
+        <a class="nav-dropdown-item" [routerLink]="['/login']" (click)="closeMenu()">Iniciar sesión</a>
+        <a class="nav-dropdown-item" href="#registro" (click)="closeMenu()" style="color: #f5b026; font-weight: 600">Comenzar</a>
       </div>
     </div>
   </nav>
@@ -54,8 +52,8 @@
             dispositivo.
           </p>
           <div class="hero-actions">
-            <a [routerLink]="['/register']" class="btn-primary-amber">
-              Prueba gratis
+            <a href="#registro" class="btn-primary-amber">
+              Comenzar
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
@@ -75,15 +73,15 @@
           <div class="hero-card">
             <div class="hero-card-stat">
               <span class="hero-card-number">24</span>
-              <span class="hero-card-label">hrs sin conexión</span>
+              <span class="hero-card-label">hrs, sin conexión</span>
             </div>
             <div class="hero-card-stat">
               <span class="hero-card-number">100%</span>
-              <span class="hero-card-label">de tus datos</span>
+              <span class="hero-card-label">seguridad de tus datos</span>
             </div>
             <div class="hero-card-stat">
               <span class="hero-card-number">0</span>
-              <span class="hero-card-label">costo mensual</span>
+              <span class="hero-card-label">descontrol</span>
             </div>
           </div>
         </div>
@@ -137,7 +135,7 @@
               </svg>
             </div>
             <h3 class="feature-title">Funciona sin Internet</h3>
-            <p class="feature-desc">Todas las funciones disponibles sin conexión. Solo la autenticación requiere red.</p>
+            <p class="feature-desc">Todas las funciones disponibles sin conexión. Solo la autenticación requiere Internet.</p>
           </div>
         </div>
 
@@ -338,12 +336,12 @@
           style="
             margin-top: 1.25rem;
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 0.75rem;
+            font-size: 1rem;
             color: rgba(245, 240, 235, 0.3);
             letter-spacing: 0.04em;
           "
         >
-          Sin tarjeta de crédito · Sin suscripciones mensuales
+          2 meses de prueba gratis · Pago mensual post-uso
         </p>
       </div>
     </div>
@@ -352,7 +350,7 @@
   <!-- FOOTER -->
   <footer class="footer">
     <div class="container">
-      <p class="footer-text mb-0"> &copy; 2026 VendeDTo · Desarrollado con ♥ para emprendedores </p>
+      <p class="footer-text mb-0"> &copy; 2026 VendeDTo · Desarrollado para emprendedores con éxito</p>
     </div>
   </footer>
 </div>
