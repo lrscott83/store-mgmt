@@ -11,6 +11,7 @@ import { locale as deLang } from './_modules/i18n/vocabs/de';
 import { locale as frLang } from './_modules/i18n/vocabs/fr';
 import { LoadingComponent } from './presentation/shared/components/loading/loading.component';
 import { UpdateService } from './_services/update/update.service';
+import { LoadingService } from './_services/loading.service';
 import { StoreUsageTrackerService } from './_services/usage-tracker/store-usage-tracker.service';
 import Swal from 'sweetalert2';
 import { SwUpdate } from '@angular/service-worker';
@@ -37,12 +38,14 @@ export class AppComponent implements OnInit {
   downloadedSize$ = this.downloadManager.downloadedSize$;
   totalSize$ = this.downloadManager.totalSize$;
   estimatedTime = '';
+  loading$ = this.loadingService.loading$;
 
   constructor(
     private translationService: TranslationService,
     private updateService: UpdateService,
     private storeUsageTracker: StoreUsageTrackerService,
-    private downloadManager: DownloadManagerService
+    private downloadManager: DownloadManagerService,
+    private loadingService: LoadingService
   ) {
     // register translations
     this.translationService.loadTranslations(esLang, enLang, chLang, jpLang, deLang, frLang);

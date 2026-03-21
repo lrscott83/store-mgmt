@@ -1,6 +1,7 @@
 <!-- <app-loading-spinner id="loading-spinner"></app-loading-spinner> -->
-<block-ui blockTarget="mainBlocker">
-  <router-outlet>
-    <!-- <app-spinner></app-spinner> -->
-  </router-outlet>
-</block-ui>
+@if (loading$ | async) {
+  <div class="http-loading-overlay">
+    <div class="http-loading-spinner"></div>
+  </div>
+}
+<router-outlet></router-outlet>

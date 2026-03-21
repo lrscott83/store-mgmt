@@ -60,8 +60,7 @@ export function initializeApp(appInitService: AppInitService) {
     ServiceWorkerModule.register('/ngsw-worker.js', {
       enabled: true,
       registrationStrategy: 'registerWithDelay:5000'
-    }),
-    LoadingInterceptor
+    })
   ],
   providers: [
     //provideRouter(routes),
