@@ -53,6 +53,40 @@
 @import 'ngx-toastr/toastr-bs5-alert';
 
 .barcode-scanner-modal {
+
+}
+
+/****************************/
+/* NG-HTTP-LOADER OVERRIDE  */
+/****************************/
+
+.overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(10, 10, 10, 0.75) !important;
+  z-index: 9999 !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.spinner {
+  width: 48px !important;
+  height: 48px !important;
+  border: 3px solid rgba(245, 176, 38, 0.2) !important;
+  border-top-color: #f5b026 !important;
+  border-radius: 50% !important;
+  animation: httpLoaderSpin 0.8s linear infinite !important;
+}
+
+@keyframes httpLoaderSpin {
+  to { transform: rotate(360deg); }
+}
   .modal-dialog {
     max-width: 500px;
     width: 90%;

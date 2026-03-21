@@ -97,9 +97,6 @@
               <mat-icon>login</mat-icon>
               {{ 'AUTH.GENERAL.SIGNIN_BUTTON' | translate }}
             </button>
-            @if (isLoading$ | async) {
-              <span class="spinner-inline" aria-label="Loading"></span>
-            }
           </div>
         </form>
       </div>

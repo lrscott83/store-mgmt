@@ -16,7 +16,7 @@ import { ErrorInterceptor } from './_interceptors/error-interceptor.service';
 import { AppInitService } from './_services/app-init.service';
 import { InlineSVGModule } from 'ng-inline-svg-w';
 import { provideToastr, ToastrModule } from 'ngx-toastr';
-import { NgHttpLoaderComponent } from 'ng-http-loader';
+import { LoadingInterceptor } from './_interceptors/loading-interceptor.service';
 // import { AngularSlickgridModule } from 'angular-slickgrid';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
 //import { ConnectionInterceptor } from './_interceptors/connection-interceptor.service';
@@ -61,7 +61,7 @@ export function initializeApp(appInitService: AppInitService) {
       enabled: true,
       registrationStrategy: 'registerWithDelay:5000'
     }),
-    NgHttpLoaderComponent
+    LoadingInterceptor
   ],
   providers: [
     //provideRouter(routes),
@@ -79,6 +79,11 @@ export function initializeApp(appInitService: AppInitService) {
     {
       provide: HTTP_INTERCEPTORS,
       useClass: InterceptorService,
+      multi: true
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: LoadingInterceptor,
       multi: true
     },
     // {
