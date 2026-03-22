@@ -8,16 +8,37 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="description" content="vende de todo" />
     <meta name="keywords" content="Venta, productos, cuadre, reportes" />
-    <meta name="author" content="CodedThemes" />
+    <meta name="author" content="AutoBusinessPro" />
     <link rel="icon" type="image/png" href="assets/favicon.png" />
     <link rel="manifest" href="assets/manifest.webmanifest" />
     <meta name="theme-color" content="#1976d2" />
+
+    <!-- Preload critical font to avoid blank screen in PWA -->
+    <link rel="preload" href="assets/fonts/material-icons.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="assets/fonts/bootstrap-icons.woff2" as="font" type="font/woff2" crossorigin />
+
+    <!-- Debug: log if PWA standalone mode -->
+    <script>
+      (function() {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                            navigator.standalone === true ||
+                            (window.navigator as any).standalone === true;
+        console.log('[PWA] Running in standalone mode:', isStandalone);
+        console.log('[PWA] Display mode:', window.matchMedia('(display-mode: standalone)').matches);
+      })();
+    </script>
 
     <style type="text/css">
       body,
       html {
         height: 100%;
         padding: 0;
+        margin: 0;
+        background: #0a0a0a;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Display', system-ui, sans-serif;
       }
 
       .app-loading {
@@ -53,7 +74,7 @@
         stroke-dashoffset: 0;
         animation: dash 1.5s ease-in-out infinite;
         stroke-linecap: round;
-        stroke: #ddd;
+        stroke: #f5b026;
       }
 
       @keyframes rotate {
@@ -94,5 +115,38 @@
       </div>
     </app-root>
     <noscript>Please enable JavaScript to continue using this application.</noscript>
+
+    <!-- Debug: Show error in PWA when pressing Ctrl+Shift+E -->
+    <script>
+      window.addEventListener('keydown', function (e) {
+        if (e.ctrlKey && e.shiftKey && e.key === 'E') {
+          e.preventDefault();
+          const logs = document.createElement('div');
+          logs.id = 'debug-logs';
+          logs.style.cssText =
+            'position:fixed;top:0;left:0;width:100%;height:50vh;background:#000;color:#0f0;font-family:monospace;font-size:12px;overflow:auto;z-index:999999;padding:10px;';
+          logs.innerHTML = '<h3>Console Logs</h3><pre id="log-content"></pre>';
+          document.body.appendChild(logs);
+
+          // Try to capture console
+          const originalLog = console.log;
+          const originalError = console.error;
+          const logsArr = [];
+
+          console.log = function (...args) {
+            logsArr.push('[LOG] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+            originalLog.apply(console, args);
+          };
+          console.error = function (...args) {
+            logsArr.push('[ERROR] ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+            originalError.apply(console, args);
+          };
+
+          setTimeout(() => {
+            document.getElementById('log-content').textContent = logsArr.join('\n');
+          }, 1000);
+        }
+      });
+    </script>
   </body>
 </html>

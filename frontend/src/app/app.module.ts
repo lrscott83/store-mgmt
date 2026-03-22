@@ -1,9 +1,6 @@
 // angular import
-import { NgModule, inject, provideAppInitializer } from '@angular/core';
+import { NgModule, inject, provideAppInitializer, ErrorHandler } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-// import { BrowserAnimationsModule, provideAnimations } from '@angular/platform-browser/animations';
-
-// project import
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { SharedModule } from './presentation/shared/shared.module';
@@ -17,9 +14,7 @@ import { AppInitService } from './_services/app-init.service';
 import { InlineSVGModule } from 'ng-inline-svg-w';
 import { provideToastr, ToastrModule } from 'ngx-toastr';
 import { LoadingInterceptor } from './_interceptors/loading-interceptor.service';
-// import { AngularSlickgridModule } from 'angular-slickgrid';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
-//import { ConnectionInterceptor } from './_interceptors/connection-interceptor.service';
 import { ProductCategoryOnlineService } from './application/categories/product-category-online.service';
 import { ProductCategoryOfflineService } from './application/categories/product-category-offline.service';
 import { productCategoryServiceFactory } from './_services/factories/product-category-service.factory';
@@ -28,6 +23,7 @@ import { ProductOfflineService } from './application/products/product-offline.se
 import { ProductOnlineService } from './application/products/product-online.service';
 import { productServiceFactory } from './_services/factories/product-service.factory';
 import { ServiceWorkerModule } from '@angular/service-worker';
+import { GlobalErrorHandler } from './_services/global-error-handler.service';
 
 export function initializeApp(appInitService: AppInitService) {
   return (): Promise<any> => {
@@ -63,14 +59,14 @@ export function initializeApp(appInitService: AppInitService) {
     })
   ],
   providers: [
-    //provideRouter(routes),
-    //provideHttpClient(),
     provideHttpClient(withInterceptorsFromDi()),
-    // importProvidersFrom(AngularSlickgridModule.forRoot()),
     AppInitService,
     provideEnvironmentNgxMask(),
-    //provideAnimations(), // required animations providers
-    provideToastr(), // Toastr providers
+    provideToastr(),
+    {
+      provide: ErrorHandler,
+      useClass: GlobalErrorHandler
+    },
     provideAppInitializer(() => {
       const initializerFn = initializeApp(inject(AppInitService));
       return initializerFn();
