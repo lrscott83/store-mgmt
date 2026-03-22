@@ -14,15 +14,14 @@
     <meta name="theme-color" content="#1976d2" />
 
     <!-- Preload critical font to avoid blank screen in PWA -->
-    <link rel="preload" href="assets/fonts/material-icons.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="assets/fonts/bootstrap-icons.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="assets/fonts/material-icons.woff2" as="font" type="font/woff2" />
+    <link rel="preload" href="assets/fonts/bootstrap-icons.woff2" as="font" type="font/woff2" />
 
     <!-- Debug: log if PWA standalone mode -->
     <script>
-      (function() {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                            navigator.standalone === true ||
-                            (window.navigator as any).standalone === true;
+      (function () {
+        var nav = navigator;
+        var isStandalone = window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true;
         console.log('[PWA] Running in standalone mode:', isStandalone);
         console.log('[PWA] Display mode:', window.matchMedia('(display-mode: standalone)').matches);
       })();

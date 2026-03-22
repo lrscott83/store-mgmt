@@ -21,8 +21,9 @@ export class DownloadManagerService {
   private estimatedTotalSize = 0;
 
   constructor(
-    // private swUpdate: SwUpdate, 
-    private ngZone: NgZone) {
+    // private swUpdate: SwUpdate,
+    private ngZone: NgZone
+  ) {
     this.setupServiceWorkerEvents();
     this.calculateAppSize();
   }
@@ -31,24 +32,24 @@ export class DownloadManagerService {
     // Estimar tamaño total de la aplicación
     const links = document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]');
     const scripts = document.querySelectorAll<HTMLScriptElement>('script[src]');
-    
+
     let total = 0;
-    
+
     // Sumar tamaño de CSS
-    links.forEach(link => {
+    links.forEach((link) => {
       total += this.estimateResourceSize(link.href);
     });
-    
+
     // Sumar tamaño de JS
-    scripts.forEach(script => {
+    scripts.forEach((script) => {
       if (script.src && !script.src.includes('hot-update')) {
         total += this.estimateResourceSize(script.src);
       }
     });
-    
+
     // Agregar tamaño estimado de otros recursos
     total += 100000; // ~100KB para HTML, imágenes, etc.
-    
+
     this.estimatedTotalSize = total;
     this.totalSizeSubject.next(total);
   }
@@ -74,30 +75,62 @@ export class DownloadManagerService {
   }
 
   private handleServiceWorkerMessage(message: any): void {
-    console.log('handleServiceWorkerMessage with message: ' +JSON.stringify(message));
+    console.log('handleServiceWorkerMessage with message: ' + JSON.stringify(message));
+
+    // Handle hash mismatch: old SW cached ngsw.json from previous build
+    if (message.type === 'VERSION_INSTALLATION_FAILED') {
+      console.warn('[DownloadManager] SW version installation failed (hash mismatch). Clearing old SW cache...');
+      this.clearServiceWorkerCache();
+      return;
+    }
+
     if (message.type === 'INSTALLING') {
       this.isDownloadingSubject.next(true);
       this.progressSubject.next(0);
     }
-    
+
     if (message.type === 'DOWNLOADING') {
       const { downloaded, total } = message.payload;
       this.downloadedFiles = downloaded;
       this.totalFiles = total;
-      
+
       const progress = total > 0 ? Math.round((downloaded / total) * 100) : 0;
       this.progressSubject.next(progress);
-      
+
       // Calcular tamaño descargado estimado
       const downloadedSize = (downloaded / total) * this.estimatedTotalSize;
       this.downloadedSizeSubject.next(downloadedSize);
     }
-    
+
     if (message.type === 'INSTALLED') {
       setTimeout(() => {
         this.isDownloadingSubject.next(false);
         this.progressSubject.next(100);
       }, 1000);
+    }
+  }
+
+  private clearServiceWorkerCache(): void {
+    // Unregister old service workers so new build takes over
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          console.log('[DownloadManager] Unregistering old SW:', registration.scope);
+          registration.unregister();
+        });
+      });
+
+      // Also clear SW cache via Cache API if available
+      if ('caches' in window) {
+        caches.keys().then((cacheNames) => {
+          cacheNames.forEach((cacheName) => {
+            if (cacheName.includes('ngsw') || cacheName.includes('workbox')) {
+              console.log('[DownloadManager] Deleting SW cache:', cacheName);
+              caches.delete(cacheName);
+            }
+          });
+        });
+      }
     }
   }
 
