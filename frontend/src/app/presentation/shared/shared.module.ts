@@ -140,6 +140,6 @@ import { FileSizePipe } from 'src/app/_shared/pipes/file-size/file-size.pipe';
     FileSizePipe
   ],
   declarations: [SpinnerComponent, LoadingSpinnerComponent, DownloadProgressComponent, FileSizePipe],
-  providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-ES' }, provideNgxMask()]
+  providers: [{ provide: MAT_DATE_LOCALE, useValue: 'es-ES' }]
 })
 export class SharedModule {}

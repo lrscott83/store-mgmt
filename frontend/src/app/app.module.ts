@@ -1,5 +1,5 @@
 // angular import
-import { NgModule, inject, provideAppInitializer, ErrorHandler } from '@angular/core';
+import { NgModule, inject, provideAppInitializer, ErrorHandler, LOCALE_ID } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -59,6 +59,7 @@ export function initializeApp(appInitService: AppInitService) {
     })
   ],
   providers: [
+    { provide: LOCALE_ID, useValue: 'es-ES' },
     provideHttpClient(withInterceptorsFromDi()),
     AppInitService,
     provideEnvironmentNgxMask(),
