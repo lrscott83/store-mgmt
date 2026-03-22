@@ -17,6 +17,8 @@ import Swal from 'sweetalert2';
 import { SwUpdate } from '@angular/service-worker';
 import { DownloadManagerService } from './_services/download-manager/download-manager.service';
 import { filter } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'app-root',
@@ -45,7 +47,8 @@ export class AppComponent implements OnInit {
     private updateService: UpdateService,
     private storeUsageTracker: StoreUsageTrackerService,
     private downloadManager: DownloadManagerService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private http: HttpClient
   ) {
     // register translations
     this.translationService.loadTranslations(esLang, enLang, chLang, jpLang, deLang, frLang);
@@ -59,6 +62,13 @@ export class AppComponent implements OnInit {
     this.setupProgressTracking();
     this.checkPWAStatus();
     setTimeout(() => this.updateService.init(), 5000);
+
+    // DEBUG: Test HTTP interceptor with a simple request
+    console.log('[AppComponent] Making test HTTP request to check interceptor...');
+    this.http.get(`${environment.apiUrl}/v1/auth/google-auth-url`).subscribe({
+      next: () => console.log('[AppComponent] Test request SUCCEEDED'),
+      error: (err) => console.log('[AppComponent] Test request FAILED (expected - no auth):', err.status)
+    });
   }
 
   pwaStatus = '';
