@@ -81,6 +81,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "prettier": "3.2.5",
+    "purgecss": "^5.0.0",
     "sharp": "^0.34.5",
     "source-map-explorer": "^2.5.3",
     "typescript": "5.9.3",

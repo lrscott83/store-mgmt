@@ -1,85 +1,307 @@
 const fs = require('fs');
 const path = require('path');
 const glob = require('glob');
+const postcss = require('postcss');
+const purgecss = require('@fullhuman/postcss-purgecss');
 
 const projectRoot = process.cwd().replace(/\\/g, '/');
 const distPath = path.join(projectRoot, 'dist', 'browser');
 
-console.log('Searching for CSS files in:', distPath);
+console.log('[PurgeCSS] Searching for CSS files in:', distPath);
 
 const cssFiles = glob.sync(path.join(distPath, 'styles-*.css').replace(/\\/g, '/'));
-console.log('Found CSS files:', cssFiles);
-
 if (cssFiles.length === 0) {
-  console.log('No styles.css found, skipping PurgeCSS');
+  console.log('[PurgeCSS] No styles CSS found, skipping');
   process.exit(0);
 }
 
 const stylesFile = cssFiles[0];
-console.log('Running PurgeCSS on:', path.basename(stylesFile));
+const originalSize = fs.statSync(stylesFile).size;
+console.log('[PurgeCSS] Processing:', path.basename(stylesFile), `(${(originalSize / 1024).toFixed(1)} KB raw)`);
 
-const contentFiles = [path.join(distPath, 'index.html').replace(/\\/g, '/'), ...glob.sync(path.join(distPath, '*.js').replace(/\\/g, '/'))];
-console.log('Content files count:', contentFiles.length);
+const contentFiles = [
+  path.join(distPath, 'index.html').replace(/\\/g, '/'),
+  ...glob.sync(path.join(distPath, '*.js').replace(/\\/g, '/'))
+];
 
-const purgecss = require('@fullhuman/postcss-purgecss');
+const cssContent = fs.readFileSync(stylesFile);
 
-const result = purgecss({
+postcss([purgecss({
   content: contentFiles,
-  css: [stylesFile],
   safelist: {
-    standard: [/^ng-/, /^mat-/, /^cdk-/, /^nb-/, /^p-/],
+    standard: [
+      'html', 'body', 'app-root', 'mat-icon',
+      'mat-drawer-container', 'mat-drawer-content', 'mat-drawer',
+      'mat-sidenav-container', 'mat-sidenav-content', 'mat-sidenav',
+      'mat-snack-bar-container', 'mat-simple-snackbar',
+      'mat-tooltip', 'cdk-overlay-container', 'cdk-overlay-backdrop',
+      'modal-backdrop', 'modal-open', 'modal-dialog', 'modal-content',
+      'toast', 'toast-container', 'toastr', 'toast-success', 'toast-error',
+      'toast-warning', 'toast-info', 'toast-close-button',
+      'ngx-toastr', 'bs-tooltip', 'tooltip', 'popover',
+      'show', 'hide', 'fade', 'collapse', 'in', 'dropdown-toggle',
+      'nav-link', 'nav-item', 'nav-tabs', 'nav-pills',
+      'active', 'disabled', 'open', 'loading', 'visible', 'hidden',
+      'scrollbar-view', 'scrollbar-inner', 'perfect-scrollbar',
+      'swal2-container', 'swal2-popup', 'swal2-title', 'swal2-html-container',
+      'ng-star-inserted', 'ng-trigger', 'ng-tns-c', 'ng-touched', 'ng-untouched',
+      'ng-dirty', 'ng-pristine', 'ng-valid', 'ng-invalid',
+      'mat-mdc-form-field', 'mat-mdc-text-field-wrapper', 'mat-mdc-floating',
+      'mat-mdc-input', 'mat-mdc-select', 'mdc-text-field', 'mdc-floating-label',
+      'mat-primary', 'mat-accent', 'mat-warn', 'mat-mdc-button', 'mat-mdc-raised-button',
+      'mat-mdc-icon-button', 'mat-mdc-outlined-button', 'mat-mdc-unelevated-button',
+      'mat-mdc-card', 'mat-mdc-table', 'mat-mdc-header-cell', 'mat-mdc-cell',
+      'mat-mdc-dialog', 'mat-mdc-dialog-surface', 'mat-mdc-dialog-title',
+      'mat-mdc-menu', 'mat-mdc-menu-item', 'mat-mdc-menu-trigger',
+      'mat-mdc-snack-bar', 'mat-mdc-snack-bar-container',
+      'mat-mdc-tooltip', 'mat-mdc-tooltip-surface',
+      'mat-datepicker', 'mat-calendar', 'mat-calendar-header',
+      'mat-mdc-checkbox', 'mat-mdc-radio', 'mat-mdc-slide-toggle',
+      'mat-mdc-progress-bar', 'mat-mdc-progress-spinner',
+      'mat-mdc-tab', 'mat-mdc-tab-group', 'mat-mdc-tab-header',
+      'mat-mdc-expansion', 'mat-mdc-expansion-panel',
+      'mat-mdc-select-panel', 'mat-mdc-option',
+      'mat-mdc-autocomplete', 'mat-mdc-chip',
+      'mat-body', 'mat-body-1', 'mat-title', 'mat-typography',
+      'pe-7s-browser', 'pe-7s-file', 'pe-7s-search', 'pe-7s-trash',
+      'pe-7s-user', 'pe-7s-config', 'pe-7s-settings', 'pe-7s-print',
+      'pe-7s-date', 'pe-7s-date', 'pe-7s-add', 'pe-7s-edit',
+      'pe-7s-delete', 'pe-7s-shopping-cart', 'pe-7s-cart', 'pe-7s-plus',
+      'pe-7s-minus', 'pe-7s-check', 'pe-7s-close', 'pe-7s-arrow',
+      'pe-7s-download', 'pe-7s-upload', 'pe-7s-cloud', 'pe-7s-box',
+      'bi-clock-history', 'bi-plus-circle', 'bi-dash-circle', 'bi-x-circle',
+      'bi-check-circle', 'bi-pencil', 'bi-trash', 'bi-search',
+      'bi-bar-chart', 'bi-graph-up', 'bi-download', 'bi-upload',
+      'bi-house', 'bi-person', 'bi-cart3', 'bi-box-seam',
+      'bi-chevron-right', 'bi-chevron-left', 'bi-chevron-up', 'bi-chevron-down',
+      'fa', 'fa-user', 'fa-home', 'fa-cog', 'fa-edit', 'fa-trash',
+      'material-icons', 'material-icons-two-tone',
+      'align-items-center', 'd-flex', 'd-none', 'd-block', 'd-inline',
+      'justify-content-between', 'justify-content-center', 'justify-content-end',
+      'text-center', 'text-right', 'text-muted', 'text-primary',
+      'text-danger', 'text-success', 'text-warning',
+      'fw-bold', 'fw-normal', 'fw-light',
+      'mb-0', 'mb-1', 'mb-2', 'mb-3', 'mb-4', 'mb-5',
+      'mt-0', 'mt-1', 'mt-2', 'mt-3', 'mt-4', 'mt-5',
+      'pb-0', 'pb-1', 'pb-2', 'pb-3', 'pb-4', 'pb-5',
+      'pt-0', 'pt-1', 'pt-2', 'pt-3', 'pt-4', 'pt-5',
+      'ps-0', 'ps-1', 'ps-2', 'ps-3', 'ps-4', 'ps-5',
+      'pe-0', 'pe-1', 'pe-2', 'pe-3', 'pe-4', 'pe-5',
+      'ms-0', 'ms-1', 'ms-2', 'ms-3', 'ms-4', 'ms-5',
+      'me-0', 'me-1', 'me-2', 'me-3', 'me-4', 'me-5',
+      'mx-auto', 'my-auto', 'mx-0', 'mx-1', 'mx-2', 'mx-3', 'mx-4', 'mx-5',
+      'my-0', 'my-1', 'my-2', 'my-3', 'my-4', 'my-5',
+      'p-0', 'p-1', 'p-2', 'p-3', 'p-4', 'p-5',
+      'm-0', 'm-1', 'm-2', 'm-3', 'm-4', 'm-5',
+      'gap-0', 'gap-1', 'gap-2', 'gap-3', 'gap-4', 'gap-5',
+      'row', 'col', 'col-1', 'col-2', 'col-3', 'col-4', 'col-5', 'col-6',
+      'col-7', 'col-8', 'col-9', 'col-10', 'col-11', 'col-12',
+      'col-auto', 'col-sm', 'col-md', 'col-lg', 'col-xl',
+      'container', 'container-fluid', 'container-sm', 'container-md', 'container-lg', 'container-xl',
+      'table', 'table-striped', 'table-bordered', 'table-hover', 'table-sm',
+      'table-dark', 'table-light', 'table-responsive',
+      'card', 'card-body', 'card-header', 'card-footer', 'card-title', 'card-text',
+      'btn', 'btn-primary', 'btn-secondary', 'btn-success', 'btn-danger', 'btn-warning', 'btn-info', 'btn-light', 'btn-dark', 'btn-link',
+      'btn-sm', 'btn-lg', 'btn-block', 'btn-outline-primary', 'btn-outline-secondary',
+      'btn-close', 'btn-group', 'btn-group-vertical',
+      'form-control', 'form-select', 'form-check', 'form-check-input', 'form-check-label',
+      'form-label', 'form-text', 'input-group', 'input-group-text',
+      'badge', 'badge-primary', 'badge-secondary', 'badge-success', 'badge-danger', 'badge-warning', 'badge-info',
+      'breadcrumb', 'breadcrumb-item',
+      'progress', 'progress-bar', 'progress-bar-striped', 'progress-bar-animated',
+      'dropdown-menu', 'dropdown-item', 'dropdown-divider', 'dropdown-toggle-split',
+      'modal', 'modal-dialog', 'modal-content', 'modal-header', 'modal-body', 'modal-footer', 'modal-title',
+      'nav', 'navbar', 'navbar-brand', 'navbar-nav', 'navbar-toggler', 'navbar-expand',
+      'accordion', 'accordion-item', 'accordion-button', 'accordion-collapse', 'accordion-body',
+      'toast', 'toast-header', 'toast-body',
+      'spinner', 'spinner-border', 'spinner-grow', 'spinner-border-sm', 'spinner-grow-sm',
+      'visually-hidden', 'stretched-link', 'link-danger',
+      'block-ui-wrapper', 'block-ui-spinner', 'block-ui-overlay',
+      'mat-mdc-form-field-error-wrapper', 'mat-mdc-form-field-subscript-wrapper',
+      'mat-mdc-form-field-infix', 'mat-mdc-form-field-hint-wrapper',
+      'mat-mdc-notch', 'mat-mdc-notch-leading', 'mat-mdc-notch-trailing',
+      'mdc-text-field__input', 'mdc-text-field__affix',
+      'mdc-floating-label--float-above', 'mdc-text-field--outlined',
+      'mat-mdc-select-value', 'mat-mdc-select-arrow-wrapper',
+      'mat-mdc-tab-body-wrapper', 'mat-mdc-tab-body-content',
+      'cdk-overlay-pane', 'cdk-overlay-backdrop', 'cdk-global-overlay-wrapper',
+      'mat-mdc-snack-bar-action', 'mat-mdc-snack-bar-label',
+      'chart-container', 'apexcharts-canvas', 'apexcharts-svg',
+      'ngx-charts', 'ngx-charts-outer', 'ngx-charts-inner',
+      'mat-mdc-form-field-error', 'mat-mdc-hint', 'mat-mdc-hint-text-end',
+      'mat-mdc-form-field-underline', 'mat-mdc-line', 'mat-mdc-line-none'
+    ],
     deep: [
       /mat-mdc-/,
-      /mat-drawer/,
-      /mat-sidenav/,
-      /ng-trigger/,
-      /ng-star-/,
-      /modal-/,
-      /toast-/,
-      /fade/,
-      /show/,
-      /collapse/,
-      /dropdown/,
-      /nav-/,
-      /accordion-/,
-      /spinner/,
-      /visible/,
-      /hidden/,
-      /scrollbar/,
-      /owl-/,
-      /active/,
-      /disabled/,
-      /open/,
-      /loading/,
-      /mat-/,
       /cdk-/,
       /ng-/,
-      /nb-/,
-      /accordion/,
-      /collapsible/,
-      /fa-/,
+      /mdc-/,
+      /owl-/,
+      /pe-7s-/,
       /bi-/,
-      /pe-7s/,
-      /al-/
+      /fa[farsb]?-/,
+      /ngx-/,
+      /swal2-/,
+      /toastr?/,
+      /apexcharts?/,
+      /^col-/,
+      /^mb-/,
+      /^mt-/,
+      /^ms-/,
+      /^me-/,
+      /^ps-/,
+      /^pe-/,
+      /^mx-/,
+      /^my-/,
+      /^p-/,
+      /^m-/,
+      /^g-/,
+      /^d-/,
+      /^fw-/,
+      /^text-/,
+      /^align-/,
+      /^justify-/,
+      /^btn/,
+      /^badge/,
+      /^nav/,
+      /^modal/,
+      /^progress/,
+      /^spinner/,
+      /^table/,
+      /^card/,
+      /^form/,
+      /^input/,
+      /^dropdown/,
+      /^breadcrumb/,
+      /^accordion/,
+      /^toast/,
+      /^block-ui/,
+      /^bg-/,
+      /^border-/,
+      /^rounded-/,
+      /^shadow-/,
+      /^overflow-/,
+      /^position-/,
+      /^top-/,
+      /^bottom-/,
+      /^start-/,
+      /^end-/,
+      /^z-/,
+      /^w-/,
+      /^h-/,
+      /^opacity-/,
+      /^transition/,
+      /^translate-middle/,
+      /^visually-/,
+      /^link-/,
+      /^stretched-/,
+      /^animate-/,
+      /^zoom-/,
+      /^cursor-/,
+      /^user-select-/,
+      /^pointer-/,
+      /^white-space-/,
+      /^word-/,
+      /^overflow-wrap/,
+      /^container/,
+      /^row/,
+      /^col-/,
+      /^gx-/,
+      /^gy-/,
+      /^gutters-/,
+      /^no-gutters/,
+      /^offset-/,
+      /^order-/,
+      /^align-content-/,
+      /^align-self-/,
+      /^flex-/,
+      /^float-/,
+      /^clearfix/,
+      /^embed-/,
+      /^ratio-/,
+      /^block-ui/,
+      /^ngx-perfect-scrollbar/,
+      /^perfect-scrollbar/,
+      /^scrollbar/,
+      /^ngx-toastr/,
+      /^bs-tooltip/,
+      /^tooltip/,
+      /^popover/,
+      /^apexcharts/,
+      /^html5-qrcode/,
+      /^pdf/,
+      /^jspdf/,
+      /^jspdf-autotable/,
+      /^html2canvas/,
+      /^mat-form-field-/,
+      /^mat-drawer-/,
+      /^mat-sidenav-/,
+      /^mat-snack-/,
+      /^mat-tooltip-/,
+      /^mat-tab-/,
+      /^mat-dialog-/,
+      /^mat-menu-/,
+      /^mat-select-/,
+      /^mat-option-/,
+      /^mat-datepicker-/,
+      /^mat-chip-/,
+      /^mat-checkbox-/,
+      /^mat-radio-/,
+      /^mat-slide-/,
+      /^mat-progress-/,
+      /^mat-expansion-/,
+      /^mat-autocomplete-/,
+      /^mat-button-/,
+      /^mat-icon-/,
+      /^mat-card-/,
+      /^mat-table-/,
+      /^mat-list-/,
+      /^mat-toolbar-/,
+      /^mat-step-/,
+      /^mat-paginator-/,
+      /^mat-sort-/,
+      /^mat-accordion-/,
+      /^mat-content-/,
+      /^mat-action-/,
+      /^mat-header-/,
+      /^mat-cell-/,
+      /^mat-row-/,
+      /^mat-column-/,
+      /^mat-label-/,
+      /^mat-hint-/,
+      /^mat-error-/,
+      /^mat-icon-button-/,
+      /^mat-fab-/,
+      /^mat-mini-fab-/,
+      /^mat-ripple-/,
+      /^mat-tooltip-panel-/,
+      /^mat-snack-bar-/,
+      /^mat-dialog-/,
+      /^mat-menu-panel-/,
+      /^mat-menu-item-/,
+      /^mat-select-panel-/,
+      /^mat-calendar-/,
+      /^ngx-perfect-scrollbar-/,
+      /^ngx-charts-/,
+      /^ng-apexcharts-/,
+      /^--bs-/,
+      /^ngx-clipboard-/,
+      /^ngx-mask-/,
+      /^ngx-scrollbar-/
     ]
   },
-  defaultExtractor: (content) => content.match(/[\w-/:]+(?<!:)/g) || []
-});
-
-if (result && result.css) {
-  const purged = result.css;
-  const originalSize = fs.statSync(stylesFile).size;
-  fs.writeFileSync(stylesFile, purged);
-  const newSize = fs.statSync(stylesFile).size;
-  const savings = (((originalSize - newSize) / originalSize) * 100).toFixed(1);
-  console.log(`CSS reduced: ${(originalSize / 1024).toFixed(1)}KB -> ${(newSize / 1024).toFixed(1)}KB (${savings}% reduction)`);
-} else if (Array.isArray(result)) {
-  const purged = result[0].css;
-  const originalSize = fs.statSync(stylesFile).size;
-  fs.writeFileSync(stylesFile, purged);
-  const newSize = fs.statSync(stylesFile).size;
-  const savings = (((originalSize - newSize) / originalSize) * 100).toFixed(1);
-  console.log(`CSS reduced: ${(originalSize / 1024).toFixed(1)}KB -> ${(newSize / 1024).toFixed(1)}KB (${savings}% reduction)`);
-} else {
-  console.log('PurgeCSS completed but no output');
-}
+  fontFace: false,
+  variables: true,
+  keyframes: false
+})])
+  .process(cssContent, { from: stylesFile })
+  .then((result) => {
+    fs.writeFileSync(stylesFile, result.css);
+    const newSize = fs.statSync(stylesFile).size;
+    const savings = (((originalSize - newSize) / originalSize) * 100).toFixed(1);
+    console.log(`[PurgeCSS] Done: ${(originalSize / 1024).toFixed(1)} KB -> ${(newSize / 1024).toFixed(1)} KB (${savings}% reduction)`);
+  })
+  .catch((err) => {
+    console.error('[PurgeCSS] Error:', err.message);
+    process.exit(1);
+  });
