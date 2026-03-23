@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
 import { TranslationService } from './_modules/i18n/translation.service';
 import { locale as enLang } from './_modules/i18n/vocabs/en';
 import { locale as chLang } from './_modules/i18n/vocabs/ch';
@@ -34,7 +33,6 @@ export class AppComponent implements OnInit {
   loading$ = this.loadingService.loading$;
 
   constructor(
-    private router: Router,
     private translationService: TranslationService,
     private updateService: UpdateService,
     private storeUsageTracker: StoreUsageTrackerService,
@@ -50,13 +48,6 @@ export class AppComponent implements OnInit {
   ngOnInit() {
     console.log('[AppComponent] ngOnInit - START');
     console.log('[AppComponent] URL on init:', window.location.href);
-
-    // If PWA is opened in standalone mode (installed), redirect to login
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-    if (isStandalone && (window.location.pathname === '/' || window.location.pathname === '')) {
-      console.log('[AppComponent] PWA standalone mode detected, redirecting to /login');
-      this.router.navigate(['/login']);
-    }
 
     this.storeUsageTracker.cleanOldData(30);
     this.checkPWAInstallability();
