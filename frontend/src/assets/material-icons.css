@@ -1,15 +1,11 @@
-// Material Icons font - loaded via CSS
-// Path is relative to the generated CSS file (served from /)
-$material-icons-font-path: 'assets/fonts/';
-
+/* Material Icons Font - served from /assets/fonts/ for offline use */
 @font-face {
   font-family: 'Material Icons';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src:
-    url('#{$material-icons-font-path}/material-icons.woff2') format('woff2'),
-    url('#{$material-icons-font-path}/material-icons.woff') format('woff');
+  src: url('assets/fonts/material-icons.woff2') format('woff2'),
+       url('assets/fonts/material-icons.woff') format('woff');
 }
 
 .material-icons {

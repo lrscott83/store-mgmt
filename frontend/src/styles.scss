@@ -24,8 +24,8 @@
 @import 'scss/themes/general.scss';
 @import 'scss/themes/components/components.scss';
 
-// Material icons
-@import './assets/fonts/material-icons';
+// Material icons - handled by Angular Material defaults
+// Fallback to Google Fonts if offline fonts not available
 
 // custom inputs
 @import './app/_shared/material-input.scss';

@@ -10,8 +10,7 @@ export class IconSetupService {
   ) {}
 
   init(): void {
-    this.matIconRegistry.setFontRegisterClass(
-      this.domSanitizer.bypassSecurityTrustResourceUrl('assets/material-icons.woff2')
-    );
+    // Material Icons are loaded via CSS from assets/fonts/
+    // The font path is configured in material-icons.scss
   }
 }
