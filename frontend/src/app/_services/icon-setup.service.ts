@@ -10,7 +10,10 @@ export class IconSetupService {
   ) {}
 
   init(): void {
-    // Material Icons are loaded via CSS from assets/fonts/
-    // The font path is configured in material-icons.scss
+    // Register Material Icons font alias from local assets
+    this.matIconRegistry.registerFontClassAlias('material-icons', 'material-icons');
+
+    // Set as default font for mat-icon components
+    this.matIconRegistry.setDefaultFontSetClass('material-icons');
   }
 }
