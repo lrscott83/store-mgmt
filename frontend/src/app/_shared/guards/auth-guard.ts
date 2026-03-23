@@ -5,7 +5,10 @@ import { AuthService } from 'src/app/_services/services.index';
 import { GlobalConfig } from '../configs/global.config';
 import { AuthorizationService } from 'src/app/_services/authorization/authorization.service';
 
+console.log('[AuthGuard] Module loaded');
+
 export const AuthGuard = (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
+  console.log('[AuthGuard] CALLED - url:', state.url);
   const authService = inject(AuthService);
   const authorizationService = inject(AuthorizationService);
   const currentUser = authService.currentUserValue;

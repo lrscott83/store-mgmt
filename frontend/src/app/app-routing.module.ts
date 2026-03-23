@@ -175,13 +175,19 @@ const routes: Routes = [
       },
       {
         path: 'inventory/today-quantities',
-        loadComponent: () => import('./presentation/inventory/inventory-today-quantities/inventory-today-quantities.component').then((c) => c.InventoryTodayQuantitiesComponent),
+        loadComponent: () =>
+          import('./presentation/inventory/inventory-today-quantities/inventory-today-quantities.component').then(
+            (c) => c.InventoryTodayQuantitiesComponent
+          ),
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.InventoryTodayQuantities] }
       },
       {
         path: 'inventory/today-sales-profit',
-        loadComponent: () => import('./presentation/inventory/inventory-today-sales-profit/inventory-today-sales-profit.component').then((c) => c.InventoryTodaySalesProfitComponent),
+        loadComponent: () =>
+          import('./presentation/inventory/inventory-today-sales-profit/inventory-today-sales-profit.component').then(
+            (c) => c.InventoryTodaySalesProfitComponent
+          ),
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.InventoryTodaySaleProfit] }
       },
@@ -280,7 +286,9 @@ const routes: Routes = [
         data: { expectedFeatures: [EFeatures.Profile] }
       }
     ]
-  }
+  },
+  { path: 'local', redirectTo: '' },
+  { path: '**', redirectTo: '' }
 ];
 
 @NgModule({

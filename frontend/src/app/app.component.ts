@@ -39,15 +39,21 @@ export class AppComponent implements OnInit {
     private downloadManager: DownloadManagerService,
     private loadingService: LoadingService
   ) {
+    console.log('[AppComponent] Constructor - START');
+    console.log('[AppComponent] Loading translations...');
     this.translationService.loadTranslations(esLang, enLang, chLang, jpLang, deLang, frLang);
+    console.log('[AppComponent] Constructor - DONE');
   }
 
   ngOnInit() {
+    console.log('[AppComponent] ngOnInit - START');
+    console.log('[AppComponent] URL on init:', window.location.href);
     this.storeUsageTracker.cleanOldData(30);
     this.checkPWAInstallability();
     this.checkFirstVisit();
     this.setupProgressTracking();
     setTimeout(() => this.updateService.init(), 5000);
+    console.log('[AppComponent] ngOnInit - DONE');
   }
 
   private checkPWAInstallability(): void {

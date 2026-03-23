@@ -1,5 +1,5 @@
 // angular import
-import { NgModule, inject, provideAppInitializer, ErrorHandler, LOCALE_ID } from '@angular/core';
+import { NgModule, inject, provideAppInitializer, ErrorHandler } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
@@ -25,8 +25,11 @@ import { productServiceFactory } from './_services/factories/product-service.fac
 import { ServiceWorkerModule } from '@angular/service-worker';
 import { GlobalErrorHandler } from './_services/global-error-handler.service';
 
+console.log('[AppModule] Module definition loading...');
+
 export function initializeApp(appInitService: AppInitService) {
   return (): Promise<any> => {
+    console.log('[AppModule] initializeApp function called');
     return appInitService.Init();
   };
 }
@@ -59,7 +62,6 @@ export function initializeApp(appInitService: AppInitService) {
     })
   ],
   providers: [
-    { provide: LOCALE_ID, useValue: 'es-ES' },
     provideHttpClient(withInterceptorsFromDi()),
     AppInitService,
     provideEnvironmentNgxMask(),
