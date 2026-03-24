@@ -1,6 +1,6 @@
 import { Injectable, Injector } from '@angular/core';
 import { HttpRequest, HttpHandler, HttpEvent, HttpInterceptor } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { AuthService } from 'src/app/_services/auth/auth.service';
@@ -49,10 +49,16 @@ export class ErrorInterceptor implements HttpInterceptor {
     return next.handle(request).pipe(
       timeout(30000),
       catchError((err) => {
+        // Handle network errors (offline) - don't re-throw, just return empty/error
+        if (err.status === 0 || err.name === 'TimeoutError' || err.message?.includes('Network')) {
+          console.warn('[ErrorInterceptor] Network error ignored:', err.message);
+          // Return a re-thrown error but with a flag so GlobalErrorHandler can identify it
+          const networkErr = new Error(err.message || 'Network error');
+          (networkErr as any).isNetworkError = true;
+          return throwError(() => networkErr);
+        }
+
         switch (err.status) {
-          case 0: {
-            return throwError(() => err);
-          }
           case 401: {
             const authService = this.getAuthService();
             authService?.logout();

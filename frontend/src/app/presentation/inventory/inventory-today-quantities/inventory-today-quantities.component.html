@@ -1,1 +1,105 @@
-<p>inventory-today-quantities works!</p>
+<div class="card card-custom gutter-b">
+  <!-- Header -->
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label">{{ 'INVENTORY.TODAY_QUANTITIES' | translate }}</h3>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    @if (isLoading) {
+      <div class="loading-state">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">{{ 'GENERAL.LOADING' | translate }}</span>
+        </div>
+        <p class="mt-3 text-muted">{{ 'GENERAL.LOADING' | translate }}</p>
+      </div>
+    } @else if (categoryGroups.length === 0) {
+      <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-muted">
+          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+        <p class="mt-3 text-muted">{{ 'INVENTORY.NO_PRODUCTS' | translate }}</p>
+      </div>
+    } @else {
+      <!-- Desktop/Tablet Table View -->
+      <div class="table-responsive desktop-view">
+        <table class="table table-hover quantities-table mb-0">
+          <thead>
+            <tr>
+              <th class="col-product">{{ 'INVENTORY.PRODUCT' | translate }}</th>
+              <th class="col-num text-end">{{ 'INVENTORY.BEGINNING' | translate }}</th>
+              <th class="col-num text-end">{{ 'INVENTORY.ENTRIES' | translate }}</th>
+              <th class="col-num text-end">{{ 'INVENTORY.AVAILABLE' | translate }}</th>
+              <th class="col-num text-end">{{ 'INVENTORY.SOLD' | translate }}</th>
+              <th class="col-num text-end">{{ 'INVENTORY.ENDING' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (category of categoryGroups; track trackByCategory($index, category)) {
+              @for (product of category.products; track trackByProduct($index, product)) {
+                <tr class="product-row">
+                  <td class="col-product">
+                    <span class="product-name">{{ category.categoryName }} - {{ product.productName }}</span>
+                  </td>
+                  <td class="col-num text-end" [class.text-danger]="product.inicio < 0">{{ product.inicio }}</td>
+                  <td class="col-num text-end" [class.text-success]="product.entradas > 0">{{ product.entradas }}</td>
+                  <td class="col-num text-end fw-bold">{{ product.disponible }}</td>
+                  <td class="col-num text-end" [class.text-warning]="product.vendido > 0" [class.fw-bold]="product.vendido > 0">{{
+                    product.vendido
+                  }}</td>
+                  <td class="col-num text-end" [class.text-danger]="product.final < 0" [class.fw-bold]="product.final < 0">{{
+                    product.final
+                  }}</td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile Card View -->
+      <div class="mobile-view px-3 py-2">
+        @for (category of categoryGroups; track trackByCategory($index, category)) {
+          <div class="category-section">
+            @for (product of category.products; track trackByProduct($index, product)) {
+              <div class="product-card mb-3">
+                <!-- Product name with category -->
+                <div class="product-header">
+                  <span class="product-title">{{ category.categoryName }} - {{ product.productName }}</span>
+                </div>
+                <!-- Second row: Quantities -->
+                <div class="product-quantities">
+                  <div class="quantity-item">
+                    <span class="quantity-label">{{ 'INVENTORY.BEGINNING' | translate }}</span>
+                    <span class="quantity-value" [class.text-danger]="product.inicio < 0">{{ product.inicio }}</span>
+                  </div>
+                  <div class="quantity-item">
+                    <span class="quantity-label">{{ 'INVENTORY.ENTRIES' | translate }}</span>
+                    <span class="quantity-value" [class.text-success]="product.entradas > 0">{{ product.entradas }}</span>
+                  </div>
+                  <div class="quantity-item">
+                    <span class="quantity-label">{{ 'INVENTORY.AVAILABLE' | translate }}</span>
+                    <span class="quantity-value fw-bold">{{ product.disponible }}</span>
+                  </div>
+                  <div class="quantity-item">
+                    <span class="quantity-label">{{ 'INVENTORY.SOLD' | translate }}</span>
+                    <span class="quantity-value" [class.text-warning]="product.vendido > 0" [class.fw-bold]="product.vendido > 0">{{
+                      product.vendido
+                    }}</span>
+                  </div>
+                  <div class="quantity-item">
+                    <span class="quantity-label">{{ 'INVENTORY.ENDING' | translate }}</span>
+                    <span class="quantity-value" [class.text-danger]="product.final < 0" [class.fw-bold]="product.final < 0">{{
+                      product.final
+                    }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

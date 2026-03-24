@@ -1,6 +1,8 @@
 // angular import
 import { NgModule, inject, provideAppInitializer, ErrorHandler } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { provideAnimations } from '@angular/platform-browser/animations';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { SharedModule } from './presentation/shared/shared.module';
@@ -62,6 +64,7 @@ export function initializeApp(appInitService: AppInitService) {
     })
   ],
   providers: [
+    provideAnimations(),
     provideHttpClient(withInterceptorsFromDi()),
     AppInitService,
     provideEnvironmentNgxMask(),

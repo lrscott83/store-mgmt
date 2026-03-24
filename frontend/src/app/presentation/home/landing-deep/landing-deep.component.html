@@ -8,6 +8,9 @@
         <div class="d-none d-lg-flex align-items-center gap-4">
           <a class="nav-auth-link" href="#caracteristicas">Características</a>
           <a class="nav-auth-link" href="#como-funciona">Cómo funciona</a>
+          @if (showLoginButton) {
+            <a class="nav-auth-link" [routerLink]="['/login']">Entrar</a>
+          }
           <a class="btn-primary-amber" href="#registro">
             Comenzar
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

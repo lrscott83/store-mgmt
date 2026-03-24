@@ -16,13 +16,70 @@ import { AdminAuthGuard } from './_shared/guards/admin-auth-guard';
 import { ReSellerAuthGuard } from './_shared/guards/reseller-auth-guard';
 import { LandingDeepComponent } from './presentation/home/landing-deep/landing-deep.component';
 
+// Admin components
+import { AdminDashboardComponent } from './presentation/admin-dashboard/admin-dashboard.component';
+import { StoresComponent } from './presentation/stores/stores.component';
+import { OwnersComponent } from './presentation/owners/owners.component';
+import { CreateOwnerComponent } from './presentation/owners/create-owner/create-owner.component';
+import { EditOwnerComponent } from './presentation/owners/edit-owner/edit-owner.component';
+import { ResellersComponent } from './presentation/resellers/resellers.component';
+import { CreateResellerComponent } from './presentation/resellers/create-reseller/create-reseller.component';
+import { EditResellerComponent } from './presentation/resellers/edit-reseller/edit-reseller.component';
+import { FeaturesComponent } from './presentation/features/features.component';
+
+// Sales components
+import { ProductsComponent } from './presentation/products/products.component';
+import { SaleComponent } from './presentation/sale/sale.component';
+import { TodayOrdersComponent } from './presentation/sale/today-orders/today-orders.component';
+import { TodaySaleCreditsComponent } from './presentation/sale/today-sale-credits/today-sale-credits.component';
+import { SaleCreditsComponent } from './presentation/sale/sale-credits/sale-credits.component';
+import { OrdersComponent } from './presentation/sale/orders/orders.component';
+import { TodayStatsComponent } from './presentation/sale/today-stats/today-stats.component';
+
+// Expenses components
+import { ExpensesTodayComponent } from './presentation/expenses/expenses-today/expenses-today.component';
+import { ExpensesComponent } from './presentation/expenses/expenses/expenses.component';
+
+// Inventory components
+import { InventoryAvailableComponent } from './presentation/inventory/inventory-available/inventory-available.component';
+import { TodayEntriesComponent } from './presentation/inventory/today-entries/today-entries.component';
+import { InventoryTodayQuantitiesComponent } from './presentation/inventory/inventory-today-quantities/inventory-today-quantities.component';
+import { InventoryTodaySalesProfitComponent } from './presentation/inventory/inventory-today-sales-profit/inventory-today-sales-profit.component';
+import { EgressComponent } from './presentation/inventory/egress/egress.component';
+import { EntriesComponent } from './presentation/inventory/entries/entries.component';
+
+// Synchronization components
+import { SendDataComponent } from './presentation/synchronization/send-data/send-data.component';
+import { ReceiveDataComponent } from './presentation/synchronization/receive-data/receive-data.component';
+
+// Statistics components
+import { DashboardComponent } from './presentation/statistics/dashboard/dashboard.component';
+
+// Reports components
+import { InventoryTodaySaleComponent } from './presentation/reports/inventory-today-sale/inventory-today-sale.component';
+
+// Management components
+import { EditStoreComponent } from './presentation/stores/edit-store/edit-store.component';
+import { UsersComponent } from './presentation/users/users.component';
+import { CreateStoreUserComponent } from './presentation/users/create-store-user/create-store-user.component';
+import { EditUserComponent } from './presentation/users/edit-user/edit-user.component';
+import { ConfigurationsComponent } from './presentation/configurations/configurations.component';
+
+// Profile components
+import { EditProfileComponent } from './presentation/profile/edit-profile/edit-profile.component';
+import { ChangePasswordComponent } from './presentation/profile/change-password/change-password.component';
+
+// Help components
+import { TutorialComponent } from './presentation/help/tutorial/tutorial.component';
+
 const routes: Routes = [
   { path: '', component: LandingDeepComponent },
-  {
-    path: 'scanner',
-    loadComponent: () =>
-      import('./presentation/shared/components/html5-scanner/html5-scanner.component').then((m) => m.Html5ScannerComponent)
-  },
+  // Scanner route - disabled for offline PWA
+  // {
+  //   path: 'scanner',
+  //   loadComponent: () =>
+  //     import('./presentation/shared/components/html5-scanner/html5-scanner.component').then((m) => m.Html5ScannerComponent)
+  // },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'cookies-private', component: CookiesPrivateComponent },
@@ -35,7 +92,7 @@ const routes: Routes = [
     children: [
       {
         path: 'help/tutorial',
-        loadComponent: () => import('./presentation/help/tutorial/tutorial.component').then((c) => c.TutorialComponent),
+        component: TutorialComponent,
         data: { expectedFeatures: [] }
       },
       {
@@ -45,243 +102,229 @@ const routes: Routes = [
       },
       {
         path: 'admin/dashboard',
-        loadComponent: () => import('./presentation/admin-dashboard/admin-dashboard.component').then((c) => c.AdminDashboardComponent),
+        component: AdminDashboardComponent,
         canActivate: [SuperAdminAuthGuard],
         data: { expectedFeatures: [EFeatures.AdminDashboard] }
       },
       {
         path: 'admin/stores',
-        loadComponent: () => import('./presentation/stores/stores.component').then((c) => c.StoresComponent),
+        component: StoresComponent,
         canActivate: [SuperAdminAuthGuard],
         data: { expectedFeatures: [EFeatures.AdminStores] }
       },
       {
         path: 'admin/owners',
-        loadComponent: () => import('./presentation/owners/owners.component').then((c) => c.OwnersComponent),
+        component: OwnersComponent,
         canActivate: [ReSellerAuthGuard],
         data: { expectedFeatures: [EFeatures.Owners] }
       },
       {
         path: 'admin/owners/create',
-        loadComponent: () => import('./presentation/owners/create-owner/create-owner.component').then((c) => c.CreateOwnerComponent),
+        component: CreateOwnerComponent,
         canActivate: [ReSellerAuthGuard],
         data: { expectedFeatures: [EFeatures.Owners] }
       },
       {
         path: 'admin/owners/edit/:id',
-        loadComponent: () => import('./presentation/owners/edit-owner/edit-owner.component').then((c) => c.EditOwnerComponent),
+        component: EditOwnerComponent,
         canActivate: [ReSellerAuthGuard],
         data: { expectedFeatures: [EFeatures.Owners] }
       },
       {
         path: 'admin/resellers',
-        loadComponent: () => import('./presentation/resellers/resellers.component').then((c) => c.ResellersComponent),
+        component: ResellersComponent,
         canActivate: [SuperAdminAuthGuard],
         data: { expectedFeatures: [EFeatures.ReSellers] }
       },
       {
         path: 'admin/resellers/create',
-        loadComponent: () =>
-          import('./presentation/resellers/create-reseller/create-reseller.component').then((c) => c.CreateResellerComponent),
+        component: CreateResellerComponent,
         canActivate: [SuperAdminAuthGuard],
         data: { expectedFeatures: [EFeatures.ReSellers] }
       },
       {
         path: 'admin/resellers/edit/:id',
-        loadComponent: () => import('./presentation/resellers/edit-reseller/edit-reseller.component').then((c) => c.EditResellerComponent),
+        component: EditResellerComponent,
         canActivate: [SuperAdminAuthGuard],
         data: { expectedFeatures: [EFeatures.ReSellers] }
       },
       {
         path: 'admin/features',
-        loadComponent: () => import('./presentation/features/features.component').then((c) => c.FeaturesComponent),
+        component: FeaturesComponent,
         canActivate: [SuperAdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Features] }
       },
       {
         path: 'admin/roles',
-        loadComponent: () => import('./presentation/owners/owners.component').then((c) => c.OwnersComponent),
+        component: OwnersComponent,
         canActivate: [SuperAdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Roles] }
       },
       {
         path: 'sales/products',
-        loadComponent: () => import('./presentation/products/products.component').then((c) => c.ProductsComponent),
+        component: ProductsComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Products] }
       },
       {
         path: 'sales/sale',
-        loadComponent: () => import('./presentation/sale/sale.component').then((c) => c.SaleComponent),
+        component: SaleComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Sale] }
       },
       {
         path: 'sales/today-orders',
-        loadComponent: () => import('./presentation/sale/today-orders/today-orders.component').then((c) => c.TodayOrdersComponent),
+        component: TodayOrdersComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.TodayOrders] }
       },
       {
         path: 'sales/today-credits',
-        loadComponent: () =>
-          import('./presentation/sale/today-sale-credits/today-sale-credits.component').then((c) => c.TodaySaleCreditsComponent),
+        component: TodaySaleCreditsComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.CreditSale] }
       },
       {
         path: 'sales/credits',
-        loadComponent: () => import('./presentation/sale/sale-credits/sale-credits.component').then((c) => c.SaleCreditsComponent),
+        component: SaleCreditsComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.CreditSale] }
       },
       {
         path: 'sales/orders',
-        loadComponent: () => import('./presentation/sale/orders/orders.component').then((c) => c.OrdersComponent),
+        component: OrdersComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.SalesHistory] }
       },
       {
         path: 'sales/stats',
-        loadComponent: () => import('./presentation/sale/today-stats/today-stats.component').then((c) => c.TodayStatsComponent),
+        component: TodayStatsComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Sale] }
       },
       {
         path: 'expenses/today',
-        loadComponent: () =>
-          import('./presentation/expenses/expenses-today/expenses-today.component').then((c) => c.ExpensesTodayComponent),
+        component: ExpensesTodayComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.TodayExpenses] }
       },
       {
         path: 'expenses/expenses',
-        loadComponent: () => import('./presentation/expenses/expenses/expenses.component').then((c) => c.ExpensesComponent),
+        component: ExpensesComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.ExpensesHistory] }
       },
       {
         path: 'inventory/available',
-        loadComponent: () =>
-          import('./presentation/inventory/inventory-available/inventory-available.component').then((c) => c.InventoryAvailableComponent),
+        component: InventoryAvailableComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Available] }
       },
       {
         path: 'inventory/today-entries',
-        loadComponent: () => import('./presentation/inventory/today-entries/today-entries.component').then((c) => c.TodayEntriesComponent),
+        component: TodayEntriesComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Entries] }
       },
       {
         path: 'inventory/today-quantities',
-        loadComponent: () =>
-          import('./presentation/inventory/inventory-today-quantities/inventory-today-quantities.component').then(
-            (c) => c.InventoryTodayQuantitiesComponent
-          ),
+        component: InventoryTodayQuantitiesComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.InventoryTodayQuantities] }
       },
       {
         path: 'inventory/today-sales-profit',
-        loadComponent: () =>
-          import('./presentation/inventory/inventory-today-sales-profit/inventory-today-sales-profit.component').then(
-            (c) => c.InventoryTodaySalesProfitComponent
-          ),
+        component: InventoryTodaySalesProfitComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.InventoryTodaySaleProfit] }
       },
       {
         path: 'inventory/egress',
-        loadComponent: () => import('./presentation/inventory/egress/egress.component').then((c) => c.EgressComponent),
+        component: EgressComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Egress] }
       },
       {
         path: 'inventory/entries',
-        loadComponent: () => import('./presentation/inventory/entries/entries.component').then((c) => c.EntriesComponent),
+        component: EntriesComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.EntriesHistory] }
       },
       {
         path: 'synchronization/export',
-        loadComponent: () => import('./presentation/synchronization/send-data/send-data.component').then((c) => c.SendDataComponent),
+        component: SendDataComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Send] }
       },
       {
         path: 'synchronization/import',
-        loadComponent: () =>
-          import('./presentation/synchronization/receive-data/receive-data.component').then((c) => c.ReceiveDataComponent),
+        component: ReceiveDataComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Receive] }
       },
       {
         path: 'statistics/dashboard',
-        loadComponent: () => import('./presentation/statistics/dashboard/dashboard.component').then((c) => c.DashboardComponent),
+        component: DashboardComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Dashboard] }
       },
       {
         path: 'reports/today',
-        loadComponent: () =>
-          import('./presentation/reports/inventory-today-sale/inventory-today-sale.component').then((c) => c.InventoryTodaySaleComponent),
+        component: InventoryTodaySaleComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.TodayReports] }
       },
       {
         path: 'management/stores',
-        loadComponent: () => import('./presentation/stores/edit-store/edit-store.component').then((c) => c.EditStoreComponent),
+        component: EditStoreComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Stores] }
       },
       {
         path: 'management/stores/create',
-        loadComponent: () => import('./presentation/stores/edit-store/edit-store.component').then((c) => c.EditStoreComponent),
+        component: EditStoreComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Stores] }
       },
       {
         path: 'management/stores/edit/:id',
-        loadComponent: () => import('./presentation/stores/edit-store/edit-store.component').then((c) => c.EditStoreComponent),
+        component: EditStoreComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Stores] }
       },
       {
         path: 'management/users',
-        loadComponent: () => import('./presentation/users/users.component').then((c) => c.UsersComponent),
+        component: UsersComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Users] }
       },
       {
         path: 'management/users/create/:storeId',
-        loadComponent: () =>
-          import('./presentation/users/create-store-user/create-store-user.component').then((c) => c.CreateStoreUserComponent),
+        component: CreateStoreUserComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Users] }
       },
       {
         path: 'management/users/edit/:id',
-        loadComponent: () => import('./presentation/users/edit-user/edit-user.component').then((c) => c.EditUserComponent),
+        component: EditUserComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Users] }
       },
       {
         path: 'management/configurations',
-        loadComponent: () => import('./presentation/configurations/configurations.component').then((c) => c.ConfigurationsComponent),
+        component: ConfigurationsComponent,
         canActivate: [AdminAuthGuard],
         data: { expectedFeatures: [EFeatures.Configurations] }
       },
       {
         path: 'profile/edit',
-        loadComponent: () => import('./presentation/profile/edit-profile/edit-profile.component').then((c) => c.EditProfileComponent),
+        component: EditProfileComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Profile] }
       },
       {
         path: 'profile/change-password',
-        loadComponent: () =>
-          import('./presentation/profile/change-password/change-password.component').then((c) => c.ChangePasswordComponent),
+        component: ChangePasswordComponent,
         canActivate: [AuthGuard],
         data: { expectedFeatures: [EFeatures.Profile] }
       }

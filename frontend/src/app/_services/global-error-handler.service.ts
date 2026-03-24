@@ -8,6 +8,12 @@ export class GlobalErrorHandler implements ErrorHandler {
     let message = error?.message || error?.toString() || 'Unknown error';
     const stack = error?.stack || '';
 
+    // Check for network error flag set by ErrorInterceptor
+    if (error?.isNetworkError || this.isNetworkError(error, message)) {
+      console.warn('[GlobalErrorHandler] Network error ignored:', message);
+      return;
+    }
+
     console.error('[GlobalErrorHandler] ERROR:', message);
     console.error('[GlobalErrorHandler] STACK:', stack);
     console.error('[GlobalErrorHandler] FULL ERROR:', error);
@@ -18,6 +24,24 @@ export class GlobalErrorHandler implements ErrorHandler {
     }
 
     this.showErrorInUI(message, stack);
+  }
+
+  private isNetworkError(error: any, message: string): boolean {
+    // Check for common network error patterns
+    if (
+      message.includes('Failed to fetch') ||
+      message.includes('NetworkError') ||
+      message.includes('net::ERR') ||
+      message.includes('Network request failed') ||
+      message.includes('HttpErrorResponse') ||
+      message.includes('HTTP') ||
+      message.includes('fetch') ||
+      error?.status === 0 ||
+      (error?.status >= 0 && error?.status < 200)
+    ) {
+      return true;
+    }
+    return false;
   }
 
   private getEnhancedMessage(message: string, error: any): string {

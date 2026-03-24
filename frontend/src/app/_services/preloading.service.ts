@@ -4,7 +4,9 @@ import { Injectable } from '@angular/core';
   providedIn: 'root'
 })
 export class PreloadingService {
-  private authPreloadRoutes = ['/admin/dashboard', '/statistics/dashboard', '/reports/today', '/scanner'];
+  // Scanner disabled for offline PWA
+  // private authPreloadRoutes = ['/admin/dashboard', '/statistics/dashboard', '/reports/today', '/scanner'];
+  private authPreloadRoutes = ['/admin/dashboard', '/statistics/dashboard', '/reports/today'];
 
   constructor() {
     console.log('[PreloadingService] Initialized');
@@ -32,10 +34,11 @@ export class PreloadingService {
         loadChildren = () =>
           import('../presentation/reports/inventory-today-sale/inventory-today-sale.component').then((m) => m.InventoryTodaySaleComponent);
         break;
-      case '/scanner':
-        loadChildren = () =>
-          import('../presentation/shared/components/html5-scanner/html5-scanner.component').then((m) => m.Html5ScannerComponent);
-        break;
+      // Scanner disabled for offline PWA
+      // case '/scanner':
+      //   loadChildren = () =>
+      //     import('../presentation/shared/components/html5-scanner/html5-scanner.component').then((m) => m.Html5ScannerComponent);
+      //   break;
       default:
         console.warn(`[PreloadingService] Unknown route: ${route}`);
         return;

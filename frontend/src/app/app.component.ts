@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { TranslationService } from './_modules/i18n/translation.service';
 import { locale as enLang } from './_modules/i18n/vocabs/en';
 import { locale as chLang } from './_modules/i18n/vocabs/ch';
@@ -11,7 +11,6 @@ import { UpdateService } from './_services/update/update.service';
 import { LoadingService } from './_services/loading.service';
 import { StoreUsageTrackerService } from './_services/usage-tracker/store-usage-tracker.service';
 import { DownloadManagerService } from './_services/download-manager/download-manager.service';
-import { AuthService } from './_services/services.index';
 
 @Component({
   selector: 'app-root',
@@ -39,7 +38,7 @@ export class AppComponent implements OnInit {
     private storeUsageTracker: StoreUsageTrackerService,
     private downloadManager: DownloadManagerService,
     private loadingService: LoadingService,
-    private authService: AuthService
+    private cdr: ChangeDetectorRef
   ) {
     console.log('[AppComponent] Constructor - START');
     console.log('[AppComponent] Loading translations...');
@@ -59,17 +58,14 @@ export class AppComponent implements OnInit {
     console.log('[AppComponent] ngOnInit - DONE');
   }
 
-  get isLoggedIn(): boolean {
-    return !!this.authService.currentUserValue;
-  }
-
-  get showLoginButton(): boolean {
-    return !this.canInstall;
-  }
-
   private checkPWAInstallability(): void {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
     const swSupported = 'serviceWorker' in navigator;
+
+    // Check if we're in development mode (localhost or 127.0.0.1)
+    const isDevMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    console.log('[AppComponent] checkPWAInstallability:', { isStandalone, swSupported, isDevMode, hostname: window.location.hostname });
 
     if (swSupported && !isStandalone) {
       this.canInstall = true;
@@ -78,15 +74,26 @@ export class AppComponent implements OnInit {
       this.deferredPrompt = null;
     }
 
+    console.log('[AppComponent] canInstall set to:', this.canInstall);
+    this.cdr.detectChanges();
+
+    // In dev mode, simulate deferredPrompt availability
+    if (isDevMode && this.canInstall) {
+      console.log('[AppComponent] Dev mode detected - PWA install available');
+    }
+
     window.addEventListener('beforeinstallprompt', (e: Event) => {
       e.preventDefault();
       this.deferredPrompt = e;
       this.canInstall = true;
+      console.log('[AppComponent] beforeinstallprompt received');
+      this.cdr.detectChanges();
     });
 
     window.addEventListener('appinstalled', () => {
       this.deferredPrompt = null;
       this.canInstall = false;
+      this.cdr.detectChanges();
     });
   }
 

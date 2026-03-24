@@ -1,0 +1,289 @@
+:host {
+  display: block;
+}
+
+.inventory-quantities {
+  padding: 0;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Display', system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #212529;
+  margin: 0 0 8px;
+}
+
+.page-subtitle {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 0.875rem;
+  color: rgba(33, 37, 41, 0.6);
+  margin: 0;
+}
+
+// Loading State
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: rgba(33, 37, 41, 0.5);
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(245, 176, 38, 0.2);
+    border-top-color: #f5b026;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+  }
+
+  p {
+    font-size: 0.875rem;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Empty State
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: rgba(33, 37, 41, 0.4);
+
+  svg {
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  p {
+    font-size: 0.9rem;
+  }
+}
+
+// Desktop/Tablet Table View
+.desktop-view {
+  display: none;
+
+  @media (min-width: 768px) {
+    display: block;
+  }
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.quantities-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  thead tr {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  th {
+    padding: 14px 12px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(33, 37, 41, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 12px;
+    font-size: 0.875rem;
+    color: #212529;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .col-product {
+    min-width: 180px;
+  }
+
+  .col-num {
+    text-align: right;
+    min-width: 80px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .product-row {
+    &:hover {
+      background: rgba(245, 176, 38, 0.03);
+    }
+
+    &:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  .totals-row {
+    background: rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+
+    td {
+      border-top: 2px solid rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .category-label {
+    color: #f5b026;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+
+  .product-name {
+    display: inline;
+    font-size: 0.875rem;
+    color: #212529;
+  }
+
+  .negative {
+    color: #dc3545 !important;
+  }
+
+  .positive {
+    color: #198754 !important;
+  }
+
+  .sold {
+    color: #f5b026 !important;
+    font-weight: 600;
+  }
+
+  // Price cell with unit and total
+  .price-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.3;
+
+    .unit-value {
+      font-size: 0.75rem;
+      color: rgba(33, 37, 41, 0.6);
+    }
+
+    .total-value {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #212529;
+    }
+  }
+}
+
+// Mobile Card View
+.mobile-view {
+  display: block;
+
+  @media (min-width: 768px) {
+    display: none;
+  }
+}
+
+.category-section {
+  margin-bottom: 16px;
+}
+
+.product-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.product-header {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.product-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+// 4-column layout for mobile
+.profit-quantities {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.profit-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.profit-label {
+  font-size: 0.65rem;
+  color: rgba(33, 37, 41, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.profit-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #212529;
+  font-variant-numeric: tabular-nums;
+
+  &.negative {
+    color: #dc3545;
+  }
+
+  &.positive {
+    color: #198754;
+  }
+
+  &.sold {
+    color: #f5b026;
+  }
+}
+
+// Price values with unit and total for mobile
+.price-values {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.3;
+
+  .unit-value {
+    font-size: 0.7rem;
+    color: rgba(33, 37, 41, 0.6);
+  }
+
+  .total-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #212529;
+  }
+}

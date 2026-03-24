@@ -3,7 +3,7 @@ export const locale = {
   lang: 'es',
   data: {
     TRANSLATOR: {
-      SELECT: 'Elige tu idioma',
+      SELECT: 'Elige tu idioma'
     },
     MENU: {
       ADMIN: {
@@ -25,7 +25,7 @@ export const locale = {
         SALE_CREDITS: 'Créditos',
         SALE_CREDITS_HISTORY: 'Créditos',
         TODAY_SALE_CREDITS: 'Créditos del día',
-        ORDER_HISTORY: 'Ventas',
+        ORDER_HISTORY: 'Ventas'
       },
       INVENTORY_MGMT: {
         TITLE: 'INVENTARIO',
@@ -35,12 +35,12 @@ export const locale = {
         TODAY_STATS: 'Cuadre del día',
         EGRESS: 'Salida',
         TODAY_QUANTITIES: 'Cantidades del día',
-        TODAY_SALES_PROFIT: 'Ganancias del día',
+        TODAY_SALES_PROFIT: 'Ganancias del día'
       },
       EXPENSES: {
         TITLE: 'GASTOS',
         TODAY_EXPENSES: 'Gastos del día',
-        EXPENSES_HISTORY: 'Gastos',
+        EXPENSES_HISTORY: 'Gastos'
       },
       SYNCHRONIZATION: {
         TITLE: 'SINCRONIZACIÓN',
@@ -48,16 +48,16 @@ export const locale = {
         DOWNLOAD: 'Descargar',
         RECEIVE: 'Recibir',
         IMPORT: 'Importar',
-        EXPORT: 'Exportar',
+        EXPORT: 'Exportar'
       },
       REPORTS: {
         TITLE: 'REPORTES',
         DASHBOARD: 'Reportes del día',
-        TODAY_REPORTS: 'Reportes del día',
+        TODAY_REPORTS: 'Reportes del día'
       },
       STATISTICS: {
         TITLE: 'ESTADÍSTICAS',
-        DASHBOARD: 'Panel de Control',
+        DASHBOARD: 'Panel de Control'
       },
       SHOPPING: 'VENTA',
       PRODUCTS: 'PRODUCTOS',
@@ -69,19 +69,19 @@ export const locale = {
       DASHBOARD: 'DASHBOARD',
       APP_MGMT: {
         TITLE: 'Configuración',
-        TENANTS: 'Tenants',
+        TENANTS: 'Tenants'
       },
       USER_MGMT: {
         TITLE: 'Gestión de Usuario',
         USERS: 'Usuarios',
-        ROLES: 'Roles',
+        ROLES: 'Roles'
       },
       STORE_MGMT: {
         TITLE: 'GESTIÓN',
         PROFILE: 'Perfil',
         STORES: 'Tiendas',
         USERS: 'Empleados',
-        CONFIGURATIONS: 'Configuraciones',
+        CONFIGURATIONS: 'Configuraciones'
       }
     },
     AUTH: {
@@ -96,18 +96,18 @@ export const locale = {
         PRIVACY: 'Intimidad',
         LEGAL: 'Legal',
         CONTACT: 'Contacto',
-        WELCOME: 'Autenticación',
+        WELCOME: 'Autenticación'
       },
       LOGIN: {
         TITLE: 'Crear una cuenta',
         BUTTON: 'Registrarse',
-        UNEXPECTED_ERROR: 'Usted no pudo entrar por algún error inesperado. Por favor, revise su conexión a Internet e inténtelo de nuevo, y si persiste el error contacte al equipo de soporte técnico.',
+        UNEXPECTED_ERROR:
+          'Usted no pudo entrar por algún error inesperado. Por favor, revise su conexión a Internet e inténtelo de nuevo, y si persiste el error contacte al equipo de soporte técnico.',
         INVALID_ERROR: 'La autenticación no es válida por el siguiente error: {{error}}',
         OFFLINE_MESSAGE: 'Usted está desconectado a Internet. Debe conectarse a Internet para poder entrar al sistema.',
         OFFLINE_TITLE: 'Desconectado',
         ONLINE_MESSAGE: 'Usted está conectado a Internet y puede entrar al sistema',
-        ONLINE_TITLE: 'Conectado',
-
+        ONLINE_TITLE: 'Conectado'
       },
       FORGOT: {
         TITLE: '¿Contraseña olvidada?',
@@ -125,7 +125,7 @@ export const locale = {
         PASSWORD: 'Password',
         CONFIRM_PASSWORD: 'Confirm Password',
         USERNAME: 'Usuario'
-      },
+      }
     },
     REGISTRATION: {
       WELCOME: 'Creación de cuenta',
@@ -135,7 +135,8 @@ export const locale = {
       ACCEPT_CONDITIONS: 'Estoy de acuerdo con los ',
       TERMS_CONDITIONS: 'términos y condiciones',
       INFO_TERMS_CONDITIONS: 'Usted debe aceptar los términos y condiciones para registrarse en el sistema.',
-      UNEXPECTED_ERROR: 'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.',
+      UNEXPECTED_ERROR:
+        'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.'
     },
     FOOTER: {
       COPYRIGHT1: '© AutoBusinessPro - {{year}}',
@@ -144,7 +145,7 @@ export const locale = {
       CONTACT_US: 'Contáctanos',
       PRIVACY_POLICE: 'Políticas de Privacidad',
       COOKIES_POLICE: 'Políticas de Cookies',
-      TERMS_CONDITIONS: 'Términos y Condiciones',
+      TERMS_CONDITIONS: 'Términos y Condiciones'
     },
     GENERAL: {
       LOGIN: 'Usuario',
@@ -243,16 +244,17 @@ export const locale = {
         NUMBER_GREADER_THAN_ONE: '{{name}} mínimo valor es 1',
         NUMBER_LESS_THAN_ONE_HUNDRED: '{{name}} máximo valor es 100',
         INVALID_INTEGER: 'El valor no es válido. Debe ser un entero mayor a 1.',
-        INVALID_FLOAT: 'El valor no es válido. Debe ser un número y usar el . como valor decimal.',
+        INVALID_FLOAT: 'El valor no es válido. Debe ser un número y usar el . como valor decimal.'
       },
       RESPONSE: {
         SUCCESS_MESSAGE: 'Los datos fueron salvados satisfactoriamente',
         SUCCESS_TITLE: 'Éxito',
         ERROR_TITLE: 'Error',
         WARNING_TITLE: 'Alerta',
-        ERROR404_MESSAGE: 'Puede que necesite estar conectado a Internet para hacer esta operación. Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
-        ERROR500_MESSAGE: 'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
-      },
+        ERROR404_MESSAGE:
+          'Puede que necesite estar conectado a Internet para hacer esta operación. Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+        ERROR500_MESSAGE: 'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.'
+      }
     },
     ECOMMERCE: {
       COMMON: {
@@ -296,7 +298,7 @@ export const locale = {
       }
     },
     NOTIFICATION: {
-      TITLE: 'Notificaciones',
+      TITLE: 'Notificaciones'
     },
     USER: {
       ADD_USER: 'Adicionar Empleado',
@@ -305,7 +307,7 @@ export const locale = {
       TEXT: 'Usuario',
       EDIT_USER: 'Editar Empleado',
       DEACTIVATE_USER: 'Desactivar',
-      ACTIVATE_USER: 'Activar',
+      ACTIVATE_USER: 'Activar'
     },
     LIST_ACTION_BUTTON: {
       DETAILS: 'Detalles',
@@ -314,7 +316,7 @@ export const locale = {
       APPROVE: 'Aceptar',
       DISAPPROVE: 'Desaprobar',
       ACTIVATE: 'Activar',
-      DEACTIVATE: 'Desactivar',
+      DEACTIVATE: 'Desactivar'
     },
     APP: {
       TENANT: {
@@ -327,8 +329,8 @@ export const locale = {
         TENANTS: 'Tenants',
         NEW_TENANT: 'Adicionar Tenant',
         TEXT: 'Tenant',
-        FEATURES: 'Features',
-      },
+        FEATURES: 'Features'
+      }
     },
     STORE: {
       HEADER: 'Tienda',
@@ -342,7 +344,7 @@ export const locale = {
       CONFIRM_TEXT: 'esta tienda',
       SELECT_MODULES: 'Seleccionar módulos',
       PAYMENT_START_DATE: 'Fecha de inicio del pago',
-      STORE_NAME: 'Nombre de la tienda',
+      STORE_NAME: 'Nombre de la tienda'
     },
     PRODUCT_CATEGORY: {
       TEXT: 'Categoría',
@@ -357,7 +359,7 @@ export const locale = {
       DELETE_CATEGORY: 'Eliminar Categoría',
       ADD_PRODUCT: 'Producto',
       IMPORT_PRODUCTS: 'Importar Productos',
-      DOWNLOAD_SAMPLE: 'Descargar Ejemplo',
+      DOWNLOAD_SAMPLE: 'Descargar Ejemplo'
     },
     PRODUCT: {
       TEXT: 'Product',
@@ -368,7 +370,7 @@ export const locale = {
       DELETE_PRODUCT: 'Eliminar Producto',
       AVAILABLE_TO_SALE: 'Disponible para Vender',
       DISCOUNT_FROM_INVENTORY: 'Descuenta del Inventario',
-      ADD_PRODUCTS: 'Adicionar Productos',
+      ADD_PRODUCTS: 'Adicionar Productos'
     },
     SHOPPING_CART: {
       PRODUCTS_LABEL: 'productos',
@@ -377,29 +379,31 @@ export const locale = {
       REGISTER: 'Registrar',
       PRICE_LABEL: 'Precio: ',
       ORDER_CREATED: 'La venta fue creada satisfactoriamente.',
-      ORDER_NOT_CREATED: 'Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
+      ORDER_NOT_CREATED:
+        'Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
       DON_NOT_PAY_EMPTY_CART: 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
       GENERATE_FACTURE: 'Generar Factura (modo prueba)',
       PRINT_INVOICE: 'Imprimir Factura (prueba)',
       CLEAR: 'Limpiar',
       EDIT_DETAILS: 'Editar Detalles',
       DON_NOT_PAY_LESS_THAN_CART_TOTAL: 'Usted no puede realizar la venta porque el pago es menor que el total.',
-      DON_NOT_SALE_CREDIT_WITHOUT_CLIENT: 'Usted no puede realizar la venta por cobrar sin especificar el cliente.',
+      DON_NOT_SALE_CREDIT_WITHOUT_CLIENT: 'Usted no puede realizar la venta por cobrar sin especificar el cliente.'
     },
     SALES: {
       NO_CATEGORY_ALERT_MESSAGE: 'No existe ninguna categoría. Usted puede adicionar categorías si da click aquí: ',
       HEADER: 'Productos para vender',
       NO_SELECTED_CATEGORY_ALERT_MESSAGE: 'Seleccione primero una categoría para adicionar productos a la venta.',
       PRODUCT_ADDED_TO_CART: 'El producto fue adicionado a la venta',
-      PRODUCT_NOT_ADDED_TO_CART: 'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
+      PRODUCT_NOT_ADDED_TO_CART:
+        'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
       CONFIRM_NOT_INVENTORY_AVAILABLE_TITLE: 'Confirmar sin disponibilidad',
       CONFIRM_NOT_INVENTORY_AVAILABLE_MESSAGE: 'El producto no está disponible en el inventario. Usted desea adicionarlo a la venta?',
-      NOT_INVENTORY_AVAILABLE_MESSAGE: 'El producto no está disponible en el inventario.',
+      NOT_INVENTORY_AVAILABLE_MESSAGE: 'El producto no está disponible en el inventario.'
     },
     TODAY_STATS: {
       HEADER: 'Cuadre del día',
       NO_ORDER_FOUND: 'No se ha realizado ninguna venta en el día de hoy.',
-      NO_EXPENSE_FOUND: 'No se ha realizado ningun gasto en el día de hoy.',
+      NO_EXPENSE_FOUND: 'No se ha realizado ningun gasto en el día de hoy.'
     },
     TODAY_ORDERS: {
       HEADER: 'Ventas del día',
@@ -411,7 +415,7 @@ export const locale = {
       EDIT_ORDER: 'Editar Venta',
       DELETE_ORDER: 'Eliminar Venta',
       DEACTIVATE_ORDER: 'Cancelar Venta',
-      ACTIVATE_ORDER: 'Activar Venta',
+      ACTIVATE_ORDER: 'Activar Venta'
     },
     INVENTORY_ENTRY: {
       TEXT: 'Entrada',
@@ -420,7 +424,7 @@ export const locale = {
       NO_ENTRY_FOUND_IN_DAY: 'No existe ninguna entrada en el día',
       EDIT_INVENTORY_ENTRY: 'Editar Entrada',
       DELETE_INVENTORY_ENTRY: 'Eliminar Entrada',
-      PRODUCT_NOT_FOUND: 'El producto seleccionado no existe.',
+      PRODUCT_NOT_FOUND: 'El producto seleccionado no existe.'
     },
     INVENTORY: {
       INVENTORY: 'Inventario',
@@ -429,18 +433,37 @@ export const locale = {
       CATEGORY_PRODUCT_NO_FOUND: 'No existe ningún producto disponible en la categoría',
       ENTRIES_HISTORY: 'Historial de Entradas',
       NO_HISTORY_ENTRY_FOUND: 'No se encontró ninguna entrada',
+      TODAY_QUANTITIES: 'Cantidades del Día',
+      TODAY_QUANTITIES_SUBTITLE: 'Inventario de hoy con entradas y ventas',
+      TODAY_SALES_PROFIT: 'Ganancias del Día',
+      NO_SALES_TODAY: 'No hay ventas hoy',
+      NO_PRODUCTS: 'No hay productos disponibles',
+      PRODUCT: 'Producto',
+      BEGINNING: 'Inicio',
+      ENTRIES: 'Entradas',
+      AVAILABLE: 'Disponible',
+      SOLD: 'Vendido',
+      ENDING: 'Final',
+      SALE_PRICE: 'Precio Venta',
+      AMOUNT: 'Importe',
+      UNIT_COST: 'Costo Unit.',
+      TOTAL_COST: 'Costo Total',
+      PROFIT: 'Ganancia',
+      TOTAL: 'Total',
+      PRICE: 'Precio',
+      COST: 'Costo'
     },
     INVENTORY_EGRESS: {
-      HEADER: 'Salida',
+      HEADER: 'Salida'
     },
     HELP: {
       MENU: {
         PRODUCTS: {
-          TITLE: 'Ayuda - Catálogo de Productos',
+          TITLE: 'Ayuda - Catálogo de Productos'
         },
         SALES: {
-          TITLE: 'Ayuda - Ventas',
-        },
+          TITLE: 'Ayuda - Ventas'
+        }
       }
     },
     OWNER: {
@@ -450,35 +473,33 @@ export const locale = {
       APPROVE_OWNER: 'Aprobar Propietario',
       ADD_OWNER: 'Adicionar Propietario',
       STORE_SINGLE_PRICE: 'en {{count}} tienda',
-      STORE_MULTIPLE_PRICE: 'en {{count}} tiendas',
+      STORE_MULTIPLE_PRICE: 'en {{count}} tiendas'
     },
     RESELLER: {
       ADD_RESELLER: 'Adicionar Gestor'
     },
     PROFILE: {
       EDIT_PROFILE: 'Editar Perfil',
-      CHANGE_PASSWORD: 'Cambiar Contraseña',
+      CHANGE_PASSWORD: 'Cambiar Contraseña'
     },
-    MODULE: {
-
-    },
+    MODULE: {},
     SYNCHRONIZATION: {
       SEND_TITLE: 'Exportar Datos',
       SEND_EXPORT: 'Exportar',
       RECEIVE_TITLE: 'Importar Datos',
       RECEIVE_IMPORT: 'Importar',
       RECEIVE_IMPORT_ERROR: 'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
-      RECEIVE_IMPORT_SUCCESS: 'Los datos se importaron correctamente.',
+      RECEIVE_IMPORT_SUCCESS: 'Los datos se importaron correctamente.'
     },
     REPORT: {
       TITLE: 'Reportes',
-      INVENTORY_TODAY_SALE: 'Inventario a precio de venta',
+      INVENTORY_TODAY_SALE: 'Inventario a precio de venta'
     },
     TUTORIAL: {
-      TITLE: 'Ayuda General',
+      TITLE: 'Ayuda General'
     },
     DASHBOARD: {
-      HEADER: 'Panel de Control',
+      HEADER: 'Panel de Control'
     },
     FEATURES: {
       TITLE: 'Funcionalidades',
@@ -492,7 +513,7 @@ export const locale = {
       NEW_EXPENSE: 'Adicionar Gasto',
       EDIT_EXPENSE: 'Editar Gatos',
       EXPENSES_HISTORY: 'Historial de Gastos',
-      NO_EXPENSE_FOUND: 'No se enxontró ningún gasto',
+      NO_EXPENSE_FOUND: 'No se enxontró ningún gasto'
     },
     SALE_CREDIT: {
       TITLE: 'Créditos',
@@ -502,11 +523,11 @@ export const locale = {
       PAYMENT_CONFIRM_TITLE: 'Confirmación de Pago',
       PAYMENT_CONFIRM_MESSAGE: 'Usted está segura(o) que desea pagar este crédito por venta?',
       NO_SALE_CREDIT_FOUND_IN_DAY: 'No existe ningún crédito en el día',
-      NO_SALE_CREDIT_FOUND: 'No se encontró ningún crédito',
+      NO_SALE_CREDIT_FOUND: 'No se encontró ningún crédito'
     },
     ORDERS: {
       TITLE: 'Historial de Ventas',
-      NO_ORDERS_FOUND: 'No se encontró ninguna venta',
+      NO_ORDERS_FOUND: 'No se encontró ninguna venta'
     }
   }
 };
