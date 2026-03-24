@@ -11,6 +11,7 @@ import { UpdateService } from './_services/update/update.service';
 import { LoadingService } from './_services/loading.service';
 import { StoreUsageTrackerService } from './_services/usage-tracker/store-usage-tracker.service';
 import { DownloadManagerService } from './_services/download-manager/download-manager.service';
+import { AuthService } from './_services/services.index';
 
 @Component({
   selector: 'app-root',
@@ -37,7 +38,8 @@ export class AppComponent implements OnInit {
     private updateService: UpdateService,
     private storeUsageTracker: StoreUsageTrackerService,
     private downloadManager: DownloadManagerService,
-    private loadingService: LoadingService
+    private loadingService: LoadingService,
+    private authService: AuthService
   ) {
     console.log('[AppComponent] Constructor - START');
     console.log('[AppComponent] Loading translations...');
@@ -55,6 +57,14 @@ export class AppComponent implements OnInit {
     this.setupProgressTracking();
     setTimeout(() => this.updateService.init(), 5000);
     console.log('[AppComponent] ngOnInit - DONE');
+  }
+
+  get isLoggedIn(): boolean {
+    return !!this.authService.currentUserValue;
+  }
+
+  get showLoginButton(): boolean {
+    return !this.canInstall;
   }
 
   private checkPWAInstallability(): void {
