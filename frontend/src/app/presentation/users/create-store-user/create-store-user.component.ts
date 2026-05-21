@@ -8,23 +8,27 @@ import { CanDeactivateType } from 'src/app/_shared/guards/can-deactivate.guard';
 import { StoreUserService } from 'src/app/_services/storeuser/store-user.service';
 
 @Component({
-    selector: 'app-create-store-user',
-    imports: [SharedModule, TranslateModule, RouterModule],
-    templateUrl: './create-store-user.component.html',
-    styleUrl: './create-store-user.component.scss'
+  selector: 'app-create-store-user',
+  imports: [SharedModule, TranslateModule, RouterModule],
+  templateUrl: './create-store-user.component.html',
+  styleUrl: './create-store-user.component.scss'
 })
 export class CreateStoreUserComponent implements OnInit {
   storeId: string;
 
   showPassword: boolean = false;
-  formGroup: FormGroup;
+  formGroup: FormGroup = new FormGroup({});
   hasError: boolean;
   errorMessage: string;
-  email: string = "info@mail.com";
+  email: string = 'info@mail.com';
 
-  constructor(private formBuilder: FormBuilder, private translateService: TranslateService, private router: Router, private storeUserService: StoreUserService, private route: ActivatedRoute) {
-
-  }
+  constructor(
+    private formBuilder: FormBuilder,
+    private translateService: TranslateService,
+    private router: Router,
+    private storeUserService: StoreUserService,
+    private route: ActivatedRoute
+  ) {}
 
   // @HostListener allows us to also guard against browser refresh, close, etc.
   //@HostListener('window:beforeunload')
@@ -39,7 +43,7 @@ export class CreateStoreUserComponent implements OnInit {
   ngOnInit(): void {
     this.storeId = this.route.snapshot.params['storeId'];
     if (!this.storeId) {
-      this.router.navigateByUrl("/management/stores");
+      this.router.navigateByUrl('/management/stores');
       return;
     }
     this.loadForm();
@@ -52,19 +56,29 @@ export class CreateStoreUserComponent implements OnInit {
         return resolve(false);
       }
 
-      this.storeUserService.createStoreUser(this.storeId, this.formGroup.value.fullName, this.formGroup.value.login, this.formGroup.value.password, this.formGroup.value.cellPhone, this.formGroup.value.email)
-        .pipe(catchError((error) => {
-          // return of({
-          //   data: null,
-          //   succeeded: false,
-          //   message: "",
-          //   actionCode: 400,
-          //   errors: [this.translateService.instant('REGISTRATION.UNEXPECTED_ERROR')],
-          // });
-          resolve(false)
-          throw error;
-        }))
-        .subscribe(response => {
+      this.storeUserService
+        .createStoreUser(
+          this.storeId,
+          this.formGroup.value.fullName,
+          this.formGroup.value.login,
+          this.formGroup.value.password,
+          this.formGroup.value.cellPhone,
+          this.formGroup.value.email
+        )
+        .pipe(
+          catchError((error) => {
+            // return of({
+            //   data: null,
+            //   succeeded: false,
+            //   message: "",
+            //   actionCode: 400,
+            //   errors: [this.translateService.instant('REGISTRATION.UNEXPECTED_ERROR')],
+            // });
+            resolve(false);
+            throw error;
+          })
+        )
+        .subscribe((response) => {
           if (response && response.succeeded) {
             this.router.navigateByUrl('/management/users');
             resolve(true);
@@ -74,18 +88,20 @@ export class CreateStoreUserComponent implements OnInit {
           this.errorMessage = response.errors[0].description;
           resolve(false);
         });
-    })
+    });
   }
 
   loadForm() {
     this.formGroup = this.formBuilder.group({
-      fullName: [{ value: "", disabled: false }, Validators.compose([Validators.required])],
-      login: [{ value: "", disabled: false }, Validators.compose([Validators.required])],
-      password: [{ value: "", disabled: false }, Validators.compose([Validators.required,
-      Validators.pattern('(?=\\D*\\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}')])],
-      confirmPassword: [{ value: "", disabled: false }, Validators.compose([Validators.required])],
-      cellPhone: [{ value: "", disabled: false }, Validators.compose([Validators.required])],
-      email: [{ value: "", disabled: false }, Validators.compose([Validators.email])],
+      fullName: [{ value: '', disabled: false }, Validators.compose([Validators.required])],
+      login: [{ value: '', disabled: false }, Validators.compose([Validators.required])],
+      password: [
+        { value: '', disabled: false },
+        Validators.compose([Validators.required, Validators.pattern('(?=\\D*\\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}')])
+      ],
+      confirmPassword: [{ value: '', disabled: false }, Validators.compose([Validators.required])],
+      cellPhone: [{ value: '', disabled: false }, Validators.compose([Validators.required])],
+      email: [{ value: '', disabled: false }, Validators.compose([Validators.email])]
     });
   }
 
@@ -96,7 +112,7 @@ export class CreateStoreUserComponent implements OnInit {
 
   isControlInvalid(controlName: string, validator: string): boolean {
     const control = this.formGroup.controls[controlName];
-    if (validator === "passwordMatch") {
+    if (validator === 'passwordMatch') {
       const pass = this.formGroup.get('password');
       if (control.value && pass.value !== control.value) {
         control.setErrors({});
@@ -106,10 +122,8 @@ export class CreateStoreUserComponent implements OnInit {
         control.setErrors(null);
       }
       return false;
-    }
-    else {
+    } else {
       return control.hasError(validator) && (control.dirty || control.touched);
     }
   }
-
 }

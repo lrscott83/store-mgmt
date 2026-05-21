@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { Landing2Component } from './landing2.component';
@@ -8,7 +10,7 @@ describe('Landing2Component', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Landing2Component]
+      imports: [Landing2Component, CommonTestModule]
     })
     .compileComponents();
 

@@ -10,10 +10,10 @@ import { ProductService } from 'src/app/domain/interfaces/product.service';
 import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 
 @Component({
-    selector: 'app-sale-category-products',
-    imports: [SharedModule, TranslateModule, SaleProductRowComponent],
-    templateUrl: './sale-category-products.component.html',
-    styleUrl: './sale-category-products.component.scss'
+  selector: 'app-sale-category-products',
+  imports: [SharedModule, TranslateModule, SaleProductRowComponent],
+  templateUrl: './sale-category-products.component.html',
+  styleUrl: './sale-category-products.component.scss'
 })
 export class SaleCategoryProductsComponent implements OnInit, OnDestroy {
   @Input() category: Observable<ProductCategory>;
@@ -24,15 +24,15 @@ export class SaleCategoryProductsComponent implements OnInit, OnDestroy {
 
   private unsubscribe: Subscription[] = [];
 
-  constructor(@Inject(PRODUCT_SERVICE) private productService: ProductService) { 
+  constructor(@Inject(PRODUCT_SERVICE) private productService: ProductService) {
     this.editPrice = this.orderType !== OrderType.Normal;
   }
 
   ngOnInit(): void {
-    const categorySubscription = this.category.subscribe(cat => {
-      if (!cat)
-        return;
-      const productsSubscription = this.productService.getProductsToSaleByCategoryId(cat.id).subscribe(response => {
+    if (!this.category) return;
+    const categorySubscription = this.category.subscribe((cat) => {
+      if (!cat?.id) return;
+      const productsSubscription = this.productService.getProductsToSaleByCategoryId(cat.id).subscribe((response) => {
         if (response.succeeded) {
           this.products$.next(response.data);
         }

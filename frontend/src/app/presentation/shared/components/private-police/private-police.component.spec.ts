@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { PrivatePoliceComponent } from './private-police.component';
@@ -8,7 +10,7 @@ describe('PrivatePoliceComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PrivatePoliceComponent]
+      imports: [PrivatePoliceComponent, CommonTestModule]
     })
     .compileComponents();
     

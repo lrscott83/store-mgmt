@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../testing/common-test.module';
+
 import { TestBed } from '@angular/core/testing';
 
 import { DownloadManagerService } from './download-manager.service';

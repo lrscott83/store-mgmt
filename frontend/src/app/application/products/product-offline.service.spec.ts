@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../testing/common-test.module';
+
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { HttpClient } from '@angular/common/http';
@@ -60,7 +62,7 @@ describe('ProductCategoryOfflineService + ProductRepository Integration', () => 
     localStorage.clear();
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
+      imports: [HttpClientTestingModule, CommonTestModule],
       providers: [
         ProductRepository,
         ProductCategoryRepository,

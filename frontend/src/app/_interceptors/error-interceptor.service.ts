@@ -65,8 +65,10 @@ export class ErrorInterceptor implements HttpInterceptor {
             return throwError(() => err);
           }
           case 403: {
-            const authService = this.getAuthService();
-            authService?.logout();
+            // 403 means "Forbidden" - user IS authenticated but doesn't have permission
+            // OR backend is unavailable (e.g., usage tracker when offline)
+            // DO NOT logout - just re-throw the error
+            // The component/service that made the request can handle it silently
             return throwError(() => err);
           }
           case 404: {

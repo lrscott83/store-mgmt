@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { CsvProductImporterModalComponent } from './csv-product-importer-modal.component';
@@ -8,7 +10,7 @@ describe('CsvProductImporterModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CsvProductImporterModalComponent]
+      imports: [CsvProductImporterModalComponent, CommonTestModule]
     })
     .compileComponents();
 

@@ -3,46 +3,42 @@
     <div class="col text-end">
       <button mat-fab extended color="primary" (click)="openEditOrderModal(order)">
         <mat-icon>edit</mat-icon>
-        {{'GENERAL.EDIT'| translate}}
+        {{ 'GENERAL.EDIT' | translate }}
       </button>
-      @if (order.isActive) {
-        <button mat-fab extended color="primary" (click)="deactivateOrder(order)" style="margin-left: 10px;">
+      @if (order?.isActive) {
+        <button mat-fab extended color="primary" (click)="deactivateOrder(order)" style="margin-left: 10px">
           <mat-icon color="warn">delete</mat-icon>
-          {{'GENERAL.DELETE'| translate}}
+          {{ 'GENERAL.DELETE' | translate }}
         </button>
       }
-      <!-- @else {
-      <button mat-fab extended color="primary" (click)="activateOrder(order)">
-        <mat-icon>edit</mat-icon>
-        {{'TODAY_ORDERS.ACTIVATE_ORDER'| translate}}
-      </button>
-      } -->
     </div>
   </div>
 }
 
-<div class="table-responsive">
-  <table class="table table-borderless table-vertical-center">
-    <tbody>
-      @for (item of order.orderItems; track item) {
-        <tr class="border-1">
-          <td class="p-2">
-            <span class="text-dark font-weight-bold mb-1 font-size-lg">
-              {{item.name}}
-            </span>
-          </td>
-          <td class="text-end p-2">
-            <span class="label label-success font-weight-bold font-size-lg">
-              {{item.quantity}}
-            </span>
-          </td>
-          <td class="text-end p-2">
-            <span class="font-weight-bold mb-1 font-size-lg">
-              {{(item.price * item.quantity) | currency:'USD':'symbol':'1.2-2'}}
-            </span>
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
-</div>
+@if (order?.orderItems) {
+  <div class="table-responsive">
+    <table class="table table-borderless table-vertical-center">
+      <tbody>
+        @for (item of order.orderItems; track item) {
+          <tr class="border-1">
+            <td class="p-2">
+              <span class="text-dark font-weight-bold mb-1 font-size-lg">
+                {{ item.name }}
+              </span>
+            </td>
+            <td class="text-end p-2">
+              <span class="label label-success font-weight-bold font-size-lg">
+                {{ item.quantity }}
+              </span>
+            </td>
+            <td class="text-end p-2">
+              <span class="font-weight-bold mb-1 font-size-lg">
+                {{ item.price * item.quantity | currency: 'USD' : 'symbol' : '1.2-2' }}
+              </span>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

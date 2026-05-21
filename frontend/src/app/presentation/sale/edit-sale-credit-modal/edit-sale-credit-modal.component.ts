@@ -12,10 +12,10 @@ import Swal from 'sweetalert2';
 import { RegExExtensions } from 'src/app/_helpers/extensions/regex-extension';
 
 @Component({
-    selector: 'app-edit-sale-credit-modal',
-    imports: [SharedModule, TranslateModule],
-    templateUrl: './edit-sale-credit-modal.component.html',
-    styleUrl: './edit-sale-credit-modal.component.scss'
+  selector: 'app-edit-sale-credit-modal',
+  imports: [SharedModule, TranslateModule],
+  templateUrl: './edit-sale-credit-modal.component.html',
+  styleUrl: './edit-sale-credit-modal.component.scss'
 })
 export class EditSaleCreditModalComponent implements OnInit {
   @Input() saleCredit: SaleCredit;
@@ -25,7 +25,12 @@ export class EditSaleCreditModalComponent implements OnInit {
   formGroup: FormGroup;
   formPatterns: any;
 
-  constructor(private saleCreditService: SaleCreditOfflineService, private formBuilder: FormBuilder, private modal: NgbActiveModal, private translate: TranslateService) {
+  constructor(
+    private saleCreditService: SaleCreditOfflineService,
+    private formBuilder: FormBuilder,
+    private modal: NgbActiveModal,
+    private translate: TranslateService
+  ) {
     this.loadForm();
   }
 
@@ -46,7 +51,12 @@ export class EditSaleCreditModalComponent implements OnInit {
       return;
     }
     // Update
-    const dataEntry: DataResult<SaleCredit> = this.saleCreditService.updateSaleCredit(this.saleCredit.id, this.formGroup.value.client, this.formGroup.value.note);
+    if (!this.saleCredit?.id) return;
+    const dataEntry: DataResult<SaleCredit> = this.saleCreditService.updateSaleCredit(
+      this.saleCredit.id,
+      this.formGroup.value.client,
+      this.formGroup.value.note
+    );
     if (dataEntry && dataEntry.succeeded) {
       if (this.saleCreditUpdatedEmitter) {
         this.saleCreditUpdatedEmitter.emit(dataEntry.data);
@@ -64,8 +74,8 @@ export class EditSaleCreditModalComponent implements OnInit {
   loadForm() {
     this.loadPatterns();
     this.formGroup = this.formBuilder.group({
-      client: [{ value: "", disabled: false }, Validators.compose([Validators.required])],
-      note: [{ value: "", disabled: false }, Validators.compose([])],
+      client: [{ value: '', disabled: false }, Validators.compose([Validators.required])],
+      note: [{ value: '', disabled: false }, Validators.compose([])]
     });
   }
 
@@ -73,11 +83,11 @@ export class EditSaleCreditModalComponent implements OnInit {
     this.formPatterns = {
       number: {
         regex: RegExExtensions.numeric,
-        mask: "0*",
+        mask: '0*'
       },
       currency: {
         regex: RegExExtensions.currency,
-        mask: "0*.00",
+        mask: '0*.00'
       }
     };
   }
@@ -93,11 +103,10 @@ export class EditSaleCreditModalComponent implements OnInit {
   // helpers for View
   isControlInvalid(controlName: string, validator: string): boolean {
     const control = this.formGroup.controls[controlName];
-    if (validator == "") {
+    if (validator == '') {
       return control.hasError('required') && (control.dirty || control.touched);
     } else {
       return control.hasError(validator) && (control.dirty || control.touched);
     }
   }
-
 }

@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../../testing/common-test.module';
+
 // https://angular.io/guide/http#testing-requests
 import { TestBed, getTestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
@@ -12,7 +14,7 @@ describe('AuthFakeHTTPService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [AuthFakeHTTPService],
-      imports: [HttpClientTestingModule]
+      imports: [HttpClientTestingModule, CommonTestModule]
     });
 
     // We inject our service (which imports the HttpClient) and the Test Controller

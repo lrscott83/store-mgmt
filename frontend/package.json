@@ -1,6 +1,6 @@
 {
   "name": "vende-de-todo-app",
-  "version": "4.0.0",
+  "version": "1.0.0",
   "author": "AutoBusinessPro",
   "license": "MIT",
   "scripts": {
@@ -11,6 +11,11 @@
     "build-prod": "ng build --configuration production --base-href /angular/free/",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "test:watch": "ng test --watch",
+    "test:coverage": "ng test --code-coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
     "lint": "ng lint",
     "lint-fix": "ng lint --fix",
     "optimize:images": "node scripts/optimize-images.js"
@@ -59,6 +64,7 @@
     "zone.js": "~0.15.1"
   },
   "devDependencies": {
+    "@analogjs/vitest-angular": "^2.3.1",
     "@angular-eslint/builder": "21.1.0",
     "@angular-eslint/eslint-plugin": "21.1.0",
     "@angular-eslint/eslint-plugin-template": "21.1.0",
@@ -67,24 +73,32 @@
     "@angular/build": "^21.1.1",
     "@angular/cli": "~21.1.1",
     "@angular/compiler-cli": "^21.1.1",
+    "@angular/testing": "^0.0.0-0",
     "@fullhuman/postcss-purgecss": "^8.0.0",
+    "@playwright/test": "^1.58.2",
+    "@testing-library/angular": "^19.2.1",
+    "@testing-library/dom": "^10.4.1",
     "@types/jasmine": "~5.1.4",
     "@types/node": "^20.12.7",
     "@typescript-eslint/eslint-plugin": "7.11.0",
     "@typescript-eslint/parser": "7.11.0",
+    "@vitest/coverage-v8": "^4.1.1",
     "eslint": "8.57.1",
     "glob": "^13.0.0",
     "jasmine-core": "~5.1.2",
+    "jsdom": "^29.0.1",
     "karma": "~6.4.3",
     "karma-chrome-launcher": "~3.2.0",
     "karma-coverage": "~2.2.1",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "playwright": "^1.58.2",
     "prettier": "3.2.5",
     "purgecss": "^5.0.0",
     "sharp": "^0.34.5",
     "source-map-explorer": "^2.5.3",
     "typescript": "5.9.3",
+    "vitest": "^4.1.1",
     "webpack-bundle-analyzer": "^5.2.0"
   }
 }

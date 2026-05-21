@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { SplashScreenComponent } from './splash-screen.component';
@@ -8,7 +10,7 @@ describe('SplashScreenComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SplashScreenComponent]
+      imports: [SplashScreenComponent, CommonTestModule]
     })
     .compileComponents();
     

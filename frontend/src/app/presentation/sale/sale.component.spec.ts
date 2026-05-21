@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { SaleComponent } from './sale.component';
@@ -8,7 +10,7 @@ describe('SaleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SaleComponent]
+      imports: [SaleComponent, CommonTestModule]
     })
     .compileComponents();
     

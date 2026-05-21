@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { Html5ScannerComponent } from './html5-scanner.component';
@@ -8,7 +10,7 @@ describe('Html5ScannerComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Html5ScannerComponent]
+      imports: [Html5ScannerComponent, CommonTestModule]
     })
     .compileComponents();
 

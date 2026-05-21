@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { EgressComponent } from './egress.component';
@@ -8,7 +10,7 @@ describe('EgressComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EgressComponent]
+      imports: [EgressComponent, CommonTestModule]
     })
     .compileComponents();
 

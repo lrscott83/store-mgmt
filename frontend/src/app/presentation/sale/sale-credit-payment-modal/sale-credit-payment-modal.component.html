@@ -11,24 +11,31 @@
     <form class="form" id="product_form" [formGroup]="formGroup" (ngSubmit)="onSubmit()">
       <div class="row">
         <div class="col-md-10 col-lg-8 mx-auto">
-          <div style="margin-bottom: 10px;">Cliente: {{saleCredit.client}}</div>
-          <div style="margin-bottom: 20px;">Pagar: {{saleCredit.total | currency:'USD':'symbol':'1.2-2'}}</div>
+          <div style="margin-bottom: 10px">Cliente: {{ saleCredit?.client || 'N/A' }}</div>
+          <div style="margin-bottom: 20px">Pagar: {{ saleCredit?.total || 0 | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
 
           <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
             <mat-label>Forma de Pago</mat-label>
             <mat-select name="Forma de Pago" [(value)]="paymentType">
               @for (type of paymentTypes; track type) {
                 <mat-option [value]="type.value">
-                  {{type.label}}
+                  {{ type.label }}
                 </mat-option>
               }
             </mat-select>
           </mat-form-field>
 
           <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
-            <mat-label>{{'GENERAL.NOTE'| translate}}</mat-label>
-            <textarea matInput appTitleCase formControlName="note" autocomplete="off"
-            matTextareaAutosize matAutosizeMinRows="2" matAutosizeMaxRows="5"></textarea>
+            <mat-label>{{ 'GENERAL.NOTE' | translate }}</mat-label>
+            <textarea
+              matInput
+              appTitleCase
+              formControlName="note"
+              autocomplete="off"
+              matTextareaAutosize
+              matAutosizeMinRows="2"
+              matAutosizeMaxRows="5"
+            ></textarea>
           </mat-form-field>
         </div>
       </div>
@@ -37,11 +44,11 @@
   <div class="modal-footer">
     <button mat-fab extended color="primary" (click)="closeModal()">
       <mat-icon>close</mat-icon>
-      {{ 'GENERAL.CLOSE' | translate}}
+      {{ 'GENERAL.CLOSE' | translate }}
     </button>
     <button mat-fab extended color="primary" (click)="onSubmit()">
       <mat-icon>payment</mat-icon>
-      {{ 'SALE_CREDIT.TO_PAY' | translate}}
+      {{ 'SALE_CREDIT.TO_PAY' | translate }}
     </button>
   </div>
 </div>

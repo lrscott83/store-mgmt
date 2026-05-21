@@ -12,10 +12,10 @@ import { InventoryOfflineService } from 'src/app/application/entries/inventory-o
 import { OrderType } from 'src/app/domain/entities/orders/order.model';
 
 @Component({
-    selector: 'app-sale-product-row',
-    imports: [SharedModule, TranslateModule],
-    templateUrl: './sale-product-row.component.html',
-    styleUrl: './sale-product-row.component.scss'
+  selector: 'app-sale-product-row',
+  imports: [SharedModule, TranslateModule],
+  templateUrl: './sale-product-row.component.html',
+  styleUrl: './sale-product-row.component.scss'
 })
 export class SaleProductRowComponent implements OnInit, OnChanges {
   @Input() product: Product;
@@ -24,13 +24,18 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
   formGroup: FormGroup;
   formPatterns: any;
 
-  constructor(private formBuilder: FormBuilder, private shoppingCartService: ShoppingCartService, private translate: TranslateService, private inventoryService: InventoryOfflineService) {
+  constructor(
+    private formBuilder: FormBuilder,
+    private shoppingCartService: ShoppingCartService,
+    private translate: TranslateService,
+    private inventoryService: InventoryOfflineService
+  ) {
     this.loadForm();
   }
 
   ngOnInit(): void {
-    this.formGroup.patchValue({ quantity: 1, price: this.product.price });
-    this.enableOrDisablePriceFromControl()
+    this.formGroup.patchValue({ quantity: 1, price: this.product?.price });
+    this.enableOrDisablePriceFromControl();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -56,16 +61,17 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
     const availableResult: Result = this.inventoryService.hasAvailableProductToSale(productId, quantity + shoppingCartQty);
     if (!availableResult.succeeded) {
       // TODO. Show confirm message y notificar al dueño de la tienda.
-      const message = availableResult.errors && availableResult.errors.length > 0
-        ? availableResult.errors[0].description
-        : ProductErrors.ProductNotAvailable.description;
+      const message =
+        availableResult.errors && availableResult.errors.length > 0
+          ? availableResult.errors[0].description
+          : ProductErrors.ProductNotAvailable.description;
       Swal.fire({
         // title: this.translate.instant('SALES.CONFIRM_NOT_INVENTORY_AVAILABLE_TITLE'),
         // text: this.translate.instant('SALES.CONFIRM_NOT_INVENTORY_AVAILABLE_MESSAGE'),
         // icon: "question",
         title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
         text: message,
-        icon: "error",
+        icon: 'error'
         // showCancelButton: true,
         // confirmButtonColor: "#3456ff",
         // cancelButtonColor: "#dc3545",
@@ -95,24 +101,23 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
         //       });
         //   }
       });
-    } else
-      this.addCartItem(this.orderType, productId);
-
+    } else this.addCartItem(this.orderType, productId);
   }
 
   addCartItem(orderType: OrderType, productId: string) {
-    this.shoppingCartService.addCartItem(orderType, productId, this.formGroup.value.quantity, this.getPrice()).then(response => {
+    this.shoppingCartService.addCartItem(orderType, productId, this.formGroup.value.quantity, this.getPrice()).then((response) => {
       if (response.succeeded) {
         // this.toastrService.success(
         //   this.translate.instant('SALES.PRODUCT_ADDED_TO_CART'));
       } else {
-        const message = response.errors && response.errors.length > 0
-          ? response.errors[0].description
-          : this.translate.instant('SALES.PRODUCT_NOT_ADDED_TO_CART');
+        const message =
+          response.errors && response.errors.length > 0
+            ? response.errors[0].description
+            : this.translate.instant('SALES.PRODUCT_NOT_ADDED_TO_CART');
         Swal.fire({
-          icon: "error",
+          icon: 'error',
           title: this.translate.instant('GENERAL.RESPONSE.ERROR_TITLE'),
-          text: message,
+          text: message
         });
       }
     });
@@ -125,9 +130,10 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
   loadForm() {
     this.loadPatterns();
     this.formGroup = this.formBuilder.group({
-      quantity: [{ value: "", disabled: false }, Validators.compose([
-        Validators.required,
-        Validators.pattern(this.formPatterns.number.regex)])],
+      quantity: [
+        { value: '', disabled: false },
+        Validators.compose([Validators.required, Validators.pattern(this.formPatterns.number.regex)])
+      ]
       // price: [{ value: "", disabled: false }, Validators.compose([
       //   Validators.required,
       //   Validators.min(0),
@@ -135,9 +141,7 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
     });
 
     if (!this.isNormalSale()) {
-      this.formGroup.addControl('price', new FormControl("", Validators.compose([
-        Validators.required,
-        Validators.min(0)])));
+      this.formGroup.addControl('price', new FormControl('', Validators.compose([Validators.required, Validators.min(0)])));
     }
   }
 
@@ -145,7 +149,7 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
     this.formPatterns = {
       number: {
         regex: RegExExtensions.numeric,
-        mask: "0",
+        mask: '0'
       }
     };
   }
@@ -161,7 +165,7 @@ export class SaleProductRowComponent implements OnInit, OnChanges {
   // helpers for View
   isControlInvalid(controlName: string, validator: string): boolean {
     const control = this.formGroup.controls[controlName];
-    if (validator == "") {
+    if (validator == '') {
       return control.hasError('required') && (control.dirty || control.touched);
     } else {
       return control.hasError(validator) && (control.dirty || control.touched);

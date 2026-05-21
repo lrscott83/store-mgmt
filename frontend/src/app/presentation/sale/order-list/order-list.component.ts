@@ -9,10 +9,10 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 @Component({
-    selector: 'app-order-list',
-    imports: [SharedModule, TranslateModule, OrderItemListComponent],
-    templateUrl: './order-list.component.html',
-    styleUrl: './order-list.component.scss'
+  selector: 'app-order-list',
+  imports: [SharedModule, TranslateModule, OrderItemListComponent],
+  templateUrl: './order-list.component.html',
+  styleUrl: './order-list.component.scss'
 })
 export class OrderListComponent implements OnInit {
   @Input() orders$: Observable<Order[]>;
@@ -22,10 +22,12 @@ export class OrderListComponent implements OnInit {
   ordersItemsCount: number;
 
   ngOnInit(): void {
-    this.orders$.subscribe(orders => {
-      this.ordersItemsCount = orders.reduce((count, order) => count += order.itemsCount, 0);
-      this.ordersTotal = orders.reduce((total, order) => total += order.total, 0);
-    })
+    this.orders$?.subscribe((orders) => {
+      if (orders) {
+        this.ordersItemsCount = orders.reduce((count, order) => (count += order.itemsCount), 0);
+        this.ordersTotal = orders.reduce((total, order) => (total += order.total), 0);
+      }
+    });
   }
 
   getOrderTime(order: Order): string {
@@ -38,22 +40,18 @@ export class OrderListComponent implements OnInit {
   }
 
   getOrderBackgroundColor(order: Order) {
-    return order.isCredit ? "credit-order" : "";
+    return order.isCredit ? 'credit-order' : '';
   }
 
   getOrderTotal(order: Order): number {
     let totalSum: number = 0;
-    order.orderItems.forEach(
-      (item) => (totalSum += item.price * item.quantity)
-    );
+    order.orderItems.forEach((item) => (totalSum += item.price * item.quantity));
     return totalSum;
   }
 
   getOrderItemsCount(order: Order): number {
     let itemsCount: number = 0;
-    order.orderItems.forEach(
-      (item) => (itemsCount += item.quantity)
-    );
+    order.orderItems.forEach((item) => (itemsCount += item.quantity));
     return itemsCount;
   }
 }

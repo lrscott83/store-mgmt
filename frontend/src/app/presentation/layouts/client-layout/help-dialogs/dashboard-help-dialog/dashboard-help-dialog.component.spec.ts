@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { DashboardHelpDialogComponent } from './dashboard-help-dialog.component';
@@ -8,7 +10,7 @@ describe('DashboardHelpDialogComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DashboardHelpDialogComponent]
+      imports: [DashboardHelpDialogComponent, CommonTestModule]
     })
     .compileComponents();
     

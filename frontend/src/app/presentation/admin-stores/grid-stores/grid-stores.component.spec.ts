@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { GridStoresComponent } from './grid-stores.component';
@@ -8,7 +10,7 @@ describe('GridStoresComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GridStoresComponent]
+      imports: [GridStoresComponent, CommonTestModule]
     })
     .compileComponents();
     

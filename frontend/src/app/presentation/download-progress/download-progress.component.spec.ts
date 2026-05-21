@@ -1,3 +1,6 @@
+import { CommonTestModule } from '../../../testing/common-test.module';
+import { SharedModule } from '../shared/shared.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { DownloadProgressComponent } from './download-progress.component';
@@ -8,9 +11,8 @@ describe('DownloadProgressComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DownloadProgressComponent]
-    })
-    .compileComponents();
+      imports: [SharedModule, CommonTestModule]
+    }).compileComponents();
 
     fixture = TestBed.createComponent(DownloadProgressComponent);
     component = fixture.componentInstance;

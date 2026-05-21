@@ -1,0 +1,175 @@
+:host {
+  display: block;
+}
+
+.category-button {
+  padding: 8px 16px;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.no-scrollbar {
+  scrollbar-width: none !important;
+  overflow: -moz-scrollbars-none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0 !important;
+  display: none !important;
+}
+
+.scrollmenu {
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 4px 0;
+}
+
+// Desktop View
+.desktop-view {
+  display: none;
+
+  @media (min-width: 768px) {
+    display: block;
+  }
+}
+
+// Mobile View
+.mobile-view {
+  display: block;
+
+  @media (min-width: 768px) {
+    display: none;
+  }
+}
+
+// Table styles
+.table {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(33, 37, 41, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+    padding: 12px 8px;
+  }
+
+  td {
+    padding: 12px 8px;
+    vertical-align: middle;
+  }
+
+  .product-name {
+    font-size: 0.875rem;
+    color: #212529;
+  }
+
+  tfoot td {
+    border-top: 2px solid rgba(0, 0, 0, 0.15);
+  }
+}
+
+.table-danger {
+  background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.table-secondary {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.table-success {
+  background-color: rgba(25, 135, 84, 0.1);
+}
+
+// Mobile Card
+.product-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+
+  &.card-danger {
+    border-color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.05);
+  }
+}
+
+.product-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.product-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.product-values {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 12px 16px;
+
+  @media (max-width: 576px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.value-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.value-label {
+  font-size: 0.65rem;
+  color: rgba(33, 37, 41, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.value-number {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #212529;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='number'] {
+  &:focus {
+    border-color: #3456ff;
+    box-shadow: 0 0 0 0.2rem rgba(52, 86, 255, 0.25);
+  }
+}
+
+// Alert
+.alert-danger {
+  border-radius: 8px;
+}
+
+// Card footer
+.card-footer {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.table-sm {
+  margin-bottom: 0;
+
+  td {
+    padding: 6px 8px;
+  }
+}

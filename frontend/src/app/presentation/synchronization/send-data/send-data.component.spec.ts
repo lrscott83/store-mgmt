@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { SendDataComponent } from './send-data.component';
@@ -8,7 +10,7 @@ describe('SendDataComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SendDataComponent]
+      imports: [SendDataComponent, CommonTestModule]
     })
     .compileComponents();
     

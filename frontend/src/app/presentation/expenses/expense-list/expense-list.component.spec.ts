@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ExpenseListComponent } from './expense-list.component';
@@ -8,7 +10,7 @@ describe('ExpenseListComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ExpenseListComponent]
+      imports: [ExpenseListComponent, CommonTestModule]
     })
     .compileComponents();
 

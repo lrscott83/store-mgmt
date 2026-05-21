@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ReceiveDataComponent } from './receive-data.component';
@@ -8,7 +10,7 @@ describe('ReceiveDataComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ReceiveDataComponent]
+      imports: [ReceiveDataComponent, CommonTestModule]
     })
     .compileComponents();
     

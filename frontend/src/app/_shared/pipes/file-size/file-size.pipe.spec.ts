@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { FileSizePipe } from './file-size.pipe';
 
 describe('FileSizePipe', () => {

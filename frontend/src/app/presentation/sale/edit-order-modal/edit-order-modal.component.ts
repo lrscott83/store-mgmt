@@ -10,10 +10,10 @@ import { PaymentType, PaymentTypeUtils } from 'src/app/domain/commons/payment-ty
 import { TypeData } from 'src/app/domain/commons/type-data';
 
 @Component({
-    selector: 'app-edit-order-modal',
-    imports: [SharedModule, TranslateModule],
-    templateUrl: './edit-order-modal.component.html',
-    styleUrl: './edit-order-modal.component.scss'
+  selector: 'app-edit-order-modal',
+  imports: [SharedModule, TranslateModule],
+  templateUrl: './edit-order-modal.component.html',
+  styleUrl: './edit-order-modal.component.scss'
 })
 export class EditOrderModalComponent implements OnInit {
   @Input() order: Order;
@@ -22,11 +22,14 @@ export class EditOrderModalComponent implements OnInit {
   paymentType: PaymentType = PaymentType.Efectivo;
   paymentTypes: TypeData[] = PaymentTypeUtils.getPaymentTypes();
 
-  constructor(private orderService: OrderOfflineService, private modal: NgbActiveModal, private translate: TranslateService) {
-  }
+  constructor(
+    private orderService: OrderOfflineService,
+    private modal: NgbActiveModal,
+    private translate: TranslateService
+  ) {}
 
   ngOnInit(): void {
-    this.paymentType = this.order.paymentType;
+    this.paymentType = this.order?.paymentType || PaymentType.Efectivo;
   }
 
   closeModal() {
@@ -35,6 +38,7 @@ export class EditOrderModalComponent implements OnInit {
 
   onSubmit() {
     // Update
+    if (!this.order?.id) return;
     const dataEntry: DataResult<Order> = this.orderService.updateTodayOrder(this.order.id, this.paymentType);
     if (dataEntry && dataEntry.succeeded) {
       if (this.orderUpdatedEmitter) {

@@ -13,45 +13,53 @@ import { PRODUCT_SERVICE } from 'src/app/_services/tokens';
 import { ProductService } from 'src/app/domain/interfaces/product.service';
 
 @Component({
-    selector: 'app-category-product-list',
-    imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, EditProductsModalComponent],
-    templateUrl: './category-product-list.component.html',
-    styleUrl: './category-product-list.component.scss'
+  selector: 'app-category-product-list',
+  imports: [SharedModule, TranslateModule, EditProductCategoryModalComponent, EditProductsModalComponent],
+  templateUrl: './category-product-list.component.html',
+  styleUrl: './category-product-list.component.scss'
 })
 export class CategoryProductListComponent implements OnInit {
-
   @Input() category: ProductCategory;
   @Output() categoryUpdated = new EventEmitter();
   products$: BehaviorSubject<Product[]> = new BehaviorSubject<Product[]>([]);
 
-  constructor(@Inject(PRODUCT_SERVICE) private productService: ProductService, private modalService: NgbModal, private translate: TranslateService) { }
+  constructor(
+    @Inject(PRODUCT_SERVICE) private productService: ProductService,
+    private modalService: NgbModal,
+    private translate: TranslateService
+  ) {}
 
   ngOnInit(): void {
-    this.loadProductsByCategoryId(this.category.id);
+    if (this.category?.id) {
+      this.loadProductsByCategoryId(this.category.id);
+    }
   }
 
   loadProductsByCategoryId(categoryId: string) {
-    this.productService.getAvailableProductsByCategoryId(categoryId).subscribe(response => {
-      if (response.succeeded) {
-        this.products$.next(response.data);
-      } else {
-        console.log("Error loadProductsByCategoryId");
+    this.productService.getAvailableProductsByCategoryId(categoryId).subscribe(
+      (response) => {
+        if (response.succeeded) {
+          this.products$.next(response.data);
+        } else {
+          console.log('Error loadProductsByCategoryId');
+        }
+      },
+      (error) => {
+        console.log('Error loadProductsByCategoryId: ', error);
       }
-    }, error => {
-      console.log("Error loadProductsByCategoryId: ", error);
-    })
+    );
   }
 
   openEditCategoryModal() {
-    const modalRef = this.modalService.open(EditProductCategoryModalComponent, { centered: true, size: "lg" });
+    const modalRef = this.modalService.open(EditProductCategoryModalComponent, { centered: true, size: 'lg' });
     modalRef.componentInstance.category = this.category;
     modalRef.componentInstance.productCategoryUpdatedEmitter.subscribe(() => {
       this.categoryUpdated.emit();
     });
   }
-  
+
   openAddProductModal() {
-    const modalRef = this.modalService.open(EditProductModalComponent, { centered: true, size: "lg" });
+    const modalRef = this.modalService.open(EditProductModalComponent, { centered: true, size: 'lg' });
     modalRef.componentInstance.category = this.category;
     modalRef.componentInstance.productUpdatedEmitter.subscribe(() => {
       this.loadProductsByCategoryId(this.category.id);
@@ -59,7 +67,7 @@ export class CategoryProductListComponent implements OnInit {
   }
 
   openAddProductsModal() {
-    const modalRef = this.modalService.open(EditProductsModalComponent, { centered: true, size: "lg" });
+    const modalRef = this.modalService.open(EditProductsModalComponent, { centered: true, size: 'lg' });
     modalRef.componentInstance.category = this.category;
     modalRef.componentInstance.productUpdatedEmitter.subscribe(() => {
       this.loadProductsByCategoryId(this.category.id);
@@ -67,7 +75,7 @@ export class CategoryProductListComponent implements OnInit {
   }
 
   openEditProductModal(product: Product) {
-    const modalRef = this.modalService.open(EditProductModalComponent, { centered: true, size: "lg" });
+    const modalRef = this.modalService.open(EditProductModalComponent, { centered: true, size: 'lg' });
     modalRef.componentInstance.category = this.category;
     modalRef.componentInstance.product = product;
     modalRef.componentInstance.productUpdatedEmitter.subscribe(() => {
@@ -78,31 +86,23 @@ export class CategoryProductListComponent implements OnInit {
   onDeleteProduct(productId: string) {
     Swal.fire({
       title: this.translate.instant('GENERAL.DELETE_CONFIRM_TITLE'),
-      text: this.translate.instant('GENERAL.DELETE_CONFIRM_MESSAGE_A',
-        { name: this.translate.instant('PRODUCT.TEXT') }),
-      icon: "question",
+      text: this.translate.instant('GENERAL.DELETE_CONFIRM_MESSAGE_A', { name: this.translate.instant('PRODUCT.TEXT') }),
+      icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: "#3456ff",
-      cancelButtonColor: "#dc3545",
+      confirmButtonColor: '#3456ff',
+      cancelButtonColor: '#dc3545',
       confirmButtonText: this.translate.instant('GENERAL.YES'),
-      cancelButtonText: this.translate.instant('GENERAL.NO'),
+      cancelButtonText: this.translate.instant('GENERAL.NO')
     }).then((result) => {
       if (result.isConfirmed) {
-        this.productService.deleteProduct(productId).subscribe(response => {
-          if (response && response.succeeded)
-            this.loadProductsByCategoryId(this.category.id);
+        this.productService.deleteProduct(productId).subscribe((response) => {
+          if (response && response.succeeded) this.loadProductsByCategoryId(this.category.id);
         });
-        
       }
     });
   }
 
-  deactivateProduct(product: Product) {
-    
-  }
+  deactivateProduct(product: Product) {}
 
-  activateProduct(product: Product) {
-    
-  }
-
+  activateProduct(product: Product) {}
 }

@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { CookiesPrivateComponent } from './cookies-private.component';
@@ -8,7 +10,7 @@ describe('CookiesPrivateComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CookiesPrivateComponent]
+      imports: [CookiesPrivateComponent, CommonTestModule]
     })
     .compileComponents();
     

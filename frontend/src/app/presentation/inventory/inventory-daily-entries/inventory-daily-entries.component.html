@@ -1,0 +1,226 @@
+<div class="card card-custom gutter-b">
+  <!-- Header -->
+  <div class="card-header">
+    <div class="card-title">
+      <h3 class="card-label">{{ 'INVENTORY.DAILY_ENTRIES' | translate }}</h3>
+    </div>
+    <div class="card-toolbar">
+      <button class="btn btn-primary" (click)="generateEntriesAndOrder()" [disabled]="showErrorMessage">
+        {{ 'INVENTORY.GENERATE_ENTRIES' | translate }}
+      </button>
+    </div>
+  </div>
+
+  @if (showErrorMessage) {
+    <div class="alert alert-danger m-3" role="alert">
+      {{ 'INVENTORY.VALIDATION_ERRORS' | translate }}
+    </div>
+  }
+
+  <!-- Search and Filters -->
+  <div class="card-body p-3">
+    <!-- Category Filter - Horizontal Scroll -->
+    <div class="scrollmenu no-scrollbar mb-3">
+      <button
+        (click)="selectAllCategories()"
+        type="button"
+        class="btn cursor-pointer category-button"
+        [class.btn-primary]="selectedCategories.size === 0"
+        [class.btn-outline-primary]="selectedCategories.size > 0"
+      >
+        {{ 'INVENTORY.ALL_CATEGORIES' | translate }}
+      </button>
+      @for (category of categories; track trackByCategory($index, category)) {
+        <button
+          (click)="toggleCategory(category.id)"
+          type="button"
+          class="btn cursor-pointer category-button"
+          [class.btn-primary]="selectedCategories.has(category.id)"
+          [class.btn-outline-primary]="!selectedCategories.has(category.id)"
+        >
+          {{ category.name }}
+        </button>
+      }
+    </div>
+
+    <!-- Search -->
+    <mat-form-field appearance="outline" floatLabel="auto" class="w-100 mb-3">
+      <mat-label>{{ 'GENERAL.SEARCH' | translate }}</mat-label>
+      <input matInput [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange()" [placeholder]="'GENERAL.SEARCH' | translate" />
+      <mat-icon matPrefix>search</mat-icon>
+    </mat-form-field>
+
+    @if (isLoading) {
+      <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-3 text-muted">{{ 'GENERAL.LOADING' | translate }}</p>
+      </div>
+    } @else if (filteredProducts.length === 0) {
+      <div class="text-center p-5 text-muted">
+        <p>{{ 'INVENTORY.NO_PRODUCTS' | translate }}</p>
+      </div>
+    } @else {
+      <!-- Desktop Table View -->
+      <div class="table-responsive desktop-view">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>{{ 'INVENTORY.PRODUCT' | translate }}</th>
+              <th class="text-end">{{ 'INVENTORY.BEGINNING' | translate }}</th>
+              <th class="text-end">{{ 'INVENTORY.ENTRIES' | translate }}</th>
+              <th class="text-end">{{ 'INVENTORY.AVAILABLE' | translate }}</th>
+              <th class="text-end">{{ 'INVENTORY.ENDING' | translate }}</th>
+              <th class="text-end">{{ 'INVENTORY.SOLD' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (product of filteredProducts; track trackByProduct($index, product)) {
+              <tr [class.table-danger]="product.errors.length > 0">
+                <td>
+                  <span class="product-name">{{ product.categoryName }} - {{ product.productName }}</span>
+                </td>
+                <td class="text-end">{{ product.inicio }}</td>
+                <td class="text-end">
+                  <input
+                    type="number"
+                    class="form-control text-end"
+                    [(ngModel)]="product.entradas"
+                    (ngModelChange)="onEntradasChange(product.productId, $event)"
+                    min="0"
+                    style="width: 80px; display: inline-block"
+                  />
+                </td>
+                <td class="text-end fw-bold">{{ product.disponible }}</td>
+                <td class="text-end">
+                  <input
+                    type="number"
+                    class="form-control text-end"
+                    [(ngModel)]="product.final"
+                    (ngModelChange)="onFinalChange(product.productId, $event)"
+                    min="0"
+                    style="width: 80px; display: inline-block"
+                  />
+                </td>
+                <td class="text-end" [class.text-warning]="product.vendido > 0" [class.fw-bold]="product.vendido > 0">
+                  {{ product.vendido }}
+                </td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr class="table-secondary">
+              <td class="fw-bold">{{ 'INVENTORY.TOTAL' | translate }}</td>
+              <td class="text-end fw-bold">{{ totalInicio }}</td>
+              <td class="text-end fw-bold">{{ totalEntradas }}</td>
+              <td class="text-end fw-bold">{{ totalDisponible }}</td>
+              <td class="text-end fw-bold">{{ totalFinal }}</td>
+              <td class="text-end fw-bold">{{ totalVendido }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Mobile Card View -->
+      <div class="mobile-view">
+        @for (product of filteredProducts; track trackByProduct($index, product)) {
+          <div class="product-card mb-3" [class.card-danger]="product.errors.length > 0">
+            <div class="product-header">
+              <span class="product-title">{{ product.categoryName }} - {{ product.productName }}</span>
+              @if (product.errors.length > 0) {
+                <span class="badge bg-danger ms-2">{{ product.errors.length }}</span>
+              }
+            </div>
+            <div class="product-values">
+              <div class="value-item">
+                <span class="value-label">{{ 'INVENTORY.BEGINNING' | translate }}</span>
+                <span class="value-number">{{ product.inicio }}</span>
+              </div>
+              <div class="value-item">
+                <span class="value-label">{{ 'INVENTORY.ENTRIES' | translate }}</span>
+                <input
+                  type="number"
+                  class="form-control form-control-sm text-end"
+                  [(ngModel)]="product.entradas"
+                  (ngModelChange)="onEntradasChange(product.productId, $event)"
+                  min="0"
+                />
+              </div>
+              <div class="value-item">
+                <span class="value-label">{{ 'INVENTORY.AVAILABLE' | translate }}</span>
+                <span class="value-number fw-bold">{{ product.disponible }}</span>
+              </div>
+              <div class="value-item">
+                <span class="value-label">{{ 'INVENTORY.ENDING' | translate }}</span>
+                <input
+                  type="number"
+                  class="form-control form-control-sm text-end"
+                  [(ngModel)]="product.final"
+                  (ngModelChange)="onFinalChange(product.productId, $event)"
+                  min="0"
+                />
+              </div>
+              <div class="value-item">
+                <span class="value-label">{{ 'INVENTORY.SOLD' | translate }}</span>
+                <span class="value-number" [class.text-warning]="product.vendido > 0" [class.fw-bold]="product.vendido > 0">{{
+                  product.vendido
+                }}</span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Summary Section -->
+  <div class="card-footer">
+    <div class="row">
+      <div class="col-md-6">
+        <h6>{{ 'INVENTORY.INVENTORY_SUMMARY' | translate }}</h6>
+        <table class="table table-sm">
+          <tbody>
+            <tr>
+              <td>{{ 'INVENTORY.BEGINNING' | translate }}</td>
+              <td class="text-end">{{ totalInicio }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'INVENTORY.ENTRIES' | translate }}</td>
+              <td class="text-end">{{ totalEntradas }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'INVENTORY.AVAILABLE' | translate }}</td>
+              <td class="text-end fw-bold">{{ totalDisponible }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'INVENTORY.SOLD' | translate }}</td>
+              <td class="text-end">{{ totalVendido }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'INVENTORY.ENDING' | translate }}</td>
+              <td class="text-end">{{ totalFinal }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col-md-6">
+        <h6>{{ 'INVENTORY.CASH_SUMMARY' | translate }}</h6>
+        <table class="table table-sm">
+          <tbody>
+            <tr>
+              <td>{{ 'INVENTORY.SALES_AMOUNT' | translate }}</td>
+              <td class="text-end">{{ totalSalesAmount | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>{{ 'INVENTORY.COST_AMOUNT' | translate }}</td>
+              <td class="text-end">{{ totalCostAmount | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
+            </tr>
+            <tr class="table-success">
+              <td class="fw-bold">{{ 'INVENTORY.PROFIT' | translate }}</td>
+              <td class="text-end fw-bold text-success">{{ totalProfit | currency: 'USD' : 'symbol' : '1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

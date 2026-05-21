@@ -2,12 +2,10 @@ import { Component, Input } from '@angular/core';
 import { SharedModule } from '../shared/shared.module';
 
 @Component({
-    selector: 'app-download-progress',
-    // standalone: true,
-    // imports: [],
-    templateUrl: './download-progress.component.html',
-    styleUrl: './download-progress.component.scss',
-    standalone: false
+  selector: 'app-download-progress',
+  standalone: false,
+  templateUrl: './download-progress.component.html',
+  styleUrl: './download-progress.component.scss'
 })
 export class DownloadProgressComponent {
   @Input() show = false;

@@ -1,3 +1,5 @@
+import { CommonTestModule } from '../../../../testing/common-test.module';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { LandingDeepComponent } from './landing-deep.component';
@@ -8,7 +10,7 @@ describe('LandingDeepComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [LandingDeepComponent]
+      imports: [LandingDeepComponent, CommonTestModule]
     })
     .compileComponents();
 
