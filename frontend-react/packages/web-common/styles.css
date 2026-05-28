@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@source "../../apps/web-store-pos/app/**/*.{ts,tsx}";
+@source "./src/**/*.{ts,tsx}";
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter/inter-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter/inter-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter/inter-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter/inter-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('/fonts/inter/inter-800.woff2') format('woff2');
+}
+
+@layer base {
+  :root {
+    --color-primary: 34 211 238;
+    --color-primary-hover: 6 182 212;
+    --color-secondary: 45 212 191;
+    --color-accent: 134 239 172;
+    --color-background: 236 242 247;
+    --color-surface: 250 251 252;
+    --color-text: 15 23 42;
+    --color-text-muted: 100 116 139;
+  }
+
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  body {
+    background-color: rgb(var(--color-background));
+    color: rgb(var(--color-text));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
