@@ -4,23 +4,12 @@ import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { startOfDay, addDays } from '~/shared/lib/date-utils';
 
 const repo = new BaseRepository<Order>('orders', ['date', 'createdDate', 'updatedDate']);
 
 function generateId(): string {
   return crypto.randomUUID();
-}
-
-function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
 }
 
 export class OrderOfflineService {

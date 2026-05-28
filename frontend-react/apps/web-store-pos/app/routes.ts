@@ -29,6 +29,16 @@ export default [
     route('inventory/today-quantities', 'inventory/routes/today-quantities.tsx'),
     route('inventory/today-sales-profit', 'inventory/routes/today-sales-profit.tsx'),
     route('inventory/egress', 'inventory/routes/egress.tsx'),
+
+    // Expenses
+    route('expenses/today', 'expenses/routes/today-expenses.tsx'),
+    route('expenses/expenses', 'expenses/routes/expenses-history.tsx'),
+
+    // Reports
+    route('reports/today', 'reports/routes/today-report.tsx'),
+
+    // Statistics
+    route('stats/dashboard', 'statistics/routes/dashboard.tsx'),
   ]),
 
   // Utility routes

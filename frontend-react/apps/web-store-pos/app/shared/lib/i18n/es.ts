@@ -211,6 +211,73 @@ const messages: Record<string, string> = {
   'SCANNER.PRODUCT_NOT_FOUND': 'Producto no encontrado: {barcode}',
   'SCANNER.SCANNING': 'Escaneando...',
 
+  // Expenses — Today
+  'EXPENSES.TODAY.TITLE': 'Gastos de hoy',
+  'EXPENSES.NEW_TITLE': 'Nuevo gasto',
+  'EXPENSES.EDIT_TITLE': 'Editar gasto',
+  'EXPENSES.EMPTY_STATE': 'No hay gastos registrados',
+  'EXPENSES.EDIT': 'Editar',
+  'EXPENSES.DELETE': 'Eliminar',
+  'EXPENSES.DELETE_CONFIRM': '¿Estás seguro de que querés eliminar este gasto?',
+  'EXPENSES.RUNNING_TOTAL': 'Total del día: ${total}',
+  'EXPENSES.ADD_BUTTON': 'Nuevo gasto',
+
+  // Expenses — History
+  'EXPENSES.HISTORY.TITLE': 'Historial de gastos',
+  'EXPENSES.FILTERED_TOTAL': 'Total filtrado: ${total}',
+
+  // Expenses — Form
+  'EXPENSES.FORM.TYPE': 'Tipo de gasto',
+  'EXPENSES.FORM.TOTAL': 'Total',
+  'EXPENSES.FORM.DATE': 'Fecha',
+  'EXPENSES.FORM.PAYMENT_TYPE': 'Tipo de pago',
+  'EXPENSES.FORM.NOTE': 'Nota',
+  'EXPENSES.FORM.TOTAL_REQUIRED': 'El total debe ser mayor a 0',
+
+  // Expenses — Filters
+  'EXPENSES.FILTER.DATE_FROM': 'Desde',
+  'EXPENSES.FILTER.DATE_TO': 'Hasta',
+  'EXPENSES.FILTER.TYPE': 'Tipo',
+
+  // Expenses — Pagination
+  'EXPENSES.PAGINATION.ROWS_PER_PAGE': 'Filas por página',
+  'EXPENSES.PAGINATION.INFO': 'Página {page} de {totalPages} ({total} registros)',
+  'EXPENSES.PAGINATION.PREV': 'Anterior',
+  'EXPENSES.PAGINATION.NEXT': 'Siguiente',
+
+  // Expenses — Expense types
+  'EXPENSES.TYPE.SALARIO': 'Salario',
+  'EXPENSES.TYPE.TRANSPORTE': 'Transporte',
+  'EXPENSES.TYPE.ALQUILER': 'Alquiler',
+  'EXPENSES.TYPE.CORRIENTE': 'Cuenta corriente',
+  'EXPENSES.TYPE.AGUA': 'Agua',
+  'EXPENSES.TYPE.COMIDA': 'Comida',
+  'EXPENSES.TYPE.OPERACIONES': 'Operaciones',
+  'EXPENSES.TYPE.VIAJE': 'Viaje',
+  'EXPENSES.TYPE.DIVISA': 'Divisa',
+  'EXPENSES.TYPE.IMPUESTO': 'Impuesto',
+  'EXPENSES.TYPE.OTRO': 'Otro',
+
+  // Reports — Today
+  'REPORTS.TODAY.TITLE': 'Reportes de hoy',
+  'REPORTS.REFRESH': 'Actualizar',
+  'REPORTS.SALES_SUMMARY.TITLE': 'Resumen de ventas',
+  'REPORTS.SALES_SUMMARY.ORDER_COUNT': 'Pedidos',
+  'REPORTS.SALES_SUMMARY.TOTAL_REVENUE': 'Ingresos',
+  'REPORTS.SALES_SUMMARY.TOTAL_COST': 'Costo',
+  'REPORTS.SALES_SUMMARY.TOTAL_PROFIT': 'Ganancia bruta',
+  'REPORTS.INVENTORY.TITLE': 'Estado de inventario',
+  'REPORTS.INVENTORY.PRODUCT': 'Producto',
+  'REPORTS.INVENTORY.AVAILABLE': 'Disponible',
+  'REPORTS.INVENTORY.EMPTY_STATE': 'Sin stock disponible',
+
+  // Statistics — Dashboard
+  'STATISTICS.DASHBOARD.TITLE': 'Dashboard',
+  'STATISTICS.LAST_30_DAYS': 'Últimos 30 días',
+  'STATISTICS.SALES.TITLE': 'Ventas',
+  'STATISTICS.PROFIT.TITLE': 'Ganancia bruta',
+  'STATISTICS.EMPTY_STATE': 'Sin datos para mostrar',
+
   // Footer
   'FOOTER.COPYRIGHT': '© {year} Vende De Todo. Todos los derechos reservados.',
 };

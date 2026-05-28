@@ -1,5 +1,6 @@
 import type { InventoryEntry, InventoryEntryCost, InventoryEntryView, OrderItem } from '@store-mgmt/domain';
 import { InventoryRepository } from '../repositories/inventory-repository';
+import { startOfDay, addDays } from '~/shared/lib/date-utils';
 
 /**
  * Available stock grouped by category → product.
@@ -21,18 +22,6 @@ export interface InventoryCategoryView {
 
 function generateId(): string {
   return crypto.randomUUID();
-}
-
-function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
 }
 
 /**

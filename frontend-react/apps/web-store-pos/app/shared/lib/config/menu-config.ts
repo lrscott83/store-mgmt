@@ -52,6 +52,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     moduleId: EModules.Expenses,
     items: [
       { label: 'MENU.TODAY_EXPENSES', path: '/expenses/today', featureIds: [EFeatures.TodayExpenses], moduleId: EModules.Expenses },
+      { label: 'MENU.EXPENSES_HISTORY', path: '/expenses/expenses', featureIds: [EFeatures.ExpensesHistory], moduleId: EModules.Expenses },
     ],
   },
   {
