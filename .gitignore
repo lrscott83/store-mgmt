@@ -151,3 +151,6 @@ dist
 /backend/src/bin
 /backend/src/Application/bin
 lizo-models/
+
+# gentle-ai skill registry cache
+.atl/
