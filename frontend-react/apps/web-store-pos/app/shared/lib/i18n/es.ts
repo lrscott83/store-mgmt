@@ -281,6 +281,29 @@ const messages: Record<string, string> = {
   // Footer
   'FOOTER.COPYRIGHT': '© {year} Vende De Todo. Todos los derechos reservados.',
 
+  // Profile
+  'PROFILE.EDIT_TITLE': 'Editar perfil',
+  'PROFILE.CHANGE_PASSWORD_TITLE': 'Cambiar contraseña',
+  'PROFILE.FULL_NAME': 'Nombre completo',
+  'PROFILE.CELL_PHONE': 'Teléfono celular',
+  'PROFILE.EMAIL': 'Email',
+  'PROFILE.SAVE': 'Guardar cambios',
+  'PROFILE.SAVING': 'Guardando...',
+  'PROFILE.UPDATE_SUCCESS': 'Perfil actualizado correctamente.',
+  'PROFILE.UPDATE_ERROR': 'No se pudo actualizar el perfil. Intentá de nuevo.',
+  'PROFILE.OLD_PASSWORD': 'Contraseña actual',
+  'PROFILE.NEW_PASSWORD': 'Nueva contraseña',
+  'PROFILE.CONFIRM_PASSWORD': 'Confirmar nueva contraseña',
+  'PROFILE.CHANGE_PASSWORD_SUBMIT': 'Cambiar contraseña',
+  'PROFILE.PASSWORD_REGEX_ERROR': 'La contraseña debe tener entre 8 y 30 caracteres, al menos una mayúscula, una minúscula y un número.',
+  'PROFILE.PASSWORD_MISMATCH': 'Las contraseñas no coinciden.',
+  'PROFILE.OFFLINE_NOTICE': 'Sin conexión. Conectate a internet para guardar cambios.',
+  'PROFILE.PASSWORD_RULES': 'Mínimo 8 caracteres, una mayúscula, una minúscula y un número.',
+  'PROFILE.SUCCESS': 'Operación exitosa.',
+  'PROFILE.ERROR': 'Ocurrió un error. Intentá de nuevo.',
+  'PROFILE.REQUIRED': 'Este campo es obligatorio.',
+  'PROFILE.INVALID_EMAIL': 'El formato del email no es válido.',
+
   // Sync — Export / Import
   'SYNC.EXPORT_TITLE': 'Exportar datos',
   'SYNC.IMPORT_TITLE': 'Importar datos',
