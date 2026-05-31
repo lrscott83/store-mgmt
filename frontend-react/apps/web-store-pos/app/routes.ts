@@ -44,6 +44,11 @@ export default [
     route('sync/export', 'sync/routes/export.tsx'),
     route('sync/import', 'sync/routes/import.tsx'),
 
+    // Management — Stores
+    route('management/stores', 'management/stores/routes/store-list.tsx'),
+    route('management/stores/create', 'management/stores/routes/store-create.tsx'),
+    route('management/stores/edit/:id', 'management/stores/routes/store-edit.tsx'),
+
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
