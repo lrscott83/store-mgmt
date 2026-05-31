@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { unzipSync } from 'fflate';
 import {
   DataSerializerService,
   WrongPasswordError,
@@ -374,6 +375,49 @@ describe('DataSerializerService', () => {
       const ids = parsed.inventoryEntries.map((e) => e.id);
       expect(ids).toContain('inv-1');
       expect(ids).toContain('inv-2');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // S-1: ZIP contains exactly one member named sync-data.json (single-envelope layout)
+  // -------------------------------------------------------------------------
+
+  describe('S-1 — single-envelope ZIP layout', () => {
+    it('the exported ZIP contains exactly one member: sync-data.json', async () => {
+      const PBKDF2_HEADER = 28; // salt(16) + iv(12)
+      const svc = makeService();
+      const payload = await svc.export(PASSWORD);
+
+      // Slice header and decrypt to recover the raw zip bytes
+      const salt = payload.slice(0, 16);
+      const iv = payload.slice(16, 28);
+      const cipher = payload.slice(28);
+
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        enc.encode(PASSWORD),
+        'PBKDF2',
+        false,
+        ['deriveKey'],
+      );
+      const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 210_000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt'],
+      );
+      const zipBytes = new Uint8Array(
+        await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher),
+      );
+
+      // Unzip and inspect members
+      const members = unzipSync(zipBytes);
+      const memberNames = Object.keys(members);
+
+      expect(memberNames).toHaveLength(1);
+      expect(memberNames[0]).toBe('sync-data.json');
     });
   });
 });

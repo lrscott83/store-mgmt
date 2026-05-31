@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { ExportForm } from '../export-form';
@@ -117,6 +117,8 @@ describe('ExportForm — S-EXPORT-4: loading state', () => {
       expect(screen.getByRole('button', { name: /exportando/i })).toBeDisabled(),
     );
 
-    resolveExport(new Uint8Array([1, 2, 3]));
+    await act(async () => {
+      resolveExport(new Uint8Array([1, 2, 3]));
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { ImportForm } from '../import-form';
@@ -183,6 +183,8 @@ describe('ImportForm — S-IMPORT-6: loading state', () => {
       expect(screen.getByRole('button', { name: /importando/i })).toBeDisabled(),
     );
 
-    resolveImport(SUCCESS_RESULT);
+    await act(async () => {
+      resolveImport(SUCCESS_RESULT);
+    });
   });
 });
