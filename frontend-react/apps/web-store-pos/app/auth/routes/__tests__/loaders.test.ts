@@ -13,6 +13,7 @@ import {
   featureLoader,
   adminLoader,
   resellerLoader,
+  adminFeatureLoader,
 } from '../loaders';
 import type { UserModel } from '@store-mgmt/domain';
 
@@ -161,6 +162,42 @@ describe('Route Loaders (AUTH-04)', () => {
       expect(result).toBeInstanceOf(Response);
       const res = result as Response;
       expect(res.headers.get('Location')).toBe('/unauthorized');
+    });
+  });
+
+  describe('adminFeatureLoader', () => {
+    it('redirects unauthenticated user to /login', async () => {
+      setAuthState(null);
+      const loader = adminFeatureLoader([73]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.headers.get('Location')).toBe('/login');
+    });
+
+    it('redirects non-admin authenticated user to /unauthorized', async () => {
+      setAuthState(makeUser({ isSuperAdmin: false, isOwnerAdmin: false }));
+      const loader = adminFeatureLoader([73]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.headers.get('Location')).toBe('/unauthorized');
+    });
+
+    it('redirects admin without required feature to /unauthorized', async () => {
+      setAuthState(makeUser({ isOwnerAdmin: true, featureIds: [] }));
+      const loader = adminFeatureLoader([73]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.headers.get('Location')).toBe('/unauthorized');
+    });
+
+    it('returns null for SuperAdmin with required feature', async () => {
+      setAuthState(makeUser({ isSuperAdmin: true, featureIds: [73] }));
+      const loader = adminFeatureLoader([73]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeNull();
     });
   });
 

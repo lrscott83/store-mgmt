@@ -48,6 +48,14 @@ export async function adminLoader(): Promise<Response | null> {
   return null;
 }
 
+export function adminFeatureLoader(featureIds: number[]) {
+  return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
+    const adminResult = await adminLoader();
+    if (adminResult) return adminResult;
+    return featureLoader(featureIds)({ params } as LoaderFunctionArgs);
+  };
+}
+
 export async function resellerLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {
