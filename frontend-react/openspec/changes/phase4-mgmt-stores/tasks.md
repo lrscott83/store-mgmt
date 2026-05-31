@@ -44,7 +44,7 @@ Unit 2 (http service)  ──┘                                       ├──
 
 ### Tasks
 
-- [ ] **1.1 — TEST** Add `describe('adminFeatureLoader')` block to the existing
+- [x] **1.1 — TEST** Add `describe('adminFeatureLoader')` block to the existing
   `loaders.test.ts` with 4 cases:
   - unauthenticated user → redirects to `/login` (ACCESS-3)
   - authenticated non-admin (regular StoreUser) → redirects to `/unauthorized` (ACCESS-6)
@@ -53,12 +53,12 @@ Unit 2 (http service)  ──┘                                       ├──
   All cases use the existing `makeUser` / `setAuthState` helpers already in the file.
   Confirm suite goes RED.
 
-- [ ] **1.2 — IMPL** Add `adminFeatureLoader(requiredFeatureIds: number[], storeIdParam?: string)`
+- [x] **1.2 — IMPL** Add `adminFeatureLoader(requiredFeatureIds: number[], storeIdParam?: string)`
   factory to `app/auth/routes/loaders.ts`. Implementation: await `adminLoader()`; if truthy return
   it; else return `featureLoader(requiredFeatureIds, storeIdParam)(args)`. Export named. Do NOT
   touch any existing function. Confirm suite goes GREEN.
 
-- [ ] **1.3 — VERIFY** Run full test suite; confirm total >= baseline. adminFeatureLoader 4 new
+- [x] **1.3 — VERIFY** Run full test suite; confirm total >= baseline. adminFeatureLoader 4 new
   tests added.
 
 ---
@@ -72,7 +72,7 @@ Unit 2 (http service)  ──┘                                       ├──
 
 ### Tasks
 
-- [ ] **2.1 — TEST** Create `store-http-service.test.ts`. Mock `apiClient` (vi.mock of
+- [x] **2.1 — TEST** Create `store-http-service.test.ts`. Mock `apiClient` (vi.mock of
   `~/shared/lib/http/api-client`). Write test cases:
   - `listStores()` → calls `GET /v1/stores/by-current-user`, returns `.data` (HTTP-2)
   - `getStore(id)` → calls `GET /v1/stores/{id}`, returns `.data` (HTTP-3)
@@ -88,13 +88,13 @@ Unit 2 (http service)  ──┘                                       ├──
   - `listOwners()` → calls `GET /v1/owners/all/true`, returns `.data` (OWNER-1, HTTP-3 variant)
   Confirm suite goes RED (import missing).
 
-- [ ] **2.2 — IMPL** Create `store-http-service.ts`. Plain object `storeHttpService` with all
+- [x] **2.2 — IMPL** Create `store-http-service.ts`. Plain object `storeHttpService` with all
   functions above over `apiClient`. All paths prefixed `/v1`. Each returns `response.data.data`
   to match `BaseResponseModel<T>` envelope (same as `profileHttpService`). No Axios instance.
   `listOwners()` included here (not a separate service). HTTP-10 compliance: only `apiClient`.
   Confirm suite goes GREEN.
 
-- [ ] **2.3 — VERIFY** Run full suite; confirm total >= baseline + new tests.
+- [x] **2.3 — VERIFY** Run full suite; confirm total >= baseline + new tests.
 
 ---
 
@@ -107,7 +107,7 @@ Unit 2 (http service)  ──┘                                       ├──
 
 ### Tasks
 
-- [ ] **3.1 — TEST** Create `module-picker.test.tsx` wrapped in `IntlProvider` with real `es`
+- [x] **3.1 — TEST** Create `module-picker.test.tsx` wrapped in `IntlProvider` with real `es`
   messages. Test cases:
   - renders a checkbox for each module in the catalog (5 modules)
   - `priceIncluded=true` module renders checked AND disabled
@@ -118,12 +118,12 @@ Unit 2 (http service)  ──┘                                       ├──
   - no HTTP/router imports in the component (PRES-10 — structural test via imports)
   Confirm RED.
 
-- [ ] **3.2 — IMPL** Create `module-picker.tsx`. Props: `modules: Module[]`, `onChange(modules:
+- [x] **3.2 — IMPL** Create `module-picker.tsx`. Props: `modules: Module[]`, `onChange(modules:
   Module[])`. Renders checkbox list; `priceIncluded` rows = checked + `disabled`; select-all
   toggle acts only on non-locked; running total = `currentPrice` sum of `selected` modules. No
   HTTP, no router, no auth-store. Confirm GREEN.
 
-- [ ] **3.3 — VERIFY** Full suite >= prior total. New module-picker tests added.
+- [x] **3.3 — VERIFY** Full suite >= prior total. New module-picker tests added.
 
 ---
 
@@ -136,7 +136,7 @@ Unit 2 (http service)  ──┘                                       ├──
 
 ### Tasks
 
-- [ ] **4.1 — TEST** Create `store-form.test.tsx` wrapped in `IntlProvider`. Mock `ModulePicker`
+- [x] **4.1 — TEST** Create `store-form.test.tsx` wrapped in `IntlProvider`. Mock `ModulePicker`
   (`vi.mock`) to isolate. Test cases (role-conditional fields per PRES-6):
   - non-owner-admin, create mode: renders `name` + `address` only; NO `ownerId`/`approved`/
     `description` (PRES-6)
@@ -150,13 +150,13 @@ Unit 2 (http service)  ──┘                                       ├──
   - `isLoading=true` → submit button disabled (PRES-8)
   Confirm RED.
 
-- [ ] **4.2 — IMPL** Create `store-form.tsx`. Props: `mode`, `initialValues`, `roleFlags`,
+- [x] **4.2 — IMPL** Create `store-form.tsx`. Props: `mode`, `initialValues`, `roleFlags`,
   `owners`, `modules`, `isOnline`, `isLoading`, `onSubmit`, `error?`. Local `useState` for fields.
   Embeds `<ModulePicker>`. Role-conditional field rendering per PRES-6. Submit disabled when
   `!isOnline || isLoading || !name`. Inline `role="alert"` for `error`. No HTTP, no router, no
   auth-store (PRES-10). Confirm GREEN.
 
-- [ ] **4.3 — VERIFY** Full suite >= prior total.
+- [x] **4.3 — VERIFY** Full suite >= prior total.
 
 ---
 
@@ -169,7 +169,7 @@ Unit 2 (http service)  ──┘                                       ├──
 
 ### Tasks
 
-- [ ] **5.1 — TEST** Create `store-list.test.tsx` wrapped in `IntlProvider`. Test cases:
+- [x] **5.1 — TEST** Create `store-list.test.tsx` wrapped in `IntlProvider`. Test cases:
   - renders a row per store in `stores[]` showing name + address (PRES-1)
   - empty state message when `stores` is empty (PRES-3)
   - offline/degraded banner rendered when `isOnline=false` (PRES-2)
@@ -180,11 +180,11 @@ Unit 2 (http service)  ──┘                                       ├──
   - no HTTP/router imports (PRES-10 structural)
   Confirm RED.
 
-- [ ] **5.2 — IMPL** Create `store-list.tsx`. Props: `stores`, `isOnline`, `isLoading`, `error?`,
+- [x] **5.2 — IMPL** Create `store-list.tsx`. Props: `stores`, `isOnline`, `isLoading`, `error?`,
   `onCreate`, `onEdit`. Renders table/list rows; offline banner; empty state; action buttons
   disabled when offline; inline error. No HTTP, no router, no auth-store. Confirm GREEN.
 
-- [ ] **5.3 — VERIFY** Full suite >= prior total.
+- [x] **5.3 — VERIFY** Full suite >= prior total.
 
 ---
 
@@ -201,7 +201,7 @@ TEST-1 through TEST-7
 
 ### Tasks
 
-- [ ] **6.1 — TEST (StoreListPage)** Add `describe('StoreListPage')` block to
+- [x] **6.1 — TEST (StoreListPage)** Add `describe('StoreListPage')` block to
   `store-routes.test.tsx`. Mocks: `vi.mock` for `storeHttpService`, `useAuthStore`, `useOnlineStatus`,
   `react-router` (useNavigate), `auth/routes/loaders` (adminFeatureLoader → null), `BaseRepository`.
   Wrap with `IntlProvider`. Test cases (spec TEST-2):
@@ -214,14 +214,14 @@ TEST-1 through TEST-7
   - lifecycle action (activate) online → calls corresponding service fn → refetches (LIST-4)
   Confirm RED.
 
-- [ ] **6.2 — IMPL (StoreListPage)** Create `store-list.tsx` container. Exports named `loader =
+- [x] **6.2 — IMPL (StoreListPage)** Create `store-list.tsx` container. Exports named `loader =
   adminFeatureLoader([EFeatures.Stores])` and default `StoreListPage`. On mount: check `isOnline`.
   Online → `storeHttpService.listStores()`, write-through cache. Offline → read cache + degraded
   flag. Navigate to create/edit. Lifecycle handlers call activate/approve/disapprove/deactivate
   service functions; on success refetch (online) or show error (LIST-4, LIST-5). Renders
   `<StoreList>` only; no markup beyond wrapper div (LIST-6). Confirm GREEN.
 
-- [ ] **6.3 — TEST (StoreCreatePage)** Add `describe('StoreCreatePage')`. Test cases (spec
+- [x] **6.3 — TEST (StoreCreatePage)** Add `describe('StoreCreatePage')`. Test cases (spec
   TEST-3):
   - on mount: calls `listModulesToStore()` + `listOwners()` (owner-admin/super-admin) (CREATE-2)
   - priceIncluded module pre-selected and locked on render (MODULE-1, PRES-5, MODULE-3)
@@ -231,13 +231,13 @@ TEST-1 through TEST-7
   - offline: submit disabled + offline notice (CREATE-5, OFFLINE-3, OFFLINE-5)
   Confirm RED.
 
-- [ ] **6.4 — IMPL (StoreCreatePage)** Create `store-create.tsx` container. `loader =
+- [x] **6.4 — IMPL (StoreCreatePage)** Create `store-create.tsx` container. `loader =
   adminFeatureLoader([EFeatures.Stores])`. On mount: `Promise.all([listModulesToStore(),
   listOwners()])`. Pre-select priceIncluded. handleSubmit: blocked offline; build payload; call
   `createStore`; navigate('/management/stores') on success; set inline error on fail. Renders
   `<StoreForm mode="create">`. Confirm GREEN.
 
-- [ ] **6.5 — TEST (StoreEditPage)** Add `describe('StoreEditPage')`. Test cases (spec TEST-4):
+- [x] **6.5 — TEST (StoreEditPage)** Add `describe('StoreEditPage')`. Test cases (spec TEST-4):
   - on mount: calls `getStore(id)`, `listModulesToStore()`, `listOwners()` (EDIT-3)
   - store modules merged into catalog with price overrides (EDIT-4, MODULE-2)
   - id fallback: when no `:id` param, uses `selectedStoreId` from auth-store (EDIT-2)
@@ -247,14 +247,14 @@ TEST-1 through TEST-7
   - offline: submit disabled (EDIT-7, OFFLINE-3)
   Confirm RED.
 
-- [ ] **6.6 — IMPL (StoreEditPage)** Create `store-edit.tsx` container. `loader =
+- [x] **6.6 — IMPL (StoreEditPage)** Create `store-edit.tsx` container. `loader =
   adminFeatureLoader([EFeatures.Stores])`. Id from `useParams().id ?? selectedStoreId`.
   `Promise.all([getStore(id), listModulesToStore(), listOwners()])`. Merge store.modules into
   catalog (selected=true + price/currentPrice/discountText override). handleSubmit: blocked offline;
   build payload with role-gated fields; `updateStore`; upsert cache; navigate on success; inline
   error on fail. Renders `<StoreForm mode="edit">`. Confirm GREEN.
 
-- [ ] **6.7 — VERIFY** Full suite >= prior total. Spec requires 5+5+6+4 = 20 container/loader test
+- [x] **6.7 — VERIFY** Full suite >= prior total. Spec requires 5+5+6+4 = 20 container/loader test
   cases minimum. Confirm no unhandled promise rejections (ERR-6).
 
 ---
@@ -270,7 +270,7 @@ This unit adds no new logic — it connects the already-green modules to the app
 
 ### Tasks
 
-- [ ] **7.1 — I18N** Add all `STORES.*` keys to `shared/lib/i18n/es.ts`. Minimum 27 keys per spec
+- [x] **7.1 — I18N** Add all `STORES.*` keys to `shared/lib/i18n/es.ts`. Minimum 27 keys per spec
   I18N-2. Use the key table from design §7 as the floor. Check that `MANAGEMENT.*` shared keys
   exist; add if absent. All values in Rioplatense Spanish.
   Keys required (27 minimum):
@@ -282,7 +282,7 @@ This unit adds no new logic — it connects the already-green modules to the app
   `STORES.LOAD_ERROR`, `STORES.OFFLINE_NOTICE`, `STORES.REQUIRED`, `STORES.EMPTY`,
   `STORES.ACTIVATE`, `STORES.DEACTIVATE`, `STORES.APPROVE`, `STORES.DISAPPROVE`.
 
-- [ ] **7.2 — ROUTES** Add 3 entries to `app/routes.ts` inside the authenticated `app-layout`
+- [x] **7.2 — ROUTES** Add 3 entries to `app/routes.ts` inside the authenticated `app-layout`
   group, after the Profile block:
   ```ts
   route('management/stores', 'management/stores/routes/store-list.tsx'),
@@ -291,7 +291,7 @@ This unit adds no new logic — it connects the already-green modules to the app
   ```
   All three route modules already export a named `loader` (ROUTE-4). No logic added here.
 
-- [ ] **7.3 — VERIFY** Run full suite. All pre-existing tests green. Copy is resolved via
+- [x] **7.3 — VERIFY** Run full suite. All pre-existing tests green. Copy is resolved via
   `IntlProvider` in existing container tests (route tests already wrap with IntlProvider + es
   messages, so they implicitly confirm i18n keys). Final count >= baseline + all new tests.
 
