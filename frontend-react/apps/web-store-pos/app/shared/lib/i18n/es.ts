@@ -280,6 +280,23 @@ const messages: Record<string, string> = {
 
   // Footer
   'FOOTER.COPYRIGHT': '© {year} Vende De Todo. Todos los derechos reservados.',
+
+  // Sync — Export / Import
+  'SYNC.EXPORT_TITLE': 'Exportar datos',
+  'SYNC.IMPORT_TITLE': 'Importar datos',
+  'SYNC.PASSWORD_LABEL': 'Contraseña de cifrado',
+  'SYNC.EXPORT_BUTTON': 'Exportar',
+  'SYNC.IMPORT_BUTTON': 'Importar',
+  'SYNC.FILE_LABEL': 'Archivo de respaldo (.zip)',
+  'SYNC.EXPORTING': 'Exportando...',
+  'SYNC.IMPORTING': 'Importando...',
+  'SYNC.SUCCESS_TITLE': 'Importación completada',
+  'SYNC.RESULT_INSERTED': '{count} insertado(s)',
+  'SYNC.RESULT_UPDATED': '{count} actualizado(s)',
+  'SYNC.ERROR_WRONG_PASSWORD': 'Contraseña incorrecta. No se realizaron cambios.',
+  'SYNC.ERROR_CORRUPT_FILE': 'El archivo está dañado o tiene un formato no compatible.',
+  'SYNC.ERROR_EMPTY_PASSWORD': 'La contraseña no puede estar vacía.',
+  'SYNC.ERROR_NO_FILE': 'Seleccioná un archivo de respaldo.',
 };
 
 export default messages;
