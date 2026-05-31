@@ -11,6 +11,7 @@ interface AuthState {
   error: string | null;
   initialize: () => void;
   setUser: (user: UserModel, token: string) => void;
+  updateUser: (user: UserModel) => void;
   login: (email: string, password: string) => Promise<UserModel>;
   logout: () => void;
 }
@@ -85,6 +86,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       document.cookie = 'hasSession=1; path=/; SameSite=Lax';
     }
     set({ user: userWithExpiry, isAuthenticated: true, error: null });
+  },
+
+  updateUser: (user: UserModel) => {
+    const updatedUser: UserModel = { ...user, password: '' };
+    localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(updatedUser));
+    localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(updatedUser));
+    set({ user: updatedUser });
   },
 
   login: async (email: string, password: string): Promise<UserModel> => {

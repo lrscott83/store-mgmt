@@ -116,6 +116,69 @@ describe('useAuthStore', () => {
     });
   });
 
+  describe('updateUser — STORE-1 through STORE-4, S-STORE-1', () => {
+    it('writes updated user to StorageKeys.AUTH_MODEL', () => {
+      const user = makeUser({ fullName: 'Original Name' });
+      useAuthStore.setState({ user, isAuthenticated: true });
+
+      const updatedUser = makeUser({ fullName: 'María García', password: '' });
+      useAuthStore.getState().updateUser(updatedUser);
+
+      const stored = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
+      expect(stored.fullName).toBe('María García');
+    });
+
+    it('writes updated user to StorageKeys.CURRENT_USER', () => {
+      const user = makeUser({ fullName: 'Original Name' });
+      useAuthStore.setState({ user, isAuthenticated: true });
+
+      const updatedUser = makeUser({ fullName: 'María García', password: '' });
+      useAuthStore.getState().updateUser(updatedUser);
+
+      const currentUser = JSON.parse(localStorage.getItem(StorageKeys.CURRENT_USER)!);
+      expect(currentUser.fullName).toBe('María García');
+    });
+
+    it('updates Zustand state.user with the new user', () => {
+      const user = makeUser({ fullName: 'Original Name' });
+      useAuthStore.setState({ user, isAuthenticated: true });
+
+      const updatedUser = makeUser({ fullName: 'María García' });
+      useAuthStore.getState().updateUser(updatedUser);
+
+      expect(useAuthStore.getState().user?.fullName).toBe('María García');
+    });
+
+    it('forces password to empty string in stored user', () => {
+      const user = makeUser({ password: 'somepass' });
+      useAuthStore.setState({ user, isAuthenticated: true });
+
+      const updatedUser = makeUser({ password: 'ShouldBeCleared' });
+      useAuthStore.getState().updateUser(updatedUser);
+
+      const stored = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
+      expect(stored.password).toBe('');
+      expect(useAuthStore.getState().user?.password).toBe('');
+    });
+
+    it('does NOT mutate isAuthenticated, isLoading, or error', () => {
+      const user = makeUser();
+      useAuthStore.setState({
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+
+      useAuthStore.getState().updateUser(makeUser({ fullName: 'New Name' }));
+
+      const state = useAuthStore.getState();
+      expect(state.isAuthenticated).toBe(true);
+      expect(state.isLoading).toBe(false);
+      expect(state.error).toBeNull();
+    });
+  });
+
   describe('AUTH-03: Background /me on startup', () => {
     it('fires background /me call when online and token exists — does not block render', async () => {
       const user = makeUser();
