@@ -42,7 +42,7 @@ EditProfile → `UserService.editUser()` → PUT. ChangePassword → `UserServic
 
 ## Approaches
 
-- **A (RECOMMENDED): route containers + `profile-http-service` + `auth-store.updateUser()`.** Consistent with all existing patterns; HTTP isolated; store is single source of truth (navbar reads it). Add `updateUser(user)` action mirroring `setUser()` (writes BOTH localStorage keys + Zustand). Add reusable `useOnlineStatus()` hook for real-time offline detection.
+- **A (RECOMMENDED): route containers + `profile-http-service` + `auth-store.updateUser()`** Consistent with all existing patterns; HTTP isolated; store is single source of truth (navbar reads it). Add `updateUser(user)` action mirroring `setUser()` (writes BOTH localStorage keys + Zustand). Add reusable `useOnlineStatus()` hook for real-time offline detection.
 - **B: inline API calls in route components (like register.tsx).** Fewer files but mixes HTTP+state; register.tsx doesn't update the store, profile MUST. Rejected.
 - **C: new `useProfileStore`.** Over-engineering; profile data already in auth-store. Rejected.
 
