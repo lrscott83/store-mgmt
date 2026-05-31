@@ -39,6 +39,10 @@ export default [
 
     // Statistics
     route('stats/dashboard', 'statistics/routes/dashboard.tsx'),
+
+    // Sync — Export / Import
+    route('sync/export', 'sync/routes/export.tsx'),
+    route('sync/import', 'sync/routes/import.tsx'),
   ]),
 
   // Utility routes
