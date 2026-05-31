@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   DataSerializerService,
   WrongPasswordError,
@@ -297,12 +297,10 @@ describe('DataSerializerService', () => {
     it('wrong password does not modify any data (no side-effect spies triggered)', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      // import() only reads/parses — it has no write side effects itself
-      // but it must not call any repo writes before throwing
-      const spy = vi.fn();
-      const badSvc = makeService();
-      await expect(badSvc.import(payload, WRONG_PASSWORD)).rejects.toThrow(WrongPasswordError);
-      expect(spy).not.toHaveBeenCalled();
+      // import() must throw before returning any parsed data.
+      // NOTE: asserting that synchronizer repo writes are NOT called belongs in the
+      // Slice 2 container test where import() and sync() are wired together.
+      await expect(svc.import(payload, WRONG_PASSWORD)).rejects.toThrow(WrongPasswordError);
     });
   });
 
@@ -355,6 +353,10 @@ describe('DataSerializerService', () => {
       expect(entry.available).toBe(mockInventoryEntry.available);
       expect(entry.costPrice).toBe(mockInventoryEntry.costPrice);
       expect(entry.order).toBe(mockInventoryEntry.order);
+      // Serializer does NOT revive dates — JSON round-trip returns ISO strings
+      expect(entry.date).toBe('2024-01-01T00:00:00.000Z');
+      expect(entry.createdDate).toBe('2024-01-01T00:00:00.000Z');
+      expect(entry.updatedDate).toBe('2024-01-02T00:00:00.000Z');
     });
 
     it('multiple inventory entries for multiple products all survive', async () => {
