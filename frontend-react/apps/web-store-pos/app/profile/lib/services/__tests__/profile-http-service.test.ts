@@ -87,8 +87,9 @@ describe('profileHttpService.changePassword — HTTP-3: POST /v1/users/change-pa
   it('returns the response from the apiClient for changePassword', async () => {
     const { profileHttpService } = await import('../profile-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
+    const mockResponse = { data: null, succeeded: true, message: '', actionCode: 0, errors: [] };
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { success: true },
+      data: mockResponse,
     });
 
     const result = await profileHttpService.changePassword('u2', {
@@ -96,6 +97,6 @@ describe('profileHttpService.changePassword — HTTP-3: POST /v1/users/change-pa
       newPassword: 'NewPass2',
     });
 
-    expect(result.success).toBe(true);
+    expect(result.succeeded).toBe(true);
   });
 });

@@ -43,6 +43,10 @@ export default [
     // Sync — Export / Import
     route('sync/export', 'sync/routes/export.tsx'),
     route('sync/import', 'sync/routes/import.tsx'),
+
+    // Profile — User profile management
+    route('profile/edit', 'profile/routes/edit-profile.tsx'),
+    route('profile/change-password', 'profile/routes/change-password.tsx'),
   ]),
 
   // Utility routes
