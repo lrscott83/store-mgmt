@@ -196,6 +196,11 @@ redirect occurs.
 callbacks (onActivate, onApprove, onDisapprove, onDeactivate, onEdit, onCreate). It MUST NOT
 import HTTP services or router navigation directly.
 
+**PRES-1a** — `onActivate` and `onDeactivate` MUST be optional props in `StoreListProps`. When a
+handler is absent, the corresponding action button MUST NOT be rendered. When a handler is
+present, the button MUST be rendered and function exactly as before. `onApprove` and `onDisapprove`
+remain required.
+
 **PRES-2** — `StoreList` MUST show a visible degraded-state indicator when passed a degraded-mode
 flag from the container (indicating data came from cache, not the network).
 

@@ -100,7 +100,74 @@ string literals are permitted in TSX.
 
 ---
 
-### Testing (TEST)
+### Admin Stores Route Registration (ADMIN-STORES-ROUTE)
+
+The system MUST register the `/admin/stores` route in `app/routes.ts` under the existing
+`app-layout` route, pointing to `AdminStoreListPage`.
+
+The route module MUST export a named `loader` bound to `superAdminLoader` AND a default export
+for the page component.
+
+**Scenarios:**
+- S-ADMIN-STORES-ROUTE-1 — Route registered with superAdminLoader; no EFeatures check.
+
+---
+
+### Admin Stores Access Control (ADMIN-STORES-ACCESS)
+
+The `admin/stores` route MUST be gated exclusively by `superAdminLoader` (`isSuperAdmin` ONLY).
+Users who are `isOwnerAdmin` but NOT `isSuperAdmin` MUST be blocked. No `EFeatures` check is
+applied.
+
+**Scenarios:**
+- S-ADMIN-STORES-ACCESS-1 — SuperAdmin reaches page
+- S-ADMIN-STORES-ACCESS-2 — OwnerAdmin blocked
+- S-ADMIN-STORES-ACCESS-3 — Unauthenticated → /login
+
+---
+
+### Admin Store List Container (ADMIN-STORES-PAGE)
+
+A container `AdminStoreListPage` MUST exist at
+`app/admin/stores/routes/store-list.tsx`, exported as a named export AND as `default`.
+
+On mount the container MUST call `storeHttpService.listStores()` (`GET /v1/stores/by-current-user`)
+and render the shared `<StoreList>` presentational component with the returned stores.
+
+The container MUST pass `isOnline={true}` and `isDegraded={false}` as static props (no offline
+gating; no `BaseRepository` cache).
+
+The container MUST wire: `onCreate` → navigate to `/management/stores/create`;
+`onEdit` → navigate to `/management/stores/edit/:id`; `onApprove` → call
+`storeHttpService.approve(id)`; `onDisapprove` → call `storeHttpService.disapprove(id)`.
+
+The container MUST NOT wire `onActivate` or `onDeactivate` (these are commented out in the Angular
+source and are intentionally omitted).
+
+**Scenarios:**
+- S-ADMIN-STORES-PAGE-1 — Successful load renders StoreList
+- S-ADMIN-STORES-PAGE-2 — onCreate navigates to create route
+- S-ADMIN-STORES-PAGE-3 — onEdit navigates to edit route
+- S-ADMIN-STORES-PAGE-4 — onApprove calls service and refetches
+- S-ADMIN-STORES-PAGE-5 — onDisapprove calls service and refetches
+- S-ADMIN-STORES-PAGE-6 — Activate/Deactivate NOT wired; buttons not rendered
+- S-ADMIN-STORES-PAGE-7 — HTTP error shows inline error
+
+---
+
+### Admin Stores Testing (ADMIN-STORES-TEST)
+
+A smoke-test suite MUST exist at
+`app/admin/stores/routes/__tests__/store-list.test.tsx`.
+
+Tests MUST cover: SuperAdmin reaches page and list renders; OwnerAdmin is blocked by
+`superAdminLoader`; `onCreate` navigates to create; `onEdit` navigates to edit; `onApprove` calls
+service; `onDisapprove` calls service; HTTP error shows inline error; activate/deactivate buttons
+are absent.
+
+---
+
+### Testing (TEST) — Features
 
 **TEST-1** — A smoke-test suite MUST exist at
 `app/admin/features/routes/__tests__/features.test.tsx`.
