@@ -83,3 +83,9 @@ export interface User {
   email: string;
   isActive: boolean;
 }
+
+export interface SystemConfiguration {
+  id: string;
+  name: string;
+  value: string;
+}
