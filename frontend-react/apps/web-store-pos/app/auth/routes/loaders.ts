@@ -56,6 +56,17 @@ export function adminFeatureLoader(featureIds: number[]) {
   };
 }
 
+export async function superAdminLoader(): Promise<Response | null> {
+  const { user, isAuthenticated } = getAuthState();
+  if (!user || !isAuthenticated) {
+    return redirect('/login');
+  }
+  if (!user.isSuperAdmin) {
+    return redirect('/unauthorized');
+  }
+  return null;
+}
+
 export async function resellerLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {

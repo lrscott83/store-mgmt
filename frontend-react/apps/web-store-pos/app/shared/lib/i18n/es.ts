@@ -370,6 +370,12 @@ const messages: Record<string, string> = {
   'USERS.CREATE': 'Crear usuario',
   'USERS.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intentá de nuevo.',
 
+  // Admin — Features
+  'FEATURES.TITLE': 'Funcionalidades',
+  'FEATURES.ACTIVATE_FEATURES': 'Activar funcionalidades',
+  'FEATURES.FEATURES_ACTIVATED': 'Las funcionalidades fueron activadas correctamente.',
+  'FEATURES.UNEXPECTED_ERROR': 'Ocurrió un error inesperado. Intentá de nuevo.',
+
   // Sync — Export / Import
   'SYNC.EXPORT_TITLE': 'Exportar datos',
   'SYNC.IMPORT_TITLE': 'Importar datos',

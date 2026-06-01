@@ -14,6 +14,7 @@ import {
   adminLoader,
   resellerLoader,
   adminFeatureLoader,
+  superAdminLoader,
 } from '../loaders';
 import type { UserModel } from '@store-mgmt/domain';
 
@@ -197,6 +198,32 @@ describe('Route Loaders (AUTH-04)', () => {
       setAuthState(makeUser({ isSuperAdmin: true, featureIds: [73] }));
       const loader = adminFeatureLoader([73]);
       const result = await loader({ params: {} } as never);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('superAdminLoader — ACCESS-1 through ACCESS-3', () => {
+    it('redirects unauthenticated user to /login', async () => {
+      setAuthState(null);
+      const result = await superAdminLoader();
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.status).toBe(302);
+      expect(res.headers.get('Location')).toBe('/login');
+    });
+
+    it('redirects OwnerAdmin (non-SuperAdmin) to /unauthorized', async () => {
+      setAuthState(makeUser({ isSuperAdmin: false, isOwnerAdmin: true }));
+      const result = await superAdminLoader();
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.status).toBe(302);
+      expect(res.headers.get('Location')).toBe('/unauthorized');
+    });
+
+    it('returns null for SuperAdmin (allows access)', async () => {
+      setAuthState(makeUser({ isSuperAdmin: true }));
+      const result = await superAdminLoader();
       expect(result).toBeNull();
     });
   });
