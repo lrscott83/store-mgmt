@@ -613,6 +613,182 @@ boundary.
 
 ---
 
+## Users Sub-Domain (phase4-mgmt-users)
+
+### Access Control (Users)
+
+**ACCESS-1** — The three user routes MUST export a named `loader` bound to `adminFeatureLoader([EFeatures.Users])`. The factory is reused from the Stores change; NOT re-created.
+
+**ACCESS-2** — Unauthenticated users are redirected to `/login`; unauthorized users to `/unauthorized`.
+
+**ACCESS-3** — Users lacking `EFeatures.Users = 72` are blocked by the feature guard.
+
+**ACCESS-4** — All 3 user routes export `loader = adminFeatureLoader([EFeatures.Users])`.
+
+**ACCESS-5** — Non-admin users never reach any user route.
+
+### Route Registration (Users)
+
+**ROUTE-1** — `/management/users` → `UserListPage`.
+
+**ROUTE-2** — `/management/users/create` → `UserCreatePage`.
+
+**ROUTE-3** — `/management/users/:id/edit` → `UserEditPage`.
+
+**ROUTE-4** — All 3 modules export named `loader` + default page component.
+
+### HTTP Service (Users)
+
+**HTTP-1** — `userHttpService` singleton at `app/management/users/lib/services/user-http-service.ts`.
+
+**HTTP-2** — `listAll()` → `GET /v1/storeusers/list/true` → `BaseResponseModel<StoreUser[]>`.
+
+**HTTP-3** — `getById(id)` → `GET /v1/storeusers/:id` → `BaseResponseModel<StoreUser>`.
+
+**HTTP-4** — `create(payload)` → `POST /v1/storeusers` body `{ storeId, fullName, login, password, cellPhone, email, roleIds: [3] }` → `BaseResponseModel<boolean>`.
+
+**HTTP-5** — `updateDetails(id, payload)` → `PUT /v1/users/:id` body `{ fullName, cellPhone, email, isActive }` → `BaseResponseModel<boolean>`.
+
+**HTTP-6** — `activate(id)` → `POST /v1/users/activate` body `{ id, isActive: true }` → `BaseResponseModel<boolean>`.
+
+**HTTP-7** — `deactivate(id)` → `DELETE /v1/users/:id` → `BaseResponseModel<boolean>`.
+
+**HTTP-8** — All via shared `apiClient`. No own Axios instance.
+
+### User Credentials (CRED)
+
+**CRED-1** — `changePassword(id, payload)` → `POST /v1/users/change-password/:id` body `{ oldPassword, newPassword }` → `BaseResponseModel<boolean>`. Exposed in `userHttpService`.
+
+**CRED-2** — `oldPassword` is ALWAYS required. No admin-bypass path exists.
+
+**CRED-3** — Change-login is explicitly out of scope. No such field shall appear.
+
+### User List Container (Users)
+
+**LIST-1** — Container at `app/management/users/routes/user-list.tsx`, exports `UserListPage` (named + default).
+
+**LIST-2** — On mount fetches `listAll()`, renders `UserList`, writes through to `BaseRepository<StoreUser>` cache.
+
+**LIST-3** — Connectivity failure → read cache, render degraded with indicator.
+
+**LIST-4** — Activate and deactivate callbacks wired; refetch on success.
+
+**LIST-5** — All lifecycle actions disabled + offline error when offline.
+
+**LIST-6** — No presentational markup in the container.
+
+### User Create Container (Users)
+
+**CREATE-1** — Container at `app/management/users/routes/user-create.tsx`, exports `UserCreatePage` (named + default).
+
+**CREATE-2** — MUST resolve storeId from route param or `selectedStoreId`. If both absent → redirect to `/management/stores`.
+
+**CREATE-3** — Submit calls `create(payload)` with `roleIds: [ERoles.StoreUser = 3]` and resolved `storeId`.
+
+**CREATE-4** — Password validated against regex `(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}` AND confirm must match before submission.
+
+**CREATE-5** — On success navigates to `/management/users`.
+
+**CREATE-6** — Submit blocked + offline error when offline.
+
+**CREATE-7** — HTTP error passed to `UserCreateForm` inline; no redirect.
+
+### User Edit Container (Users)
+
+**EDIT-1** — Container at `app/management/users/routes/user-edit.tsx`, exports `UserEditPage` (named + default).
+
+**EDIT-2** — Id from `:id` route param.
+
+**EDIT-3** — On mount fetches `getById(id)` and pre-fills `UserDetailsForm`.
+
+**EDIT-4** — Details submit calls `updateDetails(id, payload)`. Success shows inline message.
+
+**EDIT-5** — `isActive` toggle shown only to super-admin or owner-admin.
+
+**EDIT-6** — Credentials submit calls `changePassword(id, { oldPassword, newPassword })`.
+
+**EDIT-7** — Details submit and credentials submit are INDEPENDENT (each has own submit button).
+
+**EDIT-8** — Both sub-form submits blocked + offline error when offline. HTTP errors shown inline per sub-form.
+
+### User Presentational Components (PRES)
+
+**PRES-1** — `UserList` at `app/management/users/components/UserList.tsx`, pure presentational.
+
+**PRES-2** — `UserList` shows degraded indicator when passed degraded-mode flag.
+
+**PRES-3** — `UserList` shows empty-state message when array is empty.
+
+**PRES-4** — `UserCreateForm` at `app/management/users/components/UserCreateForm.tsx`. Fields: storeId (display), fullName, login, password, confirmPassword, cellPhone (required), email (optional).
+
+**PRES-5** — `UserCreateForm` MUST NOT share shape with details form (no login/password on details).
+
+**PRES-6** — `UserDetailsForm` at `app/management/users/components/UserDetailsForm.tsx`. Fields: fullName, cellPhone, email, isActive (role-conditional).
+
+**PRES-7** — `UserCredentialsForm` at `app/management/users/components/UserCredentialsForm.tsx`. Fields: oldPassword, newPassword, confirmNewPassword. No login field.
+
+**PRES-8** — None of the four components imports HTTP services, router hooks, or `useOnlineStatus`. All via props.
+
+**PRES-9** — Submit disabled + offline notice when container passes `isOnline = false`.
+
+**PRES-10** — Inline error from container; no field reset on error.
+
+### User Offline Behavior (Users)
+
+**OFFLINE-1** — Write-through cache on successful list fetch. Cache key: `StorageKeys.entityKey('storeusers', selectedStoreId)`.
+
+**OFFLINE-2** — Cache fallback on connectivity failure; empty state if cache also empty.
+
+**OFFLINE-3** — All writes blocked with visible error when offline.
+
+**OFFLINE-4** — No offline write queue.
+
+**OFFLINE-5** — Reactive gate: offline → submit disabled; online restored → re-enabled; no reload required.
+
+### User Internationalization (Users)
+
+**I18N-1** — All user-visible strings via `useIntl`/`FormattedMessage`.
+
+**I18N-2** — 27 USERS.* keys minimum: LIST_TITLE, CREATE_TITLE, EDIT_TITLE, FULL_NAME, LOGIN, PASSWORD, CONFIRM_PASSWORD, CELL_PHONE, EMAIL, IS_ACTIVE, OLD_PASSWORD, NEW_PASSWORD, CONFIRM_NEW_PASSWORD, STORE, SAVE, UPDATE, CHANGE_PASSWORD, CREATE_SUCCESS, UPDATE_SUCCESS, PASSWORD_CHANGED, OFFLINE_NOTICE, DEGRADED_NOTICE, EMPTY, ACTIVATE, DEACTIVATE, PASSWORD_POLICY, PASSWORDS_MUST_MATCH.
+
+**I18N-3** — Shared MANAGEMENT.* keys added if absent.
+
+**I18N-4** — Additional keys beyond the 27-key floor are permitted.
+
+### User Error Handling (Users)
+
+**ERR-1** — List connectivity errors → cache fallback; other HTTP errors → inline error.
+
+**ERR-2** — `create()` errors → inline in UserCreateForm, no field reset, no redirect.
+
+**ERR-3** — `updateDetails()` errors → inline in UserDetailsForm, no field reset.
+
+**ERR-4** — `changePassword()` errors → inline in UserCredentialsForm, no field reset.
+
+**ERR-5** — `getById()` error → error state on page; no crash, no redirect.
+
+**ERR-6** — No unhandled promise rejections from any container.
+
+### User Testing (Users)
+
+**TEST-1** — Suite at `app/management/users/routes/__tests__/user-routes.test.tsx`.
+
+**TEST-2** — List smoke tests (5 cases).
+
+**TEST-3** — Create smoke tests (5 cases including storeId-guard redirect).
+
+**TEST-4** — Edit smoke tests (6 cases — two sub-form paths).
+
+**TEST-5** — adminFeatureLoader reuse tests (4 cases).
+
+**TEST-6** — useIntl tests wrapped in IntlProvider.
+
+**TEST-7** — useOnlineStatus mockable; no real navigator.onLine dependency.
+
+**TEST-8** — userHttpService unit tests (8 cases, one per contract).
+
+---
+
 ## Constraints and Non-Requirements
 
 - **No backend changes.** All endpoint contracts already exist and are consumed as-is.
