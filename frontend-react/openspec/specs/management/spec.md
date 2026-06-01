@@ -791,127 +791,39 @@ boundary.
 
 ## Configurations Sub-Domain (phase4-mgmt-configurations)
 
+> **MIGRATION NOTE — PARITY STUB.**
+> The Angular `ConfigurationsComponent` is an empty stub: no service, no HTTP endpoint, no form,
+> no domain model. The React slice is a faithful 1:1 parity of that stub — a feature-gated route
+> that renders a placeholder only. There is no `configurationHttpService`, no `ConfigurationsForm`,
+> no `SystemConfiguration` model, and no `GET /PUT /v1/configurations` contract in this codebase.
+
 ### Access Control (Configurations)
 
-**ACCESS-1** — The configurations route MUST export a named `loader` bound to `adminFeatureLoader([EFeatures.Configurations])`. The factory is reused from the Stores change; NOT re-created.
+**ACCESS-1** — The configurations route exports `loader = adminFeatureLoader([EFeatures.Configurations])`. The factory is reused from the Stores change; NOT re-created.
 
-**ACCESS-2** — Unauthenticated users are redirected to `/login`; unauthorized users to `/unauthorized`.
-
-**ACCESS-3** — Users lacking `EFeatures.Configurations = 74` are blocked by the feature guard.
-
-**ACCESS-4** — The configurations route exports `loader = adminFeatureLoader([EFeatures.Configurations])`.
-
-**ACCESS-5** — Non-admin users never reach the configurations route.
+**ACCESS-2** — `EFeatures.Configurations = 74`. Unauthenticated users are redirected to `/login`; unauthorized users to `/unauthorized`; users lacking feature 74 are blocked by the feature guard.
 
 ### Route Registration (Configurations)
 
-**ROUTE-1** — `/management/configurations` → `ConfigurationsPage`.
+**ROUTE-1** — `/management/configurations` → `ConfigurationsPage` (named export + default export). No sub-routes exist.
 
-**ROUTE-2** — The route module MUST export named `loader` and default page component. No sub-routes exist.
+### Presentational Output (Configurations)
 
-### HTTP Service (Configurations)
-
-**HTTP-1** — `configurationHttpService` singleton at `app/management/configurations/lib/services/configuration-http-service.ts`.
-
-**HTTP-2** — `list()` → `GET /v1/configurations` → `BaseResponseModel<SystemConfiguration[]>`. Platform-global; no `selectedStoreId` or store path segment.
-
-**HTTP-3** — `update(payload)` → `PUT /v1/configurations` → `BaseResponseModel<boolean>`. Payload shape is the full edited `SystemConfiguration[]` array.
-
-**HTTP-4** — Both methods MUST use the shared `apiClient`. No own Axios instance.
-
-### Configurations List and Cache (Configurations)
-
-**CONFIG-1** — Container at `app/management/configurations/routes/configurations.tsx`, exports `ConfigurationsPage` (named + default).
-
-**CONFIG-2** — On mount, container MUST call `list()`, write the result to `BaseRepository<SystemConfiguration>('configurations', [])` cache, and pass the array to `ConfigurationsForm`.
-
-**CONFIG-3** — Connectivity failure on load → container reads cache, passes it to `ConfigurationsForm` with a degraded-mode flag.
-
-**CONFIG-4** — Empty response or empty cache → `ConfigurationsForm` MUST render an empty-state message.
-
-**CONFIG-5** — No presentational markup in the container.
-
-### Configurations Save (Configurations)
-
-**SAVE-1** — `ConfigurationsForm` emits the full updated `SystemConfiguration[]` on submit; container calls `update(payload)`.
-
-**SAVE-2** — On success, container MUST show a success indicator (inline message or toast); no navigation.
-
-**SAVE-3** — Submit MUST be blocked with a visible offline error when the device is offline.
-
-**SAVE-4** — HTTP error from `update()` MUST be passed to `ConfigurationsForm` inline; no field reset; no redirect.
-
-**SAVE-5** — Only the `value` field is editable per row; `name` MUST be rendered read-only.
-
-### Presentational Components (Configurations)
-
-**PRES-1** — `ConfigurationsForm` at `app/management/configurations/components/ConfigurationsForm.tsx`, pure presentational.
-
-**PRES-2** — `ConfigurationsForm` iterates `SystemConfiguration[]`; each entry renders as one row: `name` as a read-only label, `value` as an editable text input.
-
-**PRES-3** — Generic iteration — no hardcoded field names. Any entries returned by the API MUST render without code changes.
-
-**PRES-4** — `ConfigurationsForm` MUST NOT import HTTP services, router hooks, or `useOnlineStatus`. All data and callbacks via props.
-
-**PRES-5** — Submit button MUST be disabled and show an offline notice when the container passes `isOnline = false`.
-
-**PRES-6** — Degraded-mode indicator MUST be visible when the container passes `isDegraded = true`.
-
-### Offline Behavior (Configurations)
-
-**OFFLINE-1** — Write-through cache on successful list fetch. Cache key: `BaseRepository<SystemConfiguration>('configurations', [])`.
-
-**OFFLINE-2** — Cache fallback on connectivity failure; empty state rendered if cache is also empty.
-
-**OFFLINE-3** — All writes (PUT) MUST be blocked with a visible error when offline.
-
-**OFFLINE-4** — No offline write queue.
-
-**OFFLINE-5** — Reactive gate: offline → submit disabled; connectivity restored → re-enabled; no reload required.
-
-### Internationalisation (Configurations)
-
-**I18N-1** — All user-visible strings MUST be delivered via `useIntl` / `FormattedMessage`.
-
-**I18N-2** — Minimum 10 `CONFIGURATIONS.*` keys: `TITLE`, `SAVE`, `SAVE_SUCCESS`, `OFFLINE_NOTICE`, `DEGRADED_NOTICE`, `EMPTY`, `VALUE_LABEL`, `NAME_LABEL`, `SAVE_ERROR`, `LOADING`.
-
-**I18N-3** — Additional keys beyond the 10-key floor are permitted. Shared `MANAGEMENT.*` keys added if absent.
-
-### Error Handling (Configurations)
-
-**ERR-1** — List connectivity errors → cache fallback and degraded indicator; other HTTP errors → inline error message.
-
-**ERR-2** — `update()` errors → inline in `ConfigurationsForm`, no field reset, no redirect.
-
-**ERR-3** — `list()` error with empty cache → error state on page; no crash.
-
-**ERR-4** — No unhandled promise rejections from the container.
-
-**ERR-5** — The HTTP service is the seam for all backend interaction; tests MUST mock the service, not real HTTP.
+**PRES-1** — `ConfigurationsPage` renders only `<p>configurations works!</p>`. No fetching, no state management, no child components, no i18n keys.
 
 ### Testing (Configurations)
 
-**TEST-1** — Suite at `app/management/configurations/routes/__tests__/configurations.test.tsx`.
-
-**TEST-2** — List smoke tests (5 cases): successful render, empty state, degraded/cache fallback, offline+empty-cache error, mounted with data.
-
-**TEST-3** — Save smoke tests (5 cases): successful submit, offline blocked, HTTP error inline, form emits updated values, success indicator shown.
-
-**TEST-4** — `adminFeatureLoader` reuse tests (2 cases): authorised renders page, unauthorised redirects.
-
-**TEST-5** — `configurationHttpService` unit tests (2 cases): `list()` maps response, `update()` sends payload.
-
-**TEST-6** — `useOnlineStatus` MUST be mockable; no real `navigator.onLine` dependency in tests.
+**TEST-1** — Suite at `app/management/configurations/routes/__tests__/configurations.test.tsx`. Asserts that the feature-gated route renders the placeholder `<p>configurations works!</p>`.
 
 ---
 
 ## Acceptance Scenarios (Configurations)
 
-### S-CONFIG-1: Route registered and gated
+### S-CONFIG-1: Route registered and gated — renders placeholder
 
 **Given** a user who is super-admin or owner-admin AND has `EFeatures.Configurations = 74`
 **When** they navigate to `/management/configurations`
-**Then** `ConfigurationsPage` mounts and `list()` is called.
+**Then** `ConfigurationsPage` mounts and renders `<p>configurations works!</p>`. No HTTP call is made.
 
 ### S-CONFIG-2: Feature gate blocks access
 
@@ -919,90 +831,14 @@ boundary.
 **When** they navigate to `/management/configurations`
 **Then** the `adminFeatureLoader` redirects them away before the page renders.
 
-### S-CONFIG-3: Successful list load
-
-**Given** an authorised online user on `/management/configurations`
-**When** the container mounts
-**Then**
-  - `GET /v1/configurations` is called.
-  - `ConfigurationsForm` renders the returned entries.
-  - The entries are written to `BaseRepository<SystemConfiguration>` localStorage cache.
-  - No degraded indicator is visible.
-
-### S-CONFIG-4: Empty list
-
-**Given** an authorised online user whose backend returns an empty `SystemConfiguration[]`
-**When** the container mounts and the response succeeds
-**Then** `ConfigurationsForm` renders the `CONFIGURATIONS.EMPTY` empty-state message.
-
-### S-CONFIG-5: Offline — served from cache
-
-**Given** an authorised user who is offline (or whose HTTP call fails due to connectivity)
-**When** the container mounts and a prior successful fetch has populated the cache
-**Then**
-  - `ConfigurationsForm` renders the cached entries.
-  - A degraded-mode indicator (`CONFIGURATIONS.DEGRADED_NOTICE`) is visible.
-  - No crash or unhandled error occurs.
-
-### S-CONFIG-6: Offline — cache also empty
-
-**Given** an authorised user who is offline AND the cache is empty
-**When** the container mounts
-**Then** the empty-state message is shown and no crash occurs.
-
-### S-CONFIG-7: Successful save
-
-**Given** an authorised online user who edits at least one value
-**When** they submit the form
-**Then**
-  - `update(editedList)` is called.
-  - On success a success indicator is shown without navigation.
-
-### S-CONFIG-8: Offline save blocked
-
-**Given** an authorised user who is offline
-**When** they attempt to submit
-**Then** the submit is blocked, an offline error is visible, and `update()` is NOT called.
-
-### S-CONFIG-9: Save HTTP error
-
-**Given** a user who submits the form
-**When** the server returns a 4xx or 5xx error from `PUT /v1/configurations`
-**Then**
-  - An inline error message is shown inside `ConfigurationsForm`.
-  - All field values are preserved.
-  - No navigation occurs.
-
-### S-CONFIG-10: Generic row rendering
-
-**Given** `ConfigurationsForm` receives an array with N entries
-**When** it renders
-**Then** N rows appear — each with `name` as a read-only label and `value` as an editable input — regardless of the specific key names.
-
-### S-I18N-CONFIG-1: All copy from i18n
-
-**Given** any configurations container or component is rendered inside an `IntlProvider`
-**Then** no raw Spanish or English string literals appear in the rendered output; all copy originates from `es.ts` message keys.
-
----
-
-## Domain Model
-
-### SystemConfiguration
-
-**DOMAIN-1** — Add `SystemConfiguration { id: string; name: string; value: string }` to `packages/domain/src/models/store.ts` and re-export it from the domain barrel.
-
-**DOMAIN-2** — This model is platform-global; it MUST NOT carry any store-scoped fields.
-
 ---
 
 ## Constraints and Non-Requirements
 
-- **No backend changes.** All endpoint contracts already exist and are consumed as-is.
+- **No backend changes.** All endpoint contracts for Stores and Users already exist and are consumed as-is.
 - **No offline write queue.** Writes are blocked and rejected when offline; no pending sync state is stored.
-- **No domain type changes.** `Store`, `StoreUser`, and `SystemConfiguration` from `@store-mgmt/domain` are used unchanged.
 - **No owner management UI.** The owner picker is a read-only data source for the form only.
-- **Configurations sub-slice is platform-global, not store-scoped.** No `selectedStoreId` usage.
+- **Configurations is a parity stub of an empty Angular component.** There is no domain model, no HTTP endpoint, and no store-scope concept for Configurations. Any prior reference to `SystemConfiguration`, `configurationHttpService`, or `GET/PUT /v1/configurations` describes code that does not and should not exist.
 - **Post-create navigation goes to the store list (`/management/stores`), not to any users route.**
   The legacy Angular navigation to `/management/users/create/` is intentionally NOT mirrored here;
   it will be revisited when `phase4-mgmt-users` ships.

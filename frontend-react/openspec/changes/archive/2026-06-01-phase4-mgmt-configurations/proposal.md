@@ -1,3 +1,14 @@
+> **CORRECTION — IMPLEMENTATION SUPERSEDED**
+> This change was initially over-built with an invented http service (`configurationHttpService`),
+> a form component (`ConfigurationsForm`), a `SystemConfiguration` domain model, and a
+> `GET /v1/configurations` / `PUT /v1/configurations` backend contract. That design VIOLATED the
+> strict 1:1 Angular→React migration rule: the Angular `ConfigurationsComponent` is an empty stub
+> with no service and no backend endpoint. The implementation was subsequently CORRECTED to a
+> faithful parity stub — a feature-gated route (`adminFeatureLoader([EFeatures.Configurations])`)
+> whose component renders only `<p>configurations works!</p>`. The requirements, decisions, and
+> implementation details about endpoints, forms, the `SystemConfiguration` model, caching, and
+> i18n keys described below are SUPERSEDED and describe code that no longer exists.
+
 # Proposal: phase4-mgmt-configurations
 
 Sub-domain 3 of 3 of the Management slice (phase4-management) — the **LAST** change in the slice.
