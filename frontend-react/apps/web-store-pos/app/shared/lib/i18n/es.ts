@@ -370,18 +370,6 @@ const messages: Record<string, string> = {
   'USERS.CREATE': 'Crear usuario',
   'USERS.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intentá de nuevo.',
 
-  // Management — Configurations
-  'CONFIGURATIONS.TITLE': 'Configuraciones',
-  'CONFIGURATIONS.SAVE': 'Guardar',
-  'CONFIGURATIONS.SAVE_SUCCESS': 'Configuraciones guardadas correctamente.',
-  'CONFIGURATIONS.OFFLINE_NOTICE': 'Sin conexión. Conectate para guardar cambios.',
-  'CONFIGURATIONS.DEGRADED_NOTICE': 'Mostrando datos en caché (sin conexión).',
-  'CONFIGURATIONS.EMPTY': 'No hay configuraciones registradas.',
-  'CONFIGURATIONS.VALUE_LABEL': 'Valor de {name}',
-  'CONFIGURATIONS.NAME_LABEL': 'Nombre',
-  'CONFIGURATIONS.SAVE_ERROR': 'Ocurrió un error al guardar. Intentá de nuevo.',
-  'CONFIGURATIONS.LOADING': 'Cargando configuraciones...',
-
   // Sync — Export / Import
   'SYNC.EXPORT_TITLE': 'Exportar datos',
   'SYNC.IMPORT_TITLE': 'Importar datos',
