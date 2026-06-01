@@ -54,6 +54,9 @@ export default [
     route('management/users/create', 'management/users/routes/user-create.tsx'),
     route('management/users/:id/edit', 'management/users/routes/user-edit.tsx'),
 
+    // Management — Configurations
+    route('management/configurations', 'management/configurations/routes/configurations.tsx'),
+
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
