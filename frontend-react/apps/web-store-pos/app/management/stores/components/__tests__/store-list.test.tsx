@@ -201,3 +201,105 @@ describe('StoreList — ERR-3: error display', () => {
     expect(screen.getByText('Failed to load stores')).toBeInTheDocument();
   });
 });
+
+// ─── S-PRES-OPTIONAL: optional activate/deactivate handlers ───────────────────
+
+describe('StoreList — S-PRES-OPTIONAL-1: Activate button absent when handler omitted', () => {
+  it('does NOT render Activate button when onActivate is not provided', async () => {
+    const { StoreList } = await import('../store-list');
+    const store = makeStore({ id: 's1', name: 'Store One' });
+    render(
+      <Wrapper>
+        <StoreList
+          stores={[store]}
+          isOnline={true}
+          isDegraded={false}
+          onCreate={vi.fn()}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          error={undefined}
+        />
+      </Wrapper>
+    );
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.ACTIVATE'] })
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('StoreList — S-PRES-OPTIONAL-2: Deactivate button absent when handler omitted', () => {
+  it('does NOT render Deactivate button when onDeactivate is not provided', async () => {
+    const { StoreList } = await import('../store-list');
+    const store = makeStore({ id: 's1', name: 'Store One' });
+    render(
+      <Wrapper>
+        <StoreList
+          stores={[store]}
+          isOnline={true}
+          isDegraded={false}
+          onCreate={vi.fn()}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          error={undefined}
+        />
+      </Wrapper>
+    );
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] })
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('StoreList — S-PRES-OPTIONAL-3: Activate button rendered when handler provided', () => {
+  it('renders Activate button when onActivate is provided', async () => {
+    const { StoreList } = await import('../store-list');
+    const store = makeStore({ id: 's1', name: 'Store One' });
+    const onActivate = vi.fn();
+    render(
+      <Wrapper>
+        <StoreList
+          stores={[store]}
+          isOnline={true}
+          isDegraded={false}
+          onCreate={vi.fn()}
+          onEdit={vi.fn()}
+          onActivate={onActivate}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          error={undefined}
+        />
+      </Wrapper>
+    );
+    expect(
+      screen.getByRole('button', { name: esMessages['STORES.ACTIVATE'] })
+    ).toBeInTheDocument();
+  });
+});
+
+describe('StoreList — S-PRES-OPTIONAL-4: Deactivate button rendered when handler provided', () => {
+  it('renders Deactivate button when onDeactivate is provided', async () => {
+    const { StoreList } = await import('../store-list');
+    const store = makeStore({ id: 's1', name: 'Store One' });
+    const onDeactivate = vi.fn();
+    render(
+      <Wrapper>
+        <StoreList
+          stores={[store]}
+          isOnline={true}
+          isDegraded={false}
+          onCreate={vi.fn()}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onDeactivate={onDeactivate}
+          error={undefined}
+        />
+      </Wrapper>
+    );
+    expect(
+      screen.getByRole('button', { name: esMessages['STORES.DEACTIVATE'] })
+    ).toBeInTheDocument();
+  });
+});

@@ -7,10 +7,10 @@ interface StoreListProps {
   isDegraded: boolean;
   onCreate: () => void;
   onEdit: (id: string) => void;
-  onActivate: (id: string) => void;
+  onActivate?: (id: string) => void;
   onApprove: (id: string) => void;
   onDisapprove: (id: string) => void;
-  onDeactivate: (id: string) => void;
+  onDeactivate?: (id: string) => void;
   error?: string;
 }
 
@@ -84,14 +84,16 @@ export function StoreList({
                   >
                     {intl.formatMessage({ id: 'STORES.EDIT' })}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onActivate(store.id)}
-                    disabled={!isOnline}
-                    className="rounded bg-green-100 px-2 py-1 text-xs font-medium hover:bg-green-200 disabled:opacity-50"
-                  >
-                    {intl.formatMessage({ id: 'STORES.ACTIVATE' })}
-                  </button>
+                  {onActivate && (
+                    <button
+                      type="button"
+                      onClick={() => onActivate(store.id)}
+                      disabled={!isOnline}
+                      className="rounded bg-green-100 px-2 py-1 text-xs font-medium hover:bg-green-200 disabled:opacity-50"
+                    >
+                      {intl.formatMessage({ id: 'STORES.ACTIVATE' })}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onApprove(store.id)}
@@ -108,14 +110,16 @@ export function StoreList({
                   >
                     {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeactivate(store.id)}
-                    disabled={!isOnline}
-                    className="rounded bg-red-100 px-2 py-1 text-xs font-medium hover:bg-red-200 disabled:opacity-50"
-                  >
-                    {intl.formatMessage({ id: 'STORES.DEACTIVATE' })}
-                  </button>
+                  {onDeactivate && (
+                    <button
+                      type="button"
+                      onClick={() => onDeactivate(store.id)}
+                      disabled={!isOnline}
+                      className="rounded bg-red-100 px-2 py-1 text-xs font-medium hover:bg-red-200 disabled:opacity-50"
+                    >
+                      {intl.formatMessage({ id: 'STORES.DEACTIVATE' })}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
