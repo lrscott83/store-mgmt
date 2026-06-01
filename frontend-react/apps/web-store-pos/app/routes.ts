@@ -57,6 +57,9 @@ export default [
     // Management — Configurations
     route('management/configurations', 'management/configurations/routes/configurations.tsx'),
 
+    // Admin — Features
+    route('admin/features', 'admin/features/routes/features.tsx'),
+
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
