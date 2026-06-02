@@ -51,6 +51,7 @@ export function AdminStoreListPage() {
       stores={stores}
       isOnline={true}
       isDegraded={false}
+      isSuperAdmin={true}
       error={error}
       onCreate={() => navigate('/management/stores/create')}
       onEdit={(id) => navigate(`/management/stores/edit/${id}`)}

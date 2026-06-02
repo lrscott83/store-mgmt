@@ -85,16 +85,18 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 // ─── Auth store mock ──────────────────────────────────────────────────────────
 
 let mockUser: UserModel | null = makeUser();
+let mockUpdateUser = vi.fn();
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
-    const state = { user: mockUser, isAuthenticated: true };
+    const state = { user: mockUser, isAuthenticated: true, updateUser: mockUpdateUser };
     if (typeof selector === 'function') return selector(state);
     return state;
   });
   (useAuthStore as unknown as { getState: () => unknown }).getState = () => ({
     user: mockUser,
     isAuthenticated: true,
+    updateUser: mockUpdateUser,
   });
   return { useAuthStore };
 });
@@ -274,7 +276,7 @@ describe('StoreListPage — S-LIST-5: lifecycle blocked offline', () => {
 // StoreCreatePage — spec TEST-3 (5 cases)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('StoreCreatePage — S-CREATE-1: success navigates to store list', () => {
+describe('StoreCreatePage — S-CREATE-1: success navigates to user create', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
@@ -284,14 +286,19 @@ describe('StoreCreatePage — S-CREATE-1: success navigates to store list', () =
     mockCreateStore = vi.fn().mockResolvedValue({ data: makeStore() });
   });
 
-  it('navigates to /management/stores after successful create', async () => {
+  it('navigates to /management/users/create/ after successful create (Angular parity)', async () => {
     const { StoreCreatePage } = await import('../store-create');
     render(<Wrapper><StoreCreatePage /></Wrapper>);
     await waitFor(() => screen.getByLabelText(/nombre/i));
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'New Store' } });
+    // isSuperAdmin=true so owner picker is shown — select an owner to pass ownerId validation
+    const ownerSelect = screen.queryByLabelText(/propietario/i);
+    if (ownerSelect) {
+      fireEvent.change(ownerSelect, { target: { value: 'o1' } });
+    }
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/management/stores');
+      expect(mockNavigate).toHaveBeenCalledWith('/management/users/create/');
     });
   });
 });
@@ -328,11 +335,16 @@ describe('StoreCreatePage — S-CREATE-3: HTTP error shown inline', () => {
     render(<Wrapper><StoreCreatePage /></Wrapper>);
     await waitFor(() => screen.getByLabelText(/nombre/i));
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'Store X' } });
+    // Select owner to pass ownerId validation (isSuperAdmin=true shows owner picker)
+    const ownerSelect = screen.queryByLabelText(/propietario/i);
+    if (ownerSelect) {
+      fireEvent.change(ownerSelect, { target: { value: 'o1' } });
+    }
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
-    expect(mockNavigate).not.toHaveBeenCalledWith('/management/stores');
+    expect(mockNavigate).not.toHaveBeenCalledWith('/management/users/create/');
   });
 });
 
@@ -499,5 +511,114 @@ describe('StoreEditPage — S-EDIT-6: id from selectedStoreId when no param', ()
     await waitFor(() => {
       expect(mockGetStore).toHaveBeenCalledWith('s-from-user');
     });
+  });
+});
+
+// ─── Finding 9: post-create redirect to /management/users/create/ ─────────────
+
+describe('StoreCreatePage — S-CREATE-REDIRECT: navigates to /management/users/create/', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockIsOnline = true;
+    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner({ id: 'o1' })] });
+    mockCreateStore = vi.fn().mockResolvedValue({ data: makeStore() });
+  });
+
+  it('navigates to /management/users/create/ after successful create', async () => {
+    const { StoreCreatePage } = await import('../store-create');
+    render(<Wrapper><StoreCreatePage /></Wrapper>);
+    // Wait for catalog + owner to load (owner picker appears for superAdmin)
+    await waitFor(() => screen.getByLabelText(/propietario/i));
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'New Store' } });
+    fireEvent.change(screen.getByLabelText(/propietario/i), { target: { value: 'o1' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/management/users/create/');
+    });
+  });
+});
+
+// ─── Finding 10: post-edit re-fetches user via auth store (no reload) ─────────
+
+// authHttpService mock for /me re-fetch
+let mockGetMe = vi.fn();
+vi.mock('~/shared/lib/http/auth-http-service', () => ({
+  authHttpService: {
+    get getMe() { return mockGetMe; },
+  },
+}));
+
+describe('StoreEditPage — S-EDIT-POST-EDIT: refreshes user after successful edit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockIsOnline = true;
+    mockParams = { id: 's1' };
+    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
+    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
+    mockGetMe = vi.fn().mockResolvedValue({ data: makeUser() });
+  });
+
+  it('calls authHttpService.getMe and updateUser after successful edit instead of reload', async () => {
+    const { StoreEditPage } = await import('../store-edit');
+    render(<Wrapper><StoreEditPage /></Wrapper>);
+    await waitFor(() => screen.getByDisplayValue('Existing Store'));
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(mockGetMe).toHaveBeenCalled();
+      expect(mockUpdateUser).toHaveBeenCalled();
+    });
+  });
+
+  it('still navigates away after successful edit', async () => {
+    const { StoreEditPage } = await import('../store-edit');
+    render(<Wrapper><StoreEditPage /></Wrapper>);
+    await waitFor(() => screen.getByDisplayValue('Existing Store'));
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/management/stores');
+    });
+  });
+});
+
+// ─── Finding 11: isOwnerAdmin computed as isSuperAdmin || hasOwnersFeature ────
+
+describe('StoreCreatePage — S-CREATE-OWNER-GATE: isOwnerAdmin computed from feature', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsOnline = true;
+    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
+  });
+
+  it('shows owner picker for non-superAdmin user who has EFeatures.Owners in featureIds', async () => {
+    // EFeatures.Owners = 11
+    mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: true, featureIds: [73, 11] });
+    const { StoreCreatePage } = await import('../store-create');
+    render(<Wrapper><StoreCreatePage /></Wrapper>);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/propietario/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows owner picker for superAdmin even without Owners featureId', async () => {
+    mockUser = makeUser({ isSuperAdmin: true, isOwnerAdmin: false, featureIds: [73] });
+    const { StoreCreatePage } = await import('../store-create');
+    render(<Wrapper><StoreCreatePage /></Wrapper>);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/propietario/i)).toBeInTheDocument();
+    });
+  });
+
+  it('does NOT show owner picker for plain ownerAdmin without EFeatures.Owners in featureIds', async () => {
+    mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: true, featureIds: [73] });
+    const { StoreCreatePage } = await import('../store-create');
+    render(<Wrapper><StoreCreatePage /></Wrapper>);
+    await waitFor(() => screen.getByRole('button', { name: /guardar/i }));
+    expect(screen.queryByLabelText(/propietario/i)).not.toBeInTheDocument();
   });
 });

@@ -5,7 +5,9 @@ import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
+import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { StoreForm } from '~/management/stores/components/store-form';
 import type { Store, Module, Owner } from '@store-mgmt/domain';
@@ -19,11 +21,12 @@ export function StoreEditPage() {
   const navigate = useNavigate();
   const { id: paramId } = useParams<{ id: string }>();
   const isOnline = useOnlineStatus();
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
 
   const storeId = paramId ?? user?.selectedStoreId ?? '';
   const isSuperAdmin = user?.isSuperAdmin ?? false;
-  const isOwnerAdmin = user?.isOwnerAdmin ?? false;
+  // Angular: isOwnerAdmin = isSuperAdmin || authorizationService.hasOwnersAvailableFeature()
+  const isOwnerAdmin = user ? (isSuperAdmin || isUserAuthorized(user, [EFeatures.Owners], undefined)) : false;
 
   const [store, setStore] = useState<Store | undefined>(undefined);
   const [modules, setModules] = useState<Module[]>([]);
@@ -101,6 +104,14 @@ export function StoreEditPage() {
         isActive: values.isActive,
       };
       storeRepository.upsert(selectedStore, updatedStore);
+      // Angular parity: after edit, refresh user session (getUserByToken equivalent).
+      // React-idiomatic: fetch /me and update auth store — no page reload.
+      try {
+        const freshUser = await authHttpService.getMe();
+        updateUser(freshUser);
+      } catch {
+        // Non-critical: session refresh failure should not block navigation
+      }
       navigate('/management/stores');
     } catch {
       setError(intl.formatMessage({ id: 'STORES.ERROR' }));

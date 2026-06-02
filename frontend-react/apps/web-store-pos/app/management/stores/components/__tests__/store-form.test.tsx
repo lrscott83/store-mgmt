@@ -206,3 +206,156 @@ describe('StoreForm — PRES-4: isLoading state', () => {
     expect(screen.getByRole('button', { name: /guardando/i })).toBeDisabled();
   });
 });
+
+// ─── Finding 2: Owner select disabled in edit mode ────────────────────────────
+
+describe('StoreForm — EDIT-1: owner select disabled in edit mode', () => {
+  it('disables the owner select when isEditMode is true', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isOwnerAdmin={true}
+          isEditMode={true}
+          owners={[makeOwner()]}
+        />
+      </Wrapper>
+    );
+    const ownerSelect = screen.getByLabelText(/propietario/i) as HTMLSelectElement;
+    expect(ownerSelect.disabled).toBe(true);
+  });
+
+  it('owner select is enabled in create mode', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isOwnerAdmin={true}
+          isEditMode={false}
+          owners={[makeOwner()]}
+        />
+      </Wrapper>
+    );
+    const ownerSelect = screen.getByLabelText(/propietario/i) as HTMLSelectElement;
+    expect(ownerSelect.disabled).toBe(false);
+  });
+});
+
+// ─── Finding 3: ownerId required validation ───────────────────────────────────
+
+describe('StoreForm — VALID-1: ownerId required for ownerAdmin', () => {
+  it('blocks submit and shows error when ownerId is empty and user is ownerAdmin', async () => {
+    const { StoreForm } = await import('../store-form');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isOwnerAdmin={true}
+          isEditMode={false}
+          owners={[makeOwner()]}
+          onSubmit={onSubmit}
+        />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
+    // ownerId left empty
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+  });
+
+  it('allows submit when ownerId is selected and user is ownerAdmin', async () => {
+    const { StoreForm } = await import('../store-form');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isOwnerAdmin={true}
+          isEditMode={false}
+          owners={[makeOwner({ id: 'o1' })]}
+          onSubmit={onSubmit}
+        />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
+    fireEvent.change(screen.getByLabelText(/propietario/i), { target: { value: 'o1' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalled();
+    });
+  });
+});
+
+// ─── Finding 4: isActive defaults to false on create ─────────────────────────
+
+describe('StoreForm — INIT-1: isActive defaults false in create mode', () => {
+  it('isActive checkbox is unchecked by default in create mode for superAdmin', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isSuperAdmin={true}
+          isEditMode={false}
+        />
+      </Wrapper>
+    );
+    const isActiveCheckbox = screen.getByLabelText(/activa/i) as HTMLInputElement;
+    expect(isActiveCheckbox.checked).toBe(false);
+  });
+});
+
+// ─── Finding 13: paymentStartDate required when isSuperAdmin && isEditMode ────
+
+describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edit', () => {
+  it('blocks submit and shows error when paymentStartDate is empty for superAdmin in edit', async () => {
+    const { StoreForm } = await import('../store-form');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isSuperAdmin={true}
+          isEditMode={true}
+          onSubmit={onSubmit}
+        />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
+    // paymentStartDate left empty
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+  });
+
+  it('allows submit when paymentStartDate is set for superAdmin in edit', async () => {
+    const { StoreForm } = await import('../store-form');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isSuperAdmin={true}
+          isEditMode={true}
+          owners={[makeOwner({ id: 'o1' })]}
+          initialValues={{ ownerId: 'o1', name: 'Existing Store' }}
+          onSubmit={onSubmit}
+        />
+      </Wrapper>
+    );
+    // name is pre-filled, paymentStartDate needs to be filled
+    fireEvent.change(screen.getByLabelText(/fecha de inicio/i), { target: { value: '2024-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalled();
+    });
+  });
+});

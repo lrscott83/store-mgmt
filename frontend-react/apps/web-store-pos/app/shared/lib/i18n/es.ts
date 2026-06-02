@@ -333,6 +333,7 @@ const messages: Record<string, string> = {
   'STORES.NAME_REQUIRED': 'El nombre es obligatorio.',
   'STORES.MODULES_LABEL': 'Módulos',
   'STORES.MODULES_TOTAL': 'Total',
+  'STORES.MODULES_PRICE': 'Precio',
   'STORES.SELECT_ALL_MODULES': 'Seleccionar todos',
   'STORES.REQUIRED': 'Este campo es obligatorio.',
   'STORES.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intentá de nuevo.',

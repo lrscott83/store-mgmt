@@ -303,3 +303,59 @@ describe('StoreList — S-PRES-OPTIONAL-4: Deactivate button rendered when handl
     ).toBeInTheDocument();
   });
 });
+
+// ─── Finding 1: Approve/Disapprove gated by isSuperAdmin ──────────────────────
+
+describe('StoreList — SEC-1: Approve/Disapprove hidden for non-superAdmin', () => {
+  it('does NOT render Approve button when isSuperAdmin is false', async () => {
+    const { StoreList } = await import('../store-list');
+    const store = makeStore({ id: 's1', name: 'Store One' });
+    render(
+      <Wrapper>
+        <StoreList
+          stores={[store]}
+          isOnline={true}
+          isDegraded={false}
+          isSuperAdmin={false}
+          onCreate={vi.fn()}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          error={undefined}
+        />
+      </Wrapper>
+    );
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.APPROVE'] })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.DISAPPROVE'] })
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders Approve and Disapprove buttons when isSuperAdmin is true', async () => {
+    const { StoreList } = await import('../store-list');
+    const store = makeStore({ id: 's1', name: 'Store One' });
+    render(
+      <Wrapper>
+        <StoreList
+          stores={[store]}
+          isOnline={true}
+          isDegraded={false}
+          isSuperAdmin={true}
+          onCreate={vi.fn()}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          error={undefined}
+        />
+      </Wrapper>
+    );
+    expect(
+      screen.getByRole('button', { name: esMessages['STORES.APPROVE'] })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] })
+    ).toBeInTheDocument();
+  });
+});

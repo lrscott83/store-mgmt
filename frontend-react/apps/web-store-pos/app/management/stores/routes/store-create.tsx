@@ -5,6 +5,7 @@ import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
+import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreForm } from '~/management/stores/components/store-form';
 import type { Module, Owner } from '@store-mgmt/domain';
@@ -18,7 +19,9 @@ export function StoreCreatePage() {
   const { user } = useAuthStore();
 
   const isSuperAdmin = user?.isSuperAdmin ?? false;
-  const isOwnerAdmin = user?.isOwnerAdmin ?? false;
+  // Angular: isOwnerAdmin = isSuperAdmin || authorizationService.hasOwnersAvailableFeature()
+  // hasOwnersAvailableFeature() = isUserAuthorize([EFeatures.Owners])
+  const isOwnerAdmin = user ? (isSuperAdmin || isUserAuthorized(user, [EFeatures.Owners], undefined)) : false;
 
   const [modules, setModules] = useState<Module[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
@@ -65,7 +68,7 @@ export function StoreCreatePage() {
         approved: values.approved,
         moduleIds: values.moduleIds,
       });
-      navigate('/management/stores');
+      navigate('/management/users/create/');
     } catch {
       setError(intl.formatMessage({ id: 'STORES.ERROR' }));
     } finally {

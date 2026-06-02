@@ -1,4 +1,4 @@
-import type { AuthModel, BaseResponseModel, RegisterRequest } from '@store-mgmt/domain';
+import type { AuthModel, BaseResponseModel, RegisterRequest, UserModel } from '@store-mgmt/domain';
 import { apiClient } from './api-client';
 
 interface LoginPayload {
@@ -21,5 +21,10 @@ export const authHttpService = {
       payload
     );
     return response.data;
+  },
+
+  async getMe(): Promise<UserModel> {
+    const response = await apiClient.get<{ data: UserModel }>('/v1/auth/me');
+    return response.data.data;
   },
 };

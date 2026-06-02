@@ -5,6 +5,7 @@ interface StoreListProps {
   stores: Store[];
   isOnline: boolean;
   isDegraded: boolean;
+  isSuperAdmin?: boolean;
   onCreate: () => void;
   onEdit: (id: string) => void;
   onActivate?: (id: string) => void;
@@ -18,6 +19,7 @@ export function StoreList({
   stores,
   isOnline,
   isDegraded,
+  isSuperAdmin = false,
   onCreate,
   onEdit,
   onActivate,
@@ -94,22 +96,26 @@ export function StoreList({
                       {intl.formatMessage({ id: 'STORES.ACTIVATE' })}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => onApprove(store.id)}
-                    disabled={!isOnline}
-                    className="rounded bg-blue-100 px-2 py-1 text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
-                  >
-                    {intl.formatMessage({ id: 'STORES.APPROVE' })}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDisapprove(store.id)}
-                    disabled={!isOnline}
-                    className="rounded bg-yellow-100 px-2 py-1 text-xs font-medium hover:bg-yellow-200 disabled:opacity-50"
-                  >
-                    {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => onApprove(store.id)}
+                      disabled={!isOnline}
+                      className="rounded bg-blue-100 px-2 py-1 text-xs font-medium hover:bg-blue-200 disabled:opacity-50"
+                    >
+                      {intl.formatMessage({ id: 'STORES.APPROVE' })}
+                    </button>
+                  )}
+                  {isSuperAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => onDisapprove(store.id)}
+                      disabled={!isOnline}
+                      className="rounded bg-yellow-100 px-2 py-1 text-xs font-medium hover:bg-yellow-200 disabled:opacity-50"
+                    >
+                      {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
+                    </button>
+                  )}
                   {onDeactivate && (
                     <button
                       type="button"

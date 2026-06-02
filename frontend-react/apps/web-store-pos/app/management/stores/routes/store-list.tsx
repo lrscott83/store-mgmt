@@ -20,6 +20,7 @@ export function StoreListPage() {
   const isOnline = useOnlineStatus();
   const { user } = useAuthStore();
   const storeId = user?.selectedStoreId ?? '';
+  const isSuperAdmin = user?.isSuperAdmin ?? false;
 
   const [stores, setStores] = useState<Store[]>([]);
   const [isDegraded, setIsDegraded] = useState(false);
@@ -70,6 +71,7 @@ export function StoreListPage() {
       stores={stores}
       isOnline={isOnline}
       isDegraded={isDegraded}
+      isSuperAdmin={isSuperAdmin}
       error={error}
       onCreate={() => navigate('/management/stores/create')}
       onEdit={(id) => navigate(`/management/stores/edit/${id}`)}

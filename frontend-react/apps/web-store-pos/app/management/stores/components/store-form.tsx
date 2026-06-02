@@ -51,7 +51,7 @@ export function StoreForm({
       ? new Date(initialValues.paymentStartDate).toISOString().split('T')[0]
       : ''
   );
-  const [isActive, setIsActive] = useState(initialValues?.isActive ?? true);
+  const [isActive, setIsActive] = useState(initialValues?.isActive ?? false);
   const [moduleIds, setModuleIds] = useState<number[]>(() =>
     modules.filter((m) => m.priceIncluded || m.selected).map((m) => m.id)
   );
@@ -65,6 +65,14 @@ export function StoreForm({
     setValidationError('');
     if (!name.trim()) {
       setValidationError(intl.formatMessage({ id: 'STORES.NAME_REQUIRED' }));
+      return;
+    }
+    if (isAdminUser && !ownerId) {
+      setValidationError(intl.formatMessage({ id: 'STORES.REQUIRED' }));
+      return;
+    }
+    if (isSuperAdmin && isEditMode && !paymentStartDate) {
+      setValidationError(intl.formatMessage({ id: 'STORES.REQUIRED' }));
       return;
     }
     onSubmit({
@@ -147,7 +155,7 @@ export function StoreForm({
             id="store-owner"
             value={ownerId}
             onChange={(e) => setOwnerId(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isEditMode}
             aria-label={intl.formatMessage({ id: 'STORES.OWNER' })}
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
           >
