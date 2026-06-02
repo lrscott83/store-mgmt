@@ -56,6 +56,8 @@ export interface Owner extends AuditableBaseModel {
 export interface ReSeller extends AuditableBaseModel {
   id: string;
   userId: string;
+  // Returned by the reseller detail endpoint; omitted by the list endpoint.
+  login?: string;
   fullName: string;
   percentDiscountPrice: number;
   discountPrice: number;

@@ -77,8 +77,7 @@ export function ResellerEditPage() {
       .then((res) => {
         const r = res.data;
         setReseller(r);
-        // login is not in the domain ReSeller type but is returned by the API at runtime
-        setLogin((r as ReSeller & { login?: string }).login ?? '');
+        setLogin(r.login ?? '');
         setFullName(r.fullName);
         setIsActive(r.isActive);
         setPercentDiscountPrice(r.percentDiscountPrice);
