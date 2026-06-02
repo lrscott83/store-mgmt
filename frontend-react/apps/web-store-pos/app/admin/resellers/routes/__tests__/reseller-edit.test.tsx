@@ -1,0 +1,448 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { IntlProvider } from 'react-intl';
+import esMessages from '~/shared/lib/i18n/es';
+import type { ReSeller } from '@store-mgmt/domain';
+
+// ─── react-router mock ────────────────────────────────────────────────────────
+
+const mockNavigate = vi.fn();
+const mockParams: { id?: string } = { id: 'r42' };
+
+vi.mock('react-router', () => ({
+  useNavigate: () => mockNavigate,
+  useParams: () => mockParams,
+  useBlocker: vi.fn().mockReturnValue({ state: 'unblocked' }),
+}));
+
+// ─── superAdminLoader mock ────────────────────────────────────────────────────
+
+vi.mock('~/auth/routes/loaders', () => ({
+  superAdminLoader: vi.fn().mockResolvedValue(null),
+}));
+
+// ─── resellerHttpService mock ─────────────────────────────────────────────────
+
+vi.mock('~/admin/resellers/lib/services/reseller-http-service', () => ({
+  resellerHttpService: {
+    getReseller: vi.fn(),
+    updateReseller: vi.fn(),
+  },
+}));
+
+// ─── useUnsavedChangesPrompt mock ─────────────────────────────────────────────
+
+const mockUseUnsavedChangesPrompt = vi.fn();
+vi.mock('~/shared/lib/hooks/use-unsaved-changes-prompt', () => ({
+  useUnsavedChangesPrompt: (isDirty: boolean) => mockUseUnsavedChangesPrompt(isDirty),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockParams.id = 'r42';
+});
+
+function makeReseller(overrides: Partial<ReSeller> = {}): ReSeller {
+  return {
+    id: 'r42',
+    userId: 'u1',
+    fullName: 'John Edit',
+    percentDiscountPrice: 10,
+    discountPrice: 5,
+    cellPhone: '+53 5 123-4567',
+    email: 'john@example.com',
+    description: 'Edit reseller',
+    guest: false,
+    isActive: true,
+    createdDate: new Date('2024-01-01'),
+    createdByName: 'admin',
+    ...overrides,
+  };
+}
+
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+      {children}
+    </IntlProvider>
+  );
+}
+
+async function renderPage() {
+  const { ResellerEditPage } = await import('../reseller-edit');
+  return render(
+    <Wrapper>
+      <ResellerEditPage />
+    </Wrapper>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-1 — exports + loader
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — exports', () => {
+  it('exports a named loader = superAdminLoader', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    const mod = await import('../reseller-edit');
+    expect(typeof mod.loader).toBe('function');
+  });
+
+  it('exports ResellerEditPage as default', async () => {
+    const mod = await import('../reseller-edit');
+    expect(typeof mod.default).toBe('function');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-2 — loads by :id and pre-populates
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — load by id and pre-populate', () => {
+  it('calls getReseller(id) and pre-populates form fields', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller({
+        fullName: 'Pre-Populated Name',
+        cellPhone: '+53 5 999-8888',
+        email: 'prepopulated@example.com',
+      }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(resellerHttpService.getReseller).toHaveBeenCalledWith('r42');
+    });
+
+    await waitFor(() => {
+      const fullNameInput = screen.getByLabelText(esMessages['USERS.FULL_NAME']) as HTMLInputElement;
+      expect(fullNameInput.value).toBe('Pre-Populated Name');
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-3 — login field is disabled and NOT in PUT body
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — login disabled', () => {
+  it('login field is disabled/read-only', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      const loginInput = screen.getByLabelText(esMessages['USERS.LOGIN']) as HTMLInputElement;
+      expect(loginInput.disabled).toBe(true);
+    });
+  });
+
+  it('login is NOT included in updateReseller payload', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(resellerHttpService.updateReseller).toHaveBeenCalled();
+      const payload = vi.mocked(resellerHttpService.updateReseller).mock.calls[0][1];
+      expect(payload).not.toHaveProperty('login');
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-4 — isActive toggle
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — isActive toggle', () => {
+  it('isActive field is present and toggleable', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller({ isActive: true }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      const toggle = screen.getByLabelText(esMessages['USERS.IS_ACTIVE']) as HTMLInputElement;
+      expect(toggle.checked).toBe(true);
+      fireEvent.click(toggle);
+      expect(toggle.checked).toBe(false);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-5 — number fields have min=0
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — discount fields min=0', () => {
+  it('percentDiscountPrice and discountPrice have min=0', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      const percentInput = screen.getByLabelText(esMessages['RESELLERS.PERCENT_DISCOUNT']) as HTMLInputElement;
+      const discountInput = screen.getByLabelText(esMessages['RESELLERS.DISCOUNT_PRICE']) as HTMLInputElement;
+      expect(percentInput.min).toBe('0');
+      expect(discountInput.min).toBe('0');
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-6 — bad phone blocks PUT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — phone validation blocks PUT', () => {
+  it('shows PHONE_FORMAT error and does NOT call updateReseller when phone invalid', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.CELL_PHONE'])).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+      target: { value: 'badphone' },
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['RESELLERS.PHONE_FORMAT'])).toBeInTheDocument();
+    });
+
+    expect(resellerHttpService.updateReseller).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-7 — valid → updateReseller STAYS on page (no navigate)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — successful update stays on page', () => {
+  it('calls updateReseller and does NOT navigate away on success', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(resellerHttpService.updateReseller).toHaveBeenCalledWith(
+        'r42',
+        expect.objectContaining({
+          fullName: 'John Edit',
+          cellPhone: '+53 5 123-4567',
+          email: 'john@example.com',
+          percentDiscountPrice: 10,
+          discountPrice: 5,
+          isActive: true,
+          description: 'Edit reseller',
+        })
+      );
+    });
+
+    // STAYS on page — no navigate call
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT-8 — !succeeded → errors[0].description inline
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — server-side error', () => {
+  it('shows errors[0].description when succeeded is false', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
+      succeeded: false,
+      data: false,
+      message: '',
+      actionCode: 0,
+      errors: [{ code: 'ERR02', description: 'Update failed on server' }],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText('Update failed on server')).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT — HTTP throw → RESELLERS.ERROR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — HTTP throw on update', () => {
+  it('shows RESELLERS.ERROR when updateReseller throws', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(resellerHttpService.updateReseller).mockRejectedValue(new Error('Network error'));
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT — guard active on snapshot diff
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — unsaved changes guard', () => {
+  it('calls useUnsavedChangesPrompt with true when a field differs from loaded snapshot', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller({ fullName: 'Original Name' }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Changed Name' },
+    });
+
+    await waitFor(() => {
+      const calls = mockUseUnsavedChangesPrompt.mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).toBe(true);
+    });
+  });
+});
