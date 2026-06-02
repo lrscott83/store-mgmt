@@ -1,0 +1,329 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { IntlProvider } from 'react-intl';
+import esMessages from '~/shared/lib/i18n/es';
+
+// ─── react-router mock ────────────────────────────────────────────────────────
+
+const mockNavigate = vi.fn();
+vi.mock('react-router', () => ({
+  useNavigate: () => mockNavigate,
+  useBlocker: vi.fn().mockReturnValue({ state: 'unblocked' }),
+}));
+
+// ─── superAdminLoader mock ────────────────────────────────────────────────────
+
+vi.mock('~/auth/routes/loaders', () => ({
+  superAdminLoader: vi.fn().mockResolvedValue(null),
+}));
+
+// ─── resellerHttpService mock ─────────────────────────────────────────────────
+
+vi.mock('~/admin/resellers/lib/services/reseller-http-service', () => ({
+  resellerHttpService: {
+    createReseller: vi.fn(),
+  },
+}));
+
+// ─── useUnsavedChangesPrompt mock ─────────────────────────────────────────────
+
+const mockUseUnsavedChangesPrompt = vi.fn();
+vi.mock('~/shared/lib/hooks/use-unsaved-changes-prompt', () => ({
+  useUnsavedChangesPrompt: (isDirty: boolean) => mockUseUnsavedChangesPrompt(isDirty),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+      {children}
+    </IntlProvider>
+  );
+}
+
+async function renderPage() {
+  const { ResellerCreatePage } = await import('../reseller-create');
+  return render(
+    <Wrapper>
+      <ResellerCreatePage />
+    </Wrapper>
+  );
+}
+
+function fillValidForm() {
+  fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    target: { value: 'Jane Doe' },
+  });
+  fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
+    target: { value: 'janedoe' },
+  });
+  fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+    target: { value: 'Password1' },
+  });
+  fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+    target: { value: 'Password1' },
+  });
+  fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+    target: { value: '+53 5 123-4567' },
+  });
+  fireEvent.change(screen.getByLabelText(esMessages['USERS.EMAIL']), {
+    target: { value: 'jane@example.com' },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-1 — exports
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — exports', () => {
+  it('exports a named loader = superAdminLoader', async () => {
+    const mod = await import('../reseller-create');
+    expect(typeof mod.loader).toBe('function');
+  });
+
+  it('exports ResellerCreatePage as default', async () => {
+    const mod = await import('../reseller-create');
+    expect(typeof mod.default).toBe('function');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-2 — renders 7 fields
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — fields', () => {
+  it('renders fullName, login, password, confirmPassword, cellPhone, email, description fields', async () => {
+    await renderPage();
+
+    expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['USERS.LOGIN'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['USERS.PASSWORD'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['USERS.CELL_PHONE'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['USERS.EMAIL'])).toBeInTheDocument();
+    expect(screen.getByLabelText(/descripci/i)).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-3 — PASSWORD_REGEX fail → RESELLERS.PASSWORD_POLICY, no call
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — password regex validation', () => {
+  it('shows PASSWORD_POLICY error and does NOT call createReseller when password fails regex', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
+      target: { value: 'jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+      target: { value: 'weak' }, // fails regex
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'weak' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+      target: { value: '+53 5 123-4567' },
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['RESELLERS.PASSWORD_POLICY'])).toBeInTheDocument();
+    });
+
+    expect(resellerHttpService.createReseller).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-4 — mismatch → RESELLERS.PASSWORDS_MUST_MATCH, no call
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — password mismatch validation', () => {
+  it('shows PASSWORDS_MUST_MATCH and does NOT call createReseller when passwords differ', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
+      target: { value: 'jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'Password2' }, // mismatch
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+      target: { value: '+53 5 123-4567' },
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['RESELLERS.PASSWORDS_MUST_MATCH'])).toBeInTheDocument();
+    });
+
+    expect(resellerHttpService.createReseller).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-5 — bad phone → RESELLERS.PHONE_FORMAT, no call
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — phone format validation', () => {
+  it('shows PHONE_FORMAT error and does NOT call createReseller when phone is invalid', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
+      target: { value: 'jane' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+      target: { value: '12345' }, // invalid phone
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['RESELLERS.PHONE_FORMAT'])).toBeInTheDocument();
+    });
+
+    expect(resellerHttpService.createReseller).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-6 — valid → createReseller + navigate /admin/resellers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — successful submit', () => {
+  it('calls createReseller and navigates to /admin/resellers on success', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.createReseller).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(resellerHttpService.createReseller).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fullName: 'Jane Doe',
+          login: 'janedoe',
+          password: 'Password1',
+          cellPhone: '+53 5 123-4567',
+          email: 'jane@example.com',
+        })
+      );
+      expect(mockNavigate).toHaveBeenCalledWith('/admin/resellers');
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-7 — !succeeded → errors[0].description inline
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — server-side error', () => {
+  it('shows errors[0].description when succeeded is false', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.createReseller).mockResolvedValue({
+      succeeded: false,
+      data: false,
+      message: '',
+      actionCode: 0,
+      errors: [{ code: 'ERR01', description: 'Login already exists' }],
+    });
+
+    await renderPage();
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText('Login already exists')).toBeInTheDocument();
+    });
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-8 — throw → RESELLERS.ERROR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — HTTP throw', () => {
+  it('shows RESELLERS.ERROR when createReseller throws', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.createReseller).mockRejectedValue(new Error('Network error'));
+
+    await renderPage();
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-9 — useUnsavedChangesPrompt called with truthy isDirty
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — unsaved changes guard', () => {
+  it('calls useUnsavedChangesPrompt with truthy isDirty after typing', async () => {
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Typing something' },
+    });
+
+    await waitFor(() => {
+      const calls = mockUseUnsavedChangesPrompt.mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[0]).toBe(true);
+    });
+  });
+});
