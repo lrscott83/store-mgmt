@@ -267,3 +267,104 @@ describe('AdminDashboardPage — activeStoreCount not rendered', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE-3 (extended) — toggle back from 30-day to 7-day re-fetches last week
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminDashboardPage — toggle back to 7-day', () => {
+  it('calls getStoresLastWeek again after toggling 30-day then back to 7-day', async () => {
+    const { usageHttpService } = await import(
+      '~/admin/dashboard/lib/services/usage-http-service'
+    );
+    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
+      succeeded: true,
+      data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 3 },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(usageHttpService.getStoresLastMonth).mockResolvedValue({
+      succeeded: true,
+      data: {
+        storeUsagesCountDays: Array.from({ length: 30 }, (_, i) => i + 1),
+        activeStoreCount: 3,
+      },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminDashboardPage } = await import('../dashboard');
+    render(
+      <Wrapper>
+        <AdminDashboardPage />
+      </Wrapper>
+    );
+
+    // Wait for initial 7-day fetch
+    await waitFor(() => {
+      expect(usageHttpService.getStoresLastWeek).toHaveBeenCalledTimes(1);
+    });
+
+    // Toggle to 30-day
+    fireEvent.click(
+      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] })
+    );
+    await waitFor(() => {
+      expect(usageHttpService.getStoresLastMonth).toHaveBeenCalledTimes(1);
+    });
+
+    // Toggle back to 7-day — getStoresLastWeek must be called a second time
+    fireEvent.click(
+      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'] })
+    );
+    await waitFor(() => {
+      expect(usageHttpService.getStoresLastWeek).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE-4 (extended) — value||0 fallback when response array is shorter than labels
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminDashboardPage — value||0 fallback for missing rows', () => {
+  it('renders 0 for rows beyond the length of storeUsagesCountDays', async () => {
+    const { usageHttpService } = await import(
+      '~/admin/dashboard/lib/services/usage-http-service'
+    );
+    // Only 3 values for a 7-label window — rows 4-7 should show 0
+    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
+      succeeded: true,
+      data: { storeUsagesCountDays: [10, 20, 30], activeStoreCount: 1 },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminDashboardPage } = await import('../dashboard');
+    render(
+      <Wrapper>
+        <AdminDashboardPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(usageHttpService.getStoresLastWeek).toHaveBeenCalledTimes(1);
+    });
+
+    // Provided values must appear
+    await waitFor(() => {
+      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByText('20')).toBeInTheDocument();
+      expect(screen.getByText('30')).toBeInTheDocument();
+    });
+
+    // Missing rows (indices 3-6) must fall back to 0 — there are 4 such rows
+    await waitFor(() => {
+      const zeroCells = screen.getAllByText('0');
+      expect(zeroCells.length).toBe(4);
+    });
+  });
+});

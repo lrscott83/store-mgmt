@@ -53,11 +53,38 @@ describe('usageHttpService.getStoresLastWeek — HTTP-2: GET /v1/usages/stores-l
 describe('usageHttpService.getStoresLastMonth — HTTP-3: GET /v1/usages/stores-last-month', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+  });
+
+  it('calls GET /v1/usages/stores-last-month and returns response.data', async () => {
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    (apiClient.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        succeeded: true,
+        data: {
+          storeUsagesCountDays: Array.from({ length: 30 }, (_, i) => i + 1),
+          activeStoreCount: 10,
+        },
+        message: '',
+        actionCode: 0,
+        errors: [],
+      },
+    });
+
+    const { usageHttpService } = await import('../usage-http-service');
+    const result = await usageHttpService.getStoresLastMonth();
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/usages/stores-last-month');
+    expect(result.succeeded).toBe(true);
+    expect(result.data.storeUsagesCountDays).toHaveLength(30);
+    expect(result.data.activeStoreCount).toBe(10);
+    expect(result.message).toBe('');
+    expect(result.actionCode).toBe(0);
+    expect(result.errors).toEqual([]);
   });
 
   it('throws when apiClient.get rejects', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
+
     const { usageHttpService } = await import('../usage-http-service');
     await expect(usageHttpService.getStoresLastMonth()).rejects.toThrow('Network error');
   });
