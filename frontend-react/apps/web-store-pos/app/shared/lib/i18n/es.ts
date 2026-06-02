@@ -379,6 +379,18 @@ const messages: Record<string, string> = {
   'ADMIN_DASHBOARD.COL_VALUE': 'Valor',
   'ADMIN_DASHBOARD.ERROR': 'Ocurrió un error. Intentá de nuevo.',
 
+  // Admin — Resellers
+  'RESELLERS.LIST_TITLE': 'Revendedores',
+  'RESELLERS.ADD': 'Agregar revendedor',
+  'RESELLERS.CREATE_TITLE': 'Nuevo revendedor',
+  'RESELLERS.EDIT_TITLE': 'Editar revendedor',
+  'RESELLERS.PERCENT_DISCOUNT': 'Descuento porcentual',
+  'RESELLERS.DISCOUNT_PRICE': 'Precio con descuento',
+  'RESELLERS.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
+  'RESELLERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
+  'RESELLERS.PHONE_FORMAT': 'El teléfono debe tener formato cubano (+53 X XXX-XXXX).',
+  'RESELLERS.ERROR': 'Ocurrió un error. Intentá de nuevo.',
+
   // Admin — Features
   'FEATURES.TITLE': 'Funcionalidades',
   'FEATURES.ACTIVATE_FEATURES': 'Activar funcionalidades',

@@ -66,6 +66,11 @@ export default [
     // Admin — Dashboard
     route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx'),
 
+    // Admin — Resellers
+    route('admin/resellers', 'admin/resellers/routes/reseller-list.tsx'),
+    route('admin/resellers/create', 'admin/resellers/routes/reseller-create.tsx'),
+    route('admin/resellers/edit/:id', 'admin/resellers/routes/reseller-edit.tsx'),
+
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
