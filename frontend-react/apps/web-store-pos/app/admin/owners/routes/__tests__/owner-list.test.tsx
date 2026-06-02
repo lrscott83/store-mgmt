@@ -148,7 +148,7 @@ describe('OwnerListPage — card fields', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Jane Owner')).toBeInTheDocument();
-      expect(screen.getByText('My Reseller')).toBeInTheDocument();
+      expect(screen.getByText(/My Reseller/)).toBeInTheDocument();
       expect(screen.getByText('+53 5 555-1234')).toBeInTheDocument();
       expect(screen.getByText('jane@test.com')).toBeInTheDocument();
       expect(screen.getByText('Top owner')).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe('OwnerListPage — card fields', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('ADMIN')).toBeInTheDocument();
+      expect(screen.getByText(/ADMIN/)).toBeInTheDocument();
     });
   });
 
@@ -395,6 +395,71 @@ describe('OwnerListPage — edit navigation', () => {
     fireEvent.click(editBtn);
 
     expect(mockNavigate).toHaveBeenCalledWith('/admin/owners/edit/o42');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-OWNERS-LIST-7b — GENERAL.RESELLER label prefix in card
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerListPage — GENERAL.RESELLER label', () => {
+  it('renders the GENERAL.RESELLER label prefix before the reSellerName value', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner({ reSellerName: 'Label Reseller' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      // The paragraph should contain both the label key translation and the value
+      expect(screen.getByText(new RegExp(`${esMessages['GENERAL.RESELLER']}.*Label Reseller`))).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-OWNERS-LIST-REGRESSION — no approve / activate / deactivate buttons
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerListPage — no approve/activate/deactivate buttons', () => {
+  it('does NOT render approve, activate, or deactivate controls (Angular no-ops omitted)', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner()],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['OWNER.LIST_TITLE'])).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /aprobar|approve/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /activar|activate/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /desactivar|deactivate/i })).not.toBeInTheDocument();
   });
 });
 

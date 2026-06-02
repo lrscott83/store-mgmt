@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ReSeller } from '@store-mgmt/domain';
@@ -125,11 +125,15 @@ async function renderPage(isSuperAdmin = false) {
     });
   }
   const { OwnerCreatePage } = await import('../owner-create');
-  return render(
-    <Wrapper>
-      <OwnerCreatePage />
-    </Wrapper>
-  );
+  let result!: ReturnType<typeof render>;
+  await act(async () => {
+    result = render(
+      <Wrapper>
+        <OwnerCreatePage />
+      </Wrapper>
+    );
+  });
+  return result;
 }
 
 function fillValidForm(isSuperAdmin = false) {
@@ -368,6 +372,30 @@ describe('OwnerCreatePage — server error', () => {
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-OWNERS-CREATE-3b — submit disabled while pristine / enabled when dirty
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — submit disabled on pristine', () => {
+  it('submit button is disabled on initial render (pristine)', async () => {
+    await renderPage(false);
+
+    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(btn).toBeDisabled();
+  });
+
+  it('submit button is enabled after user edits a field (dirty)', async () => {
+    await renderPage(false);
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Something' },
+    });
+
+    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(btn).not.toBeDisabled();
   });
 });
 

@@ -414,6 +414,7 @@ const messages: Record<string, string> = {
   'GENERAL.DETAILS': 'Detalles',
   'GENERAL.STORES': 'Tiendas',
   'GENERAL.USERS': 'Usuarios',
+  'GENERAL.RESELLER': 'Revendedor',
 
   // Sync — Export / Import
   'SYNC.EXPORT_TITLE': 'Exportar datos',

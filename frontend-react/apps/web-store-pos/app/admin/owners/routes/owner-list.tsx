@@ -79,7 +79,9 @@ export function OwnerListPage() {
                     {' — '}
                     {intl.formatNumber(totalPrice, { style: 'currency', currency: 'USD' })}
                   </p>
-                  <p className="text-sm text-gray-600">{owner.reSellerName || 'ADMIN'}</p>
+                  <p className="text-sm text-gray-600">
+                    {intl.formatMessage({ id: 'GENERAL.RESELLER' })}{': '}{owner.reSellerName || 'ADMIN'}
+                  </p>
                   <p className="text-sm text-gray-600">{owner.cellPhone}</p>
                   {owner.email && (
                     <p className="text-sm text-gray-600">{owner.email}</p>
