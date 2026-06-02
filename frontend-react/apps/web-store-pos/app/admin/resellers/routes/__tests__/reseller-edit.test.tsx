@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { ReSeller } from '@store-mgmt/domain';
@@ -70,11 +70,15 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 async function renderPage() {
   const { ResellerEditPage } = await import('../reseller-edit');
-  return render(
-    <Wrapper>
-      <ResellerEditPage />
-    </Wrapper>
-  );
+  let result!: ReturnType<typeof render>;
+  await act(async () => {
+    result = render(
+      <Wrapper>
+        <ResellerEditPage />
+      </Wrapper>
+    );
+  });
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
