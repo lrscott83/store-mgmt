@@ -213,7 +213,7 @@ export function OwnerCreatePage() {
         {isSuperAdmin && (
           <div>
             <label htmlFor="reSellerId" className="block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'MENU.RESELLERS' })}
+              {intl.formatMessage({ id: 'GENERAL.RESELLER' })}
             </label>
             <select
               id="reSellerId"

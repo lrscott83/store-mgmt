@@ -542,3 +542,82 @@ describe('OwnerEditPage — unsaved changes prompt', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-EDIT-1 — submit button disabled while pristine (matches Angular:82)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — submit disabled while pristine', () => {
+  it('submit button is disabled immediately after load (pristine)', async () => {
+    await renderPage(false);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(btn).toBeDisabled();
+  });
+
+  it('submit button is enabled after user changes a field (dirty)', async () => {
+    await renderPage(false);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Changed Name' },
+    });
+
+    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(btn).not.toBeDisabled();
+  });
+
+  it('submit button is disabled again after successful save (re-snapshotted)', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    await renderPage(false);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    // Make dirty
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Changed Name' },
+    });
+
+    let btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(btn).not.toBeDisabled();
+
+    // Submit successfully
+    fireEvent.submit(btn.closest('form')!);
+
+    await waitFor(() => {
+      expect(ownerHttpService.updateOwner).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+      expect(btn).toBeDisabled();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-EDIT-2 — reSellerId label uses GENERAL.RESELLER (matches Angular:30)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — reSellerId label is GENERAL.RESELLER', () => {
+  it('reSellerId select label is the GENERAL.RESELLER translation, not MENU.RESELLERS', async () => {
+    await renderPage(true);
+
+    await waitFor(() => {
+      // GENERAL.RESELLER = 'Revendedor'; MENU.RESELLERS = 'Revendedores'
+      const label = screen.getByLabelText(esMessages['GENERAL.RESELLER']);
+      expect(label).toBeInTheDocument();
+    });
+  });
+});

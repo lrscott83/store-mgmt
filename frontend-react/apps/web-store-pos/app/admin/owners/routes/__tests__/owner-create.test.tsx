@@ -400,6 +400,22 @@ describe('OwnerCreatePage — submit disabled on pristine', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-CREATE-2 — reSellerId label uses GENERAL.RESELLER (matches Angular:30)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — reSellerId label is GENERAL.RESELLER', () => {
+  it('reSellerId select label is GENERAL.RESELLER translation, not MENU.RESELLERS', async () => {
+    await renderPage(true);
+
+    await waitFor(() => {
+      // GENERAL.RESELLER = 'Revendedor'; MENU.RESELLERS = 'Revendedores'
+      const label = screen.getByLabelText(esMessages['GENERAL.RESELLER']);
+      expect(label).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-CREATE-9 — unsaved changes prompt
 // ═══════════════════════════════════════════════════════════════════════════════
 
