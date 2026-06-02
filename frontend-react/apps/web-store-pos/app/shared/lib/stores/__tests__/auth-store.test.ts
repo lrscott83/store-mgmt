@@ -177,6 +177,21 @@ describe('useAuthStore', () => {
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
     });
+
+    it('keeps a valid session expiry when the updated user has no expiresIn (e.g. from /me)', () => {
+      // /v1/auth/me returns a profile UserModel without expiresIn; updateUser
+      // must not wipe the session expiry or the next reload would log the user out.
+      const sessionExpiry = Date.now() + THIRTY_FIVE_DAYS_MS;
+      const user = makeUser({ expiresIn: sessionExpiry });
+      useAuthStore.setState({ user, isAuthenticated: true });
+
+      const { expiresIn: _omit, ...fromMe } = makeUser({ fullName: 'Refreshed' });
+      useAuthStore.getState().updateUser(fromMe as UserModel);
+
+      const stored = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
+      expect(stored.fullName).toBe('Refreshed');
+      expect(stored.expiresIn).toBe(sessionExpiry);
+    });
   });
 
   describe('AUTH-03: Background /me on startup', () => {

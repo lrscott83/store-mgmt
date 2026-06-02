@@ -89,10 +89,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   updateUser: (user: UserModel) => {
-    const updatedUser: UserModel = { ...user, password: '' };
-    localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(updatedUser));
-    localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(updatedUser));
-    set({ user: updatedUser });
+    set((state) => {
+      // /v1/auth/me returns no expiresIn; preserve the current session expiry
+      // (or stamp a fresh one) so a refresh-after-edit never logs the user out.
+      const expiresIn =
+        user.expiresIn || state.user?.expiresIn || Date.now() + THIRTY_FIVE_DAYS_MS;
+      const updatedUser: UserModel = { ...user, expiresIn, password: '' };
+      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(updatedUser));
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    });
   },
 
   login: async (email: string, password: string): Promise<UserModel> => {
