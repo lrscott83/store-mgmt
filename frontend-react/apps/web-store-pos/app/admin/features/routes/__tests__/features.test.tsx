@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
@@ -16,6 +16,10 @@ vi.mock('~/admin/features/lib/services/feature-http-service', () => ({
     activateFeatures: vi.fn(),
   },
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -178,6 +182,52 @@ describe('FeaturesPage — error state (succeeded false)', () => {
         screen.getByText(esMessages['FEATURES.UNEXPECTED_ERROR'])
       ).toBeInTheDocument();
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE-7 — double-submit guard: second click while in-flight must be ignored
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('FeaturesPage — double-submit guard', () => {
+  it('ignores a second click while activateFeatures is already in-flight', async () => {
+    const { featureHttpService } = await import(
+      '~/admin/features/lib/services/feature-http-service'
+    );
+
+    let resolveFirst!: (v: { succeeded: boolean; data: boolean; message: string; actionCode: number; errors: unknown[] }) => void;
+    const firstCall = new Promise<{ succeeded: boolean; data: boolean; message: string; actionCode: number; errors: unknown[] }>(
+      (resolve) => { resolveFirst = resolve; }
+    );
+
+    vi.mocked(featureHttpService.activateFeatures).mockReturnValueOnce(firstCall as any);
+
+    const { FeaturesPage } = await import('../features');
+    render(
+      <Wrapper>
+        <FeaturesPage />
+      </Wrapper>
+    );
+
+    const button = screen.getByRole('button', {
+      name: esMessages['FEATURES.ACTIVATE_FEATURES'],
+    });
+
+    // First click — initiates the in-flight request
+    fireEvent.click(button);
+
+    // Second click while first is still pending — must be ignored
+    fireEvent.click(button);
+
+    // Now resolve the first call
+    resolveFirst({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['FEATURES.FEATURES_ACTIVATED'])).toBeInTheDocument();
+    });
+
+    // activateFeatures must have been called exactly once
+    expect(featureHttpService.activateFeatures).toHaveBeenCalledTimes(1);
   });
 });
 

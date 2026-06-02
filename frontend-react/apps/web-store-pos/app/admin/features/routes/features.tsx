@@ -7,10 +7,13 @@ export const loader = superAdminLoader;
 
 export function FeaturesPage() {
   const { formatMessage } = useIntl();
+  const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleActivate() {
+    if (isLoading) return;
+    setIsLoading(true);
     setSuccessMessage(null);
     setErrorMessage(null);
     try {
@@ -22,13 +25,15 @@ export function FeaturesPage() {
       }
     } catch {
       setErrorMessage(formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }));
+    } finally {
+      setIsLoading(false);
     }
   }
 
   return (
     <div>
       <h1>{formatMessage({ id: 'FEATURES.TITLE' })}</h1>
-      <button type="button" onClick={handleActivate}>
+      <button type="button" onClick={handleActivate} disabled={isLoading}>
         {formatMessage({ id: 'FEATURES.ACTIVATE_FEATURES' })}
       </button>
       {successMessage && <p>{successMessage}</p>}

@@ -326,6 +326,48 @@ describe('AdminDashboardPage — toggle back to 7-day', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PAGE-4b — succeeded:false → empty table, no throw (Angular parity)
+//   Angular guards `if (response && response.succeeded)` before consuming data.
+//   React must NOT call setData when succeeded is false or data is null.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminDashboardPage — succeeded:false leaves table empty', () => {
+  it('renders an empty table body when succeeded is false and data is null', async () => {
+    const { usageHttpService } = await import(
+      '~/admin/dashboard/lib/services/usage-http-service'
+    );
+    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
+      succeeded: false,
+      data: null as any,
+      message: 'Internal server error',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminDashboardPage } = await import('../dashboard');
+    render(
+      <Wrapper>
+        <AdminDashboardPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(usageHttpService.getStoresLastWeek).toHaveBeenCalledTimes(1);
+    });
+
+    // No error message because no exception was thrown
+    expect(screen.queryByText(esMessages['ADMIN_DASHBOARD.ERROR'])).not.toBeInTheDocument();
+
+    // Table is still rendered (categories are set before fetch)
+    expect(screen.getByRole('table')).toBeInTheDocument();
+
+    // All data cells should fall back to 0 (data array is empty, not set from null)
+    const valueCells = screen.getAllByText('0');
+    expect(valueCells.length).toBe(7);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PAGE-4 (extended) — value||0 fallback when response array is shorter than labels
 // ═══════════════════════════════════════════════════════════════════════════════
 

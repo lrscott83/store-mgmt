@@ -37,7 +37,9 @@ export function AdminDashboardPage() {
         view === '7days'
           ? await usageHttpService.getStoresLastWeek()
           : await usageHttpService.getStoresLastMonth();
-      setData(res.data.storeUsagesCountDays);
+      if (res.succeeded && res.data) {
+        setData(res.data.storeUsagesCountDays);
+      }
     } catch {
       setError(formatMessage({ id: 'ADMIN_DASHBOARD.ERROR' }));
     }
