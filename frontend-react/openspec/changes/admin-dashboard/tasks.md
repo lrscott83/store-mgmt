@@ -72,10 +72,27 @@
 ## Phase 6 — Full Suite Verification
 
 ### Task 6.1 — Run full test suite
-- [x] Done — 623 tests passing (61 files), baseline was 608 (59 files), +15 new tests, zero regressions
+- [x] Done (batch 1) — 623 tests passing (61 files), +15 new tests, zero regressions
+- [x] Done (batch 2) — 626 tests passing (61 files), +3 gap-closure tests, zero regressions
 
 ### Task 6.2 — Typecheck
-- [x] Done — `pnpm -C apps/web-store-pos exec tsc --noEmit` → zero errors
+- [x] Done (batch 1) — `pnpm -C apps/web-store-pos exec tsc --noEmit` → zero errors
+- [x] Done (batch 2) — `pnpm -C apps/web-store-pos exec tsc --noEmit` → zero errors
+
+---
+
+## Batch 2 — Gap Closure (2026-06-02)
+
+### Gap B2-1 — HTTP-3 happy path + describe label fix
+- [x] Done — `usage-http-service.test.ts`: describe block title kept accurate; added happy-path test asserting GET `/v1/usages/stores-last-month` and `response.data` shape (message='', actionCode=0, errors=[])
+
+### Gap B2-2 — S-ADMIN-DASHBOARD-PAGE-3 toggle-back-to-7
+- [x] Done — `dashboard.test.tsx`: "toggle back to 7-day" describe — clicks 30-day, waits for `getStoresLastMonth`, then clicks 7-day and asserts `getStoresLastWeek` called a second time
+
+### Gap B2-3 — S-ADMIN-DASHBOARD-PAGE-4 value||0 fallback
+- [x] Done — `dashboard.test.tsx`: "value||0 fallback" describe — response array [10,20,30] (length 3) against 7 labels; asserts 4 cells render `0`
+
+**Commit:** f516f61
 
 ---
 
