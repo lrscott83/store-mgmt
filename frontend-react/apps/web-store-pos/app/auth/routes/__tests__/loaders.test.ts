@@ -15,6 +15,7 @@ import {
   resellerLoader,
   adminFeatureLoader,
   superAdminLoader,
+  resellerFeatureLoader,
 } from '../loaders';
 import type { UserModel } from '@store-mgmt/domain';
 
@@ -225,6 +226,54 @@ describe('Route Loaders (AUTH-04)', () => {
       setAuthState(makeUser({ isSuperAdmin: true }));
       const result = await superAdminLoader();
       expect(result).toBeNull();
+    });
+  });
+
+  describe('resellerFeatureLoader — ADMIN-OWNERS-ACCESS', () => {
+    it('returns a loader function (factory)', () => {
+      const loader = resellerFeatureLoader([11]);
+      expect(typeof loader).toBe('function');
+    });
+
+    it('redirects unauthenticated user to /login (S-ADMIN-OWNERS-ACCESS-5)', async () => {
+      setAuthState(null);
+      const loader = resellerFeatureLoader([11]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.headers.get('Location')).toBe('/login');
+    });
+
+    it('redirects OwnerAdmin (non-reseller, non-superAdmin) to /unauthorized (S-ADMIN-OWNERS-ACCESS-3)', async () => {
+      setAuthState(makeUser({ isOwnerAdmin: true }));
+      const loader = resellerFeatureLoader([11]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.headers.get('Location')).toBe('/unauthorized');
+    });
+
+    it('allows SuperAdmin (S-ADMIN-OWNERS-ACCESS-1)', async () => {
+      setAuthState(makeUser({ isSuperAdmin: true, featureIds: [11] }));
+      const loader = resellerFeatureLoader([11]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeNull();
+    });
+
+    it('allows ReSeller with feature enabled (S-ADMIN-OWNERS-ACCESS-2)', async () => {
+      setAuthState(makeUser({ isReSeller: true, featureIds: [11] }));
+      const loader = resellerFeatureLoader([11]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeNull();
+    });
+
+    it('redirects ReSeller without required feature to /unauthorized (S-ADMIN-OWNERS-ACCESS-4)', async () => {
+      setAuthState(makeUser({ isReSeller: true, featureIds: [] }));
+      const loader = resellerFeatureLoader([11]);
+      const result = await loader({ params: {} } as never);
+      expect(result).toBeInstanceOf(Response);
+      const res = result as Response;
+      expect(res.headers.get('Location')).toBe('/unauthorized');
     });
   });
 

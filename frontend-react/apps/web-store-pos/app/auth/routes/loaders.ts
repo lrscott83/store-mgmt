@@ -67,6 +67,14 @@ export async function superAdminLoader(): Promise<Response | null> {
   return null;
 }
 
+export function resellerFeatureLoader(featureIds: number[]) {
+  return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
+    const resellerResult = await resellerLoader();
+    if (resellerResult) return resellerResult;
+    return featureLoader(featureIds)({ params } as LoaderFunctionArgs);
+  };
+}
+
 export async function resellerLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {

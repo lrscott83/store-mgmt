@@ -71,6 +71,11 @@ export default [
     route('admin/resellers/create', 'admin/resellers/routes/reseller-create.tsx'),
     route('admin/resellers/edit/:id', 'admin/resellers/routes/reseller-edit.tsx'),
 
+    // Admin — Owners
+    route('admin/owners', 'admin/owners/routes/owner-list.tsx'),
+    route('admin/owners/create', 'admin/owners/routes/owner-create.tsx'),
+    route('admin/owners/edit/:id', 'admin/owners/routes/owner-edit.tsx'),
+
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),

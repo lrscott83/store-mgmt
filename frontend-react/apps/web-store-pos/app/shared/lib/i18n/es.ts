@@ -397,6 +397,24 @@ const messages: Record<string, string> = {
   'FEATURES.FEATURES_ACTIVATED': 'Las funcionalidades fueron activadas correctamente.',
   'FEATURES.UNEXPECTED_ERROR': 'Ocurrió un error inesperado. Intentá de nuevo.',
 
+  // Admin — Owners
+  'OWNER.LIST_TITLE': 'Propietarios',
+  'OWNER.CREATE_TITLE': 'Nuevo propietario',
+  'OWNER.EDIT_TITLE': 'Editar propietario',
+  'OWNER.EDIT_OWNER': 'Editar propietario',
+  'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
+  'OWNER.ERROR': 'Ocurrió un error. Intentá de nuevo.',
+  'OWNER.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
+  'OWNER.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
+  'OWNER.PHONE_FORMAT': 'El teléfono debe tener formato cubano (+53 X XXX-XXXX).',
+  'OWNER.EDIT_TITLE_LABEL': 'Editar propietario',
+  'OWNER.USERS_TAB_PLACEHOLDER': 'Gestión de usuarios próximamente.',
+
+  // Admin — Owners — tab labels (uses GENERAL.DETAILS / GENERAL.STORES / GENERAL.USERS)
+  'GENERAL.DETAILS': 'Detalles',
+  'GENERAL.STORES': 'Tiendas',
+  'GENERAL.USERS': 'Usuarios',
+
   // Sync — Export / Import
   'SYNC.EXPORT_TITLE': 'Exportar datos',
   'SYNC.IMPORT_TITLE': 'Importar datos',
