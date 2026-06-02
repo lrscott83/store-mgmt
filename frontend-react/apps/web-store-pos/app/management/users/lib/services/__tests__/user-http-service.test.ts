@@ -19,20 +19,20 @@ describe('userHttpService — HTTP-1: module exists as singleton', () => {
   });
 });
 
-describe('userHttpService.listUsers — HTTP-2: GET /v1/storeusers/list/true', () => {
+describe('userHttpService.listUsers — HTTP-2: GET /v1/users/all/true', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: [{ id: 'u1', fullName: 'User One', login: 'user1', isActive: true }] },
+      data: { data: [{ id: 'u1', fullName: 'User One', isActive: true }] },
     });
   });
 
-  it('calls GET /v1/storeusers/list/true (not /users/all/true)', async () => {
+  it('calls GET /v1/users/all/true (not /storeusers/list/true)', async () => {
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     await userHttpService.listUsers();
-    expect(apiClient.get).toHaveBeenCalledWith('/v1/storeusers/list/true');
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/users/all/true');
   });
 
   it('returns the data array from the response', async () => {
@@ -43,7 +43,7 @@ describe('userHttpService.listUsers — HTTP-2: GET /v1/storeusers/list/true', (
   });
 });
 
-describe('userHttpService.getUser — HTTP-3: GET /v1/storeusers/:id', () => {
+describe('userHttpService.getUser — HTTP-3: GET /v1/users/:id', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
@@ -52,11 +52,11 @@ describe('userHttpService.getUser — HTTP-3: GET /v1/storeusers/:id', () => {
     });
   });
 
-  it('calls GET /v1/storeusers/:id with correct id', async () => {
+  it('calls GET /v1/users/:id with correct id', async () => {
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     await userHttpService.getUser('u1');
-    expect(apiClient.get).toHaveBeenCalledWith('/v1/storeusers/u1');
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/users/u1');
   });
 
   it('returns the user from the response', async () => {

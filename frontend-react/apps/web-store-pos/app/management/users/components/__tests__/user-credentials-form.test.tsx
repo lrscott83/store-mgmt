@@ -85,6 +85,61 @@ describe('UserCredentialsForm — CRED-1: valid submit fires onSubmit with {oldP
   });
 });
 
+describe('UserCredentialsForm — CRED-PWD-REGEX: password that passes mismatch check but fails regex is blocked', () => {
+  it('shows policy error when new password has no uppercase (fails regex)', async () => {
+    const { UserCredentialsForm } = await import('../UserCredentialsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserCredentialsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/contraseña actual/i), { target: { value: 'OldPass1' } });
+    fireEvent.change(screen.getByLabelText(/^nueva contraseña$/i), { target: { value: 'nouppercase1' } });
+    fireEvent.change(screen.getByLabelText(/^confirmar nueva contraseña$/i), { target: { value: 'nouppercase1' } });
+    fireEvent.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/contraseña debe/i)).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows policy error when new password has no digit (fails regex)', async () => {
+    const { UserCredentialsForm } = await import('../UserCredentialsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserCredentialsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/contraseña actual/i), { target: { value: 'OldPass1' } });
+    fireEvent.change(screen.getByLabelText(/^nueva contraseña$/i), { target: { value: 'NoDigitPass' } });
+    fireEvent.change(screen.getByLabelText(/^confirmar nueva contraseña$/i), { target: { value: 'NoDigitPass' } });
+    fireEvent.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/contraseña debe/i)).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('passes through when password satisfies regex (upper + lower + digit, 8+ chars)', async () => {
+    const { UserCredentialsForm } = await import('../UserCredentialsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserCredentialsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/contraseña actual/i), { target: { value: 'OldPass1' } });
+    fireEvent.change(screen.getByLabelText(/^nueva contraseña$/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/^confirmar nueva contraseña$/i), { target: { value: 'ValidPass1' } });
+    fireEvent.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ oldPassword: 'OldPass1', newPassword: 'ValidPass1' });
+    });
+  });
+});
+
 describe('UserCredentialsForm — PRES-9: offline disables submit and shows notice', () => {
   it('disables submit button and shows offline notice when isOnline=false', async () => {
     const { UserCredentialsForm } = await import('../UserCredentialsForm');

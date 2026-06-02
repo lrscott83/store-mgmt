@@ -1,8 +1,8 @@
 import { useIntl } from 'react-intl';
-import type { StoreUser } from '@store-mgmt/domain';
+import type { User } from '@store-mgmt/domain';
 
 interface UserListProps {
-  users: StoreUser[];
+  users: User[];
   isOnline: boolean;
   isDegraded: boolean;
   onCreate: () => void;
@@ -58,7 +58,6 @@ export function UserList({
           <thead>
             <tr className="border-b text-left text-xs font-medium text-gray-500 uppercase">
               <th className="py-2 pr-4">{intl.formatMessage({ id: 'USERS.FULL_NAME' })}</th>
-              <th className="py-2 pr-4">{intl.formatMessage({ id: 'USERS.LOGIN' })}</th>
               <th className="py-2 pr-4">{intl.formatMessage({ id: 'USERS.CELL_PHONE' })}</th>
               <th className="py-2 pr-4">{intl.formatMessage({ id: 'USERS.IS_ACTIVE' })}</th>
               <th className="py-2" />
@@ -68,7 +67,6 @@ export function UserList({
             {users.map((user) => (
               <tr key={user.id} className="border-b">
                 <td className="py-2 pr-4 font-medium">{user.fullName}</td>
-                <td className="py-2 pr-4 text-gray-600">{user.login}</td>
                 <td className="py-2 pr-4 text-gray-600">{user.cellPhone}</td>
                 <td className="py-2 pr-4">{user.isActive ? '✓' : '✗'}</td>
                 <td className="py-2 flex gap-1 flex-wrap">
@@ -80,22 +78,26 @@ export function UserList({
                   >
                     {intl.formatMessage({ id: 'USERS.EDIT' })}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onActivate(user.id)}
-                    disabled={!isOnline}
-                    className="rounded bg-green-100 px-2 py-1 text-xs font-medium hover:bg-green-200 disabled:opacity-50"
-                  >
-                    {intl.formatMessage({ id: 'USERS.ACTIVATE' })}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeactivate(user.id)}
-                    disabled={!isOnline}
-                    className="rounded bg-red-100 px-2 py-1 text-xs font-medium hover:bg-red-200 disabled:opacity-50"
-                  >
-                    {intl.formatMessage({ id: 'USERS.DEACTIVATE' })}
-                  </button>
+                  {!user.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => onActivate(user.id)}
+                      disabled={!isOnline}
+                      className="rounded bg-green-100 px-2 py-1 text-xs font-medium hover:bg-green-200 disabled:opacity-50"
+                    >
+                      {intl.formatMessage({ id: 'USERS.ACTIVATE' })}
+                    </button>
+                  )}
+                  {user.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => onDeactivate(user.id)}
+                      disabled={!isOnline}
+                      className="rounded bg-red-100 px-2 py-1 text-xs font-medium hover:bg-red-200 disabled:opacity-50"
+                    >
+                      {intl.formatMessage({ id: 'USERS.DEACTIVATE' })}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

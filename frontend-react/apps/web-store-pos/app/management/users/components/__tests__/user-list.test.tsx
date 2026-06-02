@@ -2,14 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { StoreUser } from '@store-mgmt/domain';
+import type { User } from '@store-mgmt/domain';
 
-function makeStoreUser(overrides: Partial<StoreUser> = {}): StoreUser {
+function makeUser(overrides: Partial<User> = {}): User {
   return {
     id: 'u1',
-    storeId: 's1',
-    storeName: 'Store One',
-    login: 'user1',
     fullName: 'User One',
     cellPhone: '+123',
     email: 'user@test.com',
@@ -27,7 +24,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const baseProps = {
-  users: [],
+  users: [] as User[],
   isOnline: true,
   isDegraded: false,
   onCreate: vi.fn(),
@@ -40,8 +37,8 @@ describe('UserList — PRES-1: renders user rows', () => {
   it('renders a row per user with their fullName', async () => {
     const { UserList } = await import('../UserList');
     const users = [
-      makeStoreUser({ id: 'u1', fullName: 'Alice Smith' }),
-      makeStoreUser({ id: 'u2', fullName: 'Bob Jones' }),
+      makeUser({ id: 'u1', fullName: 'Alice Smith' }),
+      makeUser({ id: 'u2', fullName: 'Bob Jones' }),
     ];
     render(
       <Wrapper>
@@ -70,7 +67,7 @@ describe('UserList — PRES-2: degraded indicator', () => {
     const { UserList } = await import('../UserList');
     render(
       <Wrapper>
-        <UserList {...baseProps} users={[makeStoreUser()]} isDegraded={true} isOnline={false} />
+        <UserList {...baseProps} users={[makeUser()]} isDegraded={true} isOnline={false} />
       </Wrapper>
     );
     expect(screen.getByText(/caché/i)).toBeInTheDocument();
@@ -81,7 +78,7 @@ describe('UserList — LIST-4: activate/deactivate callbacks fire', () => {
   it('calls onActivate with user id when activate button clicked', async () => {
     const { UserList } = await import('../UserList');
     const onActivate = vi.fn();
-    const user = makeStoreUser({ id: 'u-test', isActive: false });
+    const user = makeUser({ id: 'u-test', isActive: false });
     render(
       <Wrapper>
         <UserList {...baseProps} users={[user]} onActivate={onActivate} />
@@ -94,7 +91,7 @@ describe('UserList — LIST-4: activate/deactivate callbacks fire', () => {
   it('calls onDeactivate with user id when deactivate button clicked', async () => {
     const { UserList } = await import('../UserList');
     const onDeactivate = vi.fn();
-    const user = makeStoreUser({ id: 'u-test2', isActive: true });
+    const user = makeUser({ id: 'u-test2', isActive: true });
     render(
       <Wrapper>
         <UserList {...baseProps} users={[user]} onDeactivate={onDeactivate} />
@@ -105,6 +102,32 @@ describe('UserList — LIST-4: activate/deactivate callbacks fire', () => {
   });
 });
 
+describe('UserList — LIST-ACT-COND: Activate shown only when !isActive, Deactivate only when isActive', () => {
+  it('shows only Activate button (not Deactivate) for inactive user', async () => {
+    const { UserList } = await import('../UserList');
+    const user = makeUser({ id: 'u-inactive', isActive: false });
+    render(
+      <Wrapper>
+        <UserList {...baseProps} users={[user]} />
+      </Wrapper>
+    );
+    expect(screen.getByRole('button', { name: /^activar$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^desactivar$/i })).not.toBeInTheDocument();
+  });
+
+  it('shows only Deactivate button (not Activate) for active user', async () => {
+    const { UserList } = await import('../UserList');
+    const user = makeUser({ id: 'u-active', isActive: true });
+    render(
+      <Wrapper>
+        <UserList {...baseProps} users={[user]} />
+      </Wrapper>
+    );
+    expect(screen.getByRole('button', { name: /^desactivar$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^activar$/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('UserList — LIST-5: lifecycle buttons disabled when offline', () => {
   it('disables action buttons when isOnline=false', async () => {
     const { UserList } = await import('../UserList');
@@ -112,7 +135,7 @@ describe('UserList — LIST-5: lifecycle buttons disabled when offline', () => {
       <Wrapper>
         <UserList
           {...baseProps}
-          users={[makeStoreUser()]}
+          users={[makeUser()]}
           isOnline={false}
           isDegraded={true}
         />
@@ -151,7 +174,7 @@ describe('UserList — LIST-4: onCreate/onEdit fire', () => {
   it('calls onEdit with user id when edit button clicked', async () => {
     const { UserList } = await import('../UserList');
     const onEdit = vi.fn();
-    const user = makeStoreUser({ id: 'edit-me', fullName: 'Edit Me' });
+    const user = makeUser({ id: 'edit-me', fullName: 'Edit Me' });
     render(
       <Wrapper>
         <UserList {...baseProps} users={[user]} onEdit={onEdit} />

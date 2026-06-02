@@ -366,6 +366,7 @@ const messages: Record<string, string> = {
   'USERS.DEACTIVATE': 'Desactivar',
   'USERS.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'USERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
+  'USERS.CELL_PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'USERS.ERROR': 'Ocurrió un error. Intentá de nuevo.',
   'USERS.EDIT': 'Editar',
   'USERS.CREATE': 'Crear usuario',

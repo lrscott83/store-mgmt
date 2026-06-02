@@ -52,7 +52,8 @@ export default [
     // Management — Users
     route('management/users', 'management/users/routes/user-list.tsx'),
     route('management/users/create', 'management/users/routes/user-create.tsx'),
-    route('management/users/:id/edit', 'management/users/routes/user-edit.tsx'),
+    route('management/users/create/:storeId', 'management/users/routes/user-create.tsx'),
+    route('management/users/edit/:id', 'management/users/routes/user-edit.tsx'),
 
     // Management — Configurations
     route('management/configurations', 'management/configurations/routes/configurations.tsx'),

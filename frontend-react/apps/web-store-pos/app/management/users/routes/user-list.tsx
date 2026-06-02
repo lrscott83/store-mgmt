@@ -8,9 +8,9 @@ import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserList } from '~/management/users/components/UserList';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
-import type { StoreUser } from '@store-mgmt/domain';
+import type { User } from '@store-mgmt/domain';
 
-const userRepository = new BaseRepository<StoreUser>('storeusers', []);
+const userRepository = new BaseRepository<User>('storeusers', []);
 
 export const loader = adminFeatureLoader([EFeatures.Users]);
 
@@ -21,7 +21,7 @@ export function UserListPage() {
   const { user } = useAuthStore();
   const storeId = user?.selectedStoreId ?? '';
 
-  const [users, setUsers] = useState<StoreUser[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isDegraded, setIsDegraded] = useState(false);
   const [error, setError] = useState('');
 
@@ -71,7 +71,7 @@ export function UserListPage() {
       isDegraded={isDegraded}
       error={error}
       onCreate={() => navigate('/management/users/create')}
-      onEdit={(id) => navigate(`/management/users/${id}/edit`)}
+      onEdit={(id) => navigate(`/management/users/edit/${id}`)}
       onActivate={(id) => handleLifecycleAction(userHttpService.activateUser, id)}
       onDeactivate={(id) => handleLifecycleAction(userHttpService.deactivateUser, id)}
     />

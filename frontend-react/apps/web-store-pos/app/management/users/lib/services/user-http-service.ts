@@ -1,4 +1,4 @@
-import type { BaseResponseModel, StoreUser } from '@store-mgmt/domain';
+import type { BaseResponseModel, User } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
 interface CreateUserPayload {
@@ -24,16 +24,16 @@ interface ChangePasswordPayload {
 }
 
 export const userHttpService = {
-  async listUsers(): Promise<BaseResponseModel<StoreUser[]>> {
-    const response = await apiClient.get<BaseResponseModel<StoreUser[]>>(
-      '/v1/storeusers/list/true'
+  async listUsers(): Promise<BaseResponseModel<User[]>> {
+    const response = await apiClient.get<BaseResponseModel<User[]>>(
+      '/v1/users/all/true'
     );
     return response.data;
   },
 
-  async getUser(id: string): Promise<BaseResponseModel<StoreUser>> {
-    const response = await apiClient.get<BaseResponseModel<StoreUser>>(
-      `/v1/storeusers/${id}`
+  async getUser(id: string): Promise<BaseResponseModel<User>> {
+    const response = await apiClient.get<BaseResponseModel<User>>(
+      `/v1/users/${id}`
     );
     return response.data;
   },

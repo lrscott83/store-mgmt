@@ -76,6 +76,42 @@ describe('UserDetailsForm — EDIT-3: pre-fills from initialValues', () => {
   });
 });
 
+describe('UserDetailsForm — DET-CELL-REQ: cellPhone is required', () => {
+  it('shows required error and blocks submit when cellPhone is empty', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Alice' } });
+    // Leave cellPhone empty
+    fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/teléfono es obligatorio/i)).toBeInTheDocument();
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('does not show required error when cellPhone is filled', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Alice' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+123' } });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalled();
+    });
+    expect(screen.queryByText(/teléfono es obligatorio/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('UserDetailsForm — PRES-9: valid submit fires onSubmit', () => {
   it('calls onSubmit with form values when submitted', async () => {
     const { UserDetailsForm } = await import('../UserDetailsForm');

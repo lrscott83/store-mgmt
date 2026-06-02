@@ -26,9 +26,16 @@ export function UserCredentialsForm({
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [validationError, setValidationError] = useState('');
 
+  const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValidationError('');
+
+    if (!PASSWORD_REGEX.test(newPassword)) {
+      setValidationError(intl.formatMessage({ id: 'USERS.PASSWORD_POLICY' }));
+      return;
+    }
 
     if (newPassword !== confirmNewPassword) {
       setValidationError(intl.formatMessage({ id: 'USERS.PASSWORDS_MUST_MATCH' }));

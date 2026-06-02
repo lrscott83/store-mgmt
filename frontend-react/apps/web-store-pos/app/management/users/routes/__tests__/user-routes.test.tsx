@@ -2,17 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { StoreUser } from '@store-mgmt/domain';
+import type { User } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 
 // ─── Domain factories ─────────────────────────────────────────────────────────
 
-function makeStoreUser(overrides: Partial<StoreUser> = {}): StoreUser {
+function makeDomainUser(overrides: Partial<User> = {}): User {
   return {
     id: 'u1',
-    storeId: 's1',
-    storeName: 'Store One',
-    login: 'user1',
     fullName: 'User One',
     cellPhone: '+123',
     email: 'user@test.com',
@@ -137,7 +134,7 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
     mockUser = makeUser();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockListUsers = vi.fn().mockResolvedValue({ data: [makeStoreUser({ fullName: 'Alice Smith' })] });
+    mockListUsers = vi.fn().mockResolvedValue({ data: [makeDomainUser({ fullName: 'Alice Smith' })] });
   });
 
   it('fetches users on mount and renders them', async () => {
@@ -173,7 +170,7 @@ describe('UserListPage — S-LIST-3: offline + cache fallback', () => {
     mockIsOnline = false;
     localStorageMock.clear();
     const cacheKey = `lizoft.store-storeusers-s1`;
-    const cachedUser = makeStoreUser({ fullName: 'Cached User' });
+    const cachedUser = makeDomainUser({ fullName: 'Cached User' });
     localStorageMock.setItem(cacheKey, JSON.stringify([[cachedUser.id, cachedUser]]));
     mockListUsers = vi.fn();
   });
@@ -210,7 +207,8 @@ describe('UserListPage — S-LIST-5: lifecycle buttons online (re-enabled)', () 
     vi.clearAllMocks();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockListUsers = vi.fn().mockResolvedValue({ data: [makeStoreUser({ fullName: 'User Z', id: 'uz' })] });
+    // Use isActive:false so the Activate button is visible after the conditional fix
+    mockListUsers = vi.fn().mockResolvedValue({ data: [makeDomainUser({ fullName: 'User Z', id: 'uz', isActive: false })] });
     mockActivateUser = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -348,7 +346,7 @@ describe('UserEditPage — S-EDIT-1: pre-fills UserDetailsForm after getById', (
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeStoreUser({ fullName: 'Pre-filled Name' }) });
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Pre-filled Name' }) });
   });
 
   it('pre-fills the fullName input from the fetched user', async () => {
@@ -366,7 +364,7 @@ describe('UserEditPage — S-EDIT-2: details submit calls updateUserDetails', ()
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeStoreUser({ fullName: 'Existing User' }) });
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Existing User' }) });
     mockUpdateUserDetails = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -387,7 +385,7 @@ describe('UserEditPage — S-EDIT-3: credentials submit calls changePassword', (
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeStoreUser() });
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser() });
     mockChangePassword = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -411,7 +409,7 @@ describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = false;
     mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeStoreUser() });
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser() });
   });
 
   it('details submit is disabled when offline', async () => {
@@ -428,7 +426,7 @@ describe('UserEditPage — S-EDIT-5: credentials form offline blocked', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = false;
     mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeStoreUser() });
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser() });
   });
 
   it('credentials submit is disabled when offline', async () => {
@@ -445,7 +443,7 @@ describe('UserEditPage — S-EDIT-6: isActive hidden for non-admin', () => {
     mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: false });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeStoreUser() });
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser() });
   });
 
   it('does not show isActive toggle for regular (non-admin) user', async () => {
@@ -496,11 +494,58 @@ describe('adminFeatureLoader — ACCESS-4: all 3 user routes export named loader
     expect(typeof mod.loader).toBe('function');
   });
 
-  it('route param shape is :id/edit (id before edit)', () => {
-    // ROUTE-3: /management/users/:id/edit — NOT /management/users/edit/:id
-    // Asserting the design decision: :id param precedes /edit segment
-    const routePath = 'management/users/:id/edit';
-    expect(routePath).toMatch(/:\w+\/edit$/);
-    expect(routePath).not.toMatch(/edit\/:\w+$/);
+  it('ROUTE-EDIT-SHAPE: edit route uses /edit/:id (matching Angular + React convention)', () => {
+    // Angular: management/users/edit/:id
+    // React convention (resellers, owners): /admin/resellers/edit/:id, /admin/owners/edit/:id
+    const routePath = 'management/users/edit/:id';
+    expect(routePath).toMatch(/\/edit\/:\w+$/);
+    expect(routePath).not.toMatch(/\/:\w+\/edit$/);
+  });
+});
+
+describe('UserCreatePage — ROUTE-STOREID: resolves storeId from :storeId param or auth fallback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsOnline = true;
+  });
+
+  it('uses :storeId param when provided (deep-link from store create)', async () => {
+    mockUser = makeUser({ selectedStoreId: 'fallback-store' });
+    mockParams = { storeId: 'param-store' };
+    mockCreateUser = vi.fn().mockResolvedValue({ data: true });
+    const { UserCreatePage } = await import('../user-create');
+    render(<Wrapper><UserCreatePage /></Wrapper>);
+    await waitFor(() => screen.getByLabelText(/nombre completo/i));
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User A' } });
+    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'usera' } });
+    fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(mockCreateUser).toHaveBeenCalledWith(
+        expect.objectContaining({ storeId: 'param-store' })
+      );
+    });
+  });
+
+  it('falls back to selectedStoreId when :storeId param is absent (bare redirect)', async () => {
+    mockUser = makeUser({ selectedStoreId: 'fallback-store' });
+    mockParams = {};
+    mockCreateUser = vi.fn().mockResolvedValue({ data: true });
+    const { UserCreatePage } = await import('../user-create');
+    render(<Wrapper><UserCreatePage /></Wrapper>);
+    await waitFor(() => screen.getByLabelText(/nombre completo/i));
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User B' } });
+    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'userb' } });
+    fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+222' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(mockCreateUser).toHaveBeenCalledWith(
+        expect.objectContaining({ storeId: 'fallback-store' })
+      );
+    });
   });
 });

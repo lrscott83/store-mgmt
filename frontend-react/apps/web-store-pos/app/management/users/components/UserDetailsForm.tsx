@@ -31,9 +31,17 @@ export function UserDetailsForm({
   const [cellPhone, setCellPhone] = useState(initialValues?.cellPhone ?? '');
   const [email, setEmail] = useState(initialValues?.email ?? '');
   const [isActive, setIsActive] = useState(initialValues?.isActive ?? true);
+  const [cellPhoneError, setCellPhoneError] = useState('');
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setCellPhoneError('');
+
+    if (!cellPhone.trim()) {
+      setCellPhoneError(intl.formatMessage({ id: 'USERS.CELL_PHONE_REQUIRED' }));
+      return;
+    }
+
     onSubmit({ fullName, cellPhone, email, isActive });
   }
 
@@ -73,9 +81,12 @@ export function UserDetailsForm({
           id="cellPhone"
           type="text"
           value={cellPhone}
-          onChange={(e) => setCellPhone(e.target.value)}
+          onChange={(e) => { setCellPhone(e.target.value); setCellPhoneError(''); }}
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {cellPhoneError && (
+          <p className="mt-1 text-xs text-red-600">{cellPhoneError}</p>
+        )}
       </div>
 
       <div>

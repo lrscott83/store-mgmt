@@ -8,7 +8,7 @@ import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserDetailsForm } from '~/management/users/components/UserDetailsForm';
 import { UserCredentialsForm } from '~/management/users/components/UserCredentialsForm';
-import type { StoreUser } from '@store-mgmt/domain';
+import type { User } from '@store-mgmt/domain';
 
 export const loader = adminFeatureLoader([EFeatures.Users]);
 
@@ -23,7 +23,7 @@ export function UserEditPage() {
   const isOwnerAdmin = user?.isOwnerAdmin ?? false;
   const canToggleActive = isSuperAdmin || isOwnerAdmin;
 
-  const [storeUser, setStoreUser] = useState<StoreUser | undefined>(undefined);
+  const [storeUser, setStoreUser] = useState<User | undefined>(undefined);
   const [loadError, setLoadError] = useState('');
 
   const [detailsLoading, setDetailsLoading] = useState(false);
