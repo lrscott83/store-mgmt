@@ -370,6 +370,15 @@ const messages: Record<string, string> = {
   'USERS.CREATE': 'Crear usuario',
   'USERS.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intentá de nuevo.',
 
+  // Admin — Dashboard
+  'ADMIN_DASHBOARD.HEADER': 'Panel de Control',
+  'ADMIN_DASHBOARD.TITLE': 'Estadísticas de Tiendas Activos',
+  'ADMIN_DASHBOARD.LAST_7_DAYS': 'Últimos 7 días',
+  'ADMIN_DASHBOARD.LAST_30_DAYS': 'Últimos 30 días',
+  'ADMIN_DASHBOARD.COL_CATEGORY': 'Categoría',
+  'ADMIN_DASHBOARD.COL_VALUE': 'Valor',
+  'ADMIN_DASHBOARD.ERROR': 'Ocurrió un error. Intentá de nuevo.',
+
   // Admin — Features
   'FEATURES.TITLE': 'Funcionalidades',
   'FEATURES.ACTIVATE_FEATURES': 'Activar funcionalidades',

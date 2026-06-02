@@ -63,6 +63,9 @@ export default [
     // Admin — Stores
     route('admin/stores', 'admin/stores/routes/store-list.tsx'),
 
+    // Admin — Dashboard
+    route('admin/dashboard', 'admin/dashboard/routes/dashboard.tsx'),
+
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
