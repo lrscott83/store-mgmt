@@ -309,6 +309,31 @@ describe('ResellerCreatePage — HTTP throw', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-CREATE-10 — submit button disabled while pristine (Angular parity)
+// Angular: [disabled]="formGroup.pristine" on create-reseller.component.html line 114
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — submit disabled while pristine', () => {
+  it('submit button is disabled on initial render (form pristine)', async () => {
+    await renderPage();
+
+    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(submitBtn).toBeDisabled();
+  });
+
+  it('submit button becomes enabled after any field is changed', async () => {
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Jane' },
+    });
+
+    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(submitBtn).not.toBeDisabled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-RESELLERS-CREATE-9 — useUnsavedChangesPrompt called with truthy isDirty
 // ═══════════════════════════════════════════════════════════════════════════════
 

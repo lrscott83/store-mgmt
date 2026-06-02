@@ -417,6 +417,105 @@ describe('ResellerEditPage — HTTP throw on update', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// S-ADMIN-RESELLERS-EDIT — submit disabled while pristine (Angular parity)
+// Angular: [disabled]="formGroup.pristine" on edit-reseller-details.component.html line 95
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — submit disabled while pristine', () => {
+  it('submit button is disabled immediately after data loads (snapshot matches fields)', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(submitBtn).toBeDisabled();
+  });
+
+  it('submit button becomes enabled after a field is changed from the loaded snapshot', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller({ fullName: 'Original Name' }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Changed Name' },
+    });
+
+    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    expect(submitBtn).not.toBeDisabled();
+  });
+
+  it('submit button goes back to disabled after successful save re-snapshots', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller({ fullName: 'Original' }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    // Make it dirty
+    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+      target: { value: 'Changed' },
+    });
+
+    // Submit
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+
+    // After save, re-snapshot → button should be disabled again
+    await waitFor(() => {
+      expect(resellerHttpService.updateReseller).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+      expect(submitBtn).toBeDisabled();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-RESELLERS-EDIT — guard active on snapshot diff
 // ═══════════════════════════════════════════════════════════════════════════════
 
