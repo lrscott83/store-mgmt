@@ -41,7 +41,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
     cellPhone: '+54911',
     isActive: true,
     password: '',
-    login: 'juan@test.com',
+    login: 'jperez',
     authToken: 'tok',
     refreshToken: 'ref',
     expiresIn: Date.now() + 35 * 24 * 60 * 60 * 1000,
@@ -91,34 +91,34 @@ describe('Navbar — S-NAV-1: both profile links render in user dropdown', () =>
     vi.clearAllMocks();
   });
 
-  it('shows Editar perfil link when dropdown is open', () => {
+  it('shows Editar Perfil link when dropdown is open', () => {
     render(
       <Wrapper>
-        <Navbar onSidebarToggle={vi.fn()} />
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
-    expect(screen.getByText('Editar perfil')).toBeInTheDocument();
+    expect(screen.getByText('Editar Perfil')).toBeInTheDocument();
   });
 
-  it('shows Cambiar contraseña link when dropdown is open', () => {
+  it('shows Cambiar Contraseña link when dropdown is open', () => {
     render(
       <Wrapper>
-        <Navbar onSidebarToggle={vi.fn()} />
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
-    expect(screen.getByText('Cambiar contraseña')).toBeInTheDocument();
+    expect(screen.getByText('Cambiar Contraseña')).toBeInTheDocument();
   });
 
-  it('logout link is still present in the dropdown', () => {
+  it('logout link uses Angular exact "Salir" label (GENERAL.LOGOUT)', () => {
     render(
       <Wrapper>
-        <Navbar onSidebarToggle={vi.fn()} />
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
-    expect(screen.getByText('Cerrar sesión')).toBeInTheDocument();
+    expect(screen.getByText('Salir')).toBeInTheDocument();
   });
 });
 
@@ -127,34 +127,105 @@ describe('Navbar — S-NAV-2: clicking profile links closes the dropdown', () =>
     vi.clearAllMocks();
   });
 
-  it('closes dropdown when Editar perfil link is clicked', () => {
+  it('closes dropdown when Editar Perfil link is clicked', () => {
     render(
       <Wrapper>
-        <Navbar onSidebarToggle={vi.fn()} />
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
     // Open dropdown
     fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
-    expect(screen.getByText('Editar perfil')).toBeInTheDocument();
+    expect(screen.getByText('Editar Perfil')).toBeInTheDocument();
 
     // Click the link
-    fireEvent.click(screen.getByText('Editar perfil'));
+    fireEvent.click(screen.getByText('Editar Perfil'));
 
     // Dropdown should be closed (link should no longer be visible via the dropdown)
-    expect(screen.queryByText('Cambiar contraseña')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cambiar Contraseña')).not.toBeInTheDocument();
   });
 
-  it('closes dropdown when Cambiar contraseña link is clicked', () => {
+  it('closes dropdown when Cambiar Contraseña link is clicked', () => {
     render(
       <Wrapper>
-        <Navbar onSidebarToggle={vi.fn()} />
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
-    expect(screen.getByText('Cambiar contraseña')).toBeInTheDocument();
+    expect(screen.getByText('Cambiar Contraseña')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('Cambiar contraseña'));
+    fireEvent.click(screen.getByText('Cambiar Contraseña'));
 
-    expect(screen.queryByText('Editar perfil')).not.toBeInTheDocument();
+    expect(screen.queryByText('Editar Perfil')).not.toBeInTheDocument();
+  });
+});
+
+describe('Navbar — S-NAV-3: sidebar collapse toggle moved into header (Angular nav-left position)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls onSidebarToggle when the header toggle button is clicked', () => {
+    const onSidebarToggle = vi.fn();
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={onSidebarToggle} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }));
+    expect(onSidebarToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders an unfold-style icon when the sidebar is collapsed', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    const toggle = screen.getByRole('button', { name: /toggle sidebar/i });
+    expect(toggle.querySelector('[data-icon="menu-unfold"]')).toBeInTheDocument();
+  });
+
+  it('renders a fold-style icon when the sidebar is expanded', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={true} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    const toggle = screen.getByRole('button', { name: /toggle sidebar/i });
+    expect(toggle.querySelector('[data-icon="menu-fold"]')).toBeInTheDocument();
+  });
+});
+
+describe('Navbar — S-NAV-4: user menu trigger is a plain person icon (Angular header-user-profile)', () => {
+  it('does not render the cyan avatar initial', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('J')).not.toBeInTheDocument();
+  });
+
+  it('shows the user login (not email) in the dropdown header', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    expect(screen.getByText('jperez')).toBeInTheDocument();
+    expect(screen.queryByText('juan@test.com')).not.toBeInTheDocument();
+  });
+});
+
+describe('Navbar — S-NAV-5: help icon has the Angular gray-pill background', () => {
+  it('applies bg-gray-200 to the tutorial/help link', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    const helpLink = screen.getByRole('link', { name: /tutorial/i });
+    expect(helpLink.className).toContain('bg-gray-200');
   });
 });

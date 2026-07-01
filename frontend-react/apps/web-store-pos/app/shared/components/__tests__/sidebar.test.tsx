@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { IntlProvider } from 'react-intl';
 import type { UserModel } from '@store-mgmt/domain';
@@ -57,17 +56,15 @@ const makeStoreUser = (featureIds: number[], storeId = 's1'): UserModel => ({
 });
 
 function renderSidebar(user: UserModel, isOpen = true) {
-  const onToggle = vi.fn();
   vi.mocked(useAuthStore).mockReturnValue({ user } as ReturnType<typeof useAuthStore>);
 
   render(
     <IntlProvider locale="es" messages={esMessages}>
       <MemoryRouter>
-        <Sidebar isOpen={isOpen} onToggle={onToggle} />
+        <Sidebar isOpen={isOpen} />
       </MemoryRouter>
     </IntlProvider>
   );
-  return { onToggle };
 }
 
 describe('Sidebar — SHELL-02 permission-filtered menu', () => {
@@ -97,30 +94,31 @@ describe('Sidebar — SHELL-02 permission-filtered menu', () => {
     expect(links.length).toBeGreaterThan(0);
     // Should NOT see admin items (featureId 16, 15, etc.)
     const linkTexts = links.map((l) => l.textContent ?? '');
-    expect(linkTexts.some((t) => t.includes('Panel de Admin') || t.includes('Tiendas (Admin)'))).toBe(false);
+    // Angular exact strings: MENU.ADMIN.DASHBOARD = 'Dashboard', MENU.ADMIN.STORES = 'Tiendas'
+    expect(linkTexts.some((t) => t.includes('Dashboard'))).toBe(false);
   });
 
   it('StoreUser with Sale feature sees Sale link', () => {
     const user = makeStoreUser([EFeatures.Sale], 's1');
     renderSidebar(user);
 
-    // The Sale link key is MENU.SALE rendered as 'Venta'
-    expect(screen.getByText('Venta')).toBeInTheDocument();
+    // The Sale link key is MENU.SALE rendered as Angular's exact 'Vender' (MENU.SALE_MGMT.SALE)
+    expect(screen.getByText('Vender')).toBeInTheDocument();
   });
 
   it('StoreUser without Sale feature does NOT see Sale link', () => {
     const user = makeStoreUser([EFeatures.Products], 's1');
     renderSidebar(user);
 
-    // Sale (MENU.SALE -> 'Venta') should not appear
-    expect(screen.queryByText('Venta')).not.toBeInTheDocument();
+    // Sale (MENU.SALE -> 'Vender') should not appear
+    expect(screen.queryByText('Vender')).not.toBeInTheDocument();
   });
 
   it('SuperAdmin sees Sale and Admin items', () => {
     renderSidebar(makeSuperAdmin());
 
-    expect(screen.getByText('Venta')).toBeInTheDocument();
-    expect(screen.getByText('Panel de Admin')).toBeInTheDocument();
+    expect(screen.getByText('Vender')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
   it('renders nothing for user with no features', () => {
@@ -130,15 +128,6 @@ describe('Sidebar — SHELL-02 permission-filtered menu', () => {
     // No feature-gated links should appear
     const links = screen.queryAllByRole('link');
     expect(links.length).toBe(0);
-  });
-
-  it('toggle button calls onToggle', async () => {
-    const user = userEvent.setup();
-    const { onToggle } = renderSidebar(makeSuperAdmin(), true);
-
-    const toggleBtn = screen.getByRole('button', { name: /toggle sidebar/i });
-    await user.click(toggleBtn);
-    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
   it('renders closed sidebar when isOpen is false', () => {

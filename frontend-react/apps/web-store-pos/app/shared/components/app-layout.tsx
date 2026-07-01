@@ -10,26 +10,23 @@ export const clientLoader = authLoader;
 
 const MOBILE_BREAKPOINT = 1025;
 
+/**
+ * Sidebar defaults to COLLAPSED (user preference — overrides Angular's
+ * expanded-by-default nav). Resize only ever auto-CLOSES the sidebar when
+ * crossing into mobile width; it never force-opens it back on desktop,
+ * since the collapsed default must survive resizes too.
+ */
 function useAutoCollapseSidebar(): [boolean, React.Dispatch<React.SetStateAction<boolean>>] {
-  const [isOpen, setIsOpen] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth >= MOBILE_BREAKPOINT;
-    }
-    return true;
-  });
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     function handleResize() {
       if (window.innerWidth < MOBILE_BREAKPOINT) {
         setIsOpen(false);
-      } else {
-        setIsOpen(true);
       }
     }
 
     window.addEventListener('resize', handleResize);
-    // Run on mount to set initial state
-    handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -50,11 +47,11 @@ export function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Sidebar */}
-      <Sidebar isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen((v) => !v)} />
+      <Sidebar isOpen={isSidebarOpen} />
 
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar onSidebarToggle={() => setIsSidebarOpen((v) => !v)} />
+        <Navbar isSidebarOpen={isSidebarOpen} onSidebarToggle={() => setIsSidebarOpen((v) => !v)} />
         <Breadcrumbs />
         <main className="flex-1 overflow-y-auto p-4">
           <Outlet />
