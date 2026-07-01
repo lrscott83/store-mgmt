@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { useNavigate, Link } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { CartShell } from './cart-shell';
 
 interface NavbarProps {
@@ -14,6 +15,9 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(userMenuRef, () => setIsUserMenuOpen(false));
 
   function handleLogout() {
     logout();
@@ -57,7 +61,7 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
         <CartShell />
 
         {/* User dropdown — trigger is a plain person icon, matches Angular's header-user-profile */}
-        <div className="relative">
+        <div className="relative" ref={userMenuRef}>
           <button
             type="button"
             onClick={() => setIsUserMenuOpen((v) => !v)}

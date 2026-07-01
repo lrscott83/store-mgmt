@@ -229,3 +229,39 @@ describe('Navbar — S-NAV-5: help icon has the Angular gray-pill background', (
     expect(helpLink.className).toContain('bg-gray-200');
   });
 });
+
+describe('Navbar — S-NAV-6: user menu dropdown closes on outside click', () => {
+  it('closes the dropdown when clicking outside it', () => {
+    render(
+      <Wrapper>
+        <div>
+          <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+          <div data-testid="outside-area">outside</div>
+        </div>
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    expect(screen.getByText('Editar Perfil')).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByTestId('outside-area'));
+
+    expect(screen.queryByText('Editar Perfil')).not.toBeInTheDocument();
+  });
+
+  it('does not close the dropdown when clicking inside it', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    const editProfileLink = screen.getByText('Editar Perfil');
+    expect(editProfileLink).toBeInTheDocument();
+
+    fireEvent.mouseDown(editProfileLink);
+
+    expect(screen.getByText('Editar Perfil')).toBeInTheDocument();
+  });
+});

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { PaymentType } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 
 export function CartShell() {
@@ -10,6 +11,9 @@ export function CartShell() {
   const [isOpen, setIsOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const cartRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(cartRef, () => setIsOpen(false));
   const {
     items,
     paymentType,
@@ -60,7 +64,7 @@ export function CartShell() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={cartRef}>
       {/* Cart button with badge */}
       <button
         type="button"

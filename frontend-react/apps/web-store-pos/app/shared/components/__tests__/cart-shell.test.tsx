@@ -153,3 +153,42 @@ describe('CartShell — submit action validation', () => {
     });
   });
 });
+
+describe('CartShell — CART-05: dropdown closes on outside click', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+  });
+
+  it('closes the cart panel when clicking outside it', () => {
+    render(
+      <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
+        <div>
+          <CartShell />
+          <div data-testid="outside-area">outside</div>
+        </div>
+      </IntlProvider>,
+    );
+
+    const cartButton = screen.getByRole('button', { name: /carrito/i });
+    fireEvent.click(cartButton);
+    expect(screen.getByText('Carrito')).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByTestId('outside-area'));
+
+    expect(screen.queryByText('Carrito')).not.toBeInTheDocument();
+  });
+
+  it('does not close the cart panel when clicking inside it', () => {
+    renderCartShell();
+
+    const cartButton = screen.getByRole('button', { name: /carrito/i });
+    fireEvent.click(cartButton);
+    const title = screen.getByText('Carrito');
+    expect(title).toBeInTheDocument();
+
+    fireEvent.mouseDown(title);
+
+    expect(screen.getByText('Carrito')).toBeInTheDocument();
+  });
+});
