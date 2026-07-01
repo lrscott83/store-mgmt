@@ -4,6 +4,8 @@ import type { Product, ProductCategory } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Button } from '~/shared/components/ui/button';
+import { Card } from '~/shared/components/ui/card';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import { CategoryProductList } from '../components/category-product-list';
@@ -140,66 +142,45 @@ export function ProductsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">
-          {intl.formatMessage({ id: 'PRODUCTS.TITLE' })}
-        </h1>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setModal({ type: 'csv' })}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-            data-testid="import-csv-button"
-          >
-            {intl.formatMessage({ id: 'PRODUCTS.IMPORT_CSV' })}
-          </button>
-          <button
-            type="button"
-            onClick={() => setModal({ type: 'bulk' })}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-            data-testid="bulk-edit-button"
-          >
-            {intl.formatMessage({ id: 'PRODUCTS.BULK_EDIT' })}
-          </button>
-          <button
-            type="button"
-            onClick={() => setModal({ type: 'category' })}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-            data-testid="add-category-button"
-          >
-            {intl.formatMessage({ id: 'PRODUCTS.CATEGORY.CREATE' })}
-          </button>
-          <button
-            type="button"
-            onClick={() => setModal({ type: 'create' })}
-            className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-700"
-            data-testid="create-product-button"
-          >
-            {intl.formatMessage({ id: 'PRODUCTS.CREATE' })}
-          </button>
+      <Card
+        title={intl.formatMessage({ id: 'PRODUCTS.TITLE' })}
+        footer={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
+              {intl.formatMessage({ id: 'PRODUCTS.IMPORT_CSV' })}
+            </Button>
+            <Button variant="outline" onClick={() => setModal({ type: 'bulk' })} data-testid="bulk-edit-button">
+              {intl.formatMessage({ id: 'PRODUCTS.BULK_EDIT' })}
+            </Button>
+            <Button variant="outline" onClick={() => setModal({ type: 'category' })} data-testid="add-category-button">
+              {intl.formatMessage({ id: 'PRODUCTS.CATEGORY.CREATE' })}
+            </Button>
+            <Button onClick={() => setModal({ type: 'create' })} data-testid="create-product-button">
+              {intl.formatMessage({ id: 'PRODUCTS.CREATE' })}
+            </Button>
+          </div>
+        }
+      >
+        {/* Search */}
+        <div className="mb-4">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
+            className="w-full max-w-sm rounded-md border border-border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            data-testid="products-search-input"
+          />
         </div>
-      </div>
 
-      {/* Search */}
-      <div>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
-          className="w-full max-w-sm rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
-          data-testid="products-search-input"
+        {/* Product list */}
+        <CategoryProductList
+          categories={categories}
+          products={products}
+          searchQuery={searchQuery}
+          onEdit={(product) => setModal({ type: 'edit', product })}
         />
-      </div>
-
-      {/* Product list */}
-      <CategoryProductList
-        categories={categories}
-        products={products}
-        searchQuery={searchQuery}
-        onEdit={(product) => setModal({ type: 'edit', product })}
-      />
+      </Card>
 
       {/* Modals */}
       {modal?.type === 'create' && (

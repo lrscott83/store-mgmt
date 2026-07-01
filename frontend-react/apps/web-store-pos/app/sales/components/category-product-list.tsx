@@ -1,5 +1,6 @@
 import { useIntl } from 'react-intl';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
+import { InfoBox } from '~/shared/components/ui/info-box';
 
 interface CategoryProductListProps {
   categories: ProductCategory[];
@@ -51,7 +52,7 @@ export function CategoryProductList({ categories, products, searchQuery, onEdit 
                     <button
                       type="button"
                       onClick={() => onEdit(product)}
-                      className="text-xs font-medium text-cyan-600 hover:text-cyan-800 transition-colors"
+                      className="text-xs font-medium text-primary hover:text-primary-hover transition-colors"
                       aria-label={`${intl.formatMessage({ id: 'PRODUCTS.EDIT' })} ${product.name}`}
                     >
                       {intl.formatMessage({ id: 'PRODUCTS.EDIT' })}
@@ -64,9 +65,9 @@ export function CategoryProductList({ categories, products, searchQuery, onEdit 
         );
       })}
       {filtered.length === 0 && (
-        <p className="text-center text-sm text-gray-400 py-10">
+        <InfoBox className="text-center">
           {intl.formatMessage({ id: 'PRODUCTS.EMPTY_STATE' })}
-        </p>
+        </InfoBox>
       )}
     </div>
   );
