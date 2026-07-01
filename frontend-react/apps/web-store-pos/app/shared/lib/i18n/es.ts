@@ -17,11 +17,11 @@ const messages: Record<string, string> = {
   'GENERAL.ERROR': 'Error',
   'GENERAL.SUCCESS': 'Éxito',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
+  'GENERAL.LOGOUT': 'Salir',
 
   // Auth
   'AUTH.SIGN_IN': 'Iniciar sesión',
   'AUTH.SIGN_IN_TITLE': 'Ingresá a tu cuenta',
-  'AUTH.SIGN_OUT': 'Cerrar sesión',
   'AUTH.REGISTER': 'Crear cuenta',
   'AUTH.REGISTER_TITLE': 'Crear nueva cuenta',
   'AUTH.EMAIL': 'Email',
@@ -48,58 +48,58 @@ const messages: Record<string, string> = {
   // Tutorial
   'TUTORIAL.TITLE': 'Tutorial',
 
-  // Menu groups
-  'MENU.ADMIN': 'Administración',
-  'MENU.SALES': 'Ventas',
-  'MENU.INVENTORY': 'Inventario',
-  'MENU.EXPENSES': 'Gastos',
-  'MENU.SYNCHRONIZATION': 'Sincronización',
-  'MENU.REPORTS': 'Reportes',
-  'MENU.STATISTICS': 'Estadísticas',
-  'MENU.MANAGEMENT': 'Gestión',
+  // Menu groups (exact Angular MENU.*.TITLE strings from vocabs/es.ts)
+  'MENU.ADMIN': 'ADMINISTRACIÓN',
+  'MENU.SALES': 'VENTA',
+  'MENU.INVENTORY': 'INVENTARIO',
+  'MENU.EXPENSES': 'GASTOS',
+  'MENU.SYNCHRONIZATION': 'SINCRONIZACIÓN',
+  'MENU.REPORTS': 'REPORTES',
+  'MENU.STATISTICS': 'ESTADÍSTICAS',
+  'MENU.MANAGEMENT': 'GESTIÓN',
   'MENU.PROFILE': 'Perfil',
 
-  // Menu items — Admin
-  'MENU.ADMIN_DASHBOARD': 'Panel de Admin',
-  'MENU.ADMIN_STORES': 'Tiendas (Admin)',
+  // Menu items — Admin (Angular MENU.ADMIN.*)
+  'MENU.ADMIN_DASHBOARD': 'Dashboard',
+  'MENU.ADMIN_STORES': 'Tiendas',
   'MENU.OWNERS': 'Propietarios',
-  'MENU.RESELLERS': 'Revendedores',
+  'MENU.RESELLERS': 'Gestores',
   'MENU.FEATURES': 'Funcionalidades',
 
-  // Menu items — Sales
-  'MENU.PRODUCTS': 'Productos',
-  'MENU.SALE': 'Venta',
-  'MENU.TODAY_ORDERS': 'Pedidos de hoy',
-  'MENU.TODAY_CREDITS': 'Créditos de hoy',
-  'MENU.TODAY_STATS': 'Stats de hoy',
-  'MENU.CREDITS_HISTORY': 'Historial de créditos',
-  'MENU.ORDERS_HISTORY': 'Historial de pedidos',
+  // Menu items — Sales (Angular MENU.SALE_MGMT.*)
+  'MENU.PRODUCTS': 'Catálogo Productos',
+  'MENU.SALE': 'Vender',
+  'MENU.TODAY_ORDERS': 'Ventas del día',
+  'MENU.TODAY_CREDITS': 'Créditos del día',
+  'MENU.TODAY_STATS': 'Cuadre del día',
+  'MENU.CREDITS_HISTORY': 'Créditos',
+  'MENU.ORDERS_HISTORY': 'Ventas',
 
-  // Menu items — Inventory
+  // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
-  'MENU.TODAY_ENTRIES': 'Entradas de hoy',
-  'MENU.TODAY_QUANTITIES': 'Cantidades de hoy',
-  'MENU.TODAY_SALES_PROFIT': 'Ganancia de hoy',
-  'MENU.EGRESS': 'Egresos',
-  'MENU.ENTRIES_HISTORY': 'Historial de entradas',
+  'MENU.TODAY_ENTRIES': 'Entradas del día',
+  'MENU.TODAY_QUANTITIES': 'Cantidades del día',
+  'MENU.TODAY_SALES_PROFIT': 'Ganancias del día',
+  'MENU.EGRESS': 'Salida',
+  'MENU.ENTRIES_HISTORY': 'Entradas',
 
-  // Menu items — Expenses
-  'MENU.TODAY_EXPENSES': 'Gastos de hoy',
-  'MENU.EXPENSES_HISTORY': 'Historial de gastos',
+  // Menu items — Expenses (Angular MENU.EXPENSES.*)
+  'MENU.TODAY_EXPENSES': 'Gastos del día',
+  'MENU.EXPENSES_HISTORY': 'Gastos',
 
-  // Menu items — Synchronization
+  // Menu items — Synchronization (Angular MENU.SYNCHRONIZATION.*)
   'MENU.EXPORT': 'Exportar',
   'MENU.IMPORT': 'Importar',
 
-  // Menu items — Reports / Stats / Management
-  'MENU.TODAY_REPORTS': 'Reportes de hoy',
-  'MENU.DASHBOARD': 'Dashboard',
+  // Menu items — Reports / Stats / Management (Angular MENU.REPORTS.*, MENU.STATISTICS.*, MENU.STORE_MGMT.*)
+  'MENU.TODAY_REPORTS': 'Reportes del día',
+  'MENU.DASHBOARD': 'Panel de Control',
   'MENU.STORES': 'Tiendas',
-  'MENU.USERS': 'Usuarios',
+  'MENU.USERS': 'Empleados',
   'MENU.CONFIGURATIONS': 'Configuraciones',
   'MENU.TUTORIAL': 'Tutorial',
-  'MENU.EDIT_PROFILE': 'Editar perfil',
-  'MENU.CHANGE_PASSWORD': 'Cambiar contraseña',
+  'MENU.EDIT_PROFILE': 'Editar Perfil',
+  'MENU.CHANGE_PASSWORD': 'Cambiar Contraseña',
 
   // Cart
   'CART.TITLE': 'Carrito',
@@ -282,8 +282,13 @@ const messages: Record<string, string> = {
   'STATISTICS.PROFIT.TITLE': 'Ganancia bruta',
   'STATISTICS.EMPTY_STATE': 'Sin datos para mostrar',
 
-  // Footer
-  'FOOTER.COPYRIGHT': '© {year} Vende De Todo. Todos los derechos reservados.',
+  // Footer (exact Angular FOOTER.* strings from vocabs/es.ts)
+  'FOOTER.COPYRIGHT1': '© AutoBusinessPro - {year}',
+  'FOOTER.COPYRIGHT2': 'Todos los derechos reservados',
+  'FOOTER.COOKIES_POLICE': 'Políticas de Cookies',
+  'FOOTER.PRIVACY_POLICE': 'Políticas de Privacidad',
+  'FOOTER.TERMS_CONDITIONS': 'Términos y Condiciones',
+  'FOOTER.CONTACT_US': 'Contáctanos',
 
   // Profile
   'PROFILE.EDIT_TITLE': 'Editar perfil',
