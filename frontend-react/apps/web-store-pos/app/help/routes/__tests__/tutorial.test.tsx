@@ -7,7 +7,7 @@ import esMessages from '~/shared/lib/i18n/es';
 // getState must be a vi.fn() so we can override it per test via mockReturnValue.
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const getState = vi.fn(() => ({ user: { id: 'u1' }, isAuthenticated: true }));
+  const getState = vi.fn(() => ({ user: { id: 'u1' }, isAuthenticated: true, logout: vi.fn() }));
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
     const state = { user: { id: 'u1' }, isAuthenticated: true };
     if (typeof selector === 'function') return selector(state);
@@ -141,7 +141,7 @@ describe('authLoader — S-HELP-TEST-2: unauthenticated redirect to /login', () 
     // authLoader calls useAuthStore.getState() — override the mock to return no session
     const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
     const getState = (useAuthStore as unknown as { getState: ReturnType<typeof vi.fn> }).getState;
-    getState.mockReturnValueOnce({ user: null, isAuthenticated: false });
+    getState.mockReturnValueOnce({ user: null, isAuthenticated: false, logout: vi.fn() });
 
     const { authLoader } = await import('~/auth/routes/loaders');
     const result = await authLoader();

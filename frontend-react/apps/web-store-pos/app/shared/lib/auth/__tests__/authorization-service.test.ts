@@ -61,9 +61,14 @@ describe('AuthorizationService', () => {
       expect(isUserAuthorized(user, [11, 12], undefined)).toBe(true);
     });
 
-    it('ReSeller missing one required featureId returns false', () => {
+    it('ReSeller with ANY of the required featureIds returns true (Angular .some semantics)', () => {
       const user = makeUser({ isReSeller: true, featureIds: [11] });
-      expect(isUserAuthorized(user, [11, 12], undefined)).toBe(false);
+      expect(isUserAuthorized(user, [11, 12], undefined)).toBe(true);
+    });
+
+    it('ReSeller with NONE of the required featureIds returns false', () => {
+      const user = makeUser({ isReSeller: true, featureIds: [11] });
+      expect(isUserAuthorized(user, [12, 13], undefined)).toBe(false);
     });
 
     it('OwnerAdmin with matching featureIds returns true', () => {

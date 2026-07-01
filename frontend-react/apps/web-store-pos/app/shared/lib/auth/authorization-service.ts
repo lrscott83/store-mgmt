@@ -22,7 +22,8 @@ export function isUserAuthorized(
   if (user.isSuperAdmin) return true;
 
   if (user.isReSeller || user.isOwnerAdmin) {
-    return featureIds.every((id) => user.featureIds.includes(id));
+    // Angular uses .some(): having ANY of the required features grants access.
+    return featureIds.some((id) => user.featureIds.includes(id));
   }
 
   // Store users are authorized against their selected store, matching
@@ -33,5 +34,6 @@ export function isUserAuthorized(
   if (matchingRoles.length === 0) return false;
 
   const combinedFeatureIds = matchingRoles.flatMap((role) => role.featureIds);
-  return featureIds.every((id) => combinedFeatureIds.includes(id));
+  // Angular uses .some(): having ANY of the required features grants access.
+  return featureIds.some((id) => combinedFeatureIds.includes(id));
 }

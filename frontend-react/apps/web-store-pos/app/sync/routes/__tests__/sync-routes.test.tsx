@@ -27,6 +27,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
       storeModuleIds: [],
     },
     isAuthenticated: true,
+    logout: () => {},
   };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
@@ -92,7 +93,7 @@ describe('Export route loader — S-ROUTE-1', () => {
     expect(typeof mod.clientLoader).toBe('function');
   });
 
-  it('loader redirects to /unauthorized when user lacks EFeatures.Send (40)', async () => {
+  it('loader redirects to /login when user lacks EFeatures.Send (40)', async () => {
     const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
     const restrictedState = {
       user: {
@@ -115,6 +116,7 @@ describe('Export route loader — S-ROUTE-1', () => {
         storeModuleIds: [],
       },
       isAuthenticated: true,
+      logout: () => {},
     };
     (
       useAuthStore as unknown as { getState: () => typeof restrictedState }
@@ -124,7 +126,7 @@ describe('Export route loader — S-ROUTE-1', () => {
     const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);
     expect(result).toBeInstanceOf(Response);
     const res = result as Response;
-    expect(res.headers.get('Location')).toBe('/unauthorized');
+    expect(res.headers.get('Location')).toBe('/login');
   });
 });
 
@@ -136,7 +138,7 @@ describe('Import route loader — S-ROUTE-2', () => {
     expect(typeof mod.clientLoader).toBe('function');
   });
 
-  it('loader redirects to /unauthorized when user lacks EFeatures.Receive (42)', async () => {
+  it('loader redirects to /login when user lacks EFeatures.Receive (42)', async () => {
     const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
     const restrictedState = {
       user: {
@@ -159,6 +161,7 @@ describe('Import route loader — S-ROUTE-2', () => {
         storeModuleIds: [],
       },
       isAuthenticated: true,
+      logout: () => {},
     };
     (
       useAuthStore as unknown as { getState: () => typeof restrictedState }
@@ -168,7 +171,7 @@ describe('Import route loader — S-ROUTE-2', () => {
     const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);
     expect(result).toBeInstanceOf(Response);
     const res = result as Response;
-    expect(res.headers.get('Location')).toBe('/unauthorized');
+    expect(res.headers.get('Location')).toBe('/login');
   });
 });
 

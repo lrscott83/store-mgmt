@@ -7,10 +7,18 @@ function getAuthState() {
   return useAuthStore.getState();
 }
 
+// Matches Angular's guards: any denial — unauthenticated OR lacking the
+// required feature/role — logs the user out and redirects to /login.
+// Angular has no /unauthorized route; its guards call authService.logout().
+function denyAccess(): Response {
+  useAuthStore.getState().logout();
+  return redirect('/login');
+}
+
 export async function authLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {
-    return redirect('/login');
+    return denyAccess();
   }
   return null;
 }
@@ -27,11 +35,11 @@ export function featureLoader(requiredFeatureIds: number[], storeIdParam?: strin
   return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
     const { user, isAuthenticated } = getAuthState();
     if (!user || !isAuthenticated) {
-      return redirect('/login');
+      return denyAccess();
     }
     const storeId = storeIdParam ?? (params['storeId'] as string | undefined);
     if (!isUserAuthorized(user, requiredFeatureIds, storeId)) {
-      return redirect('/unauthorized');
+      return denyAccess();
     }
     return null;
   };
@@ -40,10 +48,10 @@ export function featureLoader(requiredFeatureIds: number[], storeIdParam?: strin
 export async function adminLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {
-    return redirect('/login');
+    return denyAccess();
   }
   if (!user.isSuperAdmin && !user.isOwnerAdmin) {
-    return redirect('/unauthorized');
+    return denyAccess();
   }
   return null;
 }
@@ -59,10 +67,10 @@ export function adminFeatureLoader(featureIds: number[]) {
 export async function superAdminLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {
-    return redirect('/login');
+    return denyAccess();
   }
   if (!user.isSuperAdmin) {
-    return redirect('/unauthorized');
+    return denyAccess();
   }
   return null;
 }
@@ -78,10 +86,10 @@ export function resellerFeatureLoader(featureIds: number[]) {
 export async function resellerLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {
-    return redirect('/login');
+    return denyAccess();
   }
   if (!user.isSuperAdmin && !user.isReSeller) {
-    return redirect('/unauthorized');
+    return denyAccess();
   }
   return null;
 }
