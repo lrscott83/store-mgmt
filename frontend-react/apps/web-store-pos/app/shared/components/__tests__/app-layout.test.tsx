@@ -59,7 +59,7 @@ describe('AppLayout — sidebar default state (user preference: collapsed by def
   it('sidebar is collapsed by default even at desktop width', () => {
     renderLayout();
     const sidebar = screen.getByRole('navigation', { name: /main navigation/i });
-    expect(sidebar.className).toContain('w-16');
+    expect(sidebar.className).toContain('w-0');
   });
 
   it('does not force-open the sidebar on resize to desktop width', () => {
@@ -67,6 +67,6 @@ describe('AppLayout — sidebar default state (user preference: collapsed by def
     Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1920 });
     window.dispatchEvent(new Event('resize'));
     const sidebar = screen.getByRole('navigation', { name: /main navigation/i });
-    expect(sidebar.className).toContain('w-16');
+    expect(sidebar.className).toContain('w-0');
   });
 });
