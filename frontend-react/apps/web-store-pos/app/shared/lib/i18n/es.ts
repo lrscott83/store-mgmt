@@ -49,7 +49,6 @@ const messages: Record<string, string> = {
   'TUTORIAL.TITLE': 'Tutorial',
 
   // Menu groups
-  'MENU.HELP': 'Ayuda',
   'MENU.ADMIN': 'Administración',
   'MENU.SALES': 'Ventas',
   'MENU.INVENTORY': 'Inventario',
