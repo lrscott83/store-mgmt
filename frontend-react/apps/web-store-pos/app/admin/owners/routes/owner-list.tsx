@@ -6,7 +6,7 @@ import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
 import type { Owner } from '@store-mgmt/domain';
 
-export const loader = resellerFeatureLoader([EFeatures.Owners]);
+export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
 
 function getCardClass(owner: Owner): string {
   if (!owner.isActive) return 'deactive-owner';

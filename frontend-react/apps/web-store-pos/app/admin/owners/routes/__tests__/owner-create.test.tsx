@@ -164,7 +164,7 @@ function fillValidForm(isSuperAdmin = false) {
 describe('OwnerCreatePage — exports', () => {
   it('exports a named loader', async () => {
     const mod = await import('../owner-create');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports OwnerCreatePage as default', async () => {

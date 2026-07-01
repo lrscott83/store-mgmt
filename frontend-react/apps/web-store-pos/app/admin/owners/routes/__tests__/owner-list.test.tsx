@@ -69,7 +69,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('OwnerListPage — exports', () => {
   it('exports a named loader', async () => {
     const mod = await import('../owner-list');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports OwnerListPage as named export', async () => {

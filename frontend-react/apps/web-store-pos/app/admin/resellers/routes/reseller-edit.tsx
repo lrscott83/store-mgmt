@@ -6,7 +6,7 @@ import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-htt
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import type { ReSeller } from '@store-mgmt/domain';
 
-export const loader = superAdminLoader;
+export const clientLoader = superAdminLoader;
 
 // ADR-4: Cuban +53 mobile format
 const PHONE_REGEX = /^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/;

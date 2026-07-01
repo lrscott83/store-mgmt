@@ -67,7 +67,7 @@ describe('getDias30', () => {
 describe('AdminDashboardPage — exports', () => {
   it('exports a named loader function', async () => {
     const mod = await import('../dashboard');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports AdminDashboardPage as named export', async () => {

@@ -3,7 +3,7 @@ import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { featureHttpService } from '~/admin/features/lib/services/feature-http-service';
 
-export const loader = superAdminLoader;
+export const clientLoader = superAdminLoader;
 
 export function FeaturesPage() {
   const { formatMessage } = useIntl();

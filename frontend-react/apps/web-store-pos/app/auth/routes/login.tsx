@@ -5,7 +5,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { guestOnlyLoader } from './loaders';
 
-export const loader = guestOnlyLoader;
+export const clientLoader = guestOnlyLoader;
 
 interface FormState {
   email: string;
@@ -55,8 +55,17 @@ export default function LoginPage() {
     }
 
     try {
-      await login(form.email, form.password);
-      navigate('/sales/new');
+      const user = await login(form.email, form.password);
+      // Mirror Angular's navigateToUserHome(): resellers/superadmins land on
+      // the owners admin; everyone else goes to the POS sale screen.
+      // NOTE: Angular also sends users with no available products to
+      // /sales/products (via hasAnyAvailableToSaleProduct()); that service is
+      // not migrated yet, so the sale screen is used as the default.
+      if (user.isReSeller || user.isSuperAdmin) {
+        navigate('/admin/owners');
+      } else {
+        navigate('/sales/new');
+      }
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 401) {

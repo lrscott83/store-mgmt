@@ -10,7 +10,7 @@ import { UserDetailsForm } from '~/management/users/components/UserDetailsForm';
 import { UserCredentialsForm } from '~/management/users/components/UserCredentialsForm';
 import type { User } from '@store-mgmt/domain';
 
-export const loader = adminFeatureLoader([EFeatures.Users]);
+export const clientLoader = adminFeatureLoader([EFeatures.Users]);
 
 export function UserEditPage() {
   const intl = useIntl();

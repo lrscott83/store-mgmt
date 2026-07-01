@@ -5,7 +5,7 @@ import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import type { ReSeller } from '@store-mgmt/domain';
 
-export const loader = superAdminLoader;
+export const clientLoader = superAdminLoader;
 
 export function ResellerListPage() {
   const navigate = useNavigate();

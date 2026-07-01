@@ -10,7 +10,7 @@ import { storeHttpService } from '~/management/stores/lib/services/store-http-se
 import { StoreForm } from '~/management/stores/components/store-form';
 import type { Module, Owner } from '@store-mgmt/domain';
 
-export const loader = adminFeatureLoader([EFeatures.Stores]);
+export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 
 export function StoreCreatePage() {
   const intl = useIntl();

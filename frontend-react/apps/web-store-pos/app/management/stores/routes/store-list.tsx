@@ -12,7 +12,7 @@ import type { Store } from '@store-mgmt/domain';
 
 const storeRepository = new BaseRepository<Store>('stores', ['paymentStartDate']);
 
-export const loader = adminFeatureLoader([EFeatures.Stores]);
+export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 
 export function StoreListPage() {
   const intl = useIntl();

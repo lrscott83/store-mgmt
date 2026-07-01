@@ -11,7 +11,7 @@ import { SaleCategoryProducts } from '../components/sale-category-products';
 import { QuickSaleScanner } from '../components/quick-sale-scanner';
 import { useEffect } from 'react';
 
-export const loader = featureLoader([EFeatures.Sale]);
+export const clientLoader = featureLoader([EFeatures.Sale]);
 
 export function SalePage() {
   const intl = useIntl();

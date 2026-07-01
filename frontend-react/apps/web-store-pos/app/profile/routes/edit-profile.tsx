@@ -7,7 +7,7 @@ import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { profileHttpService } from '~/profile/lib/services/profile-http-service';
 import { EditProfileForm } from '~/profile/components/edit-profile-form';
 
-export const loader = featureLoader(
+export const clientLoader = featureLoader(
   [EFeatures.Profile],
   useAuthStore.getState().user?.selectedStoreId
 );

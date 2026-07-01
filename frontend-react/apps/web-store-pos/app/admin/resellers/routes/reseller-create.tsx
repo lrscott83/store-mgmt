@@ -5,7 +5,7 @@ import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 
-export const loader = superAdminLoader;
+export const clientLoader = superAdminLoader;
 
 // ADR-3: EXACT copy from management/users/components/UserCreateForm.tsx:4
 const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;

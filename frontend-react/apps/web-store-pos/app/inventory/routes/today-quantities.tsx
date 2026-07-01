@@ -8,7 +8,7 @@ import { EgressOfflineService } from '../lib/services/egress-offline-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 
-export const loader = featureLoader([EFeatures.InventoryTodayQuantities]);
+export const clientLoader = featureLoader([EFeatures.InventoryTodayQuantities]);
 
 interface ProductQuantities {
   productId: string;

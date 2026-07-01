@@ -8,7 +8,7 @@ import { EgressOfflineService } from '../lib/services/egress-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { EgressList } from '../components/egress-list';
 
-export const loader = featureLoader([EFeatures.Egress]);
+export const clientLoader = featureLoader([EFeatures.Egress]);
 
 type EgressView = 'today' | 'history';
 

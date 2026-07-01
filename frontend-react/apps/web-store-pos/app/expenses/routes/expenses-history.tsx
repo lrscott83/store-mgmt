@@ -12,7 +12,7 @@ import { ExpensePagination } from '../components/expense-pagination';
 import { ExpenseFormModal } from '../components/expense-form-modal';
 import type { ExpenseFormInput } from '../components/expense-form-modal';
 
-export const loader = featureLoader([EFeatures.ExpensesHistory]);
+export const clientLoader = featureLoader([EFeatures.ExpensesHistory]);
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);

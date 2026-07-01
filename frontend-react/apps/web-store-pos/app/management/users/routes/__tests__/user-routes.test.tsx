@@ -481,17 +481,17 @@ describe('UserEditPage — S-ERR-1: getById rejection renders error, no form mou
 describe('adminFeatureLoader — ACCESS-4: all 3 user routes export named loader', () => {
   it('UserListPage exports a named loader', async () => {
     const mod = await import('../user-list');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('UserCreatePage exports a named loader', async () => {
     const mod = await import('../user-create');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('UserEditPage exports a named loader', async () => {
     const mod = await import('../user-edit');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('ROUTE-EDIT-SHAPE: edit route uses /edit/:id (matching Angular + React convention)', () => {

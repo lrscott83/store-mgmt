@@ -3,7 +3,7 @@ import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { usageHttpService } from '~/admin/dashboard/lib/services/usage-http-service';
 
-export const loader = superAdminLoader;
+export const clientLoader = superAdminLoader;
 
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 

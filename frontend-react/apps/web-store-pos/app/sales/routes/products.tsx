@@ -13,7 +13,7 @@ import { EditProductsModal } from '../components/edit-products-modal';
 import { EditProductCategoryModal } from '../components/edit-product-category-modal';
 import { CsvProductImporterModal } from '../components/csv-product-importer-modal';
 
-export const loader = featureLoader([EFeatures.Products]);
+export const clientLoader = featureLoader([EFeatures.Products]);
 
 type Modal =
   | { type: 'create' }

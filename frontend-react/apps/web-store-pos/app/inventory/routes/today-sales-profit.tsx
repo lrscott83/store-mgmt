@@ -9,7 +9,7 @@ import { ProductOfflineService } from '~/sales/lib/services/product-offline-serv
 import { calculateOrderProfit } from '../lib/profit-calculator';
 import type { OrderProfitResult } from '../lib/profit-calculator';
 
-export const loader = featureLoader([EFeatures.InventoryTodaySaleProfit]);
+export const clientLoader = featureLoader([EFeatures.InventoryTodaySaleProfit]);
 
 interface ProfitRow {
   productId: string;

@@ -10,7 +10,7 @@ import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-
 import { StoreListPage } from '~/management/stores/routes/store-list';
 import type { Owner, ReSeller } from '@store-mgmt/domain';
 
-export const loader = resellerFeatureLoader([EFeatures.Owners]);
+export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
 
 // ADR-4: Cuban +53 mobile format (from reseller-create.tsx:14)
 const PHONE_REGEX = /^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/;

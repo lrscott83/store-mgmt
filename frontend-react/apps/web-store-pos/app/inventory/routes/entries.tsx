@@ -10,7 +10,7 @@ import { EntryList } from '../components/entry-list';
 import { EditInventoryEntryModal } from '../components/edit-inventory-entry-modal';
 import type { EditInventoryEntryInput } from '../components/edit-inventory-entry-modal';
 
-export const loader = featureLoader([EFeatures.EntriesHistory]);
+export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
 
 function defaultDateRange(): { from: string; to: string } {
   const now = new Date();

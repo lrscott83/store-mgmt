@@ -6,7 +6,7 @@ import { storeHttpService } from '~/management/stores/lib/services/store-http-se
 import { StoreList } from '~/management/stores/components/store-list';
 import type { Store } from '@store-mgmt/domain';
 
-export const loader = superAdminLoader;
+export const clientLoader = superAdminLoader;
 
 export function AdminStoreListPage() {
   const navigate = useNavigate();

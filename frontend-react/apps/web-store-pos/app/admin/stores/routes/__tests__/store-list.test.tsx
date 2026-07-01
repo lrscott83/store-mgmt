@@ -63,7 +63,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('AdminStoreListPage — exports', () => {
   it('exports a named loader function equal to superAdminLoader', async () => {
     const mod = await import('../store-list');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports AdminStoreListPage as named export', async () => {

@@ -9,7 +9,7 @@ import { SaleCreditList } from '../components/sale-credit-list';
 import { EditSaleCreditModal } from '../components/edit-sale-credit-modal';
 import { SaleCreditPaymentModal } from '../components/sale-credit-payment-modal';
 
-export const loader = featureLoader([EFeatures.CreditSale]);
+export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
 type CreditFilter = 'all' | 'paid' | 'unpaid';
 

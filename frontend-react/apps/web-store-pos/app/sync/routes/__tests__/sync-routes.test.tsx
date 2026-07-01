@@ -89,7 +89,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('Export route loader — S-ROUTE-1', () => {
   it('loader is exported from export.tsx', async () => {
     const mod = await import('../export');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('loader redirects to /unauthorized when user lacks EFeatures.Send (40)', async () => {
@@ -120,8 +120,8 @@ describe('Export route loader — S-ROUTE-1', () => {
       useAuthStore as unknown as { getState: () => typeof restrictedState }
     ).getState = () => restrictedState;
 
-    const { loader } = await import('../export');
-    const result = await loader({ params: { storeId: 'store-s1' } } as never);
+    const { clientLoader } = await import('../export');
+    const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);
     expect(result).toBeInstanceOf(Response);
     const res = result as Response;
     expect(res.headers.get('Location')).toBe('/unauthorized');
@@ -133,7 +133,7 @@ describe('Export route loader — S-ROUTE-1', () => {
 describe('Import route loader — S-ROUTE-2', () => {
   it('loader is exported from import.tsx', async () => {
     const mod = await import('../import');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('loader redirects to /unauthorized when user lacks EFeatures.Receive (42)', async () => {
@@ -164,8 +164,8 @@ describe('Import route loader — S-ROUTE-2', () => {
       useAuthStore as unknown as { getState: () => typeof restrictedState }
     ).getState = () => restrictedState;
 
-    const { loader } = await import('../import');
-    const result = await loader({ params: { storeId: 'store-s1' } } as never);
+    const { clientLoader } = await import('../import');
+    const result = await clientLoader({ params: { storeId: 'store-s1' } } as never);
     expect(result).toBeInstanceOf(Response);
     const res = result as Response;
     expect(res.headers.get('Location')).toBe('/unauthorized');

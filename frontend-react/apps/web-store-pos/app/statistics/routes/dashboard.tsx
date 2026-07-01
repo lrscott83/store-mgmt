@@ -8,7 +8,7 @@ import type { DailySalesPoint, DailyProfitPoint } from '../lib/services/statisti
 import { SalesChart } from '../components/sales-chart';
 import { ProfitChart } from '../components/profit-chart';
 
-export const loader = featureLoader([EFeatures.Dashboard]);
+export const clientLoader = featureLoader([EFeatures.Dashboard]);
 
 export function DashboardPage() {
   const intl = useIntl();

@@ -7,7 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { CategoryStats } from '../components/category-stats';
 
-export const loader = featureLoader([EFeatures.Sale]);
+export const clientLoader = featureLoader([EFeatures.Sale]);
 
 const PAYMENT_LABELS: Record<PaymentType, string> = {
   [PaymentType.Efectivo]: 'Efectivo',

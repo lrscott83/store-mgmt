@@ -6,7 +6,7 @@ import { Breadcrumbs } from './breadcrumbs';
 import { Footer } from './footer';
 import { authLoader } from '~/auth/routes/loaders';
 
-export const loader = authLoader;
+export const clientLoader = authLoader;
 
 const MOBILE_BREAKPOINT = 1025;
 

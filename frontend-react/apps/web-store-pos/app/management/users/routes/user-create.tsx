@@ -8,7 +8,7 @@ import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserCreateForm } from '~/management/users/components/UserCreateForm';
 
-export const loader = adminFeatureLoader([EFeatures.Users]);
+export const clientLoader = adminFeatureLoader([EFeatures.Users]);
 
 export function UserCreatePage() {
   const intl = useIntl();

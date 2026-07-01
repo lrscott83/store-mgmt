@@ -9,7 +9,7 @@ import { ExpenseList } from '../components/expense-list';
 import { ExpenseFormModal } from '../components/expense-form-modal';
 import type { ExpenseFormInput } from '../components/expense-form-modal';
 
-export const loader = featureLoader([EFeatures.TodayExpenses]);
+export const clientLoader = featureLoader([EFeatures.TodayExpenses]);
 
 export function TodayExpensesPage() {
   const intl = useIntl();

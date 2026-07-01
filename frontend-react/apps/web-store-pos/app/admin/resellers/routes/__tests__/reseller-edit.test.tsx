@@ -98,7 +98,7 @@ describe('ResellerEditPage — exports', () => {
       errors: [],
     });
     const mod = await import('../reseller-edit');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports ResellerEditPage as default', async () => {

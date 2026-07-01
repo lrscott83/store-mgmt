@@ -9,7 +9,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import type { ReSeller } from '@store-mgmt/domain';
 
-export const loader = resellerFeatureLoader([EFeatures.Owners]);
+export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
 
 // ADR-3: EXACT copy from management/users/components/UserCreateForm.tsx:4
 const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;

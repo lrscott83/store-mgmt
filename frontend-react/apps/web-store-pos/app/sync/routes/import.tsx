@@ -15,7 +15,7 @@ import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-s
 import { ImportForm } from '~/sync/components/import-form';
 import type { MergeResult } from '~/sync/lib/services/data-synchronizer-service';
 
-export const loader = featureLoader([EFeatures.Receive]);
+export const clientLoader = featureLoader([EFeatures.Receive]);
 
 export function ImportPage() {
   const intl = useIntl();

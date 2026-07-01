@@ -4,7 +4,7 @@ import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { guestOnlyLoader } from './loaders';
 
-export const loader = guestOnlyLoader;
+export const clientLoader = guestOnlyLoader;
 
 interface FormState {
   fullName: string;

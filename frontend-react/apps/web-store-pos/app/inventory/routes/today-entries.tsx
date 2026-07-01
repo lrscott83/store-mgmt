@@ -10,7 +10,7 @@ import { InventoryDailyEntries } from '../components/inventory-daily-entries';
 import { EditInventoryEntryModal } from '../components/edit-inventory-entry-modal';
 import type { EditInventoryEntryInput } from '../components/edit-inventory-entry-modal';
 
-export const loader = featureLoader([EFeatures.Entries]);
+export const clientLoader = featureLoader([EFeatures.Entries]);
 
 export function TodayEntriesPage() {
   const intl = useIntl();

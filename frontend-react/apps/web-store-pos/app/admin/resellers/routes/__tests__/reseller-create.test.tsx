@@ -81,7 +81,7 @@ function fillValidForm() {
 describe('ResellerCreatePage — exports', () => {
   it('exports a named loader = superAdminLoader', async () => {
     const mod = await import('../reseller-create');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports ResellerCreatePage as default', async () => {

@@ -11,7 +11,7 @@ import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offli
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { ExportForm } from '~/sync/components/export-form';
 
-export const loader = featureLoader([EFeatures.Send]);
+export const clientLoader = featureLoader([EFeatures.Send]);
 
 export function ExportPage() {
   const intl = useIntl();

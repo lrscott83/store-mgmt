@@ -14,7 +14,7 @@ import type { Store, Module, Owner } from '@store-mgmt/domain';
 
 const storeRepository = new BaseRepository<Store>('stores', ['paymentStartDate']);
 
-export const loader = adminFeatureLoader([EFeatures.Stores]);
+export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 
 export function StoreEditPage() {
   const intl = useIntl();

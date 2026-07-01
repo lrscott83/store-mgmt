@@ -12,7 +12,7 @@ import type { User } from '@store-mgmt/domain';
 
 const userRepository = new BaseRepository<User>('storeusers', []);
 
-export const loader = adminFeatureLoader([EFeatures.Users]);
+export const clientLoader = adminFeatureLoader([EFeatures.Users]);
 
 export function UserListPage() {
   const intl = useIntl();

@@ -8,7 +8,7 @@ import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { OrderList } from '../components/order-list';
 import { EditOrderModal } from '../components/edit-order-modal';
 
-export const loader = featureLoader([EFeatures.SalesHistory]);
+export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
 function defaultDateRange(): { from: string; to: string } {
   const now = new Date();

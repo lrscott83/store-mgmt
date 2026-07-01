@@ -195,7 +195,7 @@ async function renderPage(isSuperAdmin = false, ownerOverrides: Partial<Owner> =
 describe('OwnerEditPage — exports', () => {
   it('exports a named loader', async () => {
     const mod = await import('../owner-edit');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports OwnerEditPage as default', async () => {

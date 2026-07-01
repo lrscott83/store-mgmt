@@ -6,7 +6,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ReportAggregationService } from '../lib/services/report-aggregation-service';
 import type { ReportSummary } from '../lib/services/report-aggregation-service';
 
-export const loader = featureLoader([EFeatures.TodayReports]);
+export const clientLoader = featureLoader([EFeatures.TodayReports]);
 
 export function TodayReportPage() {
   const intl = useIntl();

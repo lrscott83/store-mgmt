@@ -24,7 +24,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('ConfigurationsPage — exports', () => {
   it('exports a named loader function', async () => {
     const mod = await import('../configurations');
-    expect(typeof mod.loader).toBe('function');
+    expect(typeof mod.clientLoader).toBe('function');
   });
 
   it('exports ConfigurationsPage as named export', async () => {

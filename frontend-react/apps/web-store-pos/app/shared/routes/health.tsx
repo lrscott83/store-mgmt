@@ -1,3 +1,3 @@
-export function loader() {
+export function clientLoader() {
   return Response.json({ status: 'ok' });
 }

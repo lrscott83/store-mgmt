@@ -9,7 +9,7 @@ import { ProductOfflineService } from '~/sales/lib/services/product-offline-serv
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 import { InventoryProductList } from '../components/inventory-product-list';
 
-export const loader = featureLoader([EFeatures.Available]);
+export const clientLoader = featureLoader([EFeatures.Available]);
 
 export function InventoryAvailablePage() {
   const intl = useIntl();
