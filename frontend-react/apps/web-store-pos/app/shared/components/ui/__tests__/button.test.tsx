@@ -63,6 +63,40 @@ describe('Button — variants and interaction', () => {
   });
 });
 
+describe('Button — variant="fab" (Angular mat-fab extended: pill, purple, elevated)', () => {
+  it('applies pill shape (rounded-full)', () => {
+    render(<Button variant="fab">+ Categoría</Button>);
+    const btn = screen.getByRole('button', { name: '+ Categoría' });
+    expect(btn.className).toContain('rounded-full');
+  });
+
+  it('applies filled purple background and white text', () => {
+    render(<Button variant="fab">+ Categoría</Button>);
+    const btn = screen.getByRole('button', { name: '+ Categoría' });
+    expect(btn.className).toContain('bg-primary');
+    expect(btn.className).toContain('text-white');
+  });
+
+  it('applies an elevated shadow', () => {
+    render(<Button variant="fab">+ Categoría</Button>);
+    const btn = screen.getByRole('button', { name: '+ Categoría' });
+    expect(btn.className).toContain('shadow-lg');
+  });
+
+  it('applies generous padding matching the extended-FAB look', () => {
+    render(<Button variant="fab">+ Categoría</Button>);
+    const btn = screen.getByRole('button', { name: '+ Categoría' });
+    expect(btn.className).toContain('px-6');
+    expect(btn.className).toContain('py-3');
+  });
+
+  it('is not the small rectangular radius used by other variants', () => {
+    render(<Button variant="fab">+ Categoría</Button>);
+    const btn = screen.getByRole('button', { name: '+ Categoría' });
+    expect(btn.className).not.toContain('rounded-md');
+  });
+});
+
 describe('FloatingButton — fixed-position action button', () => {
   it('renders as a button with an accessible label', () => {
     render(<FloatingButton aria-label="Agregar producto">+</FloatingButton>);

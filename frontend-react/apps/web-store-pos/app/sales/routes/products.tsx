@@ -146,14 +146,16 @@ export function ProductsPage() {
         title={intl.formatMessage({ id: 'PRODUCTS.TITLE' })}
         footer={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
+            {/* Angular mat-fab extended actions ("+ Categoría" / "Importar Productos" in
+                products.component.html) — pill-shaped elevated purple FABs. */}
+            <Button variant="fab" onClick={() => setModal({ type: 'category' })} data-testid="add-category-button">
+              {intl.formatMessage({ id: 'PRODUCTS.CATEGORY.CREATE' })}
+            </Button>
+            <Button variant="fab" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
               {intl.formatMessage({ id: 'PRODUCTS.IMPORT_CSV' })}
             </Button>
             <Button variant="outline" onClick={() => setModal({ type: 'bulk' })} data-testid="bulk-edit-button">
               {intl.formatMessage({ id: 'PRODUCTS.BULK_EDIT' })}
-            </Button>
-            <Button variant="outline" onClick={() => setModal({ type: 'category' })} data-testid="add-category-button">
-              {intl.formatMessage({ id: 'PRODUCTS.CATEGORY.CREATE' })}
             </Button>
             <Button onClick={() => setModal({ type: 'create' })} data-testid="create-product-button">
               {intl.formatMessage({ id: 'PRODUCTS.CREATE' })}
