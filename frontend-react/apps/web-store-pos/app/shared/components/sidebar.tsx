@@ -23,7 +23,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   return (
     <nav
-      className={`flex flex-col h-full bg-white border-r border-gray-200 transition-all duration-200 overflow-hidden ${isOpen ? 'w-64' : 'w-16'}`}
+      className={`flex flex-col h-full bg-white border-r border-gray-200 transition-all duration-200 overflow-hidden ${isOpen ? 'w-64' : 'w-0'}`}
       aria-label="Main navigation"
     >
       {/* Navigation groups */}

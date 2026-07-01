@@ -130,12 +130,13 @@ describe('Sidebar — SHELL-02 permission-filtered menu', () => {
     expect(links.length).toBe(0);
   });
 
-  it('renders closed sidebar when isOpen is false', () => {
+  it('renders closed sidebar when isOpen is false — zero width, no blank column (Angular navbar-collapsed: width 0)', () => {
     renderSidebar(makeSuperAdmin(), false);
 
-    // When closed, sidebar has collapsed class
+    // When closed, sidebar collapses to zero width so it fully disappears
     const sidebar = screen.getByRole('navigation');
-    expect(sidebar.className).toContain('w-16');
+    expect(sidebar.className).toContain('w-0');
+    expect(sidebar.className).not.toContain('w-16');
   });
 
   it('renders open sidebar when isOpen is true', () => {
