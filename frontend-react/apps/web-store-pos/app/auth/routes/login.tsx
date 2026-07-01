@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
+import { productHttpService } from '~/shared/lib/http/product-http-service';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -57,14 +58,20 @@ export default function LoginPage() {
     try {
       const user = await login(form.email, form.password);
       // Mirror Angular's navigateToUserHome(): resellers/superadmins land on
-      // the owners admin; everyone else goes to the POS sale screen.
-      // NOTE: Angular also sends users with no available products to
-      // /sales/products (via hasAnyAvailableToSaleProduct()); that service is
-      // not migrated yet, so the sale screen is used as the default.
+      // the owners admin; other users go to the sale screen if they have any
+      // available product, otherwise to the products screen.
       if (user.isReSeller || user.isSuperAdmin) {
         navigate('/admin/owners');
       } else {
-        navigate('/sales/new');
+        let hasProducts = true;
+        try {
+          hasProducts = await productHttpService.hasAnyAvailableToSaleProduct();
+        } catch {
+          // Non-blocking: on failure, fall back to the sale screen so a
+          // successful login never leaves the user stranded on /login.
+          hasProducts = true;
+        }
+        navigate(hasProducts ? '/sales/new' : '/sales/products');
       }
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
