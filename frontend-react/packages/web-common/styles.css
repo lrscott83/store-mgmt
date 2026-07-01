@@ -80,10 +80,12 @@
 
 @layer base {
   :root {
-    /* Primary: Angular purple $purple #6f42c1 (confirmed running-app primary). */
-    --color-primary: 111 66 193;
-    --color-primary-hover: 100 59 174;
-    --color-primary-light: 241 236 249;
+    /* Primary: Angular Material deeppurple-amber theme #673ab7 (Deep Purple 500,
+       verified in frontend/src/scss/deeppurple-amber.css — the app's real
+       primary; Bootstrap #6f42c1 is only on marketing landing pages). */
+    --color-primary: 103 58 183;
+    --color-primary-hover: 94 53 177;
+    --color-primary-light: 237 231 246;
 
     /* Secondary: Angular $blue #1677ff — link/secondary accent only, not primary. */
     --color-secondary: 22 119 255;
