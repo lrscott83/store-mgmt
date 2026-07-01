@@ -40,6 +40,13 @@ export default defineConfig({
   },
   envDir: join(__dirname, '../..'),
   envPrefix: ['VITE_', 'API_', 'SESSION_', 'NODE_', 'APP_'],
+  resolve: {
+    // Force a single copy of React and React Router. web-common declares its
+    // own react/react-dom/react-router deps; without dedupe pnpm resolves them
+    // as separate instances, producing "Cannot read properties of null
+    // (reading 'useContext')" during client render.
+    dedupe: ['react', 'react-dom', 'react-router'],
+  },
   optimizeDeps: {
     include: ['@store-mgmt/domain'],
   },
