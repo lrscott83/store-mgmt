@@ -45,7 +45,11 @@ const messages: Record<string, string> = {
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
   'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',
 
+  // Tutorial
+  'TUTORIAL.TITLE': 'Tutorial',
+
   // Menu groups
+  'MENU.HELP': 'Ayuda',
   'MENU.ADMIN': 'Administración',
   'MENU.SALES': 'Ventas',
   'MENU.INVENTORY': 'Inventario',
@@ -94,6 +98,7 @@ const messages: Record<string, string> = {
   'MENU.STORES': 'Tiendas',
   'MENU.USERS': 'Usuarios',
   'MENU.CONFIGURATIONS': 'Configuraciones',
+  'MENU.TUTORIAL': 'Tutorial',
   'MENU.EDIT_PROFILE': 'Editar perfil',
   'MENU.CHANGE_PASSWORD': 'Cambiar contraseña',
 

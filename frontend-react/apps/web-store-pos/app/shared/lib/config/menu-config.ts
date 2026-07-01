@@ -93,4 +93,10 @@ export const MENU_GROUPS: MenuGroup[] = [
       { label: 'MENU.CHANGE_PASSWORD', path: '/profile/change-password', featureIds: [EFeatures.Profile] },
     ],
   },
+  {
+    groupLabel: 'MENU.HELP',
+    items: [
+      { label: 'MENU.TUTORIAL', path: '/help/tutorial', featureIds: [] },
+    ],
+  },
 ];
