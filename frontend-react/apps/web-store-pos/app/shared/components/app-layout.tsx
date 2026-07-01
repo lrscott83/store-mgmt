@@ -64,3 +64,8 @@ export function AppLayout() {
     </div>
   );
 }
+
+// React Router 7 renders a layout() route from the module's DEFAULT export.
+// Without this the navbar/sidebar/breadcrumbs/footer chrome never mounts and
+// child routes render bare.
+export default AppLayout;
