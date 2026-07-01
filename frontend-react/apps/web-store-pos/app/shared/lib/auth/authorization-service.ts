@@ -25,7 +25,11 @@ export function isUserAuthorized(
     return featureIds.every((id) => user.featureIds.includes(id));
   }
 
-  const matchingRoles = user.roles.filter((role) => role.storeId === storeId);
+  // Store users are authorized against their selected store, matching
+  // Angular's isStoreUserAuthorize (r.storeId === currentUser.selectedStoreId).
+  // An explicit storeId (e.g. a store-scoped route param) takes precedence.
+  const effectiveStoreId = storeId ?? user.selectedStoreId;
+  const matchingRoles = user.roles.filter((role) => role.storeId === effectiveStoreId);
   if (matchingRoles.length === 0) return false;
 
   const combinedFeatureIds = matchingRoles.flatMap((role) => role.featureIds);
