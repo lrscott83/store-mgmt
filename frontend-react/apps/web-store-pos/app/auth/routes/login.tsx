@@ -56,7 +56,7 @@ export default function LoginPage() {
 
     try {
       await login(form.email, form.password);
-      navigate('/');
+      navigate('/sales/new');
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 401) {

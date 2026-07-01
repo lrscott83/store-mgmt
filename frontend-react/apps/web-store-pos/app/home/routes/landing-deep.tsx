@@ -1,0 +1,470 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
+import './landing-deep.css';
+
+const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = [
+  {
+    title: 'Seguridad total',
+    desc: 'Tus datos se guardan en el teléfono. Nadie más accede a ellos, nunca.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M14 2L4 6v8c0 5.5 4.3 10.7 10 12 5.7-1.3 10-6.5 10-12V6L14 2z"
+          stroke="#f5b026"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <rect x="9" y="12" width="10" height="8" rx="1.5" stroke="#f5b026" strokeWidth="1.5" />
+        <path d="M12 12v-2a2 2 0 0 1 4 0v2" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="14" cy="16" r="1" fill="#f5b026" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Funciona sin Internet',
+    desc: 'Todas las funciones disponibles sin conexión. Solo la autenticación requiere Internet.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 20c4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6 3.6 6 8 6z" stroke="#f5b026" strokeWidth="1.5" />
+        <path d="M10 14c1.7-1 3.4-1.5 4-1.5s2.3.5 4 1.5" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M4 20V8" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M24 20V8" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="6" y1="6" x2="22" y2="22" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Registro instantáneo',
+    desc: 'Anota cada venta en segundos. Sin papel, sin cálculos manuales.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M15.5 3L8 15h7l-1.5 10L22 13h-7l1-7L15.5 3z"
+          stroke="#f5b026"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <circle cx="15.5" cy="13" r="2" fill="#f5b026" fillOpacity="0.2" stroke="#f5b026" strokeWidth="1" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Cuadre de caja rápido',
+    desc: 'Cierra tu día en minutos con totales y diferencias calculadas automáticamente.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="8" width="22" height="15" rx="2" stroke="#f5b026" strokeWidth="1.5" />
+        <path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" stroke="#f5b026" strokeWidth="1.5" />
+        <line x1="3" y1="14" x2="25" y2="14" stroke="#f5b026" strokeWidth="1.5" />
+        <rect x="7" y="17" width="4" height="3" rx="0.5" fill="#f5b026" fillOpacity="0.3" stroke="#f5b026" strokeWidth="0.75" />
+        <rect x="13" y="17" width="4" height="3" rx="0.5" fill="#f5b026" fillOpacity="0.3" stroke="#f5b026" strokeWidth="0.75" />
+        <path d="M19 17v3M22 18.5h.01" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Inventario en tiempo real',
+    desc: 'Consulta cuánto tienes y cuánto vale tu stock al instante.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 8l10-4 10 4v4l-10 4-10-4V8z" stroke="#f5b026" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M4 12l10 4 10-4M14 16v8" stroke="#f5b026" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M14 20l-10-4M14 20l10-4" stroke="#f5b026" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Reportes claros',
+    desc: 'Ganancias del día, productos más vendidos y tendencias — con un clic.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="5" y1="22" x2="5" y2="14" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="10" y1="22" x2="10" y2="9" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="15" y1="22" x2="15" y2="5" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="20" y1="22" x2="20" y2="12" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="25" y1="22" x2="25" y2="17" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="3" y1="22" x2="27" y2="22" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M15 5l4-2M19 3l-4 2" stroke="#f5b026" strokeWidth="1" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Facturación integrada',
+    desc: 'Emite facturas PDF al registrar cada venta, sin pasos extra.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="5" y="3" width="18" height="22" rx="2" stroke="#f5b026" strokeWidth="1.5" />
+        <line x1="9" y1="9" x2="19" y2="9" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="9" y1="13" x2="19" y2="13" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="9" y1="17" x2="15" y2="17" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="20" cy="21" r="6" fill="#0a0a0a" stroke="#f5b026" strokeWidth="1.5" />
+        <path d="M18 21l1.5 1.5L22 19.5" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Panel de decisiones',
+    desc: 'Visualiza datos clave para planificar mejor y vender más.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="3" width="22" height="22" rx="2" stroke="#f5b026" strokeWidth="1.5" />
+        <path d="M3 9h22" stroke="#f5b026" strokeWidth="1.5" />
+        <path d="M8 9V20a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="#f5b026" strokeWidth="1.25" />
+        <path d="M14 9v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="#f5b026" strokeWidth="1.25" />
+        <path d="M20 9v4a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9" stroke="#f5b026" strokeWidth="1.25" />
+        <line x1="6" y1="12" x2="11" y2="12" stroke="#f5b026" strokeWidth="1" strokeLinecap="round" strokeDasharray="1.5 1.5" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Sincronización flexible',
+    desc: 'Sube y descarga tus datos cuando lo necesites, sin perder información.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M5 12a3 3 0 0 1 3-3h4l3-3h5a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1"
+          stroke="#f5b026"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <path d="M23 12v4a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-4" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M14 10v4a3 3 0 0 0 3 3h1" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" />
+        <line x1="5" y1="8" x2="14" y2="8" stroke="#f5b026" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" />
+      </svg>
+    ),
+  },
+];
+
+const STEPS = [
+  { number: '01', title: 'Regístrate', desc: 'Crea tu cuenta en segundos. Solo necesitas un teléfono y una contraseña.' },
+  { number: '02', title: 'Configura tu punto', desc: 'Agrega productos al catálogo y registra tu inventario inicial.' },
+  { number: '03', title: 'Empieza a vender', desc: 'Registra cada venta, consulta tu cuadre y reportes. Así de fácil.' },
+];
+
+export default function LandingDeep() {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
+  const featureCardRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  const showLoginButton = !canInstall;
+
+  function closeMenu() {
+    setTimeout(() => {
+      setMenuOpen(false);
+    }, 10);
+  }
+
+  // Scroll state for the fixed navbar background
+  useEffect(() => {
+    function onScroll() {
+      setIsScrolled(window.scrollY > 40);
+    }
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // PWA installability check
+  useEffect(() => {
+    function checkPWAInstallability() {
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      const swSupported = 'serviceWorker' in navigator;
+
+      if (swSupported && !isStandalone) {
+        setCanInstall(true);
+      } else {
+        setCanInstall(false);
+      }
+    }
+
+    checkPWAInstallability();
+
+    function onBeforeInstallPrompt() {
+      setCanInstall(true);
+    }
+    function onAppInstalled() {
+      setCanInstall(false);
+    }
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
+  }, []);
+
+  // Reveal feature cards on scroll into view
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' },
+    );
+
+    featureCardRefs.current.forEach((card) => {
+      if (card) observer.observe(card);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="landing-wrapper">
+      {/* NAVBAR */}
+      <nav className={`landing-nav${isScrolled ? ' scrolled' : ''}`}>
+        <div className="container">
+          <div className="d-flex align-items-center justify-content-between">
+            <a className="nav-brand" href="#hero">
+              VendeDTo
+            </a>
+
+            <div className="d-none d-lg-flex align-items-center gap-4">
+              <a className="nav-auth-link" href="#caracteristicas">
+                Características
+              </a>
+              <a className="nav-auth-link" href="#como-funciona">
+                Cómo funciona
+              </a>
+              {showLoginButton && (
+                <Link className="nav-auth-link" to="/login">
+                  Entrar
+                </Link>
+              )}
+              <a className="btn-primary-amber" href="#registro">
+                Comenzar
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+            </div>
+
+            <button
+              className={`d-lg-none nav-toggler${menuOpen ? ' open' : ''}`}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Menu"
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+          </div>
+
+          <div className={`nav-dropdown${menuOpen ? ' show' : ''}`}>
+            <a className="nav-dropdown-item" href="#hero" onClick={closeMenu}>
+              Inicio
+            </a>
+            <a className="nav-dropdown-item" href="#caracteristicas" onClick={closeMenu}>
+              Características
+            </a>
+            <a className="nav-dropdown-item" href="#como-funciona" onClick={closeMenu}>
+              Cómo funciona
+            </a>
+            <Link className="nav-dropdown-item" to="/login" onClick={closeMenu}>
+              Iniciar sesión
+            </Link>
+            <a
+              className="nav-dropdown-item"
+              href="#registro"
+              onClick={closeMenu}
+              style={{ color: '#f5b026', fontWeight: 600 }}
+            >
+              Comenzar
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      {/* HERO */}
+      <section id="hero" className="hero-section">
+        <div className="hero-bg-grid"></div>
+        <div className="hero-bg-glow"></div>
+
+        <div className="container position-relative">
+          <div className="row align-items-center g-5">
+            {/* Left: Copy */}
+            <div className="col-lg-6">
+              <p className="hero-eyebrow">Punto de venta offline</p>
+              <h1 className="hero-title">
+                Vende más.
+                <br />
+                Controla <span className="accent">todo.</span>
+              </h1>
+              <p className="hero-sub">
+                Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y reportes — siempre disponibles en tu
+                dispositivo.
+              </p>
+              <div className="hero-actions">
+                <a href="#registro" className="btn-primary-amber">
+                  Comenzar
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M3 8h10M9 4l4 4-4 4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </a>
+                <a href="#caracteristicas" className="btn-ghost">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M6.5 5.5l4 2.5-4 2.5v-5z" fill="currentColor" />
+                  </svg>
+                  Ver características
+                </a>
+              </div>
+            </div>
+
+            {/* Right: Stats card */}
+            <div className="col-lg-5 offset-lg-1">
+              <div className="hero-card">
+                <div className="hero-card-stat">
+                  <span className="hero-card-number">24</span>
+                  <span className="hero-card-label">hrs, sin conexión</span>
+                </div>
+                <div className="hero-card-stat">
+                  <span className="hero-card-number">100%</span>
+                  <span className="hero-card-label">seguridad de tus datos</span>
+                </div>
+                <div className="hero-card-stat">
+                  <span className="hero-card-number">0</span>
+                  <span className="hero-card-label">descontrol</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="caracteristicas" className="features-section">
+        <div className="container">
+          <div className="row mb-5 pb-3">
+            <div className="col-lg-6">
+              <p className="section-eyebrow">Lo que necesitas</p>
+              <h2 className="section-title">
+                Todo para gestionar
+                <br />
+                tu negocio
+              </h2>
+            </div>
+            <div className="col-lg-5 offset-lg-1 d-flex align-items-end">
+              <p className="section-subtitle">
+                Una herramienta completa que crece contigo. Sin suscripciones, sin complicaciones, sin internet.
+              </p>
+            </div>
+          </div>
+
+          <div className="row g-4">
+            {FEATURES.map((feature, index) => (
+              <div className="col-md-6 col-lg-4" key={feature.title}>
+                <div
+                  className="feature-card"
+                  ref={(el) => {
+                    featureCardRefs.current[index] = el;
+                  }}
+                >
+                  <div className="feature-icon-wrap">{feature.icon}</div>
+                  <h3 className="feature-title">{feature.title}</h3>
+                  <p className="feature-desc">{feature.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="como-funciona" className="features-section" style={{ borderTop: '1px solid rgba(245, 176, 66, 0.06)' }}>
+        <div className="container">
+          <div className="text-center mb-5 pb-3">
+            <p className="section-eyebrow" style={{ justifyContent: 'center' }}>
+              <span style={{ display: 'block', width: 24, height: 1, background: '#f5b026' }}></span>
+              En tres pasos
+            </p>
+            <h2 className="section-title" style={{ marginLeft: 'auto', marginRight: 'auto' }}>
+              Así de simple
+            </h2>
+          </div>
+
+          <div className="row g-5">
+            {STEPS.map((step) => (
+              <div className="col-md-4" key={step.number}>
+                <div className="feature-card">
+                  <div className="feature-icon-wrap" style={{ marginBottom: '1.5rem' }}>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: '1.6rem',
+                        fontWeight: 700,
+                        color: '#f5b026',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {step.number}
+                    </span>
+                  </div>
+                  <h3 className="feature-title">{step.title}</h3>
+                  <p className="feature-desc">{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section id="registro" className="cta-section">
+        <div className="cta-bg-element"></div>
+        <div className="container">
+          <div className="cta-inner">
+            <p className="section-eyebrow" style={{ justifyContent: 'center', marginBottom: '1.5rem' }}>
+              <span style={{ display: 'block', width: 24, height: 1, background: '#f5b026' }}></span>
+              Empieza hoy
+            </p>
+            <h2 className="cta-title">
+              Tu negocio merece
+              <br />
+              las mejores herramientas
+            </h2>
+            <p className="cta-sub">Únete a cientos de emprendedores que ya gestionan sus ventas con control y seguridad.</p>
+            <Link to="/register" className="btn-primary-amber" style={{ fontSize: '1rem', padding: '1rem 2.5rem' }}>
+              Crear cuenta gratis
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+            <p
+              style={{
+                marginTop: '1.25rem',
+                fontFamily: 'var(--font-body)',
+                fontSize: '1rem',
+                color: 'rgba(245, 240, 235, 0.3)',
+                letterSpacing: '0.04em',
+              }}
+            >
+              2 meses de prueba gratis · Pago mensual post-uso
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="container">
+          <p className="footer-text mb-0">&copy; 2026 VendeDTo · Desarrollado para emprendedores con éxito</p>
+        </div>
+      </footer>
+    </div>
+  );
+}

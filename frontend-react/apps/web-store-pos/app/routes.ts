@@ -1,6 +1,9 @@
 import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
 
 export default [
+  // Public landing page — no auth required, matches Angular's unguarded '' route
+  index('home/routes/landing-deep.tsx'),
+
   // Guest-only routes (no auth required)
   layout('auth/components/auth-layout.tsx', [
     route('login', 'auth/routes/login.tsx'),
@@ -9,8 +12,6 @@ export default [
 
   // Authenticated routes (require auth via authLoader)
   layout('shared/components/app-layout.tsx', { id: 'app-layout' }, [
-    index('home/routes/index.tsx'),
-
     // Sales — Products
     route('sales/products', 'sales/routes/products.tsx'),
     // Sales — POS & Orders
@@ -51,8 +52,9 @@ export default [
 
     // Management — Users
     route('management/users', 'management/users/routes/user-list.tsx'),
-    route('management/users/create', 'management/users/routes/user-create.tsx'),
-    route('management/users/create/:storeId', 'management/users/routes/user-create.tsx'),
+    // storeId is optional: matches both /create (from user list) and /create/:storeId
+    // (after store creation), mirroring Angular's single CreateStoreUserComponent.
+    route('management/users/create/:storeId?', 'management/users/routes/user-create.tsx'),
     route('management/users/edit/:id', 'management/users/routes/user-edit.tsx'),
 
     // Management — Configurations
@@ -80,6 +82,9 @@ export default [
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
+
+    // Help — Tutorial
+    route('help/tutorial', 'help/routes/tutorial.tsx'),
   ]),
 
   // Utility routes

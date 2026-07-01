@@ -52,7 +52,7 @@ export function Breadcrumbs() {
 function BreadcrumbNav({ items }: { items: BreadcrumbItem[] }) {
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-gray-500 px-4 py-2">
-      <Link to="/" className="hover:text-cyan-700 transition-colors">
+      <Link to="/sales/new" className="hover:text-cyan-700 transition-colors">
         Home
       </Link>
       {items.map((item) => (
