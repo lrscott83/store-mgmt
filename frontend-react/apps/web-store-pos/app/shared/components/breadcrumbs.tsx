@@ -1,7 +1,15 @@
-import { Link, useLocation, useMatches } from 'react-router';
+import { Link, useMatches } from 'react-router';
 
 interface BreadcrumbHandle {
   breadcrumb?: string;
+  /**
+   * Opt-in flag. Angular's navigation.ts sets `breadcrumbs: false` on every
+   * single leaf nav item, so the breadcrumb block never renders in the
+   * running app (see breadcrumb.component.html: `@if (last && breadcrumb.breadcrumbs !== false)`).
+   * React replicates that by defaulting to hidden; a route must explicitly
+   * set `handle: { showBreadcrumbs: true, breadcrumb: '...' }` to render one.
+   */
+  showBreadcrumbs?: boolean;
 }
 
 interface BreadcrumbItem {
@@ -10,49 +18,31 @@ interface BreadcrumbItem {
   isLast: boolean;
 }
 
-function segmentToLabel(segment: string): string {
-  return segment
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 export function Breadcrumbs() {
-  const location = useLocation();
   const matches = useMatches();
 
-  // Attempt to derive breadcrumbs from route handles first
   const handleBreadcrumbs: BreadcrumbItem[] = matches
-    .filter((m) => (m.handle as BreadcrumbHandle | undefined)?.breadcrumb)
+    .filter((m) => {
+      const handle = m.handle as BreadcrumbHandle | undefined;
+      return handle?.showBreadcrumbs === true && handle.breadcrumb;
+    })
     .map((m, index, arr) => ({
       label: (m.handle as BreadcrumbHandle).breadcrumb!,
       path: m.pathname,
       isLast: index === arr.length - 1,
     }));
 
-  if (handleBreadcrumbs.length > 0) {
-    return <BreadcrumbNav items={handleBreadcrumbs} />;
-  }
-
-  // Fallback: derive from path segments
-  const segments = location.pathname.split('/').filter(Boolean);
-  const pathBreadcrumbs: BreadcrumbItem[] = segments.map((segment, index) => ({
-    label: segmentToLabel(segment),
-    path: '/' + segments.slice(0, index + 1).join('/'),
-    isLast: index === segments.length - 1,
-  }));
-
-  if (pathBreadcrumbs.length === 0) {
+  if (handleBreadcrumbs.length === 0) {
     return null;
   }
 
-  return <BreadcrumbNav items={pathBreadcrumbs} />;
+  return <BreadcrumbNav items={handleBreadcrumbs} />;
 }
 
 function BreadcrumbNav({ items }: { items: BreadcrumbItem[] }) {
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-gray-500 px-4 py-2">
-      <Link to="/sales/new" className="hover:text-cyan-700 transition-colors">
+      <Link to="/sales/new" className="hover:text-primary transition-colors">
         Home
       </Link>
       {items.map((item) => (
@@ -63,7 +53,7 @@ function BreadcrumbNav({ items }: { items: BreadcrumbItem[] }) {
           {item.isLast ? (
             <span className="font-medium text-gray-800">{item.label}</span>
           ) : (
-            <Link to={item.path} className="hover:text-cyan-700 transition-colors">
+            <Link to={item.path} className="hover:text-primary transition-colors">
               {item.label}
             </Link>
           )}
