@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
-import { productHttpService } from '~/shared/lib/http/product-http-service';
+import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -63,14 +64,19 @@ export default function LoginPage() {
       if (user.isReSeller || user.isSuperAdmin) {
         navigate('/admin/owners');
       } else {
-        let hasProducts = true;
-        try {
-          hasProducts = await productHttpService.hasAnyAvailableToSaleProduct();
-        } catch {
-          // Non-blocking: on failure, fall back to the sale screen so a
-          // successful login never leaves the user stranded on /login.
-          hasProducts = true;
-        }
+        // Angular offline (GlobalConfig.USE_ONLINE_SERVICE=false) reads local
+        // storage, not HTTP: a store can sell when it has an active category
+        // AND an active, sellable product. Mirrors ProductOfflineService's
+        // hasAnyAvailableToSaleProduct.
+        const storeId = user.selectedStoreId;
+        const hasActiveCategory = new ProductCategoryOfflineService(storeId)
+          .getAll()
+          .some((c) => c.isActive);
+        const hasProducts =
+          hasActiveCategory &&
+          new ProductOfflineService(storeId)
+            .getAll()
+            .some((p) => p.isActive && p.availableToSale);
         navigate(hasProducts ? '/sales/new' : '/sales/products');
       }
     } catch (err: unknown) {
