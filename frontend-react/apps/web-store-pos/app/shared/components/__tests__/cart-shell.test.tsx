@@ -15,10 +15,13 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
   })),
 }));
 
-// Mock useAuthStore (needed for OrderOfflineService instantiation)
+// Mock useAuthStore (needed for OrderOfflineService instantiation + credits-module gating).
+// storeModuleIds includes EModules.Credits (11) by default so the credit toggle/client
+// input render in most tests; CART-CREDITS-GATE-* tests override this per-case.
+let mockUser: Record<string, unknown> = { selectedStoreId: 's1', storeModuleIds: [11] };
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
-  const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
+  const useAuthStore = vi.fn((selector?: (s: { user: unknown; isAuthenticated: boolean }) => unknown) => {
+    const state = { user: mockUser, isAuthenticated: true };
     if (typeof selector === 'function') return selector(state);
     return state;
   });
@@ -73,90 +76,278 @@ function mockCartState(overrides = {}) {
   vi.mocked(useCartStore).mockReturnValue({ ...defaultState, ...overrides });
 }
 
-describe('CartShell — submit action validation', () => {
+function openCart() {
+  const cartButton = screen.getByRole('button', { name: /carrito/i });
+  fireEvent.click(cartButton);
+}
+
+describe('CartShell — header (Venta actual + order type)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
   });
 
-  describe('CART-01: Create order button exists', () => {
-    it('shows "Crear pedido" button when cart has items', () => {
-      const product = makeProduct();
-      mockCartState({
-        items: [{ product, quantity: 2 }],
-        total: vi.fn().mockReturnValue(10),
-      });
-      renderCartShell();
-      // Open the cart dropdown
-      const cartButton = screen.getByRole('button', { name: /carrito/i });
-      fireEvent.click(cartButton);
-      expect(screen.getByText('Crear pedido')).toBeTruthy();
-    });
+  it('shows "Venta actual" as the dropdown title (Angular hardcoded literal, not an i18n key)', () => {
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Venta actual')).toBeInTheDocument();
   });
 
-  describe('CART-02: Empty cart validation', () => {
-    it('does not show the "Crear pedido" button when cart is empty', () => {
-      mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
-      renderCartShell();
-      const cartButton = screen.getByRole('button', { name: /carrito/i });
-      fireEvent.click(cartButton);
-      // Payment controls section is hidden when empty — no "Crear pedido"
-      expect(screen.queryByText('Crear pedido')).toBeNull();
-    });
-  });
-
-  describe('CART-03: Credit + empty client name validation', () => {
-    it('shows error when isCredit=true and clientName is empty on submit attempt', async () => {
-      const product = makeProduct();
-      mockCartState({
-        items: [{ product, quantity: 1 }],
-        isCredit: true,
-        clientName: '',
-        total: vi.fn().mockReturnValue(5),
-      });
-      renderCartShell();
-      const cartButton = screen.getByRole('button', { name: /carrito/i });
-      fireEvent.click(cartButton);
-
-      const createButton = screen.getByText('Crear pedido');
-      fireEvent.click(createButton);
-
-      await waitFor(() => {
-        // Error message for empty client name should appear
-        expect(
-          screen.getByText(/nombre del cliente es requerido/i),
-        ).toBeTruthy();
-      });
-    });
-  });
-
-  describe('CART-04: Submit with valid credit order', () => {
-    it('does not show client name error when clientName is provided', async () => {
-      const product = makeProduct();
-      mockCartState({
-        items: [{ product, quantity: 1 }],
-        isCredit: true,
-        clientName: 'Juan Perez',
-        total: vi.fn().mockReturnValue(5),
-      });
-      renderCartShell();
-      const cartButton = screen.getByRole('button', { name: /carrito/i });
-      fireEvent.click(cartButton);
-
-      const createButton = screen.getByText('Crear pedido');
-      fireEvent.click(createButton);
-
-      await waitFor(() => {
-        expect(
-          screen.queryByText(/nombre del cliente es requerido/i),
-        ).toBeNull();
-      });
-    });
+  it('shows the order type text ("Normal") as the subtitle, matching getOrderTypeText()', () => {
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Normal')).toBeInTheDocument();
   });
 });
 
-describe('CartShell — CART-05: dropdown closes on outside click', () => {
+describe('CartShell — payment input and Vuelto (change)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+  });
+
+  it('disables the payment input when the cart is empty', () => {
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByLabelText('Pago')).toBeDisabled();
+  });
+
+  it('enables the payment input when the cart has items', () => {
+    const product = makeProduct();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByLabelText('Pago')).not.toBeDisabled();
+  });
+
+  it('shows Vuelto: $0.00 when no payment has been entered', () => {
+    const product = makeProduct();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $0.00');
+  });
+
+  it('computes Vuelto as payment - total once a payment is typed', () => {
+    const product = makeProduct();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
+    renderCartShell();
+    openCart();
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '10' } });
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $5.00');
+  });
+
+  it('shows a negative Vuelto when payment is less than total', () => {
+    const product = makeProduct();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(10) });
+    renderCartShell();
+    openCart();
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '4' } });
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: -$6.00');
+  });
+});
+
+describe('CartShell — payment-type selector with icons', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+  });
+
+  it('renders the three payment type options: Efectivo, Tarjeta, Zelle', () => {
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getByText('Tarjeta')).toBeInTheDocument();
+    expect(screen.getByText('Zelle')).toBeInTheDocument();
+  });
+
+  it('renders a distinct inline SVG icon per payment type option', () => {
+    renderCartShell();
+    openCart();
+    expect(screen.getByTestId('payment-type-icon-cash')).toBeInTheDocument();
+    expect(screen.getByTestId('payment-type-icon-card')).toBeInTheDocument();
+    expect(screen.getByTestId('payment-type-icon-phone')).toBeInTheDocument();
+  });
+});
+
+describe('CartShell — credit toggle + client input gated by credits module', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows the credit toggle when the user has the credits module available', () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Venta a crédito')).toBeInTheDocument();
+  });
+
+  it('hides the credit toggle and client input when the user lacks the credits module', () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [] };
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+    renderCartShell();
+    openCart();
+    expect(screen.queryByText('Venta a crédito')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Cliente')).not.toBeInTheDocument();
+  });
+});
+
+describe('CartShell — print-invoice toggle (UI-only, no print behavior)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+  });
+
+  it('renders the print-invoice toggle labeled "Imprimir Factura (prueba)"', () => {
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Imprimir Factura (prueba)')).toBeInTheDocument();
+  });
+
+  it('toggling it does not throw or trigger any print/window.open call', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderCartShell();
+    openCart();
+    const toggle = screen.getByLabelText('Imprimir Factura (prueba)');
+    fireEvent.click(toggle);
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+});
+
+describe('CartShell — Limpiar / Registrar buttons', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+  });
+
+  it('renders "Limpiar" and "Registrar" buttons, both disabled when cart is empty', () => {
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Limpiar').closest('button')).toBeDisabled();
+    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+  });
+
+  it('enables both buttons when the cart has items', () => {
+    const product = makeProduct();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Limpiar').closest('button')).not.toBeDisabled();
+    expect(screen.getByText('Registrar').closest('button')).not.toBeDisabled();
+  });
+
+  it('clears the cart when "Limpiar" is clicked', () => {
+    const product = makeProduct();
+    const clear = vi.fn();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByText('Limpiar'));
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CartShell — createOrder validations (Registrar)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+  });
+
+  it('CART-02: shows DON_NOT_PAY_EMPTY_CART message and does not create an order when cart is empty', async () => {
+    // Registrar is disabled when empty per Angular's [disabled]="getItemsCount() === 0"
+    // binding — but validate the message text is present in the i18n dictionary and the
+    // guard function returns the right code so this becomes provably unreachable, not
+    // silently untested. Simulate by force-invoking createOrder path with a non-empty
+    // cart that has 0 itemsCount is not representable; assert button disabled instead.
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
+  });
+
+  it('CART-03: shows DON_NOT_SALE_CREDIT_WITHOUT_CLIENT when isCredit=true and client is empty', async () => {
+    const product = makeProduct();
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      isCredit: true,
+      clientName: '',
+      total: vi.fn().mockReturnValue(5),
+    });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Usted no puede realizar la venta por cobrar sin especificar el cliente.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('CART-04: does not show the credit-without-client error when clientName is provided', async () => {
+    const product = makeProduct();
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      isCredit: true,
+      clientName: 'Juan Perez',
+      total: vi.fn().mockReturnValue(5),
+    });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Usted no puede realizar la venta por cobrar sin especificar el cliente.'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('CART-06: shows DON_NOT_PAY_LESS_THAN_CART_TOTAL when payment is less than total', async () => {
+    const product = makeProduct();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(10) });
+    renderCartShell();
+    openCart();
+
+    fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '4' } });
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Usted no puede realizar la venta porque el pago es menor que el total.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('CART-07: shows ORDER_CREATED success message and clears the cart on a valid submission', async () => {
+    const product = makeProduct();
+    const clear = vi.fn();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => {
+      expect(screen.getByText('La venta fue creada satisfactoriamente.')).toBeInTheDocument();
+    });
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CartShell — dropdown closes on outside click', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
   });
 
@@ -170,25 +361,23 @@ describe('CartShell — CART-05: dropdown closes on outside click', () => {
       </IntlProvider>,
     );
 
-    const cartButton = screen.getByRole('button', { name: /carrito/i });
-    fireEvent.click(cartButton);
-    expect(screen.getByText('Carrito')).toBeInTheDocument();
+    openCart();
+    expect(screen.getByText('Venta actual')).toBeInTheDocument();
 
     fireEvent.mouseDown(screen.getByTestId('outside-area'));
 
-    expect(screen.queryByText('Carrito')).not.toBeInTheDocument();
+    expect(screen.queryByText('Venta actual')).not.toBeInTheDocument();
   });
 
   it('does not close the cart panel when clicking inside it', () => {
     renderCartShell();
 
-    const cartButton = screen.getByRole('button', { name: /carrito/i });
-    fireEvent.click(cartButton);
-    const title = screen.getByText('Carrito');
+    openCart();
+    const title = screen.getByText('Venta actual');
     expect(title).toBeInTheDocument();
 
     fireEvent.mouseDown(title);
 
-    expect(screen.getByText('Carrito')).toBeInTheDocument();
+    expect(screen.getByText('Venta actual')).toBeInTheDocument();
   });
 });

@@ -854,3 +854,159 @@ instruction throughout) — but the orchestrator/user should still confirm chain
 (stacked-to-main vs feature-branch-chain) before Stage 2 (Inventory) `sdd-apply` begins if a
 PR-based workflow is desired going forward, per the tasks artifact's Review Workload
 Forecast.
+
+## Batch 8 — Stage 1 Sales, Cart (nav-right) parity + docs reconciliation
+
+### What (Batch 8)
+
+Closed the Shopping Cart's remaining Stage 1 (Sales) parity gaps against Angular's
+`NavRightComponent`/`nav-right.component.html` (the cart dropdown), AND reconciled a
+documented contradiction: `explore.md` said "verify [shopping-cart] in Sales stage" while
+`design.md`/`tasks.md` had routed the shopping-cart service to Stage 6 (Sync).
+RESOLUTION applied (see `tasks.md` 1.5/6.1 and `design.md`'s Service Parity Method note):
+the cart UI + POS checkout FLOW parity is Stage 1 (Sales) scope — done in this batch. Only
+the cross-cutting offline `ShoppingCartService`/inventory-availability-on-increase/decrease
+audit stays Stage 6 (Sync) scope, left untouched here (deferred sub-item, see below).
+
+Gaps closed (previously React had only badge + header total from an earlier batch):
+1. Dropdown header replaced generic `CART.TITLE` with Angular's exact "Venta actual" title
+   + order-type subtitle (`getOrderTypeText(OrderType.Normal)` = "Normal").
+2. Added the `payment` (Pago) numeric input + Vuelto (change) readout, colored
+   success/danger/neutral to match Angular's `payment-return-positive`/`-negative` CSS
+   classes (React uses semantic Tailwind color classes instead of literal class names).
+   `payment` is UI-only local state, NOT persisted to the created Order — matches Angular
+   (`NavRightComponent.payment` lives on the component, not `ShoppingCartService`/`Order`).
+3. Added the payment-type selector with inline SVG icons per option (cash/card/phone),
+   replacing the plain-text-only selector — semantic 1:1 port of Angular's
+   `PaymentTypeUtils.getPaymentTypeIcon()` (`bi-cash-stack`/`bi-credit-card`/`bi-phone`),
+   no bootstrap-icons dependency added.
+4. Gated the credit toggle + client input behind `hasCreditsModuleAvailable(user)` (React
+   port already existed from Batch 7's `authorization-service.ts`) — previously the credit
+   toggle was unconditionally rendered, an ungated behavior gap vs Angular's
+   `@if (hasCreditsModuleAvailable)`.
+5. Added the print-invoice toggle (`SHOPPING_CART.PRINT_INVOICE`, "Imprimir Factura
+   (prueba)") as UI-only state (`mustGenerateFacture`) with explicitly NO print behavior —
+   parity with Angular, where `generateTicket`/`generateFacture` are dead/disabled no-op
+   `console.log` stubs (jsPDF generation commented out).
+6. Renamed the action buttons to Angular's exact texts: "Limpiar" (`SHOPPING_CART.CLEAR`,
+   clears cart) and "Registrar" (`SHOPPING_CART.REGISTER`, creates order) — replacing the
+   React-invented "Cancelar"/"Crear pedido" labels. Both buttons are now ALWAYS rendered but
+   `disabled` when `itemCount === 0`, matching Angular's `[disabled]="getItemsCount() === 0"`
+   binding on both mat-fab buttons (previously the whole payment-controls block, including
+   the create button, was conditionally unmounted when the cart was empty — a structural
+   difference from Angular's always-rendered/conditionally-disabled buttons).
+7. Ported `createOrder()`'s exact validation order and messages from
+   `NavRightComponent.createOrder()`: (a) empty cart -> `SHOPPING_CART.DON_NOT_PAY_EMPTY_CART`,
+   (b) `payment && payment < total` -> `SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL`
+   (NEW check, did not exist in React before this batch), (c) `isCredit && !client` ->
+   `SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT`. Success path now shows
+   `SHOPPING_CART.ORDER_CREATED` inline (React's existing inline-message pattern, not
+   SweetAlert/toastr) before clearing the cart.
+8. Added all `SHOPPING_CART.*` i18n keys (+ `GENERAL.PAY`) to React `es.ts`, byte-identical
+   Spanish to Angular's `vocabs/es.ts` `SHOPPING_CART` block. Existing `CART.*` keys
+   (`CART.TITLE`, `CART.EFECTIVO`/`TARJETA`/`ZELLE`, etc.) were left in place, not renamed,
+   to avoid churn in unrelated call sites — `SHOPPING_CART.*` is the new keyset used by the
+   literal Angular-matching strings this batch introduces.
+
+### Deferred sub-item (explicitly OUT of Batch 8 scope)
+
+Inventory-availability validation on cart increase/decrease — Angular's
+`ShoppingCartService.increaseCartItem`/`decreaseCartItem` check stock availability before
+allowing a quantity change; React's `cart-store.ts` is local-only (zustand + persist) and
+does NOT validate stock. NOT implemented here — flagged as a candidate for either Stage 2
+(Inventory) or the Stage 6 Sync cross-cutting `ShoppingCartService` audit (see `tasks.md`
+6.1's updated scope note). jsPDF ticket/factura generation and
+`editOrderDetails`/`EditOrderDetailsModalComponent` also confirmed out of scope (dead/unused
+in Angular's own template) — not ported, per the batch's exact-scope instruction.
+
+### Where (Batch 8)
+
+- `app/shared/components/cart-shell.tsx` — REWRITTEN (header, payment/Vuelto, payment-type
+  icons, credit gating, print-invoice toggle, Limpiar/Registrar, validations wired to the
+  new pure helpers below).
+- `app/shared/components/__tests__/cart-shell.test.tsx` — REWRITTEN/EXTENDED (23 tests,
+  was 6; mock user now carries `storeModuleIds` for the credits-module gate).
+- `app/sales/lib/order-type-utils.ts` — NEW. `getOrderTypeText(orderType)`, 1:1 port of
+  Angular's `OrderTypeUtils.getOrderTypeText` (enum-name reverse lookup, not an i18n key —
+  Angular's own template has no `[translate]` pipe on this value).
+- `app/sales/lib/__tests__/order-type-utils.test.ts` — NEW (2 tests).
+- `app/shared/lib/payment-type-icon.ts` — NEW. `getPaymentTypeIconKind(paymentType)`, pure
+  discriminant-key port of Angular's `PaymentTypeUtils.getPaymentTypeIcon` semantics, mapped
+  to inline SVGs in the component (no bootstrap-icons dependency).
+- `app/shared/lib/payment-type-icon.test.ts` — NEW (4 tests).
+- `app/shared/lib/payment-return.ts` — NEW. `getPaymentReturn`/`getPaymentReturnKind`, 1:1
+  port of `NavRightComponent.getPaymentReturn()`/`getPaymentReturnClass()`.
+- `app/shared/lib/payment-return.test.ts` — NEW (6 tests).
+- `app/shared/lib/cart-submission-validation.ts` — NEW. `validateCartSubmission(...)`, 1:1
+  port of `NavRightComponent.createOrder()`'s three-check validation sequence, extracted as
+  a pure function (Extract-Before-Mock — zero mocks needed to test the validation logic).
+- `app/shared/lib/cart-submission-validation.test.ts` — NEW (5 tests).
+- `app/shared/lib/i18n/es.ts` — ADDED `SHOPPING_CART.*` keys (`PRODUCTS_LABEL`,
+  `PRODUCT_LABEL`, `REGISTER`, `PRICE_LABEL`, `ORDER_CREATED`, `ORDER_NOT_CREATED`,
+  `DON_NOT_PAY_EMPTY_CART`, `PRINT_INVOICE`, `CLEAR`,
+  `DON_NOT_PAY_LESS_THAN_CART_TOTAL`, `DON_NOT_SALE_CREDIT_WITHOUT_CLIENT`) + `GENERAL.PAY`,
+  byte-identical Spanish to `frontend/src/app/_modules/i18n/vocabs/es.ts`.
+- `frontend-react/openspec/changes/frontend-parity-audit/tasks.md` — added explicit `1.5`
+  Stage 1 cart task; edited Stage 6's `6.1` note to scope the shopping-cart reference to the
+  service/inventory-availability audit only, cross-referencing 1.5.
+- `frontend-react/openspec/changes/frontend-parity-audit/design.md` — adjusted the Service
+  Parity Method note so the cart UI/flow is marked Stage 1, only the cross-cutting service
+  remains a Sync design question.
+- `frontend-react/openspec/changes/frontend-parity-audit/specs/frontend-parity-audit/spec.md`
+  — added a cart-scope bullet to the Sales row and a cross-reference note to the Sync row of
+  the Per-Module Acceptance table.
+
+### TDD Cycle Evidence (Batch 8)
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| `getOrderTypeText` | `sales/lib/__tests__/order-type-utils.test.ts` | Unit | N/A (new) | Written, confirmed RED (module not found) | 2/2 passed first run | 2 cases (Normal, Mayorista) | None needed |
+| `getPaymentTypeIconKind` | `shared/lib/payment-type-icon.test.ts` | Unit | N/A (new) | Written, confirmed RED | 4/4 passed first run | 4 cases (cash/card/phone/default) | None needed |
+| `getPaymentReturn`/`getPaymentReturnKind` | `shared/lib/payment-return.test.ts` | Unit | N/A (new) | Written, confirmed RED | 6/6 passed first run | 6 cases across both functions | None needed |
+| `validateCartSubmission` | `shared/lib/cart-submission-validation.test.ts` | Unit | N/A (new) | Written, confirmed RED | 5/5 passed first run | 5 cases (all 3 error codes + 2 null-path cases) | None needed |
+| `CartShell` component rewrite | `shared/components/__tests__/cart-shell.test.tsx` | Integration (RTL) | Baseline 6/6 passing before edit | Written first (22/23 new assertions RED against pre-rewrite component) | Fixed 1 bug found by GREEN run (success message wiped by a shared `handleClear` reset) — 23/23 passed after fix | Multiple scenarios per behavior (empty vs non-empty cart, credits-module gated vs ungated, all 3 validation branches, success path) | Extracted `clearCartAfterSuccessfulOrder` to avoid clobbering `submitSuccess` |
+
+### Issues Found (Batch 8)
+
+One real bug caught by the GREEN execution gate (not glossed over): the first
+`handleCreateOrder` implementation called the same `handleClear()` used by the "Limpiar"
+button after a successful order, which also reset `submitSuccess` to `null` — so the
+"La venta fue creada satisfactoriamente." message never rendered. Fixed by splitting a
+`clearCartAfterSuccessfulOrder()` helper that resets cart/transient-field state but leaves
+`submitSuccess` alone. Caught by the CART-07 test failing on first GREEN run, not silently
+shipped.
+
+### Test/Build Results (Batch 8)
+
+- `tsc -p apps/web-store-pos/tsconfig.json --noEmit` (from `frontend-react/`): clean, zero
+  errors.
+- `vitest run` (full suite): 88 test files / 980 tests passed, 0 failed. Baseline before this
+  batch: 84 files / 946 tests (Batch 7) -> +4 files (`order-type-utils.test.ts`,
+  `payment-type-icon.test.ts`, `payment-return.test.ts`, `cart-submission-validation.test.ts`),
+  +34 tests net (17 new pure-function tests + 17 net new cart-shell assertions: was 6, now 23).
+- `react-router build`: succeeded, no errors/warnings introduced.
+
+### Workload / PR Boundary (Batch 8)
+
+- Mode: no git commit/push performed by this batch — user handles commit per explicit
+  instruction (differs from Batches 1-7, which were direct work-unit commits; this batch's
+  changes are staged in the working tree only).
+- Boundary: this batch = `cart-shell.tsx` + its 4 new pure-function lib modules + their
+  tests + `es.ts` `SHOPPING_CART.*`/`GENERAL.PAY` keys + the 4 openspec docs (`tasks.md`,
+  `design.md`, `specs/frontend-parity-audit/spec.md`, this file) ONLY. Does NOT touch
+  `cart-store.ts` (zustand store shape unchanged — `payment`/`mustGenerateFacture` are local
+  component state, not store fields, matching Angular's component-vs-service field split)
+  or `order-offline-service.ts`'s `create()` signature (unchanged).
+
+### Status (Batch 8) — Stage 1 (Sales) cart parity gap CLOSED; contradiction reconciled
+
+Stage 1 (Sales) was previously marked complete across 7 batches but had left the shopping
+cart at a partial state (badge + header total only, from an earlier targeted UI/shell
+batch) with an unresolved scope contradiction between `explore.md` and
+`design.md`/`tasks.md`. This batch closes that gap: the cart dropdown now has full L4/L5/L6
+parity with Angular's `NavRightComponent`, and the scope contradiction is resolved and
+documented in `tasks.md`/`design.md`/`spec.md` (cart UI/flow = Stage 1 Sales; cart
+service/inventory-availability audit = Stage 6 Sync). The one deliberately deferred
+sub-item (inventory-availability validation on cart increase/decrease) is flagged, not
+silently dropped, and carries forward to Stage 2 (Inventory) or Stage 6 (Sync) per the
+updated `tasks.md` 6.1 note.

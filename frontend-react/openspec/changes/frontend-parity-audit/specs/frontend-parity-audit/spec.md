@@ -128,12 +128,12 @@ React route paths (including known renames), params, guards, and menu entries MU
 
 | Module | Done Criteria |
 |---|---|
-| Sales | Fields/controls/validations/actions match Angular (L4); shared tokens applied, visual match on cards/buttons/info-boxes (L5); zero missing es.ts keys, no hardcoded strings (L6) |
+| Sales | Fields/controls/validations/actions match Angular (L4); shared tokens applied, visual match on cards/buttons/info-boxes (L5); zero missing es.ts keys, no hardcoded strings (L6). IN SCOPE: the nav-right shopping-cart dropdown (badge+header total, payment/Vuelto, payment-type selector with icons, credit-module gating, print-invoice toggle, Limpiar/Registrar, createOrder validations) is Sales-stage L4/L5/L6 surface — the cart's cross-cutting offline service/inventory-availability audit stays Sync-stage (see Sync row) |
 | Inventory | Same L4/L5/L6 criteria as above, scoped to inventory views |
 | Expenses | Same L4/L5/L6 criteria, scoped to expense views |
 | Management | Same L4/L5/L6 criteria; ADDITIONALLY: UX-parity decision resolved for list/create/edit — Angular reuses `EditStoreComponent` (list root = edit form) vs React's split list/create/edit routes; decision MUST be documented before slice is marked done |
 | Admin | Same L4/L5/L6 criteria, excluding ratified-dead `admin/roles` |
-| Sync | Same L4/L5/L6 criteria; PWA cross-cutting (L2) confirmed as prerequisite |
+| Sync | Same L4/L5/L6 criteria; PWA cross-cutting (L2) confirmed as prerequisite. Scope note: only the cross-cutting offline `ShoppingCartService`/inventory-availability-on-increase/decrease audit is Sync scope for the shopping cart — the cart UI/checkout flow itself is Sales scope (see Sales row) |
 | Reports | Same L4/L5/L6 criteria, scoped to report views |
 | Statistics | Same L4/L5/L6 criteria, scoped to statistics views |
 | Profile | Same L4/L5/L6 criteria, scoped to profile views |

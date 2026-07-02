@@ -53,10 +53,23 @@ visual/token change, spot-check instead of new test.
 
 ## Stage 1 — Sales
 
-- [ ] 1.1 L4 functional diff (Angular Sales components vs React app/sales/**) + fix gaps [TDD].
-- [ ] 1.2 L5 visual: apply tokens + Button/Card/InfoBox to Sales views [VISUAL].
-- [ ] 1.3 L6 i18n: flatten-diff Sales keys vs es.ts, fill gaps, remove hardcoded Spanish.
-- [ ] 1.4 Verify: matrix all-green, tests pass, visual spot-check.
+- [x] 1.1 L4 functional diff (Angular Sales components vs React app/sales/**) + fix gaps [TDD].
+- [x] 1.2 L5 visual: apply tokens + Button/Card/InfoBox to Sales views [VISUAL].
+- [x] 1.3 L6 i18n: flatten-diff Sales keys vs es.ts, fill gaps, remove hardcoded Spanish.
+- [x] 1.5 Cart (nav-right) L4/L5/L6 parity — badge+header total, payment/Vuelto,
+  payment-type icons, credit-module gating, print-invoice toggle, validations. Scope
+  RESOLUTION: the cart UI + POS checkout FLOW (dropdown header "Venta actual"+order-type,
+  payment/Vuelto, payment-type selector with icons, credit toggle+client input gated by
+  `hasCreditsModuleAvailable`, print-invoice toggle (UI-only, no print output — parity with
+  Angular's disabled jsPDF path), Limpiar/Registrar buttons, createOrder validations) is
+  Sales-stage (L4/L5/L6) parity work, done here. Only the cross-cutting offline
+  `ShoppingCartService`/inventory-availability-on-increase/decrease audit stays referenced
+  under Stage 6 Sync (see 6.1 note below) — this reconciles the prior contradiction between
+  explore.md (verify in Sales stage) and design.md/this file (routed cart service to Sync).
+  Deferred sub-item (NOT implemented here, candidate for Stage 2 Inventory or Stage 6 Sync):
+  inventory-availability validation on cart increase/decrease (Angular's
+  `ShoppingCartService.increaseCartItem` checks stock; React cart store is local-only).
+- [x] 1.4 Verify: matrix all-green, tests pass, visual spot-check.
 
 NOTE: also resolve open question from Stage 0 — Angular's authenticated-root redirect
 (`'' -> /sales/sale` inside ClientLayoutComponent) has no React equivalent yet; React's index
@@ -99,8 +112,14 @@ route always shows the public landing page regardless of auth state.
 ## Stage 6 — Sync (includes deferred PWA cross-cutting audit)
 
 - [ ] 6.1 PWA cross-cutting audit: for each Angular _services/* (connection, download-manager, SW
-  update, usage-tracker, shopping-cart/order) determine React coverage - Angular has dedicated
+  update, usage-tracker) determine React coverage - Angular has dedicated
   services, React coverage scattered/unconfirmed per design; build gap matrix per service.
+  SCOPE NOTE (resolved this batch): `_services/order/shopping-cart.service.ts` here is ONLY the
+  cross-cutting offline `ShoppingCartService`/inventory-availability-on-increase/decrease audit
+  (Angular's `increaseCartItem`/`decreaseCartItem` stock checks — React's cart store is
+  local-only and does not validate stock). The cart UI + POS checkout FLOW parity (dropdown,
+  payment/Vuelto, payment-type icons, credit gating, print-invoice toggle, validations) was
+  done in Stage 1 (see 1.5) — do NOT re-scope that here.
 - [ ] 6.2 Fix identified gaps, consolidate scattered React logic into dedicated services where missing
   [TDD].
 - [ ] 6.3 L4 functional diff (app/sync/**) + fix [TDD].

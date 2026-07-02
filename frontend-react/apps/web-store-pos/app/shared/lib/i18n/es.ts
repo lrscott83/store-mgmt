@@ -122,6 +122,29 @@ const messages: Record<string, string> = {
   'CART.ITEMS': '{count, plural, one {# artículo} other {# artículos}}',
   'CART.CLIENT_NAME_REQUIRED': 'El nombre del cliente es requerido para ventas a crédito',
 
+  // Shopping Cart (Angular SHOPPING_CART.* — vocabs/es.ts, byte-identical. This is the
+  // nav-right cart-dropdown keyset (batch: Stage 1 Sales cart parity); CART.* above
+  // predates this batch and stays as-is, not renamed, to avoid churn in existing call
+  // sites/tests).
+  'SHOPPING_CART.PRODUCTS_LABEL': 'productos',
+  'SHOPPING_CART.PRODUCT_LABEL': 'producto',
+  'SHOPPING_CART.REGISTER': 'Registrar',
+  'SHOPPING_CART.PRICE_LABEL': 'Precio: ',
+  'SHOPPING_CART.ORDER_CREATED': 'La venta fue creada satisfactoriamente.',
+  'SHOPPING_CART.ORDER_NOT_CREATED':
+    'Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
+  'SHOPPING_CART.DON_NOT_PAY_EMPTY_CART':
+    'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
+  'SHOPPING_CART.PRINT_INVOICE': 'Imprimir Factura (prueba)',
+  'SHOPPING_CART.CLEAR': 'Limpiar',
+  'SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL':
+    'Usted no puede realizar la venta porque el pago es menor que el total.',
+  'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT':
+    'Usted no puede realizar la venta por cobrar sin especificar el cliente.',
+
+  // GENERAL.PAY — Angular's mat-form-field label for the cart's payment/tendered-amount input.
+  'GENERAL.PAY': 'Pago',
+
   // Products (Angular PRODUCT.* / PRODUCT_CATEGORY.* — literal Spanish strings from
   // frontend/src/app/_modules/i18n/vocabs/es.ts, kept byte-identical for L6 parity)
   'PRODUCTS.TITLE': 'Productos',

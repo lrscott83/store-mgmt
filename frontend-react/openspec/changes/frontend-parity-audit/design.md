@@ -54,7 +54,7 @@ Output per module: missing keys + changed keys + hardcoded-string locations.
 
 ## Service Parity Method
 
-Confirm factory pattern: React `createService(offline, online)` returns offline when `USE_ONLINE_SERVICE=false`. Enumerate Angular `application/*` services → map each method to React `*-offline-service.ts`; matrix method-level gaps. PWA cross-cutting = DESIGN QUESTIONS (Angular has `_services/connection`, `_services/download-manager`, `_services/update`, `_services/usage-tracker`, `_services/order/shopping-cart`; React coverage unconfirmed — grep found only scattered refs). Resolve these in the Sync foundation stage before declaring any module at parity.
+Confirm factory pattern: React `createService(offline, online)` returns offline when `USE_ONLINE_SERVICE=false`. Enumerate Angular `application/*` services → map each method to React `*-offline-service.ts`; matrix method-level gaps. PWA cross-cutting = DESIGN QUESTIONS (Angular has `_services/connection`, `_services/download-manager`, `_services/update`, `_services/usage-tracker`; React coverage unconfirmed — grep found only scattered refs). Resolve these in the Sync foundation stage before declaring any module at parity. NOTE (resolved, Stage 1 cart batch): `_services/order/shopping-cart.service.ts`'s cart UI/checkout FLOW parity is Stage 1 (Sales) scope, not Sync — only its cross-cutting inventory-availability-on-increase/decrease audit remains a Sync-stage design question (see tasks.md 6.1).
 
 ## Per-Module Execution Template (every slice identical)
 
