@@ -1484,3 +1484,229 @@ Both WARNINGs from the Stage 1 RE-VERIFY pass are resolved. Stage 1 (Sales) is n
 closed pending a final `sdd-verify` re-pass (recommended before `sdd-archive`), or Stage 2
 (Inventory) `sdd-apply` may proceed for the remaining carry-over items (2.5.1 cart
 increase/decrease validation + 2.6 login/auth parity).
+
+## Tier-0 Hotfix Batch (2026-07-02)
+
+A focused, out-of-band batch requested directly by the user: three LIVE bugs breaking users
+in production, fixed ahead of (and separate from) the Stage 2+ SDD plan. Scope: Fix A, B, C
+ONLY — no Tier-1 items (http services, interceptors, toastr, sidebar, guards) touched. Clean
+base — no legacy-data migrator built for Fix C.
+
+### Fix A (P0) — Session not restored on app boot
+
+**Bug:** `app/shared/lib/stores/auth-store.ts` initialized to `{ user: null, isAuthenticated:
+false }`; its hydrate-from-localStorage action `initialize()` was called ONLY by tests, never
+in production. Route loaders (`app/auth/routes/loaders.ts` — `authLoader`, `featureLoader`,
+etc.) read an empty store via `useAuthStore.getState()` on cold boot / hard refresh / direct
+navigation, logging the user out even with a valid, unexpired localStorage session. React
+port gap of Angular's `APP_INITIALIZER` (`app.module.ts:69-83` → `AppInitService.Init()` →
+`AuthService.getUserByToken()`).
+
+**Investigation — RR-v7 mechanism options considered:**
+- This app runs in **SPA mode** (`ssr:false` in `react-router.config.ts` — confirmed by
+  reading the file; comment explains: "Auth state lives in a client-side Zustand store
+  hydrated from localStorage, which server loaders cannot see — running loaders on the client
+  avoids the false 'not authenticated' redirect"). There is no `entry.client.tsx`/
+  `entry.server.tsx` override (RR7 framework defaults are used) and no server ever runs at
+  request time.
+- `app/shared/components/app-layout.tsx` already exports `clientLoader = authLoader` on the
+  authenticated layout route — the existing pattern for RR7 client loaders in this codebase.
+- Option 1 (rejected): add a root `clientLoader` in `root.tsx` that calls
+  `useAuthStore.getState().initialize()`. Rejected because RR7 runs parent and child
+  `clientLoader`s in **parallel**, not guaranteed-sequential — a root loader racing against
+  `app-layout.tsx`'s `authLoader` clientLoader does NOT guarantee hydration completes first.
+- Option 2 (chosen): hydrate **synchronously at module-scope**, guarded by
+  `typeof window !== 'undefined'`, immediately after `create()` in `auth-store.ts`. ES module
+  evaluation is synchronous and modules are cached (evaluated exactly once); any importer of
+  `auth-store.ts` (including `loaders.ts`) triggers this module's full evaluation — including
+  the guarded `initialize()` call — before the importer's own top-level code runs. This
+  GUARANTEES ordering regardless of RR7's loader scheduling, with no dependency on which
+  loader mechanism (root clientLoader vs per-route clientLoader) is used.
+
+**Fix:** `app/shared/lib/stores/auth-store.ts` — added, after the `create<AuthState>(...)`
+call:
+```ts
+if (typeof window !== 'undefined') {
+  useAuthStore.getState().initialize();
+}
+```
+SSR-safe: this only ever executes in the browser at runtime (SPA mode has no server-time
+evaluation), but the `typeof window` guard also keeps the file safe to import from any
+Node-side tooling. Token-expiry behavior preserved unchanged — `initialize()`'s existing
+`readStoredUser()` (auth-store.ts:19-30) still clears an expired stored user and restores a
+valid one; this fix only changes WHEN `initialize()` runs (module-load time, always), not
+its logic.
+
+**Tests (TDD):** new file
+`app/auth/routes/__tests__/loaders.cold-boot.test.ts` — uses the REAL (unmocked) auth-store +
+real `authLoader` (unlike `loaders.test.ts`, which mocks the store entirely to unit-test
+authorization branches and therefore cannot catch this regression). `vi.resetModules()` +
+dynamic `import()` per test forces a fresh module graph each time so the store's module-scope
+hydration side effect runs AFTER localStorage is seeded, reproducing a true cold page load.
+3 cases: valid unexpired user → `authLoader()` returns `null` (no redirect); expired user →
+redirect to `/login` AND storage cleared; no stored user → redirect to `/login`.
+
+**RED confirmed:** before the fix, the "valid unexpired user" case failed — `authLoader()`
+returned a 302 Response to `/login` instead of `null` (exact failure captured: `expected
+Response {status: 302, location: '/login'} to be null`). **GREEN confirmed:** after the fix,
+all 3 new cases pass; existing `auth-store.test.ts` (14 tests) and `loaders.test.ts` (28
+tests, fully-mocked-store unit tests) still pass unchanged.
+
+**Integration verification (cold boot):** No browser-automation tool was available in this
+environment, so the strongest verification performed was: (1) the real-module integration
+test above, which is AS CLOSE to a true cold boot as achievable without a running browser —
+real store, real loader, fresh module graph, localStorage seeded first, zero mocking of the
+subject under test; (2) a code-trace argument (module-evaluation-order guarantee, above); (3)
+a build sanity check — `vite preview` served the built `index.html` (200 OK) referencing the
+`root-*.js` chunk that contains the auth-store import chain. This is NOT a substitute for
+watching a real browser cold-load a seeded session, which could not be driven here — flagged
+explicitly rather than silently assumed.
+
+### Fix B (real bug) — Service Worker never registered
+
+**Bug:** `vite.config.ts` uses `registerType: 'prompt'` + `injectRegister: false`, requiring
+the app to call `virtual:pwa-register`'s `registerSW()` itself. No such call existed anywhere
+(confirmed absent even in the previously-built bundle) — all PWA/precache/offline machinery
+was inert in this offline-first POS.
+
+**Angular reference (verbatim source, not paraphrased):**
+`frontend/src/app/_services/update/update.service.ts` `showUpdateDialog()`:
+- `title: '¡Nueva versión disponible!'`
+- `text: 'Se ha detectado una nueva versión de la aplicación.'`
+- `icon: 'info'`, `showConfirmButton: true`, `allowOutsideClick: false`,
+  `allowEscapeKey: false` (blocking, no cancel button)
+- `confirmButtonText: 'Actualizar ahora'`
+- `customClass: { confirmButton: 'swal2-confirm swal2-styled' }`
+- On confirm: `activateUpdate().then(() => location.reload())`
+This is the ONE Angular Swal call site that hardcodes Spanish text directly (no i18n key) —
+React reproduces that verbatim, not routed through `es.ts`.
+
+**Fix:**
+- `app/shared/lib/blocking-alert.ts` — added `showUpdateAvailable(onConfirm)`, matching
+  Angular's dialog config exactly (byte-identical strings/config), calling `onConfirm()` only
+  when `result.isConfirmed`.
+- `app/root.tsx` — added `registerServiceWorker()`, called from a `useEffect` in the default
+  `App()` component (root layout, wraps every route). Guarded by `typeof window !==
+  'undefined'` AND `'serviceWorker' in navigator` (also keeps this inert in jsdom test env,
+  which doesn't implement `navigator.serviceWorker`). Dynamically imports
+  `virtual:pwa-register`, calls `registerSW({ onNeedRefresh, onOfflineReady })`.
+  `onNeedRefresh` → `showUpdateAvailable(() => updateSW(true))` (matches Angular's confirm →
+  activate → reload flow; `app/service-worker.ts` already handles the resulting
+  `SKIP_WAITING` message). `onOfflineReady` → best-effort `console.info` only — Angular's
+  `UpdateService` has no offline-ready UI either, so none was invented.
+- `apps/web-store-pos/tsconfig.json` — added `"vite-plugin-pwa/client"` to `compilerOptions.types`
+  so `virtual:pwa-register`'s module declaration resolves for `tsc`.
+- `apps/web-store-pos/package.json` + `pnpm-lock.yaml` — added `workbox-window: ^7.4.1` as a
+  direct dependency. Discovered mid-build: `vite-plugin-pwa` declares `workbox-window` as a
+  **peerDependency** (required at runtime for `virtual:pwa-register`'s dynamic
+  `import('workbox-window')`), and pnpm's strict node_modules isolation does NOT hoist
+  peer-deps of devDependencies into the consuming app automatically — the build failed with
+  `Rollup failed to resolve import "workbox-window"` until this was added explicitly.
+
+**Tests (TDD):** `app/shared/lib/__tests__/blocking-alert.test.ts` — 2 new cases for
+`showUpdateAvailable`: fires the exact Angular dialog config and calls `onConfirm` when
+confirmed; does NOT call `onConfirm` when dismissed. **RED confirmed:** `showUpdateAvailable
+is not a function` before implementation. **GREEN confirmed** after.
+
+**Integration verification (built-bundle grep — the exact check the audit used to prove SW
+registration was missing):**
+- `react-router build` succeeded (SPA mode client build + service-worker build + injectManifest
+  precache of 104 entries / 1342.70 KiB).
+- `grep -rl "serviceWorker" build/client/assets/*.js` → matches in `root-*.js`,
+  `virtual_pwa-register-*.js`, `workbox-window.prod.es5-*.js`, plus `app-layout-*.js` (the
+  existing PWA-02 `postMessage` call) and `landing-deep-*.js`.
+- `root-*.js` contains the literal `serviceWorker"in navigator` guard and `onNeedRefresh` —
+  confirming `registerServiceWorker()` is present in the shipped root chunk.
+- `virtual_pwa-register-*.js` (dedicated chunk) contains the real `registerSW` implementation:
+  `new Workbox("/service-worker.js", {scope:"/", type:"classic"})` → `t.register({immediate})`
+  → internally, `workbox-window.prod.es5-*.js` calls `serviceWorker.register(...)`.
+- This is the SAME grep-for-registration check the original audit used to PROVE the SW was
+  never registered — now positive.
+- Sanity check: `vite preview` served the built `index.html` (200 OK), referencing
+  `root-BopWWmaA.js` (the chunk containing the SW-registration wiring).
+
+### Fix C (cheap correctness) — inventory localStorage key naming
+
+**Bug:** `app/inventory/lib/repositories/inventory-repository.ts` produced
+`lizoft.store-inventoryentries-{storeId}` (via `StorageKeys.entityKey('inventoryentries',
+storeId)`) — inconsistent with every other key's hyphenated convention and with Angular's
+`lizoft.store-inventory-entries-{storeId}` (`inventory-offline.service.ts:29-30`).
+
+**Fix:** Changed the literal from `'inventoryentries'` to `'inventory-entries'` — one-line
+change. Clean base (no existing users/data), so per explicit instruction NO legacy-key
+migrator/reader was built.
+
+**Tests updated (old key literal → new key literal, mechanical replacement, no behavior
+change to test intent):**
+- `app/inventory/lib/repositories/__tests__/inventory-repository.test.ts` (2 occurrences)
+- `app/inventory/lib/services/__tests__/inventory-offline-service.test.ts` (2 occurrences)
+- `app/inventory/lib/services/__tests__/egress-offline-service.test.ts` (2 occurrences)
+- `app/sales/routes/__tests__/sale.test.tsx` (1 occurrence)
+
+**RED confirmed:** ran the 4 affected test files before the repository fix — 19 failures
+across 3 files (`inventory-repository.test.ts`, `inventory-offline-service.test.ts`,
+`egress-offline-service.test.ts`; `sale.test.tsx` incidentally still passed pre-fix because
+its assertion only checks that SOME localStorage key holds the seeded data, not the exact
+name — but the literal was updated for consistency anyway). **GREEN confirmed:** all 4 files
+pass after the fix (68/68 in that targeted run).
+
+**Grep verification:** `rg -n "inventoryentries"` across `frontend-react/` (excluding docs) →
+zero remaining references. `rg -n "inventoryentries|inventory-entries"` confirms Angular
+(`frontend/src/app/application/synchronization/data.file.model.ts`,
+`entries/inventory-offline.service.ts`) and the docs (`docs/plans/angular-analysis.md`,
+`docs/prd/*.md`) already documented `inventory-entries` as the correct form — React now
+matches.
+
+### TDD Cycle Evidence (Tier-0 Hotfix Batch)
+
+| Fix | RED | GREEN |
+|---|---|---|
+| A — session cold-boot hydration | `loaders.cold-boot.test.ts` (new file, 3 cases) — confirmed 1 failure (valid-session case redirected to `/login` instead of returning `null`) before the module-scope `initialize()` guard was added | module-scope hydration added to `auth-store.ts`; re-ran, 3/3 new + 14/14 `auth-store.test.ts` + 28/28 `loaders.test.ts` passed |
+| B — SW registration + update dialog | `blocking-alert.test.ts` (2 new cases) — confirmed `showUpdateAvailable is not a function` before implementation | `showUpdateAvailable` added to `blocking-alert.ts`, wired into `root.tsx`; re-ran, 2/2 new + build-bundle grep positive |
+| C — inventory key rename | 4 test files edited to the new key literal first — confirmed 19 failures (`lizoft.store-inventoryentries-s1` not found) across 3 files before the repository fix | `inventory-repository.ts` literal changed; re-ran, 68/68 passed across the 4 affected files |
+
+### Test/Build Results (Tier-0 Hotfix Batch)
+
+- `pnpm -C apps/web-store-pos exec tsc --noEmit`: clean, zero errors.
+- `pnpm test` (from `frontend-react/`, via turbo): **96 test files / 1033 tests passed, 0
+  failed** (was 95 files / 1028 tests before this batch — +1 new test file
+  (`loaders.cold-boot.test.ts`, 3 tests) + 2 new `showUpdateAvailable` assertions = +5 net;
+  4 existing test files had a mechanical key-literal edit with no test-count change).
+- `pnpm -C apps/web-store-pos exec react-router build`: succeeded (SPA mode client build +
+  service-worker injectManifest build, 104 precache entries / 1342.70 KiB). Initially FAILED
+  with `Rollup failed to resolve import "workbox-window"` until `workbox-window` was added as
+  a direct dependency (see Fix B) — re-ran clean after `pnpm install`.
+
+### Issues Found (Tier-0 Hotfix Batch)
+
+- Fix A's correct RR-v7 mechanism was NOT obvious — two real candidate approaches existed
+  (root `clientLoader` vs module-scope synchronous hydration); documented both above with the
+  reasoning for rejecting the root-loader approach (parallel loader execution ordering is not
+  guaranteed in RR7) rather than guessing silently.
+- Fix B build failure (`workbox-window` unresolved) was NOT anticipated from reading
+  `vite.config.ts`/`package.json` alone — only surfaced when actually running
+  `react-router build`, confirming the value of the mandated integration-build verification
+  step for this fix.
+- True end-to-end browser verification (seeded localStorage → real cold navigation → observe
+  no `/login` bounce) could NOT be performed — no browser-automation tool was available in
+  this environment. Flagged explicitly per the fix's own instructions rather than silently
+  assumed; the real-module integration test + code-trace argument is the strongest
+  substitute available.
+
+### Workload / PR Boundary (Tier-0 Hotfix Batch)
+
+- Mode: single direct work-unit commit (or a small number of tightly-scoped commits) on
+  `feat/frontend-parity-audit`, no push, no PR, per explicit instruction. Well under the
+  400-line budget (~10 source/config files + 5 test files + 1 new test file + lockfile).
+- Boundary: Fix A, B, C ONLY. Does NOT touch Tier-1 items (http services, interceptors,
+  toastr, sidebar, guards) — those remain the upcoming Stage 2 SDD plan. Does NOT touch any
+  Stage 1 (Sales) code, the Stage 2 carry-over items (2.5.1 cart validation, 2.6 login/auth
+  parity beyond what Fix A incidentally also fixes), or build any legacy-data migrator (clean
+  base, explicitly out of scope).
+
+### Status — Tier-0 Hotfix Batch CLOSED
+
+All three fixes (A, B, C) implemented, tested (TDD RED→GREEN), and verified. `tsc` clean,
+1033/1033 tests passing, build succeeds, SW-registration bundle grep positive. This batch is
+independent of and does not block the Stage 2+ (Inventory/Login) SDD plan — it may proceed
+separately.

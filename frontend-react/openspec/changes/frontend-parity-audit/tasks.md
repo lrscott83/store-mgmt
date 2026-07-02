@@ -314,3 +314,25 @@ Statistics -> PR #9 Profile -> PR #10 Help (smallest, fast-track candidate).
 Decision needed before apply: NO (for Stage 0, resolved — delivered as direct commits per
 instruction). Still YES for Stage 1+: orchestrator must confirm chain strategy
 (stacked-to-main vs feature-branch-chain) before those stages' sdd-apply begins.
+
+## Tier-0 Hotfix Batch (out-of-band, 2026-07-02) — STATUS: COMPLETE
+
+Live production bugs, fixed ahead of and separate from the Stage 2+ module plan above. Scope
+explicitly limited to Fix A/B/C — no Tier-1 items (http services, interceptors, toastr,
+sidebar, guards). Full detail in `apply-progress.md` "Tier-0 Hotfix Batch" section.
+
+- [x] Fix A (P0) — Session not restored on app boot. `auth-store.ts` module-scope
+  `initialize()` hydration guarded by `typeof window !== 'undefined'`; new integration test
+  `app/auth/routes/__tests__/loaders.cold-boot.test.ts` proves `authLoader` no longer bounces
+  a valid unexpired cold-boot session to `/login`.
+- [x] Fix B — Service Worker never registered. `registerSW` wired in `root.tsx` (client-only
+  `useEffect`), Angular's exact "nueva versión disponible" dialog ported to
+  `blocking-alert.ts` (`showUpdateAvailable`), `workbox-window` added as a required direct
+  dependency, `vite-plugin-pwa/client` added to `tsconfig.json` types. Verified via built-
+  bundle grep (the audit's original missing-SW check, now positive).
+- [x] Fix C — Inventory localStorage key naming. `inventory-repository.ts` key literal
+  changed from `inventoryentries` to `inventory-entries`, matching Angular. No migrator
+  (clean base). 4 test files updated to the new key literal.
+
+Test/Build: `tsc --noEmit` clean; `pnpm test` 96 files / 1033 tests passed (was 95/1028,
++5 net); `react-router build` succeeds (workbox-window dependency fix required first).
