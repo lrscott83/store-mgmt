@@ -109,6 +109,101 @@ describe('InventoryOfflineService', () => {
     });
   });
 
+  // Angular parity: InventoryOfflineService.getAvailableInventories ->
+  // hasAvailableProductToSale gates cost allocation on product eligibility
+  // (inventory-offline.service.ts:397-442). L4 map diff-matrix #6 / prioritized-list item #7.
+  describe('INV-06: getAvailableInventoryCosts — eligibility gate (Angular parity)', () => {
+    it('returns [] and does not deduct when eligibility.product.isActive is false', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { order: 0, available: 6, costPrice: 2.5 })]);
+      seedInventory(storeId, map);
+
+      const costs = service.getAvailableInventoryCosts('p1', 3, {
+        product: { isActive: false, availableToSale: true, discountFromInvantory: true },
+        hasInventoryModule: true,
+      });
+      expect(costs).toEqual([]);
+
+      // No mutation: a fresh service can still deduct the full original 6 units.
+      const service2 = new InventoryOfflineService(storeId);
+      const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
+      expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
+    });
+
+    it('returns [] and does not deduct when eligibility.product.availableToSale is false', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { order: 0, available: 6, costPrice: 2.5 })]);
+      seedInventory(storeId, map);
+
+      const costs = service.getAvailableInventoryCosts('p1', 3, {
+        product: { isActive: true, availableToSale: false, discountFromInvantory: true },
+        hasInventoryModule: true,
+      });
+      expect(costs).toEqual([]);
+
+      const service2 = new InventoryOfflineService(storeId);
+      const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
+      expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
+    });
+
+    it('returns [] when isActive/availableToSale are eligible but active stock is insufficient (module enabled + discountFromInvantory)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { order: 0, available: 2, costPrice: 2.5 })]);
+      seedInventory(storeId, map);
+
+      const costs = service.getAvailableInventoryCosts('p1', 5, {
+        product: { isActive: true, availableToSale: true, discountFromInvantory: true },
+        hasInventoryModule: true,
+      });
+      expect(costs).toEqual([]);
+    });
+
+    it('bypasses the stock-sufficiency check (Angular branch 4) when hasInventoryModule is false, computing partial costs from real stock', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { order: 0, available: 2, costPrice: 2.5 })]);
+      seedInventory(storeId, map);
+
+      // Requesting 5 but only 2 available: gated (module+discount enabled) this would be [],
+      // but with hasInventoryModule=false Angular's bypass branch succeeds unconditionally and
+      // the FIFO computation still runs against the real (insufficient) stock.
+      const costs = service.getAvailableInventoryCosts('p1', 5, {
+        product: { isActive: true, availableToSale: true, discountFromInvantory: true },
+        hasInventoryModule: false,
+      });
+      expect(costs).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 2 }]);
+    });
+
+    it('bypasses the stock-sufficiency check when product.discountFromInvantory is false, even with module enabled', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { order: 0, available: 2, costPrice: 2.5 })]);
+      seedInventory(storeId, map);
+
+      const costs = service.getAvailableInventoryCosts('p1', 5, {
+        product: { isActive: true, availableToSale: true, discountFromInvantory: false },
+        hasInventoryModule: true,
+      });
+      expect(costs).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 2 }]);
+    });
+
+    it('computes costs normally (unchanged from the no-eligibility-arg path) for a fully eligible product with sufficient stock', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { order: 0, available: 6, costPrice: 2.5 }),
+        makeEntry('e2', 'p1', { order: 1, available: 4, costPrice: 3.0 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const costs = service.getAvailableInventoryCosts('p1', 7, {
+        product: { isActive: true, availableToSale: true, discountFromInvantory: true },
+        hasInventoryModule: true,
+      });
+      expect(costs).toEqual([
+        { id: 'e1', costPrice: 2.5, quantity: 6 },
+        { id: 'e2', costPrice: 3.0, quantity: 1 },
+      ]);
+    });
+  });
+
   describe('INV-02: increaseQuantitiesByOrderItems — S-I3 restore', () => {
     it('restores available for each entry referenced in productCosts', () => {
       const map = new Map<string, InventoryEntry[]>();

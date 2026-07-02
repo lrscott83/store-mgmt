@@ -143,7 +143,11 @@ describe('OrderOfflineService', () => {
       const product = makeProduct({ discountFromInvantory: true });
       const items = makeCartItems([{ product, quantity: 2 }]);
       service.create(items, PaymentType.Efectivo, false, '');
-      expect(inventoryMock.getAvailableInventoryCosts).toHaveBeenCalledWith('p1', 2);
+      // hasInventoryModule defaults to true when create()'s 6th param is omitted.
+      expect(inventoryMock.getAvailableInventoryCosts).toHaveBeenCalledWith('p1', 2, {
+        product,
+        hasInventoryModule: true,
+      });
     });
 
     it('does NOT call getAvailableInventoryCosts when discountFromInvantory=false', () => {
@@ -152,6 +156,26 @@ describe('OrderOfflineService', () => {
       const items = makeCartItems([{ product, quantity: 2 }]);
       service.create(items, PaymentType.Efectivo, false, '');
       expect(inventoryMock.getAvailableInventoryCosts).not.toHaveBeenCalled();
+    });
+
+    // Real behavior fix (L4 map diff-matrix #6 / prioritized-list item #7): Angular's
+    // createOrderItems gates FIFO deduction on `product.discountFromInvantory &&
+    // hasInventoryModuleAvailable()` (order-offline.service.ts:360). Previously create() only
+    // checked discountFromInvantory, so a product left with discountFromInvantory=true after
+    // the store's inventory module was disabled would still silently deduct inventory.
+    it('does NOT call getAvailableInventoryCosts when discountFromInvantory=true but the inventory module is disabled', () => {
+      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
+      const product = makeProduct({ discountFromInvantory: true });
+      const items = makeCartItems([{ product, quantity: 2 }]);
+      service.create(items, PaymentType.Efectivo, false, '', OrderType.Normal, false);
+      expect(inventoryMock.getAvailableInventoryCosts).not.toHaveBeenCalled();
+    });
+
+    it('leaves productCosts empty when discountFromInvantory=true but the inventory module is disabled', () => {
+      const product = makeProduct({ discountFromInvantory: true });
+      const items = makeCartItems([{ product, quantity: 2 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Normal, false);
+      expect(order.orderItems[0].productCosts).toEqual([]);
     });
 
     it('sets productCosts from getAvailableInventoryCosts when discountFromInvantory=true', () => {
@@ -428,7 +452,10 @@ describe('OrderOfflineService', () => {
       const product = makeProduct({ discountFromInvantory: true });
       const items = makeCartItems([{ product, quantity: 2, price: 9 }]);
       service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
-      expect(inventoryMock.getAvailableInventoryCosts).toHaveBeenCalledWith('p1', 2);
+      expect(inventoryMock.getAvailableInventoryCosts).toHaveBeenCalledWith('p1', 2, {
+        product,
+        hasInventoryModule: true,
+      });
     });
   });
 });

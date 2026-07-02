@@ -26,8 +26,19 @@ export interface ProductInventoryAvailability {
   available: number;
 }
 
+/**
+ * The subset of Product fields checkProductAvailabilityToSale actually reads. Widened from a
+ * full `Product` so callers that only have partial product data (e.g. InventoryOfflineService's
+ * eligibility gate, which doesn't otherwise depend on Product) can reuse this predicate without
+ * duplicating it. A full `Product` still satisfies this type structurally.
+ */
+export type ProductAvailabilityFields = Pick<
+  Product,
+  'isActive' | 'availableToSale' | 'discountFromInvantory'
+>;
+
 export interface CheckProductAvailabilityParams {
-  product: Product | undefined;
+  product: ProductAvailabilityFields | undefined;
   /** Quantity being added right now (the form's quantity field). */
   quantity: number;
   /** Angular's shoppingCartService.getCartItemQuantity(productId) — quantity already in cart. */

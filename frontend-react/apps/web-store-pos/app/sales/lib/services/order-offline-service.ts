@@ -118,6 +118,10 @@ export class OrderOfflineService {
     isCredit: boolean,
     clientName: string,
     orderType: OrderType = OrderType.Normal,
+    // Defaults to true so the many pre-existing tests that don't exercise the
+    // module-disabled path are unaffected; the one real caller (CartShell.handleCreateOrder)
+    // always passes the actual authorizationService.hasInventoryModuleAvailable() value.
+    hasInventoryModule: boolean = true,
   ): Order {
     const now = new Date();
     const orderId = generateId();
@@ -127,8 +131,20 @@ export class OrderOfflineService {
       const { product, quantity } = cartItem;
       let productCosts: import('@store-mgmt/domain').InventoryEntryCost[] = [];
 
-      if (product.discountFromInvantory) {
-        productCosts = this.inventoryService.getAvailableInventoryCosts(product.id, quantity);
+      // 1:1 port of Angular's OrderOfflineService.createOrderItems gate
+      // (order-offline.service.ts:360): `product.discountFromInvantory &&
+      // authorizationService.hasInventoryModuleAvailable()`. Previously this only checked
+      // discountFromInvantory, so a product left with discountFromInvantory=true after the
+      // store's inventory module was disabled would still silently deduct inventory — fixed
+      // here to match Angular exactly (L4 map diff-matrix #6 / prioritized-list item #7).
+      // getAvailableInventoryCosts also receives the eligibility context so it self-defends
+      // against isActive/availableToSale changes since add-to-cart time, mirroring Angular's
+      // internal hasAvailableProductToSale chain.
+      if (product.discountFromInvantory && hasInventoryModule) {
+        productCosts = this.inventoryService.getAvailableInventoryCosts(product.id, quantity, {
+          product,
+          hasInventoryModule,
+        });
       }
 
       return {

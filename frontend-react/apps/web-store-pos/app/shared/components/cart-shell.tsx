@@ -176,7 +176,14 @@ export function CartShell() {
     try {
       const storeId = user?.selectedStoreId ?? '';
       const orderService = new OrderOfflineService(storeId);
-      orderService.create(items, paymentType, isCredit, clientName.trim(), orderType);
+      orderService.create(
+        items,
+        paymentType,
+        isCredit,
+        clientName.trim(),
+        orderType,
+        user ? hasInventoryModuleAvailable(user) : false,
+      );
       // NOTE (parity, intentionally not implemented): Angular's mustGenerateFacture branch
       // calls generateTicket(), which is dead/disabled code in Angular itself (no-op
       // console.log — jsPDF generation is commented out). The toggle is preserved for

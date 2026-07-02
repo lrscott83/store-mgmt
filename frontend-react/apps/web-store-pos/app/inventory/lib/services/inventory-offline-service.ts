@@ -1,6 +1,33 @@
 import type { InventoryEntry, InventoryEntryCost, InventoryEntryView, OrderItem } from '@store-mgmt/domain';
 import { InventoryRepository } from '../repositories/inventory-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
+import {
+  checkProductAvailabilityToSale,
+  type ProductAvailabilityFields,
+} from '~/sales/lib/product-availability';
+
+/**
+ * Optional eligibility context for {@link InventoryOfflineService.getAvailableInventoryCosts}.
+ * When supplied, gates the product exactly like Angular's
+ * `InventoryOfflineService.getAvailableInventories` -> `hasAvailableProductToSale` chain
+ * (frontend/src/app/application/entries/inventory-offline.service.ts:397-442) BEFORE any FIFO
+ * cost allocation happens or any entry is mutated: inactive / not-available-to-sale products
+ * yield an empty cost list, and — when the inventory module is enabled AND the product
+ * discounts from inventory — insufficient active stock also yields an empty list. When the
+ * module is disabled or the product doesn't discount from inventory, Angular's own bypass
+ * branch applies (matches `checkProductAvailabilityToSale` branch 4) and the FIFO computation
+ * proceeds unblocked, exactly as Angular does.
+ *
+ * Optional (rather than required) so the many pre-existing FIFO-mechanics unit tests that only
+ * care about entry ordering/persistence — not product eligibility — are unaffected; the one real
+ * production caller (`OrderOfflineService.create`) always supplies it.
+ *
+ * L4 map diff-matrix #6 / prioritized-list item #7 (sdd/frontend-parity-audit, Stage 2.1).
+ */
+export interface InventoryCostEligibility {
+  product: ProductAvailabilityFields | undefined;
+  hasInventoryModule: boolean;
+}
 
 /**
  * Available stock grouped by category → product.
@@ -162,8 +189,23 @@ export class InventoryOfflineService {
    *
    * Spec §6.3 getAvailableInventoryCosts contract; S-I2.
    */
-  getAvailableInventoryCosts(productId: string, quantity: number): InventoryEntryCost[] {
+  getAvailableInventoryCosts(
+    productId: string,
+    quantity: number,
+    eligibility?: InventoryCostEligibility,
+  ): InventoryEntryCost[] {
     if (quantity <= 0) return [];
+
+    if (eligibility) {
+      const gate = checkProductAvailabilityToSale({
+        product: eligibility.product,
+        quantity,
+        cartQuantity: 0,
+        hasInventoryModule: eligibility.hasInventoryModule,
+        inventory: this.getAvailableQuantity(productId),
+      });
+      if (!gate.succeeded) return [];
+    }
 
     const map = this.repo.getAll(this.storeId);
     const entries = (map.get(productId) ?? [])
