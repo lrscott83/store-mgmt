@@ -289,6 +289,33 @@ describe('EntryList — smoke render', () => {
   });
 });
 
+// ─── EntryList — readOnly prop (Angular parity: entry-list.component.ts:22
+// `@Input() readOnly: boolean = true` — gates the edit/delete menu) ─────────
+
+describe('EntryList — readOnly prop (Angular parity)', () => {
+  it('shows edit/deactivate actions by default (readOnly not passed)', () => {
+    render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Editar').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Anular pedido').length).toBeGreaterThan(0);
+  });
+
+  it('hides edit/deactivate actions when readOnly is true', () => {
+    render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} readOnly />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Editar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
+    // Data still renders — only the actions column is gated.
+    expect(screen.getAllByText('Coca Cola').length).toBeGreaterThan(0);
+  });
+});
+
 // ─── EditInventoryEntryModal ─────────────────────────────────────────────────
 
 vi.mock('~/sales/lib/services/product-offline-service', () => ({

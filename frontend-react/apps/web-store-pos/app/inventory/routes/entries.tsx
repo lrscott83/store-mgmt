@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
-import type { InventoryEntry, InventoryEntryView } from '@store-mgmt/domain';
+import type { InventoryEntryView } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -8,8 +8,6 @@ import { InventoryOfflineService } from '../lib/services/inventory-offline-servi
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { EntryList } from '../components/entry-list';
-import { EditInventoryEntryModal } from '../components/edit-inventory-entry-modal';
-import type { EditInventoryEntryInput } from '../components/edit-inventory-entry-modal';
 
 export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
 
@@ -68,15 +66,21 @@ function formatDateOnly(date: Date): string {
  * backing), none of these three controls — product-name filter, date-range filter,
  * payment-type radio — are ported. Entries render as a day-grouped accordion only (day-panel
  * pattern reused from `SaleCreditsPage`, `sales/routes/credits.tsx`).
+ *
+ * Read-only history (diff-matrix #19, L4 map): Angular's `entries.component.html:46`
+ * `<app-entry-list [entries$]="...">` passes NO `[readOnly]` override, so `entry-list`'s
+ * `@Input() readOnly: boolean = true` default applies — the edit/deactivate action column
+ * (`isOwnerAdmin() && !readOnly`, entry-list.component.html:23) is ALWAYS hidden here, and
+ * Angular's template has no "add new entry" button on this screen at all (that capability lives
+ * only on the separate Today Entries screen, `today-entries.component.html:7,24`, which passes
+ * `[readOnly]="false"`). React mirrors this exactly: `EntryList` is rendered with `readOnly`,
+ * and there is no add-entry button/modal here.
  */
 export function EntriesPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [dayGroups, setDayGroups] = useState<DayEntryGroup[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<InventoryEntry | undefined>();
-  const [modalError, setModalError] = useState('');
 
   function loadEntries() {
     const svc = new InventoryOfflineService(storeId);
@@ -105,55 +109,6 @@ export function EntriesPage() {
     });
   }
 
-  function handleEdit(entry: InventoryEntryView) {
-    setEditingEntry({
-      id: entry.id,
-      productId: entry.productId,
-      categoryId: '',
-      quantity: entry.quantity,
-      available: entry.quantity,
-      costPrice: entry.costPrice,
-      date: entry.date,
-      order: 0,
-      isActive: entry.isActive,
-      createdDate: new Date(),
-      createdByName: '',
-      updatedDate: new Date(),
-      updatedByName: '',
-    });
-    setIsModalOpen(true);
-    setModalError('');
-  }
-
-  function handleDeactivate(entry: InventoryEntryView) {
-    const svc = new InventoryOfflineService(storeId);
-    try {
-      svc.deactivate(entry.id, entry.productId);
-      loadEntries();
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  function handleSave(data: EditInventoryEntryInput, entryId?: string) {
-    const svc = new InventoryOfflineService(storeId);
-    try {
-      if (entryId) {
-        svc.update(entryId, data.productId, data.quantity, data.costPrice);
-      } else {
-        svc.create(data.productId, data.quantity, data.costPrice, data.categoryId, new Date(data.date));
-      }
-      loadEntries();
-      setIsModalOpen(false);
-      setEditingEntry(undefined);
-      setModalError('');
-    } catch (err) {
-      setModalError(
-        err instanceof Error ? err.message : intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      );
-    }
-  }
-
   const entriesCount = dayGroups.reduce((count, d) => count + d.count, 0);
   const entriesTotal = dayGroups.reduce((total, d) => total + d.total, 0);
 
@@ -168,16 +123,6 @@ export function EntriesPage() {
         </h1>
         <div className="flex items-center gap-4">
           <span className="text-sm font-semibold text-primary">${entriesTotal.toFixed(2)}</span>
-          <button
-            onClick={() => {
-              setEditingEntry(undefined);
-              setModalError('');
-              setIsModalOpen(true);
-            }}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            {intl.formatMessage({ id: 'INVENTORY.TODAY_ENTRIES.NEW_ENTRY' })}
-          </button>
         </div>
       </div>
 
@@ -209,29 +154,13 @@ export function EntriesPage() {
               </button>
               {isExpanded && (
                 <div className="border-t border-border px-4 py-3">
-                  <EntryList
-                    entries={dayGroup.entries}
-                    onEdit={handleEdit}
-                    onDeactivate={handleDeactivate}
-                  />
+                  <EntryList entries={dayGroup.entries} readOnly />
                 </div>
               )}
             </div>
           );
         })}
       </div>
-
-      <EditInventoryEntryModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingEntry(undefined);
-        }}
-        onSave={handleSave}
-        storeId={storeId}
-        entry={editingEntry}
-        error={modalError}
-      />
     </div>
   );
 }

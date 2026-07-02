@@ -201,6 +201,42 @@ describe('TodayEntriesPage — smoke render', () => {
   });
 });
 
+// ─── TodayEntriesPage — edit/deactivate actions regression guard (Angular
+// parity: today-entries.component.html:24 `<app-entry-list [readOnly]="false">`
+// — actions must stay reachable on THIS screen, unlike the Entries history
+// screen below, diff-matrix #19) ────────────────────────────────────────────
+
+describe('TodayEntriesPage — edit/deactivate actions stay reachable (regression guard)', () => {
+  it('renders row-level edit/deactivate actions for today entries', () => {
+    const todayEntries: InventoryEntryView[] = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        productName: 'Ron',
+        quantity: 5,
+        costPrice: 3,
+        date: new Date(),
+        isActive: true,
+      },
+    ];
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getByDate: vi.fn().mockReturnValue(todayEntries),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText('Editar')).toBeInTheDocument();
+    expect(screen.getByText('Anular pedido')).toBeInTheDocument();
+  });
+});
+
 // ─── EntriesPage ─────────────────────────────────────────────────────────────
 
 import { EntriesPage } from '../entries';
@@ -230,48 +266,49 @@ describe('EntriesPage — smoke render', () => {
 // no Angular analog), and omit the payment-type radio (Angular's own dead UI, no data-model
 // backing — nothing correct to implement per the Angular-bug-handling policy).
 
+// Shared fixtures reused by both the day-grouping suite and the read-only-history suite below.
+const dayOneEntries: InventoryEntryView[] = [
+  {
+    id: 'e1',
+    productId: 'p-a',
+    productName: 'Product A',
+    quantity: 2,
+    costPrice: 3,
+    date: new Date('2026-06-30T10:00:00.000Z'),
+    isActive: true,
+  },
+  {
+    id: 'e2',
+    productId: 'p-b',
+    productName: 'Product B',
+    quantity: 1,
+    costPrice: 10,
+    date: new Date('2026-06-30T08:00:00.000Z'),
+    isActive: true,
+  },
+];
+const dayTwoEntries: InventoryEntryView[] = [
+  {
+    id: 'e3',
+    productId: 'p-c',
+    productName: 'Product C',
+    quantity: 5,
+    costPrice: 2,
+    date: new Date('2026-07-01T09:00:00.000Z'),
+    isActive: true,
+  },
+];
+
+function mockEntries(entries: InventoryEntryView[]) {
+  vi.mocked(InventoryOfflineService).mockImplementationOnce(
+    () =>
+      ({
+        getAll: vi.fn().mockReturnValue(entries),
+      }) as unknown as InstanceType<typeof InventoryOfflineService>,
+  );
+}
+
 describe('EntriesPage — day grouping (Angular parity)', () => {
-  const dayOneEntries: InventoryEntryView[] = [
-    {
-      id: 'e1',
-      productId: 'p-a',
-      productName: 'Product A',
-      quantity: 2,
-      costPrice: 3,
-      date: new Date('2026-06-30T10:00:00.000Z'),
-      isActive: true,
-    },
-    {
-      id: 'e2',
-      productId: 'p-b',
-      productName: 'Product B',
-      quantity: 1,
-      costPrice: 10,
-      date: new Date('2026-06-30T08:00:00.000Z'),
-      isActive: true,
-    },
-  ];
-  const dayTwoEntries: InventoryEntryView[] = [
-    {
-      id: 'e3',
-      productId: 'p-c',
-      productName: 'Product C',
-      quantity: 5,
-      costPrice: 2,
-      date: new Date('2026-07-01T09:00:00.000Z'),
-      isActive: true,
-    },
-  ];
-
-  function mockEntries(entries: InventoryEntryView[]) {
-    vi.mocked(InventoryOfflineService).mockImplementationOnce(
-      () =>
-        ({
-          getAll: vi.fn().mockReturnValue(entries),
-        }) as unknown as InstanceType<typeof InventoryOfflineService>,
-    );
-  }
-
   it('shows the grand entries count and total in the header', () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     render(
@@ -344,6 +381,43 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
     expect(screen.queryByText('Desde')).not.toBeInTheDocument();
     expect(screen.queryByText('Hasta')).not.toBeInTheDocument();
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+});
+
+// ─── EntriesPage — read-only history (Angular parity, diff-matrix #19) ──────
+//
+// Angular reference: entry-list.component.ts:22 `@Input() readOnly: boolean =
+// true` + entries.component.html:46 `<app-entry-list [entries$]="...">` passes
+// NO `[readOnly]` override, so the edit/delete menu
+// (`isOwnerAdmin() && !readOnly`, entry-list.component.html:23) is ALWAYS
+// hidden on this screen. `entries.component.html` also has NO "add new entry"
+// button — that only exists on the separate Today Entries screen
+// (today-entries.component.html:7). This is strict-parity removal per the
+// orchestrator's decision on diff-matrix row #19.
+
+describe('EntriesPage — read-only history (Angular parity, diff-matrix #19)', () => {
+  it('renders no "Nueva Entrada" / add-entry button', () => {
+    mockEntries([...dayOneEntries, ...dayTwoEntries]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    expect(screen.queryByText(/Nueva entrada/i)).not.toBeInTheDocument();
+  });
+
+  it('renders no row-level edit/deactivate actions once a day panel is expanded', () => {
+    mockEntries([...dayOneEntries, ...dayTwoEntries]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('entry-day-panel-toggle-2026-06-30'));
+    expect(screen.queryByText('Editar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
+    // Data still renders.
+    expect(screen.getByText('Product A')).toBeInTheDocument();
   });
 });
 

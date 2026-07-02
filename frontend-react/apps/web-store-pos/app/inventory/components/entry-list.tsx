@@ -3,11 +3,19 @@ import type { InventoryEntryView } from '@store-mgmt/domain';
 
 interface EntryListProps {
   entries: InventoryEntryView[];
-  onEdit: (entry: InventoryEntryView) => void;
-  onDeactivate: (entry: InventoryEntryView) => void;
+  onEdit?: (entry: InventoryEntryView) => void;
+  onDeactivate?: (entry: InventoryEntryView) => void;
+  /**
+   * Mirrors Angular's `entry-list.component.ts:22` `@Input() readOnly: boolean = true`.
+   * When true, the edit/deactivate action column is hidden. Defaults to `false` here (not
+   * Angular's default) because the only current caller that omits an explicit override is
+   * `today-entries.tsx`, which — like Angular's own `today-entries.component.html:24`
+   * `[readOnly]="false"` — needs actions enabled by default.
+   */
+  readOnly?: boolean;
 }
 
-export function EntryList({ entries, onEdit, onDeactivate }: EntryListProps) {
+export function EntryList({ entries, onEdit, onDeactivate, readOnly = false }: EntryListProps) {
   const intl = useIntl();
 
   if (entries.length === 0) {
@@ -35,7 +43,7 @@ export function EntryList({ entries, onEdit, onDeactivate }: EntryListProps) {
             <th className="px-4 py-2 text-left font-medium text-gray-600">
               {intl.formatMessage({ id: 'INVENTORY.ENTRY.DATE' })}
             </th>
-            <th className="px-4 py-2" />
+            {!readOnly && <th className="px-4 py-2" />}
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -49,22 +57,24 @@ export function EntryList({ entries, onEdit, onDeactivate }: EntryListProps) {
               <td className="px-4 py-3 text-gray-500">
                 {new Date(entry.date).toLocaleDateString('es')}
               </td>
-              <td className="px-4 py-3">
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => onEdit(entry)}
-                    className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => onDeactivate(entry)}
-                    className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
-                  >
-                    {intl.formatMessage({ id: 'ORDERS.DEACTIVATE' })}
-                  </button>
-                </div>
-              </td>
+              {!readOnly && (
+                <td className="px-4 py-3">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => onEdit?.(entry)}
+                      className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => onDeactivate?.(entry)}
+                      className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                    >
+                      {intl.formatMessage({ id: 'ORDERS.DEACTIVATE' })}
+                    </button>
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
