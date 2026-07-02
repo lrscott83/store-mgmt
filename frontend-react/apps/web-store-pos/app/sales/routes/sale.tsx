@@ -7,8 +7,11 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
+import { checkProductAvailabilityToSale } from '../lib/product-availability';
 import { SaleCategoryProducts } from '../components/sale-category-products';
 
 export const clientLoader = featureLoader([EFeatures.Sale]);
@@ -19,8 +22,10 @@ const ORDER_TYPE = OrderType.Normal;
 
 export function SalePage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
   const addItem = useCartStore((s) => s.addItem);
+  const getCartItemQuantity = useCartStore((s) => s.getItemQuantity);
 
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,6 +60,22 @@ export function SalePage() {
     addItem(product, quantity);
   }
 
+  // 1:1 port of Angular's addProductToCart's inventory check (sale-product-row.component.ts
+  // :58-104 -> InventoryOfflineService.hasAvailableProductToSale). Includes the cart's
+  // existing quantity for this product (Angular's shoppingCartService.getCartItemQuantity)
+  // and is gated by hasInventoryModuleAvailable + product.discountFromInvantory internally.
+  function checkAvailability(productId: string, quantity: number) {
+    const product = products.find((p) => p.id === productId);
+    const inventoryService = new InventoryOfflineService(storeId);
+    return checkProductAvailabilityToSale({
+      product,
+      quantity,
+      cartQuantity: getCartItemQuantity(productId),
+      hasInventoryModule: user ? hasInventoryModuleAvailable(user) : false,
+      inventory: inventoryService.getAvailableQuantity(productId),
+    });
+  }
+
   // Angular: getProductsToSaleByCategoryId -> categoryId + isActive + availableToSale,
   // sorted by order (product-category.repository.ts / product.repository.ts equivalents)
   const categoryProducts = selectedCategoryId
@@ -82,7 +103,12 @@ export function SalePage() {
         ))}
       </div>
 
-      <SaleCategoryProducts products={categoryProducts} orderType={ORDER_TYPE} onAdded={handleAdded} />
+      <SaleCategoryProducts
+        products={categoryProducts}
+        orderType={ORDER_TYPE}
+        onAdded={handleAdded}
+        checkAvailability={checkAvailability}
+      />
 
       {categories.length > 0 && !selectedCategoryId && (
         <InfoBox variant="primary" className="mt-4 text-center">

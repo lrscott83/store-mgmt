@@ -53,3 +53,8 @@ export function hasExpensesModuleAvailable(user: UserModel): boolean {
 export function hasCreditsModuleAvailable(user: UserModel): boolean {
   return isModuleAvailable(user, EModules.Credits);
 }
+
+/** 1:1 port of Angular's `AuthorizationService.hasInventoryModuleAvailable`. */
+export function hasInventoryModuleAvailable(user: UserModel): boolean {
+  return isModuleAvailable(user, EModules.Inventory);
+}

@@ -314,4 +314,15 @@ export class InventoryOfflineService {
       .reduce((sum, e) => sum + e.available, 0);
     return total >= quantity;
   }
+
+  /**
+   * Distinguishes "no active inventory entries at all" from "active entries but not enough
+   * quantity" — mirrors Angular's InventoryOfflineService.hasAvailableProductToSale branches
+   * 5 (ProductErrors.ProductNotAvailable) and 6 (ProductErrors.ProductQuantityNotAvailable).
+   */
+  getAvailableQuantity(productId: string): { hasEntries: boolean; available: number } {
+    const activeEntries = this.repo.getByProductId(this.storeId, productId).filter((e) => e.isActive);
+    const available = activeEntries.reduce((sum, e) => sum + e.available, 0);
+    return { hasEntries: activeEntries.length > 0, available };
+  }
 }

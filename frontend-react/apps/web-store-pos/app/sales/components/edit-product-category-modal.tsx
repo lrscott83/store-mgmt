@@ -21,10 +21,19 @@ export function EditProductCategoryModal({ category, onSave, onClose }: EditProd
 
   function validate(): boolean {
     const newErrors: { name?: string; order?: string } = {};
-    if (!form.name.trim()) newErrors.name = intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' }) + ' is required';
-    const orderNum = parseInt(form.order, 10);
-    if (isNaN(orderNum) || orderNum < 1) {
-      newErrors.order = 'Order must be a positive number';
+    if (!form.name.trim()) {
+      newErrors.name = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' }) },
+      );
+    }
+    // Angular's ONLY validation on `order` is `required` (edit-product-category-modal
+    // .component.html:26-28) — no positivity/min check. Do not reintroduce one here.
+    if (!form.order.trim()) {
+      newErrors.order = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: 'GENERAL.ORDER' }) },
+      );
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -65,7 +74,9 @@ export function EditProductCategoryModal({ category, onSave, onClose }: EditProd
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Order</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              {intl.formatMessage({ id: 'GENERAL.ORDER' })}
+            </label>
             <input
               type="number"
               value={form.order}

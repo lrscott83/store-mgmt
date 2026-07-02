@@ -1025,8 +1025,171 @@ updated `tasks.md` 6.1 note.
    has nowhere; Angular shows brand "VendeDTo" + Spanish tagline "Automatiza tu Negocio". Fix
    deferred to Stage 2 task 2.6.1.
 
+## Batch 9 (2026-07-02) — Stage 1 Sales, verify-report follow-up fix batch (W1 + W2)
+
+### What
+
+Targeted fix batch closing the two findings from Stage 1's `sdd-verify` pass
+(`verify-report.md` W1, W2): (1) full Angular 1:1 parity for the Sale/POS add-to-cart stock
+check (`sale-product-row.component.ts:58-104` ->
+`InventoryOfflineService.hasAvailableProductToSale`, `inventory-offline.service.ts:397-423`),
+and (2) six hardcoded English/invented-validation text-parity fixes across three Products
+modals plus the CSV importer. This also completes (and supersedes) tasks.md's Stage 2 item
+2.5.2, which is now DONE and documented under Stage 1 (1.6).
+
+### Why
+
+`sdd-verify`'s Stage 1 pass flagged W1 as a live bug (cashiers could oversell stock-tracked
+products — `checkAvailability` was designed+tested on `SaleProductRow` but never wired from
+`sale.tsx`) and W2 as hardcoded-English + an untested invented validation rule Angular does
+not have. User provided exact Angular source line citations and directed a TRUE 5-way parity
+implementation (not the minimal `hasAvailableStock(): boolean` wiring originally scoped in
+2.5.2), plus an explicit decision to REMOVE (not fix) the invented "Order must be a positive
+number" check.
+
+### Where
+
+- `app/sales/lib/product-availability.ts` — NEW. `checkProductAvailabilityToSale()`, pure
+  1:1 port of Angular's 5-way `hasAvailableProductToSale` branch (NotExists -> Inactive ->
+  NotAvailableToSale -> gate(`!hasInventoryModule || !discountFromInvantory`) -> no-entries ->
+  quantity-check). `PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS` maps each error code to an i18n
+  key (`NOT_AVAILABLE` reuses the pre-existing `SALES.NOT_INVENTORY_AVAILABLE_MESSAGE`, the
+  other four are new `PRODUCT_ERRORS.*` keys).
+- `app/inventory/lib/services/inventory-offline-service.ts` — added `getAvailableQuantity()`,
+  distinguishes "no active entries" (Angular's `ProductNotAvailable`) from "active entries but
+  insufficient" (`ProductQuantityNotAvailable`) — `hasAvailableStock(): boolean` alone could
+  not express this distinction. `hasAvailableStock` left in place, unused by this batch's
+  wiring but not removed (pre-existing method, out of scope to delete).
+- `app/shared/lib/auth/authorization-service.ts` — added `hasInventoryModuleAvailable(user)`,
+  1:1 port of Angular's `AuthorizationService.hasInventoryModuleAvailable`, same pattern as
+  the adjacent `hasExpensesModuleAvailable`/`hasCreditsModuleAvailable`. `EModules.Inventory`
+  already existed in `@store-mgmt/domain` — no domain package changes needed.
+- `app/shared/lib/stores/cart-store.ts` — added `getItemQuantity(productId)` selector, 1:1
+  port of Angular's `ShoppingCartService.getCartItemQuantity`.
+- `app/shared/lib/blocking-alert.ts` — NEW. `showBlockingError(title, message)`, thin
+  `window.alert` wrapper. DECISION: no dedicated modal/confirm library exists anywhere in
+  this React app (searched `app/**`, only `unsaved-changes-dialog.tsx`'s bespoke full modal
+  and `use-unsaved-changes-prompt.ts`'s `window.confirm` exist) — `window.alert` is the native
+  sibling of the already-established `window.confirm` "blocking native dialog" pattern, and
+  matches Angular's blocking `Swal.fire({icon:'error', showCancelButton: false})` semantics
+  (Angular's cancel button is commented out — plain acknowledge-only alert). No new modal
+  library introduced.
+- `app/sales/components/sale-product-row.tsx` — `checkAvailability` prop signature changed
+  from `(id, qty) => boolean` to `(id, qty) => ProductAvailabilityResult`; now called
+  UNCONDITIONALLY (Angular has no `discountFromInvantory` gate at the component level — the
+  gate lives inside the service). Inline `role="alert"` paragraph removed, replaced by
+  `showBlockingError` on failure.
+- `app/sales/components/sale-category-products.tsx` — `checkAvailability` prop type updated
+  to match.
+- `app/sales/routes/sale.tsx` — wired `checkAvailability` end-to-end: reads `user` from
+  `useAuthStore`, `getItemQuantity` from `useCartStore`, instantiates
+  `InventoryOfflineService`, calls `checkProductAvailabilityToSale(...)`, passes the closure
+  to `SaleCategoryProducts`.
+- `app/shared/lib/i18n/es.ts` — added `PRODUCT_ERRORS.NOT_EXISTS` ("El producto no existe."),
+  `PRODUCT_ERRORS.INACTIVE` ("El producto no está activo."),
+  `PRODUCT_ERRORS.NOT_AVAILABLE_TO_SALE` ("El producto no está disponible para la venta."),
+  `PRODUCT_ERRORS.QUANTITY_NOT_AVAILABLE` ("La cantidad del producto no está disponible en el
+  inventario."), `GENERAL.RESPONSE.ERROR_TITLE` ("Error"), `GENERAL.ORDER` ("Orden") — all
+  byte-identical to Angular's `product.errors.ts`/`vocabs/es.ts` literals.
+- `app/sales/components/create-product-modal.tsx`,
+  `app/sales/components/edit-product-modal.tsx` — "Nombre/Precio/Categoría is required"
+  (English) -> `GENERAL.VALIDATION.REQUIRED` with the field's own label key (exact Spanish:
+  "Nombre es requerido" / "Precio es requerido" / "Categoría es requerido").
+- `app/sales/components/edit-product-category-modal.tsx` — REMOVED the invented "Order must
+  be a positive number" check entirely (Angular's order field has only `required`, per
+  `edit-product-category-modal.component.html:24-28`); "Nombre"/"Orden" required errors now
+  use `GENERAL.VALIDATION.REQUIRED`; the visible order-field label fixed from hardcoded
+  "Order" to `GENERAL.ORDER` ("Orden") — this label fix was not separately enumerated in the
+  fix list but follows directly from adding the `GENERAL.ORDER` key for the validation
+  message. The "Active" checkbox label (hardcoded English) on the SAME component was left
+  untouched — not part of this batch's explicit scope, flagged below.
+- `app/sales/components/csv-product-importer-modal.tsx` — both `parseCsvProducts` catch and
+  `FileReader.onerror` now set the single Spanish literal "Error al importar los productos"
+  (byte-identical to Angular's hardcoded fallback, kept as a hardcoded literal like Angular,
+  not promoted to an i18n key, per instruction to prefer matching Angular's own approach).
+- Tests (all new unless noted): `product-availability.test.ts` (10), `blocking-alert.test.ts`
+  (1), `cart-store.test.ts` (NEW FILE — 3, first-ever test coverage for this store),
+  `authorization-service.test.ts` (+2, existing file), `inventory-offline-service.test.ts`
+  (+4, existing file), `sale-product-row.test.tsx` (rewritten, 12, was 10 — 2 removed +4 net
+  new: FULL-parity behavior change from optional/gated `checkAvailability` to unconditional
+  typed-result call), `sale-category-products.test.tsx` (1 assertion fixed, boolean ->
+  `{succeeded:true}`), `sale.test.tsx` (+2 end-to-end wiring tests, mocks updated for
+  `getItemQuantity`/`storeModuleIds`), `create-product-modal.test.tsx` (NEW FILE — 3),
+  `edit-product-modal.test.tsx` (NEW FILE — 2), `edit-product-category-modal.test.tsx` (NEW
+  FILE — 4), `csv-product-importer-modal.test.tsx` (NEW FILE — 2).
+
+### Deferred / Out of scope (Batch 9, explicitly NOT implemented)
+
+- `edit-product-category-modal.tsx`'s hardcoded "Active" checkbox label (English) — not in
+  the verify-report W2 finding or the explicit fix list; flagged for a future L6 pass.
+- 2.5.1 (cart increase/decrease stock validation, Stage 2) — separate item, untouched.
+- `hasAvailableStock(): boolean` on `InventoryOfflineService` — left in place unused by this
+  batch's wiring (superseded by `getAvailableQuantity` for this call site), not deleted;
+  other future call sites may still use the simpler boolean form.
+
+### TDD Cycle Evidence (Batch 9)
+
+| Task | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|
+| `checkProductAvailabilityToSale` | written, confirmed RED (module not found) | 10/10 passed first run | 10 branch cases (all 5 error codes + 2 gate variants + cart-quantity inclusion) | none needed |
+| `getItemQuantity` (cart-store) | written, confirmed RED (`getItemQuantity is not a function`) | 3/3 passed first run | 3 cases incl. cross-call summation | none needed |
+| `showBlockingError` | written, confirmed RED (module not found) | 1/1 passed first run | title+message content check | none needed |
+| `hasInventoryModuleAvailable` | written, confirmed RED (`is not a function`) | 2/2 passed first run | true/false cases | none needed |
+| `getAvailableQuantity` (inventory-offline-service) | written, confirmed RED (`is not a function`) | 4/4 passed first run | no-entries / inactive-only / active-sum / mixed-active cases | none needed |
+| `SaleProductRow` full rewiring | written first, confirmed RED against pre-change component (12 new/changed assertions) | 12/12 passed after implementation | unconditional-call, per-error-code message resolution, quantity forwarding | removed dead `error` state + inline `<p role=alert>` |
+| `sale.tsx` end-to-end wiring | written first (2 new tests), confirmed RED (`getItemQuantity is not a function` on unmocked selector / real service returning "not available" against unseeded localStorage) | 10/10 passed (8 existing + 2 new) after wiring | insufficient-stock-blocks / sufficient-stock-allows | mock fixes: added `storeModuleIds`/`getItemQuantity` to existing test mocks |
+| W2 text fixes (3 modals) | git-stashed the 3 pre-written implementation edits, wrote 4 new test files (11 tests), ran against ORIGINAL code -> confirmed all 11 RED (e.g. "Precio is required" found instead of "Precio es requerido") | git-stash-popped the fix, reran -> 11/11 GREEN | Nombre/Precio/Categoría/Orden across 3 components + negative-order-allowed case | none needed |
+| CSV importer unification | written first (2 tests: parse-throw path via `vi.spyOn`, file-read-error path via `FileReader.prototype.readAsText` override), confirmed RED against original 2 English strings | 2/2 passed after single-literal fix | both failure paths produce the identical string | none needed |
+
+**Process note on the W2 RED-first recovery:** the 3 modal-fix edits (`create-product-modal.tsx`,
+`edit-product-modal.tsx`, `edit-product-category-modal.tsx`) were initially implemented BEFORE
+their tests were written, violating strict-TDD RED-first. This was caught before commit; the
+implementation edits were reverted via `git stash push` (isolated to just those 3 files), the 4
+new test files were run against the ORIGINAL (unfixed) code to confirm genuine RED (11/11
+failed, e.g. asserting "Nombre es requerido" against the old "... is required" text), then
+`git stash pop` restored the fix and the same 11 tests were rerun to confirm GREEN. No other
+files in this batch had this issue — `product-availability.ts`, `blocking-alert.ts`,
+`inventory-offline-service.ts`'s `getAvailableQuantity`, `cart-store.ts`'s `getItemQuantity`,
+`authorization-service.ts`'s `hasInventoryModuleAvailable`, the `sale-product-row.tsx`
+rewiring, and the CSV importer fix were all written test-first from the start.
+
+### Issues Found (Batch 9)
+
+None beyond the RED-first process gap noted above (caught and corrected before GREEN was
+trusted, no code-correctness bug).
+
+### Test/Build Results (Batch 9)
+
+- `tsc -p apps/web-store-pos --noEmit` (from `frontend-react/`): clean, zero errors.
+- `pnpm test` (turbo, full monorepo suite): 95 test files / 1015 tests passed, 0 failed.
+  Baseline before this batch (Batch 8): 88 files / 980 tests -> +7 files, +35 tests net.
+- `react-router build` (apps/web-store-pos): succeeded, no new errors/warnings.
+
+### Workload / PR Boundary (Batch 9)
+
+- Mode: direct work-unit commit on `feat/frontend-parity-audit`, no PR, per the established
+  Batches 1-7 precedent (Batch 8 was the one exception, left uncommitted per that batch's
+  specific instruction) — this batch's instructions explicitly requested a commit, no push,
+  no PR.
+- Boundary: `sale-product-row.tsx`/`sale-category-products.tsx`/`sale.tsx` + 2 new lib modules
+  (`product-availability.ts`, `blocking-alert.ts`) + 2 existing-service additions
+  (`inventory-offline-service.ts`, `authorization-service.ts`) + `cart-store.ts` + `es.ts` +
+  the 3 Products-modal text fixes + the CSV importer fix + their tests + tasks.md/
+  apply-progress.md docs. Does NOT touch cart increase/decrease validation (2.5.1, separate),
+  the "Active" checkbox label, Stage 2+ Inventory views, or any other module.
+
+### Status — Stage 1 (Sales) verify-report W1 + W2 findings CLOSED
+
+Both findings from Stage 1's `sdd-verify` pass are now resolved with full test coverage. 2.5.2
+in Stage 2 is DONE (moved to Stage 1, see tasks.md 1.6). Stage 1 (Sales) remains ready for a
+follow-up `sdd-verify` re-pass to confirm both findings are closed, or to proceed to Stage 2
+(Inventory) `sdd-apply` (2.5.1 cart increase/decrease validation and 2.6 login/auth parity
+remain the only Stage 2 carry-over items from Stage 1).
+
 ### NEXT ACTION
 
-**Run `sdd-verify` for Stage 1 (Sales).** Stage 1 was marked apply-complete across 8 batches
-but has NEVER been verified (only Stage 0 has a verify-report). This is the immediate next
-step before proceeding to Stage 2 (Inventory) `sdd-apply`.
+**Run `sdd-verify` for Stage 1 (Sales) again** to confirm the W1 (overselling) and W2
+(hardcoded English/invented validation) findings from the prior verify-report are closed, OR
+proceed directly to Stage 2 (Inventory) `sdd-apply` if a re-verify is not required before
+moving on — Stage 2's remaining carry-over scope is now smaller (2.5.1 cart
+increase/decrease validation + 2.6 login/auth parity; 2.5.2 is done).

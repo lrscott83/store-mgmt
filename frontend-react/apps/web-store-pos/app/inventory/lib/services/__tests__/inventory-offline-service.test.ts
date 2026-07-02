@@ -338,6 +338,42 @@ describe('InventoryOfflineService', () => {
     });
   });
 
+  describe('INV-08: getAvailableQuantity — distinguishes "no active entries" from "insufficient quantity" (Angular InventoryOfflineService.hasAvailableProductToSale branches 5 vs 6)', () => {
+    it('returns hasEntries=false and available=0 when no entries exist for the product', () => {
+      expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: false, available: 0 });
+    });
+
+    it('returns hasEntries=false when entries exist but none are active', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 10, isActive: false })]);
+      seedInventory(storeId, map);
+
+      expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: false, available: 0 });
+    });
+
+    it('returns hasEntries=true and the summed available quantity across active entries', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 6 }),
+        makeEntry('e2', 'p1', { available: 4, order: 1 }),
+      ]);
+      seedInventory(storeId, map);
+
+      expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: true, available: 10 });
+    });
+
+    it('ignores inactive entries when summing available quantity', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 6 }),
+        makeEntry('e2', 'p1', { available: 4, order: 1, isActive: false }),
+      ]);
+      seedInventory(storeId, map);
+
+      expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: true, available: 6 });
+    });
+  });
+
   describe('INV-07: getAll returns InventoryEntryView[] for active entries', () => {
     it('returns empty array when no entries', () => {
       expect(service.getAll()).toEqual([]);

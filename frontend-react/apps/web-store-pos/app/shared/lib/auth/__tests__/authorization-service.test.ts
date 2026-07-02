@@ -7,6 +7,7 @@ import {
   isModuleAvailable,
   hasExpensesModuleAvailable,
   hasCreditsModuleAvailable,
+  hasInventoryModuleAvailable,
 } from '../authorization-service';
 import { EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
@@ -175,6 +176,19 @@ describe('AuthorizationService', () => {
     it('hasCreditsModuleAvailable returns false otherwise', () => {
       const user = makeUser({ storeModuleIds: [EModules.Sales] });
       expect(hasCreditsModuleAvailable(user)).toBe(false);
+    });
+
+    // 1:1 port of Angular's AuthorizationService.hasInventoryModuleAvailable
+    // (frontend/src/app/_services/authorization/authorization.service.ts:53-55), used by
+    // InventoryOfflineService.hasAvailableProductToSale's stock-check gate.
+    it('hasInventoryModuleAvailable returns true when EModules.Inventory is in storeModuleIds', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Inventory] });
+      expect(hasInventoryModuleAvailable(user)).toBe(true);
+    });
+
+    it('hasInventoryModuleAvailable returns false otherwise', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Sales] });
+      expect(hasInventoryModuleAvailable(user)).toBe(false);
     });
   });
 });

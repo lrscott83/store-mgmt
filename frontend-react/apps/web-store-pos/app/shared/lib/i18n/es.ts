@@ -196,9 +196,25 @@ const messages: Record<string, string> = {
     'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
   'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE': 'El producto no está disponible en el inventario.',
 
+  // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
+  // hardcoded Spanish literals there, not i18n keys; added here as i18n keys for React's
+  // text-parity convention. Byte-identical to the Angular literals). Used by
+  // hasAvailableProductToSale's 5-way branch (checkProductAvailabilityToSale).
+  'PRODUCT_ERRORS.NOT_EXISTS': 'El producto no existe.',
+  'PRODUCT_ERRORS.INACTIVE': 'El producto no está activo.',
+  'PRODUCT_ERRORS.NOT_AVAILABLE_TO_SALE': 'El producto no está disponible para la venta.',
+  'PRODUCT_ERRORS.QUANTITY_NOT_AVAILABLE': 'La cantidad del producto no está disponible en el inventario.',
+
+  // GENERAL.RESPONSE.* (Angular GENERAL.RESPONSE — used as the blocking-error-modal title,
+  // e.g. sale-product-row.component.ts:72 Swal.fire title)
+  'GENERAL.RESPONSE.ERROR_TITLE': 'Error',
+
   // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',
   'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO': '{name} mínimo valor es 0',
+
+  // GENERAL.ORDER (Angular GENERAL.ORDER — used by edit-product-category-modal's order field)
+  'GENERAL.ORDER': 'Orden',
 
   // Orders (Angular ORDERS.* — vocabs/es.ts. ORDERS.TITLE fixed to the exact Angular
   // string; ORDERS.TODAY_TITLE/DATE/TOTAL/CREDIT_BADGE/EMPTY_STATE/DEACTIVATE*/DATE_FROM/

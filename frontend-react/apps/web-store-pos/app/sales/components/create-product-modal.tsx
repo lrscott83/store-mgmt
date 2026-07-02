@@ -39,13 +39,22 @@ export function CreateProductModal({ categories, onSave, onClose }: CreateProduc
   function validate(): boolean {
     const newErrors: Partial<Record<keyof CreateProductForm, string>> = {};
     if (!form.name.trim()) {
-      newErrors.name = intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' }) + ' is required';
+      newErrors.name = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' }) },
+      );
     }
     if (!form.price.trim() || isNaN(parseFloat(form.price))) {
-      newErrors.price = intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' }) + ' is required';
+      newErrors.price = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' }) },
+      );
     }
     if (!form.categoryId) {
-      newErrors.categoryId = intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' }) + ' is required';
+      newErrors.categoryId = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' }) },
+      );
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

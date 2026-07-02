@@ -109,3 +109,107 @@ The prior report's one CRITICAL-turned-WARNING (stale apply-progress primary-col
 ## Scope Note
 
 This report covers **Stage 0 only** (Foundations + Design Tokens), re-validated against the current code state as of 2026-07-02 after Stage 1 (Sales) completion. Stage 1's own functional/visual/i18n correctness (L4/L5/L6 for Sales views) is documented in `apply-progress.md` Batches 1-8 and is **not** re-litigated here — a full Stage 1 sdd-verify pass is still recommended separately before Stage 2 begins, per tasks.md's own note. Stage 2's newly added carry-over tasks (2.5, 2.6) are explicitly **out of scope** for this report.
+
+---
+
+# Verify Report: Frontend Parity Audit — Stage 1 (Sales)
+
+**Change:** frontend-parity-audit
+**Phase:** Verify (Stage 1 — Sales module, first formal pass)
+**Date:** 2026-07-02
+**Mode:** Hybrid (engram + openspec file)
+**Scope:** Stage 1 tasks 1.1-1.5 (Products, Sale/POS, Orders, Sale Credits, Today Stats, Category Stats, Cart/nav-right). Stage 2 carry-overs (2.5, 2.6, incl. the login "POS Management" copy gap) are explicitly OUT OF SCOPE for this report — they are Stage 2 tasks by design, not Stage 1 failures.
+
+---
+
+## Verdict: PASS WITH WARNINGS
+
+No CRITICAL findings. Three WARNINGs (one functional-parity gap, one i18n/hardcoded-string gap covering two components, one confirmation that prior Stage 0 documentation drift is now resolved). Two SUGGESTIONs.
+
+---
+
+## Test/Build Evidence (run 2026-07-02, actual output)
+
+**TypeScript** (`pnpm -C apps/web-store-pos exec tsc --noEmit`, from `frontend-react/`): zero errors, no output (clean).
+
+**Full test suite** (`pnpm test`, turbo across `@store-mgmt/domain`, `@store-mgmt/web-common`, `@store-mgmt/web-store-pos`):
+```
+Test Files  88 passed (88)
+     Tests  980 passed (980)
+  Duration  5.65s
+```
+Matches apply-progress's Batch 8 claim exactly (88 files / 980 tests). All Stage 1 Sales test files pass, including the new pure-function tests added in Batch 8: `order-type-utils.test.ts` (2), `payment-type-icon.test.ts` (4), `payment-return.test.ts` (6), `cart-submission-validation.test.ts` (5), and `cart-shell.test.tsx` (23, was 6 pre-Batch-8). One unrelated `stderr` line in `api-client.test.ts` (jsdom "Not implemented: navigation" warning) is expected test noise, not a failure — the test still passes.
+
+---
+
+## Task Completeness (tasks.md Stage 1)
+
+| Task | Status | Evidence |
+|---|---|---|
+| 1.1 L4 functional diff + fix gaps | [x] claimed done | Confirmed for Products/Sale/Orders/Sale-Credits/Today-Stats/Category-Stats. One tracked exception found: see W1 below (SaleProductRow `checkAvailability` not wired in `sale.tsx`) — explicitly deferred to Stage 2 (task 2.5.2), consistently documented in tasks.md/design.md/spec.md, not a silent gap. |
+| 1.2 L5 visual (tokens + Button/Card/InfoBox) | [x] claimed done | Confirmed — `sale.tsx` uses `Card`/`InfoBox`, `products.tsx` uses the new `fab` Button variant (commit `df02889`), `cart-shell.tsx` uses Tailwind semantic classes for Vuelto, no hardcoded hex found in any Stage 1 file (see regression scan below). |
+| 1.3 L6 i18n | [x] claimed done | Mostly confirmed — `SHOPPING_CART.*`/`GENERAL.PAY`/`SALES.NOT_INVENTORY_AVAILABLE_MESSAGE` keys byte-identical to Angular's `es.ts`. Exception found: see W2 below (hardcoded English strings in two Products-view components, not part of Batch 8's claimed scope). |
+| 1.5 Cart (nav-right) parity | [x] claimed done | Confirmed by direct code comparison against `nav-right.component.ts`/`.html` — see Cart Parity Detail below. |
+| 1.4 Verify (matrix, tests, visual spot-check) | [x] claimed done | Per-batch tsc/vitest/build evidence in apply-progress is accurate; this is the first *formal* `sdd-verify` pass on the full Stage 1 module, as tasks.md itself notes was still outstanding. |
+
+---
+
+## Spec Requirement Compliance (Sales module, per spec.md Per-Module Acceptance table)
+
+### L4 — Fields/controls/validations/actions match Angular
+
+**Products view** (`app/sales/routes/products.tsx` vs `presentation/products/products.component.*`): structure, bulk-edit, CSV import entry point confirmed present. Two component-level string gaps found (W2).
+
+**Sale/POS view** (`app/sales/routes/sale.tsx` vs `presentation/sale/sale.component.*`): PASS. Category selector, `SaleCategoryProducts`, no-category-selected alert all match. Angular's barcode-scanner button is commented out in its own template (`sale.component.html:6-11`) and `QuickSaleScannerComponent` is never imported/used anywhere in the Angular app (confirmed via full-repo grep — only self-references inside its own file) — correctly NOT ported to React (S1). Angular's fixed `orderType = OrderType.Normal` (no selector on this screen) correctly mirrored (`sale.tsx:18`).
+
+**`SaleProductRow`** (`app/sales/components/sale-product-row.tsx` vs `sale-product-row.component.ts`): structurally matches (name/price/quantity/add-button, price field editable only for non-Normal sales). **Gap (W1):** Angular's `addProductToCart()` calls `inventoryService.hasAvailableProductToSale(productId, qty)` unconditionally when adding to cart and blocks the add with an error dialog if insufficient stock (`sale-product-row.component.ts:58-104`). React's `SaleProductRow` has the equivalent `checkAvailability` prop, correctly gated behind `product.discountFromInvantory` (`sale-product-row.tsx:36`), and it is unit-tested (10 tests in `sale-product-row.test.tsx`, 2 specifically for the gate). However, `sale.tsx` — the actual route that renders `SaleProductRow` in production — does **not** pass a `checkAvailability` callback (confirmed via grep: zero references to `checkAvailability` in `sale.tsx`). **Net effect: the live Sale/POS screen currently allows adding a stock-tracked product to the cart with no availability check, diverging from Angular's live behavior.** This is a known, already-tracked gap (tasks.md 2.5.2, "Batch 4 flagged gap"), consistently documented across tasks.md/design.md/spec.md's Inventory row, and deliberately deferred to Stage 2 because it's framed as depending on `InventoryOfflineService`. That framing is only partially accurate: `InventoryOfflineService.hasAvailableStock(productId, quantity)` already exists and is tested today (27 tests, `inventory-offline-service.test.ts`) — the missing piece is a one-line wiring call in `sale.tsx`, not new infrastructure. See Findings/W1 for the recommendation.
+
+**Orders / Today Orders / Sale Credits / Today Sale Credits / Today Stats / Category Stats**: spot-checked, all present with matching structure. `today-stats.tsx`'s hardcoded `"Resumen Efectivo"` string matches Angular's own hardcoded literal in `today-stats.component.html:18` (no `[translate]` pipe there either) — legitimate parity, not a gap.
+
+**Cart (nav-right) — full detail check:**
+- Header "Venta actual" + `getOrderTypeText(OrderType.Normal)` subtitle: confirmed 1:1 port of `OrderTypeUtils.getOrderTypeText` (`order-type-utils.ts`).
+- Payment/Vuelto: `getPaymentReturn()`/`getPaymentReturnClass()` ported as `payment-return.ts`, semantics match `nav-right.component.ts:154-159` exactly (positive/negative/neutral).
+- `createOrder()` validation sequence: `validateCartSubmission()` in `cart-submission-validation.ts` is byte-exact in check order and condition logic vs `nav-right.component.ts:162-199` (empty-cart → payment-less-than-total → credit-without-client), confirmed by direct source read.
+- Credit toggle gating: `hasCreditsModuleAvailable(user)` call confirmed present in `cart-shell.tsx:86`, matching Angular's `authorizationService.hasCreditsModuleAvailable()` (`nav-right.component.ts:128`).
+- Payment-type literals (`Efectivo`/`Tarjeta`/`Zelle`) hardcoded in `orders.tsx`/`today-orders.tsx`/`edit-order-modal.tsx`/`sale-credit-payment-modal.tsx`: confirmed these mirror Angular's own `PaymentTypeUtils.getPaymentTypes()` (`payment-type.ts:4-6`), which hardcodes the same Spanish literals with **no** i18n pipe — legitimate parity, not a hardcoded-string violation.
+
+### L5 — Visual/token parity
+PASS. No hardcoded hex found in any Stage 1 file via `#[0-9a-fA-F]{3,6}` grep across `app/sales/**` and `cart-shell.tsx`. All styling goes through `bg-primary`/`text-primary`/Tailwind semantic classes and the shared `Card`/`InfoBox`/`Button` components.
+
+### L6 — i18n parity
+PASS WITH WARNING. `SHOPPING_CART.*`, `GENERAL.PAY`, `SALES.NOT_INVENTORY_AVAILABLE_MESSAGE`, `ORDERS.*`, `TODAY_ORDERS.*`, `TODAY_STATS.*`, `SALE_CREDIT.*` all confirmed present and byte-identical to Angular's `es.ts`. **Gap (W2):** two Products-view components contain hardcoded **English** strings that don't exist in Angular at all, or diverge from Angular's Spanish equivalent — see Findings.
+
+---
+
+## Findings
+
+### CRITICAL
+None.
+
+### WARNING
+
+**W1 — `sale.tsx` does not wire `SaleProductRow`'s `checkAvailability`, live Sale/POS screen allows overselling stock-tracked products.**
+`app/sales/routes/sale.tsx` renders `<SaleCategoryProducts products={categoryProducts} orderType={ORDER_TYPE} onAdded={handleAdded} />` with no `checkAvailability` prop, so `SaleProductRow`'s stock-gate (`sale-product-row.tsx:36`, gated on `product.discountFromInvantory`) never fires in production — it only fires in tests where the prop is passed directly. Angular's equivalent (`sale-product-row.component.ts:58-104`) performs this check unconditionally on every add-to-cart click. This is a real, live divergence in the Sales module's core action, not a cosmetic issue: a cashier can currently add more units of a stock-tracked product than are available. It is already tracked as tasks.md 2.5.2 (Stage 2 carry-over) with consistent documentation across tasks.md/design.md/spec.md's Inventory row — not a silently-missed gap. However, the stated rationale ("depends on `InventoryOfflineService`... that Stage 2 owns") is only partially accurate: `InventoryOfflineService.hasAvailableStock()` already exists and is fully tested (27 tests) as of Stage 0. The remaining work is a small integration change confined to `sale.tsx` (pass `checkAvailability={(id, qty) => inventoryService.hasAvailableStock(id, qty)}`), not new cross-cutting infrastructure. **Recommendation:** either close this 1-line wiring gap before Stage 1 is archived as fully parity-complete (it would take a small, low-risk, already-tested-downstream change), or explicitly record it as an accepted interim risk in spec.md's Sales row (currently only the Inventory row mentions the carry-over; the Sales row's "actions match Angular (L4)" claim has no caveat for this specific action).
+
+**W2 — Hardcoded English strings in two Products-view components, one also invents an untested validation rule not present in Angular.**
+- `app/sales/components/edit-product-category-modal.tsx:27`: `newErrors.order = 'Order must be a positive number'` — hardcoded English, no i18n key. Angular's equivalent (`edit-product-category-modal.component.html:24-28`) only validates `required` on the order field via `GENERAL.VALIDATION.REQUIRED` (translated); it has **no** "must be positive" rule at all. React invented an extra validation Angular doesn't have, in English, uncovered by any test.
+- `app/sales/components/csv-product-importer-modal.tsx:34,41`: `setParseError('Failed to parse CSV file')` and `setParseError('Failed to read file')` — hardcoded English. Angular's equivalent error path (`csv-product-importer-modal.component.ts:71-72`) shows a Spanish fallback: `error.message || 'Error al importar los productos'` (also a literal, but in Spanish, matching the app's language). Neither React string matches Angular's language or wording.
+Neither of these two components has a dedicated component-level test file (only `csv-product-parser.test.ts` exists, covering the pure parsing logic, not the modal's error-message strings) — these paths are currently untested at the UI layer.
+**Recommendation:** translate both error messages to Spanish (ideally via new i18n keys, consistent with the rest of the module's L6 discipline), and reconsider whether the "positive number" validation should be kept as an intentional improvement (if so, document it as a deliberate deviation) or removed to match Angular exactly.
+
+**W3 — (informational, not a new problem) Prior Stage 0 report's W1 documentation-drift finding is now confirmed resolved.**
+The 2026-07-02 Stage 0 re-verify (obs #465) flagged `spec.md` as not yet updated to match `tasks.md`/`design.md`'s reassignment of the cart's inventory-availability audit from Sync to Inventory scope. As of this Stage 1 pass, `specs/frontend-parity-audit/spec.md:131-132,136` (commits `e4331bc`/`76e2311`) now correctly reflects the three-way split (Sales = cart UI/flow, Inventory = stock-check wiring incl. `sale.tsx checkAvailability`, Sync = only the generic PWA cross-cutting services). No further action needed; noting for continuity since this was an open item from the prior report.
+
+### SUGGESTION
+
+**S1 — Angular's `QuickSaleScannerComponent` (barcode scanner) confirmed dead code; correctly not ported, but not yet on the ratified dead-code list.**
+`frontend/src/app/presentation/sale/quick-sale-scanner/*` exists but is never imported or referenced anywhere else in the Angular codebase (confirmed via full-repo grep — the component's own file is the only place its name appears, and its own `sale.component.html` has the trigger button commented out). Its core scanning logic is also internally disabled (`BrowserMultiFormatReader`/zxing imports commented out, `continuousScan()` is a no-op placeholder). React correctly did not port this. Recommend adding it to spec.md's ratified dead-code list explicitly, for audit-trail completeness (it currently isn't named there, unlike the other ratified-dead items).
+
+**S2 — (carried from Stage 0 report) pre-existing hardcoded hex in `chart-core.tsx`/`landing-deep.*`.**
+Still out of Stage 1 scope; will need cleanup under Stage 8 (Statistics) / landing-page's own L5 audit. Not introduced by Stage 1.
+
+---
+
+## Scope Note
+
+This report covers **Stage 1 only** (Sales module: Products, Sale/POS, Orders, Sale Credits, Today Stats, Category Stats, Cart/nav-right), validated against current code as of 2026-07-02. Stage 0 (Foundations) was re-verified separately (see the RE-VERIFY section above, obs #465) and is not re-litigated here. Stage 2's carry-over tasks (2.5 inventory-availability wiring, 2.6 login/auth parity incl. the "POS Management" copy gap at 2.6.1) are explicitly **out of scope** — they are correctly scheduled as Stage 2 work, not Stage 1 failures, and this report treats W1 as a *tracked* Stage 1 exception rather than an undiscovered defect.

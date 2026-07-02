@@ -25,9 +25,17 @@ export function EditProductModal({ product, categories, onSave, onDelete, onClos
 
   function validate(): boolean {
     const newErrors: { name?: string; price?: string } = {};
-    if (!form.name.trim()) newErrors.name = intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' }) + ' is required';
+    if (!form.name.trim()) {
+      newErrors.name = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' }) },
+      );
+    }
     if (!form.price.trim() || isNaN(parseFloat(form.price))) {
-      newErrors.price = intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' }) + ' is required';
+      newErrors.price = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.REQUIRED' },
+        { name: intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' }) },
+      );
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

@@ -2,19 +2,22 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { OrderType } from '@store-mgmt/domain';
+import type { ProductAvailabilityResult } from '../lib/product-availability';
+import { PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS } from '../lib/product-availability';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface SaleProductRowProps {
   product: Product;
   orderType: OrderType;
   onAdded: (productId: string, quantity: number, price: number) => void;
   /**
-   * Stock-availability check, mirrors Angular's InventoryOfflineService.hasAvailableProductToSale
-   * gated to `product.discountFromInvantory` (sale-product-row.component.ts:61). Only called when
-   * the product deducts from inventory. Optional so existing callers without inventory wiring keep
-   * working (defaults to always-available), consistent with how this stage does not yet own the
-   * `hasInventoryModuleAvailable()` feature-gate (deferred to Stage 6/Sync cross-cutting audit).
+   * Stock-availability check, 1:1 port of Angular's
+   * InventoryOfflineService.hasAvailableProductToSale, called unconditionally from
+   * addProductToCart (sale-product-row.component.ts:58-104) — no discountFromInvantory gate
+   * at the component level, the gate lives inside the service (branch 4). Optional so
+   * existing callers without inventory wiring keep working (defaults to always-available).
    */
-  checkAvailability?: (productId: string, quantity: number) => boolean;
+  checkAvailability?: (productId: string, quantity: number) => ProductAvailabilityResult;
 }
 
 /**
@@ -28,16 +31,20 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
 
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState(product.price);
-  const [error, setError] = useState<string | null>(null);
 
   function handleAddToCart() {
-    setError(null);
-
-    if (product.discountFromInvantory && checkAvailability) {
-      const available = checkAvailability(product.id, quantity);
-      if (!available) {
-        // SALES.NOT_INVENTORY_AVAILABLE_MESSAGE
-        setError(intl.formatMessage({ id: 'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE' }));
+    if (checkAvailability) {
+      const result = checkAvailability(product.id, quantity);
+      if (!result.succeeded) {
+        // Angular: Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message,
+        // icon: 'error' }) — blocking, aborts the add (sale-product-row.component.ts:62-104).
+        const messageKey = result.errorCode
+          ? PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS[result.errorCode]
+          : 'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE';
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+          intl.formatMessage({ id: messageKey }),
+        );
         return;
       }
     }
@@ -88,12 +95,6 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
             d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       </button>
-
-      {error && (
-        <p className="w-full text-xs text-danger" role="alert">
-          {error}
-        </p>
-      )}
     </form>
   );
 }

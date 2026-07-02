@@ -31,14 +31,17 @@ export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }:
         setParseError(null);
         setHasFile(true);
       } catch {
-        setParseError('Failed to parse CSV file');
+        // Angular's fallback for ANY import failure is a single hardcoded Spanish literal
+        // (csv-product-importer-modal.component.ts:71-78), not an i18n key. Kept byte-identical
+        // and unified across both failure paths (parse error and file-read error below).
+        setParseError('Error al importar los productos');
         setProducts([]);
         setErrors([]);
         setHasFile(false);
       }
     };
     reader.onerror = () => {
-      setParseError('Failed to read file');
+      setParseError('Error al importar los productos');
       setHasFile(false);
     };
     reader.readAsText(file);

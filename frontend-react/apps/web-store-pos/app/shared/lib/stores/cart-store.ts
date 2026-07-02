@@ -21,6 +21,8 @@ interface CartState {
   toggleCredit: () => void;
   clear: () => void;
   total: () => number;
+  /** 1:1 port of Angular's ShoppingCartService.getCartItemQuantity(productId). */
+  getItemQuantity: (productId: string) => number;
 }
 
 export const useCartStore = create<CartState>()(
@@ -91,6 +93,12 @@ export const useCartStore = create<CartState>()(
           (sum, item) => sum + item.product.price * item.quantity,
           0
         );
+      },
+
+      getItemQuantity: (productId: string) => {
+        return get()
+          .items.filter((i) => i.product.id === productId)
+          .reduce((sum, i) => sum + i.quantity, 0);
       },
     }),
     {

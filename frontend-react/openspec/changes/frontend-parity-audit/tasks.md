@@ -72,6 +72,38 @@ visual/token change, spot-check instead of new test.
   `InventoryOfflineService`/stock data that Stage 2 owns, so it is an Inventory dependency,
   not a generic Sync one.
 - [x] 1.4 Verify: matrix all-green, tests pass, visual spot-check.
+- [x] 1.6 Verify-report follow-up fix batch (resolves verify-report.md W1 + W2 findings,
+  2026-07-02):
+  - `checkAvailability` FULL parity (closes W1 AND supersedes/completes 2.5.2 below): ported
+    Angular's `InventoryOfflineService.hasAvailableProductToSale` 5-way branch exactly
+    (`app/sales/lib/product-availability.ts` — `checkProductAvailabilityToSale`), including
+    cart-quantity inclusion (`cart-store.ts getItemQuantity`), the
+    `hasInventoryModuleAvailable() || !discountFromInvantory` gate
+    (`authorization-service.ts hasInventoryModuleAvailable`, new), and a blocking
+    error alert (`shared/lib/blocking-alert.ts` — native `window.alert`, matching Angular's
+    blocking `Swal.fire`). Wired end-to-end `sale.tsx` -> `SaleCategoryProducts` ->
+    `SaleProductRow`. This exceeds the originally-scoped 2.5.2 minimal wiring (which assumed
+    reusing `hasAvailableStock(): boolean` unchanged) — `checkAvailability`'s signature
+    changed from `boolean` to a typed `ProductAvailabilityResult` to carry the 5 distinct
+    error codes/messages. 2.5.2 in Stage 2 below is now DONE, moved here.
+  - W2 text-parity: `create-product-modal.tsx`, `edit-product-modal.tsx`,
+    `edit-product-category-modal.tsx` — replaced hardcoded `'... is required'` English
+    strings with `GENERAL.VALIDATION.REQUIRED` (exact Spanish, e.g. "Nombre es requerido").
+    `edit-product-category-modal.tsx` — REMOVED the invented "Order must be a positive
+    number" validation entirely (Angular's order field has only `required`); order field's
+    visible label also fixed from hardcoded "Order" to `GENERAL.ORDER` ("Orden").
+    `csv-product-importer-modal.tsx` — unified both error paths (parse throw + file-read
+    error) to Angular's single hardcoded Spanish fallback literal "Error al importar los
+    productos" (byte-identical, matches Angular hardcoding it too, not an i18n key).
+  - New i18n keys added to `es.ts`: `PRODUCT_ERRORS.NOT_EXISTS/INACTIVE/
+    NOT_AVAILABLE_TO_SALE/QUANTITY_NOT_AVAILABLE`, `GENERAL.RESPONSE.ERROR_TITLE`,
+    `GENERAL.ORDER`. `NOT_AVAILABLE` reuses the pre-existing
+    `SALES.NOT_INVENTORY_AVAILABLE_MESSAGE` key.
+  - NOT in this batch's scope (flagged, carried forward): `edit-product-category-modal.tsx`'s
+    hardcoded "Active" checkbox label (English) — not part of the verify-report's W2 finding
+    or the explicit fix list, left untouched to avoid scope creep; candidate for a future L6
+    pass. 2.5.1 (cart increase/decrease stock validation) also NOT touched — separate scope,
+    remains in Stage 2.
 
 NOTE: open question from Stage 0 — Angular's authenticated-root redirect
 (`'' -> /sales/sale` inside ClientLayoutComponent) has no React equivalent yet; React's index
@@ -90,12 +122,11 @@ route always shows the public landing page regardless of auth state. MOVED to St
     Angular `ShoppingCartService.increaseCartItem`/`decreaseCartItem` stock check
     (`inventoryService.n(productId, qty)`) into the React cart flow; the local-only cart
     store must validate available stock before increasing.
-  - [ ] 2.5.2 Sale/POS `checkAvailability` wiring (from Batch 4 flagged gap, apply-progress
-    ~L234-250): `SaleProductRow` already has the designed+tested `checkAvailability` callback
-    (10 tests, 2 for the gate); `sale.tsx` does NOT wire it. Wire
-    `InventoryOfflineService.hasAvailableStock` + the feature-gate
-    (`hasInventoryModuleAvailable()` AND `product.discountFromInvantory`) into `sale.tsx`. No
-    further `SaleProductRow`/`SaleCategoryProducts` changes needed.
+  - [x] 2.5.2 Sale/POS `checkAvailability` wiring — DONE, moved to Stage 1 (see 1.6). Delivered
+    as the FULL 5-way `hasAvailableProductToSale` parity (not just `hasAvailableStock` +
+    gate as originally scoped here), including cart-quantity inclusion and a blocking error
+    alert. `SaleProductRow`/`SaleCategoryProducts` DID change (checkAvailability's return
+    type), contrary to this item's original "no further changes needed" assumption.
 - [ ] 2.6 Login / auth parity (CARRY-OVER — login has no dedicated module stage; co-located
   here because the post-login redirect depends on product-availability/Inventory data. NOTE:
   2.6.1 is a pure guest-form view parity with NO Inventory dependency — placed here for

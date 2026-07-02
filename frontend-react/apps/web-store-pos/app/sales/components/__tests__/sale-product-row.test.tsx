@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
@@ -33,6 +33,10 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
 }
 
 describe('SaleProductRow — Angular parity (sale-product-row.component.html)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renders the product name', () => {
     render(
       <Wrapper>
@@ -80,7 +84,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     expect(screen.getByRole('button', { name: /adicionar/i })).toBeInTheDocument();
   });
 
-  it('calls onAdded with productId, quantity and price when clicked (happy path, no inventory gate)', () => {
+  it('calls onAdded with productId, quantity and price when clicked (no checkAvailability wired)', () => {
     const onAdded = vi.fn();
     render(
       <Wrapper>
@@ -123,31 +127,17 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     expect(onAdded).toHaveBeenCalledWith('prod-9', 4, 3);
   });
 
-  it('blocks add-to-cart and shows an inline error when discountFromInvantory is true and stock is insufficient', () => {
+  // Angular's addProductToCart (sale-product-row.component.ts:58-104) ALWAYS calls
+  // hasAvailableProductToSale — no discountFromInvantory gate at the component level, the
+  // gate lives inside the service (branch 4). React mirrors that: checkAvailability, when
+  // provided, is called unconditionally.
+  it('calls checkAvailability regardless of discountFromInvantory (Angular always runs hasAvailableProductToSale)', () => {
+    const checkAvailability = vi.fn().mockReturnValue({ succeeded: true });
     const onAdded = vi.fn();
     render(
       <Wrapper>
         <SaleProductRow
-          product={makeProduct({ id: 'prod-low-stock', discountFromInvantory: true })}
-          orderType={OrderType.Normal}
-          onAdded={onAdded}
-          checkAvailability={() => false}
-        />
-      </Wrapper>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
-    expect(onAdded).not.toHaveBeenCalled();
-    // SALES.NOT_INVENTORY_AVAILABLE_MESSAGE
-    expect(screen.getByText('El producto no está disponible en el inventario.')).toBeInTheDocument();
-  });
-
-  it('does not call checkAvailability when discountFromInvantory is false', () => {
-    const checkAvailability = vi.fn().mockReturnValue(false);
-    const onAdded = vi.fn();
-    render(
-      <Wrapper>
-        <SaleProductRow
-          product={makeProduct({ discountFromInvantory: false })}
+          product={makeProduct({ id: 'prod-9', discountFromInvantory: false })}
           orderType={OrderType.Normal}
           onAdded={onAdded}
           checkAvailability={checkAvailability}
@@ -155,7 +145,78 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
-    expect(checkAvailability).not.toHaveBeenCalled();
+    expect(checkAvailability).toHaveBeenCalledWith('prod-9', 1);
     expect(onAdded).toHaveBeenCalled();
+  });
+
+  it('includes the current form quantity in the checkAvailability call', () => {
+    const checkAvailability = vi.fn().mockReturnValue({ succeeded: true });
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ id: 'prod-9' })}
+          orderType={OrderType.Normal}
+          onAdded={vi.fn()}
+          checkAvailability={checkAvailability}
+        />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '7' } });
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    expect(checkAvailability).toHaveBeenCalledWith('prod-9', 7);
+  });
+
+  // Angular: on failure, Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message,
+  // icon: 'error' }) — a BLOCKING modal that aborts the add (sale-product-row.component.ts
+  // :62-104). React has no modal library; this reuses the codebase's established native
+  // "blocking browser dialog" pattern (window.confirm in use-unsaved-changes-prompt.ts) via
+  // showBlockingError -> window.alert.
+  it('blocks add-to-cart and shows a blocking alert with the ERROR_TITLE + resolved message when checkAvailability fails', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const onAdded = vi.fn();
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ id: 'prod-low-stock', discountFromInvantory: true })}
+          orderType={OrderType.Normal}
+          onAdded={onAdded}
+          checkAvailability={() => ({ succeeded: false, errorCode: 'QUANTITY_NOT_AVAILABLE' })}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    expect(onAdded).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const [text] = alertSpy.mock.calls[0];
+    expect(text).toContain('Error');
+    expect(text).toContain('La cantidad del producto no está disponible en el inventario.');
+  });
+
+  it('resolves each error code to its exact Angular ProductErrors Spanish message', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const cases: Array<[string, string]> = [
+      ['NOT_EXISTS', 'El producto no existe.'],
+      ['INACTIVE', 'El producto no está activo.'],
+      ['NOT_AVAILABLE_TO_SALE', 'El producto no está disponible para la venta.'],
+      ['NOT_AVAILABLE', 'El producto no está disponible en el inventario.'],
+      ['QUANTITY_NOT_AVAILABLE', 'La cantidad del producto no está disponible en el inventario.'],
+    ];
+
+    for (const [errorCode, expectedMessage] of cases) {
+      alertSpy.mockClear();
+      render(
+        <Wrapper>
+          <SaleProductRow
+            product={makeProduct({ id: `prod-${errorCode}` })}
+            orderType={OrderType.Normal}
+            onAdded={vi.fn()}
+            checkAvailability={() => ({ succeeded: false, errorCode: errorCode as never })}
+          />
+        </Wrapper>,
+      );
+      fireEvent.click(screen.getAllByRole('button', { name: /adicionar/i }).at(-1)!);
+      const [text] = alertSpy.mock.calls[0];
+      expect(text).toContain(expectedMessage);
+    }
   });
 });

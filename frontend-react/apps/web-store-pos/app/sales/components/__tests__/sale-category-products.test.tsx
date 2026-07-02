@@ -72,7 +72,7 @@ describe('SaleCategoryProducts — Angular parity (sale-category-products.compon
   });
 
   it('forwards checkAvailability to child rows', () => {
-    const checkAvailability = vi.fn().mockReturnValue(false);
+    const checkAvailability = vi.fn().mockReturnValue({ succeeded: true });
     render(
       <Wrapper>
         <SaleCategoryProducts

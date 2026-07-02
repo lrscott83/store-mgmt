@@ -3,9 +3,12 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
+import { EModules } from '@store-mgmt/domain';
+
+const mockUser = vi.hoisted(() => ({ selectedStoreId: 's1', storeModuleIds: [] as number[] }));
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
+  const state = { user: mockUser, isAuthenticated: true };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -34,6 +37,7 @@ vi.mock('~/shared/lib/stores/cart-store', () => {
     items: [] as unknown[],
     addItem: addItemMock,
     updateQuantity: vi.fn(),
+    getItemQuantity: vi.fn(() => 0),
   };
   const useCartStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
@@ -79,6 +83,8 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     mockCategories = [];
     mockProducts = [];
     addItemMock.mockClear();
+    mockUser.storeModuleIds = [];
+    localStorage.clear();
   });
 
   it('renders the exact Angular header text SALES.HEADER', () => {
@@ -185,6 +191,66 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    expect(addItemMock).toHaveBeenCalled();
+  });
+
+  // End-to-end wiring check for checkAvailability: sale.tsx -> SaleCategoryProducts ->
+  // SaleProductRow, mirroring Angular's addProductToCart -> hasAvailableProductToSale
+  // (sale-product-row.component.ts:58-104).
+  it('blocks overselling: shows a blocking alert and does not add to cart when stock is insufficient', () => {
+    mockUser.storeModuleIds = [EModules.Inventory];
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', discountFromInvantory: true }),
+    ];
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+
+    expect(addItemMock).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const [text] = alertSpy.mock.calls[0];
+    expect(text).toContain('El producto no está disponible en el inventario.');
+  });
+
+  it('allows the sale when the inventory module is available, discountFromInvantory is set, and stock covers the quantity', () => {
+    mockUser.storeModuleIds = [EModules.Inventory];
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', discountFromInvantory: true }),
+    ];
+    const entries = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        categoryId: 'cat-1',
+        quantity: 10,
+        available: 10,
+        costPrice: 1,
+        date: new Date('2025-01-01'),
+        order: 0,
+        isActive: true,
+        createdDate: new Date('2025-01-01'),
+        createdByName: 'test',
+      },
+    ];
+    localStorage.setItem(
+      'lizoft.store-inventoryentries-s1',
+      JSON.stringify([['p1', entries]]),
+    );
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+
     expect(addItemMock).toHaveBeenCalled();
   });
 });
