@@ -101,8 +101,16 @@ route always shows the public landing page regardless of auth state. MOVED to St
   2.6.1 is a pure guest-form view parity with NO Inventory dependency — placed here for
   scheduling only, keep it clearly labeled as auth, not inventory) [TDD]:
   - [ ] 2.6.1 Login form L4/L5 view parity: `app/auth/routes/login.tsx` +
-    `auth/components/auth-layout.tsx` vs Angular `layouts/guest/**` login form (functional +
-    visual/token parity). No inventory dependency.
+    `auth/components/auth-layout.tsx` vs Angular `layouts/guest/**` +
+    `presentation/auth/login/login.component.html` (functional + visual/token parity). No
+    inventory dependency. CONCRETE GAP found 2026-07-02: React invented English copy
+    "POS Management" that Angular has NOWHERE — appears in `auth-layout.tsx:9`
+    (`<p>POS Management</p>`), `es.ts:4` (`'GENERAL.APP_SUBTITLE': 'POS Management'`), and
+    `public/manifest.webmanifest:4` (`"description": "POS Management System"`). Angular's login
+    shows brand "VendeDTo" + Spanish tagline "Automatiza tu Negocio"
+    (`login.component.html:19,21`) and has no APP_SUBTITLE key. FIX: replace the subtitle with
+    "Automatiza tu Negocio" (or i18n key), reconcile the manifest description, and drop/rename
+    the invented APP_SUBTITLE key.
   - [ ] 2.6.2 Post-login `navigateToUserHome` product-availability branch: after login, a
     non-admin user with NO available-to-sale products redirects to the products view (to add
     products) instead of `/sales/sale`. Depends on `hasAnyAvailableToSaleProduct`

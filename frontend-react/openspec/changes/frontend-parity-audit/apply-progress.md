@@ -1010,3 +1010,23 @@ service/inventory-availability audit = Stage 6 Sync). The one deliberately defer
 sub-item (inventory-availability validation on cart increase/decrease) is flagged, not
 silently dropped, and carries forward to Stage 2 (Inventory) or Stage 6 (Sync) per the
 updated `tasks.md` 6.1 note.
+
+### Post-Batch-8 scope work (2026-07-02, docs-only — no code)
+
+1. Stage 2 carry-overs formalized (`tasks.md` 2.5/2.6, `design.md`, `spec.md`): cart
+   increase/decrease stock validation + `sale.tsx` `checkAvailability` wiring (both depend on
+   `InventoryOfflineService`) and login/auth parity folded into Stage 2. Sync (Stage 6) keeps
+   only generic PWA services.
+2. Stage 0 RE-VERIFY run (2026-07-02): PASS-WITH-WARNINGS, 0 CRITICAL, NO regression from the
+   cart/i18n/shared-chrome churn. `verify-report.md` rewritten (supersedes 2026-07-01). W1
+   (spec.md scope drift) fixed same day.
+3. Login copy gap logged in `tasks.md` 2.6.1: React invented English "POS Management"
+   (`auth-layout.tsx:9`, `es.ts:4` `GENERAL.APP_SUBTITLE`, manifest description) that Angular
+   has nowhere; Angular shows brand "VendeDTo" + Spanish tagline "Automatiza tu Negocio". Fix
+   deferred to Stage 2 task 2.6.1.
+
+### NEXT ACTION
+
+**Run `sdd-verify` for Stage 1 (Sales).** Stage 1 was marked apply-complete across 8 batches
+but has NEVER been verified (only Stage 0 has a verify-report). This is the immediate next
+step before proceeding to Stage 2 (Inventory) `sdd-apply`.
