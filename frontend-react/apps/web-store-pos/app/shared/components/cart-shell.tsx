@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { OrderType, PaymentType } from '@store-mgmt/domain';
+import { PaymentType } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
@@ -14,10 +14,6 @@ import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/p
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
-
-// Angular's cart order type is always Normal — the cart never carries a different
-// OrderType (see NavRightComponent.orderType / ShoppingCartService.getOrderType()).
-const CART_ORDER_TYPE = OrderType.Normal;
 
 const PAYMENT_TYPE_OPTIONS: { type: PaymentType; labelKey: string }[] = [
   { type: PaymentType.Efectivo, labelKey: 'CART.EFECTIVO' },
@@ -220,11 +216,15 @@ export function CartShell() {
       {/* Cart dropdown panel */}
       {isOpen && (
         <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-surface shadow-card z-50">
-          {/* Header: "Venta actual" + order type subtitle, matches Angular's hardcoded title + getOrderTypeText() */}
+          {/* Header: "Venta actual" (hardcoded, matches Angular) + LIVE order type subtitle.
+              Angular's NavRightComponent binds this to shoppingCartService.getOrderType()
+              (nav-right.component.ts:427-429, nav-right.component.html:96) — NOT a fixed
+              value; the cart's orderType changes per session (Normal/Mayorista/etc, see
+              Egress/Mayorista realignment). */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div>
               <h3 className="text-sm font-semibold text-text">Venta actual</h3>
-              <span className="text-xs text-text-muted">{getOrderTypeText(CART_ORDER_TYPE)}</span>
+              <span className="text-xs text-text-muted">{getOrderTypeText(orderType)}</span>
             </div>
             <button
               type="button"

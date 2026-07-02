@@ -48,7 +48,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { CartShell } from '../cart-shell';
-import { PaymentType, EModules } from '@store-mgmt/domain';
+import { PaymentType, OrderType, EModules } from '@store-mgmt/domain';
 import type { Product } from '@store-mgmt/domain';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
@@ -80,6 +80,7 @@ function renderCartShell() {
 function mockCartState(overrides = {}) {
   const defaultState = {
     items: [],
+    orderType: OrderType.Normal,
     paymentType: PaymentType.Efectivo,
     isCredit: false,
     clientName: '',
@@ -116,6 +117,14 @@ describe('CartShell — header (Venta actual + order type)', () => {
     renderCartShell();
     openCart();
     expect(screen.getByText('Normal')).toBeInTheDocument();
+  });
+
+  it('shows the LIVE store order type as the subtitle, not a hardcoded "Normal" (Angular parity: nav-right.component.ts getOrderTypeText() reads shoppingCartService.getOrderType() live)', () => {
+    mockCartState({ items: [], total: vi.fn().mockReturnValue(0), orderType: OrderType.Mayorista });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Mayorista')).toBeInTheDocument();
+    expect(screen.queryByText('Normal')).not.toBeInTheDocument();
   });
 });
 
