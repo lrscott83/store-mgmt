@@ -1,7 +1,22 @@
 import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
 
 export default [
-  // Public landing page — no auth required, matches Angular's unguarded '' route
+  // Public landing page — no auth required, matches Angular's unguarded '' route.
+  // NOTE (frontend-parity-audit 2.6.3, investigated 2026-07-02): Angular's
+  // app-routing.module.ts ALSO registers a second '' route nested inside
+  // ClientLayoutComponent with `redirectTo: '/sales/sale', pathMatch: 'full'`
+  // (line ~99). That entry is Angular DEAD CODE, not a live redirect: the
+  // Angular Router resolves route arrays in declaration order and the FIRST
+  // `{ path: '', component: LandingDeepComponent }` (no guard, no children)
+  // fully matches the exact root URL with zero leftover segments and wins
+  // outright — the nested ClientLayoutComponent '' redirect is unreachable
+  // for '/'. Confirmed by tracing: LandingDeepComponent has no auth check in
+  // its .ts/.html, and AppComponent has no root-level redirect either. So an
+  // authenticated Angular user hitting '/' ALSO sees the public landing page,
+  // same as an unauthenticated one — this index route intentionally has NO
+  // clientLoader/redirect for authenticated users, matching real Angular
+  // behavior. Do NOT "fix" this into an authenticated-root redirect without
+  // first re-verifying against a live running Angular instance.
   index('home/routes/landing-deep.tsx'),
 
   // Guest-only routes (no auth required)

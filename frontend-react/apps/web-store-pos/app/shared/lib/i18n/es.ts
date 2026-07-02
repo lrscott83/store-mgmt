@@ -1,7 +1,7 @@
 const messages: Record<string, string> = {
   // General
-  'GENERAL.APP_NAME': 'Vende De Todo',
-  'GENERAL.APP_SUBTITLE': 'POS Management',
+  'GENERAL.APP_NAME': 'VendeDTo',
+  'GENERAL.APP_SUBTITLE': 'Automatiza tu Negocio',
   'GENERAL.LOADING': 'Cargando...',
   'GENERAL.SAVE': 'Guardar',
   'GENERAL.CANCEL': 'Cancelar',

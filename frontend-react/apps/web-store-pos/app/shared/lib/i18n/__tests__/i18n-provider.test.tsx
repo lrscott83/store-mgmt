@@ -19,7 +19,7 @@ describe('I18nProvider', () => {
         <MessageDisplay id="GENERAL.APP_NAME" />
       </I18nProvider>
     );
-    expect(screen.getByText('Vende De Todo')).toBeInTheDocument();
+    expect(screen.getByText('VendeDTo')).toBeInTheDocument();
   });
 
   it('uses Spanish messages when language is set to es', () => {

@@ -1,7 +1,6 @@
 {
   "name": "Vende De Todo",
   "short_name": "VendeDTo",
-  "description": "POS Management System",
   "start_url": "/login",
   "display": "standalone",
   "background_color": "#ecf2f7",
