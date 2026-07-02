@@ -1,14 +1,16 @@
-import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Order } from '@store-mgmt/domain';
 import { Button } from '~/shared/components/ui/button';
+import { confirmDialog, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 
 interface OrderItemListProps {
   order: Order;
   /** Angular default is `true` (read-only, no actions) — set `false` to show Editar/Eliminar. */
   readOnly?: boolean;
   onEditOrder?: (order: Order) => void;
-  onDeactivateOrder?: (order: Order) => void;
+  /** Returns `true` on success, `false` on failure — mirrors Angular's
+   * `orderService.deactivateOrder(order.id)` returning a `Result` with `succeeded`. */
+  onDeactivateOrder?: (order: Order) => boolean;
 }
 
 /**
@@ -24,15 +26,41 @@ export function OrderItemList({
   onDeactivateOrder,
 }: OrderItemListProps) {
   const intl = useIntl();
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  function handleDeactivateClick() {
-    if (!confirmDeactivate) {
-      setConfirmDeactivate(true);
-      return;
+  // Angular: deactivateOrder (order-item-list.component.ts:34-53) — Swal.fire({ title:
+  // GENERAL.DELETE_CONFIRM_TITLE, text: GENERAL.DELETE_CONFIRM_MESSAGE_A with
+  // name=TODAY_ORDERS.TEXT, icon: 'question', showCancelButton: true,
+  // confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545', confirmButtonText: YES,
+  // cancelButtonText: NO }). On confirm, deactivate; on failure, showErrorMessage (a
+  // Swal.fire OK-only error dialog with the hardcoded Angular literal below).
+  async function handleDeactivateClick() {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
+      message: intl.formatMessage(
+        { id: 'GENERAL.DELETE_CONFIRM_MESSAGE_A' },
+        { name: intl.formatMessage({ id: 'TODAY_ORDERS.TEXT' }) },
+      ),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    const succeeded = onDeactivateOrder?.(order) ?? true;
+    if (!succeeded) {
+      showAcknowledgeError({
+        title: intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        message: intl.formatMessage(
+          { id: 'TODAY_ORDERS.ERROR_DELETING_ORDER' },
+          {
+            // Angular's own hardcoded Spanish literal (order-item-list.component.ts:51),
+            // not an i18n key — preserved verbatim, same precedent as the CSV importer fix.
+            message:
+              'La venta no pudo ser cancelada. Inténtelo más tarde y si persiste el problema contacte al soporte técnico.',
+          },
+        ),
+        confirmButtonText: intl.formatMessage({ id: 'GENERAL.OK' }),
+      });
     }
-    onDeactivateOrder?.(order);
-    setConfirmDeactivate(false);
   }
 
   return (
@@ -50,9 +78,7 @@ export function OrderItemList({
               data-testid="deactivate-order-button"
             >
               {/* GENERAL.DELETE */}
-              {confirmDeactivate
-                ? intl.formatMessage({ id: 'GENERAL.YES' })
-                : intl.formatMessage({ id: 'GENERAL.DELETE' })}
+              {intl.formatMessage({ id: 'GENERAL.DELETE' })}
             </Button>
           )}
         </div>

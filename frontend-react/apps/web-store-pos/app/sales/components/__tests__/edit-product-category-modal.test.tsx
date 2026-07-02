@@ -64,4 +64,16 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
     expect(screen.getByText('Orden')).toBeInTheDocument();
     expect(screen.queryByText('Order')).not.toBeInTheDocument();
   });
+
+  // Angular: edit-product-category-modal.component.html:26 —
+  // <mat-slide-toggle formControlName="isActive">{{'GENERAL.ACTIVE'| translate}}</mat-slide-toggle>
+  it('renders the active-checkbox label as "Activo" (GENERAL.ACTIVE), not the hardcoded English "Active"', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Activo')).toBeInTheDocument();
+    expect(screen.queryByText('Active')).not.toBeInTheDocument();
+  });
 });

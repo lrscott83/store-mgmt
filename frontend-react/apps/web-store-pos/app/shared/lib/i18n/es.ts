@@ -24,8 +24,14 @@ const messages: Record<string, string> = {
   'GENERAL.UPDATE': 'Actualizar',
   'GENERAL.YES': 'Si',
   'GENERAL.NO': 'No',
+  'GENERAL.OK': 'Ok',
+  'GENERAL.ACTIVE': 'Activo',
   'GENERAL.CLIENT': 'Cliente',
   'GENERAL.NOTE': 'Nota',
+  // GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A (Angular GENERAL.* — used by SweetAlert2 confirm
+  // dialogs, e.g. order-item-list.component.ts:35-38 deactivateOrder)
+  'GENERAL.DELETE_CONFIRM_TITLE': 'Confirmación para eliminar',
+  'GENERAL.DELETE_CONFIRM_MESSAGE_A': '¿Está seguro que desea eliminar esta {name}?',
 
   // Auth
   'AUTH.SIGN_IN': 'Iniciar sesión',
@@ -141,6 +147,13 @@ const messages: Record<string, string> = {
     'Usted no puede realizar la venta porque el pago es menor que el total.',
   'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT':
     'Usted no puede realizar la venta por cobrar sin especificar el cliente.',
+  // Cart line-item quantity/remove controls — Angular's nav-right template has NO
+  // aria-labels on these buttons at all (icon-only, no accessibility text); these are a
+  // React-added a11y improvement with previously-hardcoded English text, now Spanish per
+  // the blanket text-parity rule (not a port of missing Angular copy).
+  'CART.DECREASE_QUANTITY': 'Disminuir cantidad de {name}',
+  'CART.INCREASE_QUANTITY': 'Aumentar cantidad de {name}',
+  'CART.REMOVE_ITEM': 'Eliminar {name}',
 
   // GENERAL.PAY — Angular's mat-form-field label for the cart's payment/tendered-amount input.
   'GENERAL.PAY': 'Pago',
@@ -168,6 +181,14 @@ const messages: Record<string, string> = {
   'PRODUCTS.CSV.ERROR.MISSING_PRICE': 'El precio es requerido',
   'PRODUCTS.CSV.ERROR.INVALID_PRICE': 'El precio debe ser un número válido',
   'PRODUCTS.CSV.ERROR.DUPLICATE_BARCODE': 'El código de barras ya existe',
+  // PRODUCTS.CSV preview-table column headers/status badges — this client-side CSV preview
+  // (parse + per-row validation table) has NO Angular counterpart at all (Angular's
+  // csv-product-importer-modal.component.html only has a file input, no preview table); these
+  // keys exist purely so this React-invented UI's text is Spanish per the blanket text-parity
+  // rule, not as a port of Angular copy. Reuses PRODUCTS.FORM.* for the shared field labels.
+  'PRODUCTS.CSV.COL_ROW': 'Fila',
+  'PRODUCTS.CSV.COL_STATUS': 'Estado',
+  'PRODUCTS.CSV.STATUS_VALID': 'Válido',
   'PRODUCTS.CATEGORY.CREATE': 'Crear categoría',
   'PRODUCTS.CATEGORY.EDIT': 'Editar categoría',
   // Angular PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY — header FAB label (also reused, per
@@ -208,6 +229,15 @@ const messages: Record<string, string> = {
   // GENERAL.RESPONSE.* (Angular GENERAL.RESPONSE — used as the blocking-error-modal title,
   // e.g. sale-product-row.component.ts:72 Swal.fire title)
   'GENERAL.RESPONSE.ERROR_TITLE': 'Error',
+  // GENERAL.RESPONSE.ERROR500_MESSAGE — Angular's generic technical-support fallback,
+  // reused here as the message for the credit/order edit-modals' Swal error branches
+  // (sale-credit-payment-modal.component.ts:71-75, edit-sale-credit-modal.component.ts:66-70,
+  // edit-order-modal.component.ts:49-53), which in Angular show `dataEntry.errors[0]
+  // .description` (a dynamic DataResult error). React's ported *-offline-service methods
+  // only fail via a not-found exception (no DataResult contract), so this generic Angular
+  // string is the closest faithful, non-invented Spanish fallback.
+  'GENERAL.RESPONSE.ERROR500_MESSAGE':
+    'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
 
   // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',

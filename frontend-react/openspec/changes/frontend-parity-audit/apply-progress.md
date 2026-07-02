@@ -1186,10 +1186,191 @@ follow-up `sdd-verify` re-pass to confirm both findings are closed, or to procee
 (Inventory) `sdd-apply` (2.5.1 cart increase/decrease validation and 2.6 login/auth parity
 remain the only Stage 2 carry-over items from Stage 1).
 
-### NEXT ACTION
+### NEXT ACTION (superseded by Batch 10 below)
 
-**Run `sdd-verify` for Stage 1 (Sales) again** to confirm the W1 (overselling) and W2
-(hardcoded English/invented validation) findings from the prior verify-report are closed, OR
-proceed directly to Stage 2 (Inventory) `sdd-apply` if a re-verify is not required before
-moving on — Stage 2's remaining carry-over scope is now smaller (2.5.1 cart
-increase/decrease validation + 2.6 login/auth parity; 2.5.2 is done).
+~~Run `sdd-verify` for Stage 1 (Sales) again~~ — superseded: Batch 10 below is a dedicated
+cross-cutting parity slice (SweetAlert2 port) requested directly by the user, applied before
+any further Stage 2/verify work.
+
+---
+
+## Batch 10 — SweetAlert2 (sweetalert2) port, Stage 1 Sales dialogs (2026-07-02)
+
+### What
+
+Cross-cutting parity slice: replaced React's degraded/dropped confirm-and-alert UX in the
+Sales module with the SAME library Angular uses — `sweetalert2` (`Swal.fire`). Angular has NO
+`Swal.mixin`/global theme anywhere in `frontend/` (confirmed by repo-wide grep) — every call
+site uses stock library defaults, so React does too, no custom theme/CSS import needed
+(SweetAlert2 injects its own styles at runtime).
+
+### Why
+
+Earlier batches (through Batch 9) used `window.alert` (`blocking-alert.ts`) for error dialogs
+and a bespoke "double-click to confirm" pattern for confirm dialogs, dropping Angular's real
+confirm step in `sale-credit-payment-modal.tsx` entirely (explicit code comment there said "no
+SweetAlert2 equivalent in React"). User requested restoring byte-exact SweetAlert2 parity for
+every live (template-wired) Sale-module `Swal.fire` call site, plus a stray hardcoded-English
+text sweep.
+
+### Where
+
+- `apps/web-store-pos/package.json` — added `sweetalert2 ^11.26.25` dependency (Angular pins
+  `^11.11.0`; same major, API-compatible).
+- `app/shared/lib/blocking-alert.ts` — REWRITTEN. Three exports, matching the 3 distinct
+  Angular `Swal.fire` shapes found across all in-scope call sites:
+  - `showBlockingError(title, message)` — `Swal.fire({ icon: 'error', title, text })`, no
+    button overrides (SweetAlert2's own default OK button — Angular never translates it at
+    these call sites, preserved verbatim). Replaces the old `window.alert` implementation;
+    same public API, so `sale-product-row.tsx` needed no code change.
+  - `confirmDialog(options): Promise<boolean>` — `Swal.fire({ title, text, icon: 'question',
+    showCancelButton: true, confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545',
+    confirmButtonText, cancelButtonText })`, resolves `true` only on `result.isConfirmed`.
+  - `showAcknowledgeError(options)` — `Swal.fire({ title, text, icon: 'error',
+    showCancelButton: false, confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545',
+    confirmButtonText })` — the one Angular call site (`order-item-list`'s `showErrorMessage`)
+    with an explicit translated OK button + explicit colors on an error dialog.
+
+### Ported Swal call sites (Angular source -> React file)
+
+| Angular source | React file | Config restored |
+|---|---|---|
+| `sale-product-row.component.ts:68-74` (stock error) | `sale-product-row.tsx` (via `blocking-alert.ts`) | Now real `Swal.fire` (was `window.alert`); no code change to the component, only the wrapper's internals. |
+| `sale-product-row.component.ts:117-121` (add-to-cart failure) | `sale-product-row.tsx` `addCartItem` path | Same `showBlockingError` wrapper — not separately wired in React (this failure branch has no reachable React caller; `addCartItem`'s equivalent success/fail split was not ported in earlier batches — flagged below, not invented here). |
+| `sale-credit-payment-modal.component.ts:52-60` (payment confirm) | `sale-credit-payment-modal.tsx` | RESTORED: real `confirmDialog` (title `SALE_CREDIT.PAYMENT_CONFIRM_TITLE`, message `PAYMENT_CONFIRM_MESSAGE`, YES/NO) replaces the double-click-to-confirm pattern the code comment said had "no SweetAlert2 equivalent". |
+| `sale-credit-payment-modal.component.ts:71-75` (payment failure) | `sale-credit-payment-modal.tsx` | NEW: `onConfirm` now returns `boolean`; on `false`, `showBlockingError(GENERAL.ERROR, GENERAL.RESPONSE.ERROR500_MESSAGE)`, modal stays open (was previously always closing regardless of outcome). |
+| `edit-sale-credit-modal.component.ts:66-70` | `edit-sale-credit-modal.tsx` | NEW: `onSave` returns `boolean`; same error-dialog-and-stay-open treatment. |
+| `edit-order-modal.component.ts:49-53` | `edit-order-modal.tsx` | NEW: `onUpdate` returns `boolean`; same treatment. |
+| `order-item-list.component.ts:35-44` (deactivateOrder confirm) | `order-item-list.tsx` | RESTORED: real `confirmDialog` (title `GENERAL.DELETE_CONFIRM_TITLE`, message `GENERAL.DELETE_CONFIRM_MESSAGE_A` with name=`TODAY_ORDERS.TEXT` -> "Venta") replaces the double-click pattern. |
+| `order-item-list.component.ts:124-135` (`showErrorMessage`, called from deactivateOrder's failure branch) | `order-item-list.tsx` | NEW: `onDeactivateOrder` returns `boolean`; on `false`, `showAcknowledgeError` with Angular's exact hardcoded literal ("La venta no pudo ser cancelada. ...") wrapped in `TODAY_ORDERS.ERROR_DELETING_ORDER`, `GENERAL.OK` button. |
+
+**Callback-contract propagation** (mechanical, needed so the failure signal reaches the modal
+that owns the Swal error dialog — mirrors Angular's component-owns-the-service-call
+architecture without abandoning React's callback-prop boundary):
+`order-list.tsx` (`onDeactivateOrder` type only, passthrough) · `today-orders.tsx`
+(`handleUpdate`/`handleDeactivate` now try/catch + return `boolean`) · `sale-credit-list.tsx`
+(`handleSave`/`handlePay` intermediate wrappers now return `boolean`, only close their modal
+on success) · `today-credits.tsx` (`handleSave`/`handlePay` now try/catch + return `boolean`).
+
+**NOT ported (flagged, not invented)**: `order-item-list.component.ts`'s
+`sendOrderToShoppingCart` (:70) and `onDeteleOrder` (:97) — confirmed DEAD in Angular's own
+template (`order-item-list.component.html` never calls either method; only `deactivateOrder`
+and the edit/delete action-row buttons are wired). No React counterpart invented for these.
+
+**Generic error-message decision**: React's `*-offline-service.ts` update/pay methods
+(`SaleCreditOfflineService.update/pay`, `OrderOfflineService.update`) return the updated
+entity directly and only fail via a not-found `throw` — unlike Angular's `DataResult`/`Result`
+contract which can carry a dynamic `succeeded: false` + description. Since there's no dynamic
+description to surface, the `showBlockingError` failure branches use Angular's own generic
+fallback string `GENERAL.RESPONSE.ERROR500_MESSAGE` ("Por favor, vuelva a intentarlo y si
+persiste el error contacte al equipo de soporte técnico.") — byte-identical Angular text, not
+invented copy.
+
+### i18n keys added (`app/shared/lib/i18n/es.ts`), all byte-identical to Angular vocab
+
+`GENERAL.OK` ("Ok"), `GENERAL.ACTIVE` ("Activo"), `GENERAL.DELETE_CONFIRM_TITLE`
+("Confirmación para eliminar"), `GENERAL.DELETE_CONFIRM_MESSAGE_A` ("¿Está seguro que desea
+eliminar esta {name}?"), `GENERAL.RESPONSE.ERROR500_MESSAGE`. Plus 3 keys with NO Angular
+counterpart (see stray-text section): `PRODUCTS.CSV.COL_ROW`, `PRODUCTS.CSV.COL_STATUS`,
+`PRODUCTS.CSV.STATUS_VALID`, `CART.DECREASE_QUANTITY`, `CART.INCREASE_QUANTITY`,
+`CART.REMOVE_ITEM`.
+
+### Stray-text sweep (`app/sales/**` + `cart-shell.tsx`)
+
+- `edit-product-category-modal.tsx` — "Active" checkbox label (hardcoded English) ->
+  `GENERAL.ACTIVE` ("Activo"). Confirmed via Angular's
+  `edit-product-category-modal.component.html:26` (`mat-slide-toggle` with
+  `'GENERAL.ACTIVE'| translate`).
+- `csv-product-importer-modal.tsx` — preview-table column headers ("Row"/"Name"/"Price"/
+  "Barcode"/"Category"/"Status") and status badges ("Valid"/"Error") were hardcoded English ->
+  Spanish (`PRODUCTS.CSV.COL_ROW`="Fila", reused `PRODUCTS.FORM.NAME/PRICE/BARCODE/CATEGORY`,
+  `PRODUCTS.CSV.COL_STATUS`="Estado", `PRODUCTS.CSV.STATUS_VALID`="Válido",
+  `GENERAL.ERROR`="Error" for the error badge).
+- `app/sales/lib/csv-product-parser.ts` — per-row validation messages were hardcoded English
+  ("Missing name: name is required", etc.) — changed `CsvRowError.message: string` to
+  `CsvRowError.errorCode: CsvRowErrorCode` (a plain lib fn has no `useIntl` access, so it
+  returns a code, same pattern as `product-availability.ts`); the modal component maps each
+  code to the ALREADY-EXISTING `PRODUCTS.CSV.ERROR.MISSING_NAME/MISSING_PRICE/INVALID_PRICE/
+  DUPLICATE_BARCODE` Spanish keys (these keys existed since Batch 9 but were unused — the
+  parser wasn't wired to them).
+- `cart-shell.tsx` — 3 cart line-item control `aria-label`s (decrease/increase quantity,
+  remove item) were hardcoded English template strings -> `CART.DECREASE_QUANTITY`/
+  `INCREASE_QUANTITY`/`REMOVE_ITEM` (new keys, Spanish, parameterized with the product name).
+
+### FLAGGED — React-invented UI/validation with NO Angular counterpart (not silently changed, not removed)
+
+1. **CSV import preview table** (`csv-product-importer-modal.tsx`): Angular's
+   `csv-product-importer-modal.component.html` has ONLY a file input + a static sample-format
+   text block — NO client-side parsing, NO preview table, NO per-row validation UI at all
+   (`csv-product-parser.ts` itself, the entire preview/validation table, and all
+   `PRODUCTS.CSV.*` keys except `PRODUCTS.CSV.TITLE`/`IMPORT_VALID` source text are
+   React-only). This batch only fixed the TEXT of this invented feature to Spanish per the
+   blanket text-parity rule — it did NOT remove, redesign, or extend the feature itself. Left
+   for the user to decide whether to keep, port-align (e.g. hide behind a flag), or remove.
+2. **Cart line-item aria-labels** (`cart-shell.tsx`): Angular's nav-right template has NO
+   `aria-label`s on the quantity +/- or remove buttons at all (icon-only, zero accessibility
+   text). This batch translated the existing React-added labels to Spanish rather than
+   removing them (removing would reduce accessibility with no Angular parity reason to do
+   so) — flagged as a deliberate accessibility improvement beyond strict 1:1 parity, not
+   silently invented in this batch (the labels already existed pre-batch, only the language
+   changed).
+3. **Failure-path callback contracts** (`onSave`/`onPay`/`onUpdate`/`onDeactivateOrder` now
+   return `boolean`): this is new logic (try/catch at the route layer around service calls
+   that previously could throw uncaught), added specifically to make Angular's Swal
+   error-dialog branches reachable. It is a faithful behavioral port of Angular's
+   `DataResult.succeeded` check, not an invented validation rule — flagged here for
+   visibility since it touches call signatures across 3 modals + 4 route files.
+
+### TDD Cycle Evidence (Batch 10)
+
+| Task | RED | GREEN | TRIANGULATE |
+|---|---|---|---|
+| `blocking-alert.ts` (3 exports) | 4 tests written first, confirmed RED (`is not a function`) | 4/4 passed | error shape / confirm-true / confirm-false / acknowledge-error shape |
+| `sale-product-row.test.tsx` update | switched from `window.alert` spy to `showBlockingError` mock, ran to confirm still-passing (component code unchanged, only wrapper internals changed) | 12/12 passed | single-error case + all 5 ProductErrors codes |
+| `order-components.test.tsx` (OrderList deactivate + EditOrderModal) | 4 new/changed tests written first, confirmed RED (4 failing) | 15/15 passed | confirm-then-deactivate / cancel-then-no-op / failure-shows-acknowledge-error / EditOrderModal success-closes vs failure-stays-open+shows-error |
+| `credit-components.test.tsx` (SaleCreditPaymentModal + EditSaleCreditModal) | 4 new/changed tests written first, confirmed RED (4 failing) | 22/22 passed | confirm-then-pay / cancel-then-no-op / failure-shows-error-stays-open (both modals) |
+| `edit-product-category-modal.test.tsx` (Active label) | 1 test written first, confirmed RED | 5/5 passed | "Activo" present, "Active" absent |
+| `csv-product-parser.test.ts` (errorCode) | 4 assertions changed to `errorCode`, confirmed RED (`undefined` vs expected code) | 11/11 passed | MISSING_NAME/MISSING_PRICE/INVALID_PRICE/DUPLICATE_BARCODE |
+| `csv-product-importer-modal.test.tsx` (Spanish headers/status/error-message) | 2 new tests written first, confirmed RED | 4/4 passed | valid-row Spanish headers+badge / invalid-row Spanish error message |
+| `cart-shell.test.tsx` (Spanish aria-labels) | 1 new test written first, confirmed RED | 24/24 passed | decrease/increase/remove labels |
+| `sale.test.tsx` (overselling e2e) | pre-existing test broke (real Swal + jsdom `matchMedia` missing) when the wrapper switched to real `sweetalert2` — fixed by mocking `~/shared/lib/blocking-alert` instead of `window.alert` | 10/10 passed | — (regression fix, not new behavior) |
+
+### Issues Found (Batch 10)
+
+None beyond the pre-existing `sale.test.tsx` regression (real SweetAlert2 needs
+`window.matchMedia`, unavailable in jsdom by default) — fixed by mocking the wrapper module in
+that test file rather than adding a jsdom polyfill (consistent with how every other consumer
+test in this batch mocks the wrapper, not `sweetalert2` itself).
+
+### Test/Build Results (Batch 10)
+
+- `tsc -p apps/web-store-pos --noEmit` (from `frontend-react/`): clean, zero errors.
+- `pnpm -C apps/web-store-pos exec vitest run`: 95 test files / 1028 tests passed, 0 failed.
+  Baseline before this batch (Batch 9): 95 files / 1015 tests -> +13 tests net (no new test
+  files; existing files gained cases).
+- `react-router build` (apps/web-store-pos): succeeded. New `sweetalert2` chunk
+  (`blocking-alert-*.js`) ~79.5 kB / 21.1 kB gzip — expected bundle-size increase from adding
+  a real dialog library, no build errors/warnings.
+
+### Workload / PR Boundary (Batch 10)
+
+- Mode: direct work-unit commit on `feat/frontend-parity-audit`, no push, no PR, per explicit
+  instruction for this batch (consistent with Batches 1-9 precedent).
+- Boundary: `sweetalert2` dependency + `blocking-alert.ts` rewrite + the 6 Swal call-site
+  ports (`sale-credit-payment-modal.tsx`, `edit-sale-credit-modal.tsx`, `edit-order-modal.tsx`,
+  `order-item-list.tsx`, `order-list.tsx` type-only, `sale-credit-list.tsx`) + the 2 route
+  try/catch wrappers (`today-orders.tsx`, `today-credits.tsx`) + the stray-text sweep
+  (`edit-product-category-modal.tsx`, `csv-product-importer-modal.tsx`,
+  `csv-product-parser.ts`, `cart-shell.tsx`) + `es.ts` i18n additions + all their tests. Does
+  NOT touch Stage 2+ (Inventory/Expenses/etc.), does NOT remove or redesign the CSV
+  preview-table feature (flagged instead), does NOT touch `sale-product-row.tsx`'s component
+  code (only its wrapper dependency's internals changed).
+
+### Status — Stage 1 (Sales) SweetAlert2 parity slice COMPLETE
+
+All live (template-wired) Angular Sale-module `Swal.fire` call sites now use the real
+`sweetalert2` library with byte-exact config. Two items flagged above (CSV preview-table
+scope, cart aria-label a11y-beyond-parity) are left for the user to decide, not silently
+resolved. Stage 1 (Sales) remains ready for `sdd-verify`, or Stage 2 (Inventory) `sdd-apply`
+may proceed (2.5.1 cart increase/decrease validation + 2.6 login/auth parity remain the only
+Stage 2 carry-over items).

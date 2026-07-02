@@ -1,9 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { SaleCredit } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
+
+// Angular's sale-credit-payment-modal.component.ts:52-78 uses SweetAlert2 for BOTH the
+// payment confirm step AND the failure error dialog — mock the shared wrapper module so
+// tests control resolution deterministically (not window.confirm/alert or raw Swal).
+const confirmDialogMock = vi.fn();
+const showBlockingErrorMock = vi.fn();
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+}));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -128,6 +138,10 @@ describe('SaleCreditList', () => {
 import { EditSaleCreditModal } from '../edit-sale-credit-modal';
 
 describe('EditSaleCreditModal', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders the Angular literal title (SALE_CREDIT.PAYMENT_CREDIT) when open', () => {
     const credit = makeCredit();
     render(
@@ -173,7 +187,7 @@ describe('EditSaleCreditModal', () => {
   });
 
   it('calls onSave with client and note and closes on submit', () => {
-    const onSave = vi.fn();
+    const onSave = vi.fn().mockReturnValue(true);
     const onClose = vi.fn();
     const credit = makeCredit({ id: 'c1', client: 'Ana' });
     render(
@@ -185,6 +199,26 @@ describe('EditSaleCreditModal', () => {
     fireEvent.click(screen.getByTestId('edit-sale-credit-submit'));
     expect(onSave).toHaveBeenCalledWith('c1', 'Ana Actualizada', '');
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // Angular: edit-sale-credit-modal.component.ts:60-71 — on `updateSaleCredit` failure,
+  // Swal.fire({ icon: 'error', title: GENERAL.ERROR, text: dataEntry.errors[0].description });
+  // modal stays open (no closeModal() call in the else branch).
+  it('shows a blocking error and does NOT close when onSave reports failure', () => {
+    const onSave = vi.fn().mockReturnValue(false);
+    const onClose = vi.fn();
+    const credit = makeCredit({ id: 'c1', client: 'Ana' });
+    render(
+      <Wrapper>
+        <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={onClose} onSave={onSave} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('edit-sale-credit-submit'));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      'Error',
+      'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+    );
   });
 
   it('closes without saving on Cerrar', () => {
@@ -206,6 +240,10 @@ describe('EditSaleCreditModal', () => {
 import { SaleCreditPaymentModal } from '../sale-credit-payment-modal';
 
 describe('SaleCreditPaymentModal', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders the Angular literal title (SALE_CREDIT.PAYMENT_CREDIT) when open', () => {
     const credit = makeCredit();
     render(
@@ -248,18 +286,64 @@ describe('SaleCreditPaymentModal', () => {
     expect(select.value).toBe(String(PaymentType.Efectivo));
   });
 
-  it('requires a second click (confirm gate) before calling onConfirm', () => {
-    const onConfirm = vi.fn();
+  // Angular: Swal.fire({ title: SALE_CREDIT.PAYMENT_CONFIRM_TITLE, text:
+  // SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE, icon: 'question', showCancelButton: true,
+  // confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545', confirmButtonText: YES,
+  // cancelButtonText: NO }) — onConfirm only runs when `result.isConfirmed`
+  // (sale-credit-payment-modal.component.ts:52-78).
+  it('shows a SweetAlert2 confirm dialog and only pays when confirmed', async () => {
+    const onConfirm = vi.fn().mockReturnValue(true);
     const credit = makeCredit({ id: 'c1' });
+    confirmDialogMock.mockResolvedValue(true);
     render(
       <Wrapper>
         <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={onConfirm} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('sale-credit-payment-submit'));
-    expect(onConfirm).not.toHaveBeenCalled();
+    expect(confirmDialogMock).toHaveBeenCalledWith({
+      title: 'Confirmación de Pago',
+      message: 'Usted está segura(o) que desea pagar este crédito por venta?',
+      confirmButtonText: 'Si',
+      cancelButtonText: 'No',
+    });
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith('c1', PaymentType.Efectivo, ''));
+  });
+
+  it('does not pay when the SweetAlert2 confirm dialog is cancelled', async () => {
+    const onConfirm = vi.fn();
+    const credit = makeCredit({ id: 'c1' });
+    confirmDialogMock.mockResolvedValue(false);
+    render(
+      <Wrapper>
+        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={onConfirm} />
+      </Wrapper>,
+    );
     fireEvent.click(screen.getByTestId('sale-credit-payment-submit'));
-    expect(onConfirm).toHaveBeenCalledWith('c1', PaymentType.Efectivo, '');
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  // Angular: sale-credit-payment-modal.component.ts:70-76 — on `paidSaleCredit` failure,
+  // Swal.fire({ icon: 'error', title: GENERAL.ERROR, text: dataEntry.errors[0].description });
+  // modal stays open (no closeModal() call in the else branch).
+  it('shows a blocking error and does NOT close when onConfirm reports failure', async () => {
+    const onConfirm = vi.fn().mockReturnValue(false);
+    const onClose = vi.fn();
+    const credit = makeCredit({ id: 'c1' });
+    confirmDialogMock.mockResolvedValue(true);
+    render(
+      <Wrapper>
+        <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={onClose} onConfirm={onConfirm} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('sale-credit-payment-submit'));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      'Error',
+      'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+    );
   });
 
   it('closes without confirming on Cerrar', () => {

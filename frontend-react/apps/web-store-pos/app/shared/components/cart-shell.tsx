@@ -317,7 +317,10 @@ export function CartShell() {
                         type="button"
                         onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs"
-                        aria-label={`Decrease quantity of ${item.product.name}`}
+                        aria-label={intl.formatMessage(
+                          { id: 'CART.DECREASE_QUANTITY' },
+                          { name: item.product.name },
+                        )}
                       >
                         −
                       </button>
@@ -325,7 +328,10 @@ export function CartShell() {
                         type="button"
                         onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs"
-                        aria-label={`Increase quantity of ${item.product.name}`}
+                        aria-label={intl.formatMessage(
+                          { id: 'CART.INCREASE_QUANTITY' },
+                          { name: item.product.name },
+                        )}
                       >
                         +
                       </button>
@@ -334,7 +340,7 @@ export function CartShell() {
                       type="button"
                       onClick={() => removeItem(item.product.id)}
                       className="text-border hover:text-danger transition-colors"
-                      aria-label={`Remove ${item.product.name}`}
+                      aria-label={intl.formatMessage({ id: 'CART.REMOVE_ITEM' }, { name: item.product.name })}
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

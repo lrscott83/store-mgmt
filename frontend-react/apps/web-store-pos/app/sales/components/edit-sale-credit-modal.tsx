@@ -3,12 +3,15 @@ import { useIntl } from 'react-intl';
 import type { SaleCredit } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface EditSaleCreditModalProps {
   saleCredit: SaleCredit;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (creditId: string, client: string, note: string) => void;
+  /** Returns `true` on success, `false` on failure — mirrors Angular's
+   * `saleCreditService.updateSaleCredit(...)` returning a `DataResult` with `succeeded`. */
+  onSave: (creditId: string, client: string, note: string) => boolean;
 }
 
 /**
@@ -32,12 +35,22 @@ export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: Edi
 
   const clientInvalid = touched && client.trim() === '';
 
+  // Angular: edit-sale-credit-modal.component.ts:48-72 — on `updateSaleCredit` failure,
+  // Swal.fire({ icon: 'error', title: GENERAL.ERROR, text: dataEntry.errors[0].description });
+  // modal stays open (no closeModal() call in the else branch).
   function handleSubmit() {
     setTouched(true);
     if (client.trim() === '') return;
     if (!saleCredit?.id) return;
-    onSave(saleCredit.id, client, note);
-    onClose();
+    const succeeded = onSave(saleCredit.id, client, note);
+    if (succeeded) {
+      onClose();
+    } else {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR500_MESSAGE' }),
+      );
+    }
   }
 
   return (

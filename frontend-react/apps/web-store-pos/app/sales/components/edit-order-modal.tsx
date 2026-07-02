@@ -4,12 +4,15 @@ import type { Order } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface EditOrderModalProps {
   order: Order;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: (orderId: string, paymentType: PaymentType) => void;
+  /** Returns `true` on success, `false` on failure — mirrors Angular's
+   * `orderService.updateTodayOrder(...)` returning a `DataResult` with `succeeded`. */
+  onUpdate: (orderId: string, paymentType: PaymentType) => boolean;
 }
 
 // Angular's PaymentTypeUtils.getPaymentTypes() maps enum keys to labels as-is
@@ -34,10 +37,19 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
 
   if (!isOpen) return null;
 
+  // Angular: edit-order-modal.component.ts:39-54 — on failure, Swal.fire({ icon: 'error',
+  // title: GENERAL.ERROR, text: dataEntry.errors[0].description }); modal stays open.
   function handleSubmit() {
     if (!order?.id) return;
-    onUpdate(order.id, paymentType);
-    onClose();
+    const succeeded = onUpdate(order.id, paymentType);
+    if (succeeded) {
+      onClose();
+    } else {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR500_MESSAGE' }),
+      );
+    }
   }
 
   return (

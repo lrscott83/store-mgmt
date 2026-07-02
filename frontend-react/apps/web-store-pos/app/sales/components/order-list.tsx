@@ -8,7 +8,7 @@ interface OrderListProps {
   /** Angular default is `true` (read-only, no edit/delete actions inside each panel). */
   readOnly?: boolean;
   onEditOrder?: (order: Order) => void;
-  onDeactivateOrder?: (order: Order) => void;
+  onDeactivateOrder?: (order: Order) => boolean;
 }
 
 /** Angular's `PaymentTypeUtils.getPaymentTypeIcon` — matched 1:1 with Bootstrap icon classes,

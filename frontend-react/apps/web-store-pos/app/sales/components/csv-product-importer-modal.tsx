@@ -3,6 +3,15 @@ import { useIntl } from 'react-intl';
 import type { ParsedProductRow, CsvRowError } from '../lib/csv-product-parser';
 import { parseCsvProducts } from '../lib/csv-product-parser';
 
+// Maps each parser errorCode to its existing Spanish i18n key — same error-code -> i18n-key
+// mapping pattern as app/sales/lib/product-availability.ts's PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS.
+const CSV_ROW_ERROR_MESSAGE_KEYS: Record<CsvRowError['errorCode'], string> = {
+  MISSING_NAME: 'PRODUCTS.CSV.ERROR.MISSING_NAME',
+  MISSING_PRICE: 'PRODUCTS.CSV.ERROR.MISSING_PRICE',
+  INVALID_PRICE: 'PRODUCTS.CSV.ERROR.INVALID_PRICE',
+  DUPLICATE_BARCODE: 'PRODUCTS.CSV.ERROR.DUPLICATE_BARCODE',
+};
+
 interface CsvProductImporterModalProps {
   existingBarcodes: string[];
   onImport: (products: ParsedProductRow[]) => void;
@@ -94,12 +103,24 @@ export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }:
             <table className="w-full text-xs">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Row</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Name</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Price</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Barcode</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Category</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">
+                    {intl.formatMessage({ id: 'PRODUCTS.CSV.COL_ROW' })}
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">
+                    {intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' })}
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">
+                    {intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' })}
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">
+                    {intl.formatMessage({ id: 'PRODUCTS.FORM.BARCODE' })}
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">
+                    {intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' })}
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">
+                    {intl.formatMessage({ id: 'PRODUCTS.CSV.COL_STATUS' })}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -111,16 +132,22 @@ export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }:
                     <td className="px-3 py-1.5 text-gray-500">{product.barcode ?? '-'}</td>
                     <td className="px-3 py-1.5 text-gray-500">{product.category ?? '-'}</td>
                     <td className="px-3 py-1.5">
-                      <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">Valid</span>
+                      <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
+                        {intl.formatMessage({ id: 'PRODUCTS.CSV.STATUS_VALID' })}
+                      </span>
                     </td>
                   </tr>
                 ))}
                 {errors.map((err) => (
                   <tr key={`err-${err.row}`} className="bg-red-50">
                     <td className="px-3 py-1.5 text-gray-500">{err.row}</td>
-                    <td colSpan={4} className="px-3 py-1.5 text-red-700">{err.message}</td>
+                    <td colSpan={4} className="px-3 py-1.5 text-red-700">
+                      {intl.formatMessage({ id: CSV_ROW_ERROR_MESSAGE_KEYS[err.errorCode] })}
+                    </td>
                     <td className="px-3 py-1.5">
-                      <span className="text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">Error</span>
+                      <span className="text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">
+                        {intl.formatMessage({ id: 'GENERAL.ERROR' })}
+                      </span>
                     </td>
                   </tr>
                 ))}

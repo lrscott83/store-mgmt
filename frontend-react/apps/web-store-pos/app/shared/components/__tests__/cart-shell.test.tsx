@@ -254,6 +254,26 @@ describe('CartShell — Limpiar / Registrar buttons', () => {
   });
 });
 
+describe('CartShell — cart line-item controls have Spanish aria-labels', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+  });
+
+  // Angular's nav-right template has NO aria-labels on these icon-only buttons at all —
+  // this is a React-added a11y improvement; its text must still be Spanish, not the
+  // previously-hardcoded English ("Decrease/Increase quantity of ...", "Remove ...").
+  it('uses Spanish aria-labels for decrease/increase quantity and remove-item buttons', () => {
+    const product = makeProduct({ name: 'Coca Cola' });
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByLabelText('Disminuir cantidad de Coca Cola')).toBeInTheDocument();
+    expect(screen.getByLabelText('Aumentar cantidad de Coca Cola')).toBeInTheDocument();
+    expect(screen.getByLabelText('Eliminar Coca Cola')).toBeInTheDocument();
+  });
+});
+
 describe('CartShell — createOrder validations (Registrar)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

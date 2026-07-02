@@ -31,6 +31,14 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   })),
 }));
 
+// sale-product-row's checkAvailability failure path calls showBlockingError, which now uses
+// the real SweetAlert2 library (sweetalert2) instead of window.alert — mock the wrapper
+// module directly (not window.alert) per the SweetAlert2 port.
+const showBlockingErrorMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingError: showBlockingErrorMock,
+}));
+
 const addItemMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/stores/cart-store', () => {
   const state = {
@@ -203,7 +211,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     mockProducts = [
       makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', discountFromInvantory: true }),
     ];
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    showBlockingErrorMock.mockClear();
 
     render(
       <Wrapper>
@@ -213,9 +221,9 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
 
     expect(addItemMock).not.toHaveBeenCalled();
-    expect(alertSpy).toHaveBeenCalledTimes(1);
-    const [text] = alertSpy.mock.calls[0];
-    expect(text).toContain('El producto no está disponible en el inventario.');
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const [, text] = showBlockingErrorMock.mock.calls[0];
+    expect(text).toBe('El producto no está disponible en el inventario.');
   });
 
   it('allows the sale when the inventory module is available, discountFromInvantory is set, and stock covers the quantity', () => {

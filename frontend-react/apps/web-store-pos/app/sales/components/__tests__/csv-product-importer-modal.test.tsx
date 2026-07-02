@@ -55,3 +55,43 @@ describe('CsvProductImporterModal — error text parity (Angular generic import-
     FileReader.prototype.readAsText = originalReadAsText;
   });
 });
+
+// This client-side CSV preview table (parse + per-row validation) has NO Angular
+// counterpart — flagged separately as React-added scope. Regardless, all its rendered text
+// must be Spanish per the blanket text-parity rule; these table headers/badges/row-error
+// messages were previously hardcoded English.
+describe('CsvProductImporterModal — preview table text is Spanish (no hardcoded English)', () => {
+  it('renders Spanish column headers and a Spanish "Válido" status badge for a valid row', async () => {
+    render(
+      <Wrapper>
+        <CsvProductImporterModal existingBarcodes={[]} onImport={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    const csv = ['name,price,barcode,category', 'Coca Cola,1.50,123456,Bebidas'].join('\n');
+    fireEvent.change(screen.getByTestId('csv-file-input'), {
+      target: { files: [new File([csv], 'products.csv', { type: 'text/csv' })] },
+    });
+    await waitFor(() => expect(screen.getByText('Coca Cola')).toBeInTheDocument());
+
+    expect(screen.getByText('Fila')).toBeInTheDocument();
+    expect(screen.getByText('Estado')).toBeInTheDocument();
+    expect(screen.getByText('Válido')).toBeInTheDocument();
+    expect(screen.queryByText('Row')).not.toBeInTheDocument();
+    expect(screen.queryByText('Status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Valid')).not.toBeInTheDocument();
+  });
+
+  it('renders the Spanish PRODUCTS.CSV.ERROR message (not a raw English errorCode) for an invalid row', async () => {
+    render(
+      <Wrapper>
+        <CsvProductImporterModal existingBarcodes={[]} onImport={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    const csv = ['name,price', ',1.50'].join('\n');
+    fireEvent.change(screen.getByTestId('csv-file-input'), {
+      target: { files: [new File([csv], 'products.csv', { type: 'text/csv' })] },
+    });
+    await waitFor(() => expect(screen.getByText('El nombre es requerido')).toBeInTheDocument());
+    expect(screen.getByText('Estado')).toBeInTheDocument();
+  });
+});

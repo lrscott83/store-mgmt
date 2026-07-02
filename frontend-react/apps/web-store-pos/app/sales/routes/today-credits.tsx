@@ -32,16 +32,30 @@ export function TodaySaleCreditsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
-  function handleSave(creditId: string, client: string, note: string) {
-    const service = new SaleCreditOfflineService(storeId);
-    service.update(creditId, client, note);
-    loadSaleCredits();
+  // Angular's SaleCreditOfflineService.updateSaleCredit/paidSaleCredit return a DataResult
+  // that can report `succeeded: false`; React's offline-service ports only fail via a
+  // not-found exception. try/catch is the faithful translation of that failure signal for
+  // the Swal error dialogs in EditSaleCreditModal/SaleCreditPaymentModal.
+  function handleSave(creditId: string, client: string, note: string): boolean {
+    try {
+      const service = new SaleCreditOfflineService(storeId);
+      service.update(creditId, client, note);
+      loadSaleCredits();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  function handlePay(creditId: string, paidType: PaymentType, note: string) {
-    const service = new SaleCreditOfflineService(storeId);
-    service.pay(creditId, paidType, note);
-    loadSaleCredits();
+  function handlePay(creditId: string, paidType: PaymentType, note: string): boolean {
+    try {
+      const service = new SaleCreditOfflineService(storeId);
+      service.pay(creditId, paidType, note);
+      loadSaleCredits();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   return (

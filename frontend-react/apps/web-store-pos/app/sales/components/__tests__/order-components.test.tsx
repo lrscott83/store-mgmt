@@ -1,9 +1,21 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Order } from '@store-mgmt/domain';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
+
+// Angular's order-item-list.component.ts:35-44 (deactivateOrder confirm) and :49-53
+// (edit-order-modal's Swal error branch) both use SweetAlert2 — mock the shared wrapper
+// module (not window.confirm/alert or raw Swal) so tests control resolution deterministically.
+const confirmDialogMock = vi.fn();
+const showBlockingErrorMock = vi.fn();
+const showAcknowledgeErrorMock = vi.fn();
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+  showAcknowledgeError: (...args: unknown[]) => showAcknowledgeErrorMock(...args),
+}));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -35,6 +47,10 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
 import { OrderList } from '../order-list';
 
 describe('OrderList', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders one collapsed panel per order with time, items count, and total', () => {
     const orders = [makeOrder({ id: 'o1', total: 250 })];
     render(
@@ -94,9 +110,15 @@ describe('OrderList', () => {
     expect(onEditOrder).toHaveBeenCalledWith(order);
   });
 
-  it('requires a second click to confirm deactivate', () => {
-    const onDeactivateOrder = vi.fn();
+  // Angular: Swal.fire({ title: GENERAL.DELETE_CONFIRM_TITLE, text: GENERAL
+  // .DELETE_CONFIRM_MESSAGE_A with name=TODAY_ORDERS.TEXT, icon: 'question',
+  // showCancelButton: true, confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545',
+  // confirmButtonText: GENERAL.YES, cancelButtonText: GENERAL.NO }) — only runs
+  // deactivateOrder when `result.isConfirmed` (order-item-list.component.ts:34-53).
+  it('shows a SweetAlert2 confirm dialog and only deactivates when confirmed', async () => {
+    const onDeactivateOrder = vi.fn().mockReturnValue(true);
     const order = makeOrder({ id: 'o1' });
+    confirmDialogMock.mockResolvedValue(true);
     render(
       <Wrapper>
         <OrderList orders={[order]} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={onDeactivateOrder} />
@@ -104,9 +126,53 @@ describe('OrderList', () => {
     );
     fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
     fireEvent.click(screen.getByTestId('deactivate-order-button'));
-    expect(onDeactivateOrder).not.toHaveBeenCalled();
+    expect(confirmDialogMock).toHaveBeenCalledWith({
+      title: 'Confirmación para eliminar',
+      message: '¿Está seguro que desea eliminar esta Venta?',
+      confirmButtonText: 'Si',
+      cancelButtonText: 'No',
+    });
+    await waitFor(() => expect(onDeactivateOrder).toHaveBeenCalledWith(order));
+  });
+
+  it('does not deactivate when the SweetAlert2 confirm dialog is cancelled', async () => {
+    const onDeactivateOrder = vi.fn();
+    const order = makeOrder({ id: 'o1' });
+    confirmDialogMock.mockResolvedValue(false);
+    render(
+      <Wrapper>
+        <OrderList orders={[order]} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={onDeactivateOrder} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
     fireEvent.click(screen.getByTestId('deactivate-order-button'));
-    expect(onDeactivateOrder).toHaveBeenCalledWith(order);
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
+    expect(onDeactivateOrder).not.toHaveBeenCalled();
+  });
+
+  // Angular: order-item-list.component.ts:46-52 — on deactivateOrder failure, calls
+  // showErrorMessage(["La venta no pudo ser cancelada. ..."]) -> Swal.fire({ title:
+  // GENERAL.ERROR, text: TODAY_ORDERS.ERROR_DELETING_ORDER with the joined literal,
+  // icon: 'error', confirmButtonText: GENERAL.OK }).
+  it('shows the Angular error dialog when the deactivate callback reports failure', async () => {
+    const onDeactivateOrder = vi.fn().mockReturnValue(false);
+    const order = makeOrder({ id: 'o1' });
+    confirmDialogMock.mockResolvedValue(true);
+    render(
+      <Wrapper>
+        <OrderList orders={[order]} readOnly={false} onEditOrder={vi.fn()} onDeactivateOrder={onDeactivateOrder} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('order-panel-toggle-o1'));
+    fireEvent.click(screen.getByTestId('deactivate-order-button'));
+    await waitFor(() =>
+      expect(showAcknowledgeErrorMock).toHaveBeenCalledWith({
+        title: 'Error',
+        message:
+          'Ocurrió un error eliminando la venta. La venta no pudo ser cancelada. Inténtelo más tarde y si persiste el problema contacte al soporte técnico.',
+        confirmButtonText: 'Ok',
+      }),
+    );
   });
 
   it('does not show deactivate action for inactive orders', () => {
@@ -126,6 +192,10 @@ describe('OrderList', () => {
 import { EditOrderModal } from '../edit-order-modal';
 
 describe('EditOrderModal', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders the Angular literal title (SALE_CREDIT.PAYMENT_CREDIT) when open', () => {
     const order = makeOrder();
     render(
@@ -158,7 +228,7 @@ describe('EditOrderModal', () => {
   });
 
   it('calls onUpdate with the selected payment type and closes on Actualizar', () => {
-    const onUpdate = vi.fn();
+    const onUpdate = vi.fn().mockReturnValue(true);
     const onClose = vi.fn();
     const order = makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo });
     render(
@@ -170,6 +240,26 @@ describe('EditOrderModal', () => {
     fireEvent.click(screen.getByTestId('edit-order-update-button'));
     expect(onUpdate).toHaveBeenCalledWith('o1', PaymentType.Zelle);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // Angular: edit-order-modal.component.ts:39-54 — on `updateTodayOrder` failure, Swal.fire({
+  // icon: 'error', title: GENERAL.ERROR, text: dataEntry.errors[0].description }), modal
+  // stays open (no `closeModal()` call in the else branch).
+  it('shows a blocking error and does NOT close when onUpdate reports failure', () => {
+    const onUpdate = vi.fn().mockReturnValue(false);
+    const onClose = vi.fn();
+    const order = makeOrder({ id: 'o1' });
+    render(
+      <Wrapper>
+        <EditOrderModal order={order} isOpen={true} onClose={onClose} onUpdate={onUpdate} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('edit-order-update-button'));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      'Error',
+      'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+    );
   });
 
   it('closes without updating on Cerrar', () => {

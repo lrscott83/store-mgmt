@@ -9,8 +9,10 @@ interface SaleCreditListProps {
   saleCredits: SaleCredit[];
   /** Angular default is `true` (read-only, no actions column). */
   readOnly?: boolean;
-  onSave?: (creditId: string, client: string, note: string) => void;
-  onPay?: (creditId: string, paidType: PaymentType, note: string) => void;
+  /** Returns `true` on success, `false` on failure. */
+  onSave?: (creditId: string, client: string, note: string) => boolean;
+  /** Returns `true` on success, `false` on failure. */
+  onPay?: (creditId: string, paidType: PaymentType, note: string) => boolean;
 }
 
 function formatDateOnly(date: Date): string {
@@ -36,14 +38,18 @@ export function SaleCreditList({ saleCredits, readOnly = true, onSave, onPay }: 
   const [editingCredit, setEditingCredit] = useState<SaleCredit | null>(null);
   const [payingCredit, setPayingCredit] = useState<SaleCredit | null>(null);
 
-  function handleSave(creditId: string, client: string, note: string) {
-    onSave?.(creditId, client, note);
-    setEditingCredit(null);
+  // Only closes the modal on success — a failed save/pay keeps it open so the modal's own
+  // Swal error dialog (showBlockingError) stays visible and the user can retry.
+  function handleSave(creditId: string, client: string, note: string): boolean {
+    const succeeded = onSave ? onSave(creditId, client, note) : true;
+    if (succeeded) setEditingCredit(null);
+    return succeeded;
   }
 
-  function handlePay(creditId: string, paidType: PaymentType, note: string) {
-    onPay?.(creditId, paidType, note);
-    setPayingCredit(null);
+  function handlePay(creditId: string, paidType: PaymentType, note: string): boolean {
+    const succeeded = onPay ? onPay(creditId, paidType, note) : true;
+    if (succeeded) setPayingCredit(null);
+    return succeeded;
   }
 
   return (

@@ -4,12 +4,15 @@ import type { SaleCredit } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface SaleCreditPaymentModalProps {
   saleCredit: SaleCredit;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (creditId: string, paidType: PaymentType, note: string) => void;
+  /** Returns `true` on success, `false` on failure — mirrors Angular's
+   * `saleCreditService.paidSaleCredit(...)` returning a `DataResult` with `succeeded`. */
+  onConfirm: (creditId: string, paidType: PaymentType, note: string) => boolean;
 }
 
 // Angular's PaymentTypeUtils.getPaymentTypes() maps enum keys to labels as-is
@@ -27,10 +30,10 @@ const PAYMENT_OPTIONS = [
  * three payment/edit modals). Shows "Cliente: {client}" and "Pagar: {total}"
  * literal lines, a "Forma de Pago" select (payment type, defaults to
  * Efectivo), and an optional note textarea. Angular gates the actual submit
- * behind a SweetAlert2 confirm dialog (`PAYMENT_CONFIRM_TITLE`/
- * `PAYMENT_CONFIRM_MESSAGE`) — no SweetAlert2 equivalent in React, so this
- * reuses the established two-step-inline-confirm pattern from
- * `order-item-list`'s deactivate action.
+ * behind a real SweetAlert2 confirm dialog (`SALE_CREDIT.PAYMENT_CONFIRM_TITLE`/
+ * `PAYMENT_CONFIRM_MESSAGE`, sale-credit-payment-modal.component.ts:52-60) — ported here
+ * via the shared `confirmDialog` wrapper (same `sweetalert2` library Angular uses, not a
+ * bespoke double-click gate).
  */
 export function SaleCreditPaymentModal({
   saleCredit,
@@ -41,17 +44,32 @@ export function SaleCreditPaymentModal({
   const intl = useIntl();
   const [paymentType, setPaymentType] = useState<PaymentType>(PaymentType.Efectivo);
   const [note, setNote] = useState('');
-  const [confirmSubmit, setConfirmSubmit] = useState(false);
 
   if (!isOpen) return null;
 
-  function handleSubmitClick() {
-    if (!confirmSubmit) {
-      setConfirmSubmit(true);
-      return;
+  // Angular: Swal.fire({ title: SALE_CREDIT.PAYMENT_CONFIRM_TITLE, text:
+  // SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE, icon: 'question', showCancelButton: true,
+  // confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545', confirmButtonText: YES,
+  // cancelButtonText: NO }).then(result => { if (result.isConfirmed) { ...paidSaleCredit...
+  // else Swal.fire({ icon: 'error', title: GENERAL.ERROR, text: ... }) } }).
+  async function handleSubmitClick() {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'SALE_CREDIT.PAYMENT_CONFIRM_TITLE' }),
+      message: intl.formatMessage({ id: 'SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE' }),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    const succeeded = onConfirm(saleCredit.id, paymentType, note);
+    if (succeeded) {
+      onClose();
+    } else {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR500_MESSAGE' }),
+      );
     }
-    onConfirm(saleCredit.id, paymentType, note);
-    setConfirmSubmit(false);
   }
 
   return (
@@ -125,11 +143,9 @@ export function SaleCreditPaymentModal({
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
             <Button variant="fab" onClick={handleSubmitClick} data-testid="sale-credit-payment-submit">
-              {/* SALE_CREDIT.TO_PAY, second click text becomes GENERAL.YES to mirror the
-                  SweetAlert2 confirm step Angular shows before this action */}
-              {confirmSubmit
-                ? intl.formatMessage({ id: 'GENERAL.YES' })
-                : intl.formatMessage({ id: 'SALE_CREDIT.TO_PAY' })}
+              {/* SALE_CREDIT.TO_PAY — the real SweetAlert2 confirm dialog (not a button-text
+                  swap) now gates the actual payment, matching Angular exactly. */}
+              {intl.formatMessage({ id: 'SALE_CREDIT.TO_PAY' })}
             </Button>
           </div>
         </Card>

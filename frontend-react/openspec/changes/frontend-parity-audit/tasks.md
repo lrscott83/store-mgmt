@@ -111,6 +111,35 @@ route always shows the public landing page regardless of auth state. MOVED to St
 2.6) — it is part of the login/auth carry-over, co-located there because the post-login
 `navigateToUserHome` branch depends on product-availability (Inventory) data.
 
+[x] 1.7 SweetAlert2 (`sweetalert2`) port — dedicated cross-cutting parity slice (Batch 10,
+2026-07-02), requested directly by the user: ported EVERY live (template-wired) Angular
+Sale-module `Swal.fire` call site to use the real `sweetalert2` library (Angular pins
+`^11.11.0`, React added `^11.26.25`, no global `Swal.mixin`/theme in Angular so stock
+defaults used both sides). `app/shared/lib/blocking-alert.ts` rewritten: `showBlockingError`
+(now real `Swal.fire`, replacing `window.alert`), NEW `confirmDialog` (question icon,
+Yes/No, `#3456ff`/`#dc3545` colors), NEW `showAcknowledgeError` (OK-only error, explicit
+translated button). RESTORED the payment confirm step in `sale-credit-payment-modal.tsx`
+(previously dropped — code comment said "no SweetAlert2 equivalent in React") and the
+deactivate confirm in `order-item-list.tsx` (previously a double-click gate). Added
+error-dialog-on-failure to `sale-credit-payment-modal.tsx`, `edit-sale-credit-modal.tsx`,
+`edit-order-modal.tsx`, `order-item-list.tsx` — `onSave`/`onPay`/`onUpdate`/
+`onDeactivateOrder` callbacks now return `boolean`, propagated through `sale-credit-list.tsx`/
+`order-list.tsx`/`today-orders.tsx`/`today-credits.tsx` (route-layer try/catch around
+services that only fail via a not-found throw, no `DataResult` contract in React's ports).
+Confirmed Angular's `sendOrderToShoppingCart`/`onDeteleOrder` in `order-item-list.component.ts`
+are DEAD (unreachable from the component's own template) — not ported, not invented. Also
+closed the `edit-product-category-modal.tsx` "Active" label gap flagged-but-deferred in 1.6
+(`GENERAL.ACTIVE` = "Activo"), plus a full `app/sales/**` + `cart-shell.tsx` hardcoded-English
+sweep: `csv-product-importer-modal.tsx`'s preview-table headers/status badges and
+`csv-product-parser.ts`'s per-row validation messages (changed to error codes mapped to the
+already-existing `PRODUCTS.CSV.ERROR.*` keys), and `cart-shell.tsx`'s 3 cart-item
+`aria-label`s. FLAGGED (not silently changed): the entire CSV-import preview/validation table
+has NO Angular counterpart at all (Angular's modal is just a file input + static sample text)
+— only its text was made Spanish, the feature itself untouched; and the cart aria-labels are
+a React-added a11y improvement Angular's template lacks entirely (translated, not removed).
+`tsc --noEmit` clean; `vitest run` 95 files / 1028 tests (was 1015, +13 net); `react-router
+build` succeeds (new `sweetalert2` chunk ~79.5 kB / 21.1 kB gzip).
+
 ## Stage 2 — Inventory
 
 - [ ] 2.1 L4 functional diff (app/inventory/**) + fix [TDD].
@@ -245,7 +274,7 @@ components/routes/lib-services/i18n plus shared styles.css/ui/):
 | Stage | Estimate | Actual / Notes |
 |---|---|---|
 | Stage 0 Foundations | 600-900 ln | ACTUAL ~376 ln (audit found zero L1/L2/L3 gaps requiring code, only L7 catch-all needed a fix; tokens+ui components as estimated) |
-| Stage 1 Sales | 500-800 ln | largest module, 14+ components |
+| Stage 1 Sales | 500-800 ln | ACTUAL ~3,700+ ln across 9 batches (largest module by far) + Batch 10's SweetAlert2 cross-cutting slice (~1,000+ ln incl. tests, 24 files touched) |
 | Stage 2 Inventory | 300-450 ln | 8 components |
 | Stage 3 Expenses | 200-300 ln | 4 components |
 | Stage 4 Management | 350-550 ln | incl. UX-parity decision, possible route restructure |

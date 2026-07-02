@@ -95,7 +95,9 @@ export function EditProductCategoryModal({ category, onSave, onClose }: EditProd
               className="h-4 w-4 rounded border-gray-300 text-cyan-600"
               data-testid="category-active-checkbox"
             />
-            <span className="text-xs font-medium text-gray-600">Active</span>
+            <span className="text-xs font-medium text-gray-600">
+              {intl.formatMessage({ id: 'GENERAL.ACTIVE' })}
+            </span>
           </label>
 
           <div className="flex justify-end gap-2 pt-2">

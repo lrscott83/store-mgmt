@@ -5,9 +5,17 @@ export interface ParsedProductRow {
   category?: string;
 }
 
+export type CsvRowErrorCode = 'MISSING_NAME' | 'MISSING_PRICE' | 'INVALID_PRICE' | 'DUPLICATE_BARCODE';
+
 export interface CsvRowError {
   row: number;
-  message: string;
+  /**
+   * Error code, not a hardcoded message — this is a plain lib function (no `useIntl` access),
+   * so the consuming component (`csv-product-importer-modal.tsx`) maps each code to its
+   * existing Spanish i18n key (`PRODUCTS.CSV.ERROR.*`), same pattern as
+   * `app/sales/lib/product-availability.ts`'s error-code -> i18n-key mapping.
+   */
+  errorCode: CsvRowErrorCode;
 }
 
 export interface CsvParseResult {
@@ -51,19 +59,19 @@ export function parseCsvProducts(csvText: string, existingBarcodes: string[]): C
     // --- Validate name ---
     const name = nameIdx >= 0 ? (fields[nameIdx] ?? '') : (fields[0] ?? '');
     if (!name) {
-      errors.push({ row: dataRowNum, message: 'Missing name: name is required' });
+      errors.push({ row: dataRowNum, errorCode: 'MISSING_NAME' });
       continue;
     }
 
     // --- Validate price ---
     const rawPrice = priceIdx >= 0 ? (fields[priceIdx] ?? '') : (fields[1] ?? '');
     if (!rawPrice) {
-      errors.push({ row: dataRowNum, message: 'Missing price: price is required' });
+      errors.push({ row: dataRowNum, errorCode: 'MISSING_PRICE' });
       continue;
     }
     const price = parseFloat(rawPrice);
     if (isNaN(price)) {
-      errors.push({ row: dataRowNum, message: 'Invalid price: price must be a number' });
+      errors.push({ row: dataRowNum, errorCode: 'INVALID_PRICE' });
       continue;
     }
 
@@ -72,7 +80,7 @@ export function parseCsvProducts(csvText: string, existingBarcodes: string[]): C
     const barcode = rawBarcode || undefined;
     if (barcode) {
       if (seenBarcodes.has(barcode)) {
-        errors.push({ row: dataRowNum, message: 'Duplicate barcode: barcode already exists' });
+        errors.push({ row: dataRowNum, errorCode: 'DUPLICATE_BARCODE' });
         continue;
       }
       seenBarcodes.add(barcode);

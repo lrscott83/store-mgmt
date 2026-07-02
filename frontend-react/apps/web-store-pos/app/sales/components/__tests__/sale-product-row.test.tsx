@@ -6,6 +6,15 @@ import { OrderType } from '@store-mgmt/domain';
 import type { Product } from '@store-mgmt/domain';
 import { SaleProductRow } from '../sale-product-row';
 
+// Angular: Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message, icon: 'error' })
+// (sale-product-row.component.ts:68-74). React uses the same library via the
+// showBlockingError wrapper — mock the wrapper module directly (not window.alert) per the
+// SweetAlert2 port.
+const showBlockingErrorMock = vi.fn();
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+}));
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
@@ -172,7 +181,6 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
   // "blocking browser dialog" pattern (window.confirm in use-unsaved-changes-prompt.ts) via
   // showBlockingError -> window.alert.
   it('blocks add-to-cart and shows a blocking alert with the ERROR_TITLE + resolved message when checkAvailability fails', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const onAdded = vi.fn();
     render(
       <Wrapper>
@@ -186,14 +194,13 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     );
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     expect(onAdded).not.toHaveBeenCalled();
-    expect(alertSpy).toHaveBeenCalledTimes(1);
-    const [text] = alertSpy.mock.calls[0];
-    expect(text).toContain('Error');
-    expect(text).toContain('La cantidad del producto no está disponible en el inventario.');
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const [title, text] = showBlockingErrorMock.mock.calls[0];
+    expect(title).toBe('Error');
+    expect(text).toBe('La cantidad del producto no está disponible en el inventario.');
   });
 
   it('resolves each error code to its exact Angular ProductErrors Spanish message', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const cases: Array<[string, string]> = [
       ['NOT_EXISTS', 'El producto no existe.'],
       ['INACTIVE', 'El producto no está activo.'],
@@ -203,7 +210,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     ];
 
     for (const [errorCode, expectedMessage] of cases) {
-      alertSpy.mockClear();
+      showBlockingErrorMock.mockClear();
       render(
         <Wrapper>
           <SaleProductRow
@@ -215,8 +222,8 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         </Wrapper>,
       );
       fireEvent.click(screen.getAllByRole('button', { name: /adicionar/i }).at(-1)!);
-      const [text] = alertSpy.mock.calls[0];
-      expect(text).toContain(expectedMessage);
+      const [, text] = showBlockingErrorMock.mock.calls[0];
+      expect(text).toBe(expectedMessage);
     }
   });
 });

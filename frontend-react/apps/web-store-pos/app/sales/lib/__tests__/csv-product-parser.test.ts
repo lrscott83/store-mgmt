@@ -33,14 +33,16 @@ describe('parseCsvProducts', () => {
       expect(result.products).toHaveLength(0);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].row).toBe(1);
-      expect(result.errors[0].message).toContain('price');
+      // errorCode (not a hardcoded English message) — the component maps this to the
+      // existing PRODUCTS.CSV.ERROR.MISSING_PRICE Spanish i18n key.
+      expect(result.errors[0].errorCode).toBe('MISSING_PRICE');
     });
 
     it('marks a row as error when price is not a number', () => {
       const csv = ['name,price', 'Fanta,abc'].join('\n');
       const result = parseCsvProducts(csv, []);
       expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].message).toContain('price');
+      expect(result.errors[0].errorCode).toBe('INVALID_PRICE');
     });
   });
 
@@ -49,7 +51,7 @@ describe('parseCsvProducts', () => {
       const csv = ['name,price', ',1.50'].join('\n');
       const result = parseCsvProducts(csv, []);
       expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].message).toContain('name');
+      expect(result.errors[0].errorCode).toBe('MISSING_NAME');
     });
   });
 
@@ -59,7 +61,7 @@ describe('parseCsvProducts', () => {
       const result = parseCsvProducts(csv, ['DUP123']);
       expect(result.products).toHaveLength(0);
       expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].message).toContain('barcode');
+      expect(result.errors[0].errorCode).toBe('DUPLICATE_BARCODE');
     });
 
     it('marks a row as error when two CSV rows share the same barcode', () => {
