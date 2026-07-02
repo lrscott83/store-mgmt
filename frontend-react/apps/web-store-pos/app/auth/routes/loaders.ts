@@ -2,6 +2,7 @@ import { redirect } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
+import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 
 function getAuthState() {
   return useAuthStore.getState();
@@ -24,9 +25,11 @@ export async function authLoader(): Promise<Response | null> {
 }
 
 export async function guestOnlyLoader(): Promise<Response | null> {
-  const { isAuthenticated } = getAuthState();
-  if (isAuthenticated) {
-    return redirect('/');
+  const { user, isAuthenticated } = getAuthState();
+  // An already-authenticated user hitting /login is sent to their real home view
+  // (Angular's navigateToUserHome()), NOT to a bare '/' landing.
+  if (isAuthenticated && user) {
+    return redirect(resolveUserHomePath(user));
   }
   return null;
 }

@@ -85,13 +85,28 @@ describe('Route Loaders (AUTH-04)', () => {
       expect(result).toBeNull();
     });
 
-    it('redirects to / when authenticated', async () => {
+    // Mirrors Angular login.component.ts: an authenticated user hitting /login is
+    // sent to navigateToUserHome(), NOT to '/'. With empty offline storage a normal
+    // StoreUser lands on /sales/products; resellers/superadmins on /admin/owners.
+    it('redirects an authenticated StoreUser to /sales/products', async () => {
       setAuthState(makeUser());
       const result = await guestOnlyLoader();
       expect(result).toBeInstanceOf(Response);
       const res = result as Response;
       expect(res.status).toBe(302);
-      expect(res.headers.get('Location')).toBe('/');
+      expect(res.headers.get('Location')).toBe('/sales/products');
+    });
+
+    it('redirects an authenticated superadmin to /admin/owners', async () => {
+      setAuthState(makeUser({ isSuperAdmin: true }));
+      const res = (await guestOnlyLoader()) as Response;
+      expect(res.headers.get('Location')).toBe('/admin/owners');
+    });
+
+    it('redirects an authenticated reseller to /admin/owners', async () => {
+      setAuthState(makeUser({ isReSeller: true }));
+      const res = (await guestOnlyLoader()) as Response;
+      expect(res.headers.get('Location')).toBe('/admin/owners');
     });
   });
 

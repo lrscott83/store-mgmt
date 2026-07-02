@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
-import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
+import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -58,27 +57,8 @@ export default function LoginPage() {
 
     try {
       const user = await login(form.email, form.password);
-      // Mirror Angular's navigateToUserHome(): resellers/superadmins land on
-      // the owners admin; other users go to the sale screen if they have any
-      // available product, otherwise to the products screen.
-      if (user.isReSeller || user.isSuperAdmin) {
-        navigate('/admin/owners');
-      } else {
-        // Angular offline (GlobalConfig.USE_ONLINE_SERVICE=false) reads local
-        // storage, not HTTP: a store can sell when it has an active category
-        // AND an active, sellable product. Mirrors ProductOfflineService's
-        // hasAnyAvailableToSaleProduct.
-        const storeId = user.selectedStoreId;
-        const hasActiveCategory = new ProductCategoryOfflineService(storeId)
-          .getAll()
-          .some((c) => c.isActive);
-        const hasProducts =
-          hasActiveCategory &&
-          new ProductOfflineService(storeId)
-            .getAll()
-            .some((p) => p.isActive && p.availableToSale);
-        navigate(hasProducts ? '/sales/new' : '/sales/products');
-      }
+      // Mirror Angular's navigateToUserHome() (shared with guestOnlyLoader).
+      navigate(resolveUserHomePath(user));
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 401) {
