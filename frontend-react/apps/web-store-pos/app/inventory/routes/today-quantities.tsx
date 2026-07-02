@@ -3,6 +3,9 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Card } from '~/shared/components/ui/card';
+import { Spinner } from '~/shared/components/ui/spinner';
+import { EmptyBoxesIcon } from '~/shared/components/ui/icons';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
@@ -42,8 +45,12 @@ export function InventoryTodayQuantitiesPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
+  // Angular parity: inventory-today-quantities.component.html `isLoading` branch
+  // (spinner-border + "Cargando" while data loads).
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    setIsLoading(true);
     const inventorySvc = new InventoryOfflineService(storeId);
     const orderSvc = new OrderOfflineService(storeId);
     const productSvc = new ProductOfflineService(storeId);
@@ -138,92 +145,152 @@ export function InventoryTodayQuantitiesPage() {
       }));
 
     setCategoryGroups(groups);
+    setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
   const isEmpty = categoryGroups.length === 0;
+  const allProducts = categoryGroups.flatMap((category) =>
+    category.products.map((product) => ({ category, product })),
+  );
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.TITLE' })}
-      </h1>
-
-      {isEmpty ? (
-        <div className="py-8 text-center text-gray-400">
-          {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.NO_PRODUCTS' })}
+    <Card title={intl.formatMessage({ id: 'INVENTORY.QUANTITIES.TITLE' })}>
+      {isLoading ? (
+        <Spinner label={intl.formatMessage({ id: 'GENERAL.LOADING' })} />
+      ) : isEmpty ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-text-muted">
+          <EmptyBoxesIcon className="text-text-muted" />
+          <p>{intl.formatMessage({ id: 'INVENTORY.QUANTITIES.NO_PRODUCTS' })}</p>
         </div>
       ) : (
-        <div className="rounded border bg-white">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.PRODUCT' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.BEGINNING' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.ENTRIES' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.AVAILABLE' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.SOLD' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.ENDING' })}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {categoryGroups.map((category) =>
-                category.products.map((product) => (
-                  <tr key={product.productId} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {category.categoryName} - {product.productName}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${
-                        product.inicio < 0 ? 'text-red-600' : 'text-gray-600'
-                      }`}
-                    >
+        <>
+          {/* Desktop/Tablet Table View — Angular parity: .desktop-view (>=768px). */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-background">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.PRODUCT' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.BEGINNING' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.ENTRIES' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.AVAILABLE' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.SOLD' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.ENDING' })}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {categoryGroups.map((category) =>
+                  category.products.map((product) => (
+                    <tr key={product.productId} className="hover:bg-background">
+                      <td className="px-4 py-3 font-medium text-text">
+                        {category.categoryName} - {product.productName}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${
+                          product.inicio < 0 ? 'text-danger' : 'text-text-muted'
+                        }`}
+                      >
+                        {product.inicio}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${
+                          product.entradas > 0 ? 'text-success' : 'text-text-muted'
+                        }`}
+                      >
+                        {product.entradas}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-text">
+                        {product.disponible}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${
+                          product.vendido > 0 ? 'font-semibold text-warning' : 'text-text-muted'
+                        }`}
+                      >
+                        {product.vendido}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${
+                          product.final < 0 ? 'font-semibold text-danger' : 'text-text-muted'
+                        }`}
+                      >
+                        {product.final}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View — Angular parity: .mobile-view (<768px), 5-item quantity grid. */}
+          <div className="space-y-3 md:hidden">
+            {allProducts.map(({ category, product }) => (
+              <div
+                key={product.productId}
+                className="rounded-lg border border-border bg-background p-3"
+              >
+                <p className="mb-2 font-medium text-text">
+                  {category.categoryName} - {product.productName}
+                </p>
+                <div className="grid grid-cols-5 gap-2 text-center text-xs">
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.BEGINNING' })}
+                    </p>
+                    <p className={product.inicio < 0 ? 'text-danger' : 'text-text'}>
                       {product.inicio}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${
-                        product.entradas > 0 ? 'text-green-700' : 'text-gray-600'
-                      }`}
-                    >
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.ENTRIES' })}
+                    </p>
+                    <p className={product.entradas > 0 ? 'font-semibold text-success' : 'text-text'}>
                       {product.entradas}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                      {product.disponible}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${
-                        product.vendido > 0 ? 'font-semibold text-amber-600' : 'text-gray-600'
-                      }`}
-                    >
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.AVAILABLE' })}
+                    </p>
+                    <p className="font-semibold text-text">{product.disponible}</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.SOLD' })}
+                    </p>
+                    <p className={product.vendido > 0 ? 'font-semibold text-warning' : 'text-text'}>
                       {product.vendido}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${
-                        product.final < 0 ? 'font-semibold text-red-600' : 'text-gray-600'
-                      }`}
-                    >
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.QUANTITIES.ENDING' })}
+                    </p>
+                    <p className={product.final < 0 ? 'font-semibold text-danger' : 'text-text'}>
                       {product.final}
-                    </td>
-                  </tr>
-                )),
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
-    </div>
+    </Card>
   );
 }
 

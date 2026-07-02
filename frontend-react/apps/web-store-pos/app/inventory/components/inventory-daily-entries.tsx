@@ -1,5 +1,6 @@
 import { useIntl } from 'react-intl';
 import type { InventoryEntryView } from '@store-mgmt/domain';
+import { InfoBox } from '~/shared/components/ui/info-box';
 
 interface InventoryDailyEntriesProps {
   entries: InventoryEntryView[];
@@ -12,9 +13,9 @@ export function InventoryDailyEntries({ entries, onEdit, onDeactivate }: Invento
 
   if (entries.length === 0) {
     return (
-      <div className="py-8 text-center text-gray-400">
+      <InfoBox variant="primary" className="text-center">
         {intl.formatMessage({ id: 'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY' })}
-      </div>
+      </InfoBox>
     );
   }
 
@@ -29,24 +30,24 @@ export function InventoryDailyEntries({ entries, onEdit, onDeactivate }: Invento
   return (
     <div className="space-y-4">
       {Array.from(grouped.entries()).map(([productName, productEntries]) => (
-        <div key={productName} className="rounded border bg-white">
-          <div className="border-b bg-gray-50 px-4 py-2">
-            <h3 className="font-medium text-gray-800">{productName}</h3>
+        <div key={productName} className="rounded border border-border bg-surface">
+          <div className="border-b border-border bg-background px-4 py-2">
+            <h3 className="font-medium text-text">{productName}</h3>
           </div>
-          <div className="divide-y">
+          <div className="divide-y divide-border">
             {productEntries.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between px-4 py-3">
                 <div className="space-y-0.5">
                   <div className="flex gap-4 text-sm">
-                    <span className="text-gray-500">
+                    <span className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}:{' '}
                       <strong>${entry.costPrice.toFixed(2)}</strong>
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' })}:{' '}
                       <strong>{entry.quantity}</strong>
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.ENTRY.DATE' })}:{' '}
                       {new Date(entry.date).toLocaleDateString('es')}
                     </span>
@@ -55,13 +56,13 @@ export function InventoryDailyEntries({ entries, onEdit, onDeactivate }: Invento
                 <div className="flex gap-2">
                   <button
                     onClick={() => onEdit(entry)}
-                    className="rounded bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                    className="rounded bg-primary-light px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                   >
                     {intl.formatMessage({ id: 'GENERAL.EDIT' })}
                   </button>
                   <button
                     onClick={() => onDeactivate(entry)}
-                    className="rounded bg-red-50 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                    className="rounded bg-danger/10 px-3 py-1 text-xs font-medium text-danger hover:bg-danger/20"
                   >
                     {/* CRITICAL bug fix (Angular parity: entry-list.component.html:36
                         GENERAL.DELETE) — was wrongly wired to ORDERS.DEACTIVATE

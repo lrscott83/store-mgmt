@@ -3,6 +3,9 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Card } from '~/shared/components/ui/card';
+import { Spinner } from '~/shared/components/ui/spinner';
+import { EmptyTrendingIcon } from '~/shared/components/ui/icons';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
@@ -54,13 +57,23 @@ interface CategoryGroup {
 
 const ZERO_TOTALS = { sold: 0, amount: 0, cost: 0, profit: 0 };
 
+function profitClass(profit: number): string {
+  if (profit > 0) return 'text-success';
+  if (profit < 0) return 'text-danger';
+  return 'text-text-muted';
+}
+
 export function InventoryTodaySalesProfitPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [totals, setTotals] = useState(ZERO_TOTALS);
+  // Angular parity: inventory-today-sales-profit.component.html `isLoading` branch
+  // (spinner-border + "Cargando" while data loads).
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    setIsLoading(true);
     const inventorySvc = new InventoryOfflineService(storeId);
     const orderSvc = new OrderOfflineService(storeId);
     const productSvc = new ProductOfflineService(storeId);
@@ -178,108 +191,149 @@ export function InventoryTodaySalesProfitPage() {
         ZERO_TOTALS,
       ),
     );
+    setIsLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
   const isEmpty = categoryGroups.length === 0;
+  const allProducts = categoryGroups.flatMap((category) =>
+    category.products.map((product) => ({ category, product })),
+  );
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'INVENTORY.PROFIT.TITLE' })}
-        </h1>
-        <span className="text-lg font-bold text-green-700">${totals.profit.toFixed(2)}</span>
-      </div>
-
-      {isEmpty ? (
-        <div className="py-8 text-center text-gray-400">
-          {intl.formatMessage({ id: 'INVENTORY.PROFIT.NO_SALES' })}
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          <span>{intl.formatMessage({ id: 'INVENTORY.PROFIT.TITLE' })}</span>
+          <span className="text-lg font-bold text-success">${totals.profit.toFixed(2)}</span>
+        </div>
+      }
+    >
+      {isLoading ? (
+        <Spinner label={intl.formatMessage({ id: 'GENERAL.LOADING' })} />
+      ) : isEmpty ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-text-muted">
+          <EmptyTrendingIcon className="text-text-muted" />
+          <p>{intl.formatMessage({ id: 'INVENTORY.PROFIT.NO_SALES' })}</p>
         </div>
       ) : (
-        <div className="rounded border bg-white">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRODUCT' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.PROFIT.SOLD' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRICE' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.PROFIT.COST' })}
-                </th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">
-                  {intl.formatMessage({ id: 'INVENTORY.PROFIT.PROFIT' })}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {categoryGroups.map((category) =>
-                category.products.map((product) => (
-                  <tr key={product.productId} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {category.categoryName} - {product.productName}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${
-                        product.sold > 0 ? 'font-semibold text-amber-600' : 'text-gray-600'
-                      }`}
-                    >
+        <>
+          {/* Desktop/Tablet Table View — Angular parity: .desktop-view (>=768px). */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-background">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRODUCT' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.PROFIT.SOLD' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRICE' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.PROFIT.COST' })}
+                  </th>
+                  <th className="px-4 py-2 text-right font-medium text-text-muted">
+                    {intl.formatMessage({ id: 'INVENTORY.PROFIT.PROFIT' })}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {categoryGroups.map((category) =>
+                  category.products.map((product) => (
+                    <tr key={product.productId} className="hover:bg-background">
+                      <td className="px-4 py-3 font-medium text-text">
+                        {category.categoryName} - {product.productName}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${
+                          product.sold > 0 ? 'font-semibold text-warning' : 'text-text-muted'
+                        }`}
+                      >
+                        {product.sold}
+                      </td>
+                      <td className="px-4 py-3 text-right text-text-muted">
+                        <div>{product.salePrice.toFixed(2)}</div>
+                        <div className="text-xs text-text-muted/70">{product.amount.toFixed(2)}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-text-muted">
+                        <div>{product.unitCost.toFixed(2)}</div>
+                        <div className="text-xs text-text-muted/70">{product.totalCost.toFixed(2)}</div>
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold ${profitClass(product.profit)}`}>
+                        {product.profit.toFixed(2)}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+              <tfoot className="border-t border-border bg-background">
+                <tr className="font-semibold">
+                  <td className="px-4 py-3 text-text">
+                    {intl.formatMessage({ id: 'INVENTORY.PROFIT.TOTAL' })}
+                  </td>
+                  <td className="px-4 py-3 text-right text-text">{totals.sold}</td>
+                  <td className="px-4 py-3 text-right text-text">{totals.amount.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-text">{totals.cost.toFixed(2)}</td>
+                  <td className={`px-4 py-3 text-right ${profitClass(totals.profit)}`}>
+                    {totals.profit.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* Mobile Card View — Angular parity: .mobile-view (<768px), 4-item profit grid
+              (no totals row, matching Angular's mobile-view markup). */}
+          <div className="space-y-3 md:hidden">
+            {allProducts.map(({ category, product }) => (
+              <div
+                key={product.productId}
+                className="rounded-lg border border-border bg-background p-3"
+              >
+                <p className="mb-2 font-medium text-text">
+                  {category.categoryName} - {product.productName}
+                </p>
+                <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.PROFIT.SOLD' })}
+                    </p>
+                    <p className={product.sold > 0 ? 'font-semibold text-warning' : 'text-text'}>
                       {product.sold}
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-600">
-                      <div>{product.salePrice.toFixed(2)}</div>
-                      <div className="text-xs text-gray-400">{product.amount.toFixed(2)}</div>
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-600">
-                      <div>{product.unitCost.toFixed(2)}</div>
-                      <div className="text-xs text-gray-400">{product.totalCost.toFixed(2)}</div>
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right font-semibold ${
-                        product.profit > 0
-                          ? 'text-green-700'
-                          : product.profit < 0
-                            ? 'text-red-600'
-                            : 'text-gray-600'
-                      }`}
-                    >
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRICE' })}
+                    </p>
+                    <p className="text-text">{product.salePrice.toFixed(2)}</p>
+                    <p className="text-text-muted/70">{product.amount.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.PROFIT.COST' })}
+                    </p>
+                    <p className="text-text">{product.unitCost.toFixed(2)}</p>
+                    <p className="text-text-muted/70">{product.totalCost.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">
+                      {intl.formatMessage({ id: 'INVENTORY.PROFIT.PROFIT' })}
+                    </p>
+                    <p className={`font-semibold ${profitClass(product.profit)}`}>
                       {product.profit.toFixed(2)}
-                    </td>
-                  </tr>
-                )),
-              )}
-            </tbody>
-            <tfoot className="border-t border-gray-300 bg-gray-50">
-              <tr className="font-semibold">
-                <td className="px-4 py-3 text-gray-700">
-                  {intl.formatMessage({ id: 'INVENTORY.PROFIT.TOTAL' })}
-                </td>
-                <td className="px-4 py-3 text-right text-gray-700">{totals.sold}</td>
-                <td className="px-4 py-3 text-right text-gray-700">{totals.amount.toFixed(2)}</td>
-                <td className="px-4 py-3 text-right text-gray-700">{totals.cost.toFixed(2)}</td>
-                <td
-                  className={`px-4 py-3 text-right ${
-                    totals.profit > 0
-                      ? 'text-green-800'
-                      : totals.profit < 0
-                        ? 'text-red-700'
-                        : 'text-gray-700'
-                  }`}
-                >
-                  {totals.profit.toFixed(2)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
-    </div>
+    </Card>
   );
 }
 

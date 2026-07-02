@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { InventoryEntryView, Order, OrderItem, Product, ProductCategory } from '@store-mgmt/domain';
@@ -539,7 +539,9 @@ describe('InventoryTodayQuantitiesPage — Angular inicio/entradas/disponible/ve
     );
 
     // disponible=20, entradas=10, vendido=6 -> inicio=20+6-10=16, final=20-6=14
-    const row = screen.getByText('Bebidas - Ron').closest('tr');
+    // Scoped to the desktop table — the mobile card view (md:hidden) renders the same
+    // "Bebidas - Ron" text a second time.
+    const row = within(screen.getByRole('table')).getByText('Bebidas - Ron').closest('tr');
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent('16'); // inicio
     expect(row).toHaveTextContent('10'); // entradas
@@ -711,7 +713,9 @@ describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular pa
     // productCosts were recorded) — proves the discountFromInvantory=false product was NOT
     // excluded and its sale is fully counted. Angular's table has no currency symbol in cells
     // (template uses `| number: '1.2-2'`, not `| currency`), so amounts render as plain "50.00".
-    const row = screen.getByText(/Ron/).closest('tr');
+    // Scoped to the desktop table — the mobile card view (md:hidden) renders the same
+    // product text a second time.
+    const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent('5'); // sold
     expect(row).toHaveTextContent('50.00'); // amount (5 * price 10)
@@ -865,7 +869,9 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
       </Wrapper>,
     );
 
-    const row = screen.getByText(/Ron/).closest('tr');
+    // Scoped to the desktop table — the mobile card view (md:hidden) renders the same
+    // product text a second time.
+    const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).not.toBeNull();
     // sold = 0
     expect(row).toHaveTextContent('0');
@@ -947,7 +953,9 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
       </Wrapper>,
     );
 
-    const row = screen.getByText(/Ron/).closest('tr');
+    // Scoped to the desktop table — the mobile card view (md:hidden) renders the same
+    // product text a second time.
+    const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).toHaveTextContent('3'); // sold
     expect(row).toHaveTextContent('30.00'); // amount (3 * price 10)
     expect(row).toHaveTextContent('7.00'); // totalCost (FIFO: 2*2 + 1*3)

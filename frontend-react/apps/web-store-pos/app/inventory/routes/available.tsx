@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Card } from '~/shared/components/ui/card';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
@@ -43,15 +44,18 @@ export function InventoryAvailablePage() {
   const totalInventoryValue = categories.reduce((sum, cat) => sum + cat.totalCostPrice, 0);
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'INVENTORY.AVAILABLE.TITLE' })}
-        </h1>
-        <span className="text-lg font-bold text-primary">${totalInventoryValue.toFixed(2)}</span>
-      </div>
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          <span>{intl.formatMessage({ id: 'INVENTORY.AVAILABLE.TITLE' })}</span>
+          <span className="text-lg font-bold text-primary">
+            ${totalInventoryValue.toFixed(2)}
+          </span>
+        </div>
+      }
+    >
       <InventoryProductList categories={categories} />
-    </div>
+    </Card>
   );
 }
 

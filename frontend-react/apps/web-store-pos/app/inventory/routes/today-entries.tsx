@@ -6,6 +6,9 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { Card } from '~/shared/components/ui/card';
+import { Button } from '~/shared/components/ui/button';
+import { PlusIcon } from '~/shared/components/ui/icons';
 import { InventoryDailyEntries } from '../components/inventory-daily-entries';
 import { EditInventoryEntryModal } from '../components/edit-inventory-entry-modal';
 import type { EditInventoryEntryInput } from '../components/edit-inventory-entry-modal';
@@ -96,25 +99,27 @@ export function TodayEntriesPage() {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'INVENTORY.TODAY_ENTRIES.TITLE' })}
-        </h1>
-        <button
-          onClick={() => {
-            setEditingEntry(undefined);
-            setModalError('');
-            setIsModalOpen(true);
-          }}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {/* Angular parity: today-entries.component.html:9 uses GENERAL.ENTRY ('Entrada'),
-              not a bespoke "Nueva entrada" label. */}
-          {intl.formatMessage({ id: 'GENERAL.ENTRY' })}
-        </button>
-      </div>
-
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          <span>{intl.formatMessage({ id: 'INVENTORY.TODAY_ENTRIES.TITLE' })}</span>
+          {/* Angular parity: today-entries.component.html:7-10 `mat-fab extended` with an
+              `add` icon + GENERAL.ENTRY label ('Entrada'), not the previous hardcoded
+              bg-blue-600 rectangle / bespoke "Nueva entrada" copy. */}
+          <Button
+            variant="fab"
+            onClick={() => {
+              setEditingEntry(undefined);
+              setModalError('');
+              setIsModalOpen(true);
+            }}
+          >
+            <PlusIcon />
+            {intl.formatMessage({ id: 'GENERAL.ENTRY' })}
+          </Button>
+        </div>
+      }
+    >
       <InventoryDailyEntries
         entries={entries}
         onEdit={handleEdit}
@@ -132,7 +137,7 @@ export function TodayEntriesPage() {
         entry={editingEntry}
         error={modalError}
       />
-    </div>
+    </Card>
   );
 }
 

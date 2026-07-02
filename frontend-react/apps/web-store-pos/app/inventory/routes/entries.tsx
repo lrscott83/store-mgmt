@@ -4,8 +4,10 @@ import type { InventoryEntryView } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { EntryList } from '../components/entry-list';
 
@@ -78,7 +80,11 @@ function formatDateOnly(date: Date): string {
  */
 export function EntriesPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+  // Angular parity: entry-list.component.ts:32 isOwnerAdmin() (currentUser.isOwnerAdmin) —
+  // gates the cost-price column inside EntryList (diff-matrix #6, L5 map).
+  const isOwnerAdmin = user ? checkIsOwnerAdmin(user) : false;
   const [dayGroups, setDayGroups] = useState<DayEntryGroup[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
@@ -113,55 +119,57 @@ export function EntriesPage() {
   const entriesTotal = dayGroups.reduce((total, d) => total + d.total, 0);
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="flex items-center gap-2 text-xl font-semibold">
-          {intl.formatMessage({ id: 'INVENTORY.ENTRIES.TITLE' })}
-          <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-            ({entriesCount})
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            {intl.formatMessage({ id: 'INVENTORY.ENTRIES.TITLE' })}
+            <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+              ({entriesCount})
+            </span>
           </span>
-        </h1>
-        <div className="flex items-center gap-4">
           <span className="text-sm font-semibold text-primary">${entriesTotal.toFixed(2)}</span>
         </div>
-      </div>
+      }
+    >
+      <div className="space-y-4">
+        {dayGroups.length === 0 && (
+          <InfoBox variant="primary" className="text-center">
+            {intl.formatMessage({ id: 'INVENTORY.NO_HISTORY_ENTRY_FOUND' })}
+          </InfoBox>
+        )}
 
-      {dayGroups.length === 0 && (
-        <InfoBox variant="primary" className="text-center">
-          {intl.formatMessage({ id: 'INVENTORY.NO_HISTORY_ENTRY_FOUND' })}
-        </InfoBox>
-      )}
-
-      <div className="space-y-2">
-        {dayGroups.map((dayGroup) => {
-          const dayId = new Date(dayGroup.date).toISOString().split('T')[0];
-          const isExpanded = expandedDayIds.has(dayId);
-          return (
-            <div key={dayId} className="rounded-lg border border-border bg-surface">
-              <button
-                type="button"
-                onClick={() => toggleDayPanel(dayId)}
-                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-                data-testid={`entry-day-panel-toggle-${dayId}`}
-                aria-expanded={isExpanded}
-              >
-                <span className="text-sm font-medium text-text">
-                  {formatDateOnly(dayGroup.date)}
-                </span>
-                <span className="text-sm font-semibold text-primary">
-                  ${dayGroup.total.toFixed(2)}
-                </span>
-              </button>
-              {isExpanded && (
-                <div className="border-t border-border px-4 py-3">
-                  <EntryList entries={dayGroup.entries} readOnly />
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <div className="space-y-2">
+          {dayGroups.map((dayGroup) => {
+            const dayId = new Date(dayGroup.date).toISOString().split('T')[0];
+            const isExpanded = expandedDayIds.has(dayId);
+            return (
+              <div key={dayId} className="rounded-lg border border-border bg-background">
+                <button
+                  type="button"
+                  onClick={() => toggleDayPanel(dayId)}
+                  className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                  data-testid={`entry-day-panel-toggle-${dayId}`}
+                  aria-expanded={isExpanded}
+                >
+                  <span className="text-sm font-medium text-text">
+                    {formatDateOnly(dayGroup.date)}
+                  </span>
+                  <span className="text-sm font-semibold text-primary">
+                    ${dayGroup.total.toFixed(2)}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-border px-4 py-3">
+                    <EntryList entries={dayGroup.entries} readOnly isOwnerAdmin={isOwnerAdmin} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
 

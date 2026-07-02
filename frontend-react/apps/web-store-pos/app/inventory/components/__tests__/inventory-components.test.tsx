@@ -134,6 +134,61 @@ describe('InventoryProductList — smoke render', () => {
   });
 });
 
+// ─── InventoryProductList — collapsible accordion (Angular parity: inventory-available.
+// component.html:19-33 `mat-accordion` with `[expanded]="false"` — categories collapsed by
+// default, click to expand) ──────────────────────────────────────────────────
+
+describe('InventoryProductList — collapsible accordion (Angular parity)', () => {
+  it('renders categories collapsed by default (product rows hidden, header summary shown)', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    // Category-level summary always visible, even collapsed.
+    expect(screen.getByText('Bebidas (15)')).toBeInTheDocument();
+    // Per-product rows are hidden until expanded.
+    expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fanta')).not.toBeInTheDocument();
+  });
+
+  it('expands a category on click, revealing its products', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
+    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    expect(screen.getByText('Fanta')).toBeInTheDocument();
+    // Other category stays collapsed.
+    expect(screen.queryByText('Papas Lays')).not.toBeInTheDocument();
+  });
+
+  it('collapses an expanded category back on a second click', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    const toggle = screen.getByTestId('inventory-category-toggle-cat1');
+    fireEvent.click(toggle);
+    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
+  });
+
+  it('auto-expands a category with matching search results', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'coca' } });
+    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+  });
+});
+
 // ─── InventoryProductList — weighted avg cost + total value (gap #4/#5, Angular parity) ────
 //
 // Angular reference: inventory-available.component.html:24-30 (category header shows
@@ -165,23 +220,26 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
     expect(screen.getAllByText('$40.00').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows each product weighted-average unit cost', () => {
+  it('shows each product weighted-average unit cost (category expanded)', () => {
     render(
       <Wrapper>
         <InventoryProductList categories={MOCK_CATEGORIES} />
       </Wrapper>,
     );
+    fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
     // Coca Cola: avgCostPrice=2 -> $2.00; Fanta: avgCostPrice=3 -> $3.00
     expect(screen.getByText('$2.00')).toBeInTheDocument();
     expect(screen.getByText('$3.00')).toBeInTheDocument();
   });
 
-  it('shows each product total value (avgCostPrice · totalAvailable)', () => {
+  it('shows each product total value (avgCostPrice · totalAvailable, category expanded)', () => {
     render(
       <Wrapper>
         <InventoryProductList categories={MOCK_CATEGORIES} />
       </Wrapper>,
     );
+    fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
+    fireEvent.click(screen.getByTestId('inventory-category-toggle-cat2'));
     // Coca Cola: 2 * 10 = $20.00; Fanta: 3 * 5 = $15.00; Papas Lays: 5 * 8 = $40.00
     expect(screen.getByText('$20.00')).toBeInTheDocument();
     expect(screen.getByText('$15.00')).toBeInTheDocument();
@@ -295,10 +353,10 @@ describe('EntryList — smoke render', () => {
 // `@Input() readOnly: boolean = true` — gates the edit/delete menu) ─────────
 
 describe('EntryList — readOnly prop (Angular parity)', () => {
-  it('shows edit/delete actions by default (readOnly not passed)', () => {
+  it('shows edit/delete actions when isOwnerAdmin and readOnly is not passed', () => {
     render(
       <Wrapper>
-        <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} />
+        <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} isOwnerAdmin />
       </Wrapper>,
     );
     expect(screen.getAllByText('Editar').length).toBeGreaterThan(0);
@@ -308,16 +366,58 @@ describe('EntryList — readOnly prop (Angular parity)', () => {
     expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
   });
 
-  it('hides edit/delete actions when readOnly is true', () => {
+  it('hides edit/delete actions when readOnly is true, even for an owner-admin', () => {
     render(
       <Wrapper>
-        <EntryList entries={MOCK_ENTRIES} readOnly />
+        <EntryList entries={MOCK_ENTRIES} isOwnerAdmin readOnly />
       </Wrapper>,
     );
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
     expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
     // Data still renders — only the actions column is gated.
     expect(screen.getAllByText('Coca Cola').length).toBeGreaterThan(0);
+  });
+});
+
+// ─── EntryList — isOwnerAdmin gating (Angular parity: entry-list.component.html:16,23
+// `@if (isOwnerAdmin())` for cost-price, `@if (isOwnerAdmin() && !readOnly)` for actions) ────
+//
+// Angular hides BOTH the cost-price column and the edit/delete actions from non-owner-admin
+// users — React previously rendered the cost-price column and (when !readOnly) the actions
+// column unconditionally, with no role check at all.
+
+describe('EntryList — isOwnerAdmin gating (Angular parity)', () => {
+  it('hides the cost-price column and all actions when isOwnerAdmin is false (default)', () => {
+    render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Precio de costo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Editar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
+    // Data still renders — only cost-price/actions columns are gated.
+    expect(screen.getAllByText('Coca Cola').length).toBeGreaterThan(0);
+  });
+
+  it('shows the cost-price column when isOwnerAdmin is true', () => {
+    render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} isOwnerAdmin />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Precio de costo')).toBeInTheDocument();
+    expect(screen.getByText('$0.80')).toBeInTheDocument();
+  });
+
+  it('shows actions only when isOwnerAdmin is true AND readOnly is false', () => {
+    render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} isOwnerAdmin />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Editar').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Eliminar').length).toBeGreaterThan(0);
   });
 });
 

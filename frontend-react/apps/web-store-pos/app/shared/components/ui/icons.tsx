@@ -45,3 +45,45 @@ export function EditIcon({ className = '' }: IconProps) {
     </svg>
   );
 }
+
+/**
+ * Empty-state "boxes" icon — Angular's byte-identical inline SVG path
+ * (inventory-today-quantities.component.html empty-state, 64×64, stroke-width 1.5).
+ */
+export function EmptyBoxesIcon({ className = '' }: IconProps) {
+  return (
+    <svg
+      width="64"
+      height="64"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    </svg>
+  );
+}
+
+/**
+ * Empty-state "trending" icon — Angular's byte-identical inline SVG path
+ * (inventory-today-sales-profit.component.html empty-state, 64×64, stroke-width 1.5).
+ */
+export function EmptyTrendingIcon({ className = '' }: IconProps) {
+  return (
+    <svg
+      width="64"
+      height="64"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  );
+}

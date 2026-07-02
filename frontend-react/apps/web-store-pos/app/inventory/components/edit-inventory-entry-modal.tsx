@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { InventoryEntry, Product, ProductCategory } from '@store-mgmt/domain';
+import { Card } from '~/shared/components/ui/card';
+import { Button } from '~/shared/components/ui/button';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 
@@ -109,142 +111,144 @@ export function EditInventoryEntryModal({
     );
   }
 
-  const selectedProduct = products.find((p) => p.id === productId);
   const selectedCategory = categories.find((c) => c.id === categoryId);
+  const inputClass =
+    'w-full rounded border border-border px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary';
+  const labelClass = 'mb-1 block text-sm font-medium text-text';
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            {/* Angular parity: edit-inventory-entry-modal.component.html:4 toggles between
-                NEW_INVENTORY_ENTRY and EDIT_INVENTORY_ENTRY based on `!inventoryEntry` — was a
-                copy-paste bug where both branches resolved to the same "new entry" key. */}
-            {entry
-              ? intl.formatMessage({ id: 'INVENTORY_ENTRY.EDIT_INVENTORY_ENTRY' })
-              : intl.formatMessage({ id: 'INVENTORY_ENTRY.NEW_INVENTORY_ENTRY' })}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          {/* Product (searchable select) */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}
-            </label>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">
-                {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}...
-              </option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+      <div className="w-full max-w-md">
+        <Card
+          title={
+            <div className="flex items-center justify-between">
+              {/* Angular parity: edit-inventory-entry-modal.component.html:4 toggles between
+                  NEW_INVENTORY_ENTRY and EDIT_INVENTORY_ENTRY based on `!inventoryEntry` — was
+                  a copy-paste bug where both branches resolved to the same "new entry" key. */}
+              <span>
+                {entry
+                  ? intl.formatMessage({ id: 'INVENTORY_ENTRY.EDIT_INVENTORY_ENTRY' })
+                  : intl.formatMessage({ id: 'INVENTORY_ENTRY.NEW_INVENTORY_ENTRY' })}
+              </span>
+              <button
+                onClick={onClose}
+                className="text-text-muted hover:text-text"
+                aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+              >
+                ✕
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            {/* Product (searchable select) */}
+            <div>
+              <label className={labelClass}>
+                {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}
+              </label>
+              <select
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">
+                  {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}...
                 </option>
-              ))}
-            </select>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Category (auto-filled) */}
+            <div>
+              <label className={labelClass}>
+                {intl.formatMessage({ id: 'INVENTORY.ENTRY.CATEGORY' })}
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={selectedCategory?.name ?? ''}
+                className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-muted"
+              />
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <label htmlFor="entry-quantity" className={labelClass}>
+                {intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' })}
+              </label>
+              <input
+                id="entry-quantity"
+                type="number"
+                min="1"
+                step="1"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Cost Price */}
+            <div>
+              <label htmlFor="entry-cost-price" className={labelClass}>
+                {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}
+              </label>
+              <input
+                id="entry-cost-price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={costPrice}
+                onChange={(e) => setCostPrice(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className={labelClass}>
+                {intl.formatMessage({ id: 'INVENTORY.ENTRY.DATE' })}
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Errors */}
+            {(validationError || error) && (
+              <p className="text-sm text-danger">{validationError || error}</p>
+            )}
           </div>
 
-          {/* Category (auto-filled) */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.CATEGORY' })}
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={selectedCategory?.name ?? ''}
-              className="w-full rounded border bg-gray-50 px-3 py-2 text-sm text-gray-500"
-            />
+          <div className="mt-4 flex justify-end gap-2">
+            {/* Angular parity: edit-inventory-entry-modal.component.html:77-85 —
+                `mat-fab extended` Close/Save buttons. */}
+            <Button variant="fab" onClick={onClose}>
+              {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
+            </Button>
+            <Button variant="fab" onClick={handleSave}>
+              {/* Angular parity: edit-inventory-entry-modal.component.html:84 toggles between
+                  GENERAL.INSERT (create) and GENERAL.UPDATE (edit) — was hardcoded to
+                  GENERAL.SAVE regardless of mode. */}
+              {entry
+                ? intl.formatMessage({ id: 'GENERAL.UPDATE' })
+                : intl.formatMessage({ id: 'GENERAL.INSERT' })}
+            </Button>
           </div>
-
-          {/* Quantity */}
-          <div>
-            <label htmlFor="entry-quantity" className="mb-1 block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' })}
-            </label>
-            <input
-              id="entry-quantity"
-              type="number"
-              min="1"
-              step="1"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Cost Price */}
-          <div>
-            <label htmlFor="entry-cost-price" className="mb-1 block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}
-            </label>
-            <input
-              id="entry-cost-price"
-              type="number"
-              min="0"
-              step="0.01"
-              value={costPrice}
-              onChange={(e) => setCostPrice(e.target.value)}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Date */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.DATE' })}
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Errors */}
-          {(validationError || error) && (
-            <p className="text-sm text-red-600">{validationError || error}</p>
-          )}
-        </div>
-
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={handleSave}
-            className="flex-1 rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            {/* Angular parity: edit-inventory-entry-modal.component.html:84 toggles between
-                GENERAL.INSERT (create) and GENERAL.UPDATE (edit) — was hardcoded to
-                GENERAL.SAVE regardless of mode. */}
-            {entry
-              ? intl.formatMessage({ id: 'GENERAL.UPDATE' })
-              : intl.formatMessage({ id: 'GENERAL.INSERT' })}
-          </button>
-          <button
-            onClick={onClose}
-            className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-          >
-            {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
-          </button>
-        </div>
+        </Card>
       </div>
     </div>
   );

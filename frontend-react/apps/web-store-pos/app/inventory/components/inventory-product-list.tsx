@@ -35,8 +35,21 @@ export function filterInventoryCategories(
 export function InventoryProductList({ categories }: InventoryProductListProps) {
   const intl = useIntl();
   const [search, setSearch] = useState('');
+  // Angular parity: inventory-available.component.html:19-33 `mat-accordion` with
+  // `[expanded]="false"` — categories are collapsed by default, click header to expand.
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
 
   const filtered = filterInventoryCategories(categories, search);
+  const isSearching = search.trim() !== '';
+
+  function toggleCategory(categoryId: string) {
+    setExpandedCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -48,54 +61,67 @@ export function InventoryProductList({ categories }: InventoryProductListProps) 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
-          className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 
       {filtered.length === 0 ? (
-        <div className="py-8 text-center text-gray-400">
+        <div className="py-8 text-center text-text-muted">
           {intl.formatMessage({ id: 'INVENTORY.CATEGORY_PRODUCT_NO_FOUND' })}
         </div>
       ) : (
-        filtered.map((cat) => (
-          <div key={cat.categoryId} className="space-y-1">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                {cat.categoryName} ({cat.totalQuantity})
-              </h2>
-              {/* Category total inventory value — Angular's mat-expansion-panel-header
-                  category.totalCostPrice chip (inventory-available.component.html:26). */}
-              <span className="text-sm font-semibold text-primary">
-                ${cat.totalCostPrice.toFixed(2)}
-              </span>
-            </div>
-            <div className="divide-y rounded border bg-white">
-              {cat.products.map((p) => (
-                <div key={p.productId} className="flex items-center justify-between px-4 py-3">
-                  <div>
-                    <p className="font-medium text-gray-800">{p.productName}</p>
-                    <p className="text-xs text-gray-400">{p.categoryName}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-blue-700">{p.totalAvailable}</p>
-                    <p className="text-xs text-gray-400">
-                      {intl.formatMessage({ id: 'INVENTORY.ENTRY.AVAILABLE' })}
-                    </p>
-                    {/* Weighted-average unit cost + per-product total value — Angular's
-                        product.costPrice / product.costPrice*product.quantity currency cells
-                        (inventory-product-list.component.html:20-29). */}
-                    <p className="text-sm font-semibold text-green-700">
-                      ${p.avgCostPrice.toFixed(2)}
-                    </p>
-                    <p className="text-sm font-semibold text-primary">
-                      ${(p.avgCostPrice * p.totalAvailable).toFixed(2)}
-                    </p>
-                  </div>
+        filtered.map((cat) => {
+          // A category with an active search match auto-expands, so filtering stays useful
+          // without requiring an extra click (React-only UX addition on top of the accordion).
+          const isExpanded = isSearching || expandedCategoryIds.has(cat.categoryId);
+          return (
+            <div key={cat.categoryId} className="space-y-1 rounded-lg border border-border">
+              <button
+                type="button"
+                onClick={() => toggleCategory(cat.categoryId)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left"
+                data-testid={`inventory-category-toggle-${cat.categoryId}`}
+                aria-expanded={isExpanded}
+              >
+                <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wide">
+                  {cat.categoryName} ({cat.totalQuantity})
+                </h2>
+                {/* Category total inventory value — Angular's mat-expansion-panel-header
+                    category.totalCostPrice chip (inventory-available.component.html:26). */}
+                <span className="text-sm font-semibold text-primary">
+                  ${cat.totalCostPrice.toFixed(2)}
+                </span>
+              </button>
+              {isExpanded && (
+                <div className="divide-y divide-border border-t border-border bg-surface">
+                  {cat.products.map((p) => (
+                    <div key={p.productId} className="flex items-center justify-between px-4 py-3">
+                      <div>
+                        <p className="font-medium text-text">{p.productName}</p>
+                        <p className="text-xs text-text-muted">{p.categoryName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-primary">{p.totalAvailable}</p>
+                        <p className="text-xs text-text-muted">
+                          {intl.formatMessage({ id: 'INVENTORY.ENTRY.AVAILABLE' })}
+                        </p>
+                        {/* Weighted-average unit cost + per-product total value — Angular's
+                            product.costPrice / product.costPrice*product.quantity currency cells
+                            (inventory-product-list.component.html:20-29). */}
+                        <p className="text-sm font-semibold text-success">
+                          ${p.avgCostPrice.toFixed(2)}
+                        </p>
+                        <p className="text-sm font-semibold text-primary">
+                          ${(p.avgCostPrice * p.totalAvailable).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
