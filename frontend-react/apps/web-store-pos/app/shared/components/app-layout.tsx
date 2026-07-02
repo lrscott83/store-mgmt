@@ -4,6 +4,7 @@ import { Sidebar } from './sidebar';
 import { Navbar } from './navbar';
 import { Breadcrumbs } from './breadcrumbs';
 import { Footer } from './footer';
+import { InstallAppButton } from './install-app-button';
 import { authLoader } from '~/auth/routes/loaders';
 
 export const clientLoader = authLoader;
@@ -58,6 +59,9 @@ export function AppLayout() {
         </main>
         <Footer />
       </div>
+
+      {/* Global floating PWA install prompt, mirrors Angular's app.component. */}
+      <InstallAppButton />
     </div>
   );
 }
