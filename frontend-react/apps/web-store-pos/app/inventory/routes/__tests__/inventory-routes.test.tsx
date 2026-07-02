@@ -329,7 +329,7 @@ describe('InventoryTodaySalesProfitPage — smoke render', () => {
         <InventoryTodaySalesProfitPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/Ganancia de hoy/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ganancias del Día/i)).toBeInTheDocument();
   });
 });
 
@@ -421,17 +421,293 @@ describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular pa
       </Wrapper>,
     );
 
-    // Product row renders: name, units sold, and revenue = profit = $50.00 (no cost, since
-    // no productCosts were recorded) — proves the discountFromInvantory=false product was
-    // NOT excluded and its sale is fully counted.
-    const row = screen.getByText('Ron').closest('tr');
+    // Product row renders: name, sold=5, amount=50.00 and profit=50.00 (no cost, since no
+    // productCosts were recorded) — proves the discountFromInvantory=false product was NOT
+    // excluded and its sale is fully counted. Angular's table has no currency symbol in cells
+    // (template uses `| number: '1.2-2'`, not `| currency`), so amounts render as plain "50.00".
+    const row = screen.getByText(/Ron/).closest('tr');
     expect(row).not.toBeNull();
-    expect(row).toHaveTextContent('5'); // unitsSold
-    expect(row).toHaveTextContent('$50.00'); // revenue
-    expect(row).toHaveTextContent('$0.00'); // cost (no productCosts)
+    expect(row).toHaveTextContent('5'); // sold
+    expect(row).toHaveTextContent('50.00'); // amount (5 * price 10)
+    expect(row).toHaveTextContent('0.00'); // unitCost/totalCost (no productCosts)
     // Total row reflects the same values since it's the only product/sale today.
     const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).toHaveTextContent('$50.00');
+    expect(totalRow).toHaveTextContent('50.00');
+  });
+});
+
+// ─── InventoryTodaySalesProfitPage — Angular product-set filter (Stage 2.1 gap #3b) ─────────
+//
+// Angular sources the candidate product set via `.filter(p => p.isActive && p.availableToSale)`
+// (inventory-today-sales-profit.component.ts:66-67), NOT from "whatever products happen to
+// appear in today's sold order items". This matters beyond simple exclusion of
+// inactive/non-sellable products: it is also the set gap #4's entry-only rows are drawn from —
+// a product must be in this candidate set to ever surface as an entry-only row below.
+
+function makeEntryView(overrides: Partial<InventoryEntryView> = {}): InventoryEntryView {
+  return {
+    id: 'e1',
+    productId: 'p1',
+    productName: '',
+    quantity: 10,
+    costPrice: 2,
+    date: new Date(),
+    isActive: true,
+    ...overrides,
+  };
+}
+
+describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [];
+    mockEgressCategories = [];
+  });
+
+  it('excludes an inactive product even when it has today entries (would otherwise qualify as entry-only)', () => {
+    mockEgressProducts = [makeEgressProduct({ id: 'p1', name: 'Ron', isActive: false })];
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getByDate: vi.fn().mockReturnValue([makeEntryView({ productId: 'p1' })]),
+          getAvailableByCategory: vi.fn().mockReturnValue([]),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          create: vi.fn(),
+          update: vi.fn(),
+          deactivate: vi.fn(),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+
+    expect(screen.queryByText(/Ron/)).not.toBeInTheDocument();
+  });
+
+  it('excludes a non-availableToSale product even when it has today entries', () => {
+    mockEgressProducts = [
+      makeEgressProduct({ id: 'p1', name: 'NoVendible', isActive: true, availableToSale: false }),
+    ];
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getByDate: vi.fn().mockReturnValue([makeEntryView({ productId: 'p1' })]),
+          getAvailableByCategory: vi.fn().mockReturnValue([]),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          create: vi.fn(),
+          update: vi.fn(),
+          deactivate: vi.fn(),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+
+    expect(screen.queryByText(/NoVendible/)).not.toBeInTheDocument();
+  });
+
+  it('excludes an active & availableToSale product with neither sales nor today entries', () => {
+    mockEgressProducts = [makeEgressProduct({ id: 'p1', name: 'SinActividad' })];
+    // Default top-level mocks already return [] for getByDate and getActiveOrdersInDay.
+    render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+
+    expect(screen.queryByText(/SinActividad/)).not.toBeInTheDocument();
+    expect(screen.getByText('No hay ventas hoy')).toBeInTheDocument();
+  });
+});
+
+// ─── InventoryTodaySalesProfitPage — entry-only rows (Stage 2.1 gap #4, Angular lines 98-104,
+// 122-123) ─────────────────────────────────────────────────────────────────────────────────
+//
+// Angular includes a product in the report when `sold > 0 || hasTodayEntries(productId)`
+// (line 123) — a product received today but not yet sold still surfaces, with an informational
+// average unit cost from today's entries and totalCost=0 (contributes nothing to totals).
+
+describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [];
+    mockEgressCategories = [makeCategory({ id: 'cat-1', name: 'Bebidas', order: 1 })];
+  });
+
+  it('includes a not-yet-sold product with today entries: sold=0, informational avg unitCost, totalCost=0, contributes 0 to totals', () => {
+    mockEgressProducts = [
+      makeEgressProduct({
+        id: 'p1',
+        name: 'Ron',
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        price: 15,
+      }),
+    ];
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getByDate: vi.fn().mockReturnValue([
+            makeEntryView({ id: 'e1', productId: 'p1', quantity: 10, costPrice: 2 }),
+            makeEntryView({ id: 'e2', productId: 'p1', quantity: 10, costPrice: 4 }),
+          ]),
+          getAvailableByCategory: vi.fn().mockReturnValue([]),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          create: vi.fn(),
+          update: vi.fn(),
+          deactivate: vi.fn(),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+    vi.mocked(OrderOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getActiveOrdersInDay: vi.fn().mockReturnValue([]),
+        }) as unknown as InstanceType<typeof OrderOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+
+    const row = screen.getByText(/Ron/).closest('tr');
+    expect(row).not.toBeNull();
+    // sold = 0
+    expect(row).toHaveTextContent('0');
+    // avg unitCost = ((10*2) + (10*4)) / 20 = 3.00 (informational only)
+    expect(row).toHaveTextContent('3.00');
+
+    // Totals unaffected: nothing was sold, so sold/amount/cost/profit all stay at 0.
+    const totalRow = screen.getByText('Total').closest('tr');
+    expect(totalRow).toHaveTextContent('0.00');
+  });
+});
+
+// ─── InventoryTodaySalesProfitPage — non-mutating FIFO cost (Angular-bug-handling, gap #3c
+// documented deviation) ───────────────────────────────────────────────────────────────────
+//
+// Angular's `getAvailableInventoryCosts` (inventory-offline.service.ts:445-461) recomputes AND
+// PERSISTS a FIFO cost allocation live on every profit-page render (`i.available -= ...` then
+// `this.setCurrentInventoriesLocalStorage()`) — a genuine Angular bug: viewing the page twice
+// double-deducts `available` for the same historical sale. Per the Angular-bug-handling policy,
+// React mirrors the FIFO cost-allocation INTENT but sources it from each sold order item's
+// `productCosts` — the FIFO cost breakdown already recorded, non-mutating, at the moment of the
+// original sale (via `calculateOrderProfit`) — instead of re-deriving it live. These tests pin
+// (1) correct FIFO cost for a multi-entry sale and (2) idempotence: rendering the page twice
+// yields identical numbers and never mutates the underlying order/entry data.
+
+describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, deliberate bug-fix over Angular)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [
+      makeEgressProduct({ id: 'p1', name: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas', price: 10 }),
+    ];
+    mockEgressCategories = [makeCategory({ id: 'cat-1', order: 1 })];
+  });
+
+  function makeOrderWithFifoSale(): Order {
+    const orderItem: OrderItem = {
+      productId: 'p1',
+      productName: 'Ron',
+      categoryId: 'cat-1',
+      categoryName: 'Bebidas',
+      name: 'Ron',
+      quantity: 3,
+      price: 10,
+      productBusinessId: 'biz-1',
+      // FIFO breakdown recorded at sale time: 2 units @ $2 + 1 unit @ $3 = totalCost 7.
+      productCosts: [
+        { id: 'e1', costPrice: 2, quantity: 2 },
+        { id: 'e2', costPrice: 3, quantity: 1 },
+      ],
+      order: 1,
+    };
+    return {
+      id: 'o1',
+      orderItems: [orderItem],
+      total: 30,
+      itemsCount: 3,
+      date: new Date(),
+      type: OrderType.Normal,
+      paymentType: PaymentType.Efectivo,
+      isCredit: false,
+      description: '',
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+    };
+  }
+
+  it('computes correct FIFO cost for a sold product: amount=30.00, cost=7.00 (2@2 + 1@3), profit=23.00', () => {
+    vi.mocked(OrderOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getActiveOrdersInDay: vi.fn().mockReturnValue([makeOrderWithFifoSale()]),
+        }) as unknown as InstanceType<typeof OrderOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+
+    const row = screen.getByText(/Ron/).closest('tr');
+    expect(row).toHaveTextContent('3'); // sold
+    expect(row).toHaveTextContent('30.00'); // amount (3 * price 10)
+    expect(row).toHaveTextContent('7.00'); // totalCost (FIFO: 2*2 + 1*3)
+    expect(row).toHaveTextContent('23.00'); // profit (30 - 7)
+  });
+
+  it('is idempotent: rendering the page twice with the same fixtures yields identical totals and never mutates the source order/entries (no double-deduct, unlike Angular)', () => {
+    const order = makeOrderWithFifoSale();
+    const originalCosts = JSON.parse(JSON.stringify(order.orderItems[0].productCosts));
+
+    vi.mocked(OrderOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
+        }) as unknown as InstanceType<typeof OrderOfflineService>,
+    );
+    const first = render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+    const firstTotalText = screen.getByText('Total').closest('tr')?.textContent;
+    first.unmount();
+
+    vi.mocked(OrderOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
+        }) as unknown as InstanceType<typeof OrderOfflineService>,
+    );
+    const second = render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+    const secondTotalText = screen.getByText('Total').closest('tr')?.textContent;
+    second.unmount();
+
+    expect(secondTotalText).toBe(firstTotalText);
+    // Mutation-bug guard: the order item's recorded productCosts must be byte-for-byte
+    // untouched after two renders — proves React never re-ran a mutating FIFO deduction
+    // against them (unlike Angular's getAvailableInventoryCosts, which would have decremented
+    // `available` a second time on this second render).
+    expect(order.orderItems[0].productCosts).toEqual(originalCosts);
   });
 });
 

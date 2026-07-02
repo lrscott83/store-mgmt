@@ -333,11 +333,18 @@ const messages: Record<string, string> = {
   'INVENTORY.QUANTITIES.AVAILABLE': 'Disponible',
   'INVENTORY.QUANTITIES.SOLD': 'Vendido',
   'INVENTORY.QUANTITIES.ENDING': 'Final',
-  'INVENTORY.PROFIT.TITLE': 'Ganancia de hoy',
-  'INVENTORY.PROFIT.REVENUE': 'Ingresos',
+  // Angular parity: inventory-today-sales-profit.component.ts / .html — keys mirror Angular's
+  // flat INVENTORY.{TODAY_SALES_PROFIT,NO_SALES_TODAY,PRODUCT,SOLD,PRICE,COST,PROFIT,TOTAL}
+  // vocab (es.ts:438-454), byte-identical Spanish text. Corrected TITLE from the previous
+  // invented "Ganancia de hoy"; removed REVENUE/GROSS_PROFIT/MARGIN (no Angular analog).
+  'INVENTORY.PROFIT.TITLE': 'Ganancias del Día',
+  'INVENTORY.PROFIT.NO_SALES': 'No hay ventas hoy',
+  'INVENTORY.PROFIT.PRODUCT': 'Producto',
+  'INVENTORY.PROFIT.SOLD': 'Vendido',
+  'INVENTORY.PROFIT.PRICE': 'Precio',
   'INVENTORY.PROFIT.COST': 'Costo',
-  'INVENTORY.PROFIT.GROSS_PROFIT': 'Ganancia bruta',
-  'INVENTORY.PROFIT.MARGIN': 'Margen',
+  'INVENTORY.PROFIT.PROFIT': 'Ganancia',
+  'INVENTORY.PROFIT.TOTAL': 'Total',
   'INVENTORY.ENTRY.PRODUCT': 'Producto',
   'INVENTORY.ENTRY.CATEGORY': 'Categoría',
   'INVENTORY.ENTRY.QUANTITY': 'Cantidad',
