@@ -114,7 +114,8 @@ const messages: Record<string, string> = {
   'CART.ITEMS': '{count, plural, one {# artículo} other {# artículos}}',
   'CART.CLIENT_NAME_REQUIRED': 'El nombre del cliente es requerido para ventas a crédito',
 
-  // Products
+  // Products (Angular PRODUCT.* / PRODUCT_CATEGORY.* — literal Spanish strings from
+  // frontend/src/app/_modules/i18n/vocabs/es.ts, kept byte-identical for L6 parity)
   'PRODUCTS.TITLE': 'Productos',
   'PRODUCTS.CREATE': 'Crear producto',
   'PRODUCTS.EDIT': 'Editar producto',
@@ -124,7 +125,7 @@ const messages: Record<string, string> = {
   'PRODUCTS.FORM.PRICE': 'Precio',
   'PRODUCTS.FORM.CATEGORY': 'Categoría',
   'PRODUCTS.FORM.BARCODE': 'Código de barras',
-  'PRODUCTS.FORM.AVAILABLE_TO_SALE': 'Disponible para venta',
+  'PRODUCTS.FORM.AVAILABLE_TO_SALE': 'Disponible para Vender',
   'PRODUCTS.FORM.DISCOUNT_FROM_INVENTORY': 'Descontar del inventario',
   'PRODUCTS.EMPTY_STATE': 'No hay productos registrados',
   'PRODUCTS.CSV.TITLE': 'Importar productos desde CSV',
@@ -138,6 +139,23 @@ const messages: Record<string, string> = {
   'PRODUCTS.CSV.ERROR.DUPLICATE_BARCODE': 'El código de barras ya existe',
   'PRODUCTS.CATEGORY.CREATE': 'Crear categoría',
   'PRODUCTS.CATEGORY.EDIT': 'Editar categoría',
+  // Angular PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY — header FAB label (also reused, per
+  // Angular, as the per-category "Editar Categoría" action's key EDIT_CATEGORY below)
+  'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY': 'Categoría',
+  'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY_ALERT_MESSAGE':
+    'Para adicionar un producto debe primero adicionar una categoría',
+  'PRODUCT_CATEGORY.IMPORT_PRODUCTS': 'Importar Productos',
+  'PRODUCT_CATEGORY.NO_PRODUCT_FOUND': 'No hay productos en esta categoría.',
+  // NOTE: Angular's category-product-list.component.html:15 uses key EDIT_CATEGORY (not
+  // EDIT_PRODUCT_CATEGORY) for the per-category "edit" button, and EDIT_CATEGORY's Spanish
+  // value in vocabs/es.ts is literally 'Categoría' — same text as NEW_PRODUCT_CATEGORY.
+  'PRODUCT_CATEGORY.EDIT_CATEGORY': 'Categoría',
+  'PRODUCT.PRODUCTS': 'Productos',
+  'PRODUCT.NEW_PRODUCT': 'Producto',
+  'PRODUCT.NEW_PRODUCTS': 'Productos',
+  'PRODUCT.EDIT_PRODUCT': 'Editar Producto',
+  'PRODUCT.DELETE_PRODUCT': 'Eliminar Producto',
+  'PRODUCT.AVAILABLE_TO_SALE': 'Disponible para Vender',
 
   // Orders
   'ORDERS.TITLE': 'Historial de pedidos',

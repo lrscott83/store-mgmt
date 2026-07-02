@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
+import { InfoBox } from '~/shared/components/ui/info-box';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import { CategoryProductList } from '../components/category-product-list';
@@ -18,9 +19,9 @@ import { CsvProductImporterModal } from '../components/csv-product-importer-moda
 export const clientLoader = featureLoader([EFeatures.Products]);
 
 type Modal =
-  | { type: 'create' }
+  | { type: 'create'; category: ProductCategory }
   | { type: 'edit'; product: Product }
-  | { type: 'bulk' }
+  | { type: 'bulk'; category: ProductCategory }
   | { type: 'category'; category?: ProductCategory }
   | { type: 'csv' };
 
@@ -30,7 +31,7 @@ export function ProductsPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<Modal | null>(null);
 
   const productService = new ProductOfflineService(storeId);
@@ -45,6 +46,15 @@ export function ProductsPage() {
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
+
+  function togglePanel(categoryId: string) {
+    setExpandedCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  }
 
   // --- Create product ---
   function handleCreateProduct(data: {
@@ -83,7 +93,7 @@ export function ProductsPage() {
     setModal(null);
   }
 
-  // --- Bulk edit ---
+  // --- Bulk edit (per-category "Nuevo Productos" -> bulk price edit) ---
   function handleBulkSave(updatedProducts: Product[]) {
     productService.updateMany(updatedProducts);
     loadData();
@@ -139,49 +149,73 @@ export function ProductsPage() {
   }
 
   const existingBarcodes = products.filter((p) => p.barcode).map((p) => p.barcode as string);
+  const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
 
   return (
     <div className="space-y-4">
       <Card
-        title={intl.formatMessage({ id: 'PRODUCTS.TITLE' })}
-        footer={
-          <div className="flex flex-wrap gap-2">
-            {/* Angular mat-fab extended actions ("+ Categoría" / "Importar Productos" in
-                products.component.html) — pill-shaped elevated purple FABs. */}
+        title={
+          <div className="flex items-center justify-between">
+            {/* PRODUCT.PRODUCTS */}
+            <span>{intl.formatMessage({ id: 'PRODUCT.PRODUCTS' })}</span>
             <Button variant="fab" onClick={() => setModal({ type: 'category' })} data-testid="add-category-button">
-              {intl.formatMessage({ id: 'PRODUCTS.CATEGORY.CREATE' })}
-            </Button>
-            <Button variant="fab" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
-              {intl.formatMessage({ id: 'PRODUCTS.IMPORT_CSV' })}
-            </Button>
-            <Button variant="outline" onClick={() => setModal({ type: 'bulk' })} data-testid="bulk-edit-button">
-              {intl.formatMessage({ id: 'PRODUCTS.BULK_EDIT' })}
-            </Button>
-            <Button onClick={() => setModal({ type: 'create' })} data-testid="create-product-button">
-              {intl.formatMessage({ id: 'PRODUCTS.CREATE' })}
+              {/* PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY */}
+              + {intl.formatMessage({ id: 'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY' })}
             </Button>
           </div>
         }
       >
-        {/* Search */}
-        <div className="mb-4">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={intl.formatMessage({ id: 'GENERAL.SEARCH' })}
-            className="w-full max-w-sm rounded-md border border-border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            data-testid="products-search-input"
-          />
+        {/* Category-driven info-box — shown only while there are no categories */}
+        {categories.length === 0 && (
+          <InfoBox variant="info" className="mb-4 text-center">
+            {/* PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY_ALERT_MESSAGE */}
+            {intl.formatMessage({ id: 'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY_ALERT_MESSAGE' })}
+          </InfoBox>
+        )}
+
+        <div className="flex justify-end mb-4">
+          <Button variant="fab" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
+            {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
+            {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
+          </Button>
         </div>
 
-        {/* Product list */}
-        <CategoryProductList
-          categories={categories}
-          products={products}
-          searchQuery={searchQuery}
-          onEdit={(product) => setModal({ type: 'edit', product })}
-        />
+        {/* Accordion: one panel per category, collapsed by default */}
+        <div className="space-y-2">
+          {sortedCategories.map((category) => {
+            const categoryProducts = products.filter((p) => p.categoryId === category.id && p.isActive);
+            const isExpanded = expandedCategoryIds.has(category.id);
+            return (
+              <div key={category.id} className="rounded-lg border border-border bg-surface">
+                <button
+                  type="button"
+                  onClick={() => togglePanel(category.id)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  data-testid={`category-panel-toggle-${category.id}`}
+                  aria-expanded={isExpanded}
+                >
+                  <span className="text-sm font-medium text-text">{category.name}</span>
+                  <span className="rounded-full bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary">
+                    {categoryProducts.length}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-border px-4 py-3">
+                    <CategoryProductList
+                      category={category}
+                      products={categoryProducts}
+                      onEditCategory={() => setModal({ type: 'category', category })}
+                      onAddProduct={() => setModal({ type: 'create', category })}
+                      onAddProducts={() => setModal({ type: 'bulk', category })}
+                      onEditProduct={(product) => setModal({ type: 'edit', product })}
+                      onDeleteProduct={handleDeleteProduct}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </Card>
 
       {/* Modals */}
@@ -205,7 +239,7 @@ export function ProductsPage() {
 
       {modal?.type === 'bulk' && (
         <EditProductsModal
-          products={products.filter((p) => p.isActive)}
+          products={products.filter((p) => p.isActive && p.categoryId === modal.category.id)}
           onSave={handleBulkSave}
           onClose={() => setModal(null)}
         />
