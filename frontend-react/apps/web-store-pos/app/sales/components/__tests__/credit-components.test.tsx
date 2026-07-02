@@ -215,10 +215,7 @@ describe('EditSaleCreditModal', () => {
     );
     fireEvent.click(screen.getByTestId('edit-sale-credit-submit'));
     expect(onClose).not.toHaveBeenCalled();
-    expect(showBlockingErrorMock).toHaveBeenCalledWith(
-      'Error',
-      'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
-    );
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El gasto no existe.');
   });
 
   it('closes without saving on Cerrar', () => {
@@ -340,10 +337,7 @@ describe('SaleCreditPaymentModal', () => {
     fireEvent.click(screen.getByTestId('sale-credit-payment-submit'));
     await waitFor(() => expect(onConfirm).toHaveBeenCalled());
     expect(onClose).not.toHaveBeenCalled();
-    expect(showBlockingErrorMock).toHaveBeenCalledWith(
-      'Error',
-      'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
-    );
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El gasto no existe.');
   });
 
   it('closes without confirming on Cerrar', () => {

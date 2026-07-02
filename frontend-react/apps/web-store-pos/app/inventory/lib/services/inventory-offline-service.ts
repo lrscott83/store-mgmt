@@ -316,13 +316,20 @@ export class InventoryOfflineService {
   }
 
   /**
-   * Distinguishes "no active inventory entries at all" from "active entries but not enough
+   * Distinguishes "no inventory entries at all" from "entries exist but not enough active
    * quantity" — mirrors Angular's InventoryOfflineService.hasAvailableProductToSale branches
    * 5 (ProductErrors.ProductNotAvailable) and 6 (ProductErrors.ProductQuantityNotAvailable).
+   * Angular (inventory-offline.service.ts:410-419) checks `inventories.length === 0` against
+   * the RAW entry list BEFORE filtering isActive, and only filters isActive when summing the
+   * quantity — so `hasEntries` must reflect the raw list, not the active-only subset. A
+   * product whose only entries are all inactive still has `hasEntries: true` (falls through
+   * to the quantity check, which fails with 0 available) rather than the "no entries" branch.
    */
   getAvailableQuantity(productId: string): { hasEntries: boolean; available: number } {
-    const activeEntries = this.repo.getByProductId(this.storeId, productId).filter((e) => e.isActive);
-    const available = activeEntries.reduce((sum, e) => sum + e.available, 0);
-    return { hasEntries: activeEntries.length > 0, available };
+    const allEntries = this.repo.getByProductId(this.storeId, productId);
+    const available = allEntries
+      .filter((e) => e.isActive)
+      .reduce((sum, e) => sum + e.available, 0);
+    return { hasEntries: allEntries.length > 0, available };
   }
 }

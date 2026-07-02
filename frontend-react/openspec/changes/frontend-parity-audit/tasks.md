@@ -140,6 +140,18 @@ a React-added a11y improvement Angular's template lacks entirely (translated, no
 `tsc --noEmit` clean; `vitest run` 95 files / 1028 tests (was 1015, +13 net); `react-router
 build` succeeds (new `sweetalert2` chunk ~79.5 kB / 21.1 kB gzip).
 
+- [x] 1.8 Stage 1 RE-VERIFY follow-up fix batch (Batch 11, 2026-07-02) — resolved NEW-W1
+  (`getAvailableQuantity` isActive-filter-before-hasEntries branch-order divergence vs
+  Angular's `hasAvailableProductToSale`, `app/inventory/lib/services/inventory-offline-service.ts`)
+  + NEW-W2 (3 error dialogs — `edit-sale-credit-modal.tsx`, `sale-credit-payment-modal.tsx`,
+  `edit-order-modal.tsx` — showing the generic `GENERAL.RESPONSE.ERROR500_MESSAGE` instead of
+  Angular's static, single-failure-branch `SaleCreditErrors.NotExists`/`OrderErrors.NotExists`
+  literals; new `SALE_CREDIT_ERRORS.NOT_EXISTS`/`ORDER_ERRORS.NOT_EXISTS` i18n keys added,
+  byte-identical to Angular). `tsc --noEmit` clean; `pnpm test` 95 files / 1028 tests passed
+  (0 new tests — 3 existing assertions corrected); `react-router build` succeeds. Full detail
+  in apply-progress.md Batch 11. Stage 1 (Sales) now fully closed pending a final
+  `sdd-verify` re-pass.
+
 ## Stage 2 — Inventory
 
 - [ ] 2.1 L4 functional diff (app/inventory/**) + fix [TDD].

@@ -39,6 +39,8 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
 
   // Angular: edit-order-modal.component.ts:39-54 — on failure, Swal.fire({ icon: 'error',
   // title: GENERAL.ERROR, text: dataEntry.errors[0].description }); modal stays open.
+  // `updateTodayOrder` has exactly one failure branch (record not found ->
+  // OrderErrors.NotExists), so the "dynamic" description is always this static literal.
   function handleSubmit() {
     if (!order?.id) return;
     const succeeded = onUpdate(order.id, paymentType);
@@ -47,7 +49,7 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
     } else {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR500_MESSAGE' }),
+        intl.formatMessage({ id: 'ORDER_ERRORS.NOT_EXISTS' }),
       );
     }
   }

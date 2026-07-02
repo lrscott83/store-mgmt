@@ -343,12 +343,18 @@ describe('InventoryOfflineService', () => {
       expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: false, available: 0 });
     });
 
-    it('returns hasEntries=false when entries exist but none are active', () => {
+    // Angular: hasAvailableProductToSale (inventory-offline.service.ts:410-419) checks
+    // `inventories.length === 0` against the RAW entry list (before any isActive filter),
+    // and only filters isActive when summing the quantity. So a product whose only entries
+    // are all inactive still has hasEntries=true (raw list is non-empty) — it falls through
+    // to the quantity check (0 available) and fails with ProductQuantityNotAvailable, NOT
+    // the "no entries" ProductNotAvailable branch.
+    it('returns hasEntries=true (raw entries exist) and available=0 when entries exist but none are active', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { available: 10, isActive: false })]);
       seedInventory(storeId, map);
 
-      expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: false, available: 0 });
+      expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: true, available: 0 });
     });
 
     it('returns hasEntries=true and the summed available quantity across active entries', () => {

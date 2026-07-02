@@ -37,7 +37,9 @@ export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: Edi
 
   // Angular: edit-sale-credit-modal.component.ts:48-72 — on `updateSaleCredit` failure,
   // Swal.fire({ icon: 'error', title: GENERAL.ERROR, text: dataEntry.errors[0].description });
-  // modal stays open (no closeModal() call in the else branch).
+  // modal stays open (no closeModal() call in the else branch). `updateSaleCredit` has
+  // exactly one failure branch (record not found -> SaleCreditErrors.NotExists), so the
+  // "dynamic" description is always this static literal.
   function handleSubmit() {
     setTouched(true);
     if (client.trim() === '') return;
@@ -48,7 +50,7 @@ export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: Edi
     } else {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR500_MESSAGE' }),
+        intl.formatMessage({ id: 'SALE_CREDIT_ERRORS.NOT_EXISTS' }),
       );
     }
   }

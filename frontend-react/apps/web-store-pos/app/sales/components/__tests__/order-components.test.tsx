@@ -256,10 +256,7 @@ describe('EditOrderModal', () => {
     );
     fireEvent.click(screen.getByTestId('edit-order-update-button'));
     expect(onClose).not.toHaveBeenCalled();
-    expect(showBlockingErrorMock).toHaveBeenCalledWith(
-      'Error',
-      'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
-    );
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'La orden no existe');
   });
 
   it('closes without updating on Cerrar', () => {

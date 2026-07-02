@@ -51,7 +51,9 @@ export function SaleCreditPaymentModal({
   // SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE, icon: 'question', showCancelButton: true,
   // confirmButtonColor: '#3456ff', cancelButtonColor: '#dc3545', confirmButtonText: YES,
   // cancelButtonText: NO }).then(result => { if (result.isConfirmed) { ...paidSaleCredit...
-  // else Swal.fire({ icon: 'error', title: GENERAL.ERROR, text: ... }) } }).
+  // else Swal.fire({ icon: 'error', title: GENERAL.ERROR, text: ... }) } }). `paidSaleCredit`
+  // has exactly one failure branch (record not found -> SaleCreditErrors.NotExists), so the
+  // "dynamic" description is always this static literal.
   async function handleSubmitClick() {
     const confirmed = await confirmDialog({
       title: intl.formatMessage({ id: 'SALE_CREDIT.PAYMENT_CONFIRM_TITLE' }),
@@ -67,7 +69,7 @@ export function SaleCreditPaymentModal({
     } else {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR500_MESSAGE' }),
+        intl.formatMessage({ id: 'SALE_CREDIT_ERRORS.NOT_EXISTS' }),
       );
     }
   }

@@ -1374,3 +1374,113 @@ scope, cart aria-label a11y-beyond-parity) are left for the user to decide, not 
 resolved. Stage 1 (Sales) remains ready for `sdd-verify`, or Stage 2 (Inventory) `sdd-apply`
 may proceed (2.5.1 cart increase/decrease validation + 2.6 login/auth parity remain the only
 Stage 2 carry-over items).
+
+---
+
+## Batch 11 (2026-07-02) — Stage 1 RE-VERIFY follow-up: NEW-W1 + NEW-W2 fix batch
+
+### What
+
+Closed the two narrow WARNINGs found during the Stage 1 RE-VERIFY pass (after Batches 9-10):
+NEW-W1 (`getAvailableQuantity` branch-order divergence) and NEW-W2 (3 error dialogs showing
+the wrong, overly-generic text). Both fixes are text/branch-order corrections only — no
+change to the no-overselling blocking behavior.
+
+### Why
+
+`sdd-verify` re-pass (obs #465) found: (1) `getAvailableQuantity` filtered `isActive` BEFORE
+checking whether any raw entries existed, diverging from Angular's check-raw-list-first order
+— wrong error branch selected for the all-inactive-entries edge case (still blocks the sale,
+just shows the wrong message); (2) 3 error dialogs (`edit-sale-credit-modal.tsx`,
+`sale-credit-payment-modal.tsx`, `edit-order-modal.tsx`) showed the generic
+`GENERAL.RESPONSE.ERROR500_MESSAGE` instead of Angular's `dataEntry.errors[0].description` —
+verify confirmed this description is actually STATIC (each underlying service method has
+exactly one failure branch: record-not-found), so the prior "can't surface a dynamic
+description" rationale in Batch 10 did not hold.
+
+### Where
+
+**Fix 1 (NEW-W2 — wrong error-dialog text):**
+- Verified Angular literals directly at the source (not paraphrased):
+  - `frontend/src/app/domain/entities/sale-credits/sale-credit.errors.ts:6` —
+    `SaleCreditErrors.NotExists.description = 'El gasto no existe.'` (trailing period).
+  - `frontend/src/app/domain/entities/orders/order.errors.ts:6` —
+    `OrderErrors.NotExists.description = 'La orden no existe'` (NO trailing period).
+  - Confirmed at call sites `edit-sale-credit-modal.component.ts:66-70`,
+    `sale-credit-payment-modal.component.ts:71-75`, `edit-order-modal.component.ts:49-53` that
+    `errors[0].description` is shown, and confirmed each underlying service method
+    (`SaleCreditOfflineService.updateSaleCredit`/`.paidSaleCredit`,
+    `OrderOfflineService.updateTodayOrder`) has exactly ONE failure branch (not-found), so the
+    text is static and knowable per call site — not genuinely dynamic.
+- `app/shared/lib/i18n/es.ts` — added `SALE_CREDIT_ERRORS.NOT_EXISTS` = `'El gasto no
+  existe.'` and `ORDER_ERRORS.NOT_EXISTS` = `'La orden no existe'` (byte-identical to
+  Angular, including the punctuation difference between the two), following the same
+  `PRODUCT_ERRORS.*` domain-error-as-i18n-key precedent from Batch 9.
+- `app/sales/components/edit-sale-credit-modal.tsx:51` — `showBlockingError` message
+  switched from `GENERAL.RESPONSE.ERROR500_MESSAGE` to `SALE_CREDIT_ERRORS.NOT_EXISTS`.
+- `app/sales/components/sale-credit-payment-modal.tsx:70` — same switch.
+- `app/sales/components/edit-order-modal.tsx:50` — message switched to
+  `ORDER_ERRORS.NOT_EXISTS`.
+- Tests updated (RED confirmed before the fix, GREEN after):
+  `app/sales/components/__tests__/credit-components.test.tsx` (2 assertions),
+  `app/sales/components/__tests__/order-components.test.tsx` (1 assertion).
+
+**Fix 2 (NEW-W1 — `getAvailableQuantity` branch-order divergence):**
+- Re-read Angular's `hasAvailableProductToSale`
+  (`frontend/src/app/application/entries/inventory-offline.service.ts:410-419`): checks
+  `inventories.length === 0` against the RAW entry list (line 411, before any `isActive`
+  filter) for the "no entries" branch, then filters `isActive` only when summing the quantity
+  (lines 415-419).
+- `app/inventory/lib/services/inventory-offline-service.ts` `getAvailableQuantity` (was
+  lines 323-327) — reordered to match: `hasEntries` now reflects the RAW `repo.getByProductId`
+  result length (not the active-only subset); `available` still sums only active entries. A
+  product whose only entries are all inactive now correctly returns `{ hasEntries: true,
+  available: 0 }` (falls through to the quantity check, 0 < requested, so
+  `QUANTITY_NOT_AVAILABLE`/`ProductQuantityNotAvailable`) instead of the previous `{
+  hasEntries: false }` (`NOT_AVAILABLE`/`ProductNotAvailable`), matching Angular's branch
+  exactly. `app/sales/lib/product-availability.ts` (the consumer) needed NO change — it
+  already read `inventory.hasEntries`/`inventory.available` correctly; only the upstream data
+  source had the wrong branch order.
+- Test updated (RED confirmed, then GREEN):
+  `app/inventory/lib/services/__tests__/inventory-offline-service.test.ts` — the
+  all-inactive-entries case (`INV-08` describe block) now asserts `{ hasEntries: true,
+  available: 0 }` instead of the previous (incorrect per Angular) `{ hasEntries: false,
+  available: 0 }`.
+
+### TDD Cycle Evidence (Batch 11)
+
+| Task | RED | GREEN |
+|---|---|---|
+| Error-dialog text (3 call sites) | `credit-components.test.tsx` (2 assertions) + `order-components.test.tsx` (1 assertion) edited to expect the exact Angular literals first; ran and confirmed 3 failures (received the old `ERROR500_MESSAGE` string) | i18n keys added + call sites switched; re-ran, 37/37 + 15/15 passed |
+| `getAvailableQuantity` all-inactive edge case | `inventory-offline-service.test.ts` edge-case assertion changed to `{ hasEntries: true, available: 0 }` first; ran and confirmed 1 failure (received `{ hasEntries: false }`) | branch order fixed in `getAvailableQuantity`; re-ran, 31/31 passed |
+
+### Issues Found (Batch 11)
+
+None. Neither underlying service method has more than one failure branch (STEP 3 check from
+the fix instructions — no genuinely dynamic/multi-branch case found), so hardcoding the two
+static Spanish literals is correct, not a simplification.
+
+### Test/Build Results (Batch 11)
+
+- `tsc -p apps/web-store-pos --noEmit` (from `frontend-react/`): clean, zero errors.
+- `pnpm test` (from `frontend-react/`, via turbo): 95 test files / 1028 tests passed, 0
+  failed (same total as Batch 10 — 2 existing tests edited to correct assertions, 0 net new
+  test count change, no new test files).
+- `react-router build` (apps/web-store-pos): succeeded, no new warnings.
+
+### Workload / PR Boundary (Batch 11)
+
+- Mode: single direct work-unit commit on `feat/frontend-parity-audit`, no push, no PR, per
+  explicit instruction (consistent with prior batches' no-PR direct-commit precedent for this
+  change). Small, narrow-scope fix (~5 files, well under the 400-line budget).
+- Boundary: `es.ts` (2 new keys) + 3 component call-site message switches + 1 service
+  branch-order fix + 3 test files (2 assertion updates, 1 edge-case assertion correction).
+  Does NOT touch any other Stage 1 item, the CSV-preview or cart-aria-label flagged items, or
+  any Stage 2+ scope.
+
+### Status — Stage 1 (Sales) NEW-W1/NEW-W2 CLOSED
+
+Both WARNINGs from the Stage 1 RE-VERIFY pass are resolved. Stage 1 (Sales) is now fully
+closed pending a final `sdd-verify` re-pass (recommended before `sdd-archive`), or Stage 2
+(Inventory) `sdd-apply` may proceed for the remaining carry-over items (2.5.1 cart
+increase/decrease validation + 2.6 login/auth parity).

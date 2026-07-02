@@ -229,15 +229,21 @@ const messages: Record<string, string> = {
   // GENERAL.RESPONSE.* (Angular GENERAL.RESPONSE — used as the blocking-error-modal title,
   // e.g. sale-product-row.component.ts:72 Swal.fire title)
   'GENERAL.RESPONSE.ERROR_TITLE': 'Error',
-  // GENERAL.RESPONSE.ERROR500_MESSAGE — Angular's generic technical-support fallback,
-  // reused here as the message for the credit/order edit-modals' Swal error branches
-  // (sale-credit-payment-modal.component.ts:71-75, edit-sale-credit-modal.component.ts:66-70,
-  // edit-order-modal.component.ts:49-53), which in Angular show `dataEntry.errors[0]
-  // .description` (a dynamic DataResult error). React's ported *-offline-service methods
-  // only fail via a not-found exception (no DataResult contract), so this generic Angular
-  // string is the closest faithful, non-invented Spanish fallback.
+  // GENERAL.RESPONSE.ERROR500_MESSAGE — Angular's generic technical-support fallback.
   'GENERAL.RESPONSE.ERROR500_MESSAGE':
     'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+
+  // SaleCreditErrors / OrderErrors (Angular frontend/src/app/domain/entities/sale-credits/
+  // sale-credit.errors.ts and .../orders/order.errors.ts — hardcoded Spanish literals there,
+  // not i18n keys; added here as i18n keys for React's text-parity convention, same
+  // PRODUCT_ERRORS.* precedent above). `SaleCreditOfflineService.updateSaleCredit` /
+  // `.paidSaleCredit` and `OrderOfflineService.updateTodayOrder` each have exactly ONE
+  // failure branch (record not found), so `dataEntry.errors[0].description` in Angular's
+  // edit-sale-credit-modal.component.ts:66-70, sale-credit-payment-modal.component.ts:71-75,
+  // and edit-order-modal.component.ts:49-53 is always this static literal — NOT the generic
+  // ERROR500_MESSAGE fallback used previously.
+  'SALE_CREDIT_ERRORS.NOT_EXISTS': 'El gasto no existe.',
+  'ORDER_ERRORS.NOT_EXISTS': 'La orden no existe',
 
   // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',

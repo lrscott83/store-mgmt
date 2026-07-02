@@ -213,3 +213,162 @@ Still out of Stage 1 scope; will need cleanup under Stage 8 (Statistics) / landi
 ## Scope Note
 
 This report covers **Stage 1 only** (Sales module: Products, Sale/POS, Orders, Sale Credits, Today Stats, Category Stats, Cart/nav-right), validated against current code as of 2026-07-02. Stage 0 (Foundations) was re-verified separately (see the RE-VERIFY section above, obs #465) and is not re-litigated here. Stage 2's carry-over tasks (2.5 inventory-availability wiring, 2.6 login/auth parity incl. the "POS Management" copy gap at 2.6.1) are explicitly **out of scope** — they are correctly scheduled as Stage 2 work, not Stage 1 failures, and this report treats W1 as a *tracked* Stage 1 exception rather than an undiscovered defect.
+
+---
+
+# Verify Report: Frontend Parity Audit — Stage 1 (Sales) — RE-VERIFY
+
+**Change:** frontend-parity-audit
+**Phase:** Verify (Stage 1 — Sales module, RE-VERIFY after two fix batches)
+**Date:** 2026-07-02
+**Mode:** Hybrid (engram + openspec file)
+**Reason for re-verify:** Two commits landed since the prior formal Stage 1 verify pass (obs #465, PASS WITH WARNINGS): `60b0e09` (W1 stock-availability wiring + W2 text-parity fixes) and `fbdbafd` (SweetAlert2 port, 1.7). This pass confirms whether W1/W2 are actually closed and checks for regressions/new gaps, including a specifically flagged suspicion about the 3 new ERROR500 fallback dialogs added in `fbdbafd`.
+**Scope:** Same as the prior Stage 1 report — Products, Sale/POS, Orders, Sale Credits, Today Stats, Category Stats, Cart/nav-right, plus the new SweetAlert2 dialog layer (task 1.7). Stage 2 carry-overs (2.5.1, 2.6.x) remain explicitly out of scope.
+
+---
+
+## Verdict: PASS WITH WARNINGS
+
+Zero CRITICAL. Prior W1 (overselling gap) and W2 (hardcoded English/invented validation) are **CONFIRMED RESOLVED**. Two new WARNINGs found during this re-verify: one CONFIRMED text-parity miss (the suspected ERROR500 issue — real, not a false alarm) and one newly-introduced edge-case behavioral deviation in the W1 fix itself. Zero new SUGGESTIONs beyond the two carried from the prior pass.
+
+---
+
+## Test/Build Evidence (run 2026-07-02, actual output, this session)
+
+**TypeScript** (`pnpm -C apps/web-store-pos exec tsc --noEmit`, from `frontend-react/`): clean, zero errors, no output.
+
+**Full test suite** (`pnpm test`, turbo across `@store-mgmt/domain`, `@store-mgmt/web-common`, `@store-mgmt/web-store-pos`):
+```
+ Test Files  95 passed (95)
+      Tests  1028 passed (1028)
+   Duration  5.93s
+```
+Matches apply-progress's Batch 10 claim exactly (95 files / 1028 tests, +7 files / +48 tests over the prior verify's 88/980 baseline — the delta is Batch 9's W1/W2 fix tests plus Batch 10's SweetAlert2/CSV/cart-aria-label tests). One expected `stderr` noise line in `api-client.test.ts` (jsdom navigation warning), not a failure.
+
+**Production build** (`pnpm -C apps/web-store-pos exec react-router build`): succeeded. New `sweetalert2` chunk `blocking-alert-*.js` ~79.5 kB / 21.1 kB gzip, present in the client asset manifest. No build errors or warnings beyond normal chunk-size output.
+
+---
+
+## W1 Re-Verification (stock-availability parity) — RESOLVED
+
+`app/sales/lib/product-availability.ts` (`checkProductAvailabilityToSale`) is a faithful port of Angular's `InventoryOfflineService.hasAvailableProductToSale` (`inventory-offline.service.ts:397-423`):
+
+| Branch | Angular | React |
+|---|---|---|
+| 1. Not found | `Result.Failure([ProductErrors.NotExists])` | `{ succeeded:false, errorCode:'NOT_EXISTS' }` |
+| 2. Inactive | `ProductErrors.Inactive` | `'INACTIVE'` |
+| 3. Not available to sale | `ProductErrors.ProductNotAvailableToSale` | `'NOT_AVAILABLE_TO_SALE'` |
+| 4. Gate | `!hasInventoryModuleAvailable() \|\| !discountFromInvantory` → Success | same condition → `succeeded:true` |
+| 5. No active inventory entries | `ProductErrors.ProductNotAvailable` | `'NOT_AVAILABLE'` (see WARNING below re: entry-detection edge case) |
+| 6. Quantity check | `available >= quantity` (quantity = form qty only, no cart addition **in the service itself** — see note) | `inventory.available >= (quantity + cartQuantity)` |
+
+All 5 error-code Spanish messages verified byte-identical against `product.errors.ts`/`es.ts` (`PRODUCT_ERRORS.NOT_EXISTS` = "El producto no existe.", `.INACTIVE` = "El producto no está activo.", `.NOT_AVAILABLE_TO_SALE` = "El producto no está disponible para la venta.", `SALES.NOT_INVENTORY_AVAILABLE_MESSAGE` = "El producto no está disponible en el inventario." for NOT_AVAILABLE, `PRODUCT_ERRORS.QUANTITY_NOT_AVAILABLE` = "La cantidad del producto no está disponible en el inventario.").
+
+Wiring confirmed end-to-end: `sale.tsx:67-77` (`checkAvailability`, includes `getCartItemQuantity` from the cart store and `hasInventoryModuleAvailable(user)`) → `SaleCategoryProducts` (prop passthrough) → `SaleProductRow.handleAddToCart` (`sale-product-row.tsx:35-49`), which calls `showBlockingError` with `GENERAL.RESPONSE.ERROR_TITLE` + the mapped message and **aborts the add** (`return` before `onAdded`) on failure — matches Angular's blocking `Swal.fire({icon:'error',...})` in `sale-product-row.component.ts:62-104`.
+
+Cart-quantity accumulation confirmed: React explicitly adds `cartQuantity` to the requested `quantity` before comparing against `available` (`product-availability.ts:76-77`), which is the *correct* interpretation of Angular's intent — Angular's own `hasAvailableProductToSale` signature takes a raw `quantity` argument, and the cart-quantity accumulation happens at the **caller** level in Angular (`sale-product-row.component.ts` computes `quantity = form qty + existing cart qty` before calling the service — confirmed by reading the call site, not just the service). React's single-function `checkProductAvailabilityToSale` folds both into one call, functionally equivalent.
+
+**Conclusion: W1 CLOSED. No remaining overselling gap in the live Sale/POS screen.**
+
+### NEW — WARNING found during W1 re-verify (not present in the original W1 finding)
+
+`app/inventory/lib/services/inventory-offline-service.ts:323-327` (`getAvailableQuantity`, added in commit `60b0e09`):
+```ts
+getAvailableQuantity(productId: string): { hasEntries: boolean; available: number } {
+  const activeEntries = this.repo.getByProductId(this.storeId, productId).filter((e) => e.isActive);
+  const available = activeEntries.reduce((sum, e) => sum + e.available, 0);
+  return { hasEntries: activeEntries.length > 0, available };
+}
+```
+filters `isActive` **before** computing `hasEntries`. Angular's `hasAvailableProductToSale` (`inventory-offline.service.ts:410-419`) checks `inventories.length === 0` on the **raw, unfiltered** result of `getProductInventoriesByProductId` first (branch 5, `ProductErrors.ProductNotAvailable`), and only filters `isActive` afterward when summing `available` for the quantity comparison (branch 6, `ProductErrors.ProductQuantityNotAvailable`).
+
+**Edge case:** a product whose inventory entries all exist but are all `isActive: false` (deactivated inventory rows, not deleted). Angular: `inventories.length > 0` (raw) → passes the NOT_AVAILABLE check, falls through to the quantity sum which computes `0` (all filtered out) → `0 >= quantity` is false → returns `ProductQuantityNotAvailable` ("La cantidad del producto no está disponible en el inventario."). React: `activeEntries.length === 0` → `hasEntries: false` → returns `NOT_AVAILABLE` ("El producto no está disponible en el inventario."). Both **block the sale** (no functional/security regression — overselling is still prevented), but the **specific error text shown to the user differs from Angular** in this one edge case, which is a genuine (if narrow) violation of spec.md's L6 "byte-identical Spanish text" requirement. This is a new deviation introduced by the W1 fix itself, not present before `60b0e09`.
+
+---
+
+## W2 Re-Verification (text-parity fixes) — RESOLVED
+
+- `create-product-modal.tsx` (3 sites), `edit-product-modal.tsx` (2 sites), `edit-product-category-modal.tsx` (2 sites) — all 7 `GENERAL.VALIDATION.REQUIRED` call sites confirmed, rendering `"{name} es requerido"`, matching Angular's `VALIDATION.REQUIRED = '{{name}} es requerido'` (`es.ts:232`) — same rendered Spanish text, syntax difference is only the react-intl `{name}` vs ngx-translate `{{name}}` placeholder convention, not a text discrepancy.
+- The invented "Order must be a positive number" check is gone from `edit-product-category-modal.tsx`; code comment at line 30 explicitly notes *"Angular's ONLY validation on `order` is `required`"* — confirmed against Angular's template, which has no positivity rule.
+- `csv-product-importer-modal.tsx:46,53`: both `setParseError` calls now use `'Error al importar los productos'`, matching Angular's Spanish fallback literal (`csv-product-importer-modal.component.ts:71-72`, `error.message || 'Error al importar los productos'`).
+
+**Conclusion: W2 CLOSED. No remaining hardcoded English or invented validation found in the re-checked components.**
+
+---
+
+## SweetAlert2 Parity (task 1.7, new since prior verify) — CONFIRMED
+
+`app/shared/lib/blocking-alert.ts` — all 3 exported wrappers (`showBlockingError`, `confirmDialog`, `showAcknowledgeError`) verified against Angular's 3 distinct `Swal.fire` shapes used across the Sale module (error-only, question+confirm/cancel, error+explicit-OK-button), including exact `#3456ff`/`#dc3545` button colors and `icon: 'question'`/`'error'` values. No global `Swal.mixin` exists on either side (confirmed by repo grep) — stock defaults on both, correctly not invented.
+
+**Restored confirm dialogs, both verified byte-exact:**
+1. **Payment confirm** (`sale-credit-payment-modal.tsx:56-61` vs `sale-credit-payment-modal.component.ts:52-60`): title `SALE_CREDIT.PAYMENT_CONFIRM_TITLE` = "Confirmación de Pago", message `SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE` = "Usted está segura(o) que desea pagar este crédito por venta?" — byte-identical both sides (`es.ts:305-306` React vs `es.ts:523-524` Angular).
+2. **Deactivate confirm** (`order-item-list.tsx:36-45` vs `order-item-list.component.ts:34-53`): title `GENERAL.DELETE_CONFIRM_TITLE` = "Confirmación para eliminar", message `GENERAL.DELETE_CONFIRM_MESSAGE_A` with `{name}` = `TODAY_ORDERS.TEXT` = "¿Está seguro que desea eliminar esta Ventas del día?" — byte-identical. The failure path is also correctly layered: React's `showAcknowledgeError` interpolates Angular's own hardcoded literal *inside* the `TODAY_ORDERS.ERROR_DELETING_ORDER` template (`"Ocurrió un error eliminando la venta. {message}"`), exactly matching Angular's `showErrorMessage(['La venta no pudo ser cancelada...'])` → `translate.instant('TODAY_ORDERS.ERROR_DELETING_ORDER', {message: errors.join('<br>')})` composition (`order-item-list.component.ts:50-51,96-99,124-135`). This is a subtle two-key composition that was easy to get wrong (e.g. by only porting the inner literal) and it was ported correctly.
+
+"Active"→"Activo" label gap (flagged-but-deferred in the prior W2) confirmed closed: `edit-product-category-modal.tsx:99` now uses `GENERAL.ACTIVE` = "Activo".
+
+Hardcoded-English sweep confirmed clean: grepped `app/sales/**` (excluding `__tests__`) and `cart-shell.tsx` for capitalized-English-word patterns — zero hits outside of legitimate Spanish/code-comment/i18n-key content. `cart-shell.tsx`'s 3 cart-item aria-labels (`CART.DECREASE_QUANTITY`/`INCREASE_QUANTITY`/`REMOVE_ITEM`) now resolve to Spanish, not English.
+
+---
+
+## §4 — Suspected ERROR500 Miss: CONFIRMED AS A REAL TEXT-PARITY GAP (not a false alarm)
+
+Read Angular's exact `Swal.fire` call at all three flagged sites:
+
+- `edit-sale-credit-modal.component.ts:66-70`: `Swal.fire({ icon:'error', title: translate.instant('GENERAL.ERROR'), text: dataEntry.errors[0].description })`
+- `edit-order-modal.component.ts:49-53`: identical shape.
+- `sale-credit-payment-modal.component.ts:71-75`: identical shape.
+
+Traced the underlying service calls to determine what `dataEntry.errors[0].description` actually resolves to at runtime:
+
+| Call site | Service method | Angular's ONLY failure branch | `errors[0].description` |
+|---|---|---|---|
+| `edit-sale-credit-modal` | `SaleCreditOfflineService.updateSaleCredit` (`sale-credit-offline.service.ts:67-79`) | `!saleCredit` (not found) | `SaleCreditErrors.NotExists` = **"El gasto no existe."** |
+| `sale-credit-payment-modal` | `SaleCreditOfflineService.paidSaleCredit` (`:81-97`) | `!saleCredit` (not found) | `SaleCreditErrors.NotExists` = **"El gasto no existe."** |
+| `edit-order-modal` | `OrderOfflineService.updateTodayOrder` (`order-offline.service.ts:342-352`) | `!order` (not found) | `OrderErrors.NotExists` = **"La orden no existe"** |
+
+In all three cases the "dynamic" description is **not actually dynamic** — each local-storage service method has exactly one failure branch (record not found), so the text shown is a single, known, static string per call site. Angular's title is `GENERAL.ERROR`, not `GENERAL.RESPONSE.ERROR_TITLE`.
+
+React (`edit-sale-credit-modal.tsx:49-52`, `edit-order-modal.tsx:47-51`, `sale-credit-payment-modal.tsx:67-71`) uses the correct title (`GENERAL.ERROR`) but shows `GENERAL.RESPONSE.ERROR500_MESSAGE` = **"Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico."** at all three sites — a generic, unrelated fallback message. Apply-progress's stated rationale for this choice ("React's services can't surface a dynamic description like Angular's `DataResult.errors[0].description`") does not hold up under inspection: the description is static and knowable per call site, not truly dynamic, so a generic fallback was an avoidable simplification rather than a forced tradeoff.
+
+**Exact expected Spanish (what Angular actually shows):**
+- `edit-sale-credit-modal.tsx` and `sale-credit-payment-modal.tsx` failure dialogs should show: title "Error", text **"El gasto no existe."**
+- `edit-order-modal.tsx` failure dialog should show: title "Error", text **"La orden no existe"**
+
+**Severity: WARNING** (confirmed text-parity miss on an edge-case failure path — only reachable if the underlying record is deleted/missing between load and submit — not a blocking regression to the primary happy-path flows, consistent with the severity given to the original W1/W2 findings). **Recommended fix:** add `SALE_CREDIT.NOT_EXISTS`/`ORDER.NOT_EXISTS`-equivalent i18n keys (or reuse existing ones if present) with the exact Spanish above, and have React's local `sale-credit-offline-service.ts`/`order-offline-service.ts` return a distinguishable not-found signal so the modals can show the specific message instead of the generic `ERROR500_MESSAGE` fallback.
+
+---
+
+## Findings Summary
+
+### CRITICAL
+None.
+
+### WARNING
+
+**W1 (was CRITICAL-tracked gap, now CLOSED)** — confirmed resolved, see "W1 Re-Verification" above.
+
+**W2 (was text-parity gap, now CLOSED)** — confirmed resolved, see "W2 Re-Verification" above.
+
+**NEW-W1 — `getAvailableQuantity`'s active-filter ordering diverges from Angular's `hasAvailableProductToSale` in an edge case (inventory entries exist but are all inactive), producing the wrong error message (`NOT_AVAILABLE` instead of Angular's `QUANTITY_NOT_AVAILABLE`) though blocking behavior itself is preserved.** `app/inventory/lib/services/inventory-offline-service.ts:323-327` vs `frontend/src/app/application/entries/inventory-offline.service.ts:410-419`. Newly introduced in commit `60b0e09`. Low practical impact (narrow edge case, does not allow overselling), but a confirmed code-level L6 text-parity deviation.
+
+**NEW-W2 — Confirmed ERROR500 text-parity miss at 3 call sites (edit-sale-credit-modal, edit-order-modal, sale-credit-payment-modal failure dialogs).** See "§4" section above for full detail and exact expected Spanish per site. Introduced in commit `fbdbafd`.
+
+### SUGGESTION
+
+Carried unchanged from the prior Stage 1 report (not re-litigated, no new evidence found this pass):
+- **S1** — `QuickSaleScannerComponent` confirmed dead code, correctly not ported; recommend adding to spec.md's ratified dead-code list.
+- **S2** — pre-existing hardcoded hex in `chart-core.tsx`/`landing-deep.*`, out of Stage 1 scope.
+
+---
+
+## Accepted-as-Superset (confirmed present, explicitly not flagged as failures per user direction)
+
+- CSV importer preview table + per-row validation (`csv-product-importer-modal.tsx`/`csv-product-parser.ts`) — Angular has only a file input; React's richer UI confirmed intact, text now Spanish.
+- Cart +/- and remove aria-labels (`cart-shell.tsx`) — Angular has none; React's a11y addition confirmed intact, text now Spanish.
+- `onSave`/`onPay`/`onUpdate`/`onDeactivateOrder` boolean-return contracts — confirmed as a faithful port of Angular's `DataResult.succeeded` branching, not an invented business rule.
+
+---
+
+## Scope Note
+
+This report covers **Stage 1 (Sales) RE-VERIFY only**, validated against code as of 2026-07-02 (commits `60b0e09`, `fbdbafd`). Stage 0 and the original Stage 1 formal pass are preserved unchanged above. Out of scope (per explicit direction): login "POS Management" copy (tasks.md 2.6.1), cart increase/decrease stock validation (tasks.md 2.5.1) — both remain Stage 2 carry-overs.
