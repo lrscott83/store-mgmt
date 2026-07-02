@@ -29,6 +29,7 @@
     "react-router": "^7.7.1",
     "recharts": "^2.15.3",
     "sweetalert2": "^11.26.25",
+    "workbox-window": "^7.4.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

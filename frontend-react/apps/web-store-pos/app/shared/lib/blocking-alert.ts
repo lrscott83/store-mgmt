@@ -73,3 +73,30 @@ export function showAcknowledgeError(options: AcknowledgeErrorOptions): void {
     confirmButtonText: options.confirmButtonText,
   });
 }
+
+/**
+ * Blocking "new version available" dialog. Mirrors Angular's
+ * `_services/update/update.service.ts` `showUpdateDialog()` VERBATIM (title, text, icon,
+ * `allowOutsideClick`/`allowEscapeKey: false`, `confirmButtonText`, `customClass`) — this is
+ * the ONE call site in Angular's Swal usage that hardcodes its Spanish text directly (no i18n
+ * key), so React does the same rather than routing it through `es.ts`. No cancel button:
+ * the user MUST confirm to update (or leave it running the stale version until next visit).
+ */
+export function showUpdateAvailable(onConfirm: () => void): Promise<void> {
+  return Swal.fire({
+    title: '¡Nueva versión disponible!',
+    text: 'Se ha detectado una nueva versión de la aplicación.',
+    icon: 'info',
+    showConfirmButton: true,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    confirmButtonText: 'Actualizar ahora',
+    customClass: {
+      confirmButton: 'swal2-confirm swal2-styled',
+    },
+  }).then((result) => {
+    if (result.isConfirmed) {
+      onConfirm();
+    }
+  });
+}

@@ -11,7 +11,12 @@ vi.mock('sweetalert2', () => ({
   default: { fire: (...args: unknown[]) => fireMock(...args) },
 }));
 
-import { confirmDialog, showAcknowledgeError, showBlockingError } from '../blocking-alert';
+import {
+  confirmDialog,
+  showAcknowledgeError,
+  showBlockingError,
+  showUpdateAvailable,
+} from '../blocking-alert';
 
 describe('showBlockingError', () => {
   afterEach(() => {
@@ -96,5 +101,44 @@ describe('showAcknowledgeError', () => {
       cancelButtonColor: '#dc3545',
       confirmButtonText: 'Ok',
     });
+  });
+});
+
+describe('showUpdateAvailable', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Angular: `_services/update/update.service.ts` `showUpdateDialog()` — icon 'info',
+  // allowOutsideClick/allowEscapeKey false (blocking, no cancel button), verbatim Spanish
+  // title/text, `confirmButtonText: 'Actualizar ahora'`.
+  it('fires the exact Angular "new version available" dialog and calls onConfirm when confirmed', async () => {
+    fireMock.mockResolvedValue({ isConfirmed: true });
+    const onConfirm = vi.fn();
+
+    await showUpdateAvailable(onConfirm);
+
+    expect(fireMock).toHaveBeenCalledWith({
+      title: '¡Nueva versión disponible!',
+      text: 'Se ha detectado una nueva versión de la aplicación.',
+      icon: 'info',
+      showConfirmButton: true,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      confirmButtonText: 'Actualizar ahora',
+      customClass: {
+        confirmButton: 'swal2-confirm swal2-styled',
+      },
+    });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT call onConfirm when the dialog is dismissed', async () => {
+    fireMock.mockResolvedValue({ isConfirmed: false });
+    const onConfirm = vi.fn();
+
+    await showUpdateAvailable(onConfirm);
+
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 });

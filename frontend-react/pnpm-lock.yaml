@@ -71,6 +71,9 @@ importers:
       sweetalert2:
         specifier: ^11.26.25
         version: 11.26.25
+      workbox-window:
+        specifier: ^7.4.1
+        version: 7.4.1
       zustand:
         specifier: ^5.0.3
         version: 5.0.13(@types/react@19.2.15)(react@19.2.6)
