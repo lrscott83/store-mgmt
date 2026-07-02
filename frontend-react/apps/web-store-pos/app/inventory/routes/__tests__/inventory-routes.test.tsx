@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { InventoryEntryView, Order, OrderItem, Product, ProductCategory } from '@store-mgmt/domain';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
+import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 
 // ─── Global mocks ────────────────────────────────────────────────────────────
 
@@ -219,6 +220,78 @@ function makeEgressProduct(overrides: Partial<Product> = {}): Product {
     ...overrides,
   };
 }
+
+// ─── InventoryTodaySalesProfitPage — product inclusion filter (Angular parity) ──────────────
+//
+// Angular's InventoryTodaySalesProfitComponent.loadProfitData() sources products via
+// `.filter(p => p.isActive && p.availableToSale)` only (inventory-today-sales-profit.component.ts:66-67)
+// — there is NO `discountFromInvantory` exclusion. A sold product with
+// `discountFromInvantory: false` is still counted in revenue/profit (its FIFO cost naturally
+// comes out to 0 via the eligibility-gated cost-alloc path, per Stage 2.1 L4 map gap #3a).
+
+describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular parity: no discountFromInvantory exclusion)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [];
+  });
+
+  it('includes a sold product with discountFromInvantory=false in the profit table and its totals', () => {
+    mockEgressProducts = [
+      makeEgressProduct({ id: 'p1', name: 'Ron', price: 10, discountFromInvantory: false }),
+    ];
+
+    const orderItem: OrderItem = {
+      productId: 'p1',
+      productName: 'Ron',
+      categoryId: 'cat-1',
+      categoryName: 'Bebidas',
+      name: 'Ron',
+      quantity: 5,
+      price: 10,
+      productBusinessId: 'biz-1',
+      productCosts: [],
+      order: 1,
+    };
+    const order: Order = {
+      id: 'o1',
+      orderItems: [orderItem],
+      total: 50,
+      itemsCount: 5,
+      date: new Date(),
+      type: OrderType.Normal,
+      paymentType: PaymentType.Efectivo,
+      isCredit: false,
+      description: '',
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+    };
+    vi.mocked(OrderOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
+        }) as unknown as InstanceType<typeof OrderOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+
+    // Product row renders: name, units sold, and revenue = profit = $50.00 (no cost, since
+    // no productCosts were recorded) — proves the discountFromInvantory=false product was
+    // NOT excluded and its sale is fully counted.
+    const row = screen.getByText('Ron').closest('tr');
+    expect(row).not.toBeNull();
+    expect(row).toHaveTextContent('5'); // unitsSold
+    expect(row).toHaveTextContent('$50.00'); // revenue
+    expect(row).toHaveTextContent('$0.00'); // cost (no productCosts)
+    // Total row reflects the same values since it's the only product/sale today.
+    const totalRow = screen.getByText('Total').closest('tr');
+    expect(totalRow).toHaveTextContent('$50.00');
+  });
+});
 
 import { EgressPage } from '../egress';
 

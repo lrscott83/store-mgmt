@@ -35,14 +35,18 @@ export function InventoryTodaySalesProfitPage() {
 
     const todayOrders = orderSvc.getActiveOrdersInDay(new Date());
 
-    // Aggregate profit per product, only items where discountFromInvantory === true
+    // Aggregate profit per sold product (Angular parity: no discountFromInvantory exclusion).
     const profitByProduct = new Map<string, ProfitRow>();
 
     for (const order of todayOrders) {
       for (const item of order.orderItems) {
         const product = productMap.get(item.productId);
-        // Spec §6.5, S-I8: exclude products where discountFromInvantory === false
-        if (!product?.discountFromInvantory) continue;
+        // Angular parity: inventory-today-sales-profit.component.ts:66-67 sources products
+        // via `.filter(p => p.isActive && p.availableToSale)` only — there is NO
+        // discountFromInvantory exclusion. A sold discountFromInvantory=false product IS
+        // counted in revenue/profit (its FIFO cost naturally comes out to 0 via the
+        // eligibility-gated cost-alloc path). Skip only if the product itself can't be found.
+        if (!product) continue;
 
         const profitResult: OrderProfitResult = calculateOrderProfit(item);
 
