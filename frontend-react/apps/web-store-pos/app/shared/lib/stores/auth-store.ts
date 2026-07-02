@@ -135,3 +135,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, isAuthenticated: false, error: null });
   },
 }));
+
+// AUTH-03 cold-boot fix: hydrate synchronously the moment this module is
+// first evaluated, so route loaders (`authLoader`, `featureLoader`, etc. —
+// `app/auth/routes/loaders.ts`) that call `useAuthStore.getState()` on the
+// very first render never observe the un-hydrated `{ user: null }` default.
+// `initialize()` only reads/writes localStorage and calls `set()`
+// synchronously (the AUTH-03 background `/me` refresh it may also kick off is
+// fire-and-forget) — so by the time ANY importer's own top-level code runs,
+// module evaluation of this file has already completed, which guarantees
+// ordering regardless of how React Router schedules loaders (parallel vs
+// sequential). This is the React port of Angular's `APP_INITIALIZER`
+// (`app.module.ts` → `AppInitService.Init()` → `AuthService.getUserByToken()`).
+//
+// SSR-safe: this app runs in SPA mode (`ssr:false` in `react-router.config.ts`)
+// so this file is only ever evaluated in the browser at runtime, but the
+// `typeof window` guard also keeps it safe to import from any Node-side
+// tooling (build-time module graph analysis, etc.) that never sees `window`.
+if (typeof window !== 'undefined') {
+  useAuthStore.getState().initialize();
+}
