@@ -2,7 +2,7 @@
 
 **Change:** frontend-parity-audit
 **Phase:** Apply (in progress)
-**Date:** 2026-07-01
+**Date:** 2026-07-02 (last update; created 2026-07-01)
 **Mode:** Hybrid (engram + openspec file)
 
 ---
@@ -292,7 +292,7 @@ a single-view slice).
   `OrderOfflineService`/`SaleCreditOfflineService` internals (offline order-creation flow
   confirmed intact and unmodified).
 
-### Status
+### Status (superseded by Batch 5 below — see "## Batch 5" section)
 
 4 batches complete (2 targeted UI/shell batches + Stage 1 Sales Products-view parity slice +
 Stage 1 Sales Sale/POS-view parity slice). Stage 1 (Sales) is STILL NOT fully done. Remaining
@@ -302,3 +302,178 @@ Today Sale Credits, Today Stats (Cuadre del día), Category Stats, and their mod
 (edit-order-modal, edit-sale-credit-modal, sale-credit-payment-modal — need Angular-vs-React
 diff passes same as Products/Sale). Ready for `sdd-verify` on the Products+Sale slices, or
 continue with the next Sales view per user direction.
+
+---
+
+## Batch 5 (2026-07-02) — Stage 1 Sales, ORDERS views strict Angular parity
+
+### What
+
+Strict Angular parity rebuild of the two Orders views + their shared components: Orders
+history (`orders.tsx`, Angular's `OrdersComponent`) and Today Orders (`today-orders.tsx`,
+Angular's `TodayOrdersComponent`), plus their shared `order-list.tsx` (Angular's
+`order-list.component`), `order-item-list.tsx` (Angular's `order-item-list.component`), and
+`edit-order-modal.tsx` (Angular's `edit-order-modal.component`). 1 work-unit commit
+(`6bc2b3d`, 702 insertions / 313 deletions across 8 files). No PR opened per explicit
+instruction (batch 5 of 5 so far, all direct commits). Branch: `feat/frontend-parity-audit`.
+
+### Why
+
+User explicitly requested strict Angular parity for the two Orders views as the next slice of
+Stage 1 (Sales), per the tasks artifact's L4/L5/L6 per-module template. The prior React
+implementation (`orders.tsx`/`today-orders.tsx`/`order-list.tsx`/`edit-order-modal.tsx`) was
+entirely React-invented: a date-range picker with no Angular equivalent, wrong Spanish texts
+(`ORDERS.TITLE`="Historial de pedidos" vs Angular's "Historial de Ventas"; `GENERAL.CONFIRM`
+key that doesn't exist in Angular's vocab at all), blue/cyan Tailwind classes instead of the
+purple token set, and an `EditOrderModal` that showed order metadata + an items table + a
+deactivate action — none of which exist in Angular's actual `edit-order-modal.component.html`
+(that modal is payment-type-only; order items/deactivate live in `order-item-list`).
+
+### Where (Batch 5 — this save)
+
+- `frontend-react/apps/web-store-pos/app/sales/routes/orders.tsx` — REWRITTEN. `Card`
+  title = `ORDERS.TITLE` ("Historial de Ventas") + order count badge + total. Two radio-group
+  filters mirroring Angular exactly: payment-type (Todas/Efectivo/Tarjeta/Zelle, driven by
+  `PaymentTypeUtils.getPaymentTypes()` — labels are the raw enum member names, NOT translated
+  in Angular's own template) and isCredit (Todas/Pagadas/Créditos, "Créditos" styled
+  `text-warning` matching Angular's `text-warning` span). Orders grouped by date
+  (`groupOrders`, ported 1:1 from Angular's `OrdersComponent.groupOrders`) into an accordion
+  of date panels (own local `expandedDateIds` Set, same toggle pattern as Products'
+  category-accordion). Each date panel wraps `OrderList` with NO `readOnly` prop passed
+  (Angular's `<app-order-list>` in `orders.component.html` has no `[readOnly]` binding, so it
+  stays at the default `true` — no edit/delete actions reachable from this view at all).
+  REMOVED: the entire date-range `<input type="date">` filter pair (Angular has none —
+  `loadOrdersFiltered` is always called with `startDate=null, endDate=null`).
+- `frontend-react/apps/web-store-pos/app/sales/routes/today-orders.tsx` — REWRITTEN. Same
+  `Card` + payment-type/isCredit radio filters as Orders, but flat (not grouped by date) —
+  matches Angular's `TodayOrdersComponent.loadTodayOrders()` (filter + sort only, no
+  grouping). `OrderList` rendered with `readOnly={false}` (Angular:
+  `[readOnly]="false"` explicit in `today-orders.component.html`), wiring `onEditOrder` to
+  open `EditOrderModal` and `onDeactivateOrder` to `OrderOfflineService.deactivate`. Empty
+  state intentionally uses `TODAY_STATS.NO_ORDER_FOUND` (NOT `TODAY_ORDERS.NO_ORDER_FOUND`) —
+  this is Angular's own literal source behavior at `today-orders.component.html:34`, a
+  same-text key mismatch preserved verbatim, not a React bug.
+- `frontend-react/apps/web-store-pos/app/sales/components/order-list.tsx` — REWRITTEN from a
+  flat order-button-list into an accordion-of-orders (Angular's `order-list.component.html`:
+  `mat-accordion multi`, one panel per order). Panel header: `HH:mm` time (native
+  `padStart`-based formatting, matching `date-fns format(date,'HH:mm')` output, no new
+  dependency added) + items count, payment-type icon (inline SVGs standing in for Angular's
+  `bi-*` Bootstrap Icon classes — no icon font is loaded in the React app), and
+  `getOrderTotal` computed from `orderItems` (price × quantity sum, NOT `order.total` —
+  matches Angular's `OrderListComponent.getOrderTotal` exactly, which recomputes rather than
+  trusting the stored total). Credit orders get a `border-warning` treatment (Angular:
+  `credit-order` CSS class via `getOrderBackgroundColor`). Expanding a panel renders
+  `OrderItemList`, forwarding `readOnly`/`onEditOrder`/`onDeactivateOrder`.
+- `frontend-react/apps/web-store-pos/app/sales/components/order-item-list.tsx` — REWRITTEN.
+  Matches Angular's `order-item-list.component.html`: optional action row (Editar always
+  when `!readOnly`; Eliminar/deactivate ONLY when `!readOnly && order.isActive` — Angular:
+  `@if (order?.isActive)` gates the delete button specifically, Editar has no such gate),
+  followed by a bare items table (name / quantity badge / line total) with NO header row
+  (Angular's markup has none). Deactivate requires a second click to confirm (mirrors
+  Angular's SweetAlert2 `Swal.fire({...showCancelButton...})` confirm gate — no SweetAlert2
+  equivalent exists in the React codebase, so this reuses the established two-step-inline-
+  confirm pattern from the prior `EditOrderModal`, now relocated here to match Angular's
+  actual component ownership of the deactivate action).
+- `frontend-react/apps/web-store-pos/app/sales/components/edit-order-modal.tsx` — REWRITTEN
+  down to Angular's actual scope: `edit-order-modal.component.html` is payment-type-ONLY —
+  no order metadata, no items list, no deactivate action (those all belong to
+  `order-item-list`, confirmed above). Title is Angular's literal (odd but verified) string
+  `SALE_CREDIT.PAYMENT_CREDIT` = "Venta por Cobrar" — not an order-specific title, an
+  apparent copy-paste artifact in Angular's own source, preserved byte-identical rather than
+  "fixed" (strict parity mandate: measure Angular, don't improve on it). Actions: Cerrar
+  (`GENERAL.CLOSE`) / Actualizar (`GENERAL.UPDATE`), both `Button variant="fab"` matching
+  Angular's `mat-fab extended color="primary"`. `onDeactivate` prop REMOVED from this
+  component's contract entirely (moved to `order-item-list`'s `onDeactivateOrder`).
+- `frontend-react/apps/web-store-pos/app/shared/lib/i18n/es.ts` — added exact Angular keys
+  byte-identical to `frontend/src/app/_modules/i18n/vocabs/es.ts`: `GENERAL.EDIT`='Editar',
+  `GENERAL.DELETE`='Eliminar', `GENERAL.UPDATE`='Actualizar', `GENERAL.YES`='Si',
+  `ORDERS.TITLE` corrected from the wrong "Historial de pedidos" to Angular's actual
+  "Historial de Ventas", `ORDERS.NO_ORDERS_FOUND`="No se encontró ninguna venta" (new key),
+  full `TODAY_ORDERS.*` block (HEADER/NO_ORDER_FOUND/SEND_TO_CART_CONFIRM_TITLE/
+  SEND_TO_CART_CONFIRM_MESSAGE/TEXT/ERROR_DELETING_ORDER/EDIT_ORDER/DELETE_ORDER/
+  DEACTIVATE_ORDER/ACTIVATE_ORDER — some not yet consumed by this batch's JSX, added for
+  completeness per the L6 flatten-diff method since they're live Angular keys in this
+  component family), `TODAY_STATS.NO_ORDER_FOUND`, `SALE_CREDIT.PAYMENT_CREDIT`. Pre-existing
+  `ORDERS.TODAY_TITLE`/`DATE`/`TOTAL`/`CREDIT_BADGE`/`EMPTY_STATE`/`DEACTIVATE*`/`DATE_FROM`/
+  `DATE_TO` keys are now ORPHANED (the old React-only implementation used them) — left in
+  place, not pruned, per the established no-instruction-to-prune-orphans precedent from
+  batches 3-4. `ORDERS.STATS_TITLE`/`ORDERS.ITEMS_COUNT`/`ORDERS.PAYMENT_TYPE`/`ORDERS.STATS.*`
+  are still LIVE (consumed by `today-stats.tsx`, out of this batch's scope) — confirmed NOT
+  orphaned, left untouched.
+- Test files: `order-components.test.tsx` — REWRITTEN (12 tests, was testing the old flat
+  `OrderList`/rich `EditOrderModal` APIs, now tests the accordion `OrderList` +
+  payment-type-only `EditOrderModal`). `sales-routes.test.tsx` — `OrdersPage`/
+  `TodayOrdersPage` describe blocks updated: exact-text assertions for the corrected Angular
+  headers/empty-states + radio-filter presence checks (was generic "renders without
+  crashing"/regex substring checks against wrong texts).
+
+### Removed / Relocated (strict parity — verified NOT in Angular's Orders/Today-Orders views)
+
+1. Date-range `<input type="date">` filter pair in `orders.tsx` — REMOVED, no Angular
+   equivalent (`loadOrdersFiltered` always passes `null, null` for start/end date).
+2. `EditOrderModal`'s order metadata block (date/total), items table
+   (`OrderItemList` rendered inside the old modal), and deactivate action/warning copy —
+   REMOVED from the modal, RELOCATED: items table + deactivate now live in
+   `order-item-list.tsx` (matches Angular's actual component boundary —
+   `edit-order-modal.component.html` never rendered an items list or had a delete button;
+   that was a React-only design that merged two separate Angular components' responsibilities
+   into one modal).
+3. `OrdersPage`'s edit/deactivate wiring — REMOVED entirely (Angular's Orders/history view
+   passes no `readOnly` prop to `<app-order-list>`, so it's always read-only; only Today
+   Orders is interactive, per Angular's explicit `[readOnly]="false"` binding).
+
+### TDD Cycle Evidence (Batch 5)
+
+| Task | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| OrderList (accordion) rewrite | wrote order-components.test.tsx's OrderList describe block (7 tests) against the new accordion API (`orders`, `readOnly`, `onEditOrder`, `onDeactivateOrder` props, `order-panel-toggle-{id}` testids) — components were rewritten in the same pass per Strict TDD's allowance for parity-rebuild batches (design.md: matrices are the audit unit; tests assert the target Angular-parity contract) | ran full order-components.test.tsx — 12/12 passed on first run against the rewritten components (confirms the rewrite matches the test-encoded contract with no drift) | none needed |
+| EditOrderModal (payment-type-only) rewrite | wrote EditOrderModal describe block (5 tests) asserting the literal `SALE_CREDIT.PAYMENT_CREDIT` title, payment-type radio defaulted to `order.paymentType`, `onUpdate`/`onClose` call contracts, and the REMOVED `onDeactivate` prop (no longer in the interface) | same run, 12/12 passed | none needed |
+| OrderItemList two-step deactivate confirm | covered by OrderList's "requires a second click to confirm deactivate" test — asserts `onDeactivateOrder` is NOT called on the first click, IS called with the order on the second | passed first run | none needed |
+| OrdersPage / TodayOrdersPage route rewrites | updated sales-routes.test.tsx's two describe blocks (10 tests total) with exact-text assertions for the corrected headers ("Historial de Ventas" / "Ventas del día") and empty states ("No se encontró ninguna venta" / "No se ha realizado ninguna venta en el día de hoy.") plus radio-filter presence checks | ran sales-routes.test.tsx — 10/10 passed first run | none needed |
+
+### Test/Build Results (Batch 5)
+
+- `pnpm exec tsc --noEmit` (web-store-pos): clean, zero errors.
+- `pnpm exec vitest run` (full suite, web-store-pos): 82 test files / 903 tests passed, 0
+  failed. Baseline before this batch: 82 files / 894 tests (Batch 4) → same file count (no
+  new test files added, existing ones rewritten/extended), +9 tests net (order-components.
+  test.tsx: 4 old tests -> 12 new; sales-routes.test.tsx: +3 net in the Orders/TodayOrders
+  blocks). Same pre-existing unrelated stderr noise from api-client.test.ts's AUTH-06 jsdom
+  navigation warning (not a failure, documented in batches 3-4 too).
+- `pnpm exec react-router build`: succeeded. Both `orders-DBu55wXB.js` and
+  `today-orders-Ih4fHeP-.js` chunks emitted (confirms both routes still build cleanly after
+  the rewrite). No errors or warnings introduced.
+
+### Workload / PR Boundary (Batch 5)
+
+- Mode: direct work-unit commit on `feat/frontend-parity-audit`, NO PR, per explicit user
+  instruction (same as batches 1-4).
+- 1 work-unit commit: `6bc2b3d` (702 insertions / 313 deletions across 8 files). Exceeds the
+  400-line single-PR review budget on raw insertion count; explicitly instructed as a
+  direct-commit, no-PR, single-slice batch (same accepted-exception pattern as batches 1-4).
+- Boundary: this batch = the two Orders views (`orders.tsx`, `today-orders.tsx`) + their
+  shared components (`order-list.tsx`, `order-item-list.tsx`, `edit-order-modal.tsx`) + their
+  i18n keys ONLY. Does NOT touch Sale Credits (`credits.tsx`/`today-credits.tsx`,
+  `edit-sale-credit-modal`, `sale-credit-payment-modal`), Today Stats (`today-stats.tsx`,
+  still reads the pre-existing `ORDERS.STATS_TITLE`/`ORDERS.ITEMS_COUNT`/`ORDERS.PAYMENT_TYPE`/
+  `ORDERS.STATS.*` keys unchanged), or Category Stats (`category-stats.tsx`) — those remain
+  Stage 1 Sales L4/L5/L6 work still pending. Does NOT touch `OrderOfflineService` internals
+  (only consumes its existing `getAll`/`getActiveOrdersInDay`/`update`/`deactivate` methods,
+  zero modification).
+
+### Status
+
+5 batches complete (2 targeted UI/shell batches + Stage 1 Sales Products-view parity slice +
+Stage 1 Sales Sale/POS-view parity slice + Stage 1 Sales Orders-views parity slice). Stage 1
+(Sales) is STILL NOT fully done. Remaining per the tasks artifact's Stage 1 template (L4
+functional diff + L5 visual + L6 i18n + verify), scoped to Sales module views not yet
+touched: Sale Credits (`credits.tsx`), Today Sale Credits (`today-credits.tsx`), Today Stats /
+Cuadre del día (`today-stats.tsx`), Category Stats (`category-stats.tsx`), and their modals
+(`edit-sale-credit-modal.tsx`, `sale-credit-payment-modal.tsx` — need their own
+Angular-vs-React diff passes, same as Products/Sale/Orders). Ready for `sdd-verify` on the
+Products+Sale+Orders slices, or continue with the next Sales view (Credits is the natural next
+slice — same order/payment-type radio-filter + accordion pattern established here should
+largely transfer) per user direction. Stage 1's full-module chained-PR delivery strategy
+(stacked-to-main vs feature-branch-chain) still needs an explicit decision from the
+orchestrator/user before a non-explicitly-scoped Stage 1 `sdd-apply` batch begins, per the
+tasks artifact's Review Workload Forecast.
