@@ -66,21 +66,51 @@ visual/token change, spot-check instead of new test.
   `ShoppingCartService`/inventory-availability-on-increase/decrease audit stays referenced
   under Stage 6 Sync (see 6.1 note below) — this reconciles the prior contradiction between
   explore.md (verify in Sales stage) and design.md/this file (routed cart service to Sync).
-  Deferred sub-item (NOT implemented here, candidate for Stage 2 Inventory or Stage 6 Sync):
-  inventory-availability validation on cart increase/decrease (Angular's
-  `ShoppingCartService.increaseCartItem` checks stock; React cart store is local-only).
+  Deferred sub-item (NOT implemented here): inventory-availability validation on cart
+  increase/decrease (Angular's `ShoppingCartService.increaseCartItem` checks stock; React
+  cart store is local-only). MOVED to Stage 2 (see 2.5) — it depends on
+  `InventoryOfflineService`/stock data that Stage 2 owns, so it is an Inventory dependency,
+  not a generic Sync one.
 - [x] 1.4 Verify: matrix all-green, tests pass, visual spot-check.
 
-NOTE: also resolve open question from Stage 0 — Angular's authenticated-root redirect
+NOTE: open question from Stage 0 — Angular's authenticated-root redirect
 (`'' -> /sales/sale` inside ClientLayoutComponent) has no React equivalent yet; React's index
-route always shows the public landing page regardless of auth state.
+route always shows the public landing page regardless of auth state. MOVED to Stage 2 (see
+2.6) — it is part of the login/auth carry-over, co-located there because the post-login
+`navigateToUserHome` branch depends on product-availability (Inventory) data.
 
 ## Stage 2 — Inventory
 
 - [ ] 2.1 L4 functional diff (app/inventory/**) + fix [TDD].
 - [ ] 2.2 L5 visual [VISUAL].
 - [ ] 2.3 L6 i18n.
-- [ ] 2.4 Verify.
+- [ ] 2.5 Inventory-availability cross-cutting wiring (CARRY-OVER pulled into Stage 2 from
+  Stage 1 / Stage 6 — depends on `InventoryOfflineService`/stock data this stage builds) [TDD]:
+  - [ ] 2.5.1 Cart increase/decrease stock validation (from 1.5 deferred sub-item): port
+    Angular `ShoppingCartService.increaseCartItem`/`decreaseCartItem` stock check
+    (`inventoryService.n(productId, qty)`) into the React cart flow; the local-only cart
+    store must validate available stock before increasing.
+  - [ ] 2.5.2 Sale/POS `checkAvailability` wiring (from Batch 4 flagged gap, apply-progress
+    ~L234-250): `SaleProductRow` already has the designed+tested `checkAvailability` callback
+    (10 tests, 2 for the gate); `sale.tsx` does NOT wire it. Wire
+    `InventoryOfflineService.hasAvailableStock` + the feature-gate
+    (`hasInventoryModuleAvailable()` AND `product.discountFromInvantory`) into `sale.tsx`. No
+    further `SaleProductRow`/`SaleCategoryProducts` changes needed.
+- [ ] 2.6 Login / auth parity (CARRY-OVER — login has no dedicated module stage; co-located
+  here because the post-login redirect depends on product-availability/Inventory data. NOTE:
+  2.6.1 is a pure guest-form view parity with NO Inventory dependency — placed here for
+  scheduling only, keep it clearly labeled as auth, not inventory) [TDD]:
+  - [ ] 2.6.1 Login form L4/L5 view parity: `app/auth/routes/login.tsx` +
+    `auth/components/auth-layout.tsx` vs Angular `layouts/guest/**` login form (functional +
+    visual/token parity). No inventory dependency.
+  - [ ] 2.6.2 Post-login `navigateToUserHome` product-availability branch: after login, a
+    non-admin user with NO available-to-sale products redirects to the products view (to add
+    products) instead of `/sales/sale`. Depends on `hasAnyAvailableToSaleProduct`
+    (product-availability). Partially flagged in prior memory as not-migrated.
+  - [ ] 2.6.3 Authenticated-root redirect (from Stage 1 NOTE / Stage 0 open question):
+    Angular's `'' -> /sales/sale` for an authenticated user; React's index route currently
+    always shows the public landing page. Reconcile.
+- [ ] 2.7 Verify (incl. 2.5 + 2.6 carry-overs): matrix all-green, tests pass, visual spot-check.
 
 ## Stage 3 — Expenses
 
@@ -114,12 +144,12 @@ route always shows the public landing page regardless of auth state.
 - [ ] 6.1 PWA cross-cutting audit: for each Angular _services/* (connection, download-manager, SW
   update, usage-tracker) determine React coverage - Angular has dedicated
   services, React coverage scattered/unconfirmed per design; build gap matrix per service.
-  SCOPE NOTE (resolved this batch): `_services/order/shopping-cart.service.ts` here is ONLY the
-  cross-cutting offline `ShoppingCartService`/inventory-availability-on-increase/decrease audit
-  (Angular's `increaseCartItem`/`decreaseCartItem` stock checks — React's cart store is
-  local-only and does not validate stock). The cart UI + POS checkout FLOW parity (dropdown,
-  payment/Vuelto, payment-type icons, credit gating, print-invoice toggle, validations) was
-  done in Stage 1 (see 1.5) — do NOT re-scope that here.
+  SCOPE NOTE: the cart UI + POS checkout FLOW parity (dropdown, payment/Vuelto, payment-type
+  icons, credit gating, print-invoice toggle, validations) was done in Stage 1 (see 1.5). The
+  `ShoppingCartService`/inventory-availability-on-increase/decrease stock check was MOVED to
+  Stage 2 (see 2.5.1) — it is an Inventory dependency, not a generic Sync one. Stage 6 keeps
+  ONLY the non-inventory PWA cross-cutting services (connection, download-manager, SW update,
+  usage-tracker). Do NOT re-scope the cart flow or the inventory-availability check here.
 - [ ] 6.2 Fix identified gaps, consolidate scattered React logic into dedicated services where missing
   [TDD].
 - [ ] 6.3 L4 functional diff (app/sync/**) + fix [TDD].
