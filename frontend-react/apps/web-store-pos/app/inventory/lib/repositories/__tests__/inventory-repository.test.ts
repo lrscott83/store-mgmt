@@ -31,7 +31,7 @@ describe('InventoryRepository', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('prod-1', [makeEntry('e1', 'prod-1')]);
       repo.saveAll(storeId, map);
-      const raw = localStorage.getItem('lizoft.store-inventoryentries-s1');
+      const raw = localStorage.getItem('lizoft.store-inventory-entries-s1');
       expect(raw).not.toBeNull();
     });
   });
@@ -58,7 +58,7 @@ describe('InventoryRepository', () => {
       map.set('prod-1', [entry]);
       repo.saveAll(storeId, map);
 
-      const raw = localStorage.getItem('lizoft.store-inventoryentries-s1');
+      const raw = localStorage.getItem('lizoft.store-inventory-entries-s1');
       const parsed = JSON.parse(raw!);
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed[0]).toHaveLength(2);

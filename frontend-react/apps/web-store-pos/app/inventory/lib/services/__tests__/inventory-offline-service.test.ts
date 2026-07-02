@@ -23,7 +23,7 @@ function makeEntry(id: string, productId: string, overrides: Partial<InventoryEn
 
 function seedInventory(storeId: string, map: Map<string, InventoryEntry[]>): void {
   const entries = Array.from(map.entries());
-  localStorage.setItem(`lizoft.store-inventoryentries-${storeId}`, JSON.stringify(entries));
+  localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, JSON.stringify(entries));
 }
 
 describe('InventoryOfflineService', () => {
@@ -252,7 +252,7 @@ describe('InventoryOfflineService', () => {
 
     it('persists to localStorage', () => {
       service.create('p1', 10, 1.5);
-      const raw = localStorage.getItem('lizoft.store-inventoryentries-s1');
+      const raw = localStorage.getItem('lizoft.store-inventory-entries-s1');
       expect(raw).not.toBeNull();
     });
 

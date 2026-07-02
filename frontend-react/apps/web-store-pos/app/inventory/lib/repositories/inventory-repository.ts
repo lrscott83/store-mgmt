@@ -5,7 +5,7 @@ export class InventoryRepository {
   constructor(private readonly storeId: string) {}
 
   private getStorageKey(storeId: string): string {
-    return StorageKeys.entityKey('inventoryentries', storeId);
+    return StorageKeys.entityKey('inventory-entries', storeId);
   }
 
   private reviveEntry(entry: InventoryEntry): InventoryEntry {

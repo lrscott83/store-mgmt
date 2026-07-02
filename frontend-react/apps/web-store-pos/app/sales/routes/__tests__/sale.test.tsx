@@ -248,7 +248,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       },
     ];
     localStorage.setItem(
-      'lizoft.store-inventoryentries-s1',
+      'lizoft.store-inventory-entries-s1',
       JSON.stringify([['p1', entries]]),
     );
 

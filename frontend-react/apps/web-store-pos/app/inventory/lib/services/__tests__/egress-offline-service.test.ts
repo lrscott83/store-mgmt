@@ -66,7 +66,7 @@ describe('EgressOfflineService', () => {
 
     it('does NOT touch inventory (Design Decision 4)', () => {
       // Create a raw inventory entry to verify it's not modified
-      const invKey = 'lizoft.store-inventoryentries-s1';
+      const invKey = 'lizoft.store-inventory-entries-s1';
       const map = [['p1', [{ id: 'e1', available: 10 }]]];
       localStorage.setItem(invKey, JSON.stringify(map));
 
@@ -93,7 +93,7 @@ describe('EgressOfflineService', () => {
     });
 
     it('does NOT modify inventory entries (Design Decision 4)', () => {
-      const invKey = 'lizoft.store-inventoryentries-s1';
+      const invKey = 'lizoft.store-inventory-entries-s1';
       const map = [['p1', [{ id: 'e1', available: 10 }]]];
       localStorage.setItem(invKey, JSON.stringify(map));
 
