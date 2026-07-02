@@ -119,13 +119,26 @@ describe('TodayOrdersPage — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows empty state when no orders today', () => {
+  it('shows the Angular header (Ventas del día) and empty state (reuses TODAY_STATS.NO_ORDER_FOUND)', () => {
     render(
       <Wrapper>
         <TodayOrdersPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/No hay pedidos/i)).toBeInTheDocument();
+    expect(screen.getByText('Ventas del día')).toBeInTheDocument();
+    expect(
+      screen.getByText('No se ha realizado ninguna venta en el día de hoy.'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders payment-type and isCredit radio filters', () => {
+    render(
+      <Wrapper>
+        <TodayOrdersPage />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Pagadas')).toBeInTheDocument();
+    expect(screen.getByText('Créditos')).toBeInTheDocument();
   });
 });
 
@@ -140,6 +153,16 @@ describe('OrdersPage — smoke render', () => {
       </Wrapper>,
     );
     expect(document.body).toBeTruthy();
+  });
+
+  it('shows the Angular header (Historial de Ventas) and empty state', () => {
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Historial de Ventas')).toBeInTheDocument();
+    expect(screen.getByText('No se encontró ninguna venta')).toBeInTheDocument();
   });
 });
 

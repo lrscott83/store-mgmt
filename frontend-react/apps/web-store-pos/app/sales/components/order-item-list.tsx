@@ -1,39 +1,88 @@
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { OrderItem } from '@store-mgmt/domain';
+import type { Order } from '@store-mgmt/domain';
+import { Button } from '~/shared/components/ui/button';
 
 interface OrderItemListProps {
-  items: OrderItem[];
+  order: Order;
+  /** Angular default is `true` (read-only, no actions) — set `false` to show Editar/Eliminar. */
+  readOnly?: boolean;
+  onEditOrder?: (order: Order) => void;
+  onDeactivateOrder?: (order: Order) => void;
 }
 
-export function OrderItemList({ items }: OrderItemListProps) {
+/**
+ * Matches Angular's `order-item-list.component.html`: optional action row
+ * (Editar / Eliminar, shown only when `readOnly` is false and only while the
+ * order `isActive`), followed by the order's item table (name, quantity,
+ * line total). No header row in Angular's markup — table body only.
+ */
+export function OrderItemList({
+  order,
+  readOnly = true,
+  onEditOrder,
+  onDeactivateOrder,
+}: OrderItemListProps) {
   const intl = useIntl();
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  if (items.length === 0) {
-    return (
-      <p className="text-sm text-gray-400">{intl.formatMessage({ id: 'ORDERS.EMPTY_STATE' })}</p>
-    );
+  function handleDeactivateClick() {
+    if (!confirmDeactivate) {
+      setConfirmDeactivate(true);
+      return;
+    }
+    onDeactivateOrder?.(order);
+    setConfirmDeactivate(false);
   }
 
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b text-left text-gray-500">
-          <th className="pb-1">{intl.formatMessage({ id: 'GENERAL.NAME' })}</th>
-          <th className="pb-1 text-right">{intl.formatMessage({ id: 'GENERAL.QUANTITY' })}</th>
-          <th className="pb-1 text-right">{intl.formatMessage({ id: 'GENERAL.PRICE' })}</th>
-          <th className="pb-1 text-right">{intl.formatMessage({ id: 'GENERAL.TOTAL' })}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item, idx) => (
-          <tr key={idx} className="border-b last:border-0">
-            <td className="py-1">{item.productName}</td>
-            <td className="py-1 text-right">{item.quantity}</td>
-            <td className="py-1 text-right">${item.price.toFixed(2)}</td>
-            <td className="py-1 text-right">${(item.price * item.quantity).toFixed(2)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="space-y-2">
+      {!readOnly && (
+        <div className="flex justify-end gap-2">
+          <Button variant="fab" onClick={() => onEditOrder?.(order)} data-testid="edit-order-button">
+            {/* GENERAL.EDIT */}
+            {intl.formatMessage({ id: 'GENERAL.EDIT' })}
+          </Button>
+          {order.isActive && (
+            <Button
+              variant="danger"
+              onClick={handleDeactivateClick}
+              data-testid="deactivate-order-button"
+            >
+              {/* GENERAL.DELETE */}
+              {confirmDeactivate
+                ? intl.formatMessage({ id: 'GENERAL.YES' })
+                : intl.formatMessage({ id: 'GENERAL.DELETE' })}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {order.orderItems && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <tbody>
+              {order.orderItems.map((item, idx) => (
+                <tr key={idx} className="border-b border-border last:border-0">
+                  <td className="p-2">
+                    <span className="font-semibold text-text">{item.name}</span>
+                  </td>
+                  <td className="p-2 text-right">
+                    <span className="rounded-full bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary">
+                      {item.quantity}
+                    </span>
+                  </td>
+                  <td className="p-2 text-right">
+                    <span className="font-semibold text-text">
+                      ${(item.price * item.quantity).toFixed(2)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

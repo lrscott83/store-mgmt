@@ -1,108 +1,206 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Order } from '@store-mgmt/domain';
 import { EFeatures, PaymentType } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Card } from '~/shared/components/ui/card';
+import { InfoBox } from '~/shared/components/ui/info-box';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { OrderList } from '../components/order-list';
-import { EditOrderModal } from '../components/edit-order-modal';
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
-function defaultDateRange(): { from: string; to: string } {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
-  };
+interface DateOrder {
+  date: Date;
+  orders: Order[];
+  count: number;
+  total: number;
 }
 
+const PAYMENT_TYPE_OPTIONS = [
+  { value: PaymentType.Efectivo, label: 'Efectivo' },
+  { value: PaymentType.Tarjeta, label: 'Tarjeta' },
+  { value: PaymentType.Zelle, label: 'Zelle' },
+];
+
+function groupOrders(orders: Order[]): DateOrder[] {
+  const groups = new Map<string, Order[]>();
+  orders.forEach((order) => {
+    const groupId = new Date(order.date).toISOString().split('T')[0];
+    const collection = groups.get(groupId);
+    if (collection) collection.push(order);
+    else groups.set(groupId, [order]);
+  });
+
+  const dateOrders: DateOrder[] = Array.from(groups.values()).map((groupOrders) => ({
+    date: groupOrders[0].date,
+    orders: [...groupOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    count: groupOrders.length,
+    total: groupOrders.reduce((total, o) => total + o.total, 0),
+  }));
+
+  return dateOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+function formatDateOnly(date: Date): string {
+  const d = new Date(date);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Matches Angular's `orders.component.html` (Historial de Ventas): payment-type
+ * + isCredit radio filters, orders grouped by day into an accordion, each date
+ * panel wraps `OrderList` (read-only, no edit/delete actions — Angular's
+ * `app-order-list` here has no `[readOnly]` binding, default `true`). No date
+ * range picker exists in Angular; the React-only range inputs are removed.
+ */
 export function OrdersPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const [range, setRange] = useState(defaultDateRange());
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [dateOrders, setDateOrders] = useState<DateOrder[]>([]);
+  const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
+  const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
+  const [isCredit, setIsCredit] = useState<number>(-1);
 
   function loadOrders() {
     const service = new OrderOfflineService(storeId);
-    const from = new Date(range.from);
-    const to = new Date(range.to);
-    to.setHours(23, 59, 59, 999);
-    setOrders(service.getByDateRange(from, to));
+    const filtered = service
+      .getAll()
+      .filter((o) => o.isActive)
+      .filter((o) => !paymentType || paymentType === o.paymentType)
+      .filter((o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit));
+    setDateOrders(groupOrders(filtered));
   }
 
   useEffect(() => {
     loadOrders();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, range.from, range.to]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, paymentType, isCredit]);
 
-  async function handleDeactivate(orderId: string) {
-    const service = new OrderOfflineService(storeId);
-    try {
-      await service.deactivate(orderId);
-      loadOrders();
-    } catch (err) {
-      console.error(err);
-    }
-    setSelectedOrder(null);
+  function toggleDatePanel(dateId: string) {
+    setExpandedDateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateId)) next.delete(dateId);
+      else next.add(dateId);
+      return next;
+    });
   }
 
-  async function handleUpdate(orderId: string, paymentType: PaymentType) {
-    const service = new OrderOfflineService(storeId);
-    try {
-      service.update(orderId, paymentType);
-      loadOrders();
-    } catch (err) {
-      console.error(err);
-    }
-    setSelectedOrder(null);
-  }
+  const ordersCount = dateOrders.reduce((count, d) => count + d.count, 0);
+  const ordersTotal = dateOrders.reduce((total, d) => total + d.total, 0);
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'ORDERS.TITLE' })}</h1>
-
-      {/* Date range filter */}
-      <div className="flex gap-3">
-        <div>
-          <label className="mb-1 block text-xs text-gray-500">
-            {intl.formatMessage({ id: 'ORDERS.DATE_FROM' })}
-          </label>
-          <input
-            type="date"
-            value={range.from}
-            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-            className="rounded border px-2 py-1 text-sm"
-          />
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            {/* ORDERS.TITLE */}
+            {intl.formatMessage({ id: 'ORDERS.TITLE' })}
+            <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+              ({ordersCount})
+            </span>
+          </span>
+          <span className="text-sm font-semibold text-text">${ordersTotal.toFixed(2)}</span>
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-gray-500">
-            {intl.formatMessage({ id: 'ORDERS.DATE_TO' })}
-          </label>
+      }
+    >
+      <fieldset className="mb-3 flex flex-wrap gap-4">
+        <label className="flex items-center gap-1 text-sm text-text">
           <input
-            type="date"
-            value={range.to}
-            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-            className="rounded border px-2 py-1 text-sm"
+            type="radio"
+            name="paymentType"
+            checked={paymentType === null}
+            onChange={() => setPaymentType(null)}
+            className="accent-primary"
           />
-        </div>
-      </div>
+          Todas
+        </label>
+        {PAYMENT_TYPE_OPTIONS.map((opt) => (
+          <label key={opt.value} className="flex items-center gap-1 text-sm text-text">
+            <input
+              type="radio"
+              name="paymentType"
+              checked={paymentType === opt.value}
+              onChange={() => setPaymentType(opt.value)}
+              className="accent-primary"
+            />
+            {opt.label}
+          </label>
+        ))}
+      </fieldset>
 
-      <OrderList orders={orders} onOrderClick={setSelectedOrder} />
+      <fieldset className="mb-4 flex flex-wrap gap-4">
+        <label className="flex items-center gap-1 text-sm text-text">
+          <input
+            type="radio"
+            name="isCredit"
+            checked={isCredit === -1}
+            onChange={() => setIsCredit(-1)}
+            className="accent-primary"
+          />
+          Todas
+        </label>
+        <label className="flex items-center gap-1 text-sm text-text">
+          <input
+            type="radio"
+            name="isCredit"
+            checked={isCredit === 0}
+            onChange={() => setIsCredit(0)}
+            className="accent-primary"
+          />
+          Pagadas
+        </label>
+        <label className="flex items-center gap-1 text-sm text-text">
+          <input
+            type="radio"
+            name="isCredit"
+            checked={isCredit === 1}
+            onChange={() => setIsCredit(1)}
+            className="accent-primary"
+          />
+          <span className="text-warning">Créditos</span>
+        </label>
+      </fieldset>
 
-      {selectedOrder && (
-        <EditOrderModal
-          order={selectedOrder}
-          isOpen={true}
-          onClose={() => setSelectedOrder(null)}
-          onDeactivate={handleDeactivate}
-          onUpdate={handleUpdate}
-        />
+      {dateOrders.length === 0 && (
+        <InfoBox variant="primary" className="mb-6 text-center">
+          {/* ORDERS.NO_ORDERS_FOUND */}
+          {intl.formatMessage({ id: 'ORDERS.NO_ORDERS_FOUND' })}
+        </InfoBox>
       )}
-    </div>
+
+      <div className="space-y-2">
+        {dateOrders.map((dateOrder) => {
+          const dateId = new Date(dateOrder.date).toISOString().split('T')[0];
+          const isExpanded = expandedDateIds.has(dateId);
+          return (
+            <div key={dateId} className="rounded-lg border border-border bg-surface">
+              <button
+                type="button"
+                onClick={() => toggleDatePanel(dateId)}
+                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                data-testid={`date-panel-toggle-${dateId}`}
+                aria-expanded={isExpanded}
+              >
+                <span className="text-sm font-medium text-text">
+                  {formatDateOnly(dateOrder.date)} ({dateOrder.count})
+                </span>
+                <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
+              </button>
+              {isExpanded && (
+                <div className="border-t border-border px-4 py-3">
+                  <OrderList orders={dateOrder.orders} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 

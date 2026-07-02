@@ -19,6 +19,10 @@ const messages: Record<string, string> = {
   'GENERAL.SUCCESS': 'Éxito',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
   'GENERAL.LOGOUT': 'Salir',
+  'GENERAL.EDIT': 'Editar',
+  'GENERAL.DELETE': 'Eliminar',
+  'GENERAL.UPDATE': 'Actualizar',
+  'GENERAL.YES': 'Si',
 
   // Auth
   'AUTH.SIGN_IN': 'Iniciar sesión',
@@ -170,8 +174,13 @@ const messages: Record<string, string> = {
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',
   'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO': '{name} mínimo valor es 0',
 
-  // Orders
-  'ORDERS.TITLE': 'Historial de pedidos',
+  // Orders (Angular ORDERS.* — vocabs/es.ts. ORDERS.TITLE fixed to the exact Angular
+  // string; ORDERS.TODAY_TITLE/DATE/TOTAL/CREDIT_BADGE/EMPTY_STATE/DEACTIVATE*/DATE_FROM/
+  // DATE_TO are now orphaned — the old React-only Orders/TodayOrders implementation used
+  // them, replaced this batch by strict Angular parity. Left in place, not pruned, per
+  // established no-instruction-to-prune-orphans precedent).
+  'ORDERS.TITLE': 'Historial de Ventas',
+  'ORDERS.NO_ORDERS_FOUND': 'No se encontró ninguna venta',
   'ORDERS.TODAY_TITLE': 'Pedidos de hoy',
   'ORDERS.STATS_TITLE': 'Estadísticas de hoy',
   'ORDERS.DATE': 'Fecha',
@@ -187,6 +196,28 @@ const messages: Record<string, string> = {
   'ORDERS.DATE_TO': 'Hasta',
   'ORDERS.STATS.REVENUE': 'Ingresos totales',
   'ORDERS.STATS.ITEMS_SOLD': 'Artículos vendidos',
+
+  // Today Orders (Angular TODAY_ORDERS.* — vocabs/es.ts)
+  'TODAY_ORDERS.HEADER': 'Ventas del día',
+  'TODAY_ORDERS.NO_ORDER_FOUND': 'No se ha realizado ninguna venta en el día de hoy.',
+  'TODAY_ORDERS.SEND_TO_CART_CONFIRM_TITLE': 'Confirmación para volver a vender',
+  'TODAY_ORDERS.SEND_TO_CART_CONFIRM_MESSAGE': 'Hay una venta en proceso. ¿Desea eliminar esa venta y continuar?',
+  'TODAY_ORDERS.TEXT': 'Venta',
+  'TODAY_ORDERS.ERROR_DELETING_ORDER': 'Ocurrió un error eliminando la venta. {message}',
+  'TODAY_ORDERS.EDIT_ORDER': 'Editar Venta',
+  'TODAY_ORDERS.DELETE_ORDER': 'Eliminar Venta',
+  'TODAY_ORDERS.DEACTIVATE_ORDER': 'Cancelar Venta',
+  'TODAY_ORDERS.ACTIVATE_ORDER': 'Activar Venta',
+
+  // Today Stats (Angular TODAY_STATS.* — vocabs/es.ts. today-orders.component.html reuses
+  // TODAY_STATS.NO_ORDER_FOUND for its own empty state, not TODAY_ORDERS.NO_ORDER_FOUND —
+  // that is Angular's literal source behavior, preserved here)
+  'TODAY_STATS.NO_ORDER_FOUND': 'No se ha realizado ninguna venta en el día de hoy.',
+
+  // Sale Credit (Angular SALE_CREDIT.* — vocabs/es.ts. PAYMENT_CREDIT is Angular's literal
+  // edit-order-modal.component.html title, reused verbatim even though it reads oddly for
+  // an order-payment-type modal — matches Angular's actual source, not a paraphrase)
+  'SALE_CREDIT.PAYMENT_CREDIT': 'Venta por Cobrar',
 
   // Credits
   'CREDITS.TITLE': 'Historial de créditos',
