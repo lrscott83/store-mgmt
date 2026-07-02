@@ -2,7 +2,7 @@
 
 **Change:** frontend-parity-audit
 **Phase:** Apply (in progress)
-**Date:** 2026-07-02 (last update; created 2026-07-01)
+**Date:** 2026-07-02 (last update: Batch 6, Sale Credits views; created 2026-07-01)
 **Mode:** Hybrid (engram + openspec file)
 
 ---
@@ -477,3 +477,184 @@ largely transfer) per user direction. Stage 1's full-module chained-PR delivery 
 (stacked-to-main vs feature-branch-chain) still needs an explicit decision from the
 orchestrator/user before a non-explicitly-scoped Stage 1 `sdd-apply` batch begins, per the
 tasks artifact's Review Workload Forecast.
+
+---
+
+## Batch 6 — Stage 1 Sales, SALE CREDITS views strict Angular parity
+
+### What (Batch 6)
+
+Strict Angular parity rebuild of the two Sale Credits views + their shared list + both
+modals: `credits.tsx` (Angular `SaleCreditsComponent` — "Créditos" history),
+`today-credits.tsx` (Angular `TodaySaleCreditsComponent` — "Créditos del día"),
+`sale-credit-list.tsx` (Angular `SaleCreditListComponent`), `edit-sale-credit-modal.tsx`
+(Angular `EditSaleCreditModalComponent`), `sale-credit-payment-modal.tsx` (Angular
+`SaleCreditPaymentModalComponent`). 1 work-unit commit (`c1b8617`, 708 insertions / 439
+deletions across 8 files: 6 source + 2 test files). No PR opened per explicit instruction
+(same as batches 1-5). Branch: `feat/frontend-parity-audit`.
+
+### Why (Batch 6)
+
+User explicitly requested strict Angular parity for the Sale Credits views as the next Stage
+1 (Sales) slice. The prior React implementation was entirely React-invented: a date-range
+picker with no Angular equivalent, paid/unpaid filter buttons with no Angular equivalent
+(Angular's `SaleCreditsComponent.loadSaleCredits()` always calls `filterSaleCredits(null,
+null, null, null)` — no filter UI exists at all), wrong Spanish texts under a `CREDITS.*`
+namespace that doesn't exist in Angular's vocab (Angular uses `SALE_CREDIT.*`), blue/cyan
+Tailwind classes instead of the purple token set, and both modals merged into a
+card-style-button UI instead of Angular's actual field layout (Angular's edit modal shows a
+"Pagar: {total}" line + client/note fields with a **Pagar** submit button — not
+Actualizar/Guardar; the payment modal shows "Cliente: {client}" + "Pagar: {total}" + a
+payment-type select, gated behind a SweetAlert2 confirm before actually submitting).
+
+### Where (Batch 6)
+
+- `app/sales/routes/credits.tsx` — REWRITTEN. Card title = `SALE_CREDIT.TITLE` ("Créditos")
+  + unpaid-credits-count badge + unpaid-credits-total (danger/red text) — both computed
+  exactly like Angular's `getSaleCreditsCount()`/`getSaleCreditsTotal()` (count/sum only
+  credits where `!isPaid`). NO filters at all (Angular's history view has none). Credits
+  grouped by date (`groupSaleCredits`, ported 1:1 from Angular's
+  `SaleCreditsComponent.groupSaleCredits`) into an accordion of date panels; each date panel
+  wraps `SaleCreditList` with NO `readOnly` prop passed (Angular's `<app-sale-credit-list>`
+  in `sale-credits.component.html` has no `[readOnly]` binding → stays default `true`, no
+  edit/pay actions reachable from this view at all). REMOVED: the entire date-range
+  `<input type="date">` filter pair AND the paid/unpaid radio-style filter buttons — neither
+  has an Angular equivalent.
+- `app/sales/routes/today-credits.tsx` — REWRITTEN. Card title = `SALE_CREDIT.TODAY_CREDITS`
+  ("Créditos del día"), no count/total in the header (Angular's `today-sale-credits.
+  component.html` card-toolbar is empty), flat (not grouped) list of today's active credits.
+  `SaleCreditList` rendered with `readOnly={false}` (Angular: `[readOnly]="false"` explicit),
+  wiring `onSave`→`SaleCreditOfflineService.update` and `onPay`→
+  `SaleCreditOfflineService.pay`. Empty state uses `SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY`
+  ("No existe ningún crédito en el día").
+- `app/sales/components/sale-credit-list.tsx` — REWRITTEN from a card-button list into a
+  bare table (Angular's `sale-credit-list.component.html`: `<table>` with NO header row).
+  Columns: client name, total (colored `text-success` when `isPaid` else `text-danger` —
+  matches `getSaleCreditClassName` exactly), paid-date label (only rendered when `isPaid`,
+  `dd/MM/yyyy` via `GlobalConfig.ONLY_DATE_FORMAT`), and an optional actions column (only
+  when `!readOnly`): a settings-icon button opening a menu with **Editar** (always) and
+  **Pagar** (`SALE_CREDIT.TO_PAY`, only when `!saleCredit.paid` — falsy check, not
+  `!isPaid`, matches Angular's `@if (!saleCredit.paid)` exactly, so a partially-touched
+  `paid` value also hides the action). Angular opens BOTH `EditSaleCreditModalComponent` AND
+  `SaleCreditPaymentModalComponent` from `SaleCreditListComponent` itself (not the parent
+  page) — mirrored here by owning both modals' open/close state locally in
+  `SaleCreditList`, matching Angular's actual component ownership (same lesson as Orders
+  batch's `edit-order-modal`, but inverted: there the page over-owned a modal that belonged
+  to a child component; here modals were previously mis-hosted at the page level instead of
+  the list).
+- `app/sales/components/edit-sale-credit-modal.tsx` — REWRITTEN to Angular's actual field
+  set: a "Pagar: {total}" line, then `client` (required) + `note` (optional) fields only —
+  no payment-type field (that is `SaleCreditPaymentModalComponent`'s job). Title is
+  Angular's literal `SALE_CREDIT.PAYMENT_CREDIT` = "Venta por Cobrar" (Angular reuses this
+  same key across all three modals — edit-order, edit-sale-credit, and sale-credit-payment —
+  an apparent copy-paste artifact in Angular's own source, preserved byte-identical per
+  strict-parity: measure Angular, don't improve on it). Actions: Cerrar (`GENERAL.CLOSE`) /
+  **Pagar** (`SALE_CREDIT.TO_PAY` — Angular's own submit button literally reads "Pagar" on
+  this client/note-only form even though `onSubmit()` only updates client/note, not payment;
+  preserved verbatim, flagged as an odd-but-real Angular source quirk, not fixed).
+- `app/sales/components/sale-credit-payment-modal.tsx` — REWRITTEN to Angular's actual
+  layout: same `SALE_CREDIT.PAYMENT_CREDIT` title, "Cliente: {client}" + "Pagar: {total}"
+  literal lines, a "Forma de Pago" `<select>` (payment type, defaults to `Efectivo`, raw
+  enum-member-name options exactly like `order-list`/`edit-order-modal` precedent — Angular's
+  own template does not translate these labels), and a `GENERAL.NOTE` textarea. Angular
+  gates the actual submit behind a SweetAlert2 confirm dialog (`PAYMENT_CONFIRM_TITLE`/
+  `PAYMENT_CONFIRM_MESSAGE`, Sí/No) — no SweetAlert2 equivalent exists in React, so this
+  reuses the established two-step-inline-confirm pattern from `order-item-list`'s deactivate
+  action (first click arms confirmation, button label flips to `GENERAL.YES`, second click
+  actually calls `onConfirm`).
+- `app/shared/lib/i18n/es.ts` — REPLACED the entire React-only `CREDITS.*` block with exact
+  Angular `SALE_CREDIT.*` keys byte-identical to `frontend/src/app/_modules/i18n/vocabs/
+  es.ts`: `SALE_CREDIT.TITLE`='Créditos', `SALE_CREDIT.TODAY_CREDITS`='Créditos del día',
+  `SALE_CREDIT.TO_PAY`='Pagar', `SALE_CREDIT.PAYMENT_CREDIT`='Venta por Cobrar' (already
+  present from the Orders batch, reused), `SALE_CREDIT.PAYMENT_CONFIRM_TITLE`='Confirmación
+  de Pago', `SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE`='Usted está segura(o) que desea pagar este
+  crédito por venta?' (documented for parity even though the SweetAlert2-based confirm text
+  isn't rendered directly, since the inline confirm replaces it), `SALE_CREDIT.
+  NO_SALE_CREDIT_FOUND_IN_DAY`='No existe ningún crédito en el día`, `SALE_CREDIT.
+  NO_SALE_CREDIT_FOUND`='No se encontró ningún crédito'. Added missing `GENERAL.CLIENT`=
+  'Cliente', `GENERAL.NOTE`='Nota', `GENERAL.NO`='No' (Angular's SweetAlert2 cancel button
+  text, added for completeness even though the inline-confirm pattern doesn't render a
+  distinct No button — GENERAL.YES already existed for the confirm-click label). All old
+  `CREDITS.*` keys REMOVED (were exclusively consumed by the files rewritten in this batch,
+  confirmed via grep before removal — zero orphans).
+- Test files: `credit-components.test.tsx` REWRITTEN (19 tests, was 7 testing the old
+  card-button `SaleCreditList`/rich `EditSaleCreditModal` APIs — now tests the table
+  `SaleCreditList` with actions-menu, the client/note-only `EditSaleCreditModal`, and the
+  payment-type-select + two-step-confirm `SaleCreditPaymentModal`). `sales-routes.test.tsx`
+  — `TodaySaleCreditsPage`/`SaleCreditsPage` describe blocks updated with exact-text
+  assertions for the corrected Angular headers/empty-states + confirm neither view renders
+  any radio filter or date-range input; mocked `SaleCreditOfflineService` updated to drop
+  the removed `getByDateRange` method (route now uses `getAll().filter(isActive)`, matching
+  the `OrderOfflineService`/`OrdersPage` precedent from the Orders batch instead of a
+  dedicated range-query method).
+
+### Removed / Relocated (Batch 6, strict parity)
+
+1. Date-range `<input type="date">` filter pair in `credits.tsx` — REMOVED, no Angular
+   equivalent (`loadSaleCreditsFiltered` is always called with `null, null` for both dates
+   from `loadSaleCredits()`).
+2. Paid/unpaid filter buttons (`CREDITS.FILTER.ALL/PAID/UNPAID`) in `credits.tsx` — REMOVED
+   entirely, no Angular equivalent (no filter UI in `sale-credits.component.html` at all).
+3. `EditSaleCreditModal`'s payment-type selector and standalone "Registrar pago"/"Cancelar"
+   action row — REMOVED from the modal; payment now lives exclusively in
+   `SaleCreditPaymentModal`, matching Angular's actual two-separate-modals boundary (the old
+   React modal had merged both responsibilities into one).
+4. `SaleCreditsPage`/`TodaySaleCreditsPage`'s direct modal-open wiring at the page level —
+   REMOVED, RELOCATED into `SaleCreditList` (Angular opens both modals from
+   `SaleCreditListComponent`, not the parent page).
+5. `SaleCreditOfflineService.getByDateRange` usage in `credits.tsx` — REMOVED in favor of
+   `getAll().filter(c => c.isActive)`, matching Angular's `getStorageActiveSaleCredits()`
+   filtering and the established `OrderOfflineService`/`OrdersPage` precedent (service
+   method itself untouched, zero modification — only the route's consumption changed).
+
+### TDD Cycle Evidence (Batch 6)
+
+| Task | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| SaleCreditList (table + actions menu) rewrite | wrote credit-components.test.tsx's SaleCreditList describe block (7 tests) against the new table API (`saleCredits`, `readOnly`, testids `sale-credit-actions-toggle-{id}`), confirmed RED (old card-button component had no such API) | ran full suite — 32/32 passed on first run against the rewritten component | none needed |
+| EditSaleCreditModal (client/note-only, Pagar submit) rewrite | wrote EditSaleCreditModal describe block (6 tests) asserting literal `SALE_CREDIT.PAYMENT_CREDIT` title, prefilled client/note, required-client validation message, `onSave`/`onClose` contracts via testids (not label text, since the submit button reads "Pagar" not "Actualizar") | same run, 32/32 passed | none needed |
+| SaleCreditPaymentModal (payment-type select + two-step confirm) rewrite | wrote SaleCreditPaymentModal describe block (6 tests) asserting literal title, client/total display, `Efectivo` default via `getByLabelText('Forma de Pago')`, and the two-click confirm gate (`onConfirm` not called on first click, called with `(id, paymentType, note)` on second) | same run, 32/32 passed | none needed |
+| SaleCreditsPage / TodaySaleCreditsPage route rewrites | updated sales-routes.test.tsx (13 tests total for these two describes) with exact-text header/empty-state assertions + confirmed zero radio/date-input elements render; updated the shared `SaleCreditOfflineService` mock to drop `getByDateRange` | ran sales-routes.test.tsx — 13/13 passed first run | none needed |
+
+### Test/Build Results (Batch 6)
+
+- `pnpm exec tsc --noEmit` (web-store-pos): clean, zero errors.
+- `pnpm exec vitest run` (full suite): 82 test files / 918 tests passed, 0 failed. Baseline
+  before this batch: 82 files / 903 tests (Batch 5) → same file count, +15 tests net
+  (credit-components.test.tsx: 7 old tests -> 19 new; sales-routes.test.tsx: +3 net in the
+  TodaySaleCreditsPage/SaleCreditsPage blocks). Same pre-existing unrelated stderr noise from
+  api-client.test.ts's AUTH-06 jsdom navigation warning (documented in batches 3-5 too, not a
+  failure).
+- `pnpm exec react-router build`: succeeded. Both `credits`/`today-credits` route chunks and
+  a dedicated `sale-credit-list-CaGSjS05.js` chunk emitted. No errors/warnings introduced.
+
+### Workload / PR Boundary (Batch 6)
+
+- Mode: direct work-unit commit on `feat/frontend-parity-audit`, NO PR, per explicit user
+  instruction (same as batches 1-5).
+- 1 work-unit commit: `c1b8617` (708 insertions / 439 deletions across 8 files). Exceeds the
+  400-line single-PR review budget on raw insertion count; explicitly instructed as a
+  direct-commit, no-PR, single-slice batch (same accepted-exception pattern as prior
+  batches).
+- Boundary: this batch = the two Sale Credits views (`credits.tsx`, `today-credits.tsx`) +
+  their shared list (`sale-credit-list.tsx`) + both modals (`edit-sale-credit-modal.tsx`,
+  `sale-credit-payment-modal.tsx`) + their i18n keys ONLY. Does NOT touch Today Stats /
+  Cuadre del día (`today-stats.tsx`, unchanged — still reads pre-existing `ORDERS.STATS_*`
+  keys) or Category Stats (`category-stats.tsx`, unchanged) — Stage 1 Sales L4/L5/L6 work
+  still pending on those two views. Does NOT touch `SaleCreditOfflineService` internals
+  (only consumes existing `getAll`/`getActiveToday`/`update`/`pay` methods, zero
+  modification).
+
+### Status (Batch 6)
+
+6 batches complete (2 targeted UI/shell batches + Stage 1 Sales Products-view + Sale/POS-view
++ Orders-views + Sale-Credits-views parity slices). Stage 1 (Sales) is STILL NOT fully done.
+Remaining per the tasks artifact's Stage 1 template, scoped to the two Sales views not yet
+touched: Today Stats / Cuadre del día (`today-stats.tsx`) and Category Stats
+(`category-stats.tsx`) — both need their own Angular-vs-React L4/L5/L6 diff passes before
+Stage 1 can be marked parity-complete and moved to `sdd-verify`. Ready to continue with
+Today Stats and Category Stats as the final Stage 1 slice, or run `sdd-verify` on the
+Products+Sale+Orders+Credits slices completed so far, per user direction. Stage 1's
+full-module chained-PR delivery strategy (stacked-to-main vs feature-branch-chain) still
+needs an explicit decision from the orchestrator/user before a non-explicitly-scoped Stage 1
+`sdd-apply` batch begins, per the tasks artifact's Review Workload Forecast.
