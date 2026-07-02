@@ -1,66 +1,53 @@
-import { useIntl } from 'react-intl';
-import type { Order } from '@store-mgmt/domain';
-
-interface CategoryStat {
-  categoryId: string;
-  categoryName: string;
-  revenue: number;
-  itemsSold: number;
-}
+import type { CategoryCartItemsView } from '../lib/category-cart-items-view';
 
 interface CategoryStatsProps {
-  orders: Order[];
+  category: CategoryCartItemsView;
 }
 
-function computeCategoryStats(orders: Order[]): CategoryStat[] {
-  const map = new Map<string, CategoryStat>();
-
-  for (const order of orders) {
-    if (!order.isActive) continue;
-    for (const item of order.orderItems) {
-      const existing = map.get(item.categoryId);
-      if (existing) {
-        existing.revenue += item.price * item.quantity;
-        existing.itemsSold += item.quantity;
-      } else {
-        map.set(item.categoryId, {
-          categoryId: item.categoryId,
-          categoryName: item.categoryName,
-          revenue: item.price * item.quantity,
-          itemsSold: item.quantity,
-        });
-      }
-    }
-  }
-
-  return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-}
-
-export function CategoryStats({ orders }: CategoryStatsProps) {
-  const intl = useIntl();
-  const stats = computeCategoryStats(orders);
-
-  if (stats.length === 0) {
-    return (
-      <p className="text-sm text-gray-400">
-        {intl.formatMessage({ id: 'ORDERS.EMPTY_STATE' })}
-      </p>
-    );
-  }
+/**
+ * 1:1 port of Angular's `category-stats.component.html`: a bare table (no header row)
+ * with a category summary row (name + items-count badge + total, all green/success)
+ * followed by one row per product in `category.productItems` (same column layout).
+ * No i18n keys here — Angular's template has zero static Spanish text, only
+ * currency-formatted numbers and the category/product names themselves.
+ */
+export function CategoryStats({ category }: CategoryStatsProps) {
+  if (!category) return null;
 
   return (
-    <div className="space-y-2">
-      {stats.map((stat) => (
-        <div key={stat.categoryId} className="flex items-center justify-between rounded border p-3">
-          <div>
-            <p className="font-medium text-gray-800">{stat.categoryName}</p>
-            <p className="text-xs text-gray-500">
-              {intl.formatMessage({ id: 'ORDERS.ITEMS_COUNT' })}: {stat.itemsSold}
-            </p>
-          </div>
-          <p className="font-semibold text-gray-800">${stat.revenue.toFixed(2)}</p>
-        </div>
-      ))}
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <tbody>
+          <tr className="border-b border-black">
+            <td className="p-1">
+              <span className="font-bold text-text">{category.name}</span>
+            </td>
+            <td className="p-1 text-right">
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                ({category.itemsCount})
+              </span>
+            </td>
+            <td className="p-1 text-right">
+              <span className="font-bold text-success">${category.total.toFixed(2)}</span>
+            </td>
+          </tr>
+          {category.productItems.map((product) => (
+            <tr key={product.name}>
+              <td className="p-1">
+                <span className="font-bold text-text">{product.name}</span>
+              </td>
+              <td className="p-1 text-right">
+                <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                  ({product.itemsCount})
+                </span>
+              </td>
+              <td className="p-1 text-right">
+                <span className="font-bold text-success">${product.total.toFixed(2)}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

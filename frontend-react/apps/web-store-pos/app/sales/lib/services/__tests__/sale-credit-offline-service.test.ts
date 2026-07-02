@@ -180,4 +180,52 @@ describe('SaleCreditOfflineService', () => {
       expect(raw).not.toBeNull();
     });
   });
+
+  describe('SC-09: getUnpaidCreatedToday (Angular getUnPaidSaleCreditsInDayObservable 1:1 port)', () => {
+    it('returns active unpaid credits created today', () => {
+      service.createFromOrder('o1', 'Ana', 100);
+      expect(service.getUnpaidCreatedToday()).toHaveLength(1);
+    });
+
+    it('excludes credits that were already paid', () => {
+      const credit = service.createFromOrder('o1', 'Ana', 100);
+      service.pay(credit.id, PaymentType.Efectivo, '');
+      expect(service.getUnpaidCreatedToday()).toHaveLength(0);
+    });
+
+    it('excludes credits not created today', () => {
+      const credit = service.createFromOrder('o1', 'Ana', 100);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
+      const entries: [string, Record<string, unknown>][] = JSON.parse(raw ?? '[]');
+      const backdated = entries.map(([key, value]) => [
+        key,
+        { ...value, date: yesterday.toISOString() },
+      ]);
+      localStorage.setItem('lizoft.store-saleCredits-s1', JSON.stringify(backdated));
+
+      expect(service.getUnpaidCreatedToday()).toHaveLength(0);
+    });
+  });
+
+  describe('SC-10: getPaidToday (Angular getPaidSaleCreditsInDayObservable 1:1 port)', () => {
+    it('returns active credits paid today', () => {
+      const credit = service.createFromOrder('o1', 'Ana', 100);
+      service.pay(credit.id, PaymentType.Efectivo, '');
+      expect(service.getPaidToday()).toHaveLength(1);
+    });
+
+    it('excludes unpaid credits', () => {
+      service.createFromOrder('o1', 'Ana', 100);
+      expect(service.getPaidToday()).toHaveLength(0);
+    });
+
+    it('excludes voided (inactive) credits even if paid', () => {
+      const credit = service.createFromOrder('o1', 'Ana', 100);
+      service.pay(credit.id, PaymentType.Efectivo, '');
+      service.void(credit.id);
+      expect(service.getPaidToday()).toHaveLength(0);
+    });
+  });
 });

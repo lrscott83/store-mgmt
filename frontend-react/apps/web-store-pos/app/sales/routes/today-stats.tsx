@@ -1,88 +1,303 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Order } from '@store-mgmt/domain';
-import { EFeatures, PaymentType } from '@store-mgmt/domain';
+import { EFeatures, ExpenseType, PaymentType } from '@store-mgmt/domain';
+import type { Expense, Order, SaleCredit } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import { Card } from '~/shared/components/ui/card';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
+import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { CategoryStats } from '../components/category-stats';
+import type { CategoryCartItemsView } from '../lib/category-cart-items-view';
 
 export const clientLoader = featureLoader([EFeatures.Sale]);
 
-const PAYMENT_LABELS: Record<PaymentType, string> = {
-  [PaymentType.Efectivo]: 'Efectivo',
-  [PaymentType.Tarjeta]: 'Tarjeta',
-  [PaymentType.Zelle]: 'Zelle',
+// Angular's expense-list.component.html column 1 (getExpenseTypeText) — 1:1 mapping,
+// duplicated here (not exported by app/expenses/components/expense-list.tsx) to avoid
+// coupling the Sales module to the Expenses module's presentational component.
+const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
+  [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
+  [ExpenseType.Transporte]: 'EXPENSES.TYPE.TRANSPORTE',
+  [ExpenseType.Alquiler]: 'EXPENSES.TYPE.ALQUILER',
+  [ExpenseType.Corriente]: 'EXPENSES.TYPE.CORRIENTE',
+  [ExpenseType.Agua]: 'EXPENSES.TYPE.AGUA',
+  [ExpenseType.Comida]: 'EXPENSES.TYPE.COMIDA',
+  [ExpenseType.Operaciones]: 'EXPENSES.TYPE.OPERACIONES',
+  [ExpenseType.Viaje]: 'EXPENSES.TYPE.VIAJE',
+  [ExpenseType.Divisa]: 'EXPENSES.TYPE.DIVISA',
+  [ExpenseType.Impuesto]: 'EXPENSES.TYPE.IMPUESTO',
+  [ExpenseType.Otro]: 'EXPENSES.TYPE.OTRO',
 };
 
+const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
+  [PaymentType.Efectivo]: 'CART.EFECTIVO',
+  [PaymentType.Tarjeta]: 'CART.TARJETA',
+  [PaymentType.Zelle]: 'CART.ZELLE',
+};
+
+function valueClassName(value: number): string {
+  return value > 0 ? 'text-success' : value < 0 ? 'text-danger' : 'text-text';
+}
+
+/**
+ * `<details>`/`<summary>` panel matching Angular Material's `mat-expansion-panel`
+ * (collapsed by default, `[expanded]="false"` in every panel on this view).
+ */
+function ExpansionPanel({
+  title,
+  amount,
+  amountClassName,
+  children,
+}: {
+  title: string;
+  amount: string;
+  amountClassName: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="border-b border-border last:border-0">
+      <summary className="flex cursor-pointer list-none items-center justify-between p-2 text-sm font-medium text-text hover:bg-primary-light/40">
+        <span>{title}</span>
+        <span className={amountClassName}>{amount}</span>
+      </summary>
+      <div className="p-2">{children}</div>
+    </details>
+  );
+}
+
+/**
+ * 1:1 port of Angular's `today-stats.component.html` ("Cuadre del día"): a card with the
+ * running total in the toolbar, and an accordion of collapsed-by-default panels — Resumen
+ * Efectivo (always), Gastos (if hasExpensesModuleAvailable), Créditos Por Cobrar (if
+ * hasCreditsModuleAvailable), Créditos Pagados (if hasCreditsModuleAvailable), and Ventas
+ * (always, rendering one CategoryStats row per category).
+ */
 export function TodayStatsPage() {
   const intl = useIntl();
-  const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const [orders, setOrders] = useState<Order[]>([]);
+  const user = useAuthStore((s) => s.user);
+  const storeId = user?.selectedStoreId ?? '';
+
+  const hasExpensesModule = user ? hasExpensesModuleAvailable(user) : false;
+  const hasCreditsModule = user ? hasCreditsModuleAvailable(user) : false;
+
+  const [categories, setCategories] = useState<CategoryCartItemsView[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [saleCredits, setSaleCredits] = useState<SaleCredit[]>([]);
+  const [paidSaleCredits, setPaidSaleCredits] = useState<SaleCredit[]>([]);
+  const [salesCashTotal, setSalesCashTotal] = useState(0);
 
   useEffect(() => {
-    const service = new OrderOfflineService(storeId);
-    setOrders(service.getActiveOrdersInDay(new Date()));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId]);
+    const orderService = new OrderOfflineService(storeId);
+    setCategories(orderService.getCategoryCartItemsView(new Date()));
 
-  const activeOrders = orders.filter((o) => o.isActive);
-  const totalRevenue = activeOrders.reduce((sum, o) => sum + o.total, 0);
+    const activeOrders: Order[] = orderService.getActiveOrdersInDay(new Date());
+    setSalesCashTotal(
+      activeOrders
+        .filter((o) => o.paymentType === PaymentType.Efectivo && !o.isCredit)
+        .reduce((acc, o) => acc + o.total, 0),
+    );
 
-  // Revenue per payment type
-  const revenueByPaymentType: Partial<Record<PaymentType, number>> = {};
-  for (const order of activeOrders) {
-    revenueByPaymentType[order.paymentType] =
-      (revenueByPaymentType[order.paymentType] ?? 0) + order.total;
+    if (hasExpensesModule) {
+      const expenseService = new ExpenseOfflineService(storeId);
+      setExpenses(expenseService.getActiveToday());
+    }
+
+    if (hasCreditsModule) {
+      const creditService = new SaleCreditOfflineService(storeId);
+      setSaleCredits(creditService.getUnpaidCreatedToday());
+      setPaidSaleCredits(creditService.getPaidToday());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, hasExpensesModule, hasCreditsModule]);
+
+  const expensesCashTotal = expenses
+    .filter((e) => e.paymentType === PaymentType.Efectivo)
+    .reduce((acc, e) => acc + e.total, 0);
+  const paidCreditsCashTotal = paidSaleCredits
+    .filter((c) => c.paidType === PaymentType.Efectivo)
+    .reduce((acc, c) => acc + c.total, 0);
+
+  const ordersTotal = categories.reduce((acc, c) => acc + c.total, 0);
+  const ordersItemsCount = categories.reduce((acc, c) => acc + c.itemsCount, 0);
+  const expensesTotal = expenses.reduce((acc, e) => acc + e.total, 0);
+  const expensesCount = expenses.length;
+  const paidSaleCreditsTotal = paidSaleCredits.reduce((acc, c) => acc + c.total, 0);
+  const cashTotal = salesCashTotal + paidCreditsCashTotal - expensesCashTotal;
+  const creditsCount = saleCredits.length;
+  const creditsTotal = saleCredits.reduce((acc, c) => acc + c.total, 0);
+  const total = ordersTotal + paidSaleCreditsTotal - creditsTotal - expensesTotal;
+
+  return (
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          {/* TODAY_STATS.HEADER */}
+          <span>{intl.formatMessage({ id: 'TODAY_STATS.HEADER' })}</span>
+          <span className={`text-lg font-bold ${valueClassName(total)}`}>
+            ${total.toFixed(2)}
+          </span>
+        </div>
+      }
+    >
+      <div className="divide-y divide-border">
+        {/* BEGIN CASH */}
+        <ExpansionPanel
+          title="Resumen Efectivo"
+          amount={`$${cashTotal.toFixed(2)}`}
+          amountClassName={valueClassName(cashTotal)}
+        >
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b border-border last:border-0">
+                <td className="p-1">
+                  <span className="font-bold text-text">Ventas</span>
+                </td>
+                <td className="p-1 text-right">
+                  <span className="font-bold text-success">${salesCashTotal.toFixed(2)}</span>
+                </td>
+              </tr>
+              {hasCreditsModule && (
+                <tr className="border-b border-border last:border-0">
+                  <td className="p-1">
+                    <span className="font-bold text-text">Créditos Pagados</span>
+                  </td>
+                  <td className="p-1 text-right">
+                    <span className="font-bold text-success">${paidCreditsCashTotal.toFixed(2)}</span>
+                  </td>
+                </tr>
+              )}
+              {hasExpensesModule && (
+                <tr className="border-b border-border last:border-0">
+                  <td className="p-1">
+                    <span className="font-bold text-text">Gastos</span>
+                  </td>
+                  <td className="p-1 text-right">
+                    <span className="font-bold text-danger">${expensesCashTotal.toFixed(2)}</span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </ExpansionPanel>
+        {/* END CASH */}
+
+        {/* BEGIN EXPENSES */}
+        {hasExpensesModule && (
+          <ExpansionPanel
+            title={`Gastos (${expensesCount})`}
+            amount={`$${expensesTotal.toFixed(2)}`}
+            amountClassName="text-danger"
+          >
+            {expenses.length === 0 ? (
+              <p className="py-4 text-center text-sm text-text-muted">
+                {/* TODAY_STATS.NO_EXPENSE_FOUND */}
+                {intl.formatMessage({ id: 'TODAY_STATS.NO_EXPENSE_FOUND' })}
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <tbody>
+                  {expenses.map((expense) => (
+                    <tr key={expense.id} className="border-b border-border last:border-0">
+                      <td className="p-1 text-text">
+                        {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
+                      </td>
+                      <td className="p-1 text-right text-danger">${expense.total.toFixed(2)}</td>
+                      <td className="p-1 text-right">
+                        <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                          {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </ExpansionPanel>
+        )}
+        {/* END EXPENSES */}
+
+        {/* BEGIN CREDITS */}
+        {hasCreditsModule && (
+          <ExpansionPanel
+            title={`Créditos Por Cobrar (${creditsCount})`}
+            amount={`$${creditsTotal.toFixed(2)}`}
+            amountClassName="text-danger"
+          >
+            <SaleCreditsTable saleCredits={saleCredits} />
+          </ExpansionPanel>
+        )}
+        {/* END CREDITS */}
+
+        {/* BEGIN PAID CREDITS — Angular's literal template shows getPaidSaleCreditsTotal()
+            (a currency sum) inside the "(...)" header slot, not a count. Preserved
+            verbatim, not a bug fix. */}
+        {hasCreditsModule && (
+          <ExpansionPanel
+            title={`Créditos Pagados (${paidSaleCreditsTotal})`}
+            amount={`$${paidSaleCreditsTotal.toFixed(2)}`}
+            amountClassName="text-success"
+          >
+            <SaleCreditsTable saleCredits={paidSaleCredits} />
+          </ExpansionPanel>
+        )}
+        {/* END PAID CREDITS */}
+
+        {/* BEGIN SALES */}
+        <ExpansionPanel
+          title={`Ventas (${ordersItemsCount} productos)`}
+          amount={`$${ordersTotal.toFixed(2)}`}
+          amountClassName="text-success"
+        >
+          {categories.map((category) => (
+            <CategoryStats key={category.id} category={category} />
+          ))}
+        </ExpansionPanel>
+        {/* END SALES */}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Read-only rendering of `<app-sale-credit-list [saleCredits$]="...">` with no
+ * `[readOnly]` binding (defaults `true` — no actions column), matching Angular's
+ * `sale-credit-list.component.html` bare-table layout.
+ */
+function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
+  function formatDateOnly(date: Date): string {
+    const d = new Date(date);
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const year = d.getUTCFullYear();
+    return `${day}/${month}/${year}`;
   }
 
   return (
-    <div className="space-y-6 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'ORDERS.STATS_TITLE' })}
-      </h1>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded border bg-blue-50 p-4">
-          <p className="text-xs text-blue-600">{intl.formatMessage({ id: 'ORDERS.STATS.REVENUE' })}</p>
-          <p className="mt-1 text-2xl font-bold text-blue-800">${totalRevenue.toFixed(2)}</p>
-        </div>
-        <div className="rounded border bg-gray-50 p-4">
-          <p className="text-xs text-gray-500">{intl.formatMessage({ id: 'ORDERS.ITEMS_COUNT' })}</p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">{activeOrders.length}</p>
-        </div>
-      </div>
-
-      {/* Revenue by payment type */}
-      {Object.entries(revenueByPaymentType).length > 0 && (
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-gray-600">
-            {intl.formatMessage({ id: 'ORDERS.PAYMENT_TYPE' })}
-          </h2>
-          <div className="space-y-2">
-            {(Object.entries(revenueByPaymentType) as [string, number][]).map(
-              ([type, amount]) => (
-                <div key={type} className="flex items-center justify-between rounded border p-3">
-                  <span className="text-sm text-gray-600">
-                    {PAYMENT_LABELS[Number(type) as PaymentType] ?? type}
-                  </span>
-                  <span className="font-medium">${amount.toFixed(2)}</span>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Category breakdown */}
-      <div>
-        <h2 className="mb-2 text-sm font-semibold text-gray-600">
-          {intl.formatMessage({ id: 'ORDERS.STATS.ITEMS_SOLD' })}
-        </h2>
-        <CategoryStats orders={activeOrders} />
-      </div>
-    </div>
+    <table className="w-full text-sm">
+      <tbody>
+        {saleCredits.map((saleCredit) => (
+          <tr key={saleCredit.id} className="border-b border-border last:border-0">
+            <td className="p-1">
+              <span className="text-text">{saleCredit.client}</span>
+            </td>
+            <td className="p-1 text-right">
+              <span className={saleCredit.isPaid ? 'text-success' : 'text-danger'}>
+                ${saleCredit.total.toFixed(2)}
+              </span>
+            </td>
+            <td className="p-1 text-right">
+              {saleCredit.isPaid && (
+                <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                  {formatDateOnly(saleCredit.paidDate)}
+                </span>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

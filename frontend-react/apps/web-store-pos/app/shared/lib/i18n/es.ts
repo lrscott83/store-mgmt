@@ -215,7 +215,15 @@ const messages: Record<string, string> = {
   // Today Stats (Angular TODAY_STATS.* — vocabs/es.ts. today-orders.component.html reuses
   // TODAY_STATS.NO_ORDER_FOUND for its own empty state, not TODAY_ORDERS.NO_ORDER_FOUND —
   // that is Angular's literal source behavior, preserved here)
+  'TODAY_STATS.HEADER': 'Cuadre del día',
   'TODAY_STATS.NO_ORDER_FOUND': 'No se ha realizado ninguna venta en el día de hoy.',
+  'TODAY_STATS.NO_EXPENSE_FOUND': 'No se ha realizado ningun gasto en el día de hoy.',
+  // The remaining today-stats.component.html panel labels are HARDCODED Spanish literals
+  // in Angular's own template (not i18n keys — no [translate] pipe on them). Preserved
+  // as literal strings here too, not invented translation keys, to stay byte-identical.
+
+  // Category Stats (category-stats.component.html has no i18n keys — currency-formatted
+  // numbers and category/product names only, no static Spanish text at all).
 
   // Sale Credit (Angular SALE_CREDIT.* — vocabs/es.ts, byte-identical. PAYMENT_CREDIT is
   // Angular's literal title for BOTH edit-sale-credit-modal AND sale-credit-payment-modal

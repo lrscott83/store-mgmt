@@ -33,6 +33,16 @@ vi.mock('../sale-credit-offline-service', () => ({
   })),
 }));
 
+// Mock ProductCategoryOfflineService BEFORE importing OrderOfflineService — used by
+// getCategoryCartItemsView to resolve each category's `order` field (falls back to
+// Number.MAX_VALUE when the category isn't found, matching Angular).
+const mockCategoryGetAll = vi.fn().mockReturnValue([]);
+vi.mock('../product-category-offline-service', () => ({
+  ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
+    getAll: mockCategoryGetAll,
+  })),
+}));
+
 import { OrderOfflineService } from '../order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { SaleCreditOfflineService } from '../sale-credit-offline-service';
@@ -293,6 +303,81 @@ describe('OrderOfflineService', () => {
       service.create(items, PaymentType.Efectivo, false, '');
       const raw = localStorage.getItem('lizoft.store-orders-s1');
       expect(raw).not.toBeNull();
+    });
+  });
+
+  describe('ORD-08: getCategoryCartItemsView (Angular getCategoryCartItemsView 1:1 port)', () => {
+    beforeEach(() => {
+      mockCategoryGetAll.mockReturnValue([
+        { id: 'cat1', name: 'Bebidas', order: 2, isActive: true },
+        { id: 'cat2', name: 'Snacks', order: 1, isActive: true },
+      ]);
+    });
+
+    it('returns empty array when there are no active orders today', () => {
+      expect(service.getCategoryCartItemsView(new Date())).toEqual([]);
+    });
+
+    it('groups order items by categoryId, aggregating total/itemsCount across orders', () => {
+      const items1 = makeCartItems([
+        { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },
+      ]);
+      const items2 = makeCartItems([
+        { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 3 },
+      ]);
+      service.create(items1, PaymentType.Efectivo, false, '');
+      service.create(items2, PaymentType.Efectivo, false, '');
+
+      const result = service.getCategoryCartItemsView(new Date());
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('cat1');
+      expect(result[0].name).toBe('Bebidas');
+      expect(result[0].total).toBe(25); // 5*2 + 5*3
+      expect(result[0].itemsCount).toBe(5); // 2 + 3
+    });
+
+    it('further groups by productId within each category, with per-product total/itemsCount', () => {
+      const items = makeCartItems([
+        { product: makeProduct({ id: 'p1', name: 'Cola', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },
+        { product: makeProduct({ id: 'p2', name: 'Fanta', categoryId: 'cat1', categoryName: 'Bebidas', price: 3 }), quantity: 1 },
+      ]);
+      service.create(items, PaymentType.Efectivo, false, '');
+
+      const result = service.getCategoryCartItemsView(new Date());
+      expect(result[0].productItems).toHaveLength(2);
+      const cola = result[0].productItems.find((p) => p.name === 'Cola');
+      const fanta = result[0].productItems.find((p) => p.name === 'Fanta');
+      expect(cola?.total).toBe(10);
+      expect(cola?.itemsCount).toBe(2);
+      expect(fanta?.total).toBe(3);
+      expect(fanta?.itemsCount).toBe(1);
+    });
+
+    it("resolves each category's order field from ProductCategoryOfflineService", () => {
+      const items = makeCartItems([
+        { product: makeProduct({ id: 'p1', categoryId: 'cat2', categoryName: 'Snacks', price: 2 }), quantity: 1 },
+      ]);
+      service.create(items, PaymentType.Efectivo, false, '');
+      const result = service.getCategoryCartItemsView(new Date());
+      expect(result[0].order).toBe(1); // cat2's order from the mocked category list
+    });
+
+    it('falls back to Number.MAX_VALUE when the category is not found in storage', () => {
+      const items = makeCartItems([
+        { product: makeProduct({ id: 'p1', categoryId: 'unknown-cat', categoryName: 'Ghost', price: 2 }), quantity: 1 },
+      ]);
+      service.create(items, PaymentType.Efectivo, false, '');
+      const result = service.getCategoryCartItemsView(new Date());
+      expect(result[0].order).toBe(Number.MAX_VALUE);
+    });
+
+    it('excludes inactive (deactivated) orders', () => {
+      const items = makeCartItems([
+        { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 1 },
+      ]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      service.deactivate(order.id);
+      expect(service.getCategoryCartItemsView(new Date())).toEqual([]);
     });
   });
 });

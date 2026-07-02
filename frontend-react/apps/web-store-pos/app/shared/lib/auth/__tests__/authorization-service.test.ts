@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { isUserAuthorized, isSuperAdmin, isOwnerAdmin, isReSeller } from '../authorization-service';
+import {
+  isUserAuthorized,
+  isSuperAdmin,
+  isOwnerAdmin,
+  isReSeller,
+  isModuleAvailable,
+  hasExpensesModuleAvailable,
+  hasCreditsModuleAvailable,
+} from '../authorization-service';
+import { EModules } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 
 function makeUser(overrides: Partial<UserModel>): UserModel {
@@ -127,6 +136,45 @@ describe('AuthorizationService', () => {
       });
       expect(isUserAuthorized(user, [21], 's1')).toBe(true);
       expect(isUserAuthorized(user, [31], 's1')).toBe(true);
+    });
+  });
+
+  describe('isModuleAvailable (Angular AuthorizationService.hasModuleAvailable 1:1 port)', () => {
+    it('returns true when moduleId is present in storeModuleIds', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Sales, EModules.Expenses] });
+      expect(isModuleAvailable(user, EModules.Expenses)).toBe(true);
+    });
+
+    it('returns false when moduleId is not present in storeModuleIds', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Sales] });
+      expect(isModuleAvailable(user, EModules.Credits)).toBe(false);
+    });
+
+    it('returns false for an empty storeModuleIds list', () => {
+      const user = makeUser({ storeModuleIds: [] });
+      expect(isModuleAvailable(user, EModules.Expenses)).toBe(false);
+    });
+  });
+
+  describe('hasExpensesModuleAvailable / hasCreditsModuleAvailable', () => {
+    it('hasExpensesModuleAvailable returns true when EModules.Expenses is in storeModuleIds', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Expenses] });
+      expect(hasExpensesModuleAvailable(user)).toBe(true);
+    });
+
+    it('hasExpensesModuleAvailable returns false otherwise', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Sales] });
+      expect(hasExpensesModuleAvailable(user)).toBe(false);
+    });
+
+    it('hasCreditsModuleAvailable returns true when EModules.Credits is in storeModuleIds', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Credits] });
+      expect(hasCreditsModuleAvailable(user)).toBe(true);
+    });
+
+    it('hasCreditsModuleAvailable returns false otherwise', () => {
+      const user = makeUser({ storeModuleIds: [EModules.Sales] });
+      expect(hasCreditsModuleAvailable(user)).toBe(false);
     });
   });
 });

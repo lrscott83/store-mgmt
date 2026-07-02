@@ -8,7 +8,7 @@ import type { Order, SaleCredit, Product, ProductCategory } from '@store-mgmt/do
 // --- Global mocks ---
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
+  const state = { user: { selectedStoreId: 's1', storeModuleIds: [] as number[] }, isAuthenticated: true };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -51,6 +51,7 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
     getAll: vi.fn().mockReturnValue([]),
     getActiveOrdersInDay: vi.fn().mockReturnValue([]),
     getByDateRange: vi.fn().mockReturnValue([]),
+    getCategoryCartItemsView: vi.fn().mockReturnValue([]),
     deactivate: vi.fn(),
     update: vi.fn(),
   })),
@@ -60,8 +61,17 @@ vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
     getActiveToday: vi.fn().mockReturnValue([]),
+    getUnpaidCreatedToday: vi.fn().mockReturnValue([]),
+    getPaidToday: vi.fn().mockReturnValue([]),
     pay: vi.fn(),
     update: vi.fn(),
+  })),
+}));
+
+vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
+  ExpenseOfflineService: vi.fn().mockImplementation(() => ({
+    getAll: vi.fn().mockReturnValue([]),
+    getActiveToday: vi.fn().mockReturnValue([]),
   })),
 }));
 

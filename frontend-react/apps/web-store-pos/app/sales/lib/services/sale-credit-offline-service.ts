@@ -50,6 +50,34 @@ export class SaleCreditOfflineService {
     );
   }
 
+  /**
+   * 1:1 port of Angular's `getUnPaidSaleCreditsInDayObservable`: active credits CREATED
+   * today (via `date`, not `paidDate`), filtered to `!isPaid`. Feeds the "Créditos Por
+   * Cobrar" panel on the Today Stats view.
+   */
+  getUnpaidCreatedToday(): SaleCredit[] {
+    return this.getActiveToday().filter((c) => !c.isPaid);
+  }
+
+  /**
+   * 1:1 port of Angular's `getPaidSaleCreditsInDayObservable`: active credits whose
+   * `paidDate` falls within today's range, REGARDLESS of when they were created (unlike
+   * `getUnpaidCreatedToday`, which filters by creation `date`). Feeds the "Créditos
+   * Pagados" panel on the Today Stats view.
+   */
+  getPaidToday(): SaleCredit[] {
+    const todayStart = startOfDay(new Date());
+    const tomorrowStart = startOfDay(addDays(new Date(), 1));
+    return this.getAll().filter(
+      (c) =>
+        c.isActive &&
+        c.isPaid &&
+        c.paidDate &&
+        c.paidDate >= todayStart &&
+        c.paidDate < tomorrowStart,
+    );
+  }
+
   createFromOrder(orderId: string, client: string, total: number): SaleCredit {
     const now = new Date();
     const credit: SaleCredit = {
