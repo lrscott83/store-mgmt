@@ -1,19 +1,27 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '@store-mgmt/domain';
-import { PaymentType } from '@store-mgmt/domain';
+import { OrderType, PaymentType } from '@store-mgmt/domain';
 
 export interface CartItem {
   product: Product;
   quantity: number;
+  /** Per-line custom price (Angular's CartItem.price, nullable — set on first add, e.g. for
+   * a Mayorista sale's editable price). Falls back to `product.price` when unset, keeping the
+   * Normal-sale path byte-identical. */
+  price?: number;
 }
 
 interface CartState {
   items: CartItem[];
+  /** 1:1 port of Angular's ShoppingCartService's single `orderType` field
+   * (shopping-cart.service.ts:23) — overwritten only on the NEW-item branch of addItem,
+   * reset to Normal by clear(). No per-orderType cart isolation (matches Angular). */
+  orderType: OrderType;
   paymentType: PaymentType;
   isCredit: boolean;
   clientName: string;
-  addItem: (product: Product, quantity?: number) => void;
+  addItem: (product: Product, quantity?: number, orderType?: OrderType, price?: number) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, qty: number) => void;
   setPaymentType: (type: PaymentType) => void;
@@ -29,11 +37,12 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      orderType: OrderType.Normal,
       paymentType: PaymentType.Efectivo,
       isCredit: false,
       clientName: '',
 
-      addItem: (product: Product, quantity = 1) => {
+      addItem: (product: Product, quantity = 1, orderType = OrderType.Normal, price?: number) => {
         set((state) => {
           const existing = state.items.find((i) => i.product.id === product.id);
           if (existing) {
@@ -45,7 +54,10 @@ export const useCartStore = create<CartState>()(
               ),
             };
           }
-          return { items: [...state.items, { product, quantity }] };
+          return {
+            orderType,
+            items: [...state.items, { product, quantity, price: price ?? product.price }],
+          };
         });
       },
 
@@ -82,6 +94,7 @@ export const useCartStore = create<CartState>()(
       clear: () => {
         set({
           items: [],
+          orderType: OrderType.Normal,
           paymentType: PaymentType.Efectivo,
           isCredit: false,
           clientName: '',
@@ -90,7 +103,7 @@ export const useCartStore = create<CartState>()(
 
       total: () => {
         return get().items.reduce(
-          (sum, item) => sum + item.product.price * item.quantity,
+          (sum, item) => sum + (item.price ?? item.product.price) * item.quantity,
           0
         );
       },

@@ -66,8 +66,10 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   };
 }
 
-function makeCartItems(products: Array<{ product: Product; quantity: number }>): CartItem[] {
-  return products.map(({ product, quantity }) => ({ product, quantity }));
+function makeCartItems(
+  products: Array<{ product: Product; quantity: number; price?: number }>,
+): CartItem[] {
+  return products.map(({ product, quantity, price }) => ({ product, quantity, price }));
 }
 
 describe('OrderOfflineService', () => {
@@ -378,6 +380,55 @@ describe('OrderOfflineService', () => {
       const order = service.create(items, PaymentType.Efectivo, false, '');
       service.deactivate(order.id);
       expect(service.getCategoryCartItemsView(new Date())).toEqual([]);
+    });
+  });
+
+  // Egress/Mayorista realignment: create() gains a 5th orderType param, Normal-preserving by
+  // default. Per-item custom price (CartItem.price) flows into orderItem.price/order.total,
+  // and FIFO inventory deduction (getAvailableInventoryCosts) still runs identically for a
+  // Mayorista sale, since the discountFromInvantory branch is unrelated to orderType.
+  describe('ORD-09: create with orderType=Mayorista + custom per-item price', () => {
+    it('defaults order.type to Normal when orderType is not passed (Normal-preserving)', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      expect(order.type).toBe(OrderType.Normal);
+    });
+
+    it('persists order.type=Mayorista when passed', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
+      expect(order.type).toBe(OrderType.Mayorista);
+    });
+
+    it('uses the cart item custom price (not product.price) for orderItem.price when set', () => {
+      const items = makeCartItems([
+        { product: makeProduct({ price: 5 }), quantity: 2, price: 8 },
+      ]);
+      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
+      expect(order.orderItems[0].price).toBe(8);
+    });
+
+    it('uses the custom price (not product.price) for order.total when set', () => {
+      const items = makeCartItems([
+        { product: makeProduct({ price: 5 }), quantity: 2, price: 8 },
+      ]);
+      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
+      expect(order.total).toBe(16); // 8 * 2, NOT 5 * 2
+    });
+
+    it('falls back to product.price when the cart item has no custom price, even for Mayorista', () => {
+      const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 2 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
+      expect(order.orderItems[0].price).toBe(5);
+      expect(order.total).toBe(10);
+    });
+
+    it('still runs FIFO inventory deduction (getAvailableInventoryCosts) for a Mayorista sale', () => {
+      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
+      const product = makeProduct({ discountFromInvantory: true });
+      const items = makeCartItems([{ product, quantity: 2, price: 9 }]);
+      service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
+      expect(inventoryMock.getAvailableInventoryCosts).toHaveBeenCalledWith('p1', 2);
     });
   });
 });

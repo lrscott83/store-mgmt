@@ -117,6 +117,7 @@ export class OrderOfflineService {
     paymentType: PaymentType,
     isCredit: boolean,
     clientName: string,
+    orderType: OrderType = OrderType.Normal,
   ): Order {
     const now = new Date();
     const orderId = generateId();
@@ -137,14 +138,17 @@ export class OrderOfflineService {
         categoryName: product.categoryName,
         name: product.name,
         quantity,
-        price: product.price,
+        price: cartItem.price ?? product.price,
         productBusinessId: product.businessId ?? '',
         productCosts,
         order: index,
       };
     });
 
-    const total = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+    const total = cartItems.reduce(
+      (sum, item) => sum + (item.price ?? item.product.price) * item.quantity,
+      0,
+    );
     const itemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
     const order: Order = {
@@ -153,7 +157,7 @@ export class OrderOfflineService {
       total,
       itemsCount,
       date: now,
-      type: OrderType.Normal,
+      type: orderType,
       paymentType,
       isCredit,
       description: isCredit ? clientName : '',

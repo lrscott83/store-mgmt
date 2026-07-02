@@ -54,10 +54,10 @@ export function SalePage() {
     setSelectedCategoryId(category.id);
   }
 
-  function handleAdded(productId: string, quantity: number) {
+  function handleAdded(productId: string, quantity: number, price: number) {
     const product = products.find((p) => p.id === productId);
     if (!product) return;
-    addItem(product, quantity);
+    addItem(product, quantity, OrderType.Normal, price);
   }
 
   // 1:1 port of Angular's addProductToCart's inventory check (sale-product-row.component.ts

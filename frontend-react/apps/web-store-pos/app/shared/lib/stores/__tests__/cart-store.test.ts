@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Product } from '@store-mgmt/domain';
+import { OrderType } from '@store-mgmt/domain';
 import { useCartStore } from '../cart-store';
 
 // getItemQuantity is a 1:1 port of Angular's ShoppingCartService.getCartItemQuantity
@@ -44,5 +45,69 @@ describe('useCartStore.getItemQuantity', () => {
     useCartStore.getState().addItem(makeProduct({ id: 'prod-9' }), 2);
     useCartStore.getState().addItem(makeProduct({ id: 'prod-9' }), 5);
     expect(useCartStore.getState().getItemQuantity('prod-9')).toBe(7);
+  });
+});
+
+// 1:1 port of Angular's ShoppingCartService: ONE `orderType` field on the store, overwritten
+// only on the NEW-item branch of addItem (shopping-cart.service.ts:110); increments
+// (increaseCartItem/decreaseCartItem) do NOT touch it. `price` lives per-CartItem, set on
+// first add, and clearCart() resets orderType to Normal
+// (frontend/src/app/_services/order/shopping-cart.service.ts:23,110,162).
+describe('useCartStore — orderType + price threading (Egress/Mayorista realignment)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('defaults the store orderType to Normal', () => {
+    expect(useCartStore.getState().orderType).toBe(OrderType.Normal);
+  });
+
+  it('addItem with no orderType arg keeps the store orderType at Normal (default param)', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 1);
+    expect(useCartStore.getState().orderType).toBe(OrderType.Normal);
+  });
+
+  it('sets the store orderType on a NEW-item add', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 1, OrderType.Mayorista);
+    expect(useCartStore.getState().orderType).toBe(OrderType.Mayorista);
+  });
+
+  it('stores the per-item price when provided on a NEW-item add', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 1, OrderType.Mayorista, 8);
+    const item = useCartStore.getState().items.find((i) => i.product.id === 'prod-1');
+    expect(item?.price).toBe(8);
+  });
+
+  it('falls back to product.price when no custom price is provided on a NEW-item add', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }));
+    const item = useCartStore.getState().items.find((i) => i.product.id === 'prod-1');
+    expect(item?.price).toBe(5);
+  });
+
+  it('does NOT overwrite orderType or price when incrementing an existing item', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 1, OrderType.Mayorista, 9);
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 2, OrderType.Normal, 1);
+    expect(useCartStore.getState().orderType).toBe(OrderType.Mayorista);
+    const item = useCartStore.getState().items.find((i) => i.product.id === 'prod-1');
+    expect(item?.price).toBe(9);
+    expect(item?.quantity).toBe(3);
+  });
+
+  it('clear() resets the store orderType back to Normal', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 1, OrderType.Mayorista);
+    useCartStore.getState().clear();
+    expect(useCartStore.getState().orderType).toBe(OrderType.Normal);
+  });
+
+  it('total() uses the per-item price when set (not product.price)', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 2, OrderType.Mayorista, 8);
+    expect(useCartStore.getState().total()).toBe(16); // 8 * 2, NOT 5 * 2
+  });
+
+  it('total() falls back to product.price for items with no custom price (Normal sale, byte-identical)', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 5 }), 2);
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-2', price: 3 }), 1);
+    expect(useCartStore.getState().total()).toBe(13); // 5*2 + 3*1, identical to pre-change behavior
   });
 });

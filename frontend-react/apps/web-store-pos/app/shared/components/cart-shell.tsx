@@ -75,6 +75,7 @@ export function CartShell() {
   useClickOutside(cartRef, () => setIsOpen(false));
   const {
     items,
+    orderType,
     paymentType,
     isCredit,
     clientName,
@@ -179,7 +180,7 @@ export function CartShell() {
     try {
       const storeId = user?.selectedStoreId ?? '';
       const orderService = new OrderOfflineService(storeId);
-      orderService.create(items, paymentType, isCredit, clientName.trim());
+      orderService.create(items, paymentType, isCredit, clientName.trim(), orderType);
       // NOTE (parity, intentionally not implemented): Angular's mustGenerateFacture branch
       // calls generateTicket(), which is dead/disabled code in Angular itself (no-op
       // console.log — jsPDF generation is commented out). The toggle is preserved for
@@ -346,10 +347,10 @@ export function CartShell() {
                         {item.product.name} ({item.quantity})
                       </p>
                       <p className="text-xs text-text-muted">
-                        {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}${item.product.price.toFixed(2)}
+                        {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}${(item.price ?? item.product.price).toFixed(2)}
                       </p>
                     </div>
-                    <p className="text-sm text-text">${(item.product.price * item.quantity).toFixed(2)}</p>
+                    <p className="text-sm text-text">${((item.price ?? item.product.price) * item.quantity).toFixed(2)}</p>
                     {/* Quantity controls */}
                     <div className="flex items-center gap-1">
                       <button
