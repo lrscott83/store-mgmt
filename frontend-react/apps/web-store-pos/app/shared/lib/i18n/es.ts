@@ -322,7 +322,17 @@ const messages: Record<string, string> = {
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas de hoy',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   'INVENTORY.ENTRIES.TITLE': 'Historial de entradas',
-  'INVENTORY.QUANTITIES.TITLE': 'Cantidades de hoy',
+  // Angular source: inventory-today-quantities.component.html + i18n/vocabs/es.ts
+  // INVENTORY.TODAY_QUANTITIES/NO_PRODUCTS/PRODUCT/BEGINNING/ENTRIES/AVAILABLE/SOLD/ENDING —
+  // Spanish text byte-identical to Angular.
+  'INVENTORY.QUANTITIES.TITLE': 'Cantidades del Día',
+  'INVENTORY.QUANTITIES.NO_PRODUCTS': 'No hay productos disponibles',
+  'INVENTORY.QUANTITIES.PRODUCT': 'Producto',
+  'INVENTORY.QUANTITIES.BEGINNING': 'Inicio',
+  'INVENTORY.QUANTITIES.ENTRIES': 'Entradas',
+  'INVENTORY.QUANTITIES.AVAILABLE': 'Disponible',
+  'INVENTORY.QUANTITIES.SOLD': 'Vendido',
+  'INVENTORY.QUANTITIES.ENDING': 'Final',
   'INVENTORY.PROFIT.TITLE': 'Ganancia de hoy',
   'INVENTORY.PROFIT.REVENUE': 'Ingresos',
   'INVENTORY.PROFIT.COST': 'Costo',

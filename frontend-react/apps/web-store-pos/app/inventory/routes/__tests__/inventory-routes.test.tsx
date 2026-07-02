@@ -5,6 +5,8 @@ import esMessages from '~/shared/lib/i18n/es';
 import type { InventoryEntryView, Order, OrderItem, Product, ProductCategory } from '@store-mgmt/domain';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
 
 // ─── Global mocks ────────────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn(() => mockEgressCategories),
+    getById: vi.fn((id: string) => mockEgressCategories.find((c) => c.id === id)),
   })),
 }));
 
@@ -163,7 +166,146 @@ describe('InventoryTodayQuantitiesPage — smoke render', () => {
         <InventoryTodayQuantitiesPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/Cantidades de hoy/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cantidades del Día/i)).toBeInTheDocument();
+  });
+});
+
+// ─── InventoryTodayQuantitiesPage — Angular formula parity ──────────────────
+//
+// Angular reference: inventory-today-quantities.component.ts:57-137. Product set filtered to
+// `isActive && availableToSale` (line 63); per product: disponible = availableProduct?.quantity
+// ?? 0 (line 90), entradas = sum(today entries) (line 92), vendido = sum(today order items)
+// (line 93), inicio = disponible + vendido - entradas (line 94), final = disponible - vendido
+// (line 95). Rows are grouped by category, ordered by category.order then product.order
+// (lines 64-69, 118-134).
+
+describe('InventoryTodayQuantitiesPage — Angular inicio/entradas/disponible/vendido/final formula', () => {
+  beforeEach(() => {
+    mockEgressProducts = [];
+    mockEgressCategories = [];
+  });
+
+  it('computes inicio/entradas/disponible/vendido/final for a product with known entries and sales', () => {
+    mockEgressProducts = [
+      makeEgressProduct({ id: 'p1', name: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas', order: 1 }),
+    ];
+    mockEgressCategories = [makeCategory({ id: 'cat-1', order: 1 })];
+
+    const entries: InventoryEntryView[] = [
+      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 4, costPrice: 5, date: new Date(), isActive: true },
+      { id: 'e2', productId: 'p1', productName: 'Ron', quantity: 6, costPrice: 5, date: new Date(), isActive: true },
+    ];
+    const categoryView: InventoryCategoryView[] = [
+      {
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        products: [
+          { productId: 'p1', productName: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas', totalAvailable: 20 },
+        ],
+      },
+    ];
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getByDate: vi.fn().mockReturnValue(entries),
+          getAvailableByCategory: vi.fn().mockReturnValue(categoryView),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    const orderItem: OrderItem = {
+      productId: 'p1',
+      productName: 'Ron',
+      categoryId: 'cat-1',
+      categoryName: 'Bebidas',
+      name: 'Ron',
+      quantity: 6,
+      price: 10,
+      productBusinessId: 'biz-1',
+      productCosts: [],
+      order: 1,
+    };
+    const order: Order = {
+      id: 'o1',
+      orderItems: [orderItem],
+      total: 60,
+      itemsCount: 6,
+      date: new Date(),
+      type: OrderType.Normal,
+      paymentType: PaymentType.Efectivo,
+      isCredit: false,
+      description: '',
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: 'test',
+    };
+    vi.mocked(OrderOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
+        }) as unknown as InstanceType<typeof OrderOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodayQuantitiesPage />
+      </Wrapper>,
+    );
+
+    // disponible=20, entradas=10, vendido=6 -> inicio=20+6-10=16, final=20-6=14
+    const row = screen.getByText('Bebidas - Ron').closest('tr');
+    expect(row).not.toBeNull();
+    expect(row).toHaveTextContent('16'); // inicio
+    expect(row).toHaveTextContent('10'); // entradas
+    expect(row).toHaveTextContent('20'); // disponible
+    expect(row).toHaveTextContent('6'); // vendido
+    expect(row).toHaveTextContent('14'); // final
+  });
+
+  it('excludes inactive and non-availableToSale products from the report (Angular filter, line 63)', () => {
+    mockEgressProducts = [
+      makeEgressProduct({ id: 'p1', name: 'Inactivo', isActive: false, availableToSale: true }),
+      makeEgressProduct({ id: 'p2', name: 'NoVendible', isActive: true, availableToSale: false }),
+    ];
+    mockEgressCategories = [makeCategory({ id: 'cat-1', order: 1 })];
+
+    render(
+      <Wrapper>
+        <InventoryTodayQuantitiesPage />
+      </Wrapper>,
+    );
+
+    expect(screen.queryByText(/Inactivo/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/NoVendible/)).not.toBeInTheDocument();
+    expect(screen.getByText('No hay productos disponibles')).toBeInTheDocument();
+  });
+
+  it('groups products by category, ordered by category.order then product.order', () => {
+    mockEgressCategories = [
+      makeCategory({ id: 'cat-2', name: 'Snacks', order: 2 }),
+      makeCategory({ id: 'cat-1', name: 'Bebidas', order: 1 }),
+    ];
+    mockEgressProducts = [
+      makeEgressProduct({ id: 'p-a', name: 'Papas', categoryId: 'cat-2', categoryName: 'Snacks', order: 1 }),
+      makeEgressProduct({ id: 'p-b', name: 'Cerveza', categoryId: 'cat-1', categoryName: 'Bebidas', order: 2 }),
+      makeEgressProduct({ id: 'p-c', name: 'Agua', categoryId: 'cat-1', categoryName: 'Bebidas', order: 1 }),
+    ];
+
+    render(
+      <Wrapper>
+        <InventoryTodayQuantitiesPage />
+      </Wrapper>,
+    );
+
+    const rows = screen.getAllByRole('row').filter((r) => r.closest('tbody'));
+    const names = rows.map((r) => r.textContent);
+    const aguaIdx = names.findIndex((n) => n?.includes('Agua'));
+    const cervezaIdx = names.findIndex((n) => n?.includes('Cerveza'));
+    const papasIdx = names.findIndex((n) => n?.includes('Papas'));
+
+    expect(aguaIdx).toBeGreaterThanOrEqual(0);
+    expect(cervezaIdx).toBeGreaterThan(aguaIdx); // same category (Bebidas), order 1 before order 2
+    expect(papasIdx).toBeGreaterThan(cervezaIdx); // Snacks (order 2) comes after Bebidas (order 1)
   });
 });
 
