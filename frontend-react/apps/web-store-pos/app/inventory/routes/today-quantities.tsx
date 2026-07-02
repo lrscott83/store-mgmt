@@ -4,18 +4,20 @@ import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
-import { EgressOfflineService } from '../lib/services/egress-offline-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 
 export const clientLoader = featureLoader([EFeatures.InventoryTodayQuantities]);
 
+// NOTE (parity gap, intentionally NOT closed in this slice): this table is still NOT a full
+// port of Angular's Today Quantities screen — netChange here is only `entered - sold`. The
+// fabricated "egressed" column (from the deleted waste-tracker, no Angular analog) has been
+// removed, but the full Angular-formula rewrite (Stage 2 gap #2) is a SEPARATE next slice.
 interface ProductQuantities {
   productId: string;
   productName: string;
   entered: number;
   sold: number;
-  egressed: number;
   netChange: number;
 }
 
@@ -26,7 +28,6 @@ export function InventoryTodayQuantitiesPage() {
 
   useEffect(() => {
     const inventorySvc = new InventoryOfflineService(storeId);
-    const egressSvc = new EgressOfflineService(storeId);
     const orderSvc = new OrderOfflineService(storeId);
     const productSvc = new ProductOfflineService(storeId);
 
@@ -52,31 +53,18 @@ export function InventoryTodayQuantitiesPage() {
       }
     }
 
-    // Today's egress
-    const todayEgress = egressSvc.getActiveToday();
-    const egressedByProduct = new Map<string, number>();
-    for (const e of todayEgress) {
-      egressedByProduct.set(e.productId, (egressedByProduct.get(e.productId) ?? 0) + e.quantity);
-    }
-
     // Aggregate all product ids seen today
-    const allProductIds = new Set([
-      ...enteredByProduct.keys(),
-      ...soldByProduct.keys(),
-      ...egressedByProduct.keys(),
-    ]);
+    const allProductIds = new Set([...enteredByProduct.keys(), ...soldByProduct.keys()]);
 
     const result: ProductQuantities[] = Array.from(allProductIds).map((productId) => {
       const entered = enteredByProduct.get(productId) ?? 0;
       const sold = soldByProduct.get(productId) ?? 0;
-      const egressed = egressedByProduct.get(productId) ?? 0;
       return {
         productId,
         productName: productMap.get(productId) ?? productId,
         entered,
         sold,
-        egressed,
-        netChange: entered - sold - egressed,
+        netChange: entered - sold,
       };
     });
 
@@ -104,7 +92,6 @@ export function InventoryTodayQuantitiesPage() {
                 </th>
                 <th className="px-4 py-2 text-right font-medium text-gray-600">Entradas</th>
                 <th className="px-4 py-2 text-right font-medium text-gray-600">Ventas</th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">Egresos</th>
                 <th className="px-4 py-2 text-right font-medium text-gray-600">Cambio neto</th>
               </tr>
             </thead>
@@ -114,7 +101,6 @@ export function InventoryTodayQuantitiesPage() {
                   <td className="px-4 py-3 font-medium text-gray-800">{row.productName}</td>
                   <td className="px-4 py-3 text-right text-green-700">+{row.entered}</td>
                   <td className="px-4 py-3 text-right text-red-600">-{row.sold}</td>
-                  <td className="px-4 py-3 text-right text-orange-600">-{row.egressed}</td>
                   <td
                     className={`px-4 py-3 text-right font-semibold ${
                       row.netChange >= 0 ? 'text-green-700' : 'text-red-600'

@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { InventoryEntryView, EgressEntry, Order, OrderItem } from '@store-mgmt/domain';
+import type { InventoryEntryView, Order, OrderItem, Product, ProductCategory } from '@store-mgmt/domain';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
 
 // ─── Global mocks ────────────────────────────────────────────────────────────
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
+  // storeModuleIds: [] — EgressPage's checkAvailability calls hasInventoryModuleAvailable(user)
+  // unconditionally (same as sale.tsx), which throws on a user object without this field.
+  const state = { user: { selectedStoreId: 's1', storeModuleIds: [] as number[] }, isAuthenticated: true };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -21,32 +23,30 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
     getAll: vi.fn().mockReturnValue([]),
     getByDate: vi.fn().mockReturnValue([]),
     getAvailableByCategory: vi.fn().mockReturnValue([]),
+    getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
     create: vi.fn(),
     update: vi.fn(),
     deactivate: vi.fn(),
   })),
 }));
 
-vi.mock('~/inventory/lib/services/egress-offline-service', () => ({
-  EgressOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
-    getActiveToday: vi.fn().mockReturnValue([]),
-    create: vi.fn(),
-    update: vi.fn(),
-    deactivate: vi.fn(),
-  })),
-}));
+// Mutable fixtures for the EgressPage (Mayorista sale) tests below — declared here so the
+// hoisted vi.mock factories can close over them; other pages in this file (e.g.
+// InventoryAvailablePage) never populate them, so they keep seeing `[]`, matching prior
+// behavior.
+let mockEgressProducts: Product[] = [];
+let mockEgressCategories: ProductCategory[] = [];
 
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getAll: vi.fn(() => mockEgressProducts),
     getById: vi.fn().mockReturnValue(undefined),
   })),
 }));
 
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getAll: vi.fn(() => mockEgressCategories),
   })),
 }));
 
@@ -56,6 +56,20 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
     getActiveOrdersInDay: vi.fn().mockReturnValue([]),
   })),
 }));
+
+const addItemMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/stores/cart-store', () => {
+  const state = {
+    items: [] as unknown[],
+    addItem: addItemMock,
+    getItemQuantity: vi.fn(() => 0),
+  };
+  const useCartStore = vi.fn((selector?: (s: typeof state) => unknown) => {
+    if (typeof selector === 'function') return selector(state);
+    return state;
+  });
+  return { useCartStore };
+});
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -176,27 +190,122 @@ describe('InventoryTodaySalesProfitPage — smoke render', () => {
   });
 });
 
-// ─── EgressPage ──────────────────────────────────────────────────────────────
+// ─── EgressPage — Mayorista wholesale-sale screen (Angular egress.component parity) ────────
+//
+// Angular's EgressComponent (egress.component.ts:20) is NOT a waste/CRUD tracker — it is a
+// wholesale (Mayorista) SALE screen: `orderType = OrderType.Mayorista` (default), a full
+// `OrderTypeUtils.getOrderTypes()` selector, and the reused `SaleCategoryProductsComponent`.
+// These tests supersede the old fabricated waste-CRUD "EgressPage — smoke render" suite
+// (deleted, not duplicated — see Stage 2.1 tasks 2.1/3.5).
+
+function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory {
+  return { id: 'cat-1', name: 'Bebidas', order: 1, isActive: true, ...overrides };
+}
+
+function makeEgressProduct(overrides: Partial<Product> = {}): Product {
+  return {
+    id: 'prod-1',
+    name: 'Coca Cola',
+    categoryId: 'cat-1',
+    categoryName: 'Bebidas',
+    price: 10,
+    order: 1,
+    availableToSale: true,
+    discountFromInvantory: false,
+    businessId: 'biz-1',
+    isActive: true,
+    createdDate: new Date('2025-01-01'),
+    createdByName: 'test',
+    ...overrides,
+  };
+}
 
 import { EgressPage } from '../egress';
 
-describe('EgressPage — smoke render', () => {
-  it('renders without crashing', () => {
-    render(
-      <Wrapper>
-        <EgressPage />
-      </Wrapper>,
-    );
-    expect(document.body).toBeTruthy();
+describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.component parity)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [];
+    mockEgressCategories = [];
+    addItemMock.mockClear();
   });
 
-  it('shows New Egress button', () => {
+  it('renders the Angular header text INVENTORY_EGRESS.HEADER ("Salida")', () => {
     render(
       <Wrapper>
         <EgressPage />
       </Wrapper>,
     );
-    // The page should have a new egress action
-    expect(document.body).toBeTruthy();
+    expect(screen.getByText('Salida')).toBeInTheDocument();
+  });
+
+  it('renders the full OrderType selector (Angular getOrderTypes(): all 5 types) defaulting to Mayorista', () => {
+    render(
+      <Wrapper>
+        <EgressPage />
+      </Wrapper>,
+    );
+    const select = screen.getByLabelText('Tipo') as HTMLSelectElement;
+    expect(select.value).toBe(String(OrderType.Mayorista));
+    for (const label of ['Normal', 'Mayorista', 'Merma', 'Ajuste', 'Otro']) {
+      expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it('renders one category button per active category', () => {
+    mockEgressCategories = [makeCategory({ id: 'c1', name: 'Bebidas' }), makeCategory({ id: 'c2', name: 'Snacks' })];
+    render(
+      <Wrapper>
+        <EgressPage />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Bebidas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Snacks' })).toBeInTheDocument();
+  });
+
+  it('renders an editable price input by default (Mayorista is non-Normal, SaleProductRow parity)', () => {
+    mockEgressCategories = [makeCategory()];
+    mockEgressProducts = [makeEgressProduct()];
+    render(
+      <Wrapper>
+        <EgressPage />
+      </Wrapper>,
+    );
+    expect(screen.getByLabelText('Precio')).toBeInTheDocument();
+  });
+
+  it('threads productId, quantity, orderType (Mayorista) and the edited price into cart-store.addItem', () => {
+    mockEgressCategories = [makeCategory()];
+    mockEgressProducts = [makeEgressProduct({ id: 'p1', price: 10 })];
+    render(
+      <Wrapper>
+        <EgressPage />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText('Precio'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    expect(addItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'p1' }),
+      1,
+      OrderType.Mayorista,
+      12,
+    );
+  });
+
+  it('threads the newly-selected orderType (not the stale default) when the selector is changed before adding', () => {
+    mockEgressCategories = [makeCategory()];
+    mockEgressProducts = [makeEgressProduct({ id: 'p1' })];
+    render(
+      <Wrapper>
+        <EgressPage />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: String(OrderType.Merma) } });
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    expect(addItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'p1' }),
+      1,
+      OrderType.Merma,
+      expect.any(Number),
+    );
   });
 });

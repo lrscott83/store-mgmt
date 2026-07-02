@@ -208,57 +208,6 @@ describe('EntryList — smoke render', () => {
   });
 });
 
-// ─── EgressList ─────────────────────────────────────────────────────────────
-
-import { EgressList } from '../egress-list';
-import type { EgressEntry } from '@store-mgmt/domain';
-
-const MOCK_EGRESS: EgressEntry[] = [
-  {
-    id: 'eg1',
-    productId: 'p1',
-    categoryId: 'cat1',
-    quantity: 5,
-    egressType: 'waste',
-    notes: 'expired',
-    date: new Date('2025-01-01T10:00:00Z'),
-    isActive: true,
-    createdDate: new Date(),
-    createdByName: '',
-    updatedDate: new Date(),
-    updatedByName: '',
-  },
-];
-
-describe('EgressList — smoke render', () => {
-  it('renders without crashing', () => {
-    render(
-      <Wrapper>
-        <EgressList egresses={MOCK_EGRESS} productNames={new Map([['p1', 'Coca Cola']])} onEdit={vi.fn()} onDeactivate={vi.fn()} />
-      </Wrapper>,
-    );
-    expect(document.body).toBeTruthy();
-  });
-
-  it('shows empty state when no egresses', () => {
-    render(
-      <Wrapper>
-        <EgressList egresses={[]} productNames={new Map()} onEdit={vi.fn()} onDeactivate={vi.fn()} />
-      </Wrapper>,
-    );
-    expect(screen.getByText(/No hay egresos/i)).toBeInTheDocument();
-  });
-
-  it('renders egress quantity', () => {
-    render(
-      <Wrapper>
-        <EgressList egresses={MOCK_EGRESS} productNames={new Map([['p1', 'Coca Cola']])} onEdit={vi.fn()} onDeactivate={vi.fn()} />
-      </Wrapper>,
-    );
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
-  });
-});
-
 // ─── EditInventoryEntryModal ─────────────────────────────────────────────────
 
 vi.mock('~/sales/lib/services/product-offline-service', () => ({

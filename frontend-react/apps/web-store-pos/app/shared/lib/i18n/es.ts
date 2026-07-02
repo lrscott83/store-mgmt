@@ -97,6 +97,10 @@ const messages: Record<string, string> = {
   'MENU.EGRESS': 'Salida',
   'MENU.ENTRIES_HISTORY': 'Entradas',
 
+  // Egress — Mayorista wholesale-sale screen header (Angular egress.component.html:4, matches
+  // INVENTORY_MGMT.EGRESS's own header key verbatim: 'Salida')
+  'INVENTORY_EGRESS.HEADER': 'Salida',
+
   // Menu items — Expenses (Angular MENU.EXPENSES.*)
   'MENU.TODAY_EXPENSES': 'Gastos del día',
   'MENU.EXPENSES_HISTORY': 'Gastos',
@@ -333,19 +337,6 @@ const messages: Record<string, string> = {
   'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_EDIT': 'No se puede editar una entrada que ya tiene ventas asociadas',
   'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_DELETE': 'No se puede eliminar una entrada que ya tiene ventas asociadas',
   'INVENTORY.EMPTY_STATE': 'No hay entradas de inventario',
-
-  // Egress
-  'EGRESS.TITLE': 'Egresos',
-  'EGRESS.FORM.PRODUCT': 'Producto',
-  'EGRESS.FORM.QUANTITY': 'Cantidad',
-  'EGRESS.FORM.TYPE': 'Tipo de egreso',
-  'EGRESS.FORM.NOTES': 'Notas',
-  'EGRESS.FORM.DATE': 'Fecha',
-  'EGRESS.TYPES.WASTE': 'Desperdicio',
-  'EGRESS.TYPES.RETURN': 'Devolución',
-  'EGRESS.TYPES.TRANSFER': 'Transferencia',
-  'EGRESS.TYPES.ADJUSTMENT': 'Ajuste',
-  'EGRESS.EMPTY_STATE': 'No hay egresos registrados',
 
   // Scanner
   'SCANNER.CAMERA_PERMISSION_DENIED': 'Permiso de cámara denegado. Habilitá el acceso a la cámara para usar el escáner.',
