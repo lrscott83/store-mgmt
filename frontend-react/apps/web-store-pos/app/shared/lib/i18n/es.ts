@@ -322,6 +322,9 @@ const messages: Record<string, string> = {
   'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas de hoy',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
   'INVENTORY.ENTRIES.TITLE': 'Historial de entradas',
+  // Angular source: inventory-offline.service.ts callers / i18n/vocabs/es.ts:435 —
+  // byte-identical Spanish, shown when EntriesPage has zero day-groups (gap #6).
+  'INVENTORY.NO_HISTORY_ENTRY_FOUND': 'No se encontró ninguna entrada',
   // Angular source: inventory-today-quantities.component.html + i18n/vocabs/es.ts
   // INVENTORY.TODAY_QUANTITIES/NO_PRODUCTS/PRODUCT/BEGINNING/ENTRIES/AVAILABLE/SOLD/ENDING —
   // Spanish text byte-identical to Angular.

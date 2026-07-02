@@ -216,6 +216,137 @@ describe('EntriesPage — smoke render', () => {
   });
 });
 
+// ─── EntriesPage — day grouping + filter removal (Angular parity, gap #6) ────
+//
+// Angular reference: entries.component.ts:82-104 `groupEntries` (groups by calendar day,
+// per-day count = Σquantity, per-day total = ΣcostPrice·quantity, ascending sort both across
+// days and within a day) + :54-59 `getEntriesCount`/`getEntriesTotal` (grand totals) +
+// entries.component.ts:43,62-67 (loadEntries() ALWAYS calls loadEntriesFiltered(null, null,
+// null) — product/date filtering is dead code on this screen; the paymentType mat-radio-group
+// is unwired to any query param and InventoryEntryView has no paymentType field at all, so it's
+// inert). Confirmed via grep: filterInventoryEntries's only caller in the whole Angular
+// codebase is this component, always with null args. Decision (orchestrator, 2026-07-02):
+// remove React's product-name filter (no Angular analog) and date-range filter (React extra,
+// no Angular analog), and omit the payment-type radio (Angular's own dead UI, no data-model
+// backing — nothing correct to implement per the Angular-bug-handling policy).
+
+describe('EntriesPage — day grouping (Angular parity)', () => {
+  const dayOneEntries: InventoryEntryView[] = [
+    {
+      id: 'e1',
+      productId: 'p-a',
+      productName: 'Product A',
+      quantity: 2,
+      costPrice: 3,
+      date: new Date('2026-06-30T10:00:00.000Z'),
+      isActive: true,
+    },
+    {
+      id: 'e2',
+      productId: 'p-b',
+      productName: 'Product B',
+      quantity: 1,
+      costPrice: 10,
+      date: new Date('2026-06-30T08:00:00.000Z'),
+      isActive: true,
+    },
+  ];
+  const dayTwoEntries: InventoryEntryView[] = [
+    {
+      id: 'e3',
+      productId: 'p-c',
+      productName: 'Product C',
+      quantity: 5,
+      costPrice: 2,
+      date: new Date('2026-07-01T09:00:00.000Z'),
+      isActive: true,
+    },
+  ];
+
+  function mockEntries(entries: InventoryEntryView[]) {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue(entries),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+  }
+
+  it('shows the grand entries count and total in the header', () => {
+    mockEntries([...dayOneEntries, ...dayTwoEntries]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    // count = 2+1+5 = 8; total = 2*3 + 1*10 + 5*2 = 6+10+10 = 26
+    expect(screen.getByText('(8)')).toBeInTheDocument();
+    expect(screen.getByText('$26.00')).toBeInTheDocument();
+  });
+
+  it('groups entries into one panel per calendar day with the correct per-day total', () => {
+    mockEntries([...dayOneEntries, ...dayTwoEntries]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
+    expect(toggles).toHaveLength(2);
+    // day 1 total = 6+10 = 16.00; day 2 total = 10.00
+    expect(screen.getByText('$16.00')).toBeInTheDocument();
+    expect(screen.getByText('$10.00')).toBeInTheDocument();
+  });
+
+  it('sorts day panels ascending (oldest day first)', () => {
+    mockEntries([...dayOneEntries, ...dayTwoEntries]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
+    expect(toggles[0].getAttribute('data-testid')).toBe('entry-day-panel-toggle-2026-06-30');
+    expect(toggles[1].getAttribute('data-testid')).toBe('entry-day-panel-toggle-2026-07-01');
+  });
+
+  it('sorts entries within a day ascending by time', () => {
+    mockEntries([...dayOneEntries, ...dayTwoEntries]);
+    const { container } = render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('entry-day-panel-toggle-2026-06-30'));
+    const text = container.textContent ?? '';
+    // Product B (08:00) must render before Product A (10:00) once expanded.
+    expect(text.indexOf('Product B')).toBeLessThan(text.indexOf('Product A'));
+  });
+
+  it('shows the no-history message when there are no entries', () => {
+    mockEntries([]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    expect(screen.getByText('No se encontró ninguna entrada')).toBeInTheDocument();
+  });
+
+  it('renders no product-name filter, no date-range filter, and no payment-type radio', () => {
+    mockEntries([...dayOneEntries, ...dayTwoEntries]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    expect(screen.queryByPlaceholderText('Buscar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Desde')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hasta')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  });
+});
+
 // ─── InventoryTodayQuantitiesPage ────────────────────────────────────────────
 
 import { InventoryTodayQuantitiesPage } from '../today-quantities';
