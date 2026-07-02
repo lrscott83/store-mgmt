@@ -658,3 +658,199 @@ Products+Sale+Orders+Credits slices completed so far, per user direction. Stage 
 full-module chained-PR delivery strategy (stacked-to-main vs feature-branch-chain) still
 needs an explicit decision from the orchestrator/user before a non-explicitly-scoped Stage 1
 `sdd-apply` batch begins, per the tasks artifact's Review Workload Forecast.
+
+## Batch 7 — Stage 1 Sales, TODAY STATS + CATEGORY STATS strict Angular parity (FINAL Sales slice)
+
+### Why (Batch 7)
+
+User explicitly requested the final Stage 1 (Sales) slice: strict Angular parity for the
+Today Stats ("Cuadre del día") and Category Stats views — the two Sales views not yet
+touched by batches 3-6. The prior React versions were entirely React-invented: `today-stats.tsx`
+was a "TodayStatsPage" with summary cards (Ingresos totales / Artículos), a
+revenue-by-payment-type breakdown list, and a `CategoryStats` component computing
+per-category revenue from raw `Order[]` client-side — none of this has an Angular equivalent.
+Angular's `TodayStatsComponent` ("Cuadre del día") is a Material accordion of five
+collapsed-by-default expansion panels (Resumen Efectivo / Gastos / Créditos Por Cobrar /
+Créditos Pagados / Ventas) built from five distinct getter formulas and gated by
+`hasExpensesModuleAvailable()`/`hasCreditsModuleAvailable()` (module-based, NOT feature-based
+— a check that didn't exist anywhere in React's `authorization-service.ts` before this batch).
+`CategoryStatsComponent` is a bare two-level table (category summary row + one row per
+product), fed by `OrderOfflineService.getCategoryCartItemsView()` — an aggregation method
+that also didn't exist in React.
+
+### Where (Batch 7)
+
+- `app/sales/lib/category-cart-items-view.ts` — NEW. `CategoryCartItemsView` /
+  `ProductCartItemsView` view-model interfaces, 1:1 port of Angular's
+  `application/orders/category-cart-items.view.ts` / `product-cart-items.view.ts`. Lives in
+  `sales/lib` (not `@store-mgmt/domain`) because these are a service-layer projection, not
+  domain entities — matching where Angular itself puts them (`application/`, not
+  `domain/entities/`).
+- `app/sales/lib/services/order-offline-service.ts` — ADDED `getCategoryCartItemsView(date)`:
+  1:1 port of Angular's `OrderOfflineService.getCategoryCartItemsView`. Flattens today's
+  active orders' `orderItems`, groups by `categoryId` then by `productId` (custom `groupBy`
+  helper matching Angular's `Map`-based one), sums `total`/`itemsCount` per group via ported
+  `getOrderItemsTotal`/`getOrderItemsCount` helpers. Resolves each category's `order` field
+  from a new `ProductCategoryOfflineService` instance, falling back to `Number.MAX_VALUE`
+  when the category isn't found in storage — Angular's exact fallback, preserved. Also
+  preserves an Angular QUIRK verbatim: the returned array is NOT explicitly sorted by
+  `order` — iteration follows `Map` insertion order (first-seen category among the flattened
+  order items), not the resolved `order` field. Flagged, not silently fixed.
+- `app/sales/lib/services/sale-credit-offline-service.ts` — ADDED two new day-filter methods
+  Angular has but React didn't: `getUnpaidCreatedToday()` (1:1 port of
+  `getUnPaidSaleCreditsInDayObservable` — active credits CREATED today via `date`, filtered
+  to `!isPaid`; feeds "Créditos Por Cobrar") and `getPaidToday()` (1:1 port of
+  `getPaidSaleCreditsInDayObservable` — active credits whose `paidDate` falls in today's
+  range, REGARDLESS of creation date; feeds "Créditos Pagados"). These are genuinely
+  different filters — reusing the existing `getActiveToday()` (created-today only) for both
+  panels would have been WRONG for "Créditos Pagados", since a credit created yesterday and
+  paid today must still appear there. `getActiveToday()` itself is unchanged.
+- `app/shared/lib/auth/authorization-service.ts` — ADDED `isModuleAvailable(user, moduleId)`
+  (1:1 port of Angular's private `AuthorizationService.hasModuleAvailable` —
+  `storeModuleIds.some(id => id === moduleId)`, a module-based check DISTINCT from the
+  existing feature-based `isUserAuthorized`), plus `hasExpensesModuleAvailable(user)` and
+  `hasCreditsModuleAvailable(user)` thin wrappers, matching Angular's own public API shape.
+  `EModules` enum already existed in `@store-mgmt/domain` with matching numeric values
+  (Expenses=8, Credits=11) — reused, not redefined.
+- `app/sales/routes/today-stats.tsx` — REWRITTEN wholesale. Card with `TODAY_STATS.HEADER`
+  title ("Cuadre del día") + running total in the toolbar (`getTotal()` formula:
+  `ordersTotal + paidSaleCreditsTotal - creditsTotal - expensesTotal`, colored via
+  success/danger/neutral like Angular's `getTotalClassName()`). Body is a `<details>`/
+  `<summary>`-based accordion (semantic HTML substitute for Angular Material's
+  `mat-accordion`/`mat-expansion-panel`, collapsed by default matching every panel's
+  `[expanded]="false"`) with, in Angular's exact order: (1) "Resumen Efectivo" — ALWAYS
+  rendered, a 1-3 row table (Ventas always; Créditos Pagados / Gastos rows only when their
+  respective module is available), amounts colored success/danger; (2) "Gastos (N)" — only
+  when `hasExpensesModuleAvailable`, listing today's expenses with expense-type text +
+  danger-colored total + payment-type badge, using a locally-duplicated
+  `EXPENSE_TYPE_KEYS`/`PAYMENT_TYPE_KEYS` map (not imported from
+  `app/expenses/components/expense-list.tsx`, since that file doesn't export them and Sales
+  should not couple to Expenses-module internals — Stage 3 scope boundary preserved), empty
+  state uses `TODAY_STATS.NO_EXPENSE_FOUND`; (3) "Créditos Por Cobrar (N)" — only when
+  `hasCreditsModuleAvailable`, a read-only `SaleCreditsTable` (bare table, no actions column,
+  matching Angular's `<app-sale-credit-list>` with no `[readOnly]` binding here — default
+  `true`); (4) "Créditos Pagados (N)" — only when `hasCreditsModuleAvailable`; FLAGGED
+  ANGULAR QUIRK preserved verbatim: the header's `(...)` slot shows
+  `{{getPaidSaleCreditsTotal()}}` (a currency SUM), not a count, unlike every other panel
+  header on this view — Angular's own template literally does this, not a paraphrase or bug
+  fix; (5) "Ventas (N productos)" — ALWAYS rendered, one `CategoryStats` row per category
+  from `getCategoryCartItemsView()`. `SaleCreditsTable` is a small local helper duplicating
+  the read-only rendering path already established in `sale-credit-list.tsx` (kept local
+  since Today Stats doesn't need edit/pay actions or the actions-menu/modal wiring at all).
+- `app/sales/components/category-stats.tsx` — REWRITTEN wholesale from a
+  `computeCategoryStats(orders)`-based revenue-card list into a 1:1 port of
+  `category-stats.component.html`: a bare table (no header row), one summary row for the
+  category (name, `(itemsCount)` badge, green total) followed by one row per
+  `category.productItems` entry with the identical column layout. Takes a single
+  `category: CategoryCartItemsView` prop (was `orders: Order[]` before — the aggregation now
+  lives in `OrderOfflineService`, matching where Angular puts it). No i18n keys — Angular's
+  own template has zero static Spanish text in this component, only currency-formatted
+  numbers and names.
+- `app/shared/lib/i18n/es.ts` — ADDED `TODAY_STATS.HEADER` ('Cuadre del día',
+  previously only used inline, not as a key) and `TODAY_STATS.NO_EXPENSE_FOUND` ('No se ha
+  realizado ningun gasto en el día de hoy.', Angular's typo `ningun` without accent preserved
+  verbatim). The remaining panel labels ("Resumen Efectivo", "Ventas", "Créditos Pagados",
+  "Gastos", "Créditos Por Cobrar") are HARDCODED Spanish literals in Angular's own template
+  (no `[translate]` pipe on them at all) — preserved as literal strings in the React
+  components too, NOT invented as new i18n keys, to stay byte-identical to Angular's actual
+  i18n boundary.
+- Test files: `category-stats.test.tsx` (NEW, 3 tests), `today-stats.test.tsx` (NEW, 6
+  tests, includes a module-availability-gated describe block), `order-offline-service.test.ts`
+  (+6 tests for `getCategoryCartItemsView`), `sale-credit-offline-service.test.ts` (+5 tests
+  for `getUnpaidCreatedToday`/`getPaidToday`), `authorization-service.test.ts` (+7 tests for
+  `isModuleAvailable`/`hasExpensesModuleAvailable`/`hasCreditsModuleAvailable`),
+  `sales-routes.test.tsx` (updated shared `OrderOfflineService`/`SaleCreditOfflineService`
+  mocks + added an `ExpenseOfflineService` mock + `storeModuleIds: []` on the shared mock
+  user, needed because the rewritten `TodayStatsPage` now calls
+  `hasExpensesModuleAvailable`/`hasCreditsModuleAvailable` on every render).
+
+### Removed / Relocated (Batch 7, strict parity)
+
+1. `today-stats.tsx`'s summary cards (Ingresos totales / Artículos vendidos) and
+   revenue-by-payment-type breakdown list — REMOVED entirely, no Angular equivalent.
+2. `category-stats.tsx`'s client-side `computeCategoryStats(orders)` aggregation and its
+   `CategoryStat` interface — REMOVED/RELOCATED: the aggregation now lives in
+   `OrderOfflineService.getCategoryCartItemsView`, matching where Angular's own
+   `CategoryStatsComponent` gets its `[category]` input from (`OrderOfflineService`, not the
+   presentational component).
+3. `today-stats.tsx`'s old `PAYMENT_LABELS` map and `ORDERS.STATS_TITLE`/`ORDERS.STATS.*`/
+   `ORDERS.PAYMENT_TYPE` i18n key usages — ORPHANED (left in `es.ts`, not pruned, per the
+   established no-instruction-to-prune-orphans precedent from batch 5/6). Confirmed via grep
+   these keys are not consumed by any other rewritten file in this batch.
+
+### Flagged gap (out of Batch 7 scope — Stage 3 Expenses)
+
+`ExpenseOfflineService.getByDateRange`/`getActiveToday()` (React) does NOT filter
+`isActive`, unlike Angular's `getExpensesInDay` (`expense.isActive && ...`). This means a
+deleted/inactive expense would still count toward `expensesCashTotal`/`expensesTotal` on
+Today Stats if such a record ever existed. Not fixed in this batch — `ExpenseOfflineService`
+internals are Stage 3 (Expenses module) scope; Today Stats simply consumes the existing
+`getActiveToday()` as-is, same as `today-expenses.tsx`/`expenses-history.tsx` already do.
+Flagged here for Stage 3's L4 functional diff pass.
+
+### TDD Cycle Evidence (Batch 7)
+
+| Task | RED | GREEN | REFACTOR |
+|---|---|---|---|
+| `OrderOfflineService.getCategoryCartItemsView` | wrote 6 tests (empty case, category-level grouping/totals, product-level grouping/totals, category `order` resolution, `Number.MAX_VALUE` fallback, excludes inactive orders) against the not-yet-existing method; confirmed RED (`TypeError: service.getCategoryCartItemsView is not a function`, 6/6 new tests failed, 26/26 pre-existing still passed) | implemented the method — 32/32 passed first run | none needed |
+| `authorization-service.isModuleAvailable`/`hasExpensesModuleAvailable`/`hasCreditsModuleAvailable` | wrote 7 tests against not-yet-exported functions; confirmed RED (`TypeError: (0, hasCreditsModuleAvailable) is not a function`, 7/7 new failed, 16/16 pre-existing passed) | implemented — 23/23 passed first run | none needed |
+| `SaleCreditOfflineService.getUnpaidCreatedToday`/`getPaidToday` | wrote 5 tests against not-yet-existing methods; confirmed RED (`TypeError: service.getPaidToday is not a function`, 5/5 new failed, 26/26 pre-existing passed) | implemented — initially 30/31 (one test used an untyped-and-unverified backdating approach); revised the "excludes credits not created today" test to directly backdate `localStorage` and assert via the real method instead of a placeholder assertion — 31/31 passed | tightened one test's assertion from a placeholder `expect(credit).toBeTruthy()` to an actual behavioral check against `getUnpaidCreatedToday()` |
+| `CategoryStats` component rewrite | wrote 3 tests (category summary row, per-product rows, null-category guard) against the already-drafted component in the same edit pass (component written first, tests immediately after, both verified together — see Issues Found) | 3/3 passed on first run, no fix needed | none needed |
+| `TodayStatsPage` route rewrite | wrote 6 tests (header, Resumen Efectivo panel + Gastos-row visibility gating, salesCashTotal formula, Ventas-panel item count, Gastos/Créditos panels hidden without modules, Gastos/Créditos panels shown + literal "Créditos Pagados (60)" quirk with modules) against the not-yet-rewritten route; confirmed RED (5/6 failed against the old summary-card implementation) | rewrote the route — 6/6 passed first run | none needed |
+
+### Issues Found (Batch 7)
+
+`CategoryStats` was implemented before its test file in this batch (design decided while
+reading Angular's `category-stats.component.html`, tests written immediately after against
+the already-typed component) — a deviation from strict RED-before-GREEN sequencing for that
+one component. All 3 tests passed on first run with no fix needed, so no incorrect behavior
+shipped, but this is noted as a process deviation, not silently glossed over. Every other
+unit in this batch (service methods, authorization helpers, the route) followed strict
+RED-confirmed-failing → GREEN sequencing.
+
+### Test/Build Results (Batch 7)
+
+- `pnpm exec tsc --noEmit` (web-store-pos): one error found and fixed (a test-only unsafe
+  type assertion in `sale-credit-offline-service.test.ts`'s backdating helper — narrowed to
+  `Record<string, unknown>` instead of asserting through `SaleCredit`); clean after fix, zero
+  errors.
+- `pnpm exec vitest run` (full suite): 84 test files / 946 tests passed, 0 failed. Baseline
+  before this batch: 82 files / 918 tests (Batch 6) → +2 files (`category-stats.test.tsx`,
+  `today-stats.test.tsx`), +28 tests net. Same pre-existing unrelated stderr noise from
+  `api-client.test.ts`'s AUTH-06 jsdom navigation warning (documented in batches 3-6 too, not
+  a failure).
+- `pnpm exec react-router build`: succeeded. `today-stats-CpPApVTL.js` chunk emitted. No
+  errors/warnings introduced.
+
+### Workload / PR Boundary (Batch 7)
+
+- Mode: direct work-unit commit on `feat/frontend-parity-audit`, NO PR, per explicit user
+  instruction (same as batches 1-6).
+- 1 work-unit commit: `bea961f` (913 insertions / 124 deletions across 13 files: 3 new files
+  + 10 modified). Exceeds the 400-line single-PR review budget on raw insertion count;
+  explicitly instructed as a direct-commit, no-PR, single-slice batch (same
+  accepted-exception pattern as prior batches).
+- Boundary: this batch = Today Stats (`today-stats.tsx`) + Category Stats
+  (`category-stats.tsx`) + their two new service methods (`getCategoryCartItemsView`,
+  `getUnpaidCreatedToday`/`getPaidToday`) + the new `authorization-service.ts` module-check
+  helpers + their i18n keys ONLY. Does NOT touch `ExpenseOfflineService` internals (flagged
+  gap noted above, deferred to Stage 3) or `SaleCreditList`/`EditSaleCreditModal`/
+  `SaleCreditPaymentModal` (unchanged from Batch 6 — Today Stats renders its own local
+  read-only `SaleCreditsTable`, does not reuse the actions-capable `SaleCreditList`).
+
+### Status (Batch 7) — Stage 1 (Sales) COMPLETE
+
+7 batches complete (2 targeted UI/shell batches + Stage 1 Sales Products-view + Sale/POS-view
++ Orders-views + Sale-Credits-views + Today-Stats/Category-Stats parity slices). **Stage 1
+(Sales) is now FULLY parity-complete** — every Sales view listed in the tasks artifact's
+Stage 1 template has undergone its own L4 (functional diff) + L5 (visual/token) + L6 (i18n)
+pass: Products, Sale/POS, Orders (`orders.tsx`/`today-orders.tsx`), Sale Credits
+(`credits.tsx`/`today-credits.tsx`), and now Today Stats (`today-stats.tsx`) + Category Stats
+(`category-stats.tsx`). No Sales view remains untouched. Ready for `sdd-verify` on the full
+Stage 1 (Sales) module, or to proceed to Stage 2 (Inventory) per the tasks artifact's module
+order. Stage 1's full-module chained-PR delivery strategy question is now moot for delivery
+purposes (all 7 batches were delivered as direct work-unit commits, no PR, per explicit user
+instruction throughout) — but the orchestrator/user should still confirm chain strategy
+(stacked-to-main vs feature-branch-chain) before Stage 2 (Inventory) `sdd-apply` begins if a
+PR-based workflow is desired going forward, per the tasks artifact's Review Workload
+Forecast.
