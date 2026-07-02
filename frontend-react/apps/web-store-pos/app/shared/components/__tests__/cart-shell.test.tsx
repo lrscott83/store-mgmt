@@ -15,6 +15,24 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
   })),
 }));
 
+// Mock ProductOfflineService — CartShell must re-fetch the LATEST product state before
+// validating an in-cart quantity change, mirroring Angular's ShoppingCartService.addCartItem
+// (productService.getProductById), not rely on the possibly-stale product cached on the
+// cart item itself.
+let mockProductLookup: Record<string, Product | undefined> = {};
+vi.mock('~/sales/lib/services/product-offline-service', () => ({
+  ProductOfflineService: vi.fn().mockImplementation(() => ({
+    getById: vi.fn((id: string) => mockProductLookup[id]),
+  })),
+}));
+
+// Mock the SweetAlert2 wrapper — CartShell's increase/decrease guard shows a blocking
+// error identical to Angular's nav-right.component.ts increaseProduct/decreaseProduct.
+const showBlockingErrorMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingError: showBlockingErrorMock,
+}));
+
 // Mock useAuthStore (needed for OrderOfflineService instantiation + credits-module gating).
 // storeModuleIds includes EModules.Credits (11) by default so the credit toggle/client
 // input render in most tests; CART-CREDITS-GATE-* tests override this per-case.
@@ -30,7 +48,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { CartShell } from '../cart-shell';
-import { PaymentType } from '@store-mgmt/domain';
+import { PaymentType, EModules } from '@store-mgmt/domain';
 import type { Product } from '@store-mgmt/domain';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
@@ -271,6 +289,163 @@ describe('CartShell — cart line-item controls have Spanish aria-labels', () =>
     expect(screen.getByLabelText('Disminuir cantidad de Coca Cola')).toBeInTheDocument();
     expect(screen.getByLabelText('Aumentar cantidad de Coca Cola')).toBeInTheDocument();
     expect(screen.getByLabelText('Eliminar Coca Cola')).toBeInTheDocument();
+  });
+});
+
+// 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
+// ShoppingCartService.increaseCartItem/decreaseCartItem -> addCartItem(±1) -> addItem(),
+// which ALWAYS re-validates InventoryOfflineService.hasAvailableProductToSale(productId,
+// delta + currentCartQty) — same validation for BOTH directions (nav-right.component.ts:
+// 393-417, shopping-cart.service.ts:78-123). On failure: Swal.fire({ title:
+// GENERAL.RESPONSE.ERROR_TITLE, text: <error description>, icon: 'error' }).
+describe('CartShell — in-cart quantity +/- stock validation (Angular parity)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockProductLookup = {};
+    localStorage.clear();
+  });
+
+  it('CART-STOCK-01: blocks increasing quantity and shows a blocking alert when the product is no longer active', () => {
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', isActive: false });
+    mockProductLookup = { p1: product };
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
+
+    expect(updateQuantity).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const [title, text] = showBlockingErrorMock.mock.calls[0];
+    expect(title).toBe('Error');
+    expect(text).toBe('El producto no está activo.');
+  });
+
+  it('CART-STOCK-02: blocks decreasing quantity too — same validation applies to both directions', () => {
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', isActive: false });
+    mockProductLookup = { p1: product };
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Coca Cola'));
+
+    expect(updateQuantity).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const [, text] = showBlockingErrorMock.mock.calls[0];
+    expect(text).toBe('El producto no está activo.');
+  });
+
+  it('CART-STOCK-03: blocks increasing quantity when the new total exceeds available stock', () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [EModules.Inventory] };
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true });
+    mockProductLookup = { p1: product };
+    localStorage.setItem(
+      'lizoft.store-inventory-entries-s1',
+      JSON.stringify([
+        [
+          'p1',
+          [
+            {
+              id: 'e1',
+              productId: 'p1',
+              categoryId: 'cat-1',
+              quantity: 3,
+              available: 3,
+              costPrice: 1,
+              date: new Date('2025-01-01'),
+              order: 0,
+              isActive: true,
+              createdDate: new Date('2025-01-01'),
+              createdByName: 'test',
+            },
+          ],
+        ],
+      ]),
+    );
+    const updateQuantity = vi.fn();
+    // Already 3 in cart, only 3 available -> increasing to 4 must fail.
+    mockCartState({ items: [{ product, quantity: 3 }], total: vi.fn().mockReturnValue(15), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
+
+    expect(updateQuantity).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const [, text] = showBlockingErrorMock.mock.calls[0];
+    expect(text).toBe('La cantidad del producto no está disponible en el inventario.');
+  });
+
+  it('CART-STOCK-04: allows increasing quantity when stock covers the new total', () => {
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [EModules.Inventory] };
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true });
+    mockProductLookup = { p1: product };
+    localStorage.setItem(
+      'lizoft.store-inventory-entries-s1',
+      JSON.stringify([
+        [
+          'p1',
+          [
+            {
+              id: 'e1',
+              productId: 'p1',
+              categoryId: 'cat-1',
+              quantity: 10,
+              available: 10,
+              costPrice: 1,
+              date: new Date('2025-01-01'),
+              order: 0,
+              isActive: true,
+              createdDate: new Date('2025-01-01'),
+              createdByName: 'test',
+            },
+          ],
+        ],
+      ]),
+    );
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(updateQuantity).toHaveBeenCalledWith('p1', 3);
+  });
+
+  it('CART-STOCK-05: allows decreasing quantity when validation passes', () => {
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola' });
+    mockProductLookup = { p1: product };
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Coca Cola'));
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(updateQuantity).toHaveBeenCalledWith('p1', 1);
+  });
+
+  it('CART-STOCK-06: skips the stock check entirely when the inventory module is unavailable (matches hasAvailableProductToSale gate)', () => {
+    // No inventory module in storeModuleIds, discountFromInvantory true but gated off —
+    // hasAvailableProductToSale short-circuits to Success() (branch 4).
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true });
+    mockProductLookup = { p1: product };
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(updateQuantity).toHaveBeenCalledWith('p1', 3);
   });
 });
 

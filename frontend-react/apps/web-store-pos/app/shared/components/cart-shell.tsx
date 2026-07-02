@@ -5,11 +5,15 @@ import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
-import { hasCreditsModuleAvailable } from '~/shared/lib/auth/authorization-service';
+import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { checkProductAvailabilityToSale, PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS } from '~/sales/lib/product-availability';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { hasCreditsModuleAvailable, hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 // Angular's cart order type is always Normal — the cart never carries a different
 // OrderType (see NavRightComponent.orderType / ShoppingCartService.getOrderType()).
@@ -84,6 +88,7 @@ export function CartShell() {
   } = useCartStore();
   const user = useAuthStore((s) => s.user);
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
+  const storeId = user?.selectedStoreId ?? '';
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalAmount = total();
@@ -100,6 +105,40 @@ export function CartShell() {
     resetTransientFields();
     setSubmitError(null);
     setSubmitSuccess(null);
+  }
+
+  // 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
+  // ShoppingCartService.increaseCartItem/decreaseCartItem -> addCartItem(orderType,
+  // productId, ±1, null) -> addItem(), which ALWAYS re-validates
+  // InventoryOfflineService.hasAvailableProductToSale(productId, delta + currentCartQty)
+  // regardless of direction (nav-right.component.ts:393-417,
+  // shopping-cart.service.ts:78-123) — re-fetches the LATEST product state (not the
+  // possibly-stale one cached on the cart item) exactly like Angular's
+  // productService.getProductById inside addCartItem.
+  function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
+    const productService = new ProductOfflineService(storeId);
+    const inventoryService = new InventoryOfflineService(storeId);
+    const product = productService.getById(productId);
+    const result = checkProductAvailabilityToSale({
+      product,
+      quantity: delta,
+      cartQuantity: currentQuantity,
+      hasInventoryModule: user ? hasInventoryModuleAvailable(user) : false,
+      inventory: inventoryService.getAvailableQuantity(productId),
+    });
+    if (!result.succeeded) {
+      // Angular: Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message,
+      // icon: 'error' }) — blocking, aborts the quantity change.
+      const messageKey = result.errorCode
+        ? PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS[result.errorCode]
+        : 'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE';
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        intl.formatMessage({ id: messageKey }),
+      );
+      return;
+    }
+    updateQuantity(productId, currentQuantity + delta);
   }
 
   function clearCartAfterSuccessfulOrder() {
@@ -315,7 +354,7 @@ export function CartShell() {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                        onClick={() => handleQuantityChange(item.product.id, item.quantity, -1)}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs"
                         aria-label={intl.formatMessage(
                           { id: 'CART.DECREASE_QUANTITY' },
@@ -326,7 +365,7 @@ export function CartShell() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => handleQuantityChange(item.product.id, item.quantity, 1)}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs"
                         aria-label={intl.formatMessage(
                           { id: 'CART.INCREASE_QUANTITY' },
