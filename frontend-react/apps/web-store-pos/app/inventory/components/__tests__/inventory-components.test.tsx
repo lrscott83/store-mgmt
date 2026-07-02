@@ -101,13 +101,15 @@ describe('InventoryProductList — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows empty state when no categories', () => {
+  it('shows empty state when no categories (Angular parity: INVENTORY.CATEGORY_PRODUCT_NO_FOUND)', () => {
     render(
       <Wrapper>
         <InventoryProductList categories={[]} />
       </Wrapper>,
     );
-    expect(screen.getByText(/No hay entradas/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('No existe ningún producto disponible en la categoría'),
+    ).toBeInTheDocument();
   });
 
   it('renders search input', () => {
@@ -233,13 +235,13 @@ describe('InventoryDailyEntries — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows empty state when no entries', () => {
+  it('shows empty state when no entries (Angular parity: INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY)', () => {
     render(
       <Wrapper>
         <InventoryDailyEntries entries={[]} onEdit={vi.fn()} onDeactivate={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.getByText(/No hay entradas/i)).toBeInTheDocument();
+    expect(screen.getByText('No existe ninguna entrada en el día')).toBeInTheDocument();
   });
 
   it('groups entries by product name', () => {
@@ -268,13 +270,13 @@ describe('EntryList — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows empty state when no entries', () => {
+  it('shows empty state when no entries (Angular parity: INVENTORY.NO_ENTRY_FOUND)', () => {
     render(
       <Wrapper>
         <EntryList entries={[]} onEdit={vi.fn()} onDeactivate={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.getByText(/No hay entradas/i)).toBeInTheDocument();
+    expect(screen.getByText('No existe ningún producto disponible')).toBeInTheDocument();
   });
 
   it('renders each entry', () => {
@@ -293,24 +295,27 @@ describe('EntryList — smoke render', () => {
 // `@Input() readOnly: boolean = true` — gates the edit/delete menu) ─────────
 
 describe('EntryList — readOnly prop (Angular parity)', () => {
-  it('shows edit/deactivate actions by default (readOnly not passed)', () => {
+  it('shows edit/delete actions by default (readOnly not passed)', () => {
     render(
       <Wrapper>
         <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} />
       </Wrapper>,
     );
     expect(screen.getAllByText('Editar').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Anular pedido').length).toBeGreaterThan(0);
+    // CRITICAL bug fix (Angular parity: entry-list.component.html:36 GENERAL.DELETE) — was
+    // wrongly wired to ORDERS.DEACTIVATE ("Anular pedido"), the cancel-order label.
+    expect(screen.getAllByText('Eliminar').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
   });
 
-  it('hides edit/deactivate actions when readOnly is true', () => {
+  it('hides edit/delete actions when readOnly is true', () => {
     render(
       <Wrapper>
         <EntryList entries={MOCK_ENTRIES} readOnly />
       </Wrapper>,
     );
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
-    expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
     // Data still renders — only the actions column is gated.
     expect(screen.getAllByText('Coca Cola').length).toBeGreaterThan(0);
   });
@@ -340,6 +345,8 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 });
 
 import { EditInventoryEntryModal } from '../edit-inventory-entry-modal';
+import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import type { InventoryEntry } from '@store-mgmt/domain';
 
 describe('EditInventoryEntryModal — smoke render', () => {
   it('does not render when closed', () => {
@@ -368,5 +375,119 @@ describe('EditInventoryEntryModal — smoke render', () => {
       </Wrapper>,
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+// ─── EditInventoryEntryModal — create vs. edit mode (Angular parity) ────────
+//
+// Angular reference: edit-inventory-entry-modal.component.html:4 (title toggles
+// INVENTORY_ENTRY.NEW_INVENTORY_ENTRY / EDIT_INVENTORY_ENTRY based on `!inventoryEntry`) and
+// :84 (save button toggles GENERAL.INSERT / GENERAL.UPDATE). React previously had a
+// copy-paste bug: both ternary branches resolved to the same key (always "new entry" copy)
+// and the save button was hardcoded to GENERAL.SAVE regardless of mode.
+
+function makeEntry(overrides: Partial<InventoryEntry> = {}): InventoryEntry {
+  return {
+    id: 'e1',
+    productId: 'p1',
+    categoryId: 'cat1',
+    quantity: 5,
+    available: 5,
+    costPrice: 2,
+    date: new Date('2025-01-01'),
+    order: 0,
+    isActive: true,
+    createdDate: new Date('2025-01-01'),
+    createdByName: 'test',
+    ...overrides,
+  };
+}
+
+describe('EditInventoryEntryModal — title/save button toggle by mode (Angular parity)', () => {
+  it('shows the create-mode title and save label when no entry is passed', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Adicionar Entrada')).toBeInTheDocument();
+    expect(screen.queryByText('Editar Entrada')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
+  });
+
+  it('shows the edit-mode title and save label when an entry is passed', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal
+          isOpen
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+          storeId="s1"
+          entry={makeEntry()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Editar Entrada')).toBeInTheDocument();
+    expect(screen.queryByText('Adicionar Entrada')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeInTheDocument();
+  });
+});
+
+// ─── EditInventoryEntryModal — validation messages (Angular parity) ─────────
+//
+// Angular reference: edit-inventory-entry-modal.component.html:26,42,64 (GENERAL.VALIDATION.
+// REQUIRED / NUMBER_GREADER_THAN_ONE / NUMBER_GREADER_THAN_ZERO, each interpolated with the
+// field's own label). React previously hardcoded raw Spanish suffixes concatenated onto the
+// field label instead of using these i18n keys.
+
+describe('EditInventoryEntryModal — validation messages (Angular parity)', () => {
+  it('shows the required-product message using GENERAL.VALIDATION.REQUIRED', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(screen.getByText('Producto es requerido')).toBeInTheDocument();
+  });
+
+  it('shows the quantity-minimum message using GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE', () => {
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([
+            { id: 'p1', name: 'Ron', categoryId: 'cat1' },
+          ]),
+        }) as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(screen.getByText('Cantidad mínimo valor es 1')).toBeInTheDocument();
+  });
+
+  it('shows the cost-price-minimum message using GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO', () => {
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([
+            { id: 'p1', name: 'Ron', categoryId: 'cat1' },
+          ]),
+        }) as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(screen.getByText('Precio de costo mínimo valor es 0')).toBeInTheDocument();
   });
 });

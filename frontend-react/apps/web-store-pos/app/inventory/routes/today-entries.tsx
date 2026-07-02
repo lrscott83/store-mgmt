@@ -109,7 +109,9 @@ export function TodayEntriesPage() {
           }}
           className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
-          {intl.formatMessage({ id: 'INVENTORY.TODAY_ENTRIES.NEW_ENTRY' })}
+          {/* Angular parity: today-entries.component.html:9 uses GENERAL.ENTRY ('Entrada'),
+              not a bespoke "Nueva entrada" label. */}
+          {intl.formatMessage({ id: 'GENERAL.ENTRY' })}
         </button>
       </div>
 

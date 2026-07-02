@@ -21,7 +21,7 @@ export function EntryList({ entries, onEdit, onDeactivate, readOnly = false }: E
   if (entries.length === 0) {
     return (
       <div className="py-8 text-center text-gray-400">
-        {intl.formatMessage({ id: 'INVENTORY.EMPTY_STATE' })}
+        {intl.formatMessage({ id: 'INVENTORY.NO_ENTRY_FOUND' })}
       </div>
     );
   }
@@ -64,13 +64,16 @@ export function EntryList({ entries, onEdit, onDeactivate, readOnly = false }: E
                       onClick={() => onEdit?.(entry)}
                       className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
                     >
-                      Editar
+                      {intl.formatMessage({ id: 'GENERAL.EDIT' })}
                     </button>
                     <button
                       onClick={() => onDeactivate?.(entry)}
                       className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
                     >
-                      {intl.formatMessage({ id: 'ORDERS.DEACTIVATE' })}
+                      {/* CRITICAL bug fix (Angular parity: entry-list.component.html:36
+                          GENERAL.DELETE) — was wrongly wired to ORDERS.DEACTIVATE
+                          ("Anular pedido"), the cancel-order label, not delete-entry. */}
+                      {intl.formatMessage({ id: 'GENERAL.DELETE' })}
                     </button>
                   </div>
                 </td>

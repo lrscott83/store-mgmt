@@ -15,6 +15,10 @@ const messages: Record<string, string> = {
   'GENERAL.PRICE': 'Precio',
   'GENERAL.NAME': 'Nombre',
   'GENERAL.ADD': 'Adicionar',
+  // Angular GENERAL.ENTRY / GENERAL.INSERT (vocabs/es.ts:220,178) — add-entry CTA label and
+  // the create-mode save button text (edit-inventory-entry-modal.component.html:84).
+  'GENERAL.ENTRY': 'Entrada',
+  'GENERAL.INSERT': 'Adicionar',
   'GENERAL.ERROR': 'Error',
   'GENERAL.SUCCESS': 'Éxito',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
@@ -252,6 +256,12 @@ const messages: Record<string, string> = {
   // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',
   'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO': '{name} mínimo valor es 0',
+  // Angular GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE/INVALID_INTEGER/INVALID_FLOAT
+  // (vocabs/es.ts:244,246-247) — edit-inventory-entry-modal quantity/costPrice validation.
+  'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE': '{name} mínimo valor es 1',
+  'GENERAL.VALIDATION.INVALID_INTEGER': 'El valor no es válido. Debe ser un entero mayor a 1.',
+  'GENERAL.VALIDATION.INVALID_FLOAT':
+    'El valor no es válido. Debe ser un número y usar el . como valor decimal.',
 
   // GENERAL.ORDER (Angular GENERAL.ORDER — used by edit-product-category-modal's order field)
   'GENERAL.ORDER': 'Orden',
@@ -318,13 +328,35 @@ const messages: Record<string, string> = {
   'SALE_CREDIT.NO_SALE_CREDIT_FOUND': 'No se encontró ningún crédito',
 
   // Inventory
-  'INVENTORY.AVAILABLE.TITLE': 'Stock disponible',
-  'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas de hoy',
+  // TITLE values corrected to byte-match Angular's INVENTORY.INVENTORY ('Inventario') and
+  // INVENTORY_ENTRY.ENTRIES_IN_DAY ('Entradas del día') — vocabs/es.ts:430,422 (L6 parity,
+  // Stage 2.3). NEW_ENTRY kept as-is (used only for the Today Entries add-entry button, whose
+  // Angular counterpart is GENERAL.ENTRY, added separately above).
+  'INVENTORY.AVAILABLE.TITLE': 'Inventario',
+  'INVENTORY.TODAY_ENTRIES.TITLE': 'Entradas del día',
   'INVENTORY.TODAY_ENTRIES.NEW_ENTRY': 'Nueva entrada',
-  'INVENTORY.ENTRIES.TITLE': 'Historial de entradas',
+  // Capitalization fixed to byte-match Angular's INVENTORY.ENTRIES_HISTORY (vocabs/es.ts:434).
+  'INVENTORY.ENTRIES.TITLE': 'Historial de Entradas',
   // Angular source: inventory-offline.service.ts callers / i18n/vocabs/es.ts:435 —
   // byte-identical Spanish, shown when EntriesPage has zero day-groups (gap #6).
   'INVENTORY.NO_HISTORY_ENTRY_FOUND': 'No se encontró ninguna entrada',
+  // Angular INVENTORY.* keys added verbatim (vocabs/es.ts:429-434) — Stage 2.3 L6 parity.
+  // INVENTORY.INVENTORY/ENTRIES_HISTORY duplicate the (now-corrected) TITLE values above under
+  // their own Angular-named keys, kept for audit completeness/precedent (see ORDERS.* orphans).
+  'INVENTORY.INVENTORY': 'Inventario',
+  'INVENTORY.ENTRIES_HISTORY': 'Historial de Entradas',
+  // Available page's top-level "no products at all" empty state (inventory-available.component
+  // .html:15, categories$ empty) — was previously covered by the overloaded INVENTORY.EMPTY_STATE.
+  'INVENTORY.NO_ENTRY_FOUND': 'No existe ningún producto disponible',
+  // Per-category "no products in this category" empty state (inventory-product-list.component
+  // .html:4) — was previously covered by the overloaded INVENTORY.EMPTY_STATE.
+  'INVENTORY.CATEGORY_PRODUCT_NO_FOUND': 'No existe ningún producto disponible en la categoría',
+  // Angular INVENTORY_ENTRY.* namespace (vocabs/es.ts:420-426) — today-entries add/edit modal
+  // + today-entries empty state (was previously covered by the overloaded INVENTORY.EMPTY_STATE).
+  'INVENTORY_ENTRY.ENTRIES_IN_DAY': 'Entradas del día',
+  'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY': 'No existe ninguna entrada en el día',
+  'INVENTORY_ENTRY.NEW_INVENTORY_ENTRY': 'Adicionar Entrada',
+  'INVENTORY_ENTRY.EDIT_INVENTORY_ENTRY': 'Editar Entrada',
   // Angular source: inventory-today-quantities.component.html + i18n/vocabs/es.ts
   // INVENTORY.TODAY_QUANTITIES/NO_PRODUCTS/PRODUCT/BEGINNING/ENTRIES/AVAILABLE/SOLD/ENDING —
   // Spanish text byte-identical to Angular.
@@ -356,6 +388,10 @@ const messages: Record<string, string> = {
   'INVENTORY.ENTRY.AVAILABLE': 'Disponible',
   'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_EDIT': 'No se puede editar una entrada que ya tiene ventas asociadas',
   'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_DELETE': 'No se puede eliminar una entrada que ya tiene ventas asociadas',
+  // Orphaned since Stage 2.3 (L6 parity): was overloaded across 3 distinct empty-states with
+  // different Angular text (see INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY / INVENTORY.NO_ENTRY_FOUND
+  // / INVENTORY.CATEGORY_PRODUCT_NO_FOUND above, now used instead). Left in place, not pruned,
+  // per established no-instruction-to-prune-orphans precedent (see ORDERS.* orphans).
   'INVENTORY.EMPTY_STATE': 'No hay entradas de inventario',
 
   // Scanner

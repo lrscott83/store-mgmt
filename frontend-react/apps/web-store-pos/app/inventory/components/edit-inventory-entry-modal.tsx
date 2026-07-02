@@ -70,18 +70,35 @@ export function EditInventoryEntryModal({
     const cost = parseFloat(costPrice);
 
     if (!productId) {
-      setValidationError(intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' }) + ' es requerido');
+      // Angular parity: edit-inventory-entry-modal.component.html:26
+      // GENERAL.VALIDATION.REQUIRED, interpolated with the field's own label.
+      setValidationError(
+        intl.formatMessage(
+          { id: 'GENERAL.VALIDATION.REQUIRED' },
+          { name: intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' }) },
+        ),
+      );
       return;
     }
     if (!quantity || isNaN(qty) || qty <= 0) {
+      // Angular parity: edit-inventory-entry-modal.component.html:42
+      // GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE (quantity's Validators.min(1)).
       setValidationError(
-        intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' }) + ' debe ser mayor a 0',
+        intl.formatMessage(
+          { id: 'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE' },
+          { name: intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' }) },
+        ),
       );
       return;
     }
     if (costPrice === '' || isNaN(cost) || cost < 0) {
+      // Angular parity: edit-inventory-entry-modal.component.html:64
+      // GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO (costPrice's Validators.min(0)).
       setValidationError(
-        intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' }) + ' debe ser >= 0',
+        intl.formatMessage(
+          { id: 'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' },
+          { name: intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' }) },
+        ),
       );
       return;
     }
@@ -107,9 +124,12 @@ export function EditInventoryEntryModal({
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">
+            {/* Angular parity: edit-inventory-entry-modal.component.html:4 toggles between
+                NEW_INVENTORY_ENTRY and EDIT_INVENTORY_ENTRY based on `!inventoryEntry` — was a
+                copy-paste bug where both branches resolved to the same "new entry" key. */}
             {entry
-              ? intl.formatMessage({ id: 'INVENTORY.TODAY_ENTRIES.NEW_ENTRY' })
-              : intl.formatMessage({ id: 'INVENTORY.TODAY_ENTRIES.NEW_ENTRY' })}
+              ? intl.formatMessage({ id: 'INVENTORY_ENTRY.EDIT_INVENTORY_ENTRY' })
+              : intl.formatMessage({ id: 'INVENTORY_ENTRY.NEW_INVENTORY_ENTRY' })}
           </h2>
           <button
             onClick={onClose}
@@ -157,10 +177,11 @@ export function EditInventoryEntryModal({
 
           {/* Quantity */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="entry-quantity" className="mb-1 block text-sm font-medium text-gray-700">
               {intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' })}
             </label>
             <input
+              id="entry-quantity"
               type="number"
               min="1"
               step="1"
@@ -172,10 +193,11 @@ export function EditInventoryEntryModal({
 
           {/* Cost Price */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="entry-cost-price" className="mb-1 block text-sm font-medium text-gray-700">
               {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}
             </label>
             <input
+              id="entry-cost-price"
               type="number"
               min="0"
               step="0.01"
@@ -209,7 +231,12 @@ export function EditInventoryEntryModal({
             onClick={handleSave}
             className="flex-1 rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
-            {intl.formatMessage({ id: 'GENERAL.SAVE' })}
+            {/* Angular parity: edit-inventory-entry-modal.component.html:84 toggles between
+                GENERAL.INSERT (create) and GENERAL.UPDATE (edit) — was hardcoded to
+                GENERAL.SAVE regardless of mode. */}
+            {entry
+              ? intl.formatMessage({ id: 'GENERAL.UPDATE' })
+              : intl.formatMessage({ id: 'GENERAL.INSERT' })}
           </button>
           <button
             onClick={onClose}

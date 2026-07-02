@@ -54,7 +54,7 @@ export function InventoryProductList({ categories }: InventoryProductListProps) 
 
       {filtered.length === 0 ? (
         <div className="py-8 text-center text-gray-400">
-          {intl.formatMessage({ id: 'INVENTORY.EMPTY_STATE' })}
+          {intl.formatMessage({ id: 'INVENTORY.CATEGORY_PRODUCT_NO_FOUND' })}
         </div>
       ) : (
         filtered.map((cat) => (

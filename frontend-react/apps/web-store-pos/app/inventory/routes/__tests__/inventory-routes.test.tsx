@@ -103,7 +103,8 @@ describe('InventoryAvailablePage — smoke render', () => {
         <InventoryAvailablePage />
       </Wrapper>,
     );
-    expect(screen.getByText(/Stock disponible/i)).toBeInTheDocument();
+    // Angular parity: INVENTORY.INVENTORY = 'Inventario' (inventory-available.component.html:4).
+    expect(screen.getByText(/Inventario/i)).toBeInTheDocument();
   });
 });
 
@@ -191,13 +192,13 @@ describe('TodayEntriesPage — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows New Entry button', () => {
+  it('shows New Entry button (Angular parity: GENERAL.ENTRY = "Entrada", today-entries.component.html:9)', () => {
     render(
       <Wrapper>
         <TodayEntriesPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/Nueva entrada/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Entrada' })).toBeInTheDocument();
   });
 });
 
@@ -233,7 +234,8 @@ describe('TodayEntriesPage — edit/deactivate actions stay reachable (regressio
     );
 
     expect(screen.getByText('Editar')).toBeInTheDocument();
-    expect(screen.getByText('Anular pedido')).toBeInTheDocument();
+    // CRITICAL bug fix (Angular parity: GENERAL.DELETE = 'Eliminar', not ORDERS.DEACTIVATE).
+    expect(screen.getByText('Eliminar')).toBeInTheDocument();
   });
 });
 
@@ -396,14 +398,14 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
 // orchestrator's decision on diff-matrix row #19.
 
 describe('EntriesPage — read-only history (Angular parity, diff-matrix #19)', () => {
-  it('renders no "Nueva Entrada" / add-entry button', () => {
+  it('renders no "Entrada" / add-entry button', () => {
     mockEntries([...dayOneEntries, ...dayTwoEntries]);
     render(
       <Wrapper>
         <EntriesPage />
       </Wrapper>,
     );
-    expect(screen.queryByText(/Nueva entrada/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Entrada' })).not.toBeInTheDocument();
   });
 
   it('renders no row-level edit/deactivate actions once a day panel is expanded', () => {
@@ -415,7 +417,7 @@ describe('EntriesPage — read-only history (Angular parity, diff-matrix #19)', 
     );
     fireEvent.click(screen.getByTestId('entry-day-panel-toggle-2026-06-30'));
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
-    expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
     // Data still renders.
     expect(screen.getByText('Product A')).toBeInTheDocument();
   });
