@@ -69,7 +69,7 @@ export function CartShell() {
       <button
         type="button"
         onClick={() => setIsOpen((v) => !v)}
-        className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100 transition-colors"
+        className="relative rounded-lg p-2 text-text-muted hover:bg-primary-light transition-colors"
         aria-label={intl.formatMessage({ id: 'CART.TITLE' })}
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -79,7 +79,7 @@ export function CartShell() {
         {itemCount > 0 && (
           <span
             data-testid="cart-badge"
-            className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white"
+            className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
           >
             {itemCount > 99 ? '99+' : itemCount}
           </span>
@@ -88,16 +88,16 @@ export function CartShell() {
 
       {/* Cart dropdown panel */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-lg z-50">
+        <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-surface shadow-card z-50">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-800">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h3 className="text-sm font-semibold text-text">
               {intl.formatMessage({ id: 'CART.TITLE' })}
             </h3>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="rounded-md p-1 text-gray-400 hover:text-gray-600"
+              className="rounded-md p-1 text-text-muted hover:text-text"
               aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -109,23 +109,23 @@ export function CartShell() {
           {/* Items */}
           <div className="max-h-64 overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-gray-400">
+              <p className="px-4 py-6 text-center text-sm text-text-muted">
                 {intl.formatMessage({ id: 'CART.EMPTY' })}
               </p>
             ) : (
-              <ul className="divide-y divide-gray-50">
+              <ul className="divide-y divide-border">
                 {items.map((item) => (
                   <li key={item.product.id} className="flex items-center gap-3 px-4 py-2">
                     <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-800">{item.product.name}</p>
-                      <p className="text-xs text-gray-500">${item.product.price.toFixed(2)}</p>
+                      <p className="truncate text-sm font-medium text-text">{item.product.name}</p>
+                      <p className="text-xs text-text-muted">${item.product.price.toFixed(2)}</p>
                     </div>
                     {/* Quantity controls */}
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 text-xs"
+                        className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-text-muted hover:bg-primary-light text-xs"
                         aria-label={`Decrease quantity of ${item.product.name}`}
                       >
                         −
@@ -134,7 +134,7 @@ export function CartShell() {
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50 text-xs"
+                        className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-text-muted hover:bg-primary-light text-xs"
                         aria-label={`Increase quantity of ${item.product.name}`}
                       >
                         +
@@ -143,7 +143,7 @@ export function CartShell() {
                     <button
                       type="button"
                       onClick={() => removeItem(item.product.id)}
-                      className="text-gray-300 hover:text-red-500 transition-colors"
+                      className="text-border hover:text-danger transition-colors"
                       aria-label={`Remove ${item.product.name}`}
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,10 +158,10 @@ export function CartShell() {
 
           {/* Payment controls */}
           {items.length > 0 && (
-            <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+            <div className="border-t border-border px-4 py-3 space-y-3">
               {/* Payment type selector */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
+                <label className="block text-xs font-medium text-text-muted mb-1">
                   {intl.formatMessage({ id: 'CART.PAYMENT_TYPE' })}
                 </label>
                 <div className="flex gap-1">
@@ -178,8 +178,8 @@ export function CartShell() {
                         onClick={() => setPaymentType(type)}
                         className={`flex-1 rounded-md py-1 text-xs font-medium transition-colors ${
                           paymentType === type
-                            ? 'bg-cyan-600 text-white'
-                            : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+                            ? 'bg-primary text-white'
+                            : 'border border-border text-text-muted hover:bg-primary-light'
                         }`}
                       >
                         {label}
@@ -195,9 +195,9 @@ export function CartShell() {
                   type="checkbox"
                   checked={isCredit}
                   onChange={toggleCredit}
-                  className="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
-                <span className="text-xs font-medium text-gray-600">
+                <span className="text-xs font-medium text-text">
                   {intl.formatMessage({ id: 'CART.CREDIT_SALE' })}
                 </span>
               </label>
@@ -209,19 +209,19 @@ export function CartShell() {
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   placeholder={intl.formatMessage({ id: 'CART.CLIENT_NAME' })}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full rounded-md border border-border px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               )}
 
               {/* Total / Change */}
               <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-gray-800">
+                <span className="font-semibold text-text">
                   {intl.formatMessage({ id: 'GENERAL.TOTAL' })}:
                 </span>
-                <span className="font-bold text-cyan-700">${totalAmount.toFixed(2)}</span>
+                <span className="font-bold text-primary">${totalAmount.toFixed(2)}</span>
               </div>
               {paymentType === PaymentType.Efectivo && change >= 0 && (
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-text-muted">
                   <span>{intl.formatMessage({ id: 'GENERAL.CHANGE' })}:</span>
                   <span>${change.toFixed(2)}</span>
                 </div>
@@ -231,14 +231,14 @@ export function CartShell() {
               <button
                 type="button"
                 onClick={clear}
-                className="w-full rounded-lg border border-gray-300 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                className="w-full rounded-lg border border-border py-1.5 text-xs font-medium text-text-muted hover:bg-primary-light transition-colors"
               >
                 {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
               </button>
 
               {/* Submit error message */}
               {submitError && (
-                <p className="text-xs text-red-600 text-center" role="alert">
+                <p className="text-xs text-danger text-center" role="alert">
                   {submitError}
                 </p>
               )}
@@ -248,7 +248,7 @@ export function CartShell() {
                 type="button"
                 onClick={handleCreateOrder}
                 disabled={isSubmitting}
-                className="w-full rounded-lg bg-cyan-600 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 transition-colors disabled:opacity-50"
+                className="w-full rounded-lg bg-primary py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
               >
                 {isSubmitting
                   ? intl.formatMessage({ id: 'GENERAL.LOADING' })

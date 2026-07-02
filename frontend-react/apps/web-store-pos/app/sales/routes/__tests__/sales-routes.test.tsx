@@ -66,15 +66,6 @@ vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   })),
 }));
 
-// Mock barcode scanner components (lazy loaded)
-vi.mock('~/sales/components/quick-sale-scanner', () => ({
-  QuickSaleScanner: () => <div data-testid="quick-sale-scanner" />,
-  createCooldownController: (ms: number) => ({
-    isReady: () => true,
-    markUsed: vi.fn(),
-  }),
-}));
-
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">

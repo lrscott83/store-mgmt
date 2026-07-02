@@ -1,53 +1,32 @@
-import { useIntl } from 'react-intl';
-import type { Product, ProductCategory } from '@store-mgmt/domain';
+import type { Product } from '@store-mgmt/domain';
+import type { OrderType } from '@store-mgmt/domain';
 import { SaleProductRow } from './sale-product-row';
 
-interface CartQtyMap {
-  [productId: string]: number;
-}
-
 interface SaleCategoryProductsProps {
-  category: ProductCategory;
+  /** Products already scoped to the selected category by the parent (Angular's `products$`
+   * comes pre-filtered from ProductService.getProductsToSaleByCategoryId). */
   products: Product[];
-  cartQtyMap: CartQtyMap;
-  onAdd: (product: Product) => void;
-  onIncrease: (productId: string) => void;
-  onDecrease: (productId: string) => void;
+  orderType: OrderType;
+  onAdded: (productId: string, quantity: number, price: number) => void;
+  checkAvailability?: (productId: string, quantity: number) => boolean;
 }
 
-export function SaleCategoryProducts({
-  category,
-  products,
-  cartQtyMap,
-  onAdd,
-  onIncrease,
-  onDecrease,
-}: SaleCategoryProductsProps) {
-  const intl = useIntl();
-
-  const availableProducts = products.filter(
-    (p) => p.availableToSale && p.isActive && p.categoryId === category.id,
-  );
-
-  if (availableProducts.length === 0) return null;
-
+/**
+ * Strict parity with Angular's sale-category-products.component.html: a simple list of
+ * per-product rows for the currently-selected category, no extra grouping/search/filter UI.
+ */
+export function SaleCategoryProducts({ products, orderType, onAdded, checkAvailability }: SaleCategoryProductsProps) {
   return (
-    <div className="space-y-2">
-      <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">
-        {category.name}
-      </h3>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {availableProducts.map((product) => (
-          <SaleProductRow
-            key={product.id}
-            product={product}
-            quantity={cartQtyMap[product.id] ?? 0}
-            onAdd={onAdd}
-            onIncrease={onIncrease}
-            onDecrease={onDecrease}
-          />
-        ))}
-      </div>
+    <div>
+      {products.map((product) => (
+        <SaleProductRow
+          key={product.id}
+          product={product}
+          orderType={orderType}
+          onAdded={onAdded}
+          checkAvailability={checkAvailability}
+        />
+      ))}
     </div>
   );
 }

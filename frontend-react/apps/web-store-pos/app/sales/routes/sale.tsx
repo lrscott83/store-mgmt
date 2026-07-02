@@ -1,112 +1,96 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
-import { EFeatures, PaymentType } from '@store-mgmt/domain';
+import { EFeatures, OrderType } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
+import { Card } from '~/shared/components/ui/card';
+import { InfoBox } from '~/shared/components/ui/info-box';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import { SaleCategoryProducts } from '../components/sale-category-products';
-import { QuickSaleScanner } from '../components/quick-sale-scanner';
-import { useEffect } from 'react';
 
 export const clientLoader = featureLoader([EFeatures.Sale]);
+
+// Angular's SaleComponent hard-codes orderType = OrderType.Normal (sale.component.ts:27) —
+// no order-type selector exists on this screen, so React mirrors that fixed value.
+const ORDER_TYPE = OrderType.Normal;
 
 export function SalePage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const { items, addItem, updateQuantity } = useCartStore((s) => ({
-    items: s.items,
-    addItem: s.addItem,
-    updateQuantity: s.updateQuantity,
-  }));
+  const addItem = useCartStore((s) => s.addItem);
 
-  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [scannerVisible, setScannerVisible] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const productService = new ProductOfflineService(storeId);
     const categoryService = new ProductCategoryOfflineService(storeId);
-    const allProducts = productService.getAll();
-    const allCategories = categoryService.getAll().sort((a, b) => a.order - b.order);
-    setProducts(allProducts);
-    setCategories(allCategories);
-    if (allCategories.length > 0 && !activeTab) {
-      setActiveTab(allCategories[0].id);
+    const productService = new ProductOfflineService(storeId);
+
+    // Angular: getAvailableProductCategories() -> active categories, sorted by order
+    const availableCategories = categoryService
+      .getAll()
+      .filter((c) => c.isActive)
+      .sort((a, b) => a.order - b.order);
+
+    setCategories(availableCategories);
+    setProducts(productService.getAll());
+
+    if (availableCategories.length > 0) {
+      setSelectedCategoryId(availableCategories[0].id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
-  // Build a map of productId → quantity in cart
-  const cartQtyMap: Record<string, number> = {};
-  for (const item of items) {
-    cartQtyMap[item.product.id] = item.quantity;
+  function selectCategory(category: ProductCategory) {
+    setSelectedCategoryId(category.id);
   }
 
-  const activeCategory = categories.find((c) => c.id === activeTab) ?? categories[0];
-
-  function handleIncrease(productId: string) {
-    const current = cartQtyMap[productId] ?? 0;
-    updateQuantity(productId, current + 1);
+  function handleAdded(productId: string, quantity: number) {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    addItem(product, quantity);
   }
 
-  function handleDecrease(productId: string) {
-    const current = cartQtyMap[productId] ?? 0;
-    updateQuantity(productId, current - 1);
-  }
+  // Angular: getProductsToSaleByCategoryId -> categoryId + isActive + availableToSale,
+  // sorted by order (product-category.repository.ts / product.repository.ts equivalents)
+  const categoryProducts = selectedCategoryId
+    ? products
+        .filter((p) => p.categoryId === selectedCategoryId && p.isActive && p.availableToSale)
+        .sort((a, b) => a.order - b.order)
+    : [];
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'MENU.SALE' })}</h1>
-        <button
-          onClick={() => setScannerVisible((v) => !v)}
-          className="rounded border px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-        >
-          {intl.formatMessage({ id: 'SCANNER.SCANNING' })}
-        </button>
+    <Card title={intl.formatMessage({ id: 'SALES.HEADER' })}>
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            onClick={() => selectCategory(category)}
+            className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              category.id === selectedCategoryId
+                ? 'bg-primary text-white'
+                : 'bg-primary-light text-primary hover:bg-primary/20'
+            }`}
+          >
+            {category.name}
+          </button>
+        ))}
       </div>
 
-      {scannerVisible && (
-        <div className="rounded border bg-gray-50 p-3">
-          <QuickSaleScanner />
-        </div>
-      )}
+      <SaleCategoryProducts products={categoryProducts} orderType={ORDER_TYPE} onAdded={handleAdded} />
 
-      {/* Category tabs */}
-      {categories.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveTab(cat.id)}
-              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                activeTab === cat.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
+      {categories.length > 0 && !selectedCategoryId && (
+        <InfoBox variant="primary" className="mt-4 text-center">
+          {/* SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE */}
+          {intl.formatMessage({ id: 'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE' })}
+        </InfoBox>
       )}
-
-      {/* Products grid */}
-      {activeCategory && (
-        <SaleCategoryProducts
-          category={activeCategory}
-          products={products}
-          cartQtyMap={cartQtyMap}
-          onAdd={addItem}
-          onIncrease={handleIncrease}
-          onDecrease={handleDecrease}
-        />
-      )}
-    </div>
+    </Card>
   );
 }
 

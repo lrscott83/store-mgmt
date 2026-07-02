@@ -14,6 +14,7 @@ const messages: Record<string, string> = {
   'GENERAL.QUANTITY': 'Cantidad',
   'GENERAL.PRICE': 'Precio',
   'GENERAL.NAME': 'Nombre',
+  'GENERAL.ADD': 'Adicionar',
   'GENERAL.ERROR': 'Error',
   'GENERAL.SUCCESS': 'Éxito',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
@@ -156,6 +157,18 @@ const messages: Record<string, string> = {
   'PRODUCT.EDIT_PRODUCT': 'Editar Producto',
   'PRODUCT.DELETE_PRODUCT': 'Eliminar Producto',
   'PRODUCT.AVAILABLE_TO_SALE': 'Disponible para Vender',
+
+  // Sale / POS screen (Angular SALES.* — frontend/src/app/_modules/i18n/vocabs/es.ts)
+  'SALES.HEADER': 'Productos para vender',
+  'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE': 'Seleccione primero una categoría para adicionar productos a la venta.',
+  'SALES.PRODUCT_ADDED_TO_CART': 'El producto fue adicionado a la venta',
+  'SALES.PRODUCT_NOT_ADDED_TO_CART':
+    'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
+  'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE': 'El producto no está disponible en el inventario.',
+
+  // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
+  'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',
+  'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO': '{name} mínimo valor es 0',
 
   // Orders
   'ORDERS.TITLE': 'Historial de pedidos',
