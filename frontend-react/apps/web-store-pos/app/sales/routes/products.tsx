@@ -7,6 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import { CategoryProductList } from '../components/category-product-list';
@@ -159,8 +160,10 @@ export function ProductsPage() {
             {/* PRODUCT.PRODUCTS */}
             <span>{intl.formatMessage({ id: 'PRODUCT.PRODUCTS' })}</span>
             <Button variant="fab" onClick={() => setModal({ type: 'category' })} data-testid="add-category-button">
+              {/* Angular: <mat-icon>add</mat-icon> */}
+              <PlusIcon />
               {/* PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY */}
-              + {intl.formatMessage({ id: 'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY' })}
+              {intl.formatMessage({ id: 'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY' })}
             </Button>
           </div>
         }
@@ -175,6 +178,8 @@ export function ProductsPage() {
 
         <div className="flex justify-end mb-4">
           <Button variant="fab" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
+            {/* Angular: <mat-icon>attach_file</mat-icon> */}
+            <PaperclipIcon />
             {/* PRODUCT_CATEGORY.IMPORT_PRODUCTS */}
             {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
           </Button>
@@ -190,14 +195,22 @@ export function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => togglePanel(category.id)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
                   data-testid={`category-panel-toggle-${category.id}`}
                   aria-expanded={isExpanded}
                 >
-                  <span className="text-sm font-medium text-text">{category.name}</span>
-                  <span className="rounded-full bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary">
-                    {categoryProducts.length}
-                  </span>
+                  <span className="flex-1 text-base font-medium text-text">{category.name}</span>
+                  <span className="text-sm text-text-muted">{categoryProducts.length}</span>
+                  {/* Angular's mat-expansion-panel toggle indicator (rotates when open). */}
+                  <svg
+                    className={`h-5 w-5 shrink-0 text-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
                 </button>
                 {isExpanded && (
                   <div className="border-t border-border px-4 py-3">

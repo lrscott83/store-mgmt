@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
+import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 
 interface CategoryProductListProps {
@@ -36,7 +37,9 @@ export function CategoryProductList({
   return (
     <div className="space-y-4">
       {products.length === 0 && (
-        <InfoBox variant="primary" className="text-center">
+        // Angular's `alert-light-primary` renders in Bootstrap/Metronic blue
+        // ($primary: $blue #3699FF), NOT the Material purple used by buttons.
+        <InfoBox variant="info" className="text-center">
           {/* PRODUCT_CATEGORY.NO_PRODUCT_FOUND */}
           {intl.formatMessage({ id: 'PRODUCT_CATEGORY.NO_PRODUCT_FOUND' })}
         </InfoBox>
@@ -44,15 +47,21 @@ export function CategoryProductList({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="fab" onClick={onEditCategory} data-testid="edit-category-button">
+          {/* Angular: <mat-icon>edit</mat-icon> */}
+          <EditIcon />
           {/* PRODUCT_CATEGORY.EDIT_CATEGORY */}
           {intl.formatMessage({ id: 'PRODUCT_CATEGORY.EDIT_CATEGORY' })}
         </Button>
-        <div className="flex flex-wrap gap-2">
+        <div className="ml-auto flex flex-wrap justify-end gap-2">
           <Button variant="fab" onClick={onAddProducts} data-testid="add-products-button">
+            {/* Angular: <mat-icon>add</mat-icon> */}
+            <PlusIcon />
             {/* PRODUCT.NEW_PRODUCTS (bulk add) */}
             {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCTS' })}
           </Button>
           <Button variant="fab" onClick={onAddProduct} data-testid="add-product-button">
+            {/* Angular: <mat-icon>add</mat-icon> */}
+            <PlusIcon />
             {/* PRODUCT.NEW_PRODUCT (single add) */}
             {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCT' })}
           </Button>

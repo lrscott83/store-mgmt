@@ -19,7 +19,8 @@ export function Card({ title, footer, children, className = '' }: CardProps) {
     >
       {title !== undefined && (
         <div data-slot="card-header" className="border-b border-border px-6 py-4">
-          <h5 className="text-sm font-semibold text-text">{title}</h5>
+          {/* Angular's `.card-label` (h3) renders at ~1.275rem / 500 weight. */}
+          <h3 className="text-xl font-semibold text-text">{title}</h3>
         </div>
       )}
       <div data-slot="card-body" className="p-6">
