@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { IntlProvider } from 'react-intl';
 import type { UserModel } from '@store-mgmt/domain';
@@ -55,13 +55,13 @@ const makeStoreUser = (featureIds: number[], storeId = 's1'): UserModel => ({
   selectedStoreId: storeId,
 });
 
-function renderSidebar(user: UserModel, isOpen = true) {
+function renderSidebar(user: UserModel, isOpen = true, onClose = () => {}) {
   vi.mocked(useAuthStore).mockReturnValue({ user } as ReturnType<typeof useAuthStore>);
 
   render(
     <IntlProvider locale="es" messages={esMessages}>
       <MemoryRouter>
-        <Sidebar isOpen={isOpen} />
+        <Sidebar isOpen={isOpen} onClose={onClose} />
       </MemoryRouter>
     </IntlProvider>
   );
@@ -144,5 +144,108 @@ describe('Sidebar — SHELL-02 permission-filtered menu', () => {
 
     const sidebar = screen.getByRole('navigation');
     expect(sidebar.className).toContain('w-64');
+  });
+});
+
+describe('Sidebar — SHELL-03: overlays content instead of pushing it (fixed/absolute positioning)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('open sidebar has fixed/absolute overlay positioning classes', () => {
+    renderSidebar(makeSuperAdmin(), true);
+
+    const sidebar = screen.getByRole('navigation');
+    expect(sidebar.className).toMatch(/\b(fixed|absolute)\b/);
+    expect(sidebar.className).toContain('inset-y-0');
+    expect(sidebar.className).toContain('left-0');
+  });
+
+  it('open sidebar has a high z-index so it renders above content', () => {
+    renderSidebar(makeSuperAdmin(), true);
+
+    const sidebar = screen.getByRole('navigation');
+    expect(sidebar.className).toMatch(/\bz-(40|50)\b/);
+  });
+
+  it('open sidebar spans full viewport height', () => {
+    renderSidebar(makeSuperAdmin(), true);
+
+    const sidebar = screen.getByRole('navigation');
+    expect(sidebar.className).toContain('h-full');
+  });
+});
+
+describe('Sidebar — SHELL-04: backdrop/scrim closes the sidebar on click', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders a backdrop when open', () => {
+    renderSidebar(makeSuperAdmin(), true);
+
+    expect(screen.getByTestId('sidebar-backdrop')).toBeInTheDocument();
+  });
+
+  it('does not render a backdrop when closed', () => {
+    renderSidebar(makeSuperAdmin(), false);
+
+    expect(screen.queryByTestId('sidebar-backdrop')).not.toBeInTheDocument();
+  });
+
+  it('calls onClose when the backdrop is clicked', () => {
+    const onClose = vi.fn();
+    renderSidebar(makeSuperAdmin(), true, onClose);
+
+    fireEvent.click(screen.getByTestId('sidebar-backdrop'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Sidebar — SHELL-05: in-sidebar collapse toggle (top-right of sidebar header)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders a collapse button in the sidebar header when open', () => {
+    renderSidebar(makeSuperAdmin(), true);
+
+    expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeInTheDocument();
+  });
+
+  it('does not render the collapse button when closed', () => {
+    renderSidebar(makeSuperAdmin(), false);
+
+    expect(screen.queryByRole('button', { name: /collapse sidebar/i })).not.toBeInTheDocument();
+  });
+
+  it('calls onClose when the in-sidebar collapse button is clicked', () => {
+    const onClose = vi.fn();
+    renderSidebar(makeSuperAdmin(), true, onClose);
+
+    fireEvent.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Sidebar — SHELL-06: brand logo at the top of the sidebar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the VendeDTo brand text when open', () => {
+    renderSidebar(makeSuperAdmin(), true);
+
+    expect(screen.getByText('VendeDTo')).toBeInTheDocument();
+  });
+
+  it('applies primary color and bold weight to the brand text', () => {
+    renderSidebar(makeSuperAdmin(), true);
+
+    const brand = screen.getByText('VendeDTo');
+    expect(brand.className).toContain('text-primary');
+    expect(brand.className).toContain('font-bold');
   });
 });

@@ -159,12 +159,12 @@ describe('Navbar — S-NAV-2: clicking profile links closes the dropdown', () =>
   });
 });
 
-describe('Navbar — S-NAV-3: sidebar collapse toggle moved into header (Angular nav-left position)', () => {
+describe('Navbar — S-NAV-3: header keeps only the EXPAND toggle; collapse now lives in the sidebar itself', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('calls onSidebarToggle when the header toggle button is clicked', () => {
+  it('calls onSidebarToggle when the header expand toggle button is clicked', () => {
     const onSidebarToggle = vi.fn();
     render(
       <Wrapper>
@@ -185,14 +185,13 @@ describe('Navbar — S-NAV-3: sidebar collapse toggle moved into header (Angular
     expect(toggle.querySelector('[data-icon="menu-unfold"]')).toBeInTheDocument();
   });
 
-  it('renders a fold-style icon when the sidebar is expanded', () => {
+  it('does not render the header toggle button when the sidebar is already open (collapse now lives in the sidebar)', () => {
     render(
       <Wrapper>
         <Navbar isSidebarOpen={true} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    const toggle = screen.getByRole('button', { name: /toggle sidebar/i });
-    expect(toggle.querySelector('[data-icon="menu-fold"]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /toggle sidebar/i })).not.toBeInTheDocument();
   });
 });
 

@@ -26,23 +26,22 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
-      {/* Left: sidebar collapse toggle — matches Angular nav-left's pc-sidebar-collapse position */}
-      <button
-        type="button"
-        onClick={onSidebarToggle}
-        className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 transition-colors"
-        aria-label="Toggle sidebar"
-      >
-        {isSidebarOpen ? (
-          <svg data-icon="menu-fold" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          </svg>
-        ) : (
+      {/* Left: sidebar EXPAND toggle — only shown while the sidebar is closed.
+          The COLLAPSE (<<) action now lives in the sidebar's own header row. */}
+      {isSidebarOpen ? (
+        <div />
+      ) : (
+        <button
+          type="button"
+          onClick={onSidebarToggle}
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 transition-colors"
+          aria-label="Toggle sidebar"
+        >
           <svg data-icon="menu-unfold" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
           </svg>
-        )}
-      </button>
+        </button>
+      )}
 
       {/* Right: tutorial + cart + user dropdown */}
       <div className="flex items-center gap-2">

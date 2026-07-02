@@ -46,10 +46,10 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Sidebar */}
-      <Sidebar isOpen={isSidebarOpen} />
+      {/* Sidebar — overlays content when open (fixed positioning), never pushes it */}
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      {/* Main area */}
+      {/* Main area — keeps full width regardless of sidebar state */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar isSidebarOpen={isSidebarOpen} onSidebarToggle={() => setIsSidebarOpen((v) => !v)} />
         <Breadcrumbs />
