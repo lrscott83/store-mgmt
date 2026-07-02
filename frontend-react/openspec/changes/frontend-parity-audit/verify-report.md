@@ -372,3 +372,128 @@ Carried unchanged from the prior Stage 1 report (not re-litigated, no new eviden
 ## Scope Note
 
 This report covers **Stage 1 (Sales) RE-VERIFY only**, validated against code as of 2026-07-02 (commits `60b0e09`, `fbdbafd`). Stage 0 and the original Stage 1 formal pass are preserved unchanged above. Out of scope (per explicit direction): login "POS Management" copy (tasks.md 2.6.1), cart increase/decrease stock validation (tasks.md 2.5.1) — both remain Stage 2 carry-overs.
+
+---
+
+# Stage 1 (Sales) FINAL RE-VERIFY — 2026-07-02 (commit `e552258`)
+
+**Reason for this pass:** Batch 11 (commit `e552258`) landed to close the two WARNINGs (NEW-W1, NEW-W2) found in the prior RE-VERIFY pass above. This pass confirms both are actually closed, checks for regressions, and produces the final Stage 1 verdict before archive.
+
+**Scope:** Same as prior Stage 1 passes — Products, Sale/POS, Orders, Sale Credits, Today Stats, Category Stats, Cart/nav-right, SweetAlert2 dialog layer. Stage 2 carry-overs (2.5.1, 2.6.x) remain explicitly out of scope.
+
+---
+
+## Verdict: PASS
+
+Zero CRITICAL. Zero WARNING. NEW-W1 and NEW-W2 both **CONFIRMED RESOLVED** with no regressions to any prior finding (original W1, W2, or SweetAlert2 task 1.7). Two SUGGESTIONs carried unchanged from prior passes (both out of Stage 1 scope, not re-litigated). Stage 1 (Sales) is now fully closed.
+
+---
+
+## Test/Build Evidence (run 2026-07-02, actual output, this session)
+
+**TypeScript** (`pnpm -C apps/web-store-pos exec tsc --noEmit`, from `frontend-react/`): clean, zero errors, no output.
+
+**Full test suite** (`pnpm test`, turbo across `@store-mgmt/domain`, `@store-mgmt/web-common`, `@store-mgmt/web-store-pos`):
+```
+@store-mgmt/domain:test:      Tests  66 passed (66)
+@store-mgmt/web-common:test:  Tests  11 passed (11)
+@store-mgmt/web-store-pos:test:  Test Files  95 passed (95)
+@store-mgmt/web-store-pos:test:       Tests  1028 passed (1028)
+ Tasks:    3 successful, 3 total
+```
+Matches expected counts exactly (domain 66, web-common 11, web-store-pos 95/1028 — same totals as the prior RE-VERIFY pass; apply-progress Batch 11 confirms 0 net new tests, 3 existing assertions corrected to the right literals). One expected `stderr` noise line in `api-client.test.ts` (jsdom navigation warning), not a failure.
+
+**Production build** (`pnpm -C apps/web-store-pos exec react-router build`): succeeded. `blocking-alert-C1w1tbeV.js` chunk (sweetalert2) present, 79.51 kB / 21.13 kB gzip. No build errors or new warnings.
+
+---
+
+## NEW-W1 Re-Verification (inventory active-filter branch order) — RESOLVED
+
+`app/inventory/lib/services/inventory-offline-service.ts:328-334` (`getAvailableQuantity`) re-read at the current commit:
+
+```ts
+getAvailableQuantity(productId: string): { hasEntries: boolean; available: number } {
+  const allEntries = this.repo.getByProductId(this.storeId, productId);
+  const available = allEntries
+    .filter((e) => e.isActive)
+    .reduce((sum, e) => sum + e.available, 0);
+  return { hasEntries: allEntries.length > 0, available };
+}
+```
+
+`hasEntries` now derives from `allEntries` (the raw, unfiltered result), and `isActive` filtering is applied only when summing `available` — matching Angular's `hasAvailableProductToSale` (`inventory-offline.service.ts:410-419`, re-read at the source this pass) exactly: `inventories.length === 0` is checked against the raw list (line 411) before the `isActive` filter is applied to the quantity sum (lines 415-419). The all-inactive-entries edge case now falls through to the quantity check (`0 >= quantity` fails) and returns the `QUANTITY_NOT_AVAILABLE` message, identical to Angular, instead of the previous `NOT_AVAILABLE` message.
+
+Test evidence: `app/inventory/lib/services/__tests__/inventory-offline-service.test.ts` INV-08 all-inactive-entries case asserts `{hasEntries: true, available: 0}` — confirmed passing in this session's `pnpm test` run (31/31 in that file).
+
+**Conclusion: NEW-W1 CLOSED. No regression to the overselling-prevention behavior (still blocks the sale in every branch); the edge-case error text now matches Angular byte-for-byte.**
+
+---
+
+## NEW-W2 Re-Verification (ERROR500 fallback → NotExists literal) — RESOLVED
+
+Read the current React source at all three flagged call sites and the i18n dictionary, cross-checked against Angular's exact source (both re-read fresh this pass, not from apply-progress claims):
+
+| Call site | React (current) | Angular source-of-truth | Match |
+|---|---|---|---|
+| `edit-sale-credit-modal.tsx:51-54` | `intl.formatMessage({id:'SALE_CREDIT_ERRORS.NOT_EXISTS'})` → **"El gasto no existe."** | `sale-credit.errors.ts:6` `SaleCreditErrors.NotExists.description` = `` `El gasto no existe.` `` | ✅ byte-identical, trailing period preserved |
+| `sale-credit-payment-modal.tsx:70-73` | same key → **"El gasto no existe."** | same | ✅ byte-identical |
+| `edit-order-modal.tsx:50-53` | `intl.formatMessage({id:'ORDER_ERRORS.NOT_EXISTS'})` → **"La orden no existe"** | `order.errors.ts:6` `OrderErrors.NotExists.description` = `'La orden no existe'` | ✅ byte-identical, **no** trailing period — the punctuation asymmetry between the two error messages is correctly preserved, not normalized away |
+
+i18n dictionary (`app/shared/lib/i18n/es.ts:245-246`):
+```
+'SALE_CREDIT_ERRORS.NOT_EXISTS': 'El gasto no existe.',
+'ORDER_ERRORS.NOT_EXISTS': 'La orden no existe',
+```
+Both confirmed present and byte-identical to the Angular literals, including the deliberate period/no-period asymmetry.
+
+None of the three call sites reference `GENERAL.RESPONSE.ERROR500_MESSAGE` any longer.
+
+Test evidence: `credit-components.test.tsx` (2 assertions) and `order-components.test.tsx` (1 assertion) assert the exact literals above — confirmed passing in this session's `pnpm test` run (22/22 and 15/15 respectively).
+
+**Conclusion: NEW-W2 CLOSED. All 3 error dialogs now show Angular's exact static NotExists description instead of the generic ERROR500 fallback.**
+
+---
+
+## Regression Check
+
+Re-scanned the full Stage 1 finding history for drift:
+- Original **W1** (overselling gap) — still closed, `product-availability.ts` 5-way branch parity unchanged by this batch.
+- Original **W2** (hardcoded English/invented validation) — still closed, no files in Batch 11's diff touch the previously-fixed validation/CSV-import call sites.
+- **SweetAlert2 (task 1.7)** — `blocking-alert.ts` wrapper untouched by Batch 11; both restored confirm dialogs (payment, deactivate) unaffected.
+- Batch 11's diff scope (per apply-progress): `es.ts` + 3 component call sites + 1 service file (`inventory-offline-service.ts`) + 3 test files — confirmed narrow, no incidental changes to unrelated Stage 1 surface area found during this pass's source reads.
+
+No regressions found.
+
+---
+
+## Findings Summary (Final)
+
+### CRITICAL
+None.
+
+### WARNING
+None. NEW-W1 and NEW-W2 both closed, see sections above. All prior WARNINGs (original W1, W2) remain closed with no regression.
+
+### SUGGESTION
+
+Carried unchanged from all prior Stage 1 passes (not re-litigated, no new evidence found this pass, both explicitly out of Stage 1 scope):
+- **S1** — `QuickSaleScannerComponent` confirmed dead code, correctly not ported; recommend adding to spec.md's ratified dead-code list.
+- **S2** — pre-existing hardcoded hex in `chart-core.tsx`/`landing-deep.*`, out of Stage 1 scope.
+
+---
+
+## Accepted-as-Superset (unchanged, confirmed still accurate)
+
+- CSV importer preview table + per-row validation — Angular has only a file input.
+- Cart +/- and remove aria-labels — Angular has none.
+- `onSave`/`onPay`/`onUpdate`/`onDeactivateOrder` boolean-return contracts — faithful port of Angular's `DataResult.succeeded` branching.
+
+---
+
+## Final Stage 1 Verdict
+
+**PASS.** 0 CRITICAL, 0 WARNING, 2 SUGGESTION (both carried, both out of scope). Stage 1 (Sales) is fully closed. `next_recommended`: `sdd-archive` for Stage 1, or proceed directly to Stage 2 (Inventory) `sdd-apply` for the remaining carry-over items (2.5.1 cart increase/decrease validation, 2.6 login/auth parity — login "POS Management" copy gap, post-login redirect branch, authenticated-root redirect).
+
+## Scope Note
+
+This section covers the **Stage 1 (Sales) FINAL RE-VERIFY only** (commit `e552258`), validated against code as of 2026-07-02. All prior sections (Stage 0, original Stage 1 pass, first Stage 1 RE-VERIFY) are preserved unchanged above for history. Out of scope (per explicit direction, deferred to Stage 2): login "POS Management" copy (tasks.md 2.6.1), cart increase/decrease stock validation (tasks.md 2.5.1).
