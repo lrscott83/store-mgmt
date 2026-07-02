@@ -20,16 +20,41 @@ const MOCK_CATEGORIES: InventoryCategoryView[] = [
   {
     categoryId: 'cat1',
     categoryName: 'Bebidas',
+    totalQuantity: 15,
+    totalCostPrice: 35,
     products: [
-      { productId: 'p1', productName: 'Coca Cola', categoryId: 'cat1', categoryName: 'Bebidas', totalAvailable: 10 },
-      { productId: 'p2', productName: 'Fanta', categoryId: 'cat1', categoryName: 'Bebidas', totalAvailable: 5 },
+      {
+        productId: 'p1',
+        productName: 'Coca Cola',
+        categoryId: 'cat1',
+        categoryName: 'Bebidas',
+        totalAvailable: 10,
+        avgCostPrice: 2,
+      },
+      {
+        productId: 'p2',
+        productName: 'Fanta',
+        categoryId: 'cat1',
+        categoryName: 'Bebidas',
+        totalAvailable: 5,
+        avgCostPrice: 3,
+      },
     ],
   },
   {
     categoryId: 'cat2',
     categoryName: 'Snacks',
+    totalQuantity: 8,
+    totalCostPrice: 40,
     products: [
-      { productId: 'p3', productName: 'Papas Lays', categoryId: 'cat2', categoryName: 'Snacks', totalAvailable: 8 },
+      {
+        productId: 'p3',
+        productName: 'Papas Lays',
+        categoryId: 'cat2',
+        categoryName: 'Snacks',
+        totalAvailable: 8,
+        avgCostPrice: 5,
+      },
     ],
   },
 ];
@@ -104,6 +129,62 @@ describe('InventoryProductList — smoke render', () => {
     fireEvent.change(input, { target: { value: 'coca' } });
     expect(screen.getByText('Coca Cola')).toBeInTheDocument();
     expect(screen.queryByText('Fanta')).not.toBeInTheDocument();
+  });
+});
+
+// ─── InventoryProductList — weighted avg cost + total value (gap #4/#5, Angular parity) ────
+//
+// Angular reference: inventory-available.component.html:24-30 (category header shows
+// `{{category.categoryName}} ({{category.totalQuantity}})` + `{{category.totalCostPrice |
+// currency}}`) and inventory-product-list.component.html:14-29 (per-product row shows
+// `{{product.costPrice | currency}}` — the weighted-avg unit cost — and
+// `{{product.costPrice * product.quantity | currency}}` — the per-product total value).
+
+describe('InventoryProductList — weighted avg cost + total value (Angular parity)', () => {
+  it('shows the category total quantity next to the category name', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Bebidas (15)')).toBeInTheDocument();
+    expect(screen.getByText('Snacks (8)')).toBeInTheDocument();
+  });
+
+  it('shows the category total inventory value ($ prefix, matching Angular currency pipe)', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$35.00')).toBeInTheDocument();
+    // $40.00 appears twice: the Snacks category total AND Papas Lays' product total value
+    // (5 * 8 = 40) — same numeric coincidence documented in the test below.
+    expect(screen.getAllByText('$40.00').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows each product weighted-average unit cost', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    // Coca Cola: avgCostPrice=2 -> $2.00; Fanta: avgCostPrice=3 -> $3.00
+    expect(screen.getByText('$2.00')).toBeInTheDocument();
+    expect(screen.getByText('$3.00')).toBeInTheDocument();
+  });
+
+  it('shows each product total value (avgCostPrice · totalAvailable)', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    // Coca Cola: 2 * 10 = $20.00; Fanta: 3 * 5 = $15.00; Papas Lays: 5 * 8 = $40.00
+    expect(screen.getByText('$20.00')).toBeInTheDocument();
+    expect(screen.getByText('$15.00')).toBeInTheDocument();
+    // $40.00 also appears as the Snacks category total (same numeric value, expected coincidence)
+    expect(screen.getAllByText('$40.00').length).toBeGreaterThanOrEqual(1);
   });
 });
 

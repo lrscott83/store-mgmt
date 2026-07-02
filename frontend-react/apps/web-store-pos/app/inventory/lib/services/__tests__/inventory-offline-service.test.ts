@@ -398,6 +398,102 @@ describe('InventoryOfflineService', () => {
     });
   });
 
+  describe('INV-09: getAvailableByCategory — weighted-average cost + category totals (Angular parity: getInventoryCategoriesView/getAverageCostPrice/getTotalCostPrice, inventory-offline.service.ts:286-349)', () => {
+    const enrichedProduct = (id: string, name: string, categoryId: string, categoryName: string) => ({
+      id,
+      name,
+      categoryId,
+      categoryName,
+    });
+
+    it('computes weighted-average cost price per product: Σ(available·costPrice)/Σavailable', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 10, costPrice: 2 }),
+        makeEntry('e2', 'p1', { available: 10, costPrice: 4 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]);
+
+      // (10*2 + 10*4) / 20 = 3
+      expect(categories[0].products[0].avgCostPrice).toBe(3);
+      expect(categories[0].products[0].totalAvailable).toBe(20);
+    });
+
+    it('weights by available quantity, not the original received quantity', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        // received 10 @ $2 but 8 already sold -> only 2 left available
+        makeEntry('e1', 'p1', { quantity: 10, available: 2, costPrice: 2 }),
+        makeEntry('e2', 'p1', { quantity: 10, available: 8, costPrice: 5 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]);
+
+      // (2*2 + 8*5) / 10 = 4.4
+      expect(categories[0].products[0].avgCostPrice).toBeCloseTo(4.4, 5);
+    });
+
+    it('computes category totalQuantity as the sum of each product totalAvailable', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]);
+      map.set('p2', [makeEntry('e2', 'p2', { available: 5, costPrice: 3 })]);
+      seedInventory(storeId, map);
+
+      const categories = service.getAvailableByCategory([
+        enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
+        enrichedProduct('p2', 'Vodka', 'cat-1', 'Bebidas'),
+      ]);
+
+      expect(categories).toHaveLength(1);
+      expect(categories[0].totalQuantity).toBe(15);
+    });
+
+    it('computes category totalCostPrice as Σ(product.avgCostPrice·product.totalAvailable) — matches Σ(entry.available·costPrice) for the category', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]); // value = 20
+      map.set('p2', [makeEntry('e2', 'p2', { available: 5, costPrice: 3 })]); // value = 15
+      seedInventory(storeId, map);
+
+      const categories = service.getAvailableByCategory([
+        enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
+        enrichedProduct('p2', 'Vodka', 'cat-1', 'Bebidas'),
+      ]);
+
+      expect(categories[0].totalCostPrice).toBe(35);
+    });
+
+    it('keeps separate category totals for products in different categories', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]);
+      map.set('p2', [makeEntry('e2', 'p2', { available: 5, costPrice: 10 })]);
+      seedInventory(storeId, map);
+
+      const categories = service.getAvailableByCategory([
+        enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
+        enrichedProduct('p2', 'Papas', 'cat-2', 'Snacks'),
+      ]);
+
+      const bebidas = categories.find((c) => c.categoryId === 'cat-1');
+      const snacks = categories.find((c) => c.categoryId === 'cat-2');
+      expect(bebidas?.totalCostPrice).toBe(20);
+      expect(snacks?.totalCostPrice).toBe(50);
+    });
+
+    it('does not divide by zero / produce NaN for fully-depleted products (documented divergence — Angular has a NaN bug here, not replicated)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 0, costPrice: 2 })]);
+      seedInventory(storeId, map);
+
+      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]);
+
+      // Fully-depleted product is excluded entirely — pre-existing divergence, not this gap's concern.
+      expect(categories).toHaveLength(0);
+    });
+  });
+
   describe('INV-08: getByDate filters by date', () => {
     it('returns entries matching the given date', () => {
       const date = new Date('2024-03-10T10:00:00.000Z');

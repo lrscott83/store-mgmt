@@ -107,6 +107,76 @@ describe('InventoryAvailablePage — smoke render', () => {
   });
 });
 
+// ─── InventoryAvailablePage — header total inventory value (Angular parity) ─────────────────
+//
+// Angular reference: inventory-available.component.ts:38-40 `getInventoryCostTotal()` (sums
+// `category.totalCostPrice` across the currently loaded categories$) + .html:6-9 (card-toolbar
+// currency chip, `| currency:'USD':'symbol':'1.2-2'`).
+
+describe('InventoryAvailablePage — header total inventory value', () => {
+  it('shows the sum of all categories totalCostPrice as the header chip', () => {
+    const categories: InventoryCategoryView[] = [
+      {
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        totalQuantity: 20,
+        totalCostPrice: 60,
+        products: [
+          {
+            productId: 'p1',
+            productName: 'Ron',
+            categoryId: 'cat-1',
+            categoryName: 'Bebidas',
+            totalAvailable: 20,
+            avgCostPrice: 3,
+          },
+        ],
+      },
+      {
+        categoryId: 'cat-2',
+        categoryName: 'Snacks',
+        totalQuantity: 8,
+        totalCostPrice: 40,
+        products: [
+          {
+            productId: 'p2',
+            productName: 'Papas',
+            categoryId: 'cat-2',
+            categoryName: 'Snacks',
+            totalAvailable: 8,
+            avgCostPrice: 5,
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAvailableByCategory: vi.fn().mockReturnValue(categories),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryAvailablePage />
+      </Wrapper>,
+    );
+
+    // 60 + 40 = 100.00
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+  });
+
+  it('shows $0.00 when there is no inventory yet', () => {
+    render(
+      <Wrapper>
+        <InventoryAvailablePage />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$0.00')).toBeInTheDocument();
+  });
+});
+
 // ─── TodayEntriesPage ────────────────────────────────────────────────────────
 
 import { TodayEntriesPage } from '../today-entries';
@@ -199,8 +269,17 @@ describe('InventoryTodayQuantitiesPage — Angular inicio/entradas/disponible/ve
       {
         categoryId: 'cat-1',
         categoryName: 'Bebidas',
+        totalQuantity: 20,
+        totalCostPrice: 100,
         products: [
-          { productId: 'p1', productName: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas', totalAvailable: 20 },
+          {
+            productId: 'p1',
+            productName: 'Ron',
+            categoryId: 'cat-1',
+            categoryName: 'Bebidas',
+            totalAvailable: 20,
+            avgCostPrice: 5,
+          },
         ],
       },
     ];

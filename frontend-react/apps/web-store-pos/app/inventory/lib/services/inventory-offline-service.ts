@@ -12,11 +12,28 @@ export interface InventoryProductStock {
   categoryId: string;
   categoryName: string;
   totalAvailable: number;
+  /**
+   * Weighted-average cost price per unit across this product's active inventory entries:
+   * Σ(entry.available · entry.costPrice) / Σ(entry.available).
+   * Mirrors Angular's InventoryOfflineService.getAverageCostPrice
+   * (frontend/src/app/application/entries/inventory-offline.service.ts:341-349).
+   */
+  avgCostPrice: number;
 }
 
 export interface InventoryCategoryView {
   categoryId: string;
   categoryName: string;
+  /**
+   * Sum of totalAvailable across the category's products.
+   * Mirrors Angular's getTotalQuantity (inventory-offline.service.ts:317-323).
+   */
+  totalQuantity: number;
+  /**
+   * Total inventory value for the category: Σ(product.avgCostPrice · product.totalAvailable).
+   * Mirrors Angular's getTotalCostPrice (inventory-offline.service.ts:325-331).
+   */
+  totalCostPrice: number;
   products: InventoryProductStock[];
 }
 
@@ -97,11 +114,20 @@ export class InventoryOfflineService {
       const totalAvailable = activeEntries.reduce((sum, e) => sum + e.available, 0);
       if (totalAvailable === 0) continue;
 
+      // Weighted-average unit cost across active entries — Angular's getAverageCostPrice.
+      // totalAvailable > 0 here (checked above), so this never divides by zero: Angular's own
+      // division-by-zero (NaN) bug for fully-depleted products is intentionally NOT replicated
+      // (diff-matrix #4 — fully-depleted products are excluded above instead).
+      const weightedCostSum = activeEntries.reduce((sum, e) => sum + e.available * e.costPrice, 0);
+      const avgCostPrice = weightedCostSum / totalAvailable;
+
       let cat = categoryMap.get(product.categoryId);
       if (!cat) {
         cat = {
           categoryId: product.categoryId,
           categoryName: product.categoryName,
+          totalQuantity: 0,
+          totalCostPrice: 0,
           products: [],
         };
         categoryMap.set(product.categoryId, cat);
@@ -113,7 +139,15 @@ export class InventoryOfflineService {
         categoryId: product.categoryId,
         categoryName: product.categoryName,
         totalAvailable,
+        avgCostPrice,
       });
+    }
+
+    // Category totals — Angular's getTotalQuantity/getTotalCostPrice, recomputed from the
+    // per-product views (Σ totalAvailable; Σ avgCostPrice·totalAvailable).
+    for (const cat of categoryMap.values()) {
+      cat.totalQuantity = cat.products.reduce((sum, p) => sum + p.totalAvailable, 0);
+      cat.totalCostPrice = cat.products.reduce((sum, p) => sum + p.avgCostPrice * p.totalAvailable, 0);
     }
 
     return Array.from(categoryMap.values());

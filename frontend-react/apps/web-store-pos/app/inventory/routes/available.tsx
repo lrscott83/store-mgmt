@@ -36,11 +36,20 @@ export function InventoryAvailablePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
+  // Header total inventory value — Angular's InventoryAvailableComponent.getInventoryCostTotal()
+  // (inventory-available.component.ts:38-40): sums totalCostPrice across the currently loaded
+  // categories, NOT a separate service call to InventoryOfflineService.getInventoryCostTotal()
+  // (which the Angular component does not actually invoke from this screen).
+  const totalInventoryValue = categories.reduce((sum, cat) => sum + cat.totalCostPrice, 0);
+
   return (
     <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'INVENTORY.AVAILABLE.TITLE' })}
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">
+          {intl.formatMessage({ id: 'INVENTORY.AVAILABLE.TITLE' })}
+        </h1>
+        <span className="text-lg font-bold text-primary">${totalInventoryValue.toFixed(2)}</span>
+      </div>
       <InventoryProductList categories={categories} />
     </div>
   );
