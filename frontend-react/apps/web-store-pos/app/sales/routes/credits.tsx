@@ -1,139 +1,142 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { SaleCredit } from '@store-mgmt/domain';
-import { EFeatures, PaymentType } from '@store-mgmt/domain';
+import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Card } from '~/shared/components/ui/card';
+import { InfoBox } from '~/shared/components/ui/info-box';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
-import { EditSaleCreditModal } from '../components/edit-sale-credit-modal';
-import { SaleCreditPaymentModal } from '../components/sale-credit-payment-modal';
 
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
-type CreditFilter = 'all' | 'paid' | 'unpaid';
-
-function defaultDateRange(): { from: string; to: string } {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
-  };
+interface DateSaleCredit {
+  date: Date;
+  saleCredits: SaleCredit[];
+  creditsCount: number;
+  creditsTotal: number;
 }
 
+function groupSaleCredits(saleCredits: SaleCredit[]): DateSaleCredit[] {
+  const groups = new Map<string, SaleCredit[]>();
+  saleCredits.forEach((credit) => {
+    const groupId = new Date(credit.date).toISOString().split('T')[0];
+    const collection = groups.get(groupId);
+    if (collection) collection.push(credit);
+    else groups.set(groupId, [credit]);
+  });
+
+  const dateSaleCredits: DateSaleCredit[] = Array.from(groups.values()).map((credits) => ({
+    date: credits[0].date,
+    saleCredits: [...credits].sort((c1, c2) => new Date(c1.date).getTime() - new Date(c2.date).getTime()),
+    // creditsCount/creditsTotal only count UNPAID credits — matches Angular's
+    // SaleCreditsComponent.groupSaleCredits exactly (count += !isPaid ? 1 : 0).
+    creditsCount: credits.reduce((count, c) => count + (!c.isPaid ? 1 : 0), 0),
+    creditsTotal: credits.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0),
+  }));
+
+  return dateSaleCredits.sort((c1, c2) => new Date(c1.date).getTime() - new Date(c2.date).getTime());
+}
+
+function formatDateOnly(date: Date): string {
+  const d = new Date(date);
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Matches Angular's `sale-credits.component.html` (Créditos): NO filters at
+ * all — Angular's `loadSaleCredits()` always calls `filterSaleCredits(null,
+ * null, null, null)` (no date-range/paid-state UI exists). Credits grouped
+ * by date into an accordion; each date panel wraps `SaleCreditList` with NO
+ * `readOnly` prop passed (Angular's `<app-sale-credit-list>` here has no
+ * `[readOnly]` binding → default `true`, no edit/pay actions reachable from
+ * this view). Header shows count + total of UNPAID credits only.
+ */
 export function SaleCreditsPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const [range, setRange] = useState(defaultDateRange());
-  const [filter, setFilter] = useState<CreditFilter>('all');
-  const [credits, setCredits] = useState<SaleCredit[]>([]);
-  const [selectedCredit, setSelectedCredit] = useState<SaleCredit | null>(null);
-  const [paymentCredit, setPaymentCredit] = useState<SaleCredit | null>(null);
+  const [dateSaleCredits, setDateSaleCredits] = useState<DateSaleCredit[]>([]);
+  const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
 
-  function loadCredits() {
+  function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
-    const from = new Date(range.from);
-    const to = new Date(range.to);
-    to.setHours(23, 59, 59, 999);
-    setCredits(service.getByDateRange(from, to));
+    const credits = service.getAll().filter((c) => c.isActive);
+    setDateSaleCredits(groupSaleCredits(credits));
   }
 
   useEffect(() => {
-    loadCredits();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId, range.from, range.to]);
+    loadSaleCredits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
-  const filteredCredits =
-    filter === 'all'
-      ? credits
-      : filter === 'paid'
-        ? credits.filter((c) => c.isPaid)
-        : credits.filter((c) => !c.isPaid);
-
-  function handleSave(creditId: string, client: string, note: string) {
-    const service = new SaleCreditOfflineService(storeId);
-    service.update(creditId, client, note);
-    loadCredits();
-    setSelectedCredit(null);
+  function toggleDatePanel(dateId: string) {
+    setExpandedDateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateId)) next.delete(dateId);
+      else next.add(dateId);
+      return next;
+    });
   }
 
-  function handlePayment(credit: SaleCredit) {
-    setSelectedCredit(null);
-    setPaymentCredit(credit);
-  }
-
-  function handlePaymentConfirm(creditId: string, paidType: PaymentType) {
-    const service = new SaleCreditOfflineService(storeId);
-    service.pay(creditId, paidType, '');
-    loadCredits();
-    setPaymentCredit(null);
-  }
+  const creditsCount = dateSaleCredits.reduce((count, d) => count + d.creditsCount, 0);
+  const creditsTotal = dateSaleCredits.reduce((total, d) => total + d.creditsTotal, 0);
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">{intl.formatMessage({ id: 'CREDITS.TITLE' })}</h1>
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            {/* SALE_CREDIT.TITLE */}
+            {intl.formatMessage({ id: 'SALE_CREDIT.TITLE' })}
+            <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+              ({creditsCount})
+            </span>
+          </span>
+          <span className="text-sm font-semibold text-danger">${creditsTotal.toFixed(2)}</span>
+        </div>
+      }
+    >
+      {dateSaleCredits.length === 0 && (
+        <InfoBox variant="primary" className="mb-6 text-center">
+          {/* SALE_CREDIT.NO_SALE_CREDIT_FOUND */}
+          {intl.formatMessage({ id: 'SALE_CREDIT.NO_SALE_CREDIT_FOUND' })}
+        </InfoBox>
+      )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="flex gap-1">
-          {(['all', 'paid', 'unpaid'] as CreditFilter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-full px-3 py-1 text-sm font-medium ${
-                filter === f
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {intl.formatMessage({
-                id: f === 'all'
-                  ? 'CREDITS.FILTER.ALL'
-                  : f === 'paid'
-                    ? 'CREDITS.FILTER.PAID'
-                    : 'CREDITS.FILTER.UNPAID',
-              })}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="date"
-            value={range.from}
-            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-            className="rounded border px-2 py-1 text-sm"
-          />
-          <input
-            type="date"
-            value={range.to}
-            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-            className="rounded border px-2 py-1 text-sm"
-          />
-        </div>
+      <div className="space-y-2">
+        {dateSaleCredits.map((dateSaleCredit) => {
+          const dateId = new Date(dateSaleCredit.date).toISOString().split('T')[0];
+          const isExpanded = expandedDateIds.has(dateId);
+          return (
+            <div key={dateId} className="rounded-lg border border-border bg-surface">
+              <button
+                type="button"
+                onClick={() => toggleDatePanel(dateId)}
+                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                data-testid={`credit-date-panel-toggle-${dateId}`}
+                aria-expanded={isExpanded}
+              >
+                <span className="text-sm font-medium text-text">
+                  {formatDateOnly(dateSaleCredit.date)} ({dateSaleCredit.creditsCount})
+                </span>
+                <span className="text-sm font-semibold text-danger">
+                  ${dateSaleCredit.creditsTotal.toFixed(2)}
+                </span>
+              </button>
+              {isExpanded && (
+                <div className="border-t border-border px-4 py-3">
+                  <SaleCreditList saleCredits={dateSaleCredit.saleCredits} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-
-      <SaleCreditList credits={filteredCredits} onCreditClick={setSelectedCredit} />
-
-      {selectedCredit && (
-        <EditSaleCreditModal
-          credit={selectedCredit}
-          isOpen={true}
-          onClose={() => setSelectedCredit(null)}
-          onSave={handleSave}
-          onPayment={handlePayment}
-        />
-      )}
-
-      {paymentCredit && (
-        <SaleCreditPaymentModal
-          credit={paymentCredit}
-          isOpen={true}
-          onClose={() => setPaymentCredit(null)}
-          onConfirm={handlePaymentConfirm}
-        />
-      )}
-    </div>
+    </Card>
   );
 }
 

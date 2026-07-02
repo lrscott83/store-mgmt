@@ -23,6 +23,9 @@ const messages: Record<string, string> = {
   'GENERAL.DELETE': 'Eliminar',
   'GENERAL.UPDATE': 'Actualizar',
   'GENERAL.YES': 'Si',
+  'GENERAL.NO': 'No',
+  'GENERAL.CLIENT': 'Cliente',
+  'GENERAL.NOTE': 'Nota',
 
   // Auth
   'AUTH.SIGN_IN': 'Iniciar sesión',
@@ -214,29 +217,18 @@ const messages: Record<string, string> = {
   // that is Angular's literal source behavior, preserved here)
   'TODAY_STATS.NO_ORDER_FOUND': 'No se ha realizado ninguna venta en el día de hoy.',
 
-  // Sale Credit (Angular SALE_CREDIT.* — vocabs/es.ts. PAYMENT_CREDIT is Angular's literal
-  // edit-order-modal.component.html title, reused verbatim even though it reads oddly for
-  // an order-payment-type modal — matches Angular's actual source, not a paraphrase)
+  // Sale Credit (Angular SALE_CREDIT.* — vocabs/es.ts, byte-identical. PAYMENT_CREDIT is
+  // Angular's literal title for BOTH edit-sale-credit-modal AND sale-credit-payment-modal
+  // (also reused verbatim by edit-order-modal) — Angular's own source uses the same key
+  // for all three, preserved here, not a paraphrase or a bug fix).
+  'SALE_CREDIT.TITLE': 'Créditos',
+  'SALE_CREDIT.TODAY_CREDITS': 'Créditos del día',
+  'SALE_CREDIT.TO_PAY': 'Pagar',
   'SALE_CREDIT.PAYMENT_CREDIT': 'Venta por Cobrar',
-
-  // Credits
-  'CREDITS.TITLE': 'Historial de créditos',
-  'CREDITS.TODAY_TITLE': 'Créditos de hoy',
-  'CREDITS.CLIENT': 'Cliente',
-  'CREDITS.TOTAL': 'Total',
-  'CREDITS.PAID': 'Pagado',
-  'CREDITS.REMAINING': 'Saldo pendiente',
-  'CREDITS.DATE': 'Fecha',
-  'CREDITS.STATUS.PAID': 'Pagado',
-  'CREDITS.STATUS.UNPAID': 'Pendiente',
-  'CREDITS.REGISTER_PAYMENT': 'Registrar pago',
-  'CREDITS.PAYMENT.AMOUNT': 'Monto',
-  'CREDITS.PAYMENT.TYPE': 'Tipo de pago',
-  'CREDITS.PAYMENT.CONFIRM': 'Confirmar pago',
-  'CREDITS.EMPTY_STATE': 'No hay créditos',
-  'CREDITS.FILTER.ALL': 'Todos',
-  'CREDITS.FILTER.PAID': 'Pagados',
-  'CREDITS.FILTER.UNPAID': 'Pendientes',
+  'SALE_CREDIT.PAYMENT_CONFIRM_TITLE': 'Confirmación de Pago',
+  'SALE_CREDIT.PAYMENT_CONFIRM_MESSAGE': 'Usted está segura(o) que desea pagar este crédito por venta?',
+  'SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY': 'No existe ningún crédito en el día',
+  'SALE_CREDIT.NO_SALE_CREDIT_FOUND': 'No se encontró ningún crédito',
 
   // Inventory
   'INVENTORY.AVAILABLE.TITLE': 'Stock disponible',

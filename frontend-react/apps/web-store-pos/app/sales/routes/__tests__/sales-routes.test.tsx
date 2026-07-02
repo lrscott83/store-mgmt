@@ -60,7 +60,6 @@ vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
     getActiveToday: vi.fn().mockReturnValue([]),
-    getByDateRange: vi.fn().mockReturnValue([]),
     pay: vi.fn(),
     update: vi.fn(),
   })),
@@ -193,13 +192,23 @@ describe('TodaySaleCreditsPage — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows empty credits state', () => {
+  it('shows the Angular header (Créditos del día) and empty state (SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY)', () => {
     render(
       <Wrapper>
         <TodaySaleCreditsPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/No hay créditos/i)).toBeInTheDocument();
+    expect(screen.getByText('Créditos del día')).toBeInTheDocument();
+    expect(screen.getByText('No existe ningún crédito en el día')).toBeInTheDocument();
+  });
+
+  it('has no payment-type or isCredit filters (Angular has none on this view)', () => {
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('radio')).toBeNull();
   });
 });
 
@@ -214,5 +223,26 @@ describe('SaleCreditsPage — smoke render', () => {
       </Wrapper>,
     );
     expect(document.body).toBeTruthy();
+  });
+
+  it('shows the Angular header (Créditos) with a count badge and empty state (SALE_CREDIT.NO_SALE_CREDIT_FOUND)', () => {
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Créditos')).toBeInTheDocument();
+    expect(screen.getByText('(0)')).toBeInTheDocument();
+    expect(screen.getByText('No se encontró ningún crédito')).toBeInTheDocument();
+  });
+
+  it('has no date-range or paid/unpaid filters (Angular has none on this view)', () => {
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(document.querySelector('input[type="date"]')).toBeNull();
   });
 });

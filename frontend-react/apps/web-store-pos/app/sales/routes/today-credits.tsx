@@ -1,79 +1,65 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { SaleCredit } from '@store-mgmt/domain';
-import { EFeatures, PaymentType } from '@store-mgmt/domain';
+import type { SaleCredit, PaymentType } from '@store-mgmt/domain';
+import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Card } from '~/shared/components/ui/card';
+import { InfoBox } from '~/shared/components/ui/info-box';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
-import { EditSaleCreditModal } from '../components/edit-sale-credit-modal';
-import { SaleCreditPaymentModal } from '../components/sale-credit-payment-modal';
 
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
+/**
+ * Matches Angular's `today-sale-credits.component.html` (Créditos del día):
+ * no filters, flat (not grouped) list of today's active credits, rendered
+ * with `[readOnly]="false"` (edit/pay actions reachable via the settings
+ * menu inside `SaleCreditList`).
+ */
 export function TodaySaleCreditsPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const [credits, setCredits] = useState<SaleCredit[]>([]);
-  const [selectedCredit, setSelectedCredit] = useState<SaleCredit | null>(null);
-  const [paymentCredit, setPaymentCredit] = useState<SaleCredit | null>(null);
+  const [saleCredits, setSaleCredits] = useState<SaleCredit[]>([]);
 
-  function loadCredits() {
+  function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
-    setCredits(service.getActiveToday());
+    setSaleCredits(service.getActiveToday());
   }
 
   useEffect(() => {
-    loadCredits();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadSaleCredits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
   function handleSave(creditId: string, client: string, note: string) {
     const service = new SaleCreditOfflineService(storeId);
     service.update(creditId, client, note);
-    loadCredits();
-    setSelectedCredit(null);
+    loadSaleCredits();
   }
 
-  function handlePayment(credit: SaleCredit) {
-    setSelectedCredit(null);
-    setPaymentCredit(credit);
-  }
-
-  function handlePaymentConfirm(creditId: string, paidType: PaymentType) {
+  function handlePay(creditId: string, paidType: PaymentType, note: string) {
     const service = new SaleCreditOfflineService(storeId);
-    service.pay(creditId, paidType, '');
-    loadCredits();
-    setPaymentCredit(null);
+    service.pay(creditId, paidType, note);
+    loadSaleCredits();
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'CREDITS.TODAY_TITLE' })}
-      </h1>
-
-      <SaleCreditList credits={credits} onCreditClick={setSelectedCredit} />
-
-      {selectedCredit && (
-        <EditSaleCreditModal
-          credit={selectedCredit}
-          isOpen={true}
-          onClose={() => setSelectedCredit(null)}
-          onSave={handleSave}
-          onPayment={handlePayment}
-        />
+    <Card
+      title={
+        // SALE_CREDIT.TODAY_CREDITS
+        intl.formatMessage({ id: 'SALE_CREDIT.TODAY_CREDITS' })
+      }
+    >
+      {saleCredits.length === 0 && (
+        <InfoBox variant="primary" className="mb-6 text-center">
+          {/* SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY */}
+          {intl.formatMessage({ id: 'SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY' })}
+        </InfoBox>
       )}
 
-      {paymentCredit && (
-        <SaleCreditPaymentModal
-          credit={paymentCredit}
-          isOpen={true}
-          onClose={() => setPaymentCredit(null)}
-          onConfirm={handlePaymentConfirm}
-        />
-      )}
-    </div>
+      <SaleCreditList saleCredits={saleCredits} readOnly={false} onSave={handleSave} onPay={handlePay} />
+    </Card>
   );
 }
 
