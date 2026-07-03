@@ -43,8 +43,13 @@ export class ProductOfflineService {
   }
 
   update(product: Product): Product {
-    repo.upsert(this.storeId, product);
-    return product;
+    const updated: Product = {
+      ...product,
+      updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
+    };
+    repo.upsert(this.storeId, updated);
+    return updated;
   }
 
   updateMany(products: Product[]): void {

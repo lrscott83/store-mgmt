@@ -155,6 +155,27 @@ describe('ProductOfflineService', () => {
       service.update({ ...created, price: 5.0 });
       expect(service.getById(created.id)?.price).toBe(5.0);
     });
+
+    // Angular parity (audit-user-threading-followup): update stamps updatedByName
+    // from the authenticated user's login, mirroring ExpenseOfflineService.update.
+    it('stamps updatedByName with the authenticated user login on update', () => {
+      const created = service.create(makeProduct());
+      const updated = service.update({ ...created, price: 9.0 });
+      expect(updated.updatedByName).toBe('jdoe');
+    });
+
+    it('sets updatedDate to a Date instance on update', () => {
+      const created = service.create(makeProduct());
+      const updated = service.update({ ...created, price: 9.0 });
+      expect(updated.updatedDate).toBeInstanceOf(Date);
+    });
+
+    it('does not change createdByName/createdDate on update', () => {
+      const created = service.create(makeProduct());
+      const updated = service.update({ ...created, price: 9.0 });
+      expect(updated.createdByName).toBe(created.createdByName);
+      expect(updated.createdDate).toEqual(created.createdDate);
+    });
   });
 
   describe('PROD-06: delete', () => {
