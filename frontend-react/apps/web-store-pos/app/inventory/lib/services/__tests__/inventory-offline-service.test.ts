@@ -1,8 +1,32 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InventoryOfflineService } from '../inventory-offline-service';
-import type { InventoryEntry, OrderItem } from '@store-mgmt/domain';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import type { InventoryEntry, OrderItem, UserModel } from '@store-mgmt/domain';
 
 const storeId = 's1';
+
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    id: 'u1',
+    login: 'jdoe',
+    fullName: 'Test User',
+    cellPhone: '',
+    email: 'jdoe@test.com',
+    isActive: true,
+    password: '',
+    authToken: 'tok',
+    refreshToken: 'ref',
+    expiresIn: Date.now() + 1000000,
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: 's1',
+    ...overrides,
+  };
+}
 
 function makeEntry(id: string, productId: string, overrides: Partial<InventoryEntry> = {}): InventoryEntry {
   return {
@@ -26,11 +50,23 @@ function seedInventory(storeId: string, map: Map<string, InventoryEntry[]>): voi
   localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, JSON.stringify(entries));
 }
 
+function findRawEntry(storeId: string, entryId: string): (InventoryEntry & Record<string, unknown>) | undefined {
+  const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`);
+  if (!raw) return undefined;
+  const entries: [string, InventoryEntry[]][] = JSON.parse(raw);
+  for (const [, list] of entries) {
+    const found = list.find((e) => e.id === entryId);
+    if (found) return found as InventoryEntry & Record<string, unknown>;
+  }
+  return undefined;
+}
+
 describe('InventoryOfflineService', () => {
   let service: InventoryOfflineService;
 
   beforeEach(() => {
     localStorage.clear();
+    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
     service = new InventoryOfflineService(storeId);
   });
 
@@ -355,6 +391,25 @@ describe('InventoryOfflineService', () => {
       const entry = service.create('p1', 10, 1.5);
       expect(entry.isActive).toBe(true);
     });
+
+    // Angular parity (audit-user-threading): create stamps createdByName from the
+    // authenticated user's login and MUST NOT touch updatedByName/updatedDate.
+    it('stamps createdByName with the authenticated user login', () => {
+      const entry = service.create('p1', 10, 1.5);
+      expect(entry.createdByName).toBe('jdoe');
+    });
+
+    it('leaves updatedByName/updatedDate undefined on create', () => {
+      const entry = service.create('p1', 10, 1.5);
+      expect(entry.updatedByName).toBeUndefined();
+      expect(entry.updatedDate).toBeUndefined();
+    });
+
+    it('stamps createdByName with "" when no user is authenticated', () => {
+      useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+      const entry = service.create('p1', 10, 1.5);
+      expect(entry.createdByName).toBe('');
+    });
   });
 
   describe('INV-04: update — S-I4 (fails when partially sold)', () => {
@@ -376,6 +431,17 @@ describe('InventoryOfflineService', () => {
 
     it('throws when entry not found', () => {
       expect(() => service.update('nonexistent', 'p1', 10, 1.0)).toThrow();
+    });
+
+    // Angular parity (audit-user-threading): update stamps updatedByName from the
+    // authenticated user's login.
+    it('stamps updatedByName with the authenticated user login', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      const updated = service.update('e1', 'p1', 15, 2.0);
+      expect(updated.updatedByName).toBe('jdoe');
     });
   });
 
@@ -408,6 +474,17 @@ describe('InventoryOfflineService', () => {
       // OR it should have isActive=false if getAll returns all
       // Let's check that the entry is gone from the active list
       expect(found).toBeUndefined();
+    });
+
+    // Angular parity (audit-user-threading): deactivate stamps updatedByName from the
+    // authenticated user's login.
+    it('stamps updatedByName with the authenticated user login', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      service.deactivate('e1', 'p1');
+      expect(findRawEntry(storeId, 'e1')?.updatedByName).toBe('jdoe');
     });
   });
 

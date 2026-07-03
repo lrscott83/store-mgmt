@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
-import type { Product, InventoryEntryCost, OrderItem } from '@store-mgmt/domain';
+import type { Product, InventoryEntryCost, OrderItem, UserModel } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 // Mock InventoryOfflineService BEFORE importing OrderOfflineService
 vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
@@ -72,6 +73,29 @@ function makeCartItems(
   return products.map(({ product, quantity, price }) => ({ product, quantity, price }));
 }
 
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    id: 'u1',
+    login: 'jdoe',
+    fullName: 'Test User',
+    cellPhone: '',
+    email: 'jdoe@test.com',
+    isActive: true,
+    password: '',
+    authToken: 'tok',
+    refreshToken: 'ref',
+    expiresIn: Date.now() + 1000000,
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: 's1',
+    ...overrides,
+  };
+}
+
 describe('OrderOfflineService', () => {
   let service: OrderOfflineService;
   const storeId = 's1';
@@ -79,6 +103,7 @@ describe('OrderOfflineService', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
     service = new OrderOfflineService(storeId);
   });
 
@@ -125,6 +150,21 @@ describe('OrderOfflineService', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       const order = service.create(items, PaymentType.Efectivo, false, '');
       expect(order.isActive).toBe(true);
+    });
+
+    // Angular parity (audit-user-threading): create stamps createdByName from the
+    // authenticated user's login and MUST NOT touch updatedByName/updatedDate.
+    it('stamps createdByName with the authenticated user login', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      expect(order.createdByName).toBe('jdoe');
+    });
+
+    it('leaves updatedByName/updatedDate undefined on create', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      expect(order.updatedByName).toBeUndefined();
+      expect(order.updatedDate).toBeUndefined();
     });
 
     it('builds orderItems with correct product info', () => {
@@ -263,6 +303,26 @@ describe('OrderOfflineService', () => {
       service.deactivate(order.id);
       const found = service.getById(order.id);
       expect(found?.isActive).toBe(false);
+    });
+
+    // Angular parity (audit-user-threading): deactivate stamps updatedByName from the
+    // authenticated user's login — the nested creditService.voidByOrderId call stamps
+    // ITS OWN SaleCredit entity separately (mocked here, verified in the SaleCredit suite).
+    it('stamps updatedByName with the authenticated user login', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      service.deactivate(order.id);
+      const found = service.getById(order.id);
+      expect(found?.updatedByName).toBe('jdoe');
+    });
+  });
+
+  describe('ORD-10: update stamps updatedByName', () => {
+    it('stamps updatedByName with the authenticated user login', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      const updated = service.update(order.id, PaymentType.Tarjeta);
+      expect(updated.updatedByName).toBe('jdoe');
     });
   });
 

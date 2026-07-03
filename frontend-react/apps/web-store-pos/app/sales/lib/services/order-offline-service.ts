@@ -7,6 +7,7 @@ import { ProductCategoryOfflineService } from './product-category-offline-servic
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import type { CategoryCartItemsView, ProductCartItemsView } from '../category-cart-items-view';
+import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
 function groupBy<T>(items: T[], key: keyof T): Map<string, T[]> {
   const groups = new Map<string, T[]>();
@@ -179,9 +180,9 @@ export class OrderOfflineService {
       description: isCredit ? clientName : '',
       isActive: true,
       createdDate: now,
-      createdByName: '',
-      updatedDate: now,
-      updatedByName: '',
+      createdByName: getCurrentUserLogin(),
+      updatedDate: undefined,
+      updatedByName: undefined,
     };
 
     repo.upsert(this.storeId, order);
@@ -200,6 +201,7 @@ export class OrderOfflineService {
       ...order,
       paymentType,
       updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
     return updated;
@@ -214,6 +216,7 @@ export class OrderOfflineService {
       ...order,
       isActive: false,
       updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
 

@@ -5,6 +5,7 @@ import {
   checkProductAvailabilityToSale,
   type ProductAvailabilityFields,
 } from '~/sales/lib/product-availability';
+import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
 /**
  * Optional eligibility context for {@link InventoryOfflineService.getAvailableInventoryCosts}.
@@ -297,9 +298,9 @@ export class InventoryOfflineService {
       order: maxOrder + 1,
       isActive: true,
       createdDate: now,
-      createdByName: '',
-      updatedDate: now,
-      updatedByName: '',
+      createdByName: getCurrentUserLogin(),
+      updatedDate: undefined,
+      updatedByName: undefined,
     };
 
     this.repo.save(this.storeId, productId, [...existing, entry]);
@@ -337,6 +338,7 @@ export class InventoryOfflineService {
       available: quantity,
       costPrice,
       updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
     };
 
     const allForProduct = this.repo.getByProductId(this.storeId, storedProductId ?? productId);
@@ -370,6 +372,7 @@ export class InventoryOfflineService {
       ...entry,
       isActive: false,
       updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
     };
 
     const allForProduct = this.repo.getByProductId(this.storeId, storedProductId ?? productId);
