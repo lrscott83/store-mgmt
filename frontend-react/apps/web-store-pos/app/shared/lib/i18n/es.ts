@@ -404,19 +404,28 @@ const messages: Record<string, string> = {
   'SCANNER.PRODUCT_NOT_FOUND': 'Producto no encontrado: {barcode}',
   'SCANNER.SCANNING': 'Escaneando...',
 
-  // Expenses — Today
-  'EXPENSES.TODAY.TITLE': 'Gastos de hoy',
-  'EXPENSES.NEW_TITLE': 'Nuevo gasto',
-  'EXPENSES.EDIT_TITLE': 'Editar gasto',
-  'EXPENSES.EMPTY_STATE': 'No hay gastos registrados',
+  // Expenses — Today (Angular EXPENSE.TODAY_EXPENSES/NO_EXPENSE_FOUND_IN_DAY/NEW_EXPENSE/
+  // EDIT_EXPENSE, vocabs/es.ts — byte-matched here, INCLUDING Angular's own typos, per the
+  // established project-wide convention of preserving Angular source typos verbatim for
+  // strict text parity (see ORDERS.NO_ORDERS_FOUND / TODAY_STATS.NO_EXPENSE_FOUND precedent).
+  'EXPENSES.TODAY.TITLE': 'Gastos del día',
+  'EXPENSES.NEW_TITLE': 'Adicionar Gasto',
+  // Angular EXPENSE.EDIT_EXPENSE literal source typo ('Gatos' instead of 'Gastos') —
+  // preserved verbatim for byte parity, matching the project's typo-preservation convention.
+  'EXPENSES.EDIT_TITLE': 'Editar Gatos',
+  'EXPENSES.EMPTY_STATE': 'No existe ningún gasto en el día',
   'EXPENSES.EDIT': 'Editar',
   'EXPENSES.DELETE': 'Eliminar',
   'EXPENSES.DELETE_CONFIRM': '¿Estás seguro de que querés eliminar este gasto?',
   'EXPENSES.RUNNING_TOTAL': 'Total del día: ${total}',
-  'EXPENSES.ADD_BUTTON': 'Nuevo gasto',
+  'EXPENSES.ADD_BUTTON': 'Gasto',
 
-  // Expenses — History
-  'EXPENSES.HISTORY.TITLE': 'Historial de gastos',
+  // Expenses — History (Angular EXPENSE.EXPENSES_HISTORY/NO_EXPENSE_FOUND, vocabs/es.ts).
+  'EXPENSES.HISTORY.TITLE': 'Historial de Gastos',
+  // Angular EXPENSE.NO_EXPENSE_FOUND literal source typo ('enxontró' instead of
+  // 'encontró') — preserved verbatim for byte parity. History-specific empty state,
+  // distinct from the Today page's EXPENSES.EMPTY_STATE.
+  'EXPENSES.HISTORY.EMPTY_STATE': 'No se enxontró ningún gasto',
   'EXPENSES.FILTERED_TOTAL': 'Total filtrado: ${total}',
 
   // Expenses — Form
@@ -442,7 +451,10 @@ const messages: Record<string, string> = {
   'EXPENSES.TYPE.SALARIO': 'Salario',
   'EXPENSES.TYPE.TRANSPORTE': 'Transporte',
   'EXPENSES.TYPE.ALQUILER': 'Alquiler',
-  'EXPENSES.TYPE.CORRIENTE': 'Cuenta corriente',
+  // ExpenseType.Corriente (Angular expense.model.ts's raw enum-key text, no translation
+  // layer) — was mistranslated to 'Cuenta corriente'; Angular never says that anywhere in
+  // this domain. Fixed to byte-match the raw enum key.
+  'EXPENSES.TYPE.CORRIENTE': 'Corriente',
   'EXPENSES.TYPE.AGUA': 'Agua',
   'EXPENSES.TYPE.COMIDA': 'Comida',
   'EXPENSES.TYPE.OPERACIONES': 'Operaciones',

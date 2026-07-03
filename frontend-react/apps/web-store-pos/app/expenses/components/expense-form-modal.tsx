@@ -82,7 +82,9 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
 
   if (!isOpen) return null;
 
-  const isValid = form.total > 0;
+  // Angular parity: Validators.required + Validators.min(0) — a total of exactly 0 IS valid
+  // (edit-expense-modal.component.ts:88-92). Only a negative/NaN total is invalid.
+  const isValid = Number.isFinite(form.total) && form.total >= 0;
 
   function handleSubmit() {
     if (!isValid) return;
@@ -135,17 +137,22 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
 
           {/* Total */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="expense-form-total" className="mb-1 block text-sm font-medium text-gray-700">
               {intl.formatMessage({ id: 'EXPENSES.FORM.TOTAL' })}
             </label>
             <input
+              id="expense-form-total"
               type="number"
-              min="0"
               step="0.01"
               value={form.total}
-              onChange={(e) => setForm((f) => ({ ...f, total: parseFloat(e.target.value) || 0 }))}
+              onChange={(e) => setForm((f) => ({ ...f, total: parseFloat(e.target.value) }))}
               className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {!isValid && (
+              <p className="mt-1 text-xs text-red-600">
+                {intl.formatMessage({ id: 'EXPENSES.FORM.TOTAL_REQUIRED' })}
+              </p>
+            )}
           </div>
 
           {/* Date */}

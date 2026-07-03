@@ -59,7 +59,7 @@ describe('TodayExpensesPage — smoke render', () => {
         <TodayExpensesPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/Gastos de hoy/i)).toBeInTheDocument();
+    expect(screen.getByText(/Gastos del día/i)).toBeInTheDocument();
   });
 
   it('shows add button', () => {
@@ -68,7 +68,7 @@ describe('TodayExpensesPage — smoke render', () => {
         <TodayExpensesPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/Nuevo gasto/i)).toBeInTheDocument();
+    expect(screen.getByText('Gasto')).toBeInTheDocument();
   });
 
   it('shows running total', () => {
