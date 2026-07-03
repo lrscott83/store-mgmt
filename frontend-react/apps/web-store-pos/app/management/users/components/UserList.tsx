@@ -4,7 +4,6 @@ import type { User } from '@store-mgmt/domain';
 interface UserListProps {
   users: User[];
   isOnline: boolean;
-  isDegraded: boolean;
   onCreate: () => void;
   onEdit: (id: string) => void;
   onActivate: (id: string) => void;
@@ -15,7 +14,6 @@ interface UserListProps {
 export function UserList({
   users,
   isOnline,
-  isDegraded,
   onCreate,
   onEdit,
   onActivate,
@@ -38,12 +36,6 @@ export function UserList({
           {intl.formatMessage({ id: 'USERS.CREATE' })}
         </button>
       </div>
-
-      {isDegraded && (
-        <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
-          {intl.formatMessage({ id: 'USERS.DEGRADED_NOTICE' })}
-        </p>
-      )}
 
       {error && (
         <p className="text-sm text-red-600">{error}</p>

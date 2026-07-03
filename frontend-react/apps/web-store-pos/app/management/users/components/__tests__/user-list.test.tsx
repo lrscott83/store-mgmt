@@ -26,7 +26,6 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 const baseProps = {
   users: [] as User[],
   isOnline: true,
-  isDegraded: false,
   onCreate: vi.fn(),
   onEdit: vi.fn(),
   onActivate: vi.fn(),
@@ -62,15 +61,15 @@ describe('UserList — PRES-3: empty state', () => {
   });
 });
 
-describe('UserList — PRES-2: degraded indicator', () => {
-  it('shows degraded notice when isDegraded=true', async () => {
+describe('UserList — PRES-2: no degraded/cache indicator (Req: Users List Is HTTP-Only)', () => {
+  it('does not render a degraded/cache notice when offline', async () => {
     const { UserList } = await import('../UserList');
     render(
       <Wrapper>
-        <UserList {...baseProps} users={[makeUser()]} isDegraded={true} isOnline={false} />
+        <UserList {...baseProps} users={[makeUser()]} isOnline={false} />
       </Wrapper>
     );
-    expect(screen.getByText(/caché/i)).toBeInTheDocument();
+    expect(screen.queryByText(/caché/i)).not.toBeInTheDocument();
   });
 });
 
@@ -137,7 +136,6 @@ describe('UserList — LIST-5: lifecycle buttons disabled when offline', () => {
           {...baseProps}
           users={[makeUser()]}
           isOnline={false}
-          isDegraded={true}
         />
       </Wrapper>
     );

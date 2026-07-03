@@ -162,41 +162,39 @@ describe('UserListPage — S-LIST-2: empty state', () => {
   });
 });
 
-describe('UserListPage — S-LIST-3: offline + cache fallback', () => {
+describe('UserListPage — S-LIST-3: HTTP-only fetch regardless of connectivity (Req: Users List Is HTTP-Only)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsOnline = false;
     localStorageMock.clear();
-    const cacheKey = `lizoft.store-storeusers-s1`;
-    const cachedUser = makeDomainUser({ fullName: 'Cached User' });
-    localStorageMock.setItem(cacheKey, JSON.stringify([[cachedUser.id, cachedUser]]));
-    mockListUsers = vi.fn();
+    mockListUsers = vi.fn().mockResolvedValue({ data: [makeDomainUser({ fullName: 'Offline Fetch User' })] });
   });
 
-  it('reads from cache when offline and does not call HTTP', async () => {
+  it('calls the users HTTP service on mount even when isOnline=false (no local cache read)', async () => {
     const { UserListPage } = await import('../user-list');
     render(<Wrapper><UserListPage /></Wrapper>);
     await waitFor(() => {
-      expect(screen.getByText('Cached User')).toBeInTheDocument();
+      expect(screen.getByText('Offline Fetch User')).toBeInTheDocument();
     });
-    expect(mockListUsers).not.toHaveBeenCalled();
+    expect(mockListUsers).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('UserListPage — S-LIST-4: offline + empty cache shows empty state', () => {
+describe('UserListPage — S-LIST-4: no degraded/offline banner ever renders (Req: Users List Is HTTP-Only)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsOnline = false;
     localStorageMock.clear();
-    mockListUsers = vi.fn();
+    mockListUsers = vi.fn().mockResolvedValue({ data: [] });
   });
 
-  it('shows empty state when offline and cache is empty', async () => {
+  it('shows empty state and no degraded/cache notice when offline', async () => {
     const { UserListPage } = await import('../user-list');
     render(<Wrapper><UserListPage /></Wrapper>);
     await waitFor(() => {
       expect(screen.getByText(/no hay usuarios/i)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/caché/i)).not.toBeInTheDocument();
   });
 });
 
