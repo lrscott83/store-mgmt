@@ -198,22 +198,25 @@ describe('UserListPage — S-LIST-4: no degraded/offline banner ever renders (Re
   });
 });
 
-describe('UserListPage — S-LIST-5: lifecycle buttons online (re-enabled)', () => {
+describe('UserListPage — S-LIST-5: lifecycle action wired through the gear menu when online', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsOnline = true;
     localStorageMock.clear();
-    // Use isActive:false so the Activate button is visible after the conditional fix
+    // Use isActive:false so the Activar menu item is present after opening the gear menu.
     mockListUsers = vi.fn().mockResolvedValue({ data: [makeDomainUser({ fullName: 'User Z', id: 'uz', isActive: false })] });
     mockActivateUser = vi.fn().mockResolvedValue({ data: true });
   });
 
-  it('lifecycle action buttons enabled when online', async () => {
+  it('calls activateUser when Activar is chosen from the gear menu', async () => {
     const { UserListPage } = await import('../user-list');
     render(<Wrapper><UserListPage /></Wrapper>);
     await waitFor(() => screen.getByText('User Z'));
-    const activateBtn = screen.getByRole('button', { name: /^activar$/i });
-    expect(activateBtn).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^activar$/i }));
+    await waitFor(() => {
+      expect(mockActivateUser).toHaveBeenCalledWith('uz');
+    });
   });
 });
 

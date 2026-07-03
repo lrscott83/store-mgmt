@@ -5,7 +5,7 @@ import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
-import { UserList } from '~/management/users/components/UserList';
+import { UserCardList } from '~/management/users/components/user-card-list';
 import type { User } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Users]);
@@ -50,15 +50,23 @@ export function UserListPage() {
   }
 
   return (
-    <UserList
-      users={users}
-      isOnline={isOnline}
-      error={error}
-      onCreate={() => navigate('/management/users/create')}
-      onEdit={(id) => navigate(`/management/users/edit/${id}`)}
-      onActivate={(id) => handleLifecycleAction(userHttpService.activateUser, id)}
-      onDeactivate={(id) => handleLifecycleAction(userHttpService.deactivateUser, id)}
-    />
+    <div className="space-y-4 p-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">
+          {intl.formatMessage({ id: 'USERS.LIST_TITLE' })}
+        </h1>
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <UserCardList
+        users={users}
+        onCreate={() => navigate('/management/users/create')}
+        onEdit={(id) => navigate(`/management/users/edit/${id}`)}
+        onActivate={(id) => handleLifecycleAction(userHttpService.activateUser, id)}
+        onDeactivate={(id) => handleLifecycleAction(userHttpService.deactivateUser, id)}
+      />
+    </div>
   );
 }
 
