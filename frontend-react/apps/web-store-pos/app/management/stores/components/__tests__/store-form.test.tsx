@@ -82,7 +82,8 @@ describe('StoreForm — PRES-6: role-conditional fields for owner-admin', () => 
       </Wrapper>
     );
     expect(screen.getByLabelText(/propietario/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/aprobada/i)).toBeInTheDocument();
+    // L6 parity: STORES.APPROVED renamed 'Aprobada' -> 'Aceptado'
+    expect(screen.getByLabelText(/aceptado/i)).toBeInTheDocument();
   });
 
   it('does NOT show paymentStartDate or isActive fields for ownerAdmin in create mode', async () => {
@@ -98,7 +99,8 @@ describe('StoreForm — PRES-6: role-conditional fields for owner-admin', () => 
       </Wrapper>
     );
     expect(screen.queryByLabelText(/fecha de inicio/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/activa/i)).not.toBeInTheDocument();
+    // L6 parity: STORES.IS_ACTIVE renamed 'Activa' -> 'Activo'
+    expect(screen.queryByLabelText(/activo/i)).not.toBeInTheDocument();
   });
 });
 
@@ -129,7 +131,8 @@ describe('StoreForm — PRES-6: role-conditional fields for super-admin', () => 
         />
       </Wrapper>
     );
-    expect(screen.getByLabelText(/activa/i)).toBeInTheDocument();
+    // L6 parity: STORES.IS_ACTIVE renamed 'Activa' -> 'Activo'
+    expect(screen.getByLabelText(/activo/i)).toBeInTheDocument();
   });
 });
 
@@ -274,7 +277,8 @@ describe('StoreForm — VALID-1: ownerId required for ownerAdmin', () => {
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
       expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      // Req: Field-Name-Aware Required Validation (Angular GENERAL.VALIDATION.REQUIRED : { name: GENERAL.OWNER })
+      expect(screen.getByRole('alert')).toHaveTextContent('El propietario es obligatorio.');
     });
   });
 
@@ -315,7 +319,8 @@ describe('StoreForm — INIT-1: isActive defaults false in create mode', () => {
         />
       </Wrapper>
     );
-    const isActiveCheckbox = screen.getByLabelText(/activa/i) as HTMLInputElement;
+    // L6 parity: STORES.IS_ACTIVE renamed 'Activa' -> 'Activo'
+    const isActiveCheckbox = screen.getByLabelText(/activo/i) as HTMLInputElement;
     expect(isActiveCheckbox.checked).toBe(false);
   });
 });
@@ -332,16 +337,21 @@ describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edi
           {...baseProps}
           isSuperAdmin={true}
           isEditMode={true}
+          // ownerId pre-filled so the owner-required check doesn't mask paymentStartDate's
+          // (isSuperAdmin implies isAdminUser, so ownerId is required too — same as Angular's
+          // isOwnerAdmin = isSuperAdmin || hasOwnersAvailableFeature())
+          owners={[makeOwner({ id: 'o1' })]}
+          initialValues={{ ownerId: 'o1', name: 'Existing Store' }}
           onSubmit={onSubmit}
         />
       </Wrapper>
     );
-    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: 'My Store' } });
     // paymentStartDate left empty
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
       expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      // Req: Field-Name-Aware Required Validation (Angular GENERAL.VALIDATION.REQUIRED : { name: STORE.PAYMENT_START_DATE })
+      expect(screen.getByRole('alert')).toHaveTextContent('La fecha de inicio de pago es obligatoria.');
     });
   });
 

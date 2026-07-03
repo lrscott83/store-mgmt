@@ -507,14 +507,17 @@ const messages: Record<string, string> = {
   // Management — Stores
   'MANAGEMENT.TITLE': 'Gestión',
   'STORES.LIST_TITLE': 'Tiendas',
-  'STORES.CREATE_TITLE': 'Nueva tienda',
-  'STORES.EDIT_TITLE': 'Editar tienda',
+  // L6 parity (frontend/src/app/_modules/i18n/vocabs/es.ts STORE.CREATE:337 / STORE.EDIT:338)
+  'STORES.CREATE_TITLE': 'Crear una tienda',
+  'STORES.EDIT_TITLE': 'Editar la tienda',
   'STORES.NAME': 'Nombre',
   'STORES.ADDRESS': 'Dirección',
   'STORES.DESCRIPTION': 'Descripción',
   'STORES.OWNER': 'Propietario',
-  'STORES.APPROVED': 'Aprobada',
-  'STORES.IS_ACTIVE': 'Activa',
+  // L6 parity (GENERAL.APPROVED:174 'Aceptado')
+  'STORES.APPROVED': 'Aceptado',
+  // L6 parity (GENERAL.ACTIVE:154 'Activo')
+  'STORES.IS_ACTIVE': 'Activo',
   'STORES.PAYMENT_START_DATE': 'Fecha de inicio de pago',
   'STORES.SAVE': 'Guardar',
   'STORES.SAVING': 'Guardando...',
@@ -522,21 +525,23 @@ const messages: Record<string, string> = {
   'STORES.EDIT': 'Editar',
   'STORES.ACTIVATE': 'Activar',
   'STORES.DEACTIVATE': 'Desactivar',
-  'STORES.APPROVE': 'Aprobar',
+  // L6 parity (LIST_ACTION_BUTTON.APPROVE:316 'Aceptar')
+  'STORES.APPROVE': 'Aceptar',
   'STORES.DISAPPROVE': 'Desaprobar',
   'STORES.CREATE_SUCCESS': 'Tienda creada correctamente.',
   'STORES.UPDATE_SUCCESS': 'Tienda actualizada correctamente.',
-  'STORES.ERROR': 'Ocurrió un error. Intentá de nuevo.',
-  'STORES.OFFLINE_NOTICE': 'Sin conexión. Conectate para guardar cambios.',
+  // L6 parity: Angular is register-neutral, no voseo ("Intentá" -> "Intente")
+  'STORES.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'STORES.EMPTY_STATE': 'No hay tiendas registradas.',
-  'STORES.DEGRADED_NOTICE': 'Mostrando datos en caché (sin conexión).',
   'STORES.NAME_REQUIRED': 'El nombre es obligatorio.',
   'STORES.MODULES_LABEL': 'Módulos',
   'STORES.MODULES_TOTAL': 'Total',
   'STORES.MODULES_PRICE': 'Precio',
   'STORES.SELECT_ALL_MODULES': 'Seleccionar todos',
-  'STORES.REQUIRED': 'Este campo es obligatorio.',
-  'STORES.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intentá de nuevo.',
+  // Req: Field-Name-Aware Required Validation (Angular GENERAL.VALIDATION.REQUIRED : { name })
+  'STORES.OWNER_REQUIRED': 'El propietario es obligatorio.',
+  'STORES.PAYMENT_START_DATE_REQUIRED': 'La fecha de inicio de pago es obligatoria.',
+  'STORES.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intente de nuevo.',
   // Confirm-dialog copy (Angular parity: GENERAL.APPROVE_CONFIRM_TITLE/MESSAGE,
   // GENERAL.DISAPPROVE_CONFIRM_TITLE/MESSAGE + STORE.CONFIRM_TEXT 'esta tienda' interpolated in)
   'STORES.APPROVE_CONFIRM_TITLE': 'Confirmación para aprobar',

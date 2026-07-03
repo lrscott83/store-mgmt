@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Module, Owner, Store } from '@store-mgmt/domain';
+import { Card } from '~/shared/components/ui/card';
+import { Button } from '~/shared/components/ui/button';
+import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
 import { ModulePicker } from './module-picker';
 
 interface StoreFormValues {
@@ -28,6 +31,11 @@ interface StoreFormProps {
   submitDisabled?: boolean;
 }
 
+/**
+ * L5 parity: shared Card/Button chrome + icons (`shared/components/ui/{card,button,icons}.tsx`),
+ * same precedent as Expenses — matches Angular's `.card`/`mat-fab extended` chrome
+ * (edit-store.component.html:1,157-164). Fields themselves keep their existing markup/roles.
+ */
 export function StoreForm({
   modules,
   owners,
@@ -68,12 +76,13 @@ export function StoreForm({
       setValidationError(intl.formatMessage({ id: 'STORES.NAME_REQUIRED' }));
       return;
     }
+    // Req: Field-Name-Aware Required Validation (Angular GENERAL.VALIDATION.REQUIRED : { name })
     if (isAdminUser && !ownerId) {
-      setValidationError(intl.formatMessage({ id: 'STORES.REQUIRED' }));
+      setValidationError(intl.formatMessage({ id: 'STORES.OWNER_REQUIRED' }));
       return;
     }
     if (isSuperAdmin && isEditMode && !paymentStartDate) {
-      setValidationError(intl.formatMessage({ id: 'STORES.REQUIRED' }));
+      setValidationError(intl.formatMessage({ id: 'STORES.PAYMENT_START_DATE_REQUIRED' }));
       return;
     }
     onSubmit({
@@ -91,137 +100,142 @@ export function StoreForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {(validationError || error) && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {validationError || error}
         </p>
       )}
 
-      <div>
-        <label htmlFor="store-name" className="block text-sm font-medium text-gray-700">
-          {intl.formatMessage({ id: 'STORES.NAME' })}
-        </label>
-        <input
-          id="store-name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          disabled={isLoading}
-          aria-label={intl.formatMessage({ id: 'STORES.NAME' })}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="store-address" className="block text-sm font-medium text-gray-700">
-          {intl.formatMessage({ id: 'STORES.ADDRESS' })}
-        </label>
-        <input
-          id="store-address"
-          type="text"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          disabled={isLoading}
-          aria-label={intl.formatMessage({ id: 'STORES.ADDRESS' })}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-        />
-      </div>
-
-      {isAdminUser && (
-        <div>
-          <label htmlFor="store-description" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'STORES.DESCRIPTION' })}
-          </label>
-          <textarea
-            id="store-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={isLoading}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-          />
-        </div>
-      )}
-
-      {isAdminUser && (
-        <div>
-          <label htmlFor="store-owner" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'STORES.OWNER' })}
-          </label>
-          <select
-            id="store-owner"
-            value={ownerId}
-            onChange={(e) => setOwnerId(e.target.value)}
-            disabled={isLoading || isEditMode}
-            aria-label={intl.formatMessage({ id: 'STORES.OWNER' })}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-          >
-            <option value="">--</option>
-            {owners.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.fullName}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {isAdminUser && (
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="store-approved"
-            checked={approved}
-            onChange={(e) => setApproved(e.target.checked)}
-            disabled={isLoading}
-          />
-          <label htmlFor="store-approved" className="text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'STORES.APPROVED' })}
-          </label>
-        </div>
-      )}
-
-      {isSuperAdmin && isEditMode && (
-        <div>
-          <label htmlFor="store-payment-start" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'STORES.PAYMENT_START_DATE' })}
-          </label>
-          <input
-            id="store-payment-start"
-            type="date"
-            value={paymentStartDate}
-            onChange={(e) => setPaymentStartDate(e.target.value)}
-            disabled={isLoading}
-            aria-label={intl.formatMessage({ id: 'STORES.PAYMENT_START_DATE' })}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-          />
-        </div>
-      )}
-
-      {isSuperAdmin && (
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="store-is-active"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            disabled={isLoading}
-          />
-          <label htmlFor="store-is-active" className="text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'STORES.IS_ACTIVE' })}
-          </label>
-        </div>
-      )}
-
-      <ModulePicker modules={modules} onChange={setModuleIds} />
-
-      <button
-        type="submit"
-        disabled={submitDisabled}
-        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+      <Card
+        footer={
+          <div className="text-center">
+            <Button type="submit" variant="fab" disabled={submitDisabled}>
+              {isEditMode ? <EditIcon /> : <PlusIcon />}
+              {isLoading
+                ? intl.formatMessage({ id: 'STORES.SAVING' })
+                : intl.formatMessage({ id: 'STORES.SAVE' })}
+            </Button>
+          </div>
+        }
       >
-        {isLoading
-          ? intl.formatMessage({ id: 'STORES.SAVING' })
-          : intl.formatMessage({ id: 'STORES.SAVE' })}
-      </button>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="store-name" className="block text-sm font-medium text-gray-700">
+              {intl.formatMessage({ id: 'STORES.NAME' })}
+            </label>
+            <input
+              id="store-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isLoading}
+              aria-label={intl.formatMessage({ id: 'STORES.NAME' })}
+              className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="store-address" className="block text-sm font-medium text-gray-700">
+              {intl.formatMessage({ id: 'STORES.ADDRESS' })}
+            </label>
+            <input
+              id="store-address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={isLoading}
+              aria-label={intl.formatMessage({ id: 'STORES.ADDRESS' })}
+              className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+            />
+          </div>
+
+          {isAdminUser && (
+            <div>
+              <label htmlFor="store-description" className="block text-sm font-medium text-gray-700">
+                {intl.formatMessage({ id: 'STORES.DESCRIPTION' })}
+              </label>
+              <textarea
+                id="store-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={isLoading}
+                className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+          )}
+
+          {isAdminUser && (
+            <div>
+              <label htmlFor="store-owner" className="block text-sm font-medium text-gray-700">
+                {intl.formatMessage({ id: 'STORES.OWNER' })}
+              </label>
+              <select
+                id="store-owner"
+                value={ownerId}
+                onChange={(e) => setOwnerId(e.target.value)}
+                disabled={isLoading || isEditMode}
+                aria-label={intl.formatMessage({ id: 'STORES.OWNER' })}
+                className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+              >
+                <option value="">--</option>
+                {owners.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {isAdminUser && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="store-approved"
+                checked={approved}
+                onChange={(e) => setApproved(e.target.checked)}
+                disabled={isLoading}
+              />
+              <label htmlFor="store-approved" className="text-sm font-medium text-gray-700">
+                {intl.formatMessage({ id: 'STORES.APPROVED' })}
+              </label>
+            </div>
+          )}
+
+          {isSuperAdmin && isEditMode && (
+            <div>
+              <label htmlFor="store-payment-start" className="block text-sm font-medium text-gray-700">
+                {intl.formatMessage({ id: 'STORES.PAYMENT_START_DATE' })}
+              </label>
+              <input
+                id="store-payment-start"
+                type="date"
+                value={paymentStartDate}
+                onChange={(e) => setPaymentStartDate(e.target.value)}
+                disabled={isLoading}
+                aria-label={intl.formatMessage({ id: 'STORES.PAYMENT_START_DATE' })}
+                className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+          )}
+
+          {isSuperAdmin && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="store-is-active"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                disabled={isLoading}
+              />
+              <label htmlFor="store-is-active" className="text-sm font-medium text-gray-700">
+                {intl.formatMessage({ id: 'STORES.IS_ACTIVE' })}
+              </label>
+            </div>
+          )}
+
+          <ModulePicker modules={modules} onChange={setModuleIds} />
+        </div>
+      </Card>
     </form>
   );
 }
