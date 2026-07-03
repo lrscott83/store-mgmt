@@ -1,6 +1,7 @@
 import type { SaleCredit } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
+import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
 const repo = new BaseRepository<SaleCredit>('saleCredits', [
   'date',
@@ -93,9 +94,9 @@ export class SaleCreditOfflineService {
       paidType: null as unknown as PaymentType,
       note: '',
       createdDate: now,
-      createdByName: '',
-      updatedDate: now,
-      updatedByName: '',
+      createdByName: getCurrentUserLogin(),
+      updatedDate: undefined,
+      updatedByName: undefined,
     };
     repo.upsert(this.storeId, credit);
     return credit;
@@ -109,6 +110,7 @@ export class SaleCreditOfflineService {
       client,
       note,
       updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
     return updated;
@@ -127,6 +129,7 @@ export class SaleCreditOfflineService {
       paidType,
       note: note || credit.note,
       updatedDate: now,
+      updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
     return updated;
@@ -137,7 +140,12 @@ export class SaleCreditOfflineService {
     let changed = false;
     for (const [key, credit] of all) {
       if (credit.orderId === orderId) {
-        all.set(key, { ...credit, isActive: false, updatedDate: new Date() });
+        all.set(key, {
+          ...credit,
+          isActive: false,
+          updatedDate: new Date(),
+          updatedByName: getCurrentUserLogin(),
+        });
         changed = true;
       }
     }
@@ -149,6 +157,11 @@ export class SaleCreditOfflineService {
   void(id: string): void {
     const credit = repo.getById(this.storeId, id);
     if (!credit) return;
-    repo.upsert(this.storeId, { ...credit, isActive: false, updatedDate: new Date() });
+    repo.upsert(this.storeId, {
+      ...credit,
+      isActive: false,
+      updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
+    });
   }
 }

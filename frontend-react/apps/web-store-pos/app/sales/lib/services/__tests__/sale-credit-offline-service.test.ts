@@ -1,6 +1,31 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SaleCreditOfflineService } from '../sale-credit-offline-service';
 import { PaymentType } from '@store-mgmt/domain';
+import type { UserModel } from '@store-mgmt/domain';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    id: 'u1',
+    login: 'jdoe',
+    fullName: 'Test User',
+    cellPhone: '',
+    email: 'jdoe@test.com',
+    isActive: true,
+    password: '',
+    authToken: 'tok',
+    refreshToken: 'ref',
+    expiresIn: Date.now() + 1000000,
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: 's1',
+    ...overrides,
+  };
+}
 
 describe('SaleCreditOfflineService', () => {
   let service: SaleCreditOfflineService;
@@ -8,6 +33,7 @@ describe('SaleCreditOfflineService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
     service = new SaleCreditOfflineService(storeId);
   });
 
@@ -53,6 +79,20 @@ describe('SaleCreditOfflineService', () => {
       const c2 = service.createFromOrder('order-2', 'Bob', 75);
       expect(c1.id).not.toBe(c2.id);
     });
+
+    // Angular parity (audit-user-threading): createFromOrder follows CREATE semantics
+    // (matches Angular createSaleCredit) — createdByName from login, updatedByName/
+    // updatedDate untouched.
+    it('stamps createdByName with the authenticated user login', () => {
+      const credit = service.createFromOrder('order-1', 'Juan Perez', 150);
+      expect(credit.createdByName).toBe('jdoe');
+    });
+
+    it('leaves updatedByName/updatedDate undefined on createFromOrder', () => {
+      const credit = service.createFromOrder('order-1', 'Juan Perez', 150);
+      expect(credit.updatedByName).toBeUndefined();
+      expect(credit.updatedDate).toBeUndefined();
+    });
   });
 
   describe('SC-02: pay sets paid=total regardless of context (full payment only — C-7)', () => {
@@ -87,6 +127,13 @@ describe('SaleCreditOfflineService', () => {
       expect(retrieved?.isPaid).toBe(true);
       expect(retrieved?.paid).toBe(300);
     });
+
+    // Angular parity (audit-user-threading): pay stamps updatedByName from login.
+    it('stamps updatedByName with the authenticated user login', () => {
+      const credit = service.createFromOrder('order-1', 'Luis', 300);
+      const paid = service.pay(credit.id, PaymentType.Efectivo, '');
+      expect(paid.updatedByName).toBe('jdoe');
+    });
   });
 
   describe('SC-03: voidByOrderId sets isActive=false', () => {
@@ -110,6 +157,33 @@ describe('SaleCreditOfflineService', () => {
     it('does nothing when no credit matches the orderId', () => {
       service.createFromOrder('order-1', 'Ana', 50);
       expect(() => service.voidByOrderId('order-999')).not.toThrow();
+    });
+
+    // Angular parity (audit-user-threading): voidByOrderId stamps updatedByName from login.
+    it('stamps updatedByName with the authenticated user login', () => {
+      service.createFromOrder('order-x', 'Maria', 100);
+      service.voidByOrderId('order-x');
+      const all = service.getAll();
+      const credit = all.find((c) => c.orderId === 'order-x');
+      expect(credit?.updatedByName).toBe('jdoe');
+    });
+  });
+
+  describe('SC-11: update stamps updatedByName', () => {
+    it('stamps updatedByName with the authenticated user login', () => {
+      const credit = service.createFromOrder('order-1', 'Juan', 150);
+      const updated = service.update(credit.id, 'Juan Perez', 'note');
+      expect(updated.updatedByName).toBe('jdoe');
+    });
+  });
+
+  describe('SC-12: void stamps updatedByName', () => {
+    it('sets isActive=false and stamps updatedByName with the authenticated user login', () => {
+      const credit = service.createFromOrder('order-1', 'Ana', 50);
+      service.void(credit.id);
+      const found = service.getById(credit.id);
+      expect(found?.isActive).toBe(false);
+      expect(found?.updatedByName).toBe('jdoe');
     });
   });
 
