@@ -73,8 +73,6 @@ export function ProductsPage() {
       order: 1,
       isActive: true,
       businessId: '',
-      createdDate: new Date(),
-      createdByName: '',
     });
     loadData();
     setModal(null);
@@ -141,8 +139,6 @@ export function ProductsPage() {
         availableToSale: true,
         discountFromInvantory: false,
         businessId: '',
-        createdDate: new Date(),
-        createdByName: '',
       });
     }
     loadData();

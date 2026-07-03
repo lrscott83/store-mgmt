@@ -9,7 +9,7 @@ let mockCategories: ProductCategory[] = [];
 let mockProducts: Product[] = [];
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
+  const state = { user: { selectedStoreId: 's1', login: 'jdoe' }, isAuthenticated: true };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -17,13 +17,23 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
+// Hoisted so the mock factory below (which runs before module-scope const
+// declarations) and the tests can both reference the same spy instances —
+// lets tests inspect ProductOfflineService.create's call args directly.
+const productServiceSpies = vi.hoisted(() => ({
+  create: vi.fn(),
+  update: vi.fn(),
+  updateMany: vi.fn(),
+  delete: vi.fn(),
+}));
+
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn(() => mockProducts),
-    create: vi.fn(),
-    update: vi.fn(),
-    updateMany: vi.fn(),
-    delete: vi.fn(),
+    create: productServiceSpies.create,
+    update: productServiceSpies.update,
+    updateMany: productServiceSpies.updateMany,
+    delete: productServiceSpies.delete,
   })),
 }));
 
@@ -74,6 +84,10 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
   beforeEach(() => {
     mockCategories = [];
     mockProducts = [];
+    productServiceSpies.create.mockClear();
+    productServiceSpies.update.mockClear();
+    productServiceSpies.updateMany.mockClear();
+    productServiceSpies.delete.mockClear();
   });
 
   it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {
@@ -200,5 +214,30 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
     expect(screen.queryByTestId('products-search-input')).not.toBeInTheDocument();
+  });
+
+  // Angular parity (audit-user-threading-followup): the route MUST NOT supply
+  // audit fields anymore — ProductOfflineService.create owns createdByName/
+  // createdDate stamping internally.
+  it('does not pass a hardcoded createdByName on create (service owns stamping)', () => {
+    mockCategories = [makeCategory()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-product-button'));
+
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(productServiceSpies.create).toHaveBeenCalledTimes(1);
+    const payload = productServiceSpies.create.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('createdByName');
+    expect(payload).not.toHaveProperty('createdDate');
   });
 });
