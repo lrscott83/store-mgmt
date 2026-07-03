@@ -84,8 +84,10 @@ export function ExpensesHistoryPage() {
       setIsModalOpen(false);
       setEditingExpense(undefined);
       setModalError('');
-    } catch (err) {
-      setModalError(err instanceof Error ? err.message : intl.formatMessage({ id: 'GENERAL.ERROR' }));
+    } catch {
+      // Angular parity: update's only failure branch is not-found (ExpenseErrors.NotExists).
+      // Never surface the internal Error.message sentinel to the user.
+      setModalError(intl.formatMessage({ id: 'EXPENSE_ERRORS.NOT_EXISTS' }));
     }
   }
 

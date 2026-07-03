@@ -31,8 +31,10 @@ export class ExpenseOfflineService {
   getByDateRange(from: Date, to: Date): Expense[] {
     const start = startOfDay(from);
     const end = startOfDay(addDays(to, 1));
+    // Angular parity (G1): getExpensesInDay/getActiveExpensesBetweenDates both filter
+    // `expense.isActive` — soft-deleted expenses must never appear in date-range queries.
     return this.getAll().filter(
-      (e) => e.date >= start && e.date < end,
+      (e) => e.isActive && e.date >= start && e.date < end,
     );
   }
 
@@ -64,7 +66,12 @@ export class ExpenseOfflineService {
     patch: Partial<Pick<Expense, 'type' | 'total' | 'date' | 'paymentType' | 'note'>>,
   ): Expense {
     const existing = repo.getById(this.storeId, id);
-    if (!existing) throw new Error(`Expense not found: ${id}`);
+    // Angular parity: updateExpense returns DataResult(undefined, false, [ExpenseErrors.NotExists])
+    // on a missing record. React has no Result type here, so it throws instead; callers (route
+    // components) MUST NOT surface `err.message` directly — it's an internal sentinel, not
+    // user-facing text. They translate via EXPENSE_ERRORS.NOT_EXISTS ('El gasto no existe.'),
+    // matching the ORDER_ERRORS.NOT_EXISTS/SALE_CREDIT_ERRORS.NOT_EXISTS precedent.
+    if (!existing) throw new Error('EXPENSE_NOT_FOUND');
     const updated: Expense = {
       ...existing,
       ...patch,
@@ -76,6 +83,15 @@ export class ExpenseOfflineService {
   }
 
   delete(id: string): void {
-    repo.remove(this.storeId, id);
+    // Angular parity (G2): deleteExpense soft-deletes — sets isActive=false, updatedDate,
+    // keeps the record (audit trail, sync contract). No-op for a missing id, matching the
+    // prior hard-delete's no-op behavior on `repo.remove`.
+    const existing = repo.getById(this.storeId, id);
+    if (!existing) return;
+    repo.upsert(this.storeId, {
+      ...existing,
+      isActive: false,
+      updatedDate: new Date(),
+    });
   }
 }

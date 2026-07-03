@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { ExpenseType, PaymentType } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 
 // ─── Global mocks ────────────────────────────────────────────────────────────
 
@@ -77,6 +79,47 @@ describe('TodayExpensesPage — smoke render', () => {
     );
     // Running total line should be present (shows $0.00 when empty)
     expect(screen.getByText(/Total del día/i)).toBeInTheDocument();
+  });
+
+  // G-i18n: update()'s only failure branch is not-found. The route must surface the
+  // localized EXPENSE_ERRORS.NOT_EXISTS text, never the internal Error.message sentinel.
+  it('shows the localized not-found error when update fails', () => {
+    const expense = {
+      id: 'e1',
+      type: ExpenseType.Comida,
+      total: 20,
+      date: new Date(),
+      paymentType: PaymentType.Efectivo,
+      note: '',
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: '',
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockImpl = () =>
+      ({
+        getAll: vi.fn().mockReturnValue([expense]),
+        getActiveToday: vi.fn().mockReturnValue([expense]),
+        getByDateRange: vi.fn().mockReturnValue([expense]),
+        create: vi.fn(),
+        update: vi.fn(() => {
+          throw new Error('EXPENSE_NOT_FOUND');
+        }),
+        delete: vi.fn(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any;
+    // Scoped to exactly the 2 constructor calls this test triggers (mount load + save), so
+    // the module-level mock reverts to its default (empty) implementation for later tests.
+    vi.mocked(ExpenseOfflineService).mockImplementationOnce(mockImpl).mockImplementationOnce(mockImpl);
+
+    render(
+      <Wrapper>
+        <TodayExpensesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('Editar'));
+    fireEvent.click(screen.getByText('Guardar'));
+    expect(screen.getByText('El gasto no existe.')).toBeInTheDocument();
   });
 });
 

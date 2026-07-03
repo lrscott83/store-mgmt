@@ -52,17 +52,56 @@ describe('ExpenseOfflineService', () => {
     expect(svc.getById(created.id)!.total).toBe(99);
   });
 
-  // S-EXP-4: delete removes expense, no-op on missing id
-  it('S-EXP-4: delete removes expense', () => {
+  // update on a missing id throws — the UI layer (today-expenses.tsx/expenses-history.tsx)
+  // translates this into the localized EXPENSE_ERRORS.NOT_EXISTS message (Angular parity:
+  // updateExpense returns DataResult(undefined, false, [ExpenseErrors.NotExists])).
+  it('update throws for a missing id', () => {
+    expect(() => svc.update('nonexistent-id', { total: 5 })).toThrow();
+  });
+
+  // S-EXP-4: delete soft-deletes (Angular parity: deleteExpense sets isActive=false, keeps
+  // the record — G2 fix). getAll() (unfiltered, mirrors Angular getStorageExpenses()) still
+  // returns the record; it's just marked inactive.
+  it('S-EXP-4: delete soft-deletes expense (isActive=false, record retained)', () => {
     const created = svc.create(makeExpenseInput());
     svc.delete(created.id);
-    expect(svc.getAll()).toHaveLength(0);
+    const all = svc.getAll();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe(created.id);
+    expect(all[0].isActive).toBe(false);
+    expect(svc.getById(created.id)?.isActive).toBe(false);
+  });
+
+  it('S-EXP-4a: delete sets updatedDate', () => {
+    const created = svc.create(makeExpenseInput());
+    svc.delete(created.id);
+    expect(svc.getById(created.id)?.updatedDate).toBeInstanceOf(Date);
   });
 
   it('S-EXP-4b: delete is no-op for missing id', () => {
     svc.create(makeExpenseInput());
     expect(() => svc.delete('nonexistent-id')).not.toThrow();
     expect(svc.getAll()).toHaveLength(1);
+  });
+
+  // G1: getActiveToday/getByDateRange must exclude soft-deleted (isActive=false) expenses,
+  // matching Angular's getExpensesInDay/getActiveExpensesBetweenDates (both filter
+  // `expense.isActive`).
+  it('G1: getActiveToday excludes soft-deleted expenses', () => {
+    const today = new Date();
+    const created = svc.create(makeExpenseInput({ date: today }));
+    svc.delete(created.id);
+    expect(svc.getActiveToday()).toHaveLength(0);
+  });
+
+  it('G1: getByDateRange excludes soft-deleted expenses', () => {
+    const d1 = new Date('2024-01-01T10:00:00.000');
+    const created = svc.create(makeExpenseInput({ date: d1, total: 10 }));
+    svc.create(makeExpenseInput({ date: d1, total: 20 }));
+    svc.delete(created.id);
+    const range = svc.getByDateRange(new Date('2024-01-01'), new Date('2024-01-01'));
+    expect(range).toHaveLength(1);
+    expect(range[0].total).toBe(20);
   });
 
   // S-EXP-5: getActiveToday filters to current calendar day

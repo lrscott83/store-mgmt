@@ -252,6 +252,11 @@ const messages: Record<string, string> = {
   // ERROR500_MESSAGE fallback used previously.
   'SALE_CREDIT_ERRORS.NOT_EXISTS': 'El gasto no existe.',
   'ORDER_ERRORS.NOT_EXISTS': 'La orden no existe',
+  // ExpenseErrors.NotExists (Angular frontend/src/app/domain/entities/expenses/
+  // expense.errors.ts — hardcoded Spanish literal, not an i18n key there; added here as an
+  // i18n key for React's text-parity convention, same PRODUCT_ERRORS.*/ORDER_ERRORS.*
+  // precedent above). ExpenseOfflineService.update's only failure branch is not-found.
+  'EXPENSE_ERRORS.NOT_EXISTS': 'El gasto no existe.',
 
   // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',
