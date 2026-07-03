@@ -1,6 +1,9 @@
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
 import { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import { InfoBox } from '~/shared/components/ui/info-box';
+import { PaymentMethodIcon, TrashIcon } from '~/shared/components/ui/icons';
 
 const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
@@ -42,30 +45,31 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
 
   if (expenses.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-gray-500">
+      <InfoBox variant="primary" className="text-center">
         {intl.formatMessage({ id: 'EXPENSES.EMPTY_STATE' })}
-      </p>
+      </InfoBox>
     );
   }
 
   return (
-    <div className="divide-y rounded border bg-white">
+    <div className="divide-y divide-border rounded border border-border bg-surface">
       {expenses.map((expense) => (
         <div key={expense.id} className="flex items-center justify-between px-4 py-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-900">
-                ${expense.total.toFixed(2)}
-              </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+              <span className="rounded-full bg-background px-2 py-0.5 text-xs text-text-muted">
                 {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
               </span>
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+              <span className="flex items-center gap-1 text-sm font-semibold text-danger">
+                <PaymentMethodIcon kind={getPaymentTypeIconKind(expense.paymentType)} className="text-success" />
+                ${expense.total.toFixed(2)}
+              </span>
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
                 {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
               </span>
             </div>
             {expense.note && (
-              <p className="mt-0.5 truncate text-xs text-gray-500">{expense.note}</p>
+              <p className="mt-0.5 truncate text-xs text-text-muted">{expense.note}</p>
             )}
           </div>
 
@@ -73,15 +77,16 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
             <div className="ml-4 flex shrink-0 gap-2">
               <button
                 onClick={() => onEdit?.(expense)}
-                className="rounded border px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                className="rounded bg-primary-light px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
               >
                 {intl.formatMessage({ id: 'EXPENSES.EDIT' })}
               </button>
               {onDelete && (
                 <button
                   onClick={() => onDelete(expense)}
-                  className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                  className="flex items-center gap-1 rounded bg-danger/10 px-2 py-1 text-xs font-medium text-danger hover:bg-danger/20"
                 >
+                  <TrashIcon className="h-3.5 w-3.5" />
                   {intl.formatMessage({ id: 'EXPENSES.DELETE' })}
                 </button>
               )}

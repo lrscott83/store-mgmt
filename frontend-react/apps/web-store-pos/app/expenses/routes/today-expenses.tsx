@@ -4,6 +4,10 @@ import type { Expense } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { Card } from '~/shared/components/ui/card';
+import { InfoBox } from '~/shared/components/ui/info-box';
+import { Button } from '~/shared/components/ui/button';
+import { PlusIcon } from '~/shared/components/ui/icons';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
 import { ExpenseFormModal } from '../components/expense-form-modal';
@@ -91,29 +95,42 @@ export function TodayExpensesPage() {
   const runningTotal = expenses.reduce((sum, e) => sum + e.total, 0);
 
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'EXPENSES.TODAY.TITLE' })}
-        </h1>
-        <button
-          onClick={openCreate}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {intl.formatMessage({ id: 'EXPENSES.ADD_BUTTON' })}
-        </button>
-      </div>
+    <Card
+      title={
+        <div className="flex items-center justify-between">
+          <span>{intl.formatMessage({ id: 'EXPENSES.TODAY.TITLE' })}</span>
+          <Button variant="fab" onClick={openCreate}>
+            <PlusIcon />
+            {intl.formatMessage({ id: 'EXPENSES.ADD_BUTTON' })}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        {/*
+          NOTE: Angular's expenses-today.component.html has NO running-total banner — only
+          the card header + empty-state/list (L5 map, "Top gaps" #1). This is a React-only
+          addition not covered by the Stage 3 History strict-parity decision (which was
+          scoped to the History screen). Kept as-is pending an explicit product decision;
+          restyled with tokens here rather than silently removed.
+        */}
+        <div className="rounded-md border border-primary/20 bg-primary-light px-4 py-2 text-sm font-medium text-primary">
+          {intl.formatMessage({ id: 'EXPENSES.RUNNING_TOTAL' }, { total: runningTotal.toFixed(2) })}
+        </div>
 
-      <div className="rounded border bg-blue-50 px-4 py-2 text-sm font-medium text-blue-900">
-        {intl.formatMessage({ id: 'EXPENSES.RUNNING_TOTAL' }, { total: runningTotal.toFixed(2) })}
+        {expenses.length === 0 ? (
+          <InfoBox variant="primary" className="text-center">
+            {intl.formatMessage({ id: 'EXPENSES.EMPTY_STATE' })}
+          </InfoBox>
+        ) : (
+          <ExpenseList
+            expenses={expenses}
+            readOnly={false}
+            onEdit={openEdit}
+            onDelete={handleDeleteRequest}
+          />
+        )}
       </div>
-
-      <ExpenseList
-        expenses={expenses}
-        readOnly={false}
-        onEdit={openEdit}
-        onDelete={handleDeleteRequest}
-      />
 
       <ExpenseFormModal
         isOpen={isModalOpen}
@@ -133,28 +150,22 @@ export function TodayExpensesPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
         >
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <p className="mb-4 text-sm text-gray-700">
+          <div className="w-full max-w-sm rounded-lg bg-surface p-6 shadow-xl">
+            <p className="mb-4 text-sm text-text">
               {intl.formatMessage({ id: 'EXPENSES.DELETE_CONFIRM' })}
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={handleDeleteConfirm}
-                className="flex-1 rounded bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700"
-              >
+              <Button variant="danger" className="flex-1" onClick={handleDeleteConfirm}>
                 {intl.formatMessage({ id: 'GENERAL.CONFIRM' })}
-              </button>
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              >
+              </Button>
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
                 {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 

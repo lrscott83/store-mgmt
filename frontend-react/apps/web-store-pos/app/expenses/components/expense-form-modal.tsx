@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
 import { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { Button } from '~/shared/components/ui/button';
+import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 
 export interface ExpenseFormInput {
   type: ExpenseType;
@@ -102,32 +104,32 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-md rounded-lg bg-surface p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-lg font-semibold text-text">
             {expense
               ? intl.formatMessage({ id: 'EXPENSES.EDIT_TITLE' })
               : intl.formatMessage({ id: 'EXPENSES.NEW_TITLE' })}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-text-muted hover:text-text"
             aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
           >
-            ✕
+            <CloseIcon />
           </button>
         </div>
 
         <div className="space-y-3">
           {/* Type */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'EXPENSES.FORM.TYPE' })}
             </label>
             <select
               value={form.type}
               onChange={(e) => setForm((f) => ({ ...f, type: Number(e.target.value) as ExpenseType }))}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {EXPENSE_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -139,7 +141,7 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
 
           {/* Total */}
           <div>
-            <label htmlFor="expense-form-total" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="expense-form-total" className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'EXPENSES.FORM.TOTAL' })}
             </label>
             <input
@@ -148,10 +150,10 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
               step="0.01"
               value={form.total}
               onChange={(e) => setForm((f) => ({ ...f, total: parseFloat(e.target.value) }))}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             {!isValid && (
-              <p className="mt-1 text-xs text-red-600">
+              <p className="mt-1 text-xs text-danger">
                 {intl.formatMessage({ id: 'EXPENSES.FORM.TOTAL_REQUIRED' })}
               </p>
             )}
@@ -159,13 +161,13 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
 
           {/* Payment type */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'EXPENSES.FORM.PAYMENT_TYPE' })}
             </label>
             <select
               value={form.paymentType}
               onChange={(e) => setForm((f) => ({ ...f, paymentType: Number(e.target.value) as PaymentType }))}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {([PaymentType.Efectivo, PaymentType.Tarjeta, PaymentType.Zelle] as PaymentType[]).map((pt) => (
                 <option key={pt} value={pt}>
@@ -177,34 +179,28 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
 
           {/* Note */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-text">
               {intl.formatMessage({ id: 'EXPENSES.FORM.NOTE' })}
             </label>
             <textarea
               value={form.note}
               onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
               rows={2}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
         </div>
 
         <div className="mt-4 flex gap-2">
-          <button
-            onClick={handleSubmit}
-            disabled={!isValid}
-            className="flex-1 rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button variant="fab" className="flex-1 justify-center" onClick={handleSubmit} disabled={!isValid}>
+            <SaveIcon />
             {intl.formatMessage({ id: 'GENERAL.SAVE' })}
-          </button>
-          <button
-            onClick={onClose}
-            className="rounded border px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-          >
+          </Button>
+          <Button variant="outline" onClick={onClose}>
             {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
