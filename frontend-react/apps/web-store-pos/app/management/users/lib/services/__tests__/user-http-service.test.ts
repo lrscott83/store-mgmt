@@ -162,26 +162,9 @@ describe('userHttpService.deactivateUser — HTTP-7: DELETE /v1/users/:id', () =
   });
 });
 
-describe('userHttpService.changePassword — CRED-1: POST /v1/users/change-password/:id', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    const { apiClient } = await import('~/shared/lib/http/api-client');
-    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
-  });
-
-  it('calls POST /v1/users/change-password/:id with {oldPassword, newPassword}', async () => {
+describe('userHttpService — CRED-REMOVED: admin changePassword no longer exists (Req: Orphaned password service removed)', () => {
+  it('does not expose a changePassword method', async () => {
     const { userHttpService } = await import('../user-http-service');
-    const { apiClient } = await import('~/shared/lib/http/api-client');
-    await userHttpService.changePassword('u1', { oldPassword: 'OldPass1', newPassword: 'NewPass1' });
-    expect(apiClient.post).toHaveBeenCalledWith('/v1/users/change-password/u1', {
-      oldPassword: 'OldPass1',
-      newPassword: 'NewPass1',
-    });
-  });
-
-  it('returns boolean result from response', async () => {
-    const { userHttpService } = await import('../user-http-service');
-    const result = await userHttpService.changePassword('u1', { oldPassword: 'old', newPassword: 'new' });
-    expect(result.data).toBe(true);
+    expect((userHttpService as Record<string, unknown>).changePassword).toBeUndefined();
   });
 });

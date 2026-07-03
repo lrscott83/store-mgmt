@@ -66,7 +66,6 @@ let mockCreateUser = vi.fn();
 let mockUpdateUserDetails = vi.fn();
 let mockActivateUser = vi.fn();
 let mockDeactivateUser = vi.fn();
-let mockChangePassword = vi.fn();
 
 vi.mock('~/management/users/lib/services/user-http-service', () => ({
   userHttpService: {
@@ -76,7 +75,6 @@ vi.mock('~/management/users/lib/services/user-http-service', () => ({
     get updateUserDetails() { return mockUpdateUserDetails; },
     get activateUser() { return mockActivateUser; },
     get deactivateUser() { return mockDeactivateUser; },
-    get changePassword() { return mockChangePassword; },
   },
 }));
 
@@ -379,30 +377,6 @@ describe('UserEditPage — S-EDIT-2: details submit calls updateUserDetails', ()
   });
 });
 
-describe('UserEditPage — S-EDIT-3: credentials submit calls changePassword', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUser = makeUser({ isSuperAdmin: true });
-    mockIsOnline = true;
-    mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser() });
-    mockChangePassword = vi.fn().mockResolvedValue({ data: true });
-  });
-
-  it('calls changePassword when credentials form submitted', async () => {
-    const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
-    await waitFor(() => screen.getByLabelText(/contraseña actual/i));
-    fireEvent.change(screen.getByLabelText(/contraseña actual/i), { target: { value: 'OldPass1' } });
-    fireEvent.change(screen.getByLabelText(/^nueva contraseña$/i), { target: { value: 'NewPass1' } });
-    fireEvent.change(screen.getByLabelText(/^confirmar nueva contraseña$/i), { target: { value: 'NewPass1' } });
-    fireEvent.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
-    await waitFor(() => {
-      expect(mockChangePassword).toHaveBeenCalledWith('u1', { oldPassword: 'OldPass1', newPassword: 'NewPass1' });
-    });
-  });
-});
-
 describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -417,23 +391,6 @@ describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
     render(<Wrapper><UserEditPage /></Wrapper>);
     await waitFor(() => screen.getByRole('button', { name: /actualizar/i }));
     expect(screen.getByRole('button', { name: /actualizar/i })).toBeDisabled();
-  });
-});
-
-describe('UserEditPage — S-EDIT-5: credentials form offline blocked', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUser = makeUser({ isSuperAdmin: true });
-    mockIsOnline = false;
-    mockParams = { id: 'u1' };
-    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser() });
-  });
-
-  it('credentials submit is disabled when offline', async () => {
-    const { UserEditPage } = await import('../user-edit');
-    render(<Wrapper><UserEditPage /></Wrapper>);
-    await waitFor(() => screen.getByRole('button', { name: /cambiar contraseña/i }));
-    expect(screen.getByRole('button', { name: /cambiar contraseña/i })).toBeDisabled();
   });
 });
 
@@ -463,14 +420,32 @@ describe('UserEditPage — S-ERR-1: getById rejection renders error, no form mou
     mockGetUser = vi.fn().mockRejectedValue(new Error('Network error'));
   });
 
-  it('shows error alert and does not mount details or credentials inputs', async () => {
+  it('shows error alert and does not mount the details form', async () => {
     const { UserEditPage } = await import('../user-edit');
     render(<Wrapper><UserEditPage /></Wrapper>);
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
     expect(screen.queryByLabelText(/nombre completo/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('UserEditPage — S-NOCRED: no credentials/password UI is rendered (Req: Edit User Has No Admin Password Change)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockIsOnline = true;
+    mockParams = { id: 'u1' };
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser() });
+  });
+
+  it('does not render any password/credentials fields or change-password action', async () => {
+    const { UserEditPage } = await import('../user-edit');
+    render(<Wrapper><UserEditPage /></Wrapper>);
+    await waitFor(() => screen.getByDisplayValue('User One'));
     expect(screen.queryByLabelText(/contraseña actual/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^nueva contraseña$/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /cambiar contraseña/i })).not.toBeInTheDocument();
   });
 });
 

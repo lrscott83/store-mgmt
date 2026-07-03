@@ -7,7 +7,6 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserDetailsForm } from '~/management/users/components/UserDetailsForm';
-import { UserCredentialsForm } from '~/management/users/components/UserCredentialsForm';
 import type { User } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Users]);
@@ -29,10 +28,6 @@ export function UserEditPage() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState('');
   const [detailsSuccess, setDetailsSuccess] = useState(false);
-
-  const [credentialsLoading, setCredentialsLoading] = useState(false);
-  const [credentialsError, setCredentialsError] = useState('');
-  const [credentialsSuccess, setCredentialsSuccess] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -64,24 +59,6 @@ export function UserEditPage() {
       setDetailsError(intl.formatMessage({ id: 'USERS.ERROR' }));
     } finally {
       setDetailsLoading(false);
-    }
-  }
-
-  async function handlePasswordSubmit(values: {
-    oldPassword: string;
-    newPassword: string;
-  }) {
-    if (!isOnline) return;
-    setCredentialsError('');
-    setCredentialsSuccess(false);
-    setCredentialsLoading(true);
-    try {
-      await userHttpService.changePassword(userId, values);
-      setCredentialsSuccess(true);
-    } catch {
-      setCredentialsError(intl.formatMessage({ id: 'USERS.ERROR' }));
-    } finally {
-      setCredentialsLoading(false);
     }
   }
 
@@ -128,23 +105,6 @@ export function UserEditPage() {
           canToggleActive={canToggleActive}
           onSubmit={handleDetailsSubmit}
           error={detailsError}
-        />
-      </section>
-
-      <hr className="border-gray-200" />
-
-      <section className="space-y-4">
-        <h2 className="text-base font-medium text-gray-700">
-          {intl.formatMessage({ id: 'USERS.CHANGE_PASSWORD' })}
-        </h2>
-        {credentialsSuccess && (
-          <p className="text-sm text-green-700">{intl.formatMessage({ id: 'USERS.PASSWORD_CHANGED' })}</p>
-        )}
-        <UserCredentialsForm
-          isOnline={isOnline}
-          isLoading={credentialsLoading}
-          onSubmit={handlePasswordSubmit}
-          error={credentialsError}
         />
       </section>
     </div>

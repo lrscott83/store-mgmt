@@ -18,11 +18,6 @@ interface UpdateUserDetailsPayload {
   isActive: boolean;
 }
 
-interface ChangePasswordPayload {
-  oldPassword: string;
-  newPassword: string;
-}
-
 export const userHttpService = {
   async listUsers(): Promise<BaseResponseModel<User[]>> {
     const response = await apiClient.get<BaseResponseModel<User[]>>(
@@ -65,14 +60,6 @@ export const userHttpService = {
   async deactivateUser(id: string): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.delete<BaseResponseModel<boolean>>(
       `/v1/users/${id}`
-    );
-    return response.data;
-  },
-
-  async changePassword(id: string, payload: ChangePasswordPayload): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.post<BaseResponseModel<boolean>>(
-      `/v1/users/change-password/${id}`,
-      payload
     );
     return response.data;
   },
