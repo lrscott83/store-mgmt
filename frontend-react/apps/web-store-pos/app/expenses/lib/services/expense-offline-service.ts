@@ -2,6 +2,7 @@ import type { Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
+import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
 const repo = new BaseRepository<Expense>('expenses', ['date', 'createdDate', 'updatedDate']);
 
@@ -53,9 +54,9 @@ export class ExpenseOfflineService {
       note: input.note || '',
       isActive: true,
       createdDate: now,
-      createdByName: '',
-      updatedDate: now,
-      updatedByName: '',
+      createdByName: getCurrentUserLogin(),
+      updatedDate: undefined,
+      updatedByName: undefined,
     };
     repo.upsert(this.storeId, expense);
     return expense;
@@ -77,6 +78,7 @@ export class ExpenseOfflineService {
       ...patch,
       note: patch.note !== undefined ? (patch.note || '') : existing.note,
       updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
     return updated;
@@ -92,6 +94,7 @@ export class ExpenseOfflineService {
       ...existing,
       isActive: false,
       updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
     });
   }
 }

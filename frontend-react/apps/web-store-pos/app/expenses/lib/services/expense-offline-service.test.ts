@@ -1,8 +1,33 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import type { UserModel } from '@store-mgmt/domain';
 import { ExpenseOfflineService } from './expense-offline-service';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 const storeId = 'store-test';
+
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    id: 'u1',
+    login: 'jdoe',
+    fullName: 'Test User',
+    cellPhone: '',
+    email: 'jdoe@test.com',
+    isActive: true,
+    password: '',
+    authToken: 'tok',
+    refreshToken: 'ref',
+    expiresIn: Date.now() + 1000000,
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: 's1',
+    ...overrides,
+  };
+}
 
 function makeExpenseInput(overrides: Record<string, unknown> = {}) {
   return {
@@ -20,6 +45,7 @@ describe('ExpenseOfflineService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
     svc = new ExpenseOfflineService(storeId);
   });
 
@@ -52,6 +78,26 @@ describe('ExpenseOfflineService', () => {
     expect(svc.getById(created.id)!.total).toBe(99);
   });
 
+  // Angular parity (audit-user-threading): create stamps createdByName from the
+  // authenticated user's login and MUST NOT touch updatedByName/updatedDate.
+  it('stamps createdByName with the authenticated user login on create', () => {
+    const created = svc.create(makeExpenseInput());
+    expect(created.createdByName).toBe('jdoe');
+  });
+
+  it('leaves updatedByName/updatedDate undefined on create', () => {
+    const created = svc.create(makeExpenseInput());
+    expect(created.updatedByName).toBeUndefined();
+    expect(created.updatedDate).toBeUndefined();
+  });
+
+  // Angular parity (audit-user-threading): update stamps updatedByName from login.
+  it('stamps updatedByName with the authenticated user login on update', () => {
+    const created = svc.create(makeExpenseInput());
+    const updated = svc.update(created.id, { total: 99 });
+    expect(updated.updatedByName).toBe('jdoe');
+  });
+
   // update on a missing id throws — the UI layer (today-expenses.tsx/expenses-history.tsx)
   // translates this into the localized EXPENSE_ERRORS.NOT_EXISTS message (Angular parity:
   // updateExpense returns DataResult(undefined, false, [ExpenseErrors.NotExists])).
@@ -76,6 +122,13 @@ describe('ExpenseOfflineService', () => {
     const created = svc.create(makeExpenseInput());
     svc.delete(created.id);
     expect(svc.getById(created.id)?.updatedDate).toBeInstanceOf(Date);
+  });
+
+  // Angular parity (audit-user-threading): delete (soft-delete) stamps updatedByName.
+  it('stamps updatedByName with the authenticated user login on delete', () => {
+    const created = svc.create(makeExpenseInput());
+    svc.delete(created.id);
+    expect(svc.getById(created.id)?.updatedByName).toBe('jdoe');
   });
 
   it('S-EXP-4b: delete is no-op for missing id', () => {
