@@ -414,45 +414,28 @@ const messages: Record<string, string> = {
   // strict text parity (see ORDERS.NO_ORDERS_FOUND / TODAY_STATS.NO_EXPENSE_FOUND precedent).
   'EXPENSES.TODAY.TITLE': 'Gastos del día',
   'EXPENSES.NEW_TITLE': 'Adicionar Gasto',
-  // Angular EXPENSE.EDIT_EXPENSE literal source typo ('Gatos' instead of 'Gastos') —
-  // preserved verbatim for byte parity, matching the project's typo-preservation convention.
-  'EXPENSES.EDIT_TITLE': 'Editar Gatos',
+  // Angular EXPENSE.EDIT_EXPENSE has a source typo ('Gatos' instead of 'Gastos').
+  // Per policy #511 (Angular bugs are FIXED in React, not replicated) it is corrected here.
+  'EXPENSES.EDIT_TITLE': 'Editar Gastos',
   'EXPENSES.EMPTY_STATE': 'No existe ningún gasto en el día',
   'EXPENSES.EDIT': 'Editar',
   'EXPENSES.DELETE': 'Eliminar',
   'EXPENSES.DELETE_CONFIRM': '¿Estás seguro de que querés eliminar este gasto?',
-  'EXPENSES.RUNNING_TOTAL': 'Total del día: ${total}',
   'EXPENSES.ADD_BUTTON': 'Gasto',
 
   // Expenses — History (Angular EXPENSE.EXPENSES_HISTORY/NO_EXPENSE_FOUND, vocabs/es.ts).
   'EXPENSES.HISTORY.TITLE': 'Historial de Gastos',
-  // Angular EXPENSE.NO_EXPENSE_FOUND literal source typo ('enxontró' instead of
-  // 'encontró') — preserved verbatim for byte parity. History-specific empty state,
-  // distinct from the Today page's EXPENSES.EMPTY_STATE.
-  'EXPENSES.HISTORY.EMPTY_STATE': 'No se enxontró ningún gasto',
-  'EXPENSES.FILTERED_TOTAL': 'Total filtrado: ${total}',
+  // Angular EXPENSE.NO_EXPENSE_FOUND has a source typo ('enxontró' instead of 'encontró').
+  // Corrected here per policy #511 (Angular bugs are FIXED, not replicated). History-specific
+  // empty state, distinct from the Today page's EXPENSES.EMPTY_STATE.
+  'EXPENSES.HISTORY.EMPTY_STATE': 'No se encontró ningún gasto',
 
   // Expenses — Form
   'EXPENSES.FORM.TYPE': 'Tipo de gasto',
   'EXPENSES.FORM.TOTAL': 'Total',
-  'EXPENSES.FORM.DATE': 'Fecha',
   'EXPENSES.FORM.PAYMENT_TYPE': 'Tipo de pago',
   'EXPENSES.FORM.NOTE': 'Nota',
   'EXPENSES.FORM.TOTAL_REQUIRED': 'El total debe ser mayor a 0',
-
-  // Expenses — Filters/Pagination: ORPHANED (Stage 3 strict-parity decision — the
-  // date-range/expense-type filter and pagination components (expense-filters.tsx,
-  // expense-pagination.tsx) were REMOVED; Angular's History view has neither — only a
-  // single payment-type radio filter (see PAYMENT_TYPE_OPTIONS in expenses-history.tsx) and
-  // a day-grouped accordion (no pagination). Keys left in place, not pruned, matching the
-  // established ORDERS.*/INVENTORY.EMPTY_STATE no-instruction-to-prune-orphans precedent.
-  'EXPENSES.FILTER.DATE_FROM': 'Desde',
-  'EXPENSES.FILTER.DATE_TO': 'Hasta',
-  'EXPENSES.FILTER.TYPE': 'Tipo',
-  'EXPENSES.PAGINATION.ROWS_PER_PAGE': 'Filas por página',
-  'EXPENSES.PAGINATION.INFO': 'Página {page} de {totalPages} ({total} registros)',
-  'EXPENSES.PAGINATION.PREV': 'Anterior',
-  'EXPENSES.PAGINATION.NEXT': 'Siguiente',
 
   // Expenses — Expense types
   'EXPENSES.TYPE.SALARIO': 'Salario',

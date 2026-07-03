@@ -71,14 +71,15 @@ describe('TodayExpensesPage — smoke render', () => {
     expect(screen.getByText('Gasto')).toBeInTheDocument();
   });
 
-  it('shows running total', () => {
+  it('does not show a running-total banner (Angular parity: expenses-today has none)', () => {
     render(
       <Wrapper>
         <TodayExpensesPage />
       </Wrapper>,
     );
-    // Running total line should be present (shows $0.00 when empty)
-    expect(screen.getByText(/Total del día/i)).toBeInTheDocument();
+    // Angular's expenses-today.component.html has NO running-total banner — the
+    // React-only banner was removed per the Stage 3 strict-parity decision.
+    expect(screen.queryByText(/Total del día/i)).not.toBeInTheDocument();
   });
 
   // G-i18n: update()'s only failure branch is not-found. The route must surface the
@@ -199,7 +200,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
         <ExpensesHistoryPage />
       </Wrapper>,
     );
-    expect(screen.getByText('No se enxontró ningún gasto')).toBeInTheDocument();
+    expect(screen.getByText('No se encontró ningún gasto')).toBeInTheDocument();
   });
 
   it('has NO date-range or expense-type filter controls', () => {

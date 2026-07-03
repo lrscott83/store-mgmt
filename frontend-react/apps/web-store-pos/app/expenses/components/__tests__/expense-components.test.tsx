@@ -54,6 +54,33 @@ describe('ExpenseFormModal — total validation (Angular parity: required + min(
     expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
   });
 
+  // Angular's EXPENSE.EDIT_EXPENSE has a source typo ('Editar Gatos'). Per policy #511
+  // (Angular bugs are FIXED in React, not replicated) it is corrected to 'Editar Gastos'.
+  it('shows the corrected edit-mode title (not the Angular "Gatos" typo)', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal
+          isOpen
+          onClose={() => {}}
+          onSave={() => {}}
+          expense={{
+            id: 'e1',
+            type: ExpenseType.Comida,
+            total: 10,
+            date: new Date('2024-03-15T10:00:00.000'),
+            paymentType: PaymentType.Efectivo,
+            note: '',
+            isActive: true,
+            createdDate: new Date('2024-03-15T10:00:00.000'),
+            createdByName: '',
+          }}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Editar Gastos')).toBeInTheDocument();
+    expect(screen.queryByText('Editar Gatos')).not.toBeInTheDocument();
+  });
+
   // Angular parity: edit-expense-modal has NO date field at all — create always uses
   // `new Date()`, update always reuses `expense.date` unchanged (never user-editable).
   it('has no editable Date field', () => {

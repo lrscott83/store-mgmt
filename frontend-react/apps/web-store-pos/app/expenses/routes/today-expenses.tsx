@@ -92,8 +92,6 @@ export function TodayExpensesPage() {
     loadExpenses();
   }
 
-  const runningTotal = expenses.reduce((sum, e) => sum + e.total, 0);
-
   return (
     <Card
       title={
@@ -107,17 +105,9 @@ export function TodayExpensesPage() {
       }
     >
       <div className="space-y-4">
-        {/*
-          NOTE: Angular's expenses-today.component.html has NO running-total banner — only
-          the card header + empty-state/list (L5 map, "Top gaps" #1). This is a React-only
-          addition not covered by the Stage 3 History strict-parity decision (which was
-          scoped to the History screen). Kept as-is pending an explicit product decision;
-          restyled with tokens here rather than silently removed.
-        */}
-        <div className="rounded-md border border-primary/20 bg-primary-light px-4 py-2 text-sm font-medium text-primary">
-          {intl.formatMessage({ id: 'EXPENSES.RUNNING_TOTAL' }, { total: runningTotal.toFixed(2) })}
-        </div>
-
+        {/* Angular parity: expenses-today.component.html is just the card header +
+            empty-state/list — no running-total banner. The React-only banner was removed
+            per the Stage 3 strict-parity decision. */}
         {expenses.length === 0 ? (
           <InfoBox variant="primary" className="text-center">
             {intl.formatMessage({ id: 'EXPENSES.EMPTY_STATE' })}
