@@ -121,13 +121,6 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   },
 }));
 
-// ─── useOnlineStatus mock ─────────────────────────────────────────────────────
-
-let mockIsOnline = true;
-vi.mock('~/shared/lib/hooks/use-online-status', () => ({
-  useOnlineStatus: () => mockIsOnline,
-}));
-
 // ─── react-router mock ────────────────────────────────────────────────────────
 
 const mockNavigate = vi.fn();
@@ -181,7 +174,6 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('EditStorePage — mode resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockIsOnline = true;
     localStorageMock.clear();
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
@@ -246,7 +238,6 @@ describe('EditStorePage — create mode: success navigates to user create', () =
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockIsOnline = true;
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
     mockCreateStore = vi.fn().mockResolvedValue({ data: makeStore() });
@@ -273,7 +264,6 @@ describe('EditStorePage — create mode: HTTP error shown inline', () => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockIsOnline = true;
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
     mockCreateStore = vi.fn().mockRejectedValue(new Error('Server error'));
@@ -301,7 +291,6 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockIsOnline = true;
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule({ name: 'Catalog Module' })] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
@@ -321,7 +310,6 @@ describe('EditStorePage — create mode: module catalog error blocks submit', ()
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockIsOnline = true;
     mockListModulesToStore = vi.fn().mockRejectedValue(new Error('Catalog error'));
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
@@ -339,7 +327,6 @@ describe('EditStorePage — create mode: isOwnerAdmin computed from feature', ()
   beforeEach(() => {
     vi.clearAllMocks();
     mockParams = {};
-    mockIsOnline = true;
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
   });
@@ -376,7 +363,6 @@ describe('EditStorePage — create mode: HTTP-only, no offline notice (Req: HTTP
     vi.clearAllMocks();
     mockUser = makeUser({ selectedStoreId: '' });
     mockParams = {};
-    mockIsOnline = false;
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
@@ -399,7 +385,6 @@ describe('EditStorePage — edit mode: success navigates to store list', () => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockIsOnline = true;
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
@@ -423,7 +408,6 @@ describe('EditStorePage — edit mode: pre-fills form from fetched store', () =>
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockIsOnline = true;
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Pre-filled Name' }) });
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
@@ -443,7 +427,6 @@ describe('EditStorePage — edit mode: HTTP-only, no offline notice (Req: HTTP-O
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockIsOnline = false;
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore() });
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
@@ -463,7 +446,6 @@ describe('EditStorePage — no BaseRepository cache read/write on load or save (
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockIsOnline = true;
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
@@ -490,7 +472,6 @@ describe('EditStorePage — edit mode: HTTP error shown inline without redirect'
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockIsOnline = true;
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Edit Me' }) });
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
@@ -514,7 +495,6 @@ describe('EditStorePage — edit mode: store not found shows error state', () =>
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 'nonexistent' };
-    mockIsOnline = true;
     mockGetStore = vi.fn().mockRejectedValue(new Error('Not found'));
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
@@ -534,7 +514,6 @@ describe('EditStorePage — edit mode: refreshes user after successful edit (no 
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockIsOnline = true;
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });

@@ -163,6 +163,12 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.APPROVE_CONFIRM_TITLE'],
+        message: esMessages['STORES.APPROVE_CONFIRM_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
       expect(storeHttpService.approveStore).toHaveBeenCalledWith('s1');
       expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
     });
@@ -189,6 +195,12 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.APPROVE_CONFIRM_TITLE'],
+        message: esMessages['STORES.APPROVE_CONFIRM_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
     });
     expect(storeHttpService.approveStore).not.toHaveBeenCalled();
     expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
@@ -241,6 +253,12 @@ describe('AdminStoreListPage — disapprove requires confirmation', () => {
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.DISAPPROVE_CONFIRM_TITLE'],
+        message: esMessages['STORES.DISAPPROVE_CONFIRM_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
       expect(storeHttpService.disapproveStore).toHaveBeenCalledWith('s2');
       expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
     });
@@ -267,6 +285,12 @@ describe('AdminStoreListPage — disapprove requires confirmation', () => {
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.DISAPPROVE_CONFIRM_TITLE'],
+        message: esMessages['STORES.DISAPPROVE_CONFIRM_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
     });
     expect(storeHttpService.disapproveStore).not.toHaveBeenCalled();
     expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
