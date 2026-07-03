@@ -1,11 +1,17 @@
 import type { Product } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
+import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
 const repo = new BaseRepository<Product>('products', ['createdDate', 'updatedDate']);
 
 function generateId(): string {
   return crypto.randomUUID();
 }
+
+type CreateProductInput = Omit<
+  Product,
+  'id' | 'createdDate' | 'createdByName' | 'updatedDate' | 'updatedByName'
+> & { id?: string };
 
 export class ProductOfflineService {
   constructor(private readonly storeId: string) {}
@@ -23,10 +29,14 @@ export class ProductOfflineService {
     return this.getAll().find((p) => p.barcode === barcode);
   }
 
-  create(data: Omit<Product, 'id'> & { id?: string }): Product {
+  create(data: CreateProductInput): Product {
     const product: Product = {
       ...data,
       id: data.id ?? generateId(),
+      createdDate: new Date(),
+      createdByName: getCurrentUserLogin(),
+      updatedDate: undefined,
+      updatedByName: undefined,
     };
     repo.upsert(this.storeId, product);
     return product;

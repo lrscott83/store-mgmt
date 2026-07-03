@@ -1,6 +1,30 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Product } from '@store-mgmt/domain';
+import type { Product, UserModel } from '@store-mgmt/domain';
 import { ProductOfflineService } from '../product-offline-service';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    id: 'u1',
+    login: 'jdoe',
+    fullName: 'Test User',
+    cellPhone: '',
+    email: 'jdoe@test.com',
+    isActive: true,
+    password: '',
+    authToken: 'tok',
+    refreshToken: 'ref',
+    expiresIn: Date.now() + 1000000,
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: 's1',
+    ...overrides,
+  };
+}
 
 const makeProduct = (overrides: Partial<Product> = {}): Omit<Product, 'id'> & { id?: string } => ({
   name: 'Coca Cola',
@@ -24,6 +48,7 @@ describe('ProductOfflineService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
     service = new ProductOfflineService(storeId);
   });
 
@@ -50,6 +75,19 @@ describe('ProductOfflineService', () => {
       const p1 = service.create(makeProduct({ name: 'Fanta' }));
       const p2 = service.create(makeProduct({ name: 'Sprite' }));
       expect(p1.id).not.toBe(p2.id);
+    });
+
+    // Angular parity (audit-user-threading-followup): create stamps createdByName
+    // from the authenticated user's login, mirroring ExpenseOfflineService.create.
+    it('stamps createdByName with the authenticated user login on create', () => {
+      const created = service.create(makeProduct());
+      expect(created.createdByName).toBe('jdoe');
+    });
+
+    it('leaves updatedByName/updatedDate undefined on create', () => {
+      const created = service.create(makeProduct());
+      expect(created.updatedByName).toBeUndefined();
+      expect(created.updatedDate).toBeUndefined();
     });
   });
 
