@@ -63,7 +63,17 @@ export class ProductOfflineService {
   }
 
   delete(id: string): void {
-    repo.remove(this.storeId, id);
+    // Angular parity (ADR-3): deleteProduct soft-deletes — sets isActive=false,
+    // updatedDate/updatedByName, keeps the record (audit trail, sync contract).
+    // No-op for a missing id, matching the prior hard-delete's no-op behavior.
+    const existing = repo.getById(this.storeId, id);
+    if (!existing) return;
+    repo.upsert(this.storeId, {
+      ...existing,
+      isActive: false,
+      updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
+    });
   }
 
   search(query: string): Product[] {

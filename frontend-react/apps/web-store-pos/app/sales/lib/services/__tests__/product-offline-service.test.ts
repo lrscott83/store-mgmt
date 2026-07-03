@@ -209,10 +209,34 @@ describe('ProductOfflineService', () => {
   });
 
   describe('PROD-06: delete', () => {
-    it('removes a product by id', () => {
+    // Angular parity (audit-user-threading-followup, ADR-3): deleteProduct
+    // soft-deletes (isActive=false), it does NOT remove the record — required
+    // for sync propagation, mirrors ExpenseOfflineService.delete.
+    it('soft-deletes a product (isActive=false, record retained)', () => {
       const created = service.create(makeProduct());
       service.delete(created.id);
-      expect(service.getById(created.id)).toBeUndefined();
+      const all = service.getAll();
+      expect(all).toHaveLength(1);
+      expect(all[0].id).toBe(created.id);
+      expect(service.getById(created.id)?.isActive).toBe(false);
+    });
+
+    it('stamps updatedByName with the authenticated user login on delete', () => {
+      const created = service.create(makeProduct());
+      service.delete(created.id);
+      expect(service.getById(created.id)?.updatedByName).toBe('jdoe');
+    });
+
+    it('sets updatedDate to a Date instance on delete', () => {
+      const created = service.create(makeProduct());
+      service.delete(created.id);
+      expect(service.getById(created.id)?.updatedDate).toBeInstanceOf(Date);
+    });
+
+    it('is a no-op for a missing id (no throw)', () => {
+      service.create(makeProduct());
+      expect(() => service.delete('nonexistent-id')).not.toThrow();
+      expect(service.getAll()).toHaveLength(1);
     });
   });
 
