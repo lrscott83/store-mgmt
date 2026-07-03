@@ -53,9 +53,11 @@ export class ProductOfflineService {
   }
 
   updateMany(products: Product[]): void {
+    const now = new Date();
+    const login = getCurrentUserLogin();
     const all = repo.getAll(this.storeId);
     for (const product of products) {
-      all.set(product.id, product);
+      all.set(product.id, { ...product, updatedDate: now, updatedByName: login });
     }
     repo.save(this.storeId, all);
   }

@@ -135,6 +135,36 @@ describe('ProductOfflineService', () => {
       expect(service.getById(p2.id)).not.toBeUndefined();
       expect(service.getById(p3.id)).not.toBeUndefined();
     });
+
+    // Angular parity (audit-user-threading-followup): updateMany stamps
+    // updatedByName on every product in the batch, mirroring update().
+    it('stamps updatedByName on every product in the batch', () => {
+      const p1 = service.create(makeProduct({ name: 'Fanta' }));
+      const p2 = service.create(makeProduct({ name: 'Sprite' }));
+
+      service.updateMany([
+        { ...p1, price: 2.0 },
+        { ...p2, price: 3.0 },
+      ]);
+
+      expect(service.getById(p1.id)?.updatedByName).toBe('jdoe');
+      expect(service.getById(p2.id)?.updatedByName).toBe('jdoe');
+    });
+
+    it('stamps the same updatedDate on every product in the batch', () => {
+      const p1 = service.create(makeProduct({ name: 'Fanta' }));
+      const p2 = service.create(makeProduct({ name: 'Sprite' }));
+
+      service.updateMany([
+        { ...p1, price: 2.0 },
+        { ...p2, price: 3.0 },
+      ]);
+
+      const d1 = service.getById(p1.id)?.updatedDate;
+      const d2 = service.getById(p2.id)?.updatedDate;
+      expect(d1).toBeInstanceOf(Date);
+      expect(d1?.getTime()).toBe(d2?.getTime());
+    });
   });
 
   describe('PROD-04: getAll returns all products', () => {
