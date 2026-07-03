@@ -6,7 +6,6 @@ import { ExpenseType, PaymentType } from '@store-mgmt/domain';
 export interface ExpenseFormInput {
   type: ExpenseType;
   total: number;
-  date: string;
   paymentType: PaymentType;
   note: string;
 }
@@ -53,12 +52,16 @@ const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
   [PaymentType.Zelle]: 'CART.ZELLE',
 };
 
+// Angular parity: edit-expense-modal has NO date field — create always uses `new Date()`
+// (edit-expense-modal.component.ts:60), update always reuses `this.expense.date` unchanged
+// (:68). The date is never user-editable in either mode, so it's intentionally absent from
+// ExpenseFormInput; callers set it themselves (create: `new Date()`; update: omitted, so the
+// existing record's date is preserved by ExpenseOfflineService.update's `{...existing, ...patch}`).
 function emptyForm(expense?: Expense): ExpenseFormInput {
   if (expense) {
     return {
       type: expense.type,
       total: expense.total,
-      date: new Date(expense.date).toISOString().slice(0, 10),
       paymentType: expense.paymentType,
       note: expense.note ?? '',
     };
@@ -66,7 +69,6 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
   return {
     type: ExpenseType.Otro,
     total: 0,
-    date: new Date().toISOString().slice(0, 10),
     paymentType: PaymentType.Efectivo,
     note: '',
   };
@@ -153,19 +155,6 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
                 {intl.formatMessage({ id: 'EXPENSES.FORM.TOTAL_REQUIRED' })}
               </p>
             )}
-          </div>
-
-          {/* Date */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'EXPENSES.FORM.DATE' })}
-            </label>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
           </div>
 
           {/* Payment type */}

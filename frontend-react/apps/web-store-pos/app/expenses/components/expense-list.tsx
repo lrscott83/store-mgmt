@@ -24,12 +24,20 @@ const PAYMENT_TYPE_KEYS: Record<PaymentType, string> = {
 
 interface ExpenseListProps {
   expenses: Expense[];
-  allowDelete?: boolean;
-  onEdit: (expense: Expense) => void;
+  /**
+   * Mirrors Angular's `expense-list.component.ts:20` `@Input() readOnly: boolean = true` —
+   * both the edit AND delete actions are gated together behind `!readOnly`
+   * (`expense-list.component.html:22`), unlike the old React `allowDelete` prop which only
+   * hid Delete while Edit always rendered. Defaults to `false` here (not Angular's default),
+   * matching the `EntryList` precedent: both current callers (Today/History) pass an explicit
+   * override, so there's no caller relying on a fail-safe default.
+   */
+  readOnly?: boolean;
+  onEdit?: (expense: Expense) => void;
   onDelete?: (expense: Expense) => void;
 }
 
-export function ExpenseList({ expenses, allowDelete = false, onEdit, onDelete }: ExpenseListProps) {
+export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: ExpenseListProps) {
   const intl = useIntl();
 
   if (expenses.length === 0) {
@@ -61,22 +69,24 @@ export function ExpenseList({ expenses, allowDelete = false, onEdit, onDelete }:
             )}
           </div>
 
-          <div className="ml-4 flex shrink-0 gap-2">
-            <button
-              onClick={() => onEdit(expense)}
-              className="rounded border px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
-            >
-              {intl.formatMessage({ id: 'EXPENSES.EDIT' })}
-            </button>
-            {allowDelete && onDelete && (
+          {!readOnly && (
+            <div className="ml-4 flex shrink-0 gap-2">
               <button
-                onClick={() => onDelete(expense)}
-                className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                onClick={() => onEdit?.(expense)}
+                className="rounded border px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
               >
-                {intl.formatMessage({ id: 'EXPENSES.DELETE' })}
+                {intl.formatMessage({ id: 'EXPENSES.EDIT' })}
               </button>
-            )}
-          </div>
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(expense)}
+                  className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                >
+                  {intl.formatMessage({ id: 'EXPENSES.DELETE' })}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </div>

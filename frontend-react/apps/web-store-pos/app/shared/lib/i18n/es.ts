@@ -29,6 +29,10 @@ const messages: Record<string, string> = {
   'GENERAL.YES': 'Si',
   'GENERAL.NO': 'No',
   'GENERAL.OK': 'Ok',
+  // GENERAL.ALL — Angular's payment-type filter "Todas" option is a hardcoded literal with
+  // no [translate] pipe (expenses.component.html:16); added as a proper i18n key here per
+  // React's no-hardcoded-Spanish convention. Value is byte-identical to Angular's literal.
+  'GENERAL.ALL': 'Todas',
   'GENERAL.ACTIVE': 'Activo',
   'GENERAL.CLIENT': 'Cliente',
   'GENERAL.NOTE': 'Nota',
@@ -436,12 +440,15 @@ const messages: Record<string, string> = {
   'EXPENSES.FORM.NOTE': 'Nota',
   'EXPENSES.FORM.TOTAL_REQUIRED': 'El total debe ser mayor a 0',
 
-  // Expenses — Filters
+  // Expenses — Filters/Pagination: ORPHANED (Stage 3 strict-parity decision — the
+  // date-range/expense-type filter and pagination components (expense-filters.tsx,
+  // expense-pagination.tsx) were REMOVED; Angular's History view has neither — only a
+  // single payment-type radio filter (see PAYMENT_TYPE_OPTIONS in expenses-history.tsx) and
+  // a day-grouped accordion (no pagination). Keys left in place, not pruned, matching the
+  // established ORDERS.*/INVENTORY.EMPTY_STATE no-instruction-to-prune-orphans precedent.
   'EXPENSES.FILTER.DATE_FROM': 'Desde',
   'EXPENSES.FILTER.DATE_TO': 'Hasta',
   'EXPENSES.FILTER.TYPE': 'Tipo',
-
-  // Expenses — Pagination
   'EXPENSES.PAGINATION.ROWS_PER_PAGE': 'Filas por página',
   'EXPENSES.PAGINATION.INFO': 'Página {page} de {totalPages} ({total} registros)',
   'EXPENSES.PAGINATION.PREV': 'Anterior',

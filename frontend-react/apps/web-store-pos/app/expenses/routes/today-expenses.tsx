@@ -46,18 +46,21 @@ export function TodayExpensesPage() {
     const svc = new ExpenseOfflineService(storeId);
     try {
       if (id) {
+        // Angular parity: updateExpense always reuses `this.expense.date` unchanged — the
+        // `date` field is intentionally omitted from the patch so `update()`'s
+        // `{...existing, ...patch}` merge preserves the original date.
         svc.update(id, {
           type: data.type,
           total: data.total,
-          date: new Date(data.date),
           paymentType: data.paymentType,
           note: data.note,
         });
       } else {
+        // Angular parity: createExpense always uses `new Date()` — never a user-editable date.
         svc.create({
           type: data.type,
           total: data.total,
-          date: new Date(data.date),
+          date: new Date(),
           paymentType: data.paymentType,
           note: data.note,
         });
@@ -107,7 +110,7 @@ export function TodayExpensesPage() {
 
       <ExpenseList
         expenses={expenses}
-        allowDelete={true}
+        readOnly={false}
         onEdit={openEdit}
         onDelete={handleDeleteRequest}
       />
