@@ -537,6 +537,12 @@ const messages: Record<string, string> = {
   'STORES.SELECT_ALL_MODULES': 'Seleccionar todos',
   'STORES.REQUIRED': 'Este campo es obligatorio.',
   'STORES.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intentá de nuevo.',
+  // Confirm-dialog copy (Angular parity: GENERAL.APPROVE_CONFIRM_TITLE/MESSAGE,
+  // GENERAL.DISAPPROVE_CONFIRM_TITLE/MESSAGE + STORE.CONFIRM_TEXT 'esta tienda' interpolated in)
+  'STORES.APPROVE_CONFIRM_TITLE': 'Confirmación para aprobar',
+  'STORES.APPROVE_CONFIRM_MESSAGE': '¿Está seguro que desea aprobar esta tienda?',
+  'STORES.DISAPPROVE_CONFIRM_TITLE': 'Confirmación para desaprobar',
+  'STORES.DISAPPROVE_CONFIRM_MESSAGE': '¿Está seguro que desea desaprobar esta tienda?',
 
   // Management — Users
   'USERS.LIST_TITLE': 'Usuarios',

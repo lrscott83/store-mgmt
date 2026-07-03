@@ -27,6 +27,13 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
   },
 }));
 
+// ─── blocking-alert (confirmDialog) mock ──────────────────────────────────────
+
+const mockConfirmDialog = vi.fn();
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => mockConfirmDialog(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -78,7 +85,7 @@ describe('AdminStoreListPage — exports', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-STORES-PAGE-1 — list render
+// S-ADMIN-STORES-PAGE-1 — card grid render
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('AdminStoreListPage — render', () => {
@@ -111,11 +118,11 @@ describe('AdminStoreListPage — render', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-STORES-PAGE-4 — onApprove wired
+// Approve — requires confirmation (Req: Approve/Disapprove Require Confirmation)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('AdminStoreListPage — onApprove', () => {
-  it('calls approveStore then re-fetches when approve button clicked', async () => {
+describe('AdminStoreListPage — approve requires confirmation', () => {
+  beforeEach(async () => {
     const { storeHttpService } = await import(
       '~/management/stores/lib/services/store-http-service'
     );
@@ -133,6 +140,13 @@ describe('AdminStoreListPage — onApprove', () => {
       actionCode: 0,
       errors: [],
     });
+  });
+
+  it('confirmed (true) -> calls approveStore then re-fetches', async () => {
+    mockConfirmDialog.mockResolvedValue(true);
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
 
     const { AdminStoreListPage } = await import('../store-list');
     render(
@@ -148,18 +162,45 @@ describe('AdminStoreListPage — onApprove', () => {
     fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.APPROVE'] }));
 
     await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
       expect(storeHttpService.approveStore).toHaveBeenCalledWith('s1');
       expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
     });
   });
+
+  it('cancelled (false) -> does NOT call approveStore, status unchanged', async () => {
+    mockConfirmDialog.mockResolvedValue(false);
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.APPROVE'] }));
+
+    await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+    });
+    expect(storeHttpService.approveStore).not.toHaveBeenCalled();
+    expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-STORES-PAGE-5 — onDisapprove wired
+// Disapprove — requires confirmation (Req: Approve/Disapprove Require Confirmation)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('AdminStoreListPage — onDisapprove', () => {
-  it('calls disapproveStore then re-fetches when disapprove button clicked', async () => {
+describe('AdminStoreListPage — disapprove requires confirmation', () => {
+  beforeEach(async () => {
     const { storeHttpService } = await import(
       '~/management/stores/lib/services/store-http-service'
     );
@@ -177,6 +218,13 @@ describe('AdminStoreListPage — onDisapprove', () => {
       actionCode: 0,
       errors: [],
     });
+  });
+
+  it('confirmed (true) -> calls disapproveStore then re-fetches', async () => {
+    mockConfirmDialog.mockResolvedValue(true);
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
 
     const { AdminStoreListPage } = await import('../store-list');
     render(
@@ -192,9 +240,36 @@ describe('AdminStoreListPage — onDisapprove', () => {
     fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] }));
 
     await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
       expect(storeHttpService.disapproveStore).toHaveBeenCalledWith('s2');
       expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('cancelled (false) -> does NOT call disapproveStore, status unchanged', async () => {
+    mockConfirmDialog.mockResolvedValue(false);
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Beta')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] }));
+
+    await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+    });
+    expect(storeHttpService.disapproveStore).not.toHaveBeenCalled();
+    expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -223,7 +298,7 @@ describe('AdminStoreListPage — error state', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-STORES-PAGE-6 — Activate/Deactivate NOT wired
+// S-ADMIN-STORES-PAGE-6 — Activate/Deactivate NOT wired (Req: Activate/Deactivate Removed)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('AdminStoreListPage — no activate/deactivate buttons', () => {
