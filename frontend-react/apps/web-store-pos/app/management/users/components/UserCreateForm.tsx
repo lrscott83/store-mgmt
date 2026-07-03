@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { toDigits, formatCellPhone } from '~/management/users/lib/cell-phone-mask';
 
 const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;
 
@@ -133,8 +134,8 @@ export function UserCreateForm({
         <input
           id="cellPhone"
           type="text"
-          value={cellPhone}
-          onChange={(e) => setCellPhone(e.target.value)}
+          value={formatCellPhone(cellPhone)}
+          onChange={(e) => setCellPhone(toDigits(e.target.value))}
           required
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -149,6 +150,7 @@ export function UserCreateForm({
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          placeholder="info@mail.com"
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>

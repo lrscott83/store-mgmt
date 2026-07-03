@@ -378,6 +378,28 @@ describe('UserEditPage — S-EDIT-2: details submit calls updateUserDetails', ()
   });
 });
 
+describe('UserEditPage — S-EDIT-NAV: successful save navigates to the users list (Req: Edit User Navigates to List on Save Success)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockIsOnline = true;
+    mockParams = { id: 'u1' };
+    mockGetUser = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Existing User' }) });
+    mockUpdateUserDetails = vi.fn().mockResolvedValue({ data: true });
+  });
+
+  it('navigates to /management/users after a successful details save, with no inline success message', async () => {
+    const { UserEditPage } = await import('../user-edit');
+    render(<Wrapper><UserEditPage /></Wrapper>);
+    await waitFor(() => screen.getByDisplayValue('Existing User'));
+    fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/management/users');
+    });
+    expect(screen.queryByText(/usuario actualizado correctamente/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
   beforeEach(() => {
     vi.clearAllMocks();

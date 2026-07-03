@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
@@ -13,6 +13,7 @@ export const clientLoader = adminFeatureLoader([EFeatures.Users]);
 
 export function UserEditPage() {
   const intl = useIntl();
+  const navigate = useNavigate();
   const { id: paramId } = useParams<{ id: string }>();
   const isOnline = useOnlineStatus();
   const { user } = useAuthStore();
@@ -27,7 +28,6 @@ export function UserEditPage() {
 
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState('');
-  const [detailsSuccess, setDetailsSuccess] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -50,11 +50,10 @@ export function UserEditPage() {
   }) {
     if (!isOnline) return;
     setDetailsError('');
-    setDetailsSuccess(false);
     setDetailsLoading(true);
     try {
       await userHttpService.updateUserDetails(userId, values);
-      setDetailsSuccess(true);
+      navigate('/management/users');
     } catch {
       setDetailsError(intl.formatMessage({ id: 'USERS.ERROR' }));
     } finally {
@@ -90,9 +89,6 @@ export function UserEditPage() {
         <h2 className="text-base font-medium text-gray-700">
           {intl.formatMessage({ id: 'USERS.UPDATE' })}
         </h2>
-        {detailsSuccess && (
-          <p className="text-sm text-green-700">{intl.formatMessage({ id: 'USERS.UPDATE_SUCCESS' })}</p>
-        )}
         <UserDetailsForm
           initialValues={{
             fullName: storeUser.fullName,

@@ -28,7 +28,7 @@ describe('UserDetailsForm — PRES-6: renders fullName, cellPhone, email fields'
     );
     expect(screen.getByLabelText(/nombre completo/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/teléfono/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/correo|email/i)).toBeInTheDocument();
   });
 });
 
@@ -57,11 +57,11 @@ describe('UserDetailsForm — EDIT-5: isActive toggle hidden when canToggleActiv
 });
 
 describe('UserDetailsForm — EDIT-3: pre-fills from initialValues', () => {
-  it('populates inputs from initialValues prop', async () => {
+  it('populates inputs from initialValues prop, formatting cellPhone with the +53 mask', async () => {
     const { UserDetailsForm } = await import('../UserDetailsForm');
     const initialValues = {
       fullName: 'Jane Doe',
-      cellPhone: '+987654321',
+      cellPhone: '98765432',
       email: 'jane@test.com',
       isActive: true,
     };
@@ -71,7 +71,7 @@ describe('UserDetailsForm — EDIT-3: pre-fills from initialValues', () => {
       </Wrapper>
     );
     expect(screen.getByDisplayValue('Jane Doe')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('+987654321')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('+53 9 876-5432')).toBeInTheDocument();
     expect(screen.getByDisplayValue('jane@test.com')).toBeInTheDocument();
   });
 });
@@ -122,13 +122,54 @@ describe('UserDetailsForm — PRES-9: valid submit fires onSubmit', () => {
       </Wrapper>
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Updated Name' } });
-    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '111' } });
     fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ fullName: 'Updated Name', cellPhone: '+111' })
+        expect.objectContaining({ fullName: 'Updated Name', cellPhone: '111' })
       );
     });
+  });
+});
+
+describe('UserDetailsForm — CELL-MASK: cell-phone applies the +53 mask (Req: Cell-Phone Mask and Field Copy Match Angular)', () => {
+  it('displays the formatted +53 X XXX-XXXX mask as digits are typed', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
+    expect(screen.getByDisplayValue('+53 5 123-4567')).toBeInTheDocument();
+  });
+
+  it('submits raw digits (not the formatted mask string) as cellPhone', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
+      </Wrapper>
+    );
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Mask User' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '51234567' }));
+    });
+  });
+});
+
+describe('UserDetailsForm — EMAIL-PLACEHOLDER: email placeholder matches Angular (Req: Cell-Phone Mask and Field Copy Match Angular)', () => {
+  it('has placeholder="info@mail.com" on the email field', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} />
+      </Wrapper>
+    );
+    expect(screen.getByLabelText(/correo|email/i)).toHaveAttribute('placeholder', 'info@mail.com');
   });
 });
 
