@@ -13,7 +13,13 @@ import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-o
 vi.mock('~/shared/lib/stores/auth-store', () => {
   // storeModuleIds: [] — EgressPage's checkAvailability calls hasInventoryModuleAvailable(user)
   // unconditionally (same as sale.tsx), which throws on a user object without this field.
-  const state = { user: { selectedStoreId: 's1', storeModuleIds: [] as number[] }, isAuthenticated: true };
+  // isOwnerAdmin: true — represents a logged-in store owner/admin; TodayEntriesPage gates
+  // cost price + edit/delete behind isOwnerAdmin() (Angular parity, today-entries →
+  // <app-entry-list [readOnly]="false">, entry-list.component.html:16,23).
+  const state = {
+    user: { selectedStoreId: 's1', storeModuleIds: [] as number[], isOwnerAdmin: true },
+    isAuthenticated: true,
+  };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;

@@ -6,9 +6,23 @@ interface InventoryDailyEntriesProps {
   entries: InventoryEntryView[];
   onEdit: (entry: InventoryEntryView) => void;
   onDeactivate: (entry: InventoryEntryView) => void;
+  /**
+   * Mirrors Angular's `entry-list.component.ts:32` `isOwnerAdmin()`
+   * (`currentUser.isOwnerAdmin`). Angular's Today Entries screen renders
+   * `<app-entry-list [readOnly]="false">` (today-entries.component.html:24),
+   * which gates the cost price behind `@if (isOwnerAdmin())`
+   * (entry-list.component.html:16) and the edit/delete actions behind
+   * `@if (isOwnerAdmin() && !readOnly)` (:23). Defaults to `false` (fail-closed).
+   */
+  isOwnerAdmin?: boolean;
 }
 
-export function InventoryDailyEntries({ entries, onEdit, onDeactivate }: InventoryDailyEntriesProps) {
+export function InventoryDailyEntries({
+  entries,
+  onEdit,
+  onDeactivate,
+  isOwnerAdmin = false,
+}: InventoryDailyEntriesProps) {
   const intl = useIntl();
 
   if (entries.length === 0) {
@@ -39,10 +53,14 @@ export function InventoryDailyEntries({ entries, onEdit, onDeactivate }: Invento
               <div key={entry.id} className="flex items-center justify-between px-4 py-3">
                 <div className="space-y-0.5">
                   <div className="flex gap-4 text-sm">
-                    <span className="text-text-muted">
-                      {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}:{' '}
-                      <strong>${entry.costPrice.toFixed(2)}</strong>
-                    </span>
+                    {/* Angular parity: cost price gated behind isOwnerAdmin()
+                        (entry-list.component.html:16). */}
+                    {isOwnerAdmin && (
+                      <span className="text-text-muted">
+                        {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}:{' '}
+                        <strong>${entry.costPrice.toFixed(2)}</strong>
+                      </span>
+                    )}
                     <span className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' })}:{' '}
                       <strong>{entry.quantity}</strong>
@@ -53,23 +71,28 @@ export function InventoryDailyEntries({ entries, onEdit, onDeactivate }: Invento
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => onEdit(entry)}
-                    className="rounded bg-primary-light px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20"
-                  >
-                    {intl.formatMessage({ id: 'GENERAL.EDIT' })}
-                  </button>
-                  <button
-                    onClick={() => onDeactivate(entry)}
-                    className="rounded bg-danger/10 px-3 py-1 text-xs font-medium text-danger hover:bg-danger/20"
-                  >
-                    {/* CRITICAL bug fix (Angular parity: entry-list.component.html:36
-                        GENERAL.DELETE) — was wrongly wired to ORDERS.DEACTIVATE
-                        ("Anular pedido"), the cancel-order label, not delete-entry. */}
-                    {intl.formatMessage({ id: 'GENERAL.DELETE' })}
-                  </button>
-                </div>
+                {/* Angular parity: edit/delete gated behind isOwnerAdmin() && !readOnly
+                    (entry-list.component.html:23). This screen is always editable
+                    (readOnly=false), so the gate reduces to isOwnerAdmin. */}
+                {isOwnerAdmin && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onEdit(entry)}
+                      className="rounded bg-primary-light px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                    >
+                      {intl.formatMessage({ id: 'GENERAL.EDIT' })}
+                    </button>
+                    <button
+                      onClick={() => onDeactivate(entry)}
+                      className="rounded bg-danger/10 px-3 py-1 text-xs font-medium text-danger hover:bg-danger/20"
+                    >
+                      {/* CRITICAL bug fix (Angular parity: entry-list.component.html:36
+                          GENERAL.DELETE) — was wrongly wired to ORDERS.DEACTIVATE
+                          ("Anular pedido"), the cancel-order label, not delete-entry. */}
+                      {intl.formatMessage({ id: 'GENERAL.DELETE' })}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -314,6 +314,50 @@ describe('InventoryDailyEntries — smoke render', () => {
   });
 });
 
+// ─── InventoryDailyEntries — isOwnerAdmin gating (Angular parity) ─────────────
+//
+// Angular's Today Entries screen (today-entries.component.html:24) renders
+// `<app-entry-list [readOnly]="false">`, which gates the cost price behind
+// `@if (isOwnerAdmin())` (entry-list.component.html:16) and the edit/delete
+// actions behind `@if (isOwnerAdmin() && !readOnly)` (:23). React uses the
+// hand-rolled `InventoryDailyEntries` for this screen, so it must gate the same
+// way — otherwise any authenticated user sees cost price and can edit/delete.
+
+describe('InventoryDailyEntries — isOwnerAdmin gating (Angular parity)', () => {
+  it('hides cost price and actions when isOwnerAdmin is false (default)', () => {
+    render(
+      <Wrapper>
+        <InventoryDailyEntries entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} />
+      </Wrapper>,
+    );
+    // Cost value ($0.80) is inline with its label, so assert on the rendered amount.
+    expect(screen.queryByText('$0.80')).not.toBeInTheDocument();
+    expect(screen.queryByText('Editar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
+    // Data still renders — only cost-price/actions are gated.
+    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    expect(screen.getByText('Fanta')).toBeInTheDocument();
+  });
+
+  it('shows cost price and actions when isOwnerAdmin is true', () => {
+    render(
+      <Wrapper>
+        <InventoryDailyEntries
+          entries={MOCK_ENTRIES}
+          onEdit={vi.fn()}
+          onDeactivate={vi.fn()}
+          isOwnerAdmin
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$0.80')).toBeInTheDocument();
+    expect(screen.getAllByText('Editar').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Eliminar').length).toBeGreaterThan(0);
+    // The delete label is GENERAL.DELETE, never the cancel-order label.
+    expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
+  });
+});
+
 // ─── EntryList ──────────────────────────────────────────────────────────────
 
 import { EntryList } from '../entry-list';

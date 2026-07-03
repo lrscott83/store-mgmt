@@ -4,6 +4,7 @@ import type { InventoryEntry, InventoryEntryView } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { Card } from '~/shared/components/ui/card';
@@ -18,6 +19,10 @@ export const clientLoader = featureLoader([EFeatures.Entries]);
 export function TodayEntriesPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  const user = useAuthStore((s) => s.user);
+  // Angular parity: today-entries.component.html:24 renders <app-entry-list
+  // [readOnly]="false">, which gates cost price + edit/delete behind isOwnerAdmin().
+  const isOwnerAdmin = user ? checkIsOwnerAdmin(user) : false;
   const [entries, setEntries] = useState<InventoryEntryView[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<InventoryEntry | undefined>();
@@ -124,6 +129,7 @@ export function TodayEntriesPage() {
         entries={entries}
         onEdit={handleEdit}
         onDeactivate={handleDeactivate}
+        isOwnerAdmin={isOwnerAdmin}
       />
 
       <EditInventoryEntryModal
