@@ -61,9 +61,12 @@ export default [
     route('sync/import', 'sync/routes/import.tsx'),
 
     // Management — Stores
-    route('management/stores', 'management/stores/routes/store-list.tsx'),
-    route('management/stores/create', 'management/stores/routes/store-create.tsx'),
-    route('management/stores/edit/:id', 'management/stores/routes/store-edit.tsx'),
+    // Angular parity (edit-store.component.ts:53, getHeader():62-63): all three URLs render
+    // the SAME unified edit-form component. Distinct route `id`s are required because RR7
+    // rejects reusing one file across multiple route() entries without one (see design.md).
+    route('management/stores', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-index' }),
+    route('management/stores/create', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-create' }),
+    route('management/stores/edit/:id', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-edit' }),
 
     // Management — Users
     route('management/users', 'management/users/routes/user-list.tsx'),

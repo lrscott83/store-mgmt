@@ -44,11 +44,14 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
   useAuthStore: vi.fn(),
 }));
 
-// ─── StoreListPage mock ───────────────────────────────────────────────────────
-// Design confirmed: StoreListPage self-loads via useEffect (does NOT use useLoaderData).
-// Safe to mount as child; mock here to isolate edit-page tests from store fetch.
-vi.mock('~/management/stores/routes/store-list', () => ({
-  StoreListPage: () => <div data-testid="store-list-page">StoreListPage</div>,
+// ─── AdminStoreListPage mock ───────────────────────────────────────────────────
+// Stage 4 (management-stores-parity): owner-edit's "Stores" tab now mounts the SOLE
+// super-admin store list at /admin/stores (management/stores/routes/store-list.tsx, the
+// old list+lifecycle route, was deleted). AdminStoreListPage self-loads via useEffect
+// (does NOT use useLoaderData) — safe to mount as child; mocked here to isolate
+// edit-page tests from store fetch.
+vi.mock('~/admin/stores/routes/store-list', () => ({
+  AdminStoreListPage: () => <div data-testid="store-list-page">StoreListPage</div>,
   default: () => <div data-testid="store-list-page">StoreListPage</div>,
 }));
 

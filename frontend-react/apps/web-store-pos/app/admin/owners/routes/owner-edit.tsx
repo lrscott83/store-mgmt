@@ -7,7 +7,11 @@ import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
-import { StoreListPage } from '~/management/stores/routes/store-list';
+// Stage 4 (management-stores-parity): management/stores/routes/store-list.tsx (the old
+// list+lifecycle route) was deleted — /admin/stores (AdminStoreListPage) is now the SOLE
+// super-admin store lifecycle list. Reusing it here keeps this "Stores" tab on the same
+// single source of truth instead of re-implementing a second list.
+import { AdminStoreListPage } from '~/admin/stores/routes/store-list';
 import type { Owner, ReSeller } from '@store-mgmt/domain';
 
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
@@ -337,7 +341,7 @@ export function OwnerEditPage() {
 
       {activeTab === 'stores' && (
         <div>
-          <StoreListPage />
+          <AdminStoreListPage />
         </div>
       )}
 
