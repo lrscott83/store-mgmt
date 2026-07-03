@@ -173,6 +173,19 @@ describe('UserDetailsForm — EMAIL-PLACEHOLDER: email placeholder matches Angul
   });
 });
 
+describe('UserDetailsForm — L6 exact copy parity (Req: Copy Matches Angular Terminology Exactly)', () => {
+  it('uses exact Angular label case/text: "Nombre Completo", "Correo"', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} />
+      </Wrapper>
+    );
+    expect(screen.getByText('Nombre Completo')).toBeInTheDocument();
+    expect(screen.getByText('Correo')).toBeInTheDocument();
+  });
+});
+
 describe('UserDetailsForm — PRES-9: offline disables submit and shows notice', () => {
   it('disables submit button and shows offline notice when isOnline=false', async () => {
     const { UserDetailsForm } = await import('../UserDetailsForm');
@@ -183,5 +196,15 @@ describe('UserDetailsForm — PRES-9: offline disables submit and shows notice',
     );
     expect(screen.getByRole('button', { name: /actualizar/i })).toBeDisabled();
     expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
+  });
+
+  it('offline notice reads "Conéctate" (register-neutral), not voseo "Conectate" (Req: Copy Matches Angular Terminology Exactly)', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} isOnline={false} />
+      </Wrapper>
+    );
+    expect(screen.getByText('Sin conexión. Conéctate para guardar cambios.')).toBeInTheDocument();
   });
 });

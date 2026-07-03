@@ -27,7 +27,7 @@ describe('UserCreateForm — PRES-4: renders all required fields', () => {
       </Wrapper>
     );
     expect(screen.getByLabelText(/nombre completo/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/usuario \(login\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^usuario$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^contraseña$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/confirmar contraseña/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/teléfono/i)).toBeInTheDocument();
@@ -44,11 +44,11 @@ describe('UserCreateForm — CREATE-4: password regex validation blocks submit',
       </Wrapper>
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Test User' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'testuser' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'weakpass' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'weakpass' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+123' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(screen.getByText(/contraseña debe/i)).toBeInTheDocument();
     });
@@ -66,11 +66,11 @@ describe('UserCreateForm — CREATE-4: confirm password mismatch blocks submit',
       </Wrapper>
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Test User' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'testuser' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'DifferentPass1' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+123' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(screen.getByText(/contraseñas no coinciden/i)).toBeInTheDocument();
     });
@@ -88,11 +88,11 @@ describe('UserCreateForm — PRES-9: valid submit fires onSubmit with correct pa
       </Wrapper>
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Valid User' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'validuser' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'validuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
         fullName: 'Valid User',
@@ -126,11 +126,11 @@ describe('UserCreateForm — CELL-MASK: cell-phone applies the +53 mask (Req: Ce
       </Wrapper>
     );
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Mask User' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'maskuser' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'maskuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '51234567' }));
     });
@@ -149,6 +149,30 @@ describe('UserCreateForm — EMAIL-PLACEHOLDER: email placeholder matches Angula
   });
 });
 
+describe('UserCreateForm — L6 exact copy parity (Req: Copy Matches Angular Terminology Exactly)', () => {
+  it('uses exact Angular label case/text: "Nombre Completo", "Usuario", "Correo"', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} />
+      </Wrapper>
+    );
+    expect(screen.getByText('Nombre Completo')).toBeInTheDocument();
+    expect(screen.getByText('Usuario')).toBeInTheDocument();
+    expect(screen.getByText('Correo')).toBeInTheDocument();
+  });
+
+  it('submit button reads exactly "Adicionar", not "Guardar"', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} />
+      </Wrapper>
+    );
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
+  });
+});
+
 describe('UserCreateForm — PRES-9: offline disables submit and shows notice', () => {
   it('disables submit button and shows offline notice when isOnline=false', async () => {
     const { UserCreateForm } = await import('../UserCreateForm');
@@ -157,8 +181,18 @@ describe('UserCreateForm — PRES-9: offline disables submit and shows notice', 
         <UserCreateForm {...baseProps} isOnline={false} />
       </Wrapper>
     );
-    expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /adicionar/i })).toBeDisabled();
     expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
+  });
+
+  it('offline notice reads "Conéctate" (register-neutral), not voseo "Conectate" (Req: Copy Matches Angular Terminology Exactly)', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} isOnline={false} />
+      </Wrapper>
+    );
+    expect(screen.getByText('Sin conexión. Conéctate para guardar cambios.')).toBeInTheDocument();
   });
 });
 

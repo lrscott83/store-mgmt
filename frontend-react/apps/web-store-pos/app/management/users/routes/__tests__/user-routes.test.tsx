@@ -143,6 +143,13 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
     });
     expect(mockListUsers).toHaveBeenCalledTimes(1);
   });
+
+  it('renders the "Empleados" page title, not "Usuarios" (Req: Copy Matches Angular Terminology Exactly)', async () => {
+    const { UserListPage } = await import('../user-list');
+    render(<Wrapper><UserListPage /></Wrapper>);
+    await waitFor(() => screen.getByText('Alice Smith'));
+    expect(screen.getByRole('heading', { name: 'Empleados' })).toBeInTheDocument();
+  });
 });
 
 describe('UserListPage — S-LIST-2: empty state', () => {
@@ -157,7 +164,7 @@ describe('UserListPage — S-LIST-2: empty state', () => {
     const { UserListPage } = await import('../user-list');
     render(<Wrapper><UserListPage /></Wrapper>);
     await waitFor(() => {
-      expect(screen.getByText(/no hay usuarios/i)).toBeInTheDocument();
+      expect(screen.getByText(/no hay empleados/i)).toBeInTheDocument();
     });
   });
 });
@@ -192,7 +199,7 @@ describe('UserListPage — S-LIST-4: no degraded/offline banner ever renders (Re
     const { UserListPage } = await import('../user-list');
     render(<Wrapper><UserListPage /></Wrapper>);
     await waitFor(() => {
-      expect(screen.getByText(/no hay usuarios/i)).toBeInTheDocument();
+      expect(screen.getByText(/no hay empleados/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/caché/i)).not.toBeInTheDocument();
   });
@@ -241,6 +248,22 @@ describe('UserCreatePage — S-CREATE-1: missing selectedStoreId → redirect /m
   });
 });
 
+describe('UserCreatePage — S-CREATE-TITLE: renders "Adicionar Empleado", not "Nuevo usuario" (Req: Copy Matches Angular Terminology Exactly)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ selectedStoreId: 's1' });
+    mockIsOnline = true;
+    mockParams = {};
+  });
+
+  it('shows the "Adicionar Empleado" page title', async () => {
+    const { UserCreatePage } = await import('../user-create');
+    render(<Wrapper><UserCreatePage /></Wrapper>);
+    await waitFor(() => screen.getByLabelText(/nombre completo/i));
+    expect(screen.getByRole('heading', { name: 'Adicionar Empleado' })).toBeInTheDocument();
+  });
+});
+
 describe('UserCreatePage — S-CREATE-2: success navigates to /management/users', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -255,11 +278,11 @@ describe('UserCreatePage — S-CREATE-2: success navigates to /management/users'
     render(<Wrapper><UserCreatePage /></Wrapper>);
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'New User' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'newuser' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'newuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/management/users');
     });
@@ -277,8 +300,8 @@ describe('UserCreatePage — S-CREATE-3: offline blocked', () => {
   it('disables submit and shows offline notice when offline', async () => {
     const { UserCreatePage } = await import('../user-create');
     render(<Wrapper><UserCreatePage /></Wrapper>);
-    await waitFor(() => screen.getByRole('button', { name: /guardar/i }));
-    expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
+    await waitFor(() => screen.getByRole('button', { name: /adicionar/i }));
+    expect(screen.getByRole('button', { name: /adicionar/i })).toBeDisabled();
     expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
   });
 });
@@ -297,11 +320,11 @@ describe('UserCreatePage — S-CREATE-4: HTTP error shown inline', () => {
     render(<Wrapper><UserCreatePage /></Wrapper>);
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User X' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'userx' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'userx' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
@@ -323,11 +346,11 @@ describe('UserCreatePage — S-CREATE-5: password validation blocks submit', () 
     render(<Wrapper><UserCreatePage /></Wrapper>);
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User Y' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'usery' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'usery' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'weakpass' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'weakpass' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(screen.getByText(/contraseña debe/i)).toBeInTheDocument();
     });
@@ -354,6 +377,7 @@ describe('UserEditPage — S-EDIT-1: pre-fills UserDetailsForm after getById', (
     await waitFor(() => {
       expect(screen.getByDisplayValue('Pre-filled Name')).toBeInTheDocument();
     });
+    expect(screen.getByRole('heading', { name: 'Editar Empleado' })).toBeInTheDocument();
   });
 });
 
@@ -515,11 +539,11 @@ describe('UserCreatePage — ROUTE-STOREID: resolves storeId from :storeId param
     render(<Wrapper><UserCreatePage /></Wrapper>);
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User A' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'usera' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'usera' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+111' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(mockCreateUser).toHaveBeenCalledWith(
         expect.objectContaining({ storeId: 'param-store' })
@@ -535,11 +559,11 @@ describe('UserCreatePage — ROUTE-STOREID: resolves storeId from :storeId param
     render(<Wrapper><UserCreatePage /></Wrapper>);
     await waitFor(() => screen.getByLabelText(/nombre completo/i));
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'User B' } });
-    fireEvent.change(screen.getByLabelText(/usuario \(login\)/i), { target: { value: 'userb' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'userb' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+222' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
       expect(mockCreateUser).toHaveBeenCalledWith(
         expect.objectContaining({ storeId: 'fallback-store' })

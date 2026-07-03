@@ -67,7 +67,7 @@ describe('UserCardList — empty state', () => {
         <UserCardList {...baseProps} users={[]} />
       </Wrapper>
     );
-    expect(screen.getByText(/no hay usuarios/i)).toBeInTheDocument();
+    expect(screen.getByText(/no hay empleados/i)).toBeInTheDocument();
   });
 });
 
@@ -82,6 +82,16 @@ describe('UserCardList — FAB triggers onCreate', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: esMessages['USERS.CREATE'] }));
     expect(onCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('FAB reads exactly "Adicionar", not "Crear usuario" (Req: Copy Matches Angular Terminology Exactly)', async () => {
+    const { UserCardList } = await import('../user-card-list');
+    render(
+      <Wrapper>
+        <UserCardList {...baseProps} users={[]} />
+      </Wrapper>
+    );
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeInTheDocument();
   });
 });
 
