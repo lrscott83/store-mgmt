@@ -18,26 +18,27 @@ interface StoreFormProps {
   modules: Module[];
   owners: Owner[];
   initialValues?: Partial<Store>;
-  isOnline: boolean;
   isLoading: boolean;
   isSuperAdmin: boolean;
   isOwnerAdmin: boolean;
   isEditMode: boolean;
   onSubmit: (values: StoreFormValues) => void;
   error?: string;
+  /** External submit gate unrelated to connectivity — e.g. create-mode module catalog load failure. */
+  submitDisabled?: boolean;
 }
 
 export function StoreForm({
   modules,
   owners,
   initialValues,
-  isOnline,
   isLoading,
   isSuperAdmin,
   isOwnerAdmin,
   isEditMode,
   onSubmit,
   error,
+  submitDisabled: externalSubmitDisabled = false,
 }: StoreFormProps) {
   const intl = useIntl();
 
@@ -58,7 +59,7 @@ export function StoreForm({
   const [validationError, setValidationError] = useState('');
 
   const isAdminUser = isSuperAdmin || isOwnerAdmin;
-  const submitDisabled = isLoading || !isOnline;
+  const submitDisabled = isLoading || externalSubmitDisabled;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,12 +90,6 @@ export function StoreForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {!isOnline && (
-        <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
-          {intl.formatMessage({ id: 'STORES.OFFLINE_NOTICE' })}
-        </p>
-      )}
-
       {(validationError || error) && (
         <p role="alert" className="text-sm text-red-600">
           {validationError || error}

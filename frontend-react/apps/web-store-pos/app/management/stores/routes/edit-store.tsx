@@ -4,15 +4,11 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { StoreForm } from '~/management/stores/components/store-form';
 import type { Store, Module, Owner } from '@store-mgmt/domain';
-
-const storeRepository = new BaseRepository<Store>('stores', ['paymentStartDate']);
 
 export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 
@@ -24,15 +20,14 @@ export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
  * `selectedStoreId` hitting `/management/stores/create` lands in EDIT mode of their own
  * store, matching Angular byte-for-byte (`params.id || currentUser.selectedStoreId`).
  *
- * Phase 1 (structure collapse) keeps `BaseRepository`/`isOnline` plumbing verbatim from the
- * old `store-edit.tsx`/`store-create.tsx` to isolate route-merge risk from the offline-layer
- * removal, which is a separate commit (Phase 2).
+ * HTTP-only data access (Req: HTTP-Only Data Access): Angular's `store.service.ts` is pure
+ * HTTP with no local cache — no `BaseRepository`/offline-cache layer here either, and no
+ * offline/degraded notice at any connectivity state.
  */
 export function EditStorePage() {
   const intl = useIntl();
   const navigate = useNavigate();
   const { id: paramId } = useParams<{ id: string }>();
-  const isOnline = useOnlineStatus();
   const { user, updateUser } = useAuthStore();
 
   const storeId = paramId ?? user?.selectedStoreId ?? '';
@@ -110,7 +105,7 @@ export function EditStorePage() {
     isActive: boolean;
     moduleIds: number[];
   }) {
-    if (!isOnline || submitDisabled) return;
+    if (submitDisabled) return;
     setError('');
     setIsLoading(true);
     try {
@@ -126,17 +121,6 @@ export function EditStorePage() {
           moduleIds: values.moduleIds,
           isActive: values.isActive,
         });
-        // Cache upsert using merged form object (updateStore returns boolean)
-        const selectedStore = user?.selectedStoreId ?? '';
-        const updatedStore: Store = {
-          ...store,
-          name: values.name,
-          address: values.address,
-          description: values.description,
-          approved: values.approved,
-          isActive: values.isActive,
-        };
-        storeRepository.upsert(selectedStore, updatedStore);
         // Angular parity: after edit, refresh user session (getUserByToken equivalent).
         // React-idiomatic: fetch /me and update auth store — no page reload.
         try {
@@ -193,7 +177,7 @@ export function EditStorePage() {
         modules={modules}
         owners={owners}
         initialValues={store}
-        isOnline={isOnline && !submitDisabled}
+        submitDisabled={submitDisabled}
         isLoading={isLoading}
         isSuperAdmin={isSuperAdmin}
         isOwnerAdmin={isOwnerAdmin}

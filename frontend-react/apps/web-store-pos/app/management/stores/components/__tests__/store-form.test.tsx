@@ -49,7 +49,6 @@ const baseProps = {
   modules: [makeModule()],
   owners: [] as Owner[],
   initialValues: undefined as unknown as undefined,
-  isOnline: true,
   isLoading: false,
   isSuperAdmin: false,
   isOwnerAdmin: false,
@@ -148,16 +147,26 @@ describe('StoreForm — PRES-4: name required validation', () => {
   });
 });
 
-describe('StoreForm — PRES-8: offline gate disables submit', () => {
-  it('disables submit button and shows offline notice when offline', async () => {
+describe('StoreForm — HTTP-only: no offline notice, no isOnline prop (Req: HTTP-Only Data Access)', () => {
+  it('never renders an offline notice regardless of connectivity plumbing', async () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
-        <StoreForm {...baseProps} isOnline={false} />
+        <StoreForm {...baseProps} />
+      </Wrapper>
+    );
+    expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
+  });
+
+  it('submitDisabled prop (e.g. catalog load failure) disables submit without any offline notice', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm {...baseProps} submitDisabled />
       </Wrapper>
     );
     expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
-    expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
+    expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
   });
 });
 

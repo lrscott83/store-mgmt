@@ -371,7 +371,7 @@ describe('EditStorePage — create mode: isOwnerAdmin computed from feature', ()
   });
 });
 
-describe('EditStorePage — create mode offline gate (Phase 1: kept transitionally)', () => {
+describe('EditStorePage — create mode: HTTP-only, no offline notice (Req: HTTP-Only Data Access)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUser = makeUser({ selectedStoreId: '' });
@@ -381,12 +381,12 @@ describe('EditStorePage — create mode offline gate (Phase 1: kept transitional
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
-  it('disables submit and shows offline notice when offline', async () => {
+  it('does NOT show an offline notice or gate submit on connectivity state (Angular store.service.ts is pure HTTP)', async () => {
     const { EditStorePage } = await import('../edit-store');
     render(<Wrapper><EditStorePage /></Wrapper>);
     await waitFor(() => screen.getByRole('button', { name: /guardar/i }));
-    expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
-    expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /guardar/i })).not.toBeDisabled();
+    expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
   });
 });
 
@@ -438,7 +438,7 @@ describe('EditStorePage — edit mode: pre-fills form from fetched store', () =>
   });
 });
 
-describe('EditStorePage — edit mode offline gate (Phase 1: kept transitionally)', () => {
+describe('EditStorePage — edit mode: HTTP-only, no offline notice (Req: HTTP-Only Data Access)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
@@ -449,12 +449,39 @@ describe('EditStorePage — edit mode offline gate (Phase 1: kept transitionally
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
-  it('submit is disabled and shows offline notice when offline', async () => {
+  it('does NOT show an offline notice or gate submit on connectivity state (Angular store.service.ts is pure HTTP)', async () => {
     const { EditStorePage } = await import('../edit-store');
     render(<Wrapper><EditStorePage /></Wrapper>);
     await waitFor(() => screen.getByRole('button', { name: /guardar/i }));
-    expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
-    expect(screen.getByText(/sin conexión/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /guardar/i })).not.toBeDisabled();
+    expect(screen.queryByText(/sin conexión/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('EditStorePage — no BaseRepository cache read/write on load or save (Req: HTTP-Only Data Access)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockParams = { id: 's1' };
+    mockIsOnline = true;
+    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
+    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
+    mockGetMe = vi.fn().mockResolvedValue({ data: makeUser() });
+  });
+
+  it('never touches localStorage cache on load or successful save', async () => {
+    const setItemSpy = vi.spyOn(localStorageMock, 'setItem');
+    const { EditStorePage } = await import('../edit-store');
+    render(<Wrapper><EditStorePage /></Wrapper>);
+    await waitFor(() => screen.getByDisplayValue('Existing Store'));
+    expect(setItemSpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/management/stores');
+    });
+    expect(setItemSpy).not.toHaveBeenCalled();
   });
 });
 
