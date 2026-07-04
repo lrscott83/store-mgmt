@@ -604,8 +604,8 @@ const messages: Record<string, string> = {
   // Admin — Features
   'FEATURES.TITLE': 'Funcionalidades',
   'FEATURES.ACTIVATE_FEATURES': 'Activar funcionalidades',
-  'FEATURES.FEATURES_ACTIVATED': 'Las funcionalidades fueron activadas correctamente.',
-  'FEATURES.UNEXPECTED_ERROR': 'Ocurrió un error inesperado. Intentá de nuevo.',
+  'FEATURES.FEATURES_ACTIVATED': 'Las funcionalidades se activaron satisfactoriamente',
+  'FEATURES.UNEXPECTED_ERROR': 'Ocurrió un error inesperado activando las funcionalidades',
 
   // Admin — Owners
   'OWNER.LIST_TITLE': 'Propietarios',
