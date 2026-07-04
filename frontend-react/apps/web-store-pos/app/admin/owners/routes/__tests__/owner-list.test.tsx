@@ -209,8 +209,8 @@ describe('OwnerListPage — card fields', () => {
 // S-ADMIN-OWNERS-LIST-4 — deactive-owner CSS class
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('OwnerListPage — deactive-owner CSS class', () => {
-  it('applies deactive-owner when isActive is false', async () => {
+describe('OwnerListPage — state indicator classes (Req: Owners State CSS Classes)', () => {
+  it('applies bg-danger indicator when isActive is false', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
@@ -230,11 +230,12 @@ describe('OwnerListPage — deactive-owner CSS class', () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelector('.deactive-owner')).toBeInTheDocument();
+      const card = container.querySelector('[data-slot="card"]');
+      expect(card?.className).toContain('bg-danger');
     });
   });
 
-  it('applies guest-owner when isActive is true AND approved is false', async () => {
+  it('applies bg-success indicator when isActive is true AND approved is false', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
@@ -254,11 +255,12 @@ describe('OwnerListPage — deactive-owner CSS class', () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelector('.guest-owner')).toBeInTheDocument();
+      const card = container.querySelector('[data-slot="card"]');
+      expect(card?.className).toContain('bg-success');
     });
   });
 
-  it('applies no special class when isActive is true AND approved is true', async () => {
+  it('applies no special indicator when isActive is true AND approved is true', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
@@ -278,8 +280,9 @@ describe('OwnerListPage — deactive-owner CSS class', () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelector('.deactive-owner')).not.toBeInTheDocument();
-      expect(container.querySelector('.guest-owner')).not.toBeInTheDocument();
+      const card = container.querySelector('[data-slot="card"]');
+      expect(card?.className).not.toContain('bg-danger');
+      expect(card?.className).not.toContain('bg-success');
     });
   });
 });
@@ -319,7 +322,8 @@ describe('OwnerListPage — delete button', () => {
       expect(screen.getByText('To Delete')).toBeInTheDocument();
     });
 
-    const deleteBtn = screen.getByRole('button', { name: /eliminar/i });
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    const deleteBtn = screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] });
     fireEvent.click(deleteBtn);
 
     await waitFor(() => {
@@ -391,7 +395,8 @@ describe('OwnerListPage — edit navigation', () => {
       expect(screen.getByText('Editable Owner')).toBeInTheDocument();
     });
 
-    const editBtn = screen.getByRole('button', { name: esMessages['OWNER.EDIT_OWNER'] });
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    const editBtn = screen.getByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] });
     fireEvent.click(editBtn);
 
     expect(mockNavigate).toHaveBeenCalledWith('/admin/owners/edit/o42');
@@ -457,9 +462,13 @@ describe('OwnerListPage — no approve/activate/deactivate buttons', () => {
       expect(screen.getByText(esMessages['OWNER.LIST_TITLE'])).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('button', { name: /aprobar|approve/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /activar|activate/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /desactivar|deactivate/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+
+    expect(screen.queryByRole('menuitem', { name: /aprobar|approve/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /activar|activate/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /desactivar|deactivate/i })).not.toBeInTheDocument();
+    // exactly Editar + Eliminar — no other menu items
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2);
   });
 });
 

@@ -1,0 +1,111 @@
+import { useState } from 'react';
+import { useIntl } from 'react-intl';
+import type { Owner } from '@store-mgmt/domain';
+import { Card } from '~/shared/components/ui/card';
+import { SettingsIcon } from '~/shared/components/ui/icons';
+
+interface OwnerCardListProps {
+  owners: Owner[];
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+/**
+ * Owner card grid at `/admin/owners`. L5 parity: shared Card chrome + a per-card gear action
+ * menu replace the old raw-div markup, mirroring `management/users/components/user-card-list.tsx`
+ * and `admin/stores/components/store-card-list.tsx`. Angular's `owners.component.html:31-59`
+ * gear menu also renders Approve/Activate/Deactivate, but those handlers are empty no-op stubs
+ * (`owners.component.ts:345-355`) — only Edit (routerLink, LIVE) and Delete (`deleteOwner`,
+ * LIVE ts:337, no confirm dialog) are wired here (Req: Owners Gear Menu — Live Actions Only).
+ */
+function getCardClass(owner: Owner): string {
+  if (!owner.isActive) return 'bg-danger/10 border border-danger';
+  if (!owner.approved) return 'bg-success/10 border border-success';
+  return '';
+}
+
+export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) {
+  const intl = useIntl();
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  function toggleMenu(id: string) {
+    setOpenMenuId((current) => (current === id ? null : id));
+  }
+
+  function handleEdit(id: string) {
+    onEdit(id);
+    setOpenMenuId(null);
+  }
+
+  function handleDelete(id: string) {
+    onDelete(id);
+    setOpenMenuId(null);
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {owners.map((owner) => {
+        const totalPrice = owner.storeModules.reduce(
+          (sum, m) => sum + m.storeModuleTotalCurrentPrice,
+          0
+        );
+        const storeCount = owner.storeModules.length;
+
+        return (
+          <Card key={owner.id} title={owner.fullName} className={getCardClass(owner)}>
+            <div className="space-y-2">
+              <p className="text-sm text-text-muted">
+                {intl.formatMessage({ id: 'OWNER.STORE_PRICE_LABEL' }, { count: storeCount })}
+                {' — '}
+                {intl.formatNumber(totalPrice, { style: 'currency', currency: 'USD' })}
+              </p>
+              <p className="text-sm text-text-muted">
+                {intl.formatMessage({ id: 'GENERAL.RESELLER' })}
+                {': '}
+                {owner.reSellerName || 'ADMIN'}
+              </p>
+              <p className="text-sm text-text-muted">{owner.cellPhone}</p>
+              {owner.email && <p className="text-sm text-text-muted">{owner.email}</p>}
+              {owner.description && <p className="text-sm text-text-muted">{owner.description}</p>}
+              <div className="relative flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => toggleMenu(owner.id)}
+                  aria-label="Acciones"
+                  className="rounded-full p-2 text-primary hover:bg-primary-light"
+                >
+                  <SettingsIcon />
+                </button>
+                {openMenuId === owner.id && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-10 mt-1 w-40 rounded-md border border-border bg-surface shadow-card"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleEdit(owner.id)}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-text hover:bg-primary-light"
+                    >
+                      {intl.formatMessage({ id: 'OWNER.EDIT_OWNER' })}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleDelete(owner.id)}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-danger hover:bg-danger/10"
+                    >
+                      {intl.formatMessage({ id: 'GENERAL.DELETE' })}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+export default OwnerCardList;
