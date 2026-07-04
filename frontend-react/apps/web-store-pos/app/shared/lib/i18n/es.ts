@@ -521,7 +521,6 @@ const messages: Record<string, string> = {
   'STORES.PAYMENT_START_DATE': 'Fecha de inicio de pago',
   'STORES.SAVE': 'Guardar',
   'STORES.SAVING': 'Guardando...',
-  'STORES.CREATE': 'Crear tienda',
   'STORES.EDIT': 'Editar',
   'STORES.ACTIVATE': 'Activar',
   'STORES.DEACTIVATE': 'Desactivar',
