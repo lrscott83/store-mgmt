@@ -176,7 +176,7 @@ export function ResellerEditPage() {
 
         <div>
           <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-            {formatMessage({ id: 'USERS.FULL_NAME' })}
+            {formatMessage({ id: 'GENERAL.FULL_NAME' })}
           </label>
           <input
             id="fullName"
@@ -233,7 +233,7 @@ export function ResellerEditPage() {
 
         <div>
           <label htmlFor="cellPhone" className="block text-sm font-medium text-gray-700">
-            {formatMessage({ id: 'USERS.CELL_PHONE' })}
+            {formatMessage({ id: 'GENERAL.CELL_PHONE' })}
           </label>
           <input
             id="cellPhone"
@@ -247,7 +247,7 @@ export function ResellerEditPage() {
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            {formatMessage({ id: 'USERS.EMAIL' })}
+            {formatMessage({ id: 'GENERAL.EMAIL' })}
           </label>
           <input
             id="email"
@@ -261,7 +261,7 @@ export function ResellerEditPage() {
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-            {formatMessage({ id: 'STORES.DESCRIPTION' })}
+            {formatMessage({ id: 'GENERAL.DESCRIPTION' })}
           </label>
           <input
             id="description"
@@ -277,7 +277,7 @@ export function ResellerEditPage() {
           disabled={!isDirty || isSubmitting}
           className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {formatMessage({ id: 'USERS.SAVE' })}
+          {formatMessage({ id: 'GENERAL.UPDATE' })}
         </button>
       </form>
     </div>

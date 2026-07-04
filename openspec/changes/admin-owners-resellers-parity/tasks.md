@@ -51,20 +51,20 @@ size:exception is PRE-ACCEPTED (user-approved co-slice). Commits-only on `feat/f
 
 ## Phase 3: Resellers L5 — Card Grid, Gear Menu, State CSS (Work Unit B1)
 
-- [ ] 3.1 RED: write `app/admin/resellers/components/__tests__/reseller-card-list.test.tsx` (IntlProvider-wrapped) — 3-col grid, `Card` per reseller with discount/phone/email/description, FAB reads `GENERAL.ADD` ("Adicionar" — **override 1**, not "Adicionar Gestor") and calls `onCreate`, gear menu shows **Editar only** (no Activar/Desactivar/Eliminar), `onEdit(id)` fires, `isActive=false` → `bg-danger`.
-- [ ] 3.2 GREEN: create `app/admin/resellers/components/reseller-card-list.tsx` (`ResellerCardList`) — FAB (`Button variant="fab"` + `PlusIcon`) bound to `GENERAL.ADD`, grid of `Card`, gear menu with only Edit (`GENERAL.EDIT`), `cardClass = isActive===false ? 'bg-danger/10 border border-danger' : ''`.
-- [ ] 3.3 GREEN: update `app/admin/resellers/routes/reseller-list.tsx` — delegate to `<ResellerCardList resellers onCreate onEdit />`, keep `loadResellers`/error logic, drop inline divs.
-- [ ] 3.4 RED→GREEN: update `app/admin/resellers/routes/__tests__/reseller-list.test.tsx` — migrate `.deactive-reSeller` container-query assertions to `bg-danger` on `[data-slot="card"]`; FAB-name lookup resolves to `GENERAL.ADD` value "Adicionar" (**not** "Adicionar Gestor"); title resolves to `RESELLERS.LIST_TITLE`="Gestores"; keep "no activate/deactivate/delete" assertion via gear-menu item count.
-- [ ] 3.5 Verify: `pnpm test -- reseller-card-list reseller-list` green.
+- [x] 3.1 RED: write `app/admin/resellers/components/__tests__/reseller-card-list.test.tsx` (IntlProvider-wrapped) — 3-col grid, `Card` per reseller with discount/phone/email/description, FAB reads `GENERAL.ADD` ("Adicionar" — **override 1**, not "Adicionar Gestor") and calls `onCreate`, gear menu shows **Editar only** (no Activar/Desactivar/Eliminar), `onEdit(id)` fires, `isActive=false` → `bg-danger`.
+- [x] 3.2 GREEN: create `app/admin/resellers/components/reseller-card-list.tsx` (`ResellerCardList`) — FAB (`Button variant="fab"` + `PlusIcon`) bound to `GENERAL.ADD`, grid of `Card`, gear menu with only Edit (`GENERAL.EDIT`), `cardClass = isActive===false ? 'bg-danger/10 border border-danger' : ''`.
+- [x] 3.3 GREEN: update `app/admin/resellers/routes/reseller-list.tsx` — delegate to `<ResellerCardList resellers onCreate onEdit />`, keep `loadResellers`/error logic, drop inline divs.
+- [x] 3.4 RED→GREEN: update `app/admin/resellers/routes/__tests__/reseller-list.test.tsx` — migrate `.deactive-reSeller` container-query assertions to `bg-danger` on `[data-slot="card"]`; FAB-name lookup resolves to `GENERAL.ADD` value "Adicionar" (**not** "Adicionar Gestor"); title resolves to `RESELLERS.LIST_TITLE`="Gestores"; keep "no activate/deactivate/delete" assertion via gear-menu item count.
+- [x] 3.5 Verify: `pnpm test -- reseller-card-list reseller-list` green.
 
 ## Phase 4: Resellers L6 — Text/i18n Parity incl. Overrides (Work Unit B2)
 
-- [ ] 4.1 GREEN: `app/shared/lib/i18n/es.ts` — set `RESELLERS.LIST_TITLE`="Gestores"; set `RESELLERS.CREATE_TITLE`="Adicionar Gestor" (create-page title only, per `RESELLER.ADD_RESELLER`); set `RESELLERS.ADD`="Adicionar" (**override 1** — was "Agregar revendedor", literal Angular `GENERAL.ADD`, in-place value change, no key rename); set `RESELLERS.PERCENT_DISCOUNT`="Porciento de descuento"; set `RESELLERS.DISCOUNT_PRICE`="Descuento".
-- [ ] 4.2 RED: update `app/admin/resellers/routes/__tests__/reseller-create.test.tsx` — create title asserts "Adicionar Gestor"; submit asserts `GENERAL.ADD`; field labels assert `GENERAL.*`.
-- [ ] 4.3 GREEN: `app/admin/resellers/routes/reseller-create.tsx` — repoint submit `USERS.SAVE`→`GENERAL.ADD`; fields `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
-- [ ] 4.4 RED: update `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx` — submit asserts `GENERAL.UPDATE` ("Actualizar"); field labels assert `GENERAL.*`; discount labels assert new values.
-- [ ] 4.5 GREEN: `app/admin/resellers/routes/reseller-edit.tsx` — repoint submit `USERS.SAVE`→`GENERAL.UPDATE`; fields `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
-- [ ] 4.6 Verify: `pnpm test -- reseller-create reseller-edit` green; confirm reseller LIST FAB text is literally "Adicionar" (not "Adicionar Gestor") and create-page title is "Adicionar Gestor".
+- [x] 4.1 GREEN: `app/shared/lib/i18n/es.ts` — set `RESELLERS.LIST_TITLE`="Gestores"; set `RESELLERS.CREATE_TITLE`="Adicionar Gestor" (create-page title only, per `RESELLER.ADD_RESELLER`); set `RESELLERS.ADD`="Adicionar" (**override 1** — was "Agregar revendedor", literal Angular `GENERAL.ADD`, in-place value change, no key rename); set `RESELLERS.PERCENT_DISCOUNT`="Porciento de descuento"; set `RESELLERS.DISCOUNT_PRICE`="Descuento".
+- [x] 4.2 RED: update `app/admin/resellers/routes/__tests__/reseller-create.test.tsx` — create title asserts "Adicionar Gestor"; submit asserts `GENERAL.ADD`; field labels assert `GENERAL.*`.
+- [x] 4.3 GREEN: `app/admin/resellers/routes/reseller-create.tsx` — repoint submit `USERS.SAVE`→`GENERAL.ADD`; fields `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
+- [x] 4.4 RED: update `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx` — submit asserts `GENERAL.UPDATE` ("Actualizar"); field labels assert `GENERAL.*`; discount labels assert new values.
+- [x] 4.5 GREEN: `app/admin/resellers/routes/reseller-edit.tsx` — repoint submit `USERS.SAVE`→`GENERAL.UPDATE`; fields `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
+- [x] 4.6 Verify: `pnpm test -- reseller-create reseller-edit` green; confirm reseller LIST FAB text is literally "Adicionar" (not "Adicionar Gestor") and create-page title is "Adicionar Gestor".
 
 ## Phase 5: Regression / i18n Sweep (Work Unit C)
 

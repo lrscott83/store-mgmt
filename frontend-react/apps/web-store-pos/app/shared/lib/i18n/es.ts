@@ -587,12 +587,16 @@ const messages: Record<string, string> = {
   'ADMIN_DASHBOARD.ERROR': 'Ocurrió un error. Intentá de nuevo.',
 
   // Admin — Resellers
-  'RESELLERS.LIST_TITLE': 'Revendedores',
-  'RESELLERS.ADD': 'Agregar revendedor',
-  'RESELLERS.CREATE_TITLE': 'Nuevo revendedor',
+  // admin-owners-resellers-parity (Stage 5 Admin), Phase 4 — LIST_TITLE/CREATE_TITLE
+  // match Angular MENU.RESELLERS / RESELLER.ADD_RESELLER; RESELLERS.ADD is a BINDING USER
+  // OVERRIDE (supersedes design ADR-5): the Angular reseller LIST FAB literally renders
+  // GENERAL.ADD ("Adicionar"), NOT "Adicionar Gestor" — that string is create-page-only.
+  'RESELLERS.LIST_TITLE': 'Gestores',
+  'RESELLERS.ADD': 'Adicionar',
+  'RESELLERS.CREATE_TITLE': 'Adicionar Gestor',
   'RESELLERS.EDIT_TITLE': 'Editar revendedor',
-  'RESELLERS.PERCENT_DISCOUNT': 'Descuento porcentual',
-  'RESELLERS.DISCOUNT_PRICE': 'Precio con descuento',
+  'RESELLERS.PERCENT_DISCOUNT': 'Porciento de descuento',
+  'RESELLERS.DISCOUNT_PRICE': 'Descuento',
   'RESELLERS.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'RESELLERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'RESELLERS.PHONE_FORMAT': 'El teléfono debe tener formato cubano (+53 X XXX-XXXX).',

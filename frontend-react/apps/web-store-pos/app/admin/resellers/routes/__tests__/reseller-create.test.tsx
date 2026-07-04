@@ -54,22 +54,22 @@ async function renderPage() {
 }
 
 function fillValidForm() {
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
     target: { value: 'Jane Doe' },
   });
   fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
     target: { value: 'janedoe' },
   });
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
     target: { value: 'Password1' },
   });
   fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
     target: { value: 'Password1' },
   });
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
     target: { value: '+53 5 123-4567' },
   });
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.EMAIL']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), {
     target: { value: 'jane@example.com' },
   });
 }
@@ -91,6 +91,19 @@ describe('ResellerCreatePage — exports', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-CREATE-1 — title matches Angular RESELLER.ADD_RESELLER value literally
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — title text parity (Req: Resellers L6 Text Parity)', () => {
+  it('renders the title "Adicionar Gestor" (Angular RESELLER.ADD_RESELLER, via RESELLERS.CREATE_TITLE)', async () => {
+    await renderPage();
+
+    expect(esMessages['RESELLERS.CREATE_TITLE']).toBe('Adicionar Gestor');
+    expect(screen.getByText('Adicionar Gestor')).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-RESELLERS-CREATE-2 — renders 7 fields
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -98,12 +111,12 @@ describe('ResellerCreatePage — fields', () => {
   it('renders fullName, login, password, confirmPassword, cellPhone, email, description fields', async () => {
     await renderPage();
 
-    expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     expect(screen.getByLabelText(esMessages['USERS.LOGIN'])).toBeInTheDocument();
-    expect(screen.getByLabelText(esMessages['USERS.PASSWORD'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.PASSWORD'])).toBeInTheDocument();
     expect(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD'])).toBeInTheDocument();
-    expect(screen.getByLabelText(esMessages['USERS.CELL_PHONE'])).toBeInTheDocument();
-    expect(screen.getByLabelText(esMessages['USERS.EMAIL'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.EMAIL'])).toBeInTheDocument();
     expect(screen.getByLabelText(/descripci/i)).toBeInTheDocument();
   });
 });
@@ -119,23 +132,23 @@ describe('ResellerCreatePage — password regex validation', () => {
     );
     await renderPage();
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Jane' },
     });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
       target: { value: 'jane' },
     });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
       target: { value: 'weak' }, // fails regex
     });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
       target: { value: 'weak' },
     });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
       target: { value: '+53 5 123-4567' },
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.PASSWORD_POLICY'])).toBeInTheDocument();
@@ -156,23 +169,23 @@ describe('ResellerCreatePage — password mismatch validation', () => {
     );
     await renderPage();
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Jane' },
     });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
       target: { value: 'jane' },
     });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
       target: { value: 'Password1' },
     });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
       target: { value: 'Password2' }, // mismatch
     });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
       target: { value: '+53 5 123-4567' },
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.PASSWORDS_MUST_MATCH'])).toBeInTheDocument();
@@ -193,23 +206,23 @@ describe('ResellerCreatePage — phone format validation', () => {
     );
     await renderPage();
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Jane' },
     });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
       target: { value: 'jane' },
     });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
       target: { value: 'Password1' },
     });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
       target: { value: 'Password1' },
     });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
       target: { value: '12345' }, // invalid phone
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.PHONE_FORMAT'])).toBeInTheDocument();
@@ -239,7 +252,7 @@ describe('ResellerCreatePage — successful submit', () => {
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(resellerHttpService.createReseller).toHaveBeenCalledWith(
@@ -276,7 +289,7 @@ describe('ResellerCreatePage — server-side error', () => {
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText('Login already exists')).toBeInTheDocument();
@@ -300,7 +313,7 @@ describe('ResellerCreatePage — HTTP throw', () => {
     await renderPage();
     fillValidForm();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
@@ -317,18 +330,18 @@ describe('ResellerCreatePage — submit disabled while pristine', () => {
   it('submit button is disabled on initial render (form pristine)', async () => {
     await renderPage();
 
-    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const submitBtn = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
     expect(submitBtn).toBeDisabled();
   });
 
   it('submit button becomes enabled after any field is changed', async () => {
     await renderPage();
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Jane' },
     });
 
-    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const submitBtn = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
     expect(submitBtn).not.toBeDisabled();
   });
 });
@@ -341,7 +354,7 @@ describe('ResellerCreatePage — unsaved changes guard', () => {
   it('calls useUnsavedChangesPrompt with truthy isDirty after typing', async () => {
     await renderPage();
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Typing something' },
     });
 

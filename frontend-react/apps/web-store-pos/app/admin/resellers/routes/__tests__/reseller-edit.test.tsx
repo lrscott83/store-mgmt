@@ -108,6 +108,60 @@ describe('ResellerEditPage — exports', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-EDIT-1 — submit reads GENERAL.UPDATE ("Actualizar"), not USERS.SAVE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — submit label parity (Req: Resellers L6 Text Parity)', () => {
+  it('submit button reads "Actualizar" (GENERAL.UPDATE), matching edit-reseller-details.component.html:101', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(esMessages['GENERAL.UPDATE']).toBe('Actualizar');
+      expect(screen.getByRole('button', { name: 'Actualizar' })).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-EDIT-2 — discount labels match Angular literal copy
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — discount label parity (Req: Resellers L6 Text Parity)', () => {
+  it('discount labels read "Porciento de descuento" / "Descuento"', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(esMessages['RESELLERS.PERCENT_DISCOUNT']).toBe('Porciento de descuento');
+      expect(esMessages['RESELLERS.DISCOUNT_PRICE']).toBe('Descuento');
+      expect(screen.getByLabelText('Porciento de descuento')).toBeInTheDocument();
+      expect(screen.getByLabelText('Descuento')).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-RESELLERS-EDIT-2 — loads by :id and pre-populates
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -135,7 +189,7 @@ describe('ResellerEditPage — load by id and pre-populate', () => {
     });
 
     await waitFor(() => {
-      const fullNameInput = screen.getByLabelText(esMessages['USERS.FULL_NAME']) as HTMLInputElement;
+      const fullNameInput = screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement;
       expect(fullNameInput.value).toBe('Pre-Populated Name');
     });
   });
@@ -188,10 +242,10 @@ describe('ResellerEditPage — login disabled', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(resellerHttpService.updateReseller).toHaveBeenCalled();
@@ -277,14 +331,14 @@ describe('ResellerEditPage — phone validation blocks PUT', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.CELL_PHONE'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE'])).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
       target: { value: 'badphone' },
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.PHONE_FORMAT'])).toBeInTheDocument();
@@ -321,10 +375,10 @@ describe('ResellerEditPage — successful update stays on page', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(resellerHttpService.updateReseller).toHaveBeenCalledWith(
@@ -373,10 +427,10 @@ describe('ResellerEditPage — server-side error', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText('Update failed on server')).toBeInTheDocument();
@@ -405,10 +459,10 @@ describe('ResellerEditPage — HTTP throw on update', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
@@ -437,10 +491,10 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const submitBtn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
     expect(submitBtn).toBeDisabled();
   });
 
@@ -459,14 +513,14 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Changed Name' },
     });
 
-    const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const submitBtn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
     expect(submitBtn).not.toBeDisabled();
   });
 
@@ -492,16 +546,16 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
     // Make it dirty
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Changed' },
     });
 
     // Submit
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     // After save, re-snapshot → button should be disabled again
     await waitFor(() => {
@@ -509,7 +563,7 @@ describe('ResellerEditPage — submit disabled while pristine', () => {
     });
 
     await waitFor(() => {
-      const submitBtn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+      const submitBtn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
       expect(submitBtn).toBeDisabled();
     });
   });
@@ -535,10 +589,10 @@ describe('ResellerEditPage — unsaved changes guard', () => {
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Changed Name' },
     });
 
