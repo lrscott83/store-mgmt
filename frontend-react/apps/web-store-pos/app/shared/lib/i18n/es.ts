@@ -613,7 +613,7 @@ const messages: Record<string, string> = {
   // Angular OWNER.ADD_OWNER (es.ts:474) — literal parity.
   'OWNER.CREATE_TITLE': 'Adicionar Propietario',
   'OWNER.EDIT_TITLE': 'Editar propietario',
-  'OWNER.EDIT_OWNER': 'Editar propietario',
+  'OWNER.EDIT_OWNER': 'Editar Propietario',
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
   'OWNER.ERROR': 'Ocurrió un error. Intentá de nuevo.',
   'OWNER.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
