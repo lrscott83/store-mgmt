@@ -115,6 +115,34 @@ describe('AdminStoreListPage — render', () => {
 
     expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
   });
+
+  it('renders the header FAB with the GENERAL.ADD label (Req: Store List Create Label Copy Parity)', async () => {
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    expect(
+      screen.getByRole('button', { name: esMessages['GENERAL.ADD'] })
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -128,7 +156,7 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
     );
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: true,
-      data: [makeStore({ id: 's1', name: 'Store One' })],
+      data: [makeStore({ id: 's1', name: 'Store One', approved: false })],
       message: '',
       actionCode: 0,
       errors: [],

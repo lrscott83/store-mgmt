@@ -75,7 +75,7 @@ export function AdminStoreListPage() {
         <h1 className="text-xl font-semibold">{formatMessage({ id: 'STORES.LIST_TITLE' })}</h1>
         <Button variant="fab" onClick={() => navigate('/management/stores/create')}>
           <PlusIcon />
-          {formatMessage({ id: 'STORES.CREATE' })}
+          {formatMessage({ id: 'GENERAL.ADD' })}
         </Button>
       </div>
 
