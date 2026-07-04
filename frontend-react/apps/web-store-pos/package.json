@@ -17,6 +17,7 @@
     "@react-router/serve": "^7.7.1",
     "@store-mgmt/domain": "workspace:*",
     "@store-mgmt/web-common": "workspace:*",
+    "@zip.js/zip.js": "^2.8.26",
     "@zxing/browser": "^0.2.0",
     "axios": "^1.7.9",
     "cookie": "^1.0.1",

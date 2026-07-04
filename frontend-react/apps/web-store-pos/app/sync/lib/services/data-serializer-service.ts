@@ -1,4 +1,12 @@
-import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import {
+  BlobReader,
+  BlobWriter,
+  TextReader,
+  TextWriter,
+  ZipReader,
+  ZipWriter,
+  configure,
+} from '@zip.js/zip.js';
 import type {
   ProductCategory,
   Product,
@@ -7,6 +15,17 @@ import type {
   Expense,
   SaleCredit,
 } from '@store-mgmt/domain';
+
+// ---------------------------------------------------------------------------
+// zip.js runtime configuration
+// ---------------------------------------------------------------------------
+//
+// zip.js defaults to offloading (de)compression to a Web Worker. That worker
+// script needs a bundler-aware `Worker` global, which is unavailable under
+// Vitest/jsdom (and irrelevant for SSR). Disabling it does not change the
+// produced ZIP bytes/format — it is purely an execution-strategy setting —
+// so it has no effect on Angular interop.
+configure({ useWebWorkers: false });
 
 // ---------------------------------------------------------------------------
 // Error types
@@ -29,22 +48,21 @@ export class CorruptFileError extends Error {
 }
 
 // ---------------------------------------------------------------------------
-// Envelope types
+// Angular-compatible entry names (data.file.model.ts EDataFileName parity)
 // ---------------------------------------------------------------------------
 
-export interface SyncEnvelope {
-  version: 1;
-  exportedAt: string;
-  storeId: string;
-  entities: {
-    categories: ProductCategory[];
-    products: Product[];
-    inventoryEntries: InventoryEntry[];
-    orders: Order[];
-    expenses: Expense[];
-    saleCredits: SaleCredit[];
-  };
-}
+const ENTRY_NAMES = {
+  categories: 'categories.json',
+  products: 'products.json',
+  inventoryEntries: 'inventory-entries.json',
+  orders: 'orders.json',
+  expenses: 'expenses.json',
+  saleCredits: 'sale-credits.json',
+} as const;
+
+// ---------------------------------------------------------------------------
+// Parsed data shape
+// ---------------------------------------------------------------------------
 
 export interface ParsedData {
   categories: ProductCategory[];
@@ -84,52 +102,38 @@ export interface SaleCreditReader {
 }
 
 // ---------------------------------------------------------------------------
-// Crypto constants
-// ---------------------------------------------------------------------------
-
-const PBKDF2_ITERATIONS = 210_000;
-const SALT_BYTES = 16;
-const IV_BYTES = 12;
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function flattenInventoryMap(map: Map<string, InventoryEntry[]>): InventoryEntry[] {
-  const result: InventoryEntry[] = [];
-  for (const entries of map.values()) {
-    result.push(...entries);
-  }
-  return result;
+function toMapEntriesJson<T>(items: T[], idOf: (item: T) => string): string {
+  return JSON.stringify(items.map((item) => [idOf(item), item]));
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveKey'],
-  );
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt,
-      iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  );
+function parseJson<T>(contents: Map<string, string>, name: string, fallback: T): T {
+  const raw = contents.get(name);
+  if (raw === undefined) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new CorruptFileError(`Invalid JSON in ${name}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // DataSerializerService
 // ---------------------------------------------------------------------------
 
+/**
+ * Angular-compatible sync backup serializer.
+ *
+ * Matches `frontend/src/app/application/synchronization/data-serializer.service.ts`
+ * 1:1: a ZIP with 6 separate password-AES JSON entries (WinZip AE spec, zip.js
+ * default AES-256/AE-2 — no explicit `encryptionStrength` override), the
+ * decryption password being `password + selectedStoreId` (plain concatenation,
+ * no separator). This is parity BY FORMAT AND LOGIC SPECIFICATION — React never
+ * imports a real Angular-exported archive (see engram decision #645); the gate
+ * is self round-trip + entry-name/shape assertions against the documented format.
+ */
 export class DataSerializerService {
   constructor(
     private readonly storeId: string,
@@ -141,124 +145,99 @@ export class DataSerializerService {
     private readonly saleCreditReader: SaleCreditReader,
   ) {}
 
+  private derivePassword(password: string): string {
+    // Angular: `password + this.authService.currentUserValue.selectedStoreId`.
+    // Plain concatenation, password first, NO separator.
+    return password + this.storeId;
+  }
+
   /**
-   * Reads all 6 entities, wraps them in a uniform envelope, zips with fflate,
-   * then encrypts with AES-GCM (PBKDF2/SHA-256, 210k iterations).
-   * Returns: [salt(16)][iv(12)][AES-GCM ciphertext+tag]
+   * Reads all 6 entities and writes them as separate password-AES JSON
+   * entries in a single ZIP, matching Angular's `serializeEncryptedZip`.
    */
   async export(password: string): Promise<Uint8Array> {
-    // 1. Collect entities
     const categories = this.categoryReader.getAll();
     const products = this.productReader.getAll();
-    const inventoryEntries = flattenInventoryMap(this.inventoryRepo.getAll(this.storeId));
+    const inventoryMap = this.inventoryRepo.getAll(this.storeId);
     const orders = this.orderReader.getAll();
     const expenses = this.expenseReader.getAll();
     const saleCredits = this.saleCreditReader.getAll();
 
-    // 2. Build uniform envelope
-    const envelope: SyncEnvelope = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      storeId: this.storeId,
-      entities: { categories, products, inventoryEntries, orders, expenses, saleCredits },
-    };
+    const categoriesJson = toMapEntriesJson(categories, (c) => c.id);
+    const productsJson = toMapEntriesJson(products, (p) => p.id);
+    const inventoryJson = JSON.stringify(Array.from(inventoryMap.entries()));
+    const ordersJson = JSON.stringify(orders);
+    const expensesJson = JSON.stringify(expenses);
+    const saleCreditsJson = JSON.stringify(saleCredits);
 
-    // 3. ZIP the envelope (single JSON file for simplicity — envelope contains all)
-    const jsonBytes = strToU8(JSON.stringify(envelope));
-    const zipped = zipSync({ 'sync-data.json': jsonBytes });
+    const zipWriter = new ZipWriter(new BlobWriter('application/zip'), {
+      password: this.derivePassword(password),
+    });
 
-    // 4. Derive AES-GCM key with random salt
-    const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-    const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-    const key = await deriveKey(password, salt);
+    await zipWriter.add(ENTRY_NAMES.categories, new TextReader(categoriesJson));
+    await zipWriter.add(ENTRY_NAMES.products, new TextReader(productsJson));
+    await zipWriter.add(ENTRY_NAMES.inventoryEntries, new TextReader(inventoryJson));
+    await zipWriter.add(ENTRY_NAMES.orders, new TextReader(ordersJson));
+    await zipWriter.add(ENTRY_NAMES.expenses, new TextReader(expensesJson));
+    await zipWriter.add(ENTRY_NAMES.saleCredits, new TextReader(saleCreditsJson));
 
-    // 5. Encrypt the zipped bytes
-    const ciphertext = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      zipped,
-    );
-
-    // 6. Prepend [salt(16)][iv(12)] to the ciphertext+tag
-    const header = new Uint8Array(SALT_BYTES + IV_BYTES);
-    header.set(salt, 0);
-    header.set(iv, SALT_BYTES);
-
-    const cipherBytes = new Uint8Array(ciphertext);
-    const result = new Uint8Array(header.byteLength + cipherBytes.byteLength);
-    result.set(header, 0);
-    result.set(cipherBytes, header.byteLength);
-
-    return result;
+    const blob = await zipWriter.close();
+    return new Uint8Array(await blob.arrayBuffer());
   }
 
   /**
-   * Decrypts the payload (AES-GCM), unzips, parses the envelope.
-   * Throws WrongPasswordError on auth-tag failure before any write.
-   * Throws CorruptFileError on bad envelope shape.
+   * Decrypts and parses all 6 entries, matching Angular's
+   * `deserializeEncryptedZip`. Throws WrongPasswordError/CorruptFileError
+   * before returning — no repository write ever happens inside this method.
    */
   async import(payload: Uint8Array, password: string): Promise<ParsedData> {
-    // 1. Slice header
-    const salt = payload.slice(0, SALT_BYTES);
-    const iv = payload.slice(SALT_BYTES, SALT_BYTES + IV_BYTES);
-    const cipher = payload.slice(SALT_BYTES + IV_BYTES);
+    const blob = new Blob([payload]);
+    const zipReader = new ZipReader(new BlobReader(blob), {
+      password: this.derivePassword(password),
+    });
 
-    // 2. Derive key from password + salt
-    const key = await deriveKey(password, salt);
-
-    // 3. Decrypt — auth-tag failure → WrongPasswordError (no writes happen before this)
-    let zipped: ArrayBuffer;
+    let entries: Awaited<ReturnType<typeof zipReader.getEntries>>;
     try {
-      zipped = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'OperationError') {
-        throw new WrongPasswordError();
-      }
-      throw new WrongPasswordError('Decryption failed');
-    }
-
-    // 4. Unzip
-    let unzipped: ReturnType<typeof unzipSync>;
-    try {
-      unzipped = unzipSync(new Uint8Array(zipped));
+      entries = await zipReader.getEntries();
     } catch {
       throw new CorruptFileError('ZIP extraction failed');
     }
 
-    // 5. Parse envelope
-    const jsonFile = unzipped['sync-data.json'];
-    if (!jsonFile) {
-      throw new CorruptFileError('Missing sync-data.json in archive');
-    }
-
-    let envelope: unknown;
+    const contents = new Map<string, string>();
     try {
-      envelope = JSON.parse(strFromU8(jsonFile));
-    } catch {
-      throw new CorruptFileError('Invalid JSON in archive');
+      for (const entry of entries) {
+        if (entry.directory || !entry.getData) continue;
+        const text = await entry.getData(new TextWriter());
+        contents.set(entry.filename, text);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Invalid password') {
+        throw new WrongPasswordError();
+      }
+      throw new WrongPasswordError('Decryption failed');
+    } finally {
+      await zipReader.close();
     }
 
-    // 6. Validate envelope shape
-    if (
-      typeof envelope !== 'object' ||
-      envelope === null ||
-      (envelope as SyncEnvelope).version !== 1 ||
-      typeof (envelope as SyncEnvelope).entities !== 'object' ||
-      (envelope as SyncEnvelope).entities === null
-    ) {
-      throw new CorruptFileError('Invalid envelope version or missing entities');
-    }
-
-    const env = envelope as SyncEnvelope;
-    const ent = env.entities;
+    const categoryEntries = parseJson<[string, ProductCategory][]>(
+      contents,
+      ENTRY_NAMES.categories,
+      [],
+    );
+    const productEntries = parseJson<[string, Product][]>(contents, ENTRY_NAMES.products, []);
+    const inventoryEntryTuples = parseJson<[string, InventoryEntry[]][]>(
+      contents,
+      ENTRY_NAMES.inventoryEntries,
+      [],
+    );
 
     return {
-      categories: Array.isArray(ent.categories) ? ent.categories : [],
-      products: Array.isArray(ent.products) ? ent.products : [],
-      inventoryEntries: Array.isArray(ent.inventoryEntries) ? ent.inventoryEntries : [],
-      orders: Array.isArray(ent.orders) ? ent.orders : [],
-      expenses: Array.isArray(ent.expenses) ? ent.expenses : [],
-      saleCredits: Array.isArray(ent.saleCredits) ? ent.saleCredits : [],
+      categories: categoryEntries.map(([, category]) => category),
+      products: productEntries.map(([, product]) => product),
+      inventoryEntries: inventoryEntryTuples.flatMap(([, entriesForProduct]) => entriesForProduct),
+      orders: parseJson<Order[]>(contents, ENTRY_NAMES.orders, []),
+      expenses: parseJson<Expense[]>(contents, ENTRY_NAMES.expenses, []),
+      saleCredits: parseJson<SaleCredit[]>(contents, ENTRY_NAMES.saleCredits, []),
     };
   }
 }
