@@ -147,8 +147,8 @@ describe('ResellerListPage — render and card fields', () => {
 // S-ADMIN-RESELLERS-LIST-3 — deactive-reSeller CSS class on inactive
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('ResellerListPage — deactive-reSeller class', () => {
-  it('applies deactive-reSeller class when isActive is false', async () => {
+describe('ResellerListPage — bg-danger state indicator', () => {
+  it('applies bg-danger indicator when isActive is false', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
@@ -171,11 +171,11 @@ describe('ResellerListPage — deactive-reSeller class', () => {
       expect(screen.getByText('Inactive Bob')).toBeInTheDocument();
     });
 
-    const card = container.querySelector('.deactive-reSeller');
-    expect(card).toBeInTheDocument();
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card?.className).toContain('bg-danger');
   });
 
-  it('does NOT apply deactive-reSeller class when isActive is true', async () => {
+  it('does NOT apply bg-danger indicator when isActive is true', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
@@ -198,8 +198,8 @@ describe('ResellerListPage — deactive-reSeller class', () => {
       expect(screen.getByText('Active Ana')).toBeInTheDocument();
     });
 
-    const card = container.querySelector('.deactive-reSeller');
-    expect(card).not.toBeInTheDocument();
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card?.className).not.toContain('bg-danger');
   });
 });
 
@@ -207,8 +207,8 @@ describe('ResellerListPage — deactive-reSeller class', () => {
 // S-ADMIN-RESELLERS-LIST-4 — Add button → navigate /admin/resellers/create
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('ResellerListPage — Add button navigation', () => {
-  it('navigates to /admin/resellers/create when Add button is clicked', async () => {
+describe('ResellerListPage — FAB navigation (Req: Resellers L6 Text Parity, override 1)', () => {
+  it('navigates to /admin/resellers/create when the FAB (GENERAL.ADD = "Adicionar") is clicked', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
@@ -231,7 +231,8 @@ describe('ResellerListPage — Add button navigation', () => {
       expect(screen.getByText(esMessages['RESELLERS.LIST_TITLE'])).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['RESELLERS.ADD'] }));
+    expect(esMessages['GENERAL.ADD']).toBe('Adicionar');
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }));
     expect(mockNavigate).toHaveBeenCalledWith('/admin/resellers/create');
   });
 });
@@ -240,8 +241,8 @@ describe('ResellerListPage — Add button navigation', () => {
 // S-ADMIN-RESELLERS-LIST-5 — Edit button → navigate /admin/resellers/edit/:id
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('ResellerListPage — Edit button navigation', () => {
-  it('navigates to /admin/resellers/edit/:id when Edit is clicked', async () => {
+describe('ResellerListPage — Edit menu item navigation (Req: Resellers Gear Menu — Edit Only)', () => {
+  it('navigates to /admin/resellers/edit/:id when Editar is clicked via the gear menu', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
@@ -264,7 +265,8 @@ describe('ResellerListPage — Edit button navigation', () => {
       expect(screen.getByText('Edit Me')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['USERS.EDIT'] }));
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.EDIT'] }));
     expect(mockNavigate).toHaveBeenCalledWith('/admin/resellers/edit/r42');
   });
 });
@@ -297,8 +299,8 @@ describe('ResellerListPage — error state', () => {
 // S-ADMIN-RESELLERS-LIST-7 — NO activate/deactivate/delete buttons
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('ResellerListPage — no activate/deactivate/delete buttons', () => {
-  it('does NOT render Activate, Deactivate, or Delete buttons', async () => {
+describe('ResellerListPage — no activate/deactivate/delete menu items', () => {
+  it('gear menu shows exactly one item (Editar) — no Activar/Desactivar/Eliminar', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
@@ -321,10 +323,12 @@ describe('ResellerListPage — no activate/deactivate/delete buttons', () => {
       expect(screen.getByText('Only Reseller')).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('button', { name: esMessages['USERS.ACTIVATE'] })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: esMessages['USERS.DEACTIVATE'] })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /eliminar|delete/i })
-    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+    expect(screen.getByRole('menuitem', { name: esMessages['GENERAL.EDIT'] })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /activar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /desactivar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /eliminar/i })).not.toBeInTheDocument();
   });
 });
