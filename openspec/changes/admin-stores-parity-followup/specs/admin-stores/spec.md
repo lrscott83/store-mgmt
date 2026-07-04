@@ -1,57 +1,12 @@
-# Spec: Admin → Stores Parity
+# Delta for admin-stores
 
-**Capability**: React `app/admin/stores/**`  
-**Source of Truth**: Angular `frontend/src/app/admin/stores/store-list/**`  
-**Status**: Stage 5 (admin-stores-parity-followup)
+Followup to Stage 4 (`management-stores-parity`, archived). Closes 3 residual gaps in `store-card-list.tsx` per Angular `store-list.component.html:27-39`. Angular is the sole source of truth.
 
----
-
-## Requirements
-
-### Requirement: Approve/Disapprove Require Confirmation
-
-Approve and Disapprove actions on a store card MUST trigger a confirmation dialog before executing the HTTP call. The dialog MUST use the shared confirmDialog (from `shared/lib/blocking-alert.ts`).
-
-- **Approve Dialog**: Title "Confirmación para aprobar", Message "¿Está seguro que desea aprobar esta tienda?"
-- **Disapprove Dialog**: Title "Confirmación para desaprobar", Message "¿Está seguro que desea desaprobar esta tienda?"
-- Confirmed ("Si") → Issue HTTP call + reload list
-- Cancelled ("No") → No HTTP call; status unchanged
-
-#### Scenario: Approve triggers confirmation
-- GIVEN a super-admin views a store card
-- WHEN the user clicks Approve
-- THEN a confirmation dialog appears with the approve title and message
-- AND if confirmed, the HTTP call executes
-
-#### Scenario: Disapprove triggers confirmation
-- GIVEN a super-admin views a store card
-- WHEN the user clicks Disapprove
-- THEN a confirmation dialog appears with the disapprove title and message
-- AND if confirmed, the HTTP call executes
-
-#### Scenario: Cancelled confirmation does not execute call
-- GIVEN a confirmation dialog is open
-- WHEN the user clicks "No" (Cancel)
-- THEN no HTTP call is made
-- AND the store status remains unchanged
-
----
-
-### Requirement: Confirm-Dialog Copy Parity
-
-The confirmation dialogs for approve and disapprove actions MUST use exact Spanish copy matching the Angular implementation. Button text MUST reuse the shared `GENERAL.YES` ("Si") and `GENERAL.NO` ("No") keys.
-
-#### Scenario: Dialog buttons use GENERAL.YES and GENERAL.NO
-- GIVEN a confirm dialog is displayed
-- WHEN the user sees the buttons
-- THEN the confirm button reads "Si" (from GENERAL.YES)
-- AND the cancel button reads "No" (from GENERAL.NO)
-
----
+## MODIFIED Requirements
 
 ### Requirement: Card-Grid List Uses Shared Chrome
-
 The sole lifecycle list at `/admin/stores` MUST render as a Card grid using shared `Card`/`Button` components and icons, replacing raw table markup. Each card MUST show Approve XOR Disapprove — never both — based on `store.approved`: unapproved stores (`approved=false`) show only Approve; approved stores (`approved=true`) show only Disapprove. Activate/Deactivate controls MUST NOT render.
+(Previously: rendered both Approve and Disapprove buttons unconditionally, with no exclusivity by approval state.)
 
 #### Scenario: Grid renders with shared components
 - GIVEN a super-admin visits `/admin/stores`
@@ -70,10 +25,9 @@ The sole lifecycle list at `/admin/stores` MUST render as a Card grid using shar
 - THEN only the Approve button is shown
 - AND clicking it invokes `onApprove(store.id)`
 
----
+## ADDED Requirements
 
 ### Requirement: Store Card Visual Lifecycle State
-
 Each store card MUST reflect lifecycle state via a state className, matching the `owner-card-list.tsx getCardClass` convention. Inactive state (`isActive=false`) MUST render the danger style (`bg-danger/10 border border-danger`). Unapproved-but-active state (`approved=false`, `isActive=true`) MUST render the success/highlight style (`bg-success/10 border border-success`). A normal store (`isActive=true`, `approved=true`) MUST render no extra state class. When a store is both inactive and unapproved, the inactive (danger) style MUST take precedence.
 
 #### Scenario: Inactive store shows danger style
@@ -96,10 +50,7 @@ Each store card MUST reflect lifecycle state via a state className, matching the
 - WHEN its card renders
 - THEN only the danger state class is applied, not the success class
 
----
-
 ### Requirement: Store List Create Label Copy Parity
-
 The store list's create/add action MUST display the literal text "Adicionar", matching Angular's `GENERAL.ADD` key usage (`store-list.component.html`), replacing the prior "Crear tienda" copy.
 
 #### Scenario: Create label reads Adicionar
