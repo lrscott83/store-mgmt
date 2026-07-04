@@ -2,6 +2,10 @@ import { useState, useRef } from 'react';
 import { useIntl } from 'react-intl';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
 import { WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
+import { Card } from '~/shared/components/ui/card';
+import { Button } from '~/shared/components/ui/button';
+import { InfoBox } from '~/shared/components/ui/info-box';
+import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 
 export interface ImportFormProps {
   /**
@@ -21,6 +25,7 @@ export function ImportForm({ onImport }: ImportFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<SyncResult | null>(null);
@@ -60,7 +65,9 @@ export function ImportForm({ onImport }: ImportFormProps) {
       } else if (err instanceof CorruptFileError) {
         setError(intl.formatMessage({ id: 'SYNC.ERROR_CORRUPT_FILE' }));
       } else {
-        setError(err instanceof Error ? err.message : intl.formatMessage({ id: 'GENERAL.ERROR' }));
+        // Non-typed/unexpected error: never surface a raw err.message, always
+        // a translated catch-all (Stage 6 Slice B — Translated Error Fallback).
+        setError(intl.formatMessage({ id: 'SYNC.ERROR_UNEXPECTED' }));
       }
     } finally {
       setBusy(false);
@@ -68,75 +75,75 @@ export function ImportForm({ onImport }: ImportFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label
-          htmlFor="import-file"
-          className="block text-sm font-medium text-gray-700"
-        >
-          {intl.formatMessage({ id: 'SYNC.FILE_LABEL' })}
-        </label>
-        <input
-          id="import-file"
-          ref={fileInputRef}
-          type="file"
-          accept=".zip"
-          onChange={handleFileChange}
-          disabled={busy}
-          className="mt-1 block w-full text-sm text-gray-700 disabled:opacity-60"
-        />
-      </div>
-
-      <div>
-        <label
-          htmlFor="import-password"
-          className="block text-sm font-medium text-gray-700"
-        >
-          {intl.formatMessage({ id: 'SYNC.PASSWORD_LABEL' })}
-        </label>
-        <input
-          id="import-password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={busy}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-        />
-      </div>
-
-      {error && (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
-      >
-        {busy
-          ? intl.formatMessage({ id: 'SYNC.IMPORTING' })
-          : intl.formatMessage({ id: 'SYNC.IMPORT_BUTTON' })}
-      </button>
-
-      {result && (
-        <div className="rounded border bg-green-50 p-4">
-          <h2 className="mb-2 text-sm font-semibold text-green-800">
-            {intl.formatMessage({ id: 'SYNC.SUCCESS_TITLE' })}
-          </h2>
-          <ul className="space-y-1 text-sm text-green-700">
-            {result.merges.map((r) => (
-              <li key={r.entity}>
-                <span className="font-medium">{r.entity}</span>:{' '}
-                {intl.formatMessage({ id: 'SYNC.RESULT_INSERTED' }, { count: r.inserted })},{' '}
-                {intl.formatMessage({ id: 'SYNC.RESULT_UPDATED' }, { count: r.updated })}
-              </li>
-            ))}
-          </ul>
+    <Card title={intl.formatMessage({ id: 'SYNC.IMPORT_TITLE' })}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="import-file" className="block text-sm font-medium text-text">
+            {intl.formatMessage({ id: 'SYNC.FILE_LABEL' })}
+          </label>
+          <input
+            id="import-file"
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            onChange={handleFileChange}
+            disabled={busy}
+            className="mt-1 block w-full text-sm text-text disabled:opacity-60"
+          />
         </div>
-      )}
-    </form>
+
+        <div>
+          <label htmlFor="import-password" className="block text-sm font-medium text-text">
+            {intl.formatMessage({ id: 'SYNC.PASSWORD_LABEL' })}
+          </label>
+          <div className="relative mt-1">
+            <input
+              id="import-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={busy}
+              className="block w-full rounded border border-border px-3 py-2 pr-10 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={intl.formatMessage({
+                id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+              })}
+              className="absolute inset-y-0 right-0 flex items-center px-2 text-text-muted hover:text-text"
+            >
+              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
+        {error && <InfoBox variant="danger">{error}</InfoBox>}
+
+        <Button type="submit" variant="fab" disabled={busy}>
+          {busy
+            ? intl.formatMessage({ id: 'SYNC.IMPORTING' })
+            : intl.formatMessage({ id: 'SYNC.IMPORT_BUTTON' })}
+        </Button>
+
+        {result && (
+          <InfoBox variant="primary">
+            <h2 className="mb-2 text-sm font-semibold">
+              {intl.formatMessage({ id: 'SYNC.SUCCESS_TITLE' })}
+            </h2>
+            <ul className="space-y-1 text-sm">
+              {result.merges.map((r) => (
+                <li key={r.entity}>
+                  <span className="font-medium">{r.entity}</span>:{' '}
+                  {intl.formatMessage({ id: 'SYNC.RESULT_INSERTED' }, { count: r.inserted })},{' '}
+                  {intl.formatMessage({ id: 'SYNC.RESULT_UPDATED' }, { count: r.updated })}
+                </li>
+              ))}
+            </ul>
+          </InfoBox>
+        )}
+      </form>
+    </Card>
   );
 }
 

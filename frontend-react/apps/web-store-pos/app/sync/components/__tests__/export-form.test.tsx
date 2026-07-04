@@ -93,6 +93,80 @@ describe('ExportForm — S-EXPORT-3: onExport called and no error on success', (
   });
 });
 
+describe('ExportForm — S-EXPORT-5: shared UI kit (Card/Button fab/InfoBox)', () => {
+  it('renders the title via a Card header (SYNC.EXPORT_TITLE)', () => {
+    const onExport = vi.fn().mockResolvedValue(undefined);
+    render(
+      <Wrapper>
+        <ExportForm onExport={onExport} />
+      </Wrapper>,
+    );
+    const card = screen.getByText('Exportar datos').closest('[data-slot="card"]');
+    expect(card).not.toBeNull();
+  });
+
+  it('renders the submit button with the fab style (rounded-full)', () => {
+    const onExport = vi.fn().mockResolvedValue(undefined);
+    render(
+      <Wrapper>
+        <ExportForm onExport={onExport} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: /exportar/i }).className).toContain('rounded-full');
+  });
+
+  it('renders the empty-password error inside an InfoBox banner', () => {
+    const onExport = vi.fn().mockResolvedValue(undefined);
+    render(
+      <Wrapper>
+        <ExportForm onExport={onExport} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /exportar/i }));
+    const banner = screen.getByText(/La contraseña no puede estar vacía/i);
+    expect(banner.closest('[role="status"]')).not.toBeNull();
+  });
+});
+
+describe('ExportForm — S-EXPORT-6: password show/hide toggle', () => {
+  it('toggles the password input between hidden and visible text', () => {
+    const onExport = vi.fn().mockResolvedValue(undefined);
+    render(
+      <Wrapper>
+        <ExportForm onExport={onExport} />
+      </Wrapper>,
+    );
+    const input = screen.getByLabelText(/contraseña de cifrado/i) as HTMLInputElement;
+    expect(input.type).toBe('password');
+
+    fireEvent.click(screen.getByRole('button', { name: /mostrar contraseña/i }));
+    expect(input.type).toBe('text');
+
+    fireEvent.click(screen.getByRole('button', { name: /ocultar contraseña/i }));
+    expect(input.type).toBe('password');
+  });
+});
+
+describe('ExportForm — S-EXPORT-7: unexpected error shows translated catch-all', () => {
+  it('shows SYNC.ERROR_UNEXPECTED, never a raw err.message, on an unexpected error', async () => {
+    const onExport = vi.fn().mockRejectedValue(new Error('raw boom, do not leak me'));
+    render(
+      <Wrapper>
+        <ExportForm onExport={onExport} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText(/contraseña de cifrado/i), {
+      target: { value: 'secret123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /exportar/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Ocurrió un error inesperado/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/raw boom/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('ExportForm — S-EXPORT-4: loading state', () => {
   it('disables the button and shows loading text while exporting', async () => {
     let resolveExport!: (v: Uint8Array) => void;

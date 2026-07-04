@@ -1,4 +1,3 @@
-import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -14,7 +13,6 @@ import { ExportForm } from '~/sync/components/export-form';
 export const clientLoader = featureLoader([EFeatures.Send]);
 
 export function ExportPage() {
-  const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   async function handleExport(password: string): Promise<Uint8Array> {
@@ -65,10 +63,7 @@ export function ExportPage() {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'SYNC.EXPORT_TITLE' })}
-      </h1>
+    <div className="p-4">
       <ExportForm onExport={handleExport} />
     </div>
   );

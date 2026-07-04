@@ -653,6 +653,9 @@ const messages: Record<string, string> = {
   'SYNC.ERROR_CORRUPT_FILE': 'El archivo está dañado o tiene un formato no compatible.',
   'SYNC.ERROR_EMPTY_PASSWORD': 'La contraseña no puede estar vacía.',
   'SYNC.ERROR_NO_FILE': 'Seleccioná un archivo de respaldo.',
+  'SYNC.ERROR_UNEXPECTED': 'Ocurrió un error inesperado. Intentalo de nuevo.',
+  'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
+  'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
 };
 
 export default messages;

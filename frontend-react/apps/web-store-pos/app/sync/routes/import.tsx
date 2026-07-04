@@ -1,4 +1,3 @@
-import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -18,7 +17,6 @@ import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
 export const clientLoader = featureLoader([EFeatures.Receive]);
 
 export function ImportPage() {
-  const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   /**
@@ -83,10 +81,7 @@ export function ImportPage() {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      <h1 className="text-xl font-semibold">
-        {intl.formatMessage({ id: 'SYNC.IMPORT_TITLE' })}
-      </h1>
+    <div className="p-4">
       <ImportForm onImport={handleImport} />
     </div>
   );

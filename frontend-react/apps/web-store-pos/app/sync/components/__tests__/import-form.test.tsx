@@ -156,6 +156,94 @@ describe('ImportForm — S-IMPORT-5: corrupt-file error + no writes', () => {
   });
 });
 
+describe('ImportForm — S-IMPORT-7: shared UI kit (Card/Button fab/InfoBox)', () => {
+  it('renders the title via a Card header (SYNC.IMPORT_TITLE)', () => {
+    const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
+    render(
+      <Wrapper>
+        <ImportForm onImport={onImport} />
+      </Wrapper>,
+    );
+    const card = screen.getByText('Importar datos').closest('[data-slot="card"]');
+    expect(card).not.toBeNull();
+  });
+
+  it('renders the submit button with the fab style (rounded-full)', () => {
+    const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
+    render(
+      <Wrapper>
+        <ImportForm onImport={onImport} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: /importar/i }).className).toContain('rounded-full');
+  });
+
+  it('renders the success result inside an InfoBox banner', async () => {
+    const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
+    render(
+      <Wrapper>
+        <ImportForm onImport={onImport} />
+      </Wrapper>,
+    );
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(fileInput, 'files', { value: [makeZipFile()], configurable: true });
+    fireEvent.change(fileInput);
+    fireEvent.change(screen.getByLabelText(/contraseña de cifrado/i), {
+      target: { value: 'secret123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /importar/i }));
+
+    await waitFor(() => {
+      const banner = screen.getByText(/Importación completada/i);
+      expect(banner.closest('[role="status"]')).not.toBeNull();
+    });
+  });
+});
+
+describe('ImportForm — S-IMPORT-8: password show/hide toggle', () => {
+  it('toggles the password input between hidden and visible text', () => {
+    const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
+    render(
+      <Wrapper>
+        <ImportForm onImport={onImport} />
+      </Wrapper>,
+    );
+    const input = screen.getByLabelText(/contraseña de cifrado/i) as HTMLInputElement;
+    expect(input.type).toBe('password');
+
+    fireEvent.click(screen.getByRole('button', { name: /mostrar contraseña/i }));
+    expect(input.type).toBe('text');
+
+    fireEvent.click(screen.getByRole('button', { name: /ocultar contraseña/i }));
+    expect(input.type).toBe('password');
+  });
+});
+
+describe('ImportForm — S-IMPORT-9: unexpected error shows translated catch-all', () => {
+  it('shows SYNC.ERROR_UNEXPECTED, never a raw err.message, on an unexpected error', async () => {
+    const onImport = vi.fn().mockRejectedValue(new Error('raw boom, do not leak me'));
+    render(
+      <Wrapper>
+        <ImportForm onImport={onImport} />
+      </Wrapper>,
+    );
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(fileInput, 'files', { value: [makeZipFile()], configurable: true });
+    fireEvent.change(fileInput);
+    fireEvent.change(screen.getByLabelText(/contraseña de cifrado/i), {
+      target: { value: 'secret123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /importar/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Ocurrió un error inesperado/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/raw boom/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('ImportForm — S-IMPORT-6: loading state', () => {
   it('disables the button and shows loading text while importing', async () => {
     let resolveImport!: (v: SyncResult) => void;
