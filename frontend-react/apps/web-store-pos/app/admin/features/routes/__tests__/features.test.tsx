@@ -76,6 +76,29 @@ describe('FeaturesPage — render', () => {
       screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] })
     ).toBeInTheDocument();
   });
+
+  it('renders the page content inside the shared Card shell', async () => {
+    const { FeaturesPage } = await import('../features');
+    const { container } = render(
+      <Wrapper>
+        <FeaturesPage />
+      </Wrapper>
+    );
+    expect(container.querySelector('[data-slot="card"]')).toBeTruthy();
+  });
+
+  it('renders the activate action as a FAB carrying an icon', async () => {
+    const { FeaturesPage } = await import('../features');
+    render(
+      <Wrapper>
+        <FeaturesPage />
+      </Wrapper>
+    );
+    const button = screen.getByRole('button', {
+      name: esMessages['FEATURES.ACTIVATE_FEATURES'],
+    });
+    expect(button.querySelector('svg')).toBeTruthy();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
