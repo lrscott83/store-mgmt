@@ -1,0 +1,62 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import type { UserModel } from '@store-mgmt/domain';
+
+// ── USAGE-HOOK-1/2 (Stage 6 Slice C — navigation-triggered tracker) ─────────
+// Wires `registerStoreActivity` to route navigation, matching Angular's
+// `router.events.pipe(filter(NavigationEnd))` subscription.
+
+const registerStoreActivityMock = vi.fn();
+vi.mock('~/shared/lib/usage/store-usage-tracker', () => ({
+  registerStoreActivity: registerStoreActivityMock,
+}));
+
+function makeUser(overrides: Partial<UserModel> = {}): UserModel {
+  return {
+    id: 'user-1',
+    fullName: 'Test User',
+    email: 'test@example.com',
+    cellPhone: '',
+    isActive: true,
+    password: '',
+    login: 'test@example.com',
+    authToken: 'token123',
+    refreshToken: 'refresh123',
+    expiresIn: Date.now() + 1000 * 60 * 60,
+    roles: [],
+    featureIds: [],
+    storeModuleIds: [],
+    isSuperAdmin: false,
+    isOwnerAdmin: false,
+    isReSeller: false,
+    selectedStoreId: 'store-1',
+    ...overrides,
+  };
+}
+
+describe('useStoreUsageTracker — USAGE-HOOK-1: registers activity when authenticated', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls registerStoreActivity with userId + selectedStoreId on mount', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: makeUser(), isAuthenticated: true });
+
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+    renderHook(() => useStoreUsageTracker(), { wrapper: MemoryRouter });
+
+    expect(registerStoreActivityMock).toHaveBeenCalledWith('user-1', 'store-1');
+  });
+
+  it('does not call registerStoreActivity when unauthenticated', async () => {
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+    useAuthStore.setState({ user: null, isAuthenticated: false });
+
+    const { useStoreUsageTracker } = await import('../use-store-usage-tracker');
+    renderHook(() => useStoreUsageTracker(), { wrapper: MemoryRouter });
+
+    expect(registerStoreActivityMock).not.toHaveBeenCalled();
+  });
+});

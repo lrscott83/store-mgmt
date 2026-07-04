@@ -10,6 +10,7 @@ import {
 import type { Route } from './+types/root';
 import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
 import { showUpdateAvailable } from '~/shared/lib/blocking-alert';
+import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
 
 import '@store-mgmt/web-common/styles.css';
 
@@ -64,6 +65,11 @@ export default function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
+
+  // Stage 6 Slice C: client-side daily store-usage tracker, mirroring
+  // Angular's `StoreUsageTrackerService` nav hook (see
+  // `~/shared/lib/usage/store-usage-tracker.ts`).
+  useStoreUsageTracker();
 
   return <Outlet />;
 }
