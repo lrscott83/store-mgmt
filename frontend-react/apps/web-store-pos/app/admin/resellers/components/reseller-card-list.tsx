@@ -19,8 +19,9 @@ interface ResellerCardListProps {
  * gear menu also renders Activate/Deactivate/Delete, but those handlers are empty no-op stubs
  * (`resellers.component.ts:47-61`) — only Edit (routerLink, LIVE) is wired here
  * (Req: Resellers Gear Menu — Edit Only). A FAB above the grid (`resellers.component.html:7-10`)
- * navigates to the create page (Req: Resellers L6 Text Parity, override 1 — the FAB text is
- * literal Angular `GENERAL.ADD` = "Adicionar", NOT "Adicionar Gestor").
+ * navigates to the create page and reads `RESELLERS.ADD` (Req: Resellers L6 Text Parity,
+ * override 1 — value is literal Angular `GENERAL.ADD` = "Adicionar", NOT "Adicionar Gestor";
+ * this component is `RESELLERS.ADD`'s sole runtime consumer, per Phase 5 reconciliation).
  */
 function getCardClass(reseller: ReSeller): string {
   return reseller.isActive === false ? 'bg-danger/10 border border-danger' : '';
@@ -44,7 +45,7 @@ export function ResellerCardList({ resellers, onCreate, onEdit }: ResellerCardLi
       <div className="flex justify-end">
         <Button variant="fab" onClick={onCreate}>
           <PlusIcon />
-          {intl.formatMessage({ id: 'GENERAL.ADD' })}
+          {intl.formatMessage({ id: 'RESELLERS.ADD' })}
         </Button>
       </div>
 

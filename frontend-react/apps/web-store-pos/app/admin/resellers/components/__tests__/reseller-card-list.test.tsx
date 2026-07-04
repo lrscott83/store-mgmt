@@ -78,7 +78,7 @@ describe('ResellerCardList — renders a Card grid (Req: Resellers List Card Gri
 });
 
 describe('ResellerCardList — FAB (Req: Resellers L6 Text Parity, override 1)', () => {
-  it('FAB reads GENERAL.ADD ("Adicionar", not "Adicionar Gestor") and calls onCreate', async () => {
+  it('FAB reads "Adicionar" (not "Adicionar Gestor") and calls onCreate', async () => {
     const onCreate = vi.fn();
     const { ResellerCardList } = await import('../reseller-card-list');
     render(
@@ -86,11 +86,25 @@ describe('ResellerCardList — FAB (Req: Resellers L6 Text Parity, override 1)',
         <ResellerCardList {...baseProps} onCreate={onCreate} resellers={[]} />
       </Wrapper>
     );
-    expect(esMessages['GENERAL.ADD']).toBe('Adicionar');
-    const fab = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
+    expect(esMessages['RESELLERS.ADD']).toBe('Adicionar');
+    const fab = screen.getByRole('button', { name: esMessages['RESELLERS.ADD'] });
     expect(fab).toBeInTheDocument();
     fireEvent.click(fab);
     expect(onCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('FAB text is sourced from the RESELLERS.ADD key, not GENERAL.ADD (Phase 5 reconciliation — RESELLERS.ADD must have exactly one binding, not be orphaned)', async () => {
+    const { ResellerCardList } = await import('../reseller-card-list');
+    const sentinelMessages = {
+      ...esMessages,
+      'RESELLERS.ADD': 'SENTINEL_RESELLERS_ADD',
+    };
+    render(
+      <IntlProvider messages={sentinelMessages} locale="es" defaultLocale="es">
+        <ResellerCardList {...baseProps} resellers={[]} />
+      </IntlProvider>
+    );
+    expect(screen.getByRole('button', { name: 'SENTINEL_RESELLERS_ADD' })).toBeInTheDocument();
   });
 });
 

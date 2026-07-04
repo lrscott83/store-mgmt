@@ -208,7 +208,7 @@ describe('ResellerListPage — bg-danger state indicator', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('ResellerListPage — FAB navigation (Req: Resellers L6 Text Parity, override 1)', () => {
-  it('navigates to /admin/resellers/create when the FAB (GENERAL.ADD = "Adicionar") is clicked', async () => {
+  it('navigates to /admin/resellers/create when the FAB (RESELLERS.ADD = "Adicionar") is clicked', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
@@ -231,8 +231,8 @@ describe('ResellerListPage — FAB navigation (Req: Resellers L6 Text Parity, ov
       expect(screen.getByText(esMessages['RESELLERS.LIST_TITLE'])).toBeInTheDocument();
     });
 
-    expect(esMessages['GENERAL.ADD']).toBe('Adicionar');
-    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }));
+    expect(esMessages['RESELLERS.ADD']).toBe('Adicionar');
+    fireEvent.click(screen.getByRole('button', { name: esMessages['RESELLERS.ADD'] }));
     expect(mockNavigate).toHaveBeenCalledWith('/admin/resellers/create');
   });
 });
