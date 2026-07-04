@@ -1,12 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
-import {
-  DataSynchronizerService,
-} from '../data-synchronizer-service';
+import { describe, it, expect } from 'vitest';
+import { DataSynchronizerService } from '../data-synchronizer-service';
 import type {
-  CategoryWriter,
+  NameUniqueRepo,
   GenericUpsertRepo,
   InventoryRepo,
-  MergeResult,
 } from '../data-synchronizer-service';
 import type { ParsedData } from '../data-serializer-service';
 import type {
@@ -24,18 +21,18 @@ import type {
 
 const STORE_ID = 'store-test-01';
 
-function makeCategory(id: string, name: string): ProductCategory {
-  return { id, name, order: 1, isActive: true };
+function makeCategory(id: string, name: string, order = 1): ProductCategory {
+  return { id, name, order, isActive: true };
 }
 
-function makeProduct(id: string, name: string): Product {
+function makeProduct(id: string, name: string, order = 1): Product {
   return {
     id,
     name,
     categoryId: 'cat-1',
     categoryName: 'Bebidas',
     price: 1000,
-    order: 1,
+    order,
     availableToSale: true,
     discountFromInvantory: false,
     businessId: 'biz-1',
@@ -119,21 +116,25 @@ function makeSaleCredit(id: string): SaleCredit {
 // Mock repo factories
 // ---------------------------------------------------------------------------
 
-function makeCategoryWriter(initial: ProductCategory[] = []): CategoryWriter & { _saved: ProductCategory[] } {
-  const store = new Map(initial.map((c) => [c.id, c]));
-  const _saved: ProductCategory[] = [];
+function makeNameUniqueRepo<T extends { id: string; name: string }>(
+  initial: T[] = [],
+): NameUniqueRepo<T> & { snapshot(): T[] } {
+  let store = new Map(initial.map((v) => [v.id, v]));
   return {
-    _saved,
-    getAll: () => Array.from(store.values()),
-    save: (cat) => {
-      store.set(cat.id, cat);
-      _saved.push(cat);
-      return cat;
+    getAll: (_storeId: string) => new Map(store),
+    upsert: (_storeId: string, item: T) => {
+      store.set(item.id, item);
     },
+    save: (_storeId: string, items: Map<string, T>) => {
+      store = new Map(items);
+    },
+    snapshot: () => Array.from(store.values()),
   };
 }
 
-function makeGenericRepo<T extends { id: string }>(initial: T[] = []): GenericUpsertRepo<T> & { _upserted: T[] } {
+function makeGenericRepo<T extends { id: string }>(
+  initial: T[] = [],
+): GenericUpsertRepo<T> & { _upserted: T[] } {
   const store = new Map(initial.map((v) => [v.id, v]));
   const _upserted: T[] = [];
   return {
@@ -168,17 +169,9 @@ function makeService(opts?: {
   existingOrders?: Order[];
   existingExpenses?: Expense[];
   existingSaleCredits?: SaleCredit[];
-}): {
-  svc: DataSynchronizerService;
-  catWriter: ReturnType<typeof makeCategoryWriter>;
-  prodRepo: ReturnType<typeof makeGenericRepo<Product>>;
-  invRepo: ReturnType<typeof makeInventoryRepoMock>;
-  orderRepo: ReturnType<typeof makeGenericRepo<Order>>;
-  expenseRepo: ReturnType<typeof makeGenericRepo<Expense>>;
-  saleCreditRepo: ReturnType<typeof makeGenericRepo<SaleCredit>>;
-} {
-  const catWriter = makeCategoryWriter(opts?.existingCategories ?? []);
-  const prodRepo = makeGenericRepo<Product>(opts?.existingProducts ?? []);
+}) {
+  const catRepo = makeNameUniqueRepo<ProductCategory>(opts?.existingCategories ?? []);
+  const prodRepo = makeNameUniqueRepo<Product>(opts?.existingProducts ?? []);
   const invRepo = makeInventoryRepoMock(opts?.existingInventory ?? new Map());
   const orderRepo = makeGenericRepo<Order>(opts?.existingOrders ?? []);
   const expenseRepo = makeGenericRepo<Expense>(opts?.existingExpenses ?? []);
@@ -186,14 +179,14 @@ function makeService(opts?: {
 
   const svc = new DataSynchronizerService(
     STORE_ID,
-    catWriter,
+    catRepo,
     prodRepo,
     invRepo,
     orderRepo,
     expenseRepo,
     saleCreditRepo,
   );
-  return { svc, catWriter, prodRepo, invRepo, orderRepo, expenseRepo, saleCreditRepo };
+  return { svc, catRepo, prodRepo, invRepo, orderRepo, expenseRepo, saleCreditRepo };
 }
 
 function emptyData(): ParsedData {
@@ -208,146 +201,46 @@ function emptyData(): ParsedData {
 }
 
 // ---------------------------------------------------------------------------
-// T7: Merge upsert-by-id
-//   X updated not duplicated, Y inserted, local Z untouched (non-destructive)
-// ---------------------------------------------------------------------------
 
 describe('DataSynchronizerService', () => {
-  describe('T7 — merge upsert-by-id (non-destructive)', () => {
-    it('inserts new categories not present in local store', async () => {
-      const { svc } = makeService({ existingCategories: [] });
-      const data: ParsedData = {
-        ...emptyData(),
-        categories: [makeCategory('cat-new', 'New Cat')],
-      };
-      const result = await svc.sync(data);
-      const catResult = result.find((r) => r.entity === 'categories');
-      expect(catResult?.inserted).toBe(1);
-      expect(catResult?.updated).toBe(0);
-    });
-
-    it('updates existing categories (same id, different name)', async () => {
-      const existing = makeCategory('cat-1', 'Old Name');
-      const { svc } = makeService({ existingCategories: [existing] });
-      const data: ParsedData = {
-        ...emptyData(),
-        categories: [makeCategory('cat-1', 'New Name')],
-      };
-      const result = await svc.sync(data);
-      const catResult = result.find((r) => r.entity === 'categories');
-      expect(catResult?.inserted).toBe(0);
-      expect(catResult?.updated).toBe(1);
-    });
-
-    it('preserves local category not present in import data (non-destructive)', async () => {
-      const local = makeCategory('cat-local', 'Local Only');
-      const { svc, catWriter } = makeService({ existingCategories: [local] });
-      const data: ParsedData = {
-        ...emptyData(),
-        categories: [makeCategory('cat-new', 'From File')],
-      };
-      await svc.sync(data);
-      // catWriter.getAll() should still contain cat-local (non-destructive)
-      const remaining = catWriter.getAll();
-      const localExists = remaining.some((c) => c.id === 'cat-local');
-      expect(localExists).toBe(true);
-    });
-
-    it('inserts new products and returns correct count', async () => {
-      const { svc } = makeService();
-      const data: ParsedData = {
-        ...emptyData(),
-        products: [makeProduct('prod-new', 'New Product')],
-      };
-      const result = await svc.sync(data);
-      const prodResult = result.find((r) => r.entity === 'products');
-      expect(prodResult?.inserted).toBe(1);
-      expect(prodResult?.updated).toBe(0);
-    });
-
-    it('updates existing product (same id)', async () => {
-      const existing = makeProduct('prod-1', 'Old Product');
-      const { svc } = makeService({ existingProducts: [existing] });
-      const updated = { ...makeProduct('prod-1', 'Updated Product'), price: 2000 };
-      const data: ParsedData = {
-        ...emptyData(),
-        products: [updated],
-      };
-      const result = await svc.sync(data);
-      const prodResult = result.find((r) => r.entity === 'products');
-      expect(prodResult?.inserted).toBe(0);
-      expect(prodResult?.updated).toBe(1);
-    });
-
-    it('returns MergeResult for all 6 entities', async () => {
-      const { svc } = makeService();
-      const data: ParsedData = {
-        categories: [makeCategory('c1', 'Cat 1')],
-        products: [makeProduct('p1', 'Prod 1')],
-        inventoryEntries: [makeInventoryEntry('inv-1', 'p1')],
-        orders: [makeOrder('o1')],
-        expenses: [makeExpense('e1')],
-        saleCredits: [makeSaleCredit('sc1')],
-      };
-      const result = await svc.sync(data);
-      const entities = result.map((r) => r.entity);
-      expect(entities).toContain('categories');
-      expect(entities).toContain('products');
-      expect(entities).toContain('inventoryEntries');
-      expect(entities).toContain('orders');
-      expect(entities).toContain('expenses');
-      expect(entities).toContain('saleCredits');
-    });
-  });
-
   // -------------------------------------------------------------------------
-  // T8: Categories-before-products order (write order spy)
+  // 3.1: categories.json processed first regardless of zip entry order
   // -------------------------------------------------------------------------
 
-  describe('T8 — categories before products write order', () => {
-    it('categories are written before products', async () => {
+  describe('T1 — categories processed first', () => {
+    it('writes categories before products, inventory, orders, expenses, saleCredits', async () => {
       const writeOrder: string[] = [];
 
-      const catWriter: CategoryWriter = {
-        getAll: () => [],
-        save: (cat) => {
-          writeOrder.push('category:' + cat.id);
-          return cat;
-        },
+      const catRepo: NameUniqueRepo<ProductCategory> = {
+        getAll: () => new Map(),
+        upsert: (_s, item) => writeOrder.push('category:' + item.id),
+        save: () => {},
       };
-
-      const prodRepo: GenericUpsertRepo<Product> = {
-        getAll: (_storeId) => new Map(),
-        upsert: (_storeId, item) => {
-          writeOrder.push('product:' + item.id);
-        },
+      const prodRepo: NameUniqueRepo<Product> = {
+        getAll: () => new Map(),
+        upsert: (_s, item) => writeOrder.push('product:' + item.id),
+        save: () => {},
       };
-
       const invRepo: InventoryRepo = {
-        getAll: (_storeId) => new Map(),
-        save: (_storeId, productId, entries) => {
-          writeOrder.push('inventory:' + productId);
-        },
+        getAll: () => new Map(),
+        save: (_s, productId) => writeOrder.push('inventory:' + productId),
       };
-
       const orderRepo: GenericUpsertRepo<Order> = {
-        getAll: (_storeId) => new Map(),
-        upsert: (_storeId, item) => { writeOrder.push('order:' + item.id); },
+        getAll: () => new Map(),
+        upsert: (_s, item) => writeOrder.push('order:' + item.id),
       };
-
       const expenseRepo: GenericUpsertRepo<Expense> = {
-        getAll: (_storeId) => new Map(),
-        upsert: (_storeId, item) => { writeOrder.push('expense:' + item.id); },
+        getAll: () => new Map(),
+        upsert: (_s, item) => writeOrder.push('expense:' + item.id),
       };
-
       const saleCreditRepo: GenericUpsertRepo<SaleCredit> = {
-        getAll: (_storeId) => new Map(),
-        upsert: (_storeId, item) => { writeOrder.push('saleCredit:' + item.id); },
+        getAll: () => new Map(),
+        upsert: (_s, item) => writeOrder.push('saleCredit:' + item.id),
       };
 
       const svc = new DataSynchronizerService(
         STORE_ID,
-        catWriter,
+        catRepo,
         prodRepo,
         invRepo,
         orderRepo,
@@ -366,21 +259,259 @@ describe('DataSynchronizerService', () => {
 
       await svc.sync(data);
 
-      // Categories must appear before products in the write order
-      const catIdx = writeOrder.findIndex((w) => w.startsWith('category:'));
-      const prodIdx = writeOrder.findIndex((w) => w.startsWith('product:'));
-      expect(catIdx).toBeGreaterThanOrEqual(0);
-      expect(prodIdx).toBeGreaterThanOrEqual(0);
-      expect(catIdx).toBeLessThan(prodIdx);
+      expect(writeOrder).toEqual([
+        'category:cat-1',
+        'product:prod-1',
+        'inventory:prod-1',
+        'order:order-1',
+        'expense:exp-1',
+        'saleCredit:sc-1',
+      ]);
     });
   });
 
   // -------------------------------------------------------------------------
-  // T9: Import-twice idempotency
+  // 3.2: duplicate category/product name → whole-type revert + typed error
   // -------------------------------------------------------------------------
 
-  describe('T9 — import-twice idempotency', () => {
-    it('second sync of same data results in inserted:0 for all entities', async () => {
+  describe('T2 — duplicate name rejected + whole-type revert', () => {
+    it('rejects a duplicate category name and reverts categories to their pre-import snapshot', async () => {
+      const existing = makeCategory('cat-existing', 'Bebidas', 1);
+      const { svc, catRepo } = makeService({ existingCategories: [existing] });
+
+      const data: ParsedData = {
+        ...emptyData(),
+        categories: [
+          makeCategory('cat-ok', 'Snacks', 1),
+          makeCategory('cat-dup', 'Bebidas', 2), // name clashes with cat-existing
+        ],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      const catError = result.errors.find((e) => e.entity === 'categories');
+      expect(catError).toBeDefined();
+      expect(catError?.code).toBe('ProductCategory.NameExists');
+
+      // Whole-type revert: categories map is back to its pre-import state —
+      // NOT even cat-ok (which came before the clash, sorted by order) persists.
+      const remaining = catRepo.getAll(STORE_ID);
+      expect(remaining.size).toBe(1);
+      expect(remaining.has('cat-existing')).toBe(true);
+      expect(remaining.has('cat-ok')).toBe(false);
+      expect(remaining.has('cat-dup')).toBe(false);
+
+      const catMerge = result.merges.find((m) => m.entity === 'categories');
+      expect(catMerge).toEqual({ entity: 'categories', inserted: 0, updated: 0 });
+    });
+
+    it('rejects a duplicate product name and reverts products to their pre-import snapshot', async () => {
+      const existing = makeProduct('prod-existing', 'Coca Cola', 1);
+      const { svc, prodRepo } = makeService({ existingProducts: [existing] });
+
+      const data: ParsedData = {
+        ...emptyData(),
+        products: [makeProduct('prod-dup', 'Coca Cola', 1)],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      const prodError = result.errors.find((e) => e.entity === 'products');
+      expect(prodError?.code).toBe('Product.NameExists');
+
+      const remaining = prodRepo.getAll(STORE_ID);
+      expect(remaining.size).toBe(1);
+      expect(remaining.has('prod-existing')).toBe(true);
+      expect(remaining.has('prod-dup')).toBe(false);
+    });
+
+    it('processes categories sorted by order before checking for name clashes', async () => {
+      const { svc, catRepo } = makeService();
+      const data: ParsedData = {
+        ...emptyData(),
+        // Out-of-order on purpose: order=2 item appears first in the array.
+        categories: [makeCategory('cat-b', 'Second', 2), makeCategory('cat-a', 'First', 1)],
+      };
+      const result = await svc.sync(data);
+      expect(result.succeeded).toBe(true);
+      const remaining = catRepo.getAll(STORE_ID);
+      expect(remaining.size).toBe(2);
+    });
+
+    it('does not revert other entity types when categories fail', async () => {
+      const { svc, orderRepo } = makeService({
+        existingCategories: [makeCategory('cat-existing', 'Bebidas', 1)],
+      });
+      const data: ParsedData = {
+        ...emptyData(),
+        categories: [makeCategory('cat-dup', 'Bebidas', 1)],
+        orders: [makeOrder('order-1')],
+      };
+      const result = await svc.sync(data);
+      expect(result.succeeded).toBe(false);
+      // Orders are unaffected by the categories failure — sync continues.
+      expect(orderRepo.getAll(STORE_ID).has('order-1')).toBe(true);
+      const orderMerge = result.merges.find((m) => m.entity === 'orders');
+      expect(orderMerge).toEqual({ entity: 'orders', inserted: 1, updated: 0 });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 3.3: inventory/orders/expenses/saleCredits — break-only, no revert;
+  // synchronizeFiles aggregates errors across files and continues.
+  // -------------------------------------------------------------------------
+
+  describe('T3 — break-only (no revert) for orders/expenses/saleCredits/inventory', () => {
+    it('breaks the orders loop on the first failing item but keeps prior successful writes', async () => {
+      const { svc, orderRepo } = makeService();
+      const failing = makeOrder('order-bad');
+      const ok1 = makeOrder('order-ok-1');
+      const ok2 = makeOrder('order-ok-2');
+
+      // upsert throws for the "bad" order id — simulates an unexpected
+      // storage failure (Angular: caught, entity-level UnexpectedError).
+      const originalUpsert = orderRepo.upsert.bind(orderRepo);
+      orderRepo.upsert = (storeId: string, item: Order) => {
+        if (item.id === 'order-bad') throw new Error('storage exploded');
+        originalUpsert(storeId, item);
+      };
+
+      const data: ParsedData = {
+        ...emptyData(),
+        orders: [ok1, failing, ok2],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      const orderError = result.errors.find((e) => e.entity === 'orders');
+      expect(orderError).toBeDefined();
+      expect(orderError?.code).toBe('Synchronizer.OrdersUnexpectedError');
+
+      // Break-only: ok1 (written before the failure) persists, ok2 (after
+      // the break) does NOT — no revert of ok1's already-applied write.
+      const remaining = orderRepo.getAll(STORE_ID);
+      expect(remaining.has('order-ok-1')).toBe(true);
+      expect(remaining.has('order-ok-2')).toBe(false);
+    });
+
+    it('breaks the inventory loop on first failure without reverting prior product groups', async () => {
+      const { svc, invRepo } = makeService();
+      const originalSave = invRepo.save.bind(invRepo);
+      invRepo.save = (storeId: string, productId: string, entries: InventoryEntry[]) => {
+        if (productId === 'prod-bad') throw new Error('storage exploded');
+        originalSave(storeId, productId, entries);
+      };
+
+      const data: ParsedData = {
+        ...emptyData(),
+        inventoryEntries: [
+          makeInventoryEntry('inv-ok', 'prod-ok'),
+          makeInventoryEntry('inv-bad', 'prod-bad'),
+        ],
+      };
+
+      const result = await svc.sync(data);
+      expect(result.succeeded).toBe(false);
+      const invError = result.errors.find((e) => e.entity === 'inventoryEntries');
+      expect(invError?.code).toBe('Synchronizer.InventoryUnexpectedError');
+      expect(invRepo._saves.some((s) => s.productId === 'prod-ok')).toBe(true);
+    });
+
+    it('synchronizeFiles/sync aggregates errors across entity types and continues (not abort-on-first)', async () => {
+      const { svc, orderRepo, expenseRepo } = makeService();
+      orderRepo.upsert = () => {
+        throw new Error('order storage exploded');
+      };
+      expenseRepo.upsert = () => {
+        throw new Error('expense storage exploded');
+      };
+
+      const data: ParsedData = {
+        ...emptyData(),
+        orders: [makeOrder('order-1')],
+        expenses: [makeExpense('exp-1')],
+        saleCredits: [makeSaleCredit('sc-1')],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toHaveLength(2);
+      expect(result.errors.map((e) => e.entity).sort()).toEqual(['expenses', 'orders']);
+      // saleCredits (after the failing types) still gets processed.
+      const scMerge = result.merges.find((m) => m.entity === 'saleCredits');
+      expect(scMerge).toEqual({ entity: 'saleCredits', inserted: 1, updated: 0 });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Non-destructive merge (upsert-by-id) — unchanged behavior, still covered
+  // -------------------------------------------------------------------------
+
+  describe('T4 — merge upsert-by-id (non-destructive)', () => {
+    it('inserts new categories not present in local store', async () => {
+      const { svc } = makeService({ existingCategories: [] });
+      const data: ParsedData = {
+        ...emptyData(),
+        categories: [makeCategory('cat-new', 'New Cat')],
+      };
+      const result = await svc.sync(data);
+      const catResult = result.merges.find((r) => r.entity === 'categories');
+      expect(catResult?.inserted).toBe(1);
+      expect(catResult?.updated).toBe(0);
+    });
+
+    it('updates existing categories (same id, different name)', async () => {
+      const existing = makeCategory('cat-1', 'Old Name');
+      const { svc } = makeService({ existingCategories: [existing] });
+      const data: ParsedData = {
+        ...emptyData(),
+        categories: [makeCategory('cat-1', 'New Name')],
+      };
+      const result = await svc.sync(data);
+      const catResult = result.merges.find((r) => r.entity === 'categories');
+      expect(catResult?.inserted).toBe(0);
+      expect(catResult?.updated).toBe(1);
+    });
+
+    it('preserves local category not present in import data (non-destructive)', async () => {
+      const local = makeCategory('cat-local', 'Local Only');
+      const { svc, catRepo } = makeService({ existingCategories: [local] });
+      const data: ParsedData = {
+        ...emptyData(),
+        categories: [makeCategory('cat-new', 'From File')],
+      };
+      await svc.sync(data);
+      const remaining = catRepo.getAll(STORE_ID);
+      expect(remaining.has('cat-local')).toBe(true);
+    });
+
+    it('returns a merge entry for all 6 entities', async () => {
+      const { svc } = makeService();
+      const data: ParsedData = {
+        categories: [makeCategory('c1', 'Cat 1')],
+        products: [makeProduct('p1', 'Prod 1')],
+        inventoryEntries: [makeInventoryEntry('inv-1', 'p1')],
+        orders: [makeOrder('o1')],
+        expenses: [makeExpense('e1')],
+        saleCredits: [makeSaleCredit('sc1')],
+      };
+      const result = await svc.sync(data);
+      const entities = result.merges.map((r) => r.entity);
+      expect(entities).toEqual([
+        'categories',
+        'products',
+        'inventoryEntries',
+        'orders',
+        'expenses',
+        'saleCredits',
+      ]);
+    });
+
+    it('second sync of same data results in inserted:0 for all entities (idempotent)', async () => {
       const cat = makeCategory('cat-1', 'Cat');
       const prod = makeProduct('prod-1', 'Prod');
       const inv = makeInventoryEntry('inv-1', 'prod-1');
@@ -406,88 +537,54 @@ describe('DataSynchronizerService', () => {
         saleCredits: [credit],
       };
 
-      // Second import (all items already exist in store)
       const result = await svc.sync(data);
-
-      // All entities should show 0 inserted (they already exist with same id)
-      for (const r of result) {
+      for (const r of result.merges) {
         expect(r.inserted).toBe(0);
       }
-    });
-
-    it('second sync does not create duplicates', async () => {
-      const cat = makeCategory('cat-1', 'Cat');
-      const { svc, catWriter } = makeService({ existingCategories: [cat] });
-      const data: ParsedData = { ...emptyData(), categories: [cat] };
-
-      await svc.sync(data);
-      const afterSync = catWriter.getAll();
-      const catCount = afterSync.filter((c) => c.id === 'cat-1').length;
-      expect(catCount).toBe(1);
     });
   });
 
   // -------------------------------------------------------------------------
-  // T10: Envelope validation guard — bad version/missing entities → error, no writes
-  // (This test is on the serializer import side — synchronizer receives ParsedData
-  //  only after successful import. We test that sync() handles empty data gracefully.)
+  // Empty/minimal data — graceful no-op
   // -------------------------------------------------------------------------
 
-  describe('T10 — sync handles empty/minimal data gracefully', () => {
-    it('syncing empty data returns MergeResult with 0 counts for all entities', async () => {
+  describe('T5 — sync handles empty data gracefully', () => {
+    it('syncing empty data returns a succeeded result with 0 counts for all entities', async () => {
       const { svc } = makeService();
       const result = await svc.sync(emptyData());
-      for (const r of result) {
+      expect(result.succeeded).toBe(true);
+      expect(result.errors).toEqual([]);
+      for (const r of result.merges) {
         expect(r.inserted).toBe(0);
         expect(r.updated).toBe(0);
       }
     });
 
     it('syncing empty data does NOT call any repo write methods', async () => {
-      const saveSpy = vi.fn();
-      const upsertSpy = vi.fn();
-      const invSaveSpy = vi.fn();
-
-      const catWriter: CategoryWriter = {
-        getAll: () => [],
-        save: (cat) => { saveSpy(cat); return cat; },
+      const { svc, catRepo, prodRepo, invRepo, orderRepo, expenseRepo, saleCreditRepo } =
+        makeService();
+      let writes = 0;
+      catRepo.upsert = () => {
+        writes++;
       };
-      const prodRepo: GenericUpsertRepo<Product> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => upsertSpy(item),
+      prodRepo.upsert = () => {
+        writes++;
       };
-      const invRepo: InventoryRepo = {
-        getAll: () => new Map(),
-        save: (_s, pid, entries) => invSaveSpy(pid, entries),
+      invRepo.save = () => {
+        writes++;
       };
-      const orderRepo: GenericUpsertRepo<Order> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => upsertSpy(item),
+      orderRepo.upsert = () => {
+        writes++;
       };
-      const expenseRepo: GenericUpsertRepo<Expense> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => upsertSpy(item),
+      expenseRepo.upsert = () => {
+        writes++;
       };
-      const saleCreditRepo: GenericUpsertRepo<SaleCredit> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => upsertSpy(item),
+      saleCreditRepo.upsert = () => {
+        writes++;
       };
-
-      const svc = new DataSynchronizerService(
-        STORE_ID,
-        catWriter,
-        prodRepo,
-        invRepo,
-        orderRepo,
-        expenseRepo,
-        saleCreditRepo,
-      );
 
       await svc.sync(emptyData());
-
-      expect(saveSpy).not.toHaveBeenCalled();
-      expect(upsertSpy).not.toHaveBeenCalled();
-      expect(invSaveSpy).not.toHaveBeenCalled();
+      expect(writes).toBe(0);
     });
   });
 });

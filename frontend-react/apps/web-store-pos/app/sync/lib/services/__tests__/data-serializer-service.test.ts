@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
+import type { Entry } from '@zip.js/zip.js';
 import {
   DataSerializerService,
   WrongPasswordError,
@@ -189,6 +190,12 @@ async function readRawEntries(payload: Uint8Array, derivedPassword: string) {
   return entries;
 }
 
+/** Narrows an `Entry` (DirectoryEntry | FileEntry) and reads its text content. */
+async function getEntryText(entry: Entry): Promise<string> {
+  if (entry.directory) throw new Error(`unexpected directory entry: ${entry.filename}`);
+  return entry.getData(new TextWriter());
+}
+
 // ---------------------------------------------------------------------------
 
 describe('DataSerializerService', () => {
@@ -270,7 +277,7 @@ describe('DataSerializerService', () => {
       const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
       const catEntry = entries.find((e) => e.filename === 'categories.json');
       expect(catEntry).toBeDefined();
-      const text = await catEntry!.getData!(new TextWriter());
+      const text = await getEntryText(catEntry!);
       const parsed = JSON.parse(text) as [string, ProductCategory][];
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed[0][0]).toBe('cat-1');
@@ -282,7 +289,7 @@ describe('DataSerializerService', () => {
       const payload = await svc.export(PASSWORD);
       const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
       const prodEntry = entries.find((e) => e.filename === 'products.json');
-      const text = await prodEntry!.getData!(new TextWriter());
+      const text = await getEntryText(prodEntry!);
       const parsed = JSON.parse(text) as [string, Product][];
       expect(parsed[0][0]).toBe('prod-1');
       expect(parsed[0][1].price).toBe(1500);
@@ -293,7 +300,7 @@ describe('DataSerializerService', () => {
       const payload = await svc.export(PASSWORD);
       const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
       const invEntry = entries.find((e) => e.filename === 'inventory-entries.json');
-      const text = await invEntry!.getData!(new TextWriter());
+      const text = await getEntryText(invEntry!);
       const parsed = JSON.parse(text) as [string, InventoryEntry[]][];
       expect(parsed[0][0]).toBe('prod-1');
       expect(Array.isArray(parsed[0][1])).toBe(true);
@@ -306,20 +313,16 @@ describe('DataSerializerService', () => {
       const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
 
       const ordersEntry = entries.find((e) => e.filename === 'orders.json');
-      const ordersParsed = JSON.parse(await ordersEntry!.getData!(new TextWriter())) as Order[];
+      const ordersParsed = JSON.parse(await getEntryText(ordersEntry!)) as Order[];
       expect(ordersParsed[0]).not.toBeInstanceOf(Array);
       expect(ordersParsed[0].id).toBe('order-1');
 
       const expensesEntry = entries.find((e) => e.filename === 'expenses.json');
-      const expensesParsed = JSON.parse(
-        await expensesEntry!.getData!(new TextWriter()),
-      ) as Expense[];
+      const expensesParsed = JSON.parse(await getEntryText(expensesEntry!)) as Expense[];
       expect(expensesParsed[0].id).toBe('exp-1');
 
       const creditsEntry = entries.find((e) => e.filename === 'sale-credits.json');
-      const creditsParsed = JSON.parse(
-        await creditsEntry!.getData!(new TextWriter()),
-      ) as SaleCredit[];
+      const creditsParsed = JSON.parse(await getEntryText(creditsEntry!)) as SaleCredit[];
       expect(creditsParsed[0].id).toBe('credit-1');
     });
   });
@@ -341,7 +344,7 @@ describe('DataSerializerService', () => {
       const payload = await svc.export(PASSWORD);
       const entries = await readRawEntries(payload, `${PASSWORD}:${STORE_ID}`);
       const catEntry = entries.find((e) => e.filename === 'categories.json')!;
-      await expect(catEntry.getData!(new TextWriter())).rejects.toThrow();
+      await expect(getEntryText(catEntry)).rejects.toThrow();
     });
 
     it('does not set an explicit encryptionStrength override (default AE-2/AES-256)', async () => {
