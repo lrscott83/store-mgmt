@@ -27,12 +27,15 @@ export interface SyncResult {
 // Angular parity error codes (SynchronizerErrors + name-uniqueness guards)
 // ---------------------------------------------------------------------------
 //
-// Angular's synchronizer defines exactly 4 "UnexpectedError" codes (Products,
-// Categories, Orders, Inventory) — Expenses and SaleCredits reuse
-// `OrdersUnexpectedError` in `frontend/.../data-synchronizer.service.ts`
-// (`synchronizeExpenses`/`synchronizeSaleCredits` catch blocks both push
-// `SynchronizerErrors.OrdersUnexpectedError`). Replicated here verbatim for
-// logic parity, per the binding design (engram #642).
+// Angular's synchronizer defines only 4 "UnexpectedError" codes (Products,
+// Categories, Orders, Inventory) and — via a copy-paste bug — makes
+// `synchronizeExpenses`/`synchronizeSaleCredits` both emit
+// `OrdersUnexpectedError` (see `frontend/.../data-synchronizer.service.ts`
+// lines 230, 262). That bug is FIXED here, not replicated: Expenses and
+// SaleCredits emit their own correct codes. Error codes are internal — never
+// serialized into the export .zip — so this does not break the format interop
+// mandated by decision #639. Policy: frontend-parity-audit/angular-bugs-policy
+// (engram #648).
 
 export const SynchronizerErrors = {
   CategoriesUnexpectedError: {
@@ -50,6 +53,14 @@ export const SynchronizerErrors = {
   InventoryUnexpectedError: {
     code: 'Synchronizer.InventoryUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar el inventario.',
+  },
+  ExpensesUnexpectedError: {
+    code: 'Synchronizer.ExpensesUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar los gastos.',
+  },
+  SaleCreditsUnexpectedError: {
+    code: 'Synchronizer.SaleCreditsUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar los créditos.',
   },
   CategoryNameExists: {
     code: 'ProductCategory.NameExists',
@@ -178,25 +189,25 @@ export class DataSynchronizerService {
       ),
     );
 
-    // 5. Expenses — break-only (no revert). Reuses OrdersUnexpectedError,
-    // matching Angular's `synchronizeExpenses` catch block.
+    // 5. Expenses — break-only (no revert). Emits its own ExpensesUnexpectedError
+    // (Angular's copy-paste bug of reusing OrdersUnexpectedError is fixed here).
     push(
       this.mergeBreakOnly(
         'expenses',
         this.expenseRepo,
         data.expenses,
-        SynchronizerErrors.OrdersUnexpectedError,
+        SynchronizerErrors.ExpensesUnexpectedError,
       ),
     );
 
-    // 6. SaleCredits — break-only (no revert). Reuses OrdersUnexpectedError,
-    // matching Angular's `synchronizeSaleCredits` catch block.
+    // 6. SaleCredits — break-only (no revert). Emits its own
+    // SaleCreditsUnexpectedError (Angular's copy-paste bug is fixed here).
     push(
       this.mergeBreakOnly(
         'saleCredits',
         this.saleCreditRepo,
         data.saleCredits,
-        SynchronizerErrors.OrdersUnexpectedError,
+        SynchronizerErrors.SaleCreditsUnexpectedError,
       ),
     );
 

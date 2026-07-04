@@ -448,6 +448,42 @@ describe('DataSynchronizerService', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Per-type error codes — Angular's copy-paste bug is FIXED here, not replicated.
+  // Angular's synchronizeExpenses/synchronizeSaleCredits both wrongly emit
+  // OrdersUnexpectedError. Error codes are internal (never serialized into the
+  // export .zip), so correcting them does not break format interop. Policy:
+  // frontend-parity-audit/angular-bugs-policy (engram #648).
+  // -------------------------------------------------------------------------
+
+  describe('T3b — per-type error codes (Angular bug fixed, not replicated)', () => {
+    it('emits ExpensesUnexpectedError (not OrdersUnexpectedError) when an expense write fails', async () => {
+      const { svc, expenseRepo } = makeService();
+      expenseRepo.upsert = () => {
+        throw new Error('expense storage exploded');
+      };
+      const data: ParsedData = { ...emptyData(), expenses: [makeExpense('exp-1')] };
+
+      const result = await svc.sync(data);
+
+      const err = result.errors.find((e) => e.entity === 'expenses');
+      expect(err?.code).toBe('Synchronizer.ExpensesUnexpectedError');
+    });
+
+    it('emits SaleCreditsUnexpectedError (not OrdersUnexpectedError) when a sale-credit write fails', async () => {
+      const { svc, saleCreditRepo } = makeService();
+      saleCreditRepo.upsert = () => {
+        throw new Error('sale-credit storage exploded');
+      };
+      const data: ParsedData = { ...emptyData(), saleCredits: [makeSaleCredit('sc-1')] };
+
+      const result = await svc.sync(data);
+
+      const err = result.errors.find((e) => e.entity === 'saleCredits');
+      expect(err?.code).toBe('Synchronizer.SaleCreditsUnexpectedError');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Non-destructive merge (upsert-by-id) — unchanged behavior, still covered
   // -------------------------------------------------------------------------
 
