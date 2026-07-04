@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useIntl } from 'react-intl';
-import type { MergeResult } from '~/sync/lib/services/data-synchronizer-service';
+import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
 import { WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 
 export interface ImportFormProps {
@@ -8,8 +8,12 @@ export interface ImportFormProps {
    * Called with the selected file and typed password.
    * Should decrypt, parse, and run the synchronizer.
    * Should throw WrongPasswordError or CorruptFileError on failure.
+   * Resolves with a SyncResult even when the domain-validated merge itself
+   * fails (`succeeded: false` + typed `errors`) — the synchronizer never
+   * throws for merge-validation failures, only the serializer's decrypt
+   * step throws (WrongPasswordError/CorruptFileError, before any write).
    */
-  onImport: (file: File, password: string) => Promise<MergeResult>;
+  onImport: (file: File, password: string) => Promise<SyncResult>;
 }
 
 export function ImportForm({ onImport }: ImportFormProps) {
@@ -19,7 +23,7 @@ export function ImportForm({ onImport }: ImportFormProps) {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<MergeResult | null>(null);
+  const [result, setResult] = useState<SyncResult | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setSelectedFile(e.target.files?.[0] ?? null);
@@ -44,8 +48,12 @@ export function ImportForm({ onImport }: ImportFormProps) {
 
     setBusy(true);
     try {
-      const mergeResult = await onImport(selectedFile, password);
-      setResult(mergeResult);
+      const syncResult = await onImport(selectedFile, password);
+      if (syncResult.succeeded) {
+        setResult(syncResult);
+      } else {
+        setError(syncResult.errors.map((e) => e.message).join(' '));
+      }
     } catch (err) {
       if (err instanceof WrongPasswordError) {
         setError(intl.formatMessage({ id: 'SYNC.ERROR_WRONG_PASSWORD' }));
@@ -118,7 +126,7 @@ export function ImportForm({ onImport }: ImportFormProps) {
             {intl.formatMessage({ id: 'SYNC.SUCCESS_TITLE' })}
           </h2>
           <ul className="space-y-1 text-sm text-green-700">
-            {result.map((r) => (
+            {result.merges.map((r) => (
               <li key={r.entity}>
                 <span className="font-medium">{r.entity}</span>:{' '}
                 {intl.formatMessage({ id: 'SYNC.RESULT_INSERTED' }, { count: r.inserted })},{' '}

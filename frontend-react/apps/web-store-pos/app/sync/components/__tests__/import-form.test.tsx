@@ -3,7 +3,7 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { ImportForm } from '../import-form';
-import type { MergeResult } from '~/sync/lib/services/data-synchronizer-service';
+import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
 import { WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -14,14 +14,18 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-const SUCCESS_RESULT: MergeResult = [
-  { entity: 'categories', inserted: 2, updated: 1 },
-  { entity: 'products', inserted: 5, updated: 3 },
-  { entity: 'inventoryEntries', inserted: 4, updated: 0 },
-  { entity: 'orders', inserted: 1, updated: 2 },
-  { entity: 'expenses', inserted: 0, updated: 1 },
-  { entity: 'saleCredits', inserted: 3, updated: 0 },
-];
+const SUCCESS_RESULT: SyncResult = {
+  succeeded: true,
+  errors: [],
+  merges: [
+    { entity: 'categories', inserted: 2, updated: 1 },
+    { entity: 'products', inserted: 5, updated: 3 },
+    { entity: 'inventoryEntries', inserted: 4, updated: 0 },
+    { entity: 'orders', inserted: 1, updated: 2 },
+    { entity: 'expenses', inserted: 0, updated: 1 },
+    { entity: 'saleCredits', inserted: 3, updated: 0 },
+  ],
+};
 
 function makeZipFile(name = 'backup.zip'): File {
   return new File([new Uint8Array([1, 2, 3])], name, { type: 'application/zip' });
@@ -154,10 +158,10 @@ describe('ImportForm — S-IMPORT-5: corrupt-file error + no writes', () => {
 
 describe('ImportForm — S-IMPORT-6: loading state', () => {
   it('disables the button and shows loading text while importing', async () => {
-    let resolveImport!: (v: MergeResult) => void;
+    let resolveImport!: (v: SyncResult) => void;
     const onImport = vi.fn(
       () =>
-        new Promise<MergeResult>((resolve) => {
+        new Promise<SyncResult>((resolve) => {
           resolveImport = resolve;
         }),
     );
