@@ -16,8 +16,16 @@ interface StoreCardListProps {
  * icons replace the old raw-table markup (`shared/components/ui/{card,button,icons}.tsx`,
  * same precedent as Expenses). Angular's `store-list.component.html:40-50` dead-codes
  * Activate/Deactivate out of the DOM entirely for every role — neither control exists here
- * (Req: Activate/Deactivate Controls Removed).
+ * (Req: Activate/Deactivate Controls Removed). State CSS and Approve/Disapprove XOR mirror
+ * `admin/owners/components/owner-card-list.tsx getCardClass` (Req: Store Card Visual
+ * Lifecycle State, Req: Card-Grid List Uses Shared Chrome).
  */
+function getStoreCardClass(store: Store): string {
+  if (!store.isActive) return 'bg-danger/10 border border-danger';
+  if (!store.approved) return 'bg-success/10 border border-success';
+  return '';
+}
+
 export function StoreCardList({ stores, onEdit, onApprove, onDisapprove }: StoreCardListProps) {
   const intl = useIntl();
 
@@ -32,7 +40,7 @@ export function StoreCardList({ stores, onEdit, onApprove, onDisapprove }: Store
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {stores.map((store) => (
-        <Card key={store.id} title={store.name}>
+        <Card key={store.id} title={store.name} className={getStoreCardClass(store)}>
           <div className="space-y-2">
             <p className="text-sm text-text-muted">{store.address}</p>
             {store.description && <p className="text-sm text-text-muted">{store.description}</p>}
@@ -41,12 +49,15 @@ export function StoreCardList({ stores, onEdit, onApprove, onDisapprove }: Store
                 <EditIcon className="h-4 w-4" />
                 {intl.formatMessage({ id: 'STORES.EDIT' })}
               </Button>
-              <Button variant="primary" onClick={() => onApprove(store.id)}>
-                {intl.formatMessage({ id: 'STORES.APPROVE' })}
-              </Button>
-              <Button variant="danger" onClick={() => onDisapprove(store.id)}>
-                {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
-              </Button>
+              {store.approved ? (
+                <Button variant="danger" onClick={() => onDisapprove(store.id)}>
+                  {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => onApprove(store.id)}>
+                  {intl.formatMessage({ id: 'STORES.APPROVE' })}
+                </Button>
+              )}
             </div>
           </div>
         </Card>

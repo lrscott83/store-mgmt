@@ -94,7 +94,7 @@ describe('StoreCardList — Button-based actions wired', () => {
     render(
       <Wrapper>
         <StoreCardList
-          stores={[makeStore({ id: 'store-y', name: 'Store Y' })]}
+          stores={[makeStore({ id: 'store-y', name: 'Store Y', approved: false })]}
           onEdit={vi.fn()}
           onApprove={onApprove}
           onDisapprove={vi.fn()}
@@ -120,6 +120,112 @@ describe('StoreCardList — Button-based actions wired', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] }));
     expect(onDisapprove).toHaveBeenCalledWith('store-z');
+  });
+});
+
+describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Shared Chrome)', () => {
+  it('approved store renders ONLY Disapprove, not Approve', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-a', approved: true })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+        />
+      </Wrapper>
+    );
+    expect(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.APPROVE'] })
+    ).not.toBeInTheDocument();
+  });
+
+  it('unapproved store renders ONLY Approve, not Disapprove', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-b', approved: false })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+        />
+      </Wrapper>
+    );
+    expect(screen.getByRole('button', { name: esMessages['STORES.APPROVE'] })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: esMessages['STORES.DISAPPROVE'] })
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)', () => {
+  it('inactive store applies the danger state class', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    const { container } = render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ isActive: false, approved: true })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+        />
+      </Wrapper>
+    );
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card).toHaveClass('bg-danger/10', 'border-danger');
+  });
+
+  it('unapproved-but-active store applies the success state class', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    const { container } = render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ isActive: true, approved: false })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+        />
+      </Wrapper>
+    );
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card).toHaveClass('bg-success/10', 'border-success');
+  });
+
+  it('normal store (active and approved) has no extra state class', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    const { container } = render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ isActive: true, approved: true })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+        />
+      </Wrapper>
+    );
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card).not.toHaveClass('bg-danger/10');
+    expect(card).not.toHaveClass('bg-success/10');
+  });
+
+  it('inactive + unapproved store applies danger, NOT success (precedence)', async () => {
+    const { StoreCardList } = await import('../store-card-list');
+    const { container } = render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ isActive: false, approved: false })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+        />
+      </Wrapper>
+    );
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card).toHaveClass('bg-danger/10', 'border-danger');
+    expect(card).not.toHaveClass('bg-success/10');
   });
 });
 
