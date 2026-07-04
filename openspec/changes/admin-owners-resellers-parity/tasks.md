@@ -41,13 +41,13 @@ size:exception is PRE-ACCEPTED (user-approved co-slice). Commits-only on `feat/f
 
 ## Phase 2: Owners L6 — Text/i18n Parity (Work Unit A2)
 
-- [ ] 2.1 RED: update `app/admin/owners/routes/__tests__/owner-edit.test.tsx` — submit button asserts `GENERAL.UPDATE` ("Actualizar"), not `USERS.SAVE`.
-- [ ] 2.2 GREEN: `app/admin/owners/routes/owner-edit.tsx` — repoint submit label `USERS.SAVE`→`GENERAL.UPDATE`; repoint `FULL_NAME/CELL_PHONE/EMAIL/PASSWORD` from `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
-- [ ] 2.3 RED: update `app/admin/owners/routes/__tests__/owner-create.test.tsx` — title asserts `OWNER.ADD_OWNER` value "Adicionar Propietario"; submit asserts `GENERAL.ADD`; field labels assert `GENERAL.*`.
-- [ ] 2.4 GREEN: `app/admin/owners/routes/owner-create.tsx` — repoint submit `USERS.SAVE`→`GENERAL.ADD`; fields `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
-- [ ] 2.5 GREEN: `app/shared/lib/i18n/es.ts` — set `OWNER.CREATE_TITLE`="Adicionar Propietario"; add `GENERAL.FULL_NAME`/`GENERAL.CELL_PHONE`/`GENERAL.EMAIL`/`GENERAL.PASSWORD`/`GENERAL.DESCRIPTION` if not present; set `GENERAL.RESELLER`="Gestor" (**override 2**, confirmed sole consumers above).
-- [ ] 2.6 GREEN: `app/admin/owners/routes/owner-list.tsx` — repoint delete label `EXPENSES.DELETE`→`GENERAL.DELETE`.
-- [ ] 2.7 Verify: `pnpm test -- owner-list owner-edit owner-create` green; confirm `GENERAL.RESELLER` renders "Gestor" in all three routes' tests.
+- [x] 2.1 RED: update `app/admin/owners/routes/__tests__/owner-edit.test.tsx` — submit button asserts `GENERAL.UPDATE` ("Actualizar"), not `USERS.SAVE`.
+- [x] 2.2 GREEN: `app/admin/owners/routes/owner-edit.tsx` — repoint submit label `USERS.SAVE`→`GENERAL.UPDATE`; repoint `FULL_NAME/CELL_PHONE/EMAIL/PASSWORD` from `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
+- [x] 2.3 RED: update `app/admin/owners/routes/__tests__/owner-create.test.tsx` — title asserts `OWNER.ADD_OWNER` value "Adicionar Propietario"; submit asserts `GENERAL.ADD`; field labels assert `GENERAL.*`.
+- [x] 2.4 GREEN: `app/admin/owners/routes/owner-create.tsx` — repoint submit `USERS.SAVE`→`GENERAL.ADD`; fields `USERS.*`→`GENERAL.*`; `STORES.DESCRIPTION`→`GENERAL.DESCRIPTION`.
+- [x] 2.5 GREEN: `app/shared/lib/i18n/es.ts` — set `OWNER.CREATE_TITLE`="Adicionar Propietario"; add `GENERAL.FULL_NAME`/`GENERAL.CELL_PHONE`/`GENERAL.EMAIL`/`GENERAL.PASSWORD`/`GENERAL.DESCRIPTION` if not present; set `GENERAL.RESELLER`="Gestor" (**override 2**, confirmed sole consumers above).
+- [x] 2.6 GREEN: `app/admin/owners/routes/owner-list.tsx` — repoint delete label `EXPENSES.DELETE`→`GENERAL.DELETE`. (Already satisfied in Phase 1: delete rendering moved into `owner-card-list.tsx`, which uses `GENERAL.DELETE`.)
+- [x] 2.7 Verify: `pnpm test -- owner-list owner-edit owner-create` green; confirm `GENERAL.RESELLER` renders "Gestor" in all three routes' tests.
 
 ## Phase 3: Resellers L5 — Card Grid, Gear Menu, State CSS (Work Unit B1)
 

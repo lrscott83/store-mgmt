@@ -606,7 +606,8 @@ const messages: Record<string, string> = {
 
   // Admin — Owners
   'OWNER.LIST_TITLE': 'Propietarios',
-  'OWNER.CREATE_TITLE': 'Nuevo propietario',
+  // Angular OWNER.ADD_OWNER (es.ts:474) — literal parity.
+  'OWNER.CREATE_TITLE': 'Adicionar Propietario',
   'OWNER.EDIT_TITLE': 'Editar propietario',
   'OWNER.EDIT_OWNER': 'Editar propietario',
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
@@ -621,7 +622,17 @@ const messages: Record<string, string> = {
   'GENERAL.DETAILS': 'Detalles',
   'GENERAL.STORES': 'Tiendas',
   'GENERAL.USERS': 'Usuarios',
-  'GENERAL.RESELLER': 'Revendedor',
+  // Angular GENERAL.RESELLER value is "Gestor", not "Revendedor" (admin-owners-resellers-parity
+  // override 2). Sole consumers: owner-list.tsx, owner-create.tsx, owner-edit.tsx reSellerId label.
+  'GENERAL.RESELLER': 'Gestor',
+
+  // Generic field labels (DRY across owner/reseller forms — stop borrowing USERS.*/STORES.*
+  // namespace keys owned by other modules; admin-owners-resellers-parity).
+  'GENERAL.FULL_NAME': 'Nombre Completo',
+  'GENERAL.CELL_PHONE': 'Teléfono',
+  'GENERAL.EMAIL': 'Correo',
+  'GENERAL.PASSWORD': 'Contraseña',
+  'GENERAL.DESCRIPTION': 'Descripción',
 
   // Sync — Export / Import
   'SYNC.EXPORT_TITLE': 'Exportar datos',

@@ -208,6 +208,21 @@ describe('OwnerEditPage — exports', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-EDIT-3 — submit reads GENERAL.UPDATE ("Actualizar"), not USERS.SAVE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — submit label parity (Req: Owners L6 Text Parity)', () => {
+  it('submit button reads "Actualizar" (GENERAL.UPDATE), matching edit-owner-details.component.html:88', async () => {
+    await renderPage(false);
+
+    await waitFor(() => {
+      expect(esMessages['GENERAL.UPDATE']).toBe('Actualizar');
+      expect(screen.getByRole('button', { name: 'Actualizar' })).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-EDIT-DETAILS-2 — loads owner and pre-populates form
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -221,9 +236,9 @@ describe('OwnerEditPage — loads and pre-populates', () => {
     expect(ownerHttpService.getOwner).toHaveBeenCalledWith('o42');
 
     await waitFor(() => {
-      expect((screen.getByLabelText(esMessages['USERS.FULL_NAME']) as HTMLInputElement).value).toBe('John Edit');
-      expect((screen.getByLabelText(esMessages['USERS.CELL_PHONE']) as HTMLInputElement).value).toBe('+53 5 123-4567');
-      expect((screen.getByLabelText(esMessages['USERS.EMAIL']) as HTMLInputElement).value).toBe('john@example.com');
+  expect((screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement).value).toBe('John Edit');
+      expect((screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']) as HTMLInputElement).value).toBe('+53 5 123-4567');
+      expect((screen.getByLabelText(esMessages['GENERAL.EMAIL']) as HTMLInputElement).value).toBe('john@example.com');
     });
   });
 
@@ -268,7 +283,7 @@ describe('OwnerEditPage — reSellerId SuperAdmin-only', () => {
     await renderPage(true);
 
     await waitFor(() => {
-      const select = screen.getByLabelText(/revendedor|reseller/i);
+      const select = screen.getByLabelText(/revendedor|reseller|gestor/i);
       expect(select).toBeInTheDocument();
     });
   });
@@ -277,7 +292,7 @@ describe('OwnerEditPage — reSellerId SuperAdmin-only', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText(/revendedor|reseller/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/revendedor|reseller|gestor/i)).not.toBeInTheDocument();
     });
   });
 });
@@ -294,10 +309,10 @@ describe('OwnerEditPage — login not in PUT body', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(ownerHttpService.updateOwner).toHaveBeenCalled();
@@ -319,13 +334,13 @@ describe('OwnerEditPage — guest carried silently', () => {
     await renderPage(false, { guest: true });
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
     // guest should NOT be a visible field
     expect(screen.queryByLabelText(/guest/i)).not.toBeInTheDocument();
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       const payload = vi.mocked(ownerHttpService.updateOwner).mock.calls[0]?.[1];
@@ -346,14 +361,14 @@ describe('OwnerEditPage — phone validation', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.CELL_PHONE'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE'])).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
       target: { value: 'bad-phone' },
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.PHONE_FORMAT'])).toBeInTheDocument();
@@ -375,10 +390,10 @@ describe('OwnerEditPage — PUT success stays on page', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(ownerHttpService.updateOwner).toHaveBeenCalledWith('o42', expect.any(Object));
@@ -419,10 +434,10 @@ describe('OwnerEditPage — PUT failure inline error', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -450,10 +465,10 @@ describe('OwnerEditPage — PUT failure inline error', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
@@ -555,10 +570,10 @@ describe('OwnerEditPage — submit disabled while pristine', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const btn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
     expect(btn).toBeDisabled();
   });
 
@@ -566,14 +581,14 @@ describe('OwnerEditPage — submit disabled while pristine', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Changed Name' },
     });
 
-    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const btn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
     expect(btn).not.toBeDisabled();
   });
 
@@ -584,15 +599,15 @@ describe('OwnerEditPage — submit disabled while pristine', () => {
     await renderPage(false);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
     // Make dirty
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Changed Name' },
     });
 
-    let btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    let btn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
     expect(btn).not.toBeDisabled();
 
     // Submit successfully
@@ -603,7 +618,7 @@ describe('OwnerEditPage — submit disabled while pristine', () => {
     });
 
     await waitFor(() => {
-      btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+      btn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
       expect(btn).toBeDisabled();
     });
   });

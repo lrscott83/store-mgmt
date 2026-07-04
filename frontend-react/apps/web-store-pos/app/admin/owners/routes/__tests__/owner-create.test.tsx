@@ -137,22 +137,22 @@ async function renderPage(isSuperAdmin = false) {
 }
 
 function fillValidForm(isSuperAdmin = false) {
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
     target: { value: 'Jane Owner' },
   });
   fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
     target: { value: 'janeowner' },
   });
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
     target: { value: 'Password1' },
   });
   fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
     target: { value: 'Password1' },
   });
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
     target: { value: '+53 5 123-4567' },
   });
-  fireEvent.change(screen.getByLabelText(esMessages['USERS.EMAIL']), {
+  fireEvent.change(screen.getByLabelText(esMessages['GENERAL.EMAIL']), {
     target: { value: 'jane@example.com' },
   });
 }
@@ -174,6 +174,19 @@ describe('OwnerCreatePage — exports', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-CREATE-1 — title matches Angular OWNER.ADD_OWNER value literally
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — title text parity (Req: Owners L6 Text Parity)', () => {
+  it('renders the title "Adicionar Propietario" (Angular OWNER.ADD_OWNER, via OWNER.CREATE_TITLE)', async () => {
+    await renderPage(false);
+
+    expect(esMessages['OWNER.CREATE_TITLE']).toBe('Adicionar Propietario');
+    expect(screen.getByText('Adicionar Propietario')).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-CREATE-2 — renders all 7 fields for Reseller user
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -181,19 +194,19 @@ describe('OwnerCreatePage — fields (Reseller view)', () => {
   it('renders fullName, login, password, confirmPassword, cellPhone, email, description fields', async () => {
     await renderPage(false);
 
-    expect(screen.getByLabelText(esMessages['USERS.FULL_NAME'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     expect(screen.getByLabelText(esMessages['USERS.LOGIN'])).toBeInTheDocument();
-    expect(screen.getByLabelText(esMessages['USERS.PASSWORD'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.PASSWORD'])).toBeInTheDocument();
     expect(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD'])).toBeInTheDocument();
-    expect(screen.getByLabelText(esMessages['USERS.CELL_PHONE'])).toBeInTheDocument();
-    expect(screen.getByLabelText(esMessages['USERS.EMAIL'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE'])).toBeInTheDocument();
+    expect(screen.getByLabelText(esMessages['GENERAL.EMAIL'])).toBeInTheDocument();
     expect(screen.getByLabelText(/descripci/i)).toBeInTheDocument();
   });
 
   it('does NOT render reSellerId select for non-SuperAdmin', async () => {
     await renderPage(false);
     // reSellerId select should not be present
-    expect(screen.queryByLabelText(/revendedor|reseller/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/revendedor|reseller|gestor/i)).not.toBeInTheDocument();
   });
 });
 
@@ -206,7 +219,7 @@ describe('OwnerCreatePage — reSellerId SuperAdmin-only', () => {
     await renderPage(true);
 
     await waitFor(() => {
-      const select = screen.getByLabelText(/revendedor|reseller/i);
+      const select = screen.getByLabelText(/revendedor|reseller|gestor/i);
       expect(select).toBeInTheDocument();
     });
   });
@@ -223,13 +236,13 @@ describe('OwnerCreatePage — password regex validation', () => {
     );
     await renderPage(false);
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), { target: { value: 'Jane' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), { target: { value: 'Jane' } });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), { target: { value: 'jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), { target: { value: 'weak' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), { target: { value: 'weak' } });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), { target: { value: 'weak' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), { target: { value: '+53 5 123-4567' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), { target: { value: '+53 5 123-4567' } });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.PASSWORD_POLICY'])).toBeInTheDocument();
@@ -250,13 +263,13 @@ describe('OwnerCreatePage — password mismatch validation', () => {
     );
     await renderPage(false);
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), { target: { value: 'Jane' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), { target: { value: 'Jane' } });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), { target: { value: 'jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), { target: { value: 'Password1' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), { target: { value: 'Password1' } });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), { target: { value: 'Password2' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), { target: { value: '+53 5 123-4567' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), { target: { value: '+53 5 123-4567' } });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.PASSWORDS_MUST_MATCH'])).toBeInTheDocument();
@@ -277,13 +290,13 @@ describe('OwnerCreatePage — phone format validation', () => {
     );
     await renderPage(false);
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), { target: { value: 'Jane' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), { target: { value: 'Jane' } });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), { target: { value: 'jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.PASSWORD']), { target: { value: 'Password1' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), { target: { value: 'Password1' } });
     fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), { target: { value: 'Password1' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CELL_PHONE']), { target: { value: '12345' } });
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), { target: { value: '12345' } });
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.PHONE_FORMAT'])).toBeInTheDocument();
@@ -313,7 +326,7 @@ describe('OwnerCreatePage — successful submit', () => {
     await renderPage(false);
     fillValidForm(false);
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(ownerHttpService.createOwner).toHaveBeenCalledWith(
@@ -350,7 +363,7 @@ describe('OwnerCreatePage — server error', () => {
     await renderPage(false);
     fillValidForm(false);
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -367,7 +380,7 @@ describe('OwnerCreatePage — server error', () => {
     await renderPage(false);
     fillValidForm(false);
 
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['USERS.SAVE'] }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
@@ -383,18 +396,18 @@ describe('OwnerCreatePage — submit disabled on pristine', () => {
   it('submit button is disabled on initial render (pristine)', async () => {
     await renderPage(false);
 
-    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const btn = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
     expect(btn).toBeDisabled();
   });
 
   it('submit button is enabled after user edits a field (dirty)', async () => {
     await renderPage(false);
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Something' },
     });
 
-    const btn = screen.getByRole('button', { name: esMessages['USERS.SAVE'] });
+    const btn = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
     expect(btn).not.toBeDisabled();
   });
 });
@@ -423,7 +436,7 @@ describe('OwnerCreatePage — unsaved changes prompt', () => {
   it('calls useUnsavedChangesPrompt with true when form is dirty', async () => {
     await renderPage(false);
 
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.FULL_NAME']), {
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
       target: { value: 'Dirty' },
     });
 

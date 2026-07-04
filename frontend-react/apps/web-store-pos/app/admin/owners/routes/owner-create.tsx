@@ -115,7 +115,7 @@ export function OwnerCreatePage() {
 
         <div>
           <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'USERS.FULL_NAME' })}
+            {intl.formatMessage({ id: 'GENERAL.FULL_NAME' })}
           </label>
           <input
             id="fullName"
@@ -143,7 +143,7 @@ export function OwnerCreatePage() {
 
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'USERS.PASSWORD' })}
+            {intl.formatMessage({ id: 'GENERAL.PASSWORD' })}
           </label>
           <input
             id="password"
@@ -171,7 +171,7 @@ export function OwnerCreatePage() {
 
         <div>
           <label htmlFor="cellPhone" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'USERS.CELL_PHONE' })}
+            {intl.formatMessage({ id: 'GENERAL.CELL_PHONE' })}
           </label>
           <input
             id="cellPhone"
@@ -185,7 +185,7 @@ export function OwnerCreatePage() {
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'USERS.EMAIL' })}
+            {intl.formatMessage({ id: 'GENERAL.EMAIL' })}
           </label>
           <input
             id="email"
@@ -199,7 +199,7 @@ export function OwnerCreatePage() {
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-            {intl.formatMessage({ id: 'STORES.DESCRIPTION' })}
+            {intl.formatMessage({ id: 'GENERAL.DESCRIPTION' })}
           </label>
           <input
             id="description"
@@ -236,7 +236,7 @@ export function OwnerCreatePage() {
           disabled={!isDirty || isSubmitting}
           className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {intl.formatMessage({ id: 'USERS.SAVE' })}
+          {intl.formatMessage({ id: 'GENERAL.ADD' })}
         </button>
       </form>
     </div>
