@@ -7,6 +7,10 @@ export interface ProductCategory {
   isActive: boolean;
 }
 
+export interface ProductCategoryView extends ProductCategory {
+  productsCount: number;
+}
+
 export interface Product extends AuditableBaseModel {
   id: string;
   name: string;

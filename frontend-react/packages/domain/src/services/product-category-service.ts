@@ -1,4 +1,4 @@
-import type { ProductCategory } from '../models/product';
+import type { ProductCategory, ProductCategoryView } from '../models/product';
 import type { BaseService } from './base-service';
 
 /**
@@ -13,4 +13,9 @@ import type { BaseService } from './base-service';
 export interface ProductCategoryService extends BaseService<ProductCategory> {
   getByName(name: string): ProductCategory | undefined;
   save(category: ProductCategory): ProductCategory;
+  hasAnyCategory(): boolean;
+  hasAnyAvailableCategory(): boolean;
+  getMaxOrder(): number;
+  getAvailableProductCategories(): ProductCategory[];
+  getProductCategoriesView(): ProductCategoryView[];
 }
