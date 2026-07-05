@@ -317,4 +317,163 @@ describe('SaleCreditOfflineService', () => {
       expect(() => service.delete('missing-id')).not.toThrow();
     });
   });
+
+  // Test-only helper: `createFromOrder` always stamps `date: now`, so to exercise
+  // financial-window methods we backdate the persisted record directly (same
+  // localStorage-rewrite technique already used by SC-09's "excludes credits not
+  // created today" test).
+  function setCreditDate(id: string, date: Date) {
+    const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
+    const entries: [string, Record<string, unknown>][] = JSON.parse(raw ?? '[]');
+    const patched = entries.map(([key, value]) =>
+      value.id === id ? [key, { ...value, date: date.toISOString() }] : [key, value],
+    );
+    localStorage.setItem('lizoft.store-saleCredits-s1', JSON.stringify(patched));
+  }
+
+  // WU4: getActiveSaleCreditsPriceBetweenDates/Today/Yesterday
+  describe('getActiveSaleCreditsPriceBetweenDates/Today/Yesterday', () => {
+    it('sums active credits within a raw date window, excluding voided and out-of-range', () => {
+      const start = new Date('2024-02-01T00:00:00.000');
+      const end = new Date('2024-02-05T00:00:00.000');
+      const inRange1 = service.createFromOrder('o1', 'Ana', 30);
+      setCreditDate(inRange1.id, new Date('2024-02-02T10:00:00.000'));
+      const inRange2 = service.createFromOrder('o2', 'Bob', 20);
+      setCreditDate(inRange2.id, new Date('2024-02-03T10:00:00.000'));
+      const outOfRange = service.createFromOrder('o3', 'Carl', 999);
+      setCreditDate(outOfRange.id, new Date('2024-01-15T10:00:00.000'));
+      service.voidByOrderId('o1');
+      expect(service.getActiveSaleCreditsPriceBetweenDates(start, end)).toBe(20);
+    });
+
+    it('getActiveSaleCreditsPriceToday sums only credits dated today', () => {
+      const today = service.createFromOrder('o1', 'Ana', 40);
+      const yesterday = service.createFromOrder('o2', 'Bob', 999);
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      setCreditDate(yesterday.id, yesterdayDate);
+      void today;
+      expect(service.getActiveSaleCreditsPriceToday()).toBe(40);
+    });
+
+    it('getActiveSaleCreditsPriceYesterday sums only credits dated yesterday', () => {
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      yesterdayDate.setHours(10, 0, 0, 0);
+      const yesterday = service.createFromOrder('o1', 'Ana', 15);
+      setCreditDate(yesterday.id, yesterdayDate);
+      service.createFromOrder('o2', 'Bob', 999); // today
+      expect(service.getActiveSaleCreditsPriceYesterday()).toBe(15);
+    });
+  });
+
+  // WU4: getActiveUnpaidSaleCreditsPriceToday/Yesterday
+  describe('getActiveUnpaidSaleCreditsPriceToday/Yesterday', () => {
+    it('getActiveUnpaidSaleCreditsPriceToday excludes paid credits dated today', () => {
+      const unpaid = service.createFromOrder('o1', 'Ana', 40);
+      const paid = service.createFromOrder('o2', 'Bob', 999);
+      service.pay(paid.id, PaymentType.Efectivo, '');
+      void unpaid;
+      expect(service.getActiveUnpaidSaleCreditsPriceToday()).toBe(40);
+    });
+
+    it('getActiveUnpaidSaleCreditsPriceYesterday excludes paid credits dated yesterday', () => {
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      yesterdayDate.setHours(10, 0, 0, 0);
+      const unpaid = service.createFromOrder('o1', 'Ana', 25);
+      setCreditDate(unpaid.id, yesterdayDate);
+      const paid = service.createFromOrder('o2', 'Bob', 999);
+      setCreditDate(paid.id, yesterdayDate);
+      service.pay(paid.id, PaymentType.Efectivo, '');
+      expect(service.getActiveUnpaidSaleCreditsPriceYesterday()).toBe(25);
+    });
+  });
+
+  // WU4: getSaleCreditsTotalBefore/Total/Yesterday
+  describe('getSaleCreditsTotalBefore/Total/Yesterday', () => {
+    it('getSaleCreditsTotalBefore sums active credits strictly before threshold date', () => {
+      const threshold = new Date('2024-03-01T00:00:00.000');
+      const c1 = service.createFromOrder('o1', 'Ana', 10);
+      setCreditDate(c1.id, new Date('2024-02-01T10:00:00.000'));
+      const c2 = service.createFromOrder('o2', 'Bob', 25);
+      setCreditDate(c2.id, new Date('2024-02-15T10:00:00.000'));
+      const c3 = service.createFromOrder('o3', 'Carl', 999);
+      setCreditDate(c3.id, new Date('2024-03-15T10:00:00.000')); // after threshold
+      expect(service.getSaleCreditsTotalBefore(threshold)).toBe(35);
+    });
+
+    it('getSaleCreditsTotalBefore excludes voided credits', () => {
+      const threshold = new Date('2024-03-01T00:00:00.000');
+      const voided = service.createFromOrder('o1', 'Ana', 10);
+      setCreditDate(voided.id, new Date('2024-02-01T10:00:00.000'));
+      service.voidByOrderId('o1');
+      const c2 = service.createFromOrder('o2', 'Bob', 25);
+      setCreditDate(c2.id, new Date('2024-02-15T10:00:00.000'));
+      expect(service.getSaleCreditsTotalBefore(threshold)).toBe(25);
+    });
+
+    it('getSaleCreditsTotal sums all active credits up through end of today', () => {
+      service.createFromOrder('o1', 'Ana', 50); // today
+      const c2 = service.createFromOrder('o2', 'Bob', 20);
+      setCreditDate(c2.id, new Date('2024-01-01T10:00:00.000'));
+      expect(service.getSaleCreditsTotal()).toBe(70);
+    });
+
+    it('getSaleCreditsTotalYesterday sums only credits strictly before today start', () => {
+      const c1 = service.createFromOrder('o1', 'Ana', 20);
+      setCreditDate(c1.id, new Date('2024-01-01T10:00:00.000'));
+      service.createFromOrder('o2', 'Bob', 999); // today, excluded
+      expect(service.getSaleCreditsTotalYesterday()).toBe(20);
+    });
+  });
+
+  // WU4: filterSaleCredits (sync port of filterSaleCredits Observable)
+  describe('filterSaleCredits', () => {
+    it('isPaid=true constrains to paid credits only', () => {
+      const paid = service.createFromOrder('o1', 'Ana', 50);
+      service.pay(paid.id, PaymentType.Efectivo, '');
+      service.createFromOrder('o2', 'Bob', 30);
+      const result = service.filterSaleCredits(true);
+      expect(result).toHaveLength(1);
+      expect(result[0].isPaid).toBe(true);
+    });
+
+    it('isPaid=false behaves as no filter on paid status (Angular quirk: !isPaid || ...)', () => {
+      const paid = service.createFromOrder('o1', 'Ana', 50);
+      service.pay(paid.id, PaymentType.Efectivo, '');
+      service.createFromOrder('o2', 'Bob', 30);
+      const result = service.filterSaleCredits(false);
+      expect(result).toHaveLength(2);
+    });
+
+    it('filters by client substring match', () => {
+      service.createFromOrder('o1', 'Juan Perez', 50);
+      service.createFromOrder('o2', 'Maria Lopez', 30);
+      const result = service.filterSaleCredits(false, 'Perez');
+      expect(result).toHaveLength(1);
+      expect(result[0].client).toBe('Juan Perez');
+    });
+
+    it('filters by date range when start/end provided', () => {
+      const c1 = service.createFromOrder('o1', 'Ana', 10);
+      setCreditDate(c1.id, new Date('2024-01-01T10:00:00.000'));
+      const c2 = service.createFromOrder('o2', 'Bob', 20);
+      setCreditDate(c2.id, new Date('2024-06-01T10:00:00.000'));
+      const result = service.filterSaleCredits(
+        false,
+        undefined,
+        new Date('2024-05-01T00:00:00.000'),
+        new Date('2024-07-01T00:00:00.000'),
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].total).toBe(20);
+    });
+
+    it('excludes voided credits regardless of filters', () => {
+      service.createFromOrder('o1', 'Ana', 10);
+      service.voidByOrderId('o1');
+      expect(service.filterSaleCredits(false)).toHaveLength(0);
+    });
+  });
 });

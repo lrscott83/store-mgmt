@@ -79,6 +79,90 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
     );
   }
 
+  /**
+   * 1:1 port of Angular's `getSaleCreditsTotalBefore` — sum of ALL active sale credits
+   * with `date < threshold` (no lower bound).
+   */
+  getSaleCreditsTotalBefore(date: Date): number {
+    return this.getAll()
+      .filter((c) => c.isActive && c.date < date)
+      .reduce((sum, c) => sum + c.total, 0);
+  }
+
+  getSaleCreditsTotal(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.getSaleCreditsTotalBefore(end);
+  }
+
+  /**
+   * 1:1 port of Angular's `getSaleCreditsTotalYesterday` — despite computing an unused
+   * `endDate`, Angular's own body only ever calls `getSaleCreditsTotalBefore(startDate)`
+   * (today's start), i.e. "everything before today" — not replicating the dead variable.
+   */
+  getSaleCreditsTotalYesterday(): number {
+    const start = startOfDay(new Date());
+    return this.getSaleCreditsTotalBefore(start);
+  }
+
+  /**
+   * ADR-5: financial helpers use RAW date boundaries (pre-snapped by the caller), NOT
+   * the day-snapping `getByDateRange`/`getActiveToday`. 1:1 port of Angular's private
+   * `getActiveSaleCreditsBetweenDates`.
+   */
+  private activeSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
+    return this.getAll().filter((c) => c.isActive && c.date >= start && c.date < end);
+  }
+
+  private activeUnpaidSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
+    return this.activeSaleCreditsBetween(start, end).filter((c) => !c.isPaid);
+  }
+
+  getActiveSaleCreditsPriceBetweenDates(start: Date, end: Date): number {
+    return this.activeSaleCreditsBetween(start, end).reduce((sum, c) => sum + c.total, 0);
+  }
+
+  getActiveSaleCreditsPriceToday(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.getActiveSaleCreditsPriceBetweenDates(start, end);
+  }
+
+  getActiveSaleCreditsPriceYesterday(): number {
+    const start = startOfDay(addDays(new Date(), -1));
+    const end = startOfDay(new Date());
+    return this.getActiveSaleCreditsPriceBetweenDates(start, end);
+  }
+
+  getActiveUnpaidSaleCreditsPriceToday(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.activeUnpaidSaleCreditsBetween(start, end).reduce((sum, c) => sum + c.total, 0);
+  }
+
+  getActiveUnpaidSaleCreditsPriceYesterday(): number {
+    const start = startOfDay(addDays(new Date(), -1));
+    const end = startOfDay(new Date());
+    return this.activeUnpaidSaleCreditsBetween(start, end).reduce((sum, c) => sum + c.total, 0);
+  }
+
+  /**
+   * Sync replacement of Angular's `filterSaleCredits` Observable. Quirk (1:1 port):
+   * `isPaid` only constrains when truthy — `isPaid=false` behaves as "no filter" on
+   * paid status (Angular: `!isPaid || credit.isPaid === isPaid`). `client` is a
+   * case-sensitive substring match (Angular: `credit.client.includes(client)`).
+   */
+  filterSaleCredits(isPaid: boolean, client?: string, start?: Date, end?: Date): SaleCredit[] {
+    return this.getAll().filter(
+      (c) =>
+        c.isActive &&
+        (!client || c.client.includes(client)) &&
+        (!isPaid || c.isPaid === isPaid) &&
+        (!start || c.date >= start) &&
+        (!end || c.date < end),
+    );
+  }
+
   createFromOrder(orderId: string, client: string, total: number): SaleCredit {
     const now = new Date();
     const credit: SaleCredit = {
