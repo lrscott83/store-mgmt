@@ -1,4 +1,4 @@
-import type { Product } from '@store-mgmt/domain';
+import type { Product, ProductService } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
@@ -13,7 +13,7 @@ type CreateProductInput = Omit<
   'id' | 'createdDate' | 'createdByName' | 'updatedDate' | 'updatedByName'
 > & { id?: string };
 
-export class ProductOfflineService {
+export class ProductOfflineService implements ProductService {
   constructor(private readonly storeId: string) {}
 
   getAll(): Product[] {
@@ -86,5 +86,39 @@ export class ProductOfflineService {
         p.categoryName?.toLowerCase().includes(q) ||
         p.barcode?.toLowerCase().includes(q),
     );
+  }
+
+  getByName(name: string): Product | undefined {
+    return this.getAll().find((p) => p.name === name);
+  }
+
+  getMaxOrder(categoryId: string): number {
+    const orders = this.getAll()
+      .filter((p) => p.categoryId === categoryId)
+      .map((p) => p.order);
+    return orders.length > 0 ? Math.max(...orders) : 0;
+  }
+
+  getAvailableProductsByCategoryId(categoryId: string): Product[] {
+    return this.getAll()
+      .filter((p) => p.categoryId === categoryId && p.isActive)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  private setActive(id: string, isActive: boolean): void {
+    // Angular parity: activate/deactivateProduct set ONLY isActive, no
+    // updatedDate/updatedByName stamp (unlike delete/soft-delete). No-op if
+    // the id doesn't exist.
+    const existing = repo.getById(this.storeId, id);
+    if (!existing) return;
+    repo.upsert(this.storeId, { ...existing, isActive });
+  }
+
+  activate(id: string): void {
+    this.setActive(id, true);
+  }
+
+  deactivate(id: string): void {
+    this.setActive(id, false);
   }
 }

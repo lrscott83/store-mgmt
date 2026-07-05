@@ -11,4 +11,9 @@ import type { BaseService } from './base-service';
 export interface ProductService extends BaseService<Product> {
   getByBarcode(barcode: string): Product | undefined;
   update(product: Product): Product;
+  getByName(name: string): Product | undefined;
+  getMaxOrder(categoryId: string): number;
+  getAvailableProductsByCategoryId(categoryId: string): Product[];
+  activate(id: string): void;
+  deactivate(id: string): void;
 }

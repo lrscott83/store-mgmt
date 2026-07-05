@@ -44,6 +44,29 @@ class FakeProductService implements ProductService {
   delete(id: string): void {
     this.items = this.items.filter((p) => p.id !== id);
   }
+
+  getByName(name: string): Product | undefined {
+    return this.items.find((p) => p.name === name);
+  }
+
+  getMaxOrder(categoryId: string): number {
+    const orders = this.items.filter((p) => p.categoryId === categoryId).map((p) => p.order);
+    return orders.length > 0 ? Math.max(...orders) : 0;
+  }
+
+  getAvailableProductsByCategoryId(categoryId: string): Product[] {
+    return this.items
+      .filter((p) => p.categoryId === categoryId && p.isActive)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  activate(id: string): void {
+    this.items = this.items.map((p) => (p.id === id ? { ...p, isActive: true } : p));
+  }
+
+  deactivate(id: string): void {
+    this.items = this.items.map((p) => (p.id === id ? { ...p, isActive: false } : p));
+  }
 }
 
 describe('ProductService', () => {
@@ -54,5 +77,16 @@ describe('ProductService', () => {
     expect(updated.price).toBe(9);
     svc.delete('p1');
     expect(svc.getAll()).toHaveLength(0);
+  });
+
+  it('is implementable with getByName/getMaxOrder/getAvailableProductsByCategoryId/activate/deactivate', () => {
+    const svc: ProductService = new FakeProductService();
+    expect(svc.getByName('Coca Cola')?.id).toBe('p1');
+    expect(svc.getMaxOrder('cat1')).toBe(1);
+    expect(svc.getAvailableProductsByCategoryId('cat1')).toHaveLength(1);
+    svc.deactivate('p1');
+    expect(svc.getAvailableProductsByCategoryId('cat1')).toHaveLength(0);
+    svc.activate('p1');
+    expect(svc.getAvailableProductsByCategoryId('cat1')).toHaveLength(1);
   });
 });

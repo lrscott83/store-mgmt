@@ -264,4 +264,80 @@ describe('ProductOfflineService', () => {
       expect(raw).not.toBeNull();
     });
   });
+
+  describe('PROD-09: getByName', () => {
+    it('returns the product with an exact name match, including inactive products', () => {
+      service.create(makeProduct({ name: 'Coca Cola', isActive: false }));
+      const found = service.getByName('Coca Cola');
+      expect(found).not.toBeUndefined();
+      expect(found?.name).toBe('Coca Cola');
+    });
+
+    it('returns the first match when duplicate names exist', () => {
+      const p1 = service.create(makeProduct({ name: 'Dup' }));
+      service.create(makeProduct({ name: 'Dup' }));
+      const found = service.getByName('Dup');
+      expect(found?.id).toBe(p1.id);
+    });
+
+    it('returns undefined for unknown name', () => {
+      service.create(makeProduct({ name: 'Coca Cola' }));
+      expect(service.getByName('Unknown')).toBeUndefined();
+    });
+  });
+
+  describe('PROD-10: getMaxOrder', () => {
+    it('returns 0 when the category has no products', () => {
+      expect(service.getMaxOrder('empty-cat')).toBe(0);
+    });
+
+    it('returns the max order among all products (active+inactive) in the category', () => {
+      service.create(makeProduct({ categoryId: 'cat-a', order: 1 }));
+      service.create(makeProduct({ categoryId: 'cat-a', order: 5, isActive: false }));
+      service.create(makeProduct({ categoryId: 'cat-b', order: 9 }));
+      expect(service.getMaxOrder('cat-a')).toBe(5);
+    });
+  });
+
+  describe('PROD-11: getAvailableProductsByCategoryId', () => {
+    it('returns only isActive products for the given category, regardless of availableToSale', () => {
+      service.create(makeProduct({ categoryId: 'cat-a', order: 2, isActive: true, availableToSale: false }));
+      service.create(makeProduct({ categoryId: 'cat-a', order: 1, isActive: true, availableToSale: true }));
+      service.create(makeProduct({ categoryId: 'cat-a', order: 0, isActive: false }));
+      service.create(makeProduct({ categoryId: 'cat-b', order: 0, isActive: true }));
+
+      const results = service.getAvailableProductsByCategoryId('cat-a');
+      expect(results).toHaveLength(2);
+      expect(results.map((p) => p.order)).toEqual([1, 2]);
+    });
+
+    it('returns empty array when no products match', () => {
+      expect(service.getAvailableProductsByCategoryId('none')).toEqual([]);
+    });
+  });
+
+  describe('PROD-12: activate/deactivate', () => {
+    it('deactivate sets isActive=false without stamping updatedDate/updatedByName', () => {
+      const created = service.create(makeProduct({ isActive: true }));
+      service.deactivate(created.id);
+      const found = service.getById(created.id);
+      expect(found?.isActive).toBe(false);
+      expect(found?.updatedDate).toBeUndefined();
+      expect(found?.updatedByName).toBeUndefined();
+    });
+
+    it('activate sets isActive=true without stamping updatedDate/updatedByName', () => {
+      const created = service.create(makeProduct({ isActive: false }));
+      service.activate(created.id);
+      const found = service.getById(created.id);
+      expect(found?.isActive).toBe(true);
+      expect(found?.updatedDate).toBeUndefined();
+      expect(found?.updatedByName).toBeUndefined();
+    });
+
+    it('is a no-op for a missing id (no throw)', () => {
+      expect(() => service.activate('missing')).not.toThrow();
+      expect(() => service.deactivate('missing')).not.toThrow();
+    });
+  });
 });
