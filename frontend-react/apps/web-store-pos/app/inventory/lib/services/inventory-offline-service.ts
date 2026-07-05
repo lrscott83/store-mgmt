@@ -65,6 +65,18 @@ export interface InventoryCategoryView {
   products: InventoryProductStock[];
 }
 
+/**
+ * Per-product FIFO breakdown — sync equivalent of Angular's InventoryEntriesView
+ * (inventory-entries.view.ts). `availableEntries` reuses domain's InventoryEntryCost
+ * (`id`, not Angular's `inventoryId` — Batch 1 rename already applies here).
+ */
+export interface InventoryEntriesView {
+  productId: string;
+  productName: string;
+  productAvailable: number;
+  availableEntries: InventoryEntryCost[];
+}
+
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -201,6 +213,74 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     return Array.from(categoryMap.values());
   }
 
+  /**
+   * 1:1 port of Angular's `getInventoryCostTotalBefore` — sum of `available * costPrice`
+   * across ALL active entries with `date < threshold` (no lower bound).
+   */
+  getInventoryCostTotalBefore(date: Date): number {
+    let total = 0;
+    for (const [, entries] of this.repo.getAll(this.storeId)) {
+      for (const entry of entries) {
+        if (entry.isActive && entry.date < date) total += entry.available * entry.costPrice;
+      }
+    }
+    return total;
+  }
+
+  getInventoryCostTotal(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.getInventoryCostTotalBefore(end);
+  }
+
+  getInventoryCostTotalYesterday(): number {
+    const start = startOfDay(new Date());
+    return this.getInventoryCostTotalBefore(start);
+  }
+
+  /**
+   * Sync replacement of Angular's `filterInventoryEntries` Observable. All params
+   * optional and unbounded when falsy — 1:1 port, operates over active entries only
+   * (Angular's `getActiveInventoryEntriesStorage`), RAW date comparisons.
+   */
+  filterInventoryEntries(productId?: string, start?: Date, end?: Date): InventoryEntryView[] {
+    return this.getAll().filter(
+      (v) =>
+        (!productId || productId === v.productId) &&
+        (!start || v.date >= start) &&
+        (!end || v.date < end),
+    );
+  }
+
+  /**
+   * 1:1 port of Angular's `getInventoryEntriesView` — per-product FIFO breakdown of
+   * ACTIVE entries with `available > 0`, sorted by `order` ascending. Emits `id` (not
+   * Angular's `inventoryId`) via domain's InventoryEntryCost. Zero-arg per spec
+   * (offline-online-service-parity, spec-slice1); `productName` defaults to `''`
+   * (matches `getAll()`'s convention — this service has no ProductRepository
+   * dependency; containers that need names enrich separately).
+   */
+  getInventoryEntriesView(): InventoryEntriesView[] {
+    const result: InventoryEntriesView[] = [];
+    for (const [productId, entries] of this.repo.getAll(this.storeId)) {
+      const availableEntries: InventoryEntryCost[] = entries
+        .filter((e) => e.available > 0 && e.isActive)
+        .sort((a, b) => a.order - b.order)
+        .map((e) => ({ id: e.id, costPrice: e.costPrice, quantity: e.available }));
+
+      let productAvailable = 0;
+      for (const e of availableEntries) productAvailable += e.quantity;
+
+      result.push({
+        productId,
+        productName: '',
+        productAvailable,
+        availableEntries,
+      });
+    }
+    return result;
+  }
+
   // ─── FIFO deduction ──────────────────────────────────────────────────────
 
   /**
@@ -248,6 +328,40 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     this.repo.saveAll(this.storeId, map);
 
     return costs;
+  }
+
+  /**
+   * BUG FIX (angular-bugs-policy, ADR-7): Angular's `updateAvailableInventories` decrements
+   * `available` in FIFO order but computes the "amount consumed so far" AFTER zeroing —
+   * `total -= i.available` runs once `i.available` has already been set to 0, so the
+   * decrement is always 0 for any entry that gets fully drained, silently over-consuming
+   * later entries in the chain. Example (entries available=[5,10], quantity=8): Angular
+   * zeroes entry1 (available=5→0) then computes `total -= 0` (bug — should be `-= 5`),
+   * leaving `total` at 8 instead of 3, so entry2 is drained by 8 instead of 3
+   * (available=10→2 instead of the correct 10→7). React uses the same correct
+   * `Math.min(total, i.available)` pattern already proven in `getAvailableInventoryCosts`:
+   * consumed = min(remaining, i.available); i.available -= consumed; remaining -= consumed.
+   * No cost-consumption record is produced (unlike getAvailableInventoryCosts) — matches
+   * Angular's own contract (boolean success/failure only).
+   */
+  updateAvailableInventories(productId: string, quantity: number): boolean {
+    const map = this.repo.getAll(this.storeId);
+    const entries = (map.get(productId) ?? [])
+      .filter((e) => e.isActive && e.available > 0)
+      .sort((a, b) => a.order - b.order);
+
+    if (entries.length === 0) return false;
+
+    let remaining = quantity;
+    for (const entry of entries) {
+      if (remaining <= 0) break;
+      const consumed = Math.min(remaining, entry.available);
+      entry.available -= consumed;
+      remaining -= consumed;
+    }
+
+    this.repo.saveAll(this.storeId, map);
+    return true;
   }
 
   /**
@@ -410,6 +524,92 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     const found = this.repo.findEntryById(this.storeId, id);
     if (!found) throw new Error(`InventoryEntry not found: ${id}`);
     this.deactivate(id, found.productId);
+  }
+
+  /**
+   * 1:1 port of Angular's `amortizeSoldEntry` — zeroes `available` and moves the
+   * consumed amount into a permanently-reduced `quantity` (so the entry no longer
+   * shows as "still has stock" once every unit has been sold and the sale is being
+   * amortized/written off). Throws InventoryErrors.EntryNotExists when the entry is
+   * missing, InventoryErrors.SaleNotExistsWithThisEntry when nothing has actually
+   * been sold yet (`quantity === available` — return-contract collapse per ADR-1).
+   */
+  amortizeSoldEntry(productId: string, entryId: string): void {
+    const entries = this.repo.getByProductId(this.storeId, productId);
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) {
+      throw new Error(`InventoryErrors.EntryNotExists: entry ${entryId} not found for product ${productId}`);
+    }
+    if (entry.quantity === entry.available) {
+      throw new Error(
+        `InventoryErrors.SaleNotExistsWithThisEntry: entry ${entryId} has no sold units to amortize`,
+      );
+    }
+
+    entry.quantity -= entry.available;
+    entry.available = 0;
+    this.repo.save(this.storeId, productId, entries);
+  }
+
+  /**
+   * BUG FIX (angular-bugs-policy, ADR-7): Angular's cross-product `updateInventoryEntry`
+   * fetches BOTH the "new product" bucket AND the "old product" bucket via
+   * `getProductInventoriesByProductId(newProductId)` — the second call is a copy-paste
+   * bug that should read `oldProductId`. In practice this means: (1) the entry is looked
+   * up in the WRONG (new-product) bucket, typically finding nothing when the entry
+   * actually lives under `oldProductId`, so Angular's own code goes on to call
+   * `entry.quantity = ...` on `undefined` and throws a TypeError; and (2) even before
+   * that crash, `this.inventories.set(oldProductId, oldInventories)` overwrites the OLD
+   * product's bucket with a (filtered) copy of the NEW product's bucket — silently
+   * destroying oldProductId's inventory list. React's corrected version reads
+   * `oldProductId`'s bucket for removal and `newProductId`'s bucket for insertion, so a
+   * cross-product move relocates exactly the one entry and leaves every other entry (in
+   * both buckets) untouched. Kept as a DISTINCT method (not folded into the existing
+   * single-product `update`) per design — `update` still only handles same-product edits.
+   * Same partially-sold guard as `update`/`deactivate` (quantity !== available → throw).
+   */
+  updateInventoryEntry(
+    oldProductId: string,
+    entryId: string,
+    newProductId: string,
+    quantity: number,
+    costPrice: number,
+  ): InventoryEntry {
+    const oldEntries = this.repo.getByProductId(this.storeId, oldProductId);
+    const entry = oldEntries.find((e) => e.id === entryId);
+    if (!entry) throw new Error(`InventoryEntry not found: ${entryId}`);
+
+    if (entry.quantity !== entry.available) {
+      throw new Error(
+        `InventoryErrors.SaleExistsWithThisEntry: entry ${entryId} has been partially sold (qty=${entry.quantity}, available=${entry.available})`,
+      );
+    }
+
+    const updated: InventoryEntry = {
+      ...entry,
+      quantity,
+      available: quantity,
+      costPrice,
+      productId: newProductId,
+      updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
+    };
+
+    if (oldProductId === newProductId) {
+      const idx = oldEntries.findIndex((e) => e.id === entryId);
+      if (idx !== -1) oldEntries[idx] = updated;
+      this.repo.save(this.storeId, oldProductId, oldEntries);
+      return updated;
+    }
+
+    // Cross-product move: remove from oldProductId's bucket, append to newProductId's.
+    const remainingOldEntries = oldEntries.filter((e) => e.id !== entryId);
+    this.repo.save(this.storeId, oldProductId, remainingOldEntries);
+
+    const newEntries = this.repo.getByProductId(this.storeId, newProductId);
+    this.repo.save(this.storeId, newProductId, [...newEntries, updated]);
+
+    return updated;
   }
 
   // ─── Query helpers ───────────────────────────────────────────────────────

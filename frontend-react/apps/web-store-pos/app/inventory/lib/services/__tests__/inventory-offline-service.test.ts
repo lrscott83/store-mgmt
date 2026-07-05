@@ -793,4 +793,285 @@ describe('InventoryOfflineService', () => {
       expect(() => service.delete('missing')).toThrow();
     });
   });
+
+  // WU5: getInventoryCostTotalBefore/Total/Yesterday
+  describe('getInventoryCostTotalBefore/Total/Yesterday', () => {
+    it('sums available*costPrice for active entries strictly before threshold date', () => {
+      const threshold = new Date('2024-03-01T00:00:00.000');
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 10, costPrice: 2, date: new Date('2024-02-01T10:00:00.000') }), // 20
+        makeEntry('e2', 'p1', { available: 5, costPrice: 3, date: new Date('2024-02-15T10:00:00.000') }), // 15
+      ]);
+      map.set('p2', [
+        makeEntry('e3', 'p2', { available: 100, costPrice: 1, date: new Date('2024-03-15T10:00:00.000') }), // after threshold
+      ]);
+      seedInventory(storeId, map);
+      expect(service.getInventoryCostTotalBefore(threshold)).toBe(35);
+    });
+
+    it('excludes inactive entries', () => {
+      const threshold = new Date('2024-03-01T00:00:00.000');
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 10, costPrice: 2, date: new Date('2024-02-01T10:00:00.000'), isActive: false }),
+        makeEntry('e2', 'p1', { available: 5, costPrice: 3, date: new Date('2024-02-15T10:00:00.000') }),
+      ]);
+      seedInventory(storeId, map);
+      expect(service.getInventoryCostTotalBefore(threshold)).toBe(15);
+    });
+
+    it('getInventoryCostTotal sums all active entries up through end of today', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 4, costPrice: 5, date: new Date(Date.now() - 60 * 60 * 1000) }), // 20, "today"
+        makeEntry('e2', 'p1', { available: 2, costPrice: 3, date: new Date('2024-01-01T10:00:00.000') }), // 6
+      ]);
+      seedInventory(storeId, map);
+      expect(service.getInventoryCostTotal()).toBe(26);
+    });
+
+    it('getInventoryCostTotalYesterday sums only entries strictly before today start', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 2, costPrice: 3, date: new Date('2024-01-01T10:00:00.000') }), // 6
+        makeEntry('e2', 'p1', { available: 4, costPrice: 5, date: new Date(Date.now() - 60 * 60 * 1000) }), // today, excluded
+      ]);
+      seedInventory(storeId, map);
+      expect(service.getInventoryCostTotalYesterday()).toBe(6);
+    });
+  });
+
+  // WU5: filterInventoryEntries
+  describe('filterInventoryEntries', () => {
+    it('filters by productId when provided', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1')]);
+      map.set('p2', [makeEntry('e2', 'p2')]);
+      seedInventory(storeId, map);
+      const result = service.filterInventoryEntries('p1');
+      expect(result).toHaveLength(1);
+      expect(result[0].productId).toBe('p1');
+    });
+
+    it('filters by date range when start/end provided', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { date: new Date('2024-01-01T10:00:00.000') }),
+        makeEntry('e2', 'p1', { date: new Date('2024-06-01T10:00:00.000') }),
+      ]);
+      seedInventory(storeId, map);
+      const result = service.filterInventoryEntries(
+        undefined,
+        new Date('2024-05-01T00:00:00.000'),
+        new Date('2024-07-01T00:00:00.000'),
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('e2');
+    });
+
+    it('excludes inactive entries regardless of filters', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { isActive: false })]);
+      seedInventory(storeId, map);
+      expect(service.filterInventoryEntries()).toHaveLength(0);
+    });
+
+    it('returns all active entries when no filters provided', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1'), makeEntry('e2', 'p1', { order: 1 })]);
+      seedInventory(storeId, map);
+      expect(service.filterInventoryEntries()).toHaveLength(2);
+    });
+  });
+
+  // WU5: getInventoryEntriesView
+  describe('getInventoryEntriesView', () => {
+    it('returns per-product FIFO breakdown sorted by order asc, emitting `id` not `inventoryId`', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e2', 'p1', { order: 1, available: 4, costPrice: 3.0 }),
+        makeEntry('e1', 'p1', { order: 0, available: 6, costPrice: 2.5 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const views = service.getInventoryEntriesView();
+      expect(views).toHaveLength(1);
+      expect(views[0].productId).toBe('p1');
+      expect(views[0].productAvailable).toBe(10);
+      expect(views[0].availableEntries).toEqual([
+        { id: 'e1', costPrice: 2.5, quantity: 6 },
+        { id: 'e2', costPrice: 3.0, quantity: 4 },
+      ]);
+    });
+
+    it('excludes entries with available=0 and inactive entries', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { available: 0 }),
+        makeEntry('e2', 'p1', { available: 5, isActive: false, order: 1 }),
+        makeEntry('e3', 'p1', { available: 3, order: 2 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const views = service.getInventoryEntriesView();
+      expect(views[0].availableEntries).toEqual([{ id: 'e3', costPrice: 2.5, quantity: 3 }]);
+      expect(views[0].productAvailable).toBe(3);
+    });
+
+    it('returns one view per product', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 5 })]);
+      map.set('p2', [makeEntry('e2', 'p2', { available: 8 })]);
+      seedInventory(storeId, map);
+
+      const views = service.getInventoryEntriesView();
+      expect(views).toHaveLength(2);
+      expect(views.map((v) => v.productId).sort()).toEqual(['p1', 'p2']);
+    });
+
+    it('returns empty array when no entries exist', () => {
+      expect(service.getInventoryEntriesView()).toEqual([]);
+    });
+  });
+
+  // WU5: amortizeSoldEntry
+  describe('amortizeSoldEntry', () => {
+    it('zeroes available and reduces quantity by the amortized (previously-available) amount', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 3 })]); // 7 sold
+      seedInventory(storeId, map);
+
+      service.amortizeSoldEntry('p1', 'e1');
+
+      const found = findRawEntry(storeId, 'e1');
+      expect(found?.available).toBe(0);
+      expect(found?.quantity).toBe(7); // 10 - 3
+    });
+
+    it('throws InventoryErrors.EntryNotExists when entry is missing', () => {
+      expect(() => service.amortizeSoldEntry('p1', 'missing')).toThrow(/EntryNotExists/);
+    });
+
+    it('throws InventoryErrors.SaleNotExistsWithThisEntry when nothing has been sold (quantity === available)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      expect(() => service.amortizeSoldEntry('p1', 'e1')).toThrow(/SaleNotExistsWithThisEntry/);
+    });
+  });
+
+  // WU5: updateAvailableInventories — BUG FIX (ADR-7): correct FIFO decrement
+  describe('updateAvailableInventories (bug fix: correct FIFO decrement)', () => {
+    it('correctly decrements across two entries — hand-derived (Angular would over-consume entry2)', () => {
+      // entries available=[5,10], quantity=8.
+      // Correct: consume min(8,5)=5 from e1 (available->0, remaining->3);
+      //          consume min(3,10)=3 from e2 (available->7, remaining->0).
+      // Angular's bug: after zeroing e1.available, it computes `total -= i.available`
+      // (already 0), so total stays 8, over-consuming e2 down to 10-8=2 instead of 7.
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { order: 0, available: 5, costPrice: 2 }),
+        makeEntry('e2', 'p1', { order: 1, available: 10, costPrice: 3 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const result = service.updateAvailableInventories('p1', 8);
+
+      expect(result).toBe(true);
+      expect(findRawEntry(storeId, 'e1')?.available).toBe(0);
+      expect(findRawEntry(storeId, 'e2')?.available).toBe(7); // NOT 2 (the buggy Angular value)
+    });
+
+    it('returns false when no active entries with available>0 exist', () => {
+      expect(service.updateAvailableInventories('p1', 5)).toBe(false);
+    });
+
+    it('respects order field for FIFO consumption', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e2', 'p1', { order: 1, available: 4, costPrice: 3.0 }),
+        makeEntry('e1', 'p1', { order: 0, available: 6, costPrice: 2.5 }),
+      ]);
+      seedInventory(storeId, map);
+
+      service.updateAvailableInventories('p1', 3);
+
+      expect(findRawEntry(storeId, 'e1')?.available).toBe(3); // consumed first
+      expect(findRawEntry(storeId, 'e2')?.available).toBe(4); // untouched
+    });
+
+    it('excludes inactive entries from consumption', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 5, isActive: false })]);
+      seedInventory(storeId, map);
+
+      expect(service.updateAvailableInventories('p1', 3)).toBe(false);
+    });
+  });
+
+  // WU5: updateInventoryEntry — BUG FIX (ADR-7): cross-product old/new-list mix-up
+  describe('updateInventoryEntry (bug fix: cross-product reassignment)', () => {
+    it('moves the entry from oldProductId bucket to newProductId bucket, leaving other entries untouched', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { quantity: 10, available: 10, costPrice: 2 }),
+        makeEntry('e-other', 'p1', { quantity: 5, available: 5, order: 1 }),
+      ]);
+      map.set('p2', [makeEntry('e-existing', 'p2', { quantity: 3, available: 3 })]);
+      seedInventory(storeId, map);
+
+      const updated = service.updateInventoryEntry('p1', 'e1', 'p2', 20, 4);
+
+      expect(updated.productId).toBe('p2');
+      expect(updated.quantity).toBe(20);
+      expect(updated.available).toBe(20);
+      expect(updated.costPrice).toBe(4);
+
+      // p1 bucket keeps only the untouched entry
+      const p1Raw = findRawEntry(storeId, 'e-other');
+      expect(p1Raw).toBeDefined();
+      expect(findRawEntry(storeId, 'e1')?.productId).toBe('p2'); // moved, not destroyed
+
+      // p2 bucket has both the pre-existing entry AND the moved one
+      expect(findRawEntry(storeId, 'e-existing')).toBeDefined();
+    });
+
+    it('same-product update (oldProductId === newProductId) updates in place without touching other products', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      map.set('p2', [makeEntry('e2', 'p2', { quantity: 5, available: 5 })]);
+      seedInventory(storeId, map);
+
+      const updated = service.updateInventoryEntry('p1', 'e1', 'p1', 15, 3);
+      expect(updated.quantity).toBe(15);
+      expect(findRawEntry(storeId, 'e2')?.quantity).toBe(5); // p2 untouched
+    });
+
+    it('throws when the entry has been partially sold', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]);
+      seedInventory(storeId, map);
+
+      expect(() => service.updateInventoryEntry('p1', 'e1', 'p2', 5, 1)).toThrow();
+    });
+
+    it('throws when entry not found in oldProductId bucket', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      expect(() => service.updateInventoryEntry('p1', 'nonexistent', 'p2', 5, 1)).toThrow();
+    });
+
+    it('stamps updatedByName with the authenticated user login', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      const updated = service.updateInventoryEntry('p1', 'e1', 'p2', 5, 1);
+      expect(updated.updatedByName).toBe('jdoe');
+    });
+  });
 });
