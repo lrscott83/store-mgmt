@@ -666,6 +666,50 @@ describe('InventoryOfflineService', () => {
     });
   });
 
+  // Angular parity: InventoryOfflineService.getProductInventoriesByProductId
+  // (inventory-offline.service.ts:54-56) — returns the RAW entry list for a product
+  // (no isActive filter, unlike getAvailableQuantity). Consumed by Stage 7's
+  // InventoryTodaySaleService for the col-9 Costo Unitario quantity-weighted average
+  // (design ADR-2 — must NOT reuse getAvailableByCategory's available-weighted avgCostPrice,
+  // and must NEVER call getAvailableInventoryCosts since it mutates/deducts stock via FIFO).
+  describe('INV-10: getProductInventoriesByProductId — raw entries for a product (Stage 7 ADR-2)', () => {
+    it('returns all entries for the product, including inactive ones', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { isActive: true }),
+        makeEntry('e2', 'p1', { isActive: false }),
+      ]);
+      seedInventory(storeId, map);
+
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries.map((e) => e.id).sort()).toEqual(['e1', 'e2']);
+    });
+
+    it('returns entries with the raw `available` field intact (not the InventoryEntryView projection)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4, costPrice: 3 })]);
+      seedInventory(storeId, map);
+
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries[0]).toMatchObject({ quantity: 10, available: 4, costPrice: 3 });
+    });
+
+    it('returns an empty array when the product has no entries', () => {
+      expect(service.getProductInventoriesByProductId('nonexistent')).toEqual([]);
+    });
+
+    it('does not mutate `available` on the returned entries (read-only, unlike getAvailableInventoryCosts)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 7 })]);
+      seedInventory(storeId, map);
+
+      service.getProductInventoriesByProductId('p1');
+
+      const reread = service.getProductInventoriesByProductId('p1');
+      expect(reread[0].available).toBe(7);
+    });
+  });
+
   describe('INV-08: getByDate filters by date', () => {
     it('returns entries matching the given date', () => {
       const date = new Date('2024-03-10T10:00:00.000Z');

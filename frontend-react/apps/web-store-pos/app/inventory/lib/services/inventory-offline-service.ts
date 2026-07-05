@@ -395,6 +395,20 @@ export class InventoryOfflineService {
   }
 
   /**
+   * Returns the RAW inventory entries for a product — no isActive filter, no mutation.
+   * 1:1 port of Angular's `getProductInventoriesByProductId`
+   * (inventory-offline.service.ts:54-56).
+   *
+   * Stage 7 (Reports ledger, ADR-2): the only supported way to compute a
+   * quantity-weighted average cost across a product's active (available > 0) entries.
+   * Do NOT reuse `getAvailableByCategory` (weights by `available`, diverges for
+   * partially-sold entries) or `getAvailableInventoryCosts` (mutates/deducts stock via FIFO).
+   */
+  getProductInventoriesByProductId(productId: string): InventoryEntry[] {
+    return this.repo.getByProductId(this.storeId, productId);
+  }
+
+  /**
    * Distinguishes "no inventory entries at all" from "entries exist but not enough active
    * quantity" — mirrors Angular's InventoryOfflineService.hasAvailableProductToSale branches
    * 5 (ProductErrors.ProductNotAvailable) and 6 (ProductErrors.ProductQuantityNotAvailable).
