@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
-import type { Product, InventoryEntryCost, OrderItem, UserModel } from '@store-mgmt/domain';
+import type { Order, Product, InventoryEntryCost, OrderItem, UserModel } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { startOfDay, addDays } from '~/shared/lib/date-utils';
 
 // Mock InventoryOfflineService BEFORE importing OrderOfflineService
 vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
@@ -94,6 +95,56 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
     selectedStoreId: 's1',
     ...overrides,
   };
+}
+
+function makeOrder(overrides: Partial<Order> = {}): Order {
+  return {
+    id: 'o1',
+    orderItems: [],
+    total: 0,
+    itemsCount: 0,
+    date: new Date(),
+    type: OrderType.Normal,
+    paymentType: PaymentType.Efectivo,
+    isCredit: false,
+    description: '',
+    isActive: true,
+    createdDate: new Date(),
+    createdByName: 'test',
+    updatedDate: undefined,
+    updatedByName: undefined,
+    ...overrides,
+  };
+}
+
+function orderItemFor(
+  productId: string,
+  name: string,
+  opts: { price: number; qty: number; costPrice?: number },
+): OrderItem {
+  return {
+    productId,
+    productName: name,
+    categoryId: 'cat1',
+    categoryName: 'Cat',
+    name,
+    quantity: opts.qty,
+    price: opts.price,
+    productBusinessId: 'biz1',
+    productCosts:
+      opts.costPrice !== undefined
+        ? [{ id: 'cost-1', costPrice: opts.costPrice, quantity: opts.qty }]
+        : [],
+    order: 0,
+  };
+}
+
+function seedOrders(storeId: string, orders: Order[]): void {
+  const map = new Map(orders.map((o) => [o.id, o] as [string, Order]));
+  localStorage.setItem(
+    `lizoft.store-orders-${storeId}`,
+    JSON.stringify(Array.from(map.entries())),
+  );
 }
 
 describe('OrderOfflineService', () => {
@@ -545,6 +596,348 @@ describe('OrderOfflineService', () => {
       const order = service.create(items, PaymentType.Efectivo, false, '');
       service.delete(order.id);
       expect(inventoryMock.increaseQuantitiesByOrderItems).toHaveBeenCalledOnce();
+    });
+  });
+
+  // WU2 (offline-online-service-parity, Slice 1): activateOrder is flag-only
+  // (Angular's updateOrderActive(id, true)) — no credit/inventory cascade, unlike deactivate.
+  describe('ORD-12: activateOrder — flag-only, no cascade', () => {
+    it('sets isActive=true', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      service.deactivate(order.id);
+      service.activateOrder(order.id);
+      expect(service.getById(order.id)?.isActive).toBe(true);
+    });
+
+    it('throws for a missing id', () => {
+      expect(() => service.activateOrder('missing')).toThrow();
+    });
+
+    it('does NOT cascade to credit/inventory (unlike deactivate)', () => {
+      const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
+      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
+      vi.clearAllMocks();
+      service.activateOrder(order.id);
+      expect(creditMock.voidByOrderId).not.toHaveBeenCalled();
+      expect(inventoryMock.increaseQuantitiesByOrderItems).not.toHaveBeenCalled();
+    });
+
+    it('stamps updatedByName with the authenticated user login', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      service.activateOrder(order.id);
+      expect(service.getById(order.id)?.updatedByName).toBe('jdoe');
+    });
+  });
+
+  // ADR-5: financial helpers use RAW date boundaries (pre-snapped by the Today/Yesterday
+  // wrappers), via a private active*Between helper — NOT the day-snapping getByDateRange.
+  describe('ORD-13: getActiveOrdersPriceToday/Yesterday/BetweenDates', () => {
+    it('Today sums active orders total for today only', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({ id: 'today-1', total: 100, date: now, isActive: true }),
+        makeOrder({ id: 'yesterday-1', total: 50, date: addDays(now, -1), isActive: true }),
+      ]);
+      expect(service.getActiveOrdersPriceToday()).toBe(100);
+    });
+
+    it('excludes inactive orders from Today', () => {
+      const now = new Date();
+      seedOrders(storeId, [makeOrder({ id: 'inactive-today', total: 500, date: now, isActive: false })]);
+      expect(service.getActiveOrdersPriceToday()).toBe(0);
+    });
+
+    it('Yesterday sums active orders total for yesterday only', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({ id: 'today-1', total: 100, date: now, isActive: true }),
+        makeOrder({ id: 'yesterday-1', total: 50, date: addDays(now, -1), isActive: true }),
+      ]);
+      expect(service.getActiveOrdersPriceYesterday()).toBe(50);
+    });
+
+    it('BetweenDates sums active orders total in an explicit raw window', () => {
+      const now = new Date();
+      const start = addDays(startOfDay(now), -2);
+      const end = addDays(startOfDay(now), -1);
+      seedOrders(storeId, [
+        makeOrder({ id: 'in-range', total: 30, date: addDays(now, -2), isActive: true }),
+        makeOrder({ id: 'out-of-range', total: 999, date: now, isActive: true }),
+      ]);
+      expect(service.getActiveOrdersPriceBetweenDates(start, end)).toBe(30);
+    });
+  });
+
+  describe('ORD-14: getActiveOrdersProfitToday/Yesterday/BetweenDates', () => {
+    it('Today sums profit (price*qty - cost*qty) for active orders today', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: now,
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Cola', { price: 10, qty: 2, costPrice: 3 })],
+        }),
+      ]);
+      // profit = 10*2 - 3*2 = 14
+      expect(service.getActiveOrdersProfitToday()).toBe(14);
+    });
+
+    it('Yesterday sums profit for active orders yesterday only', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'y1',
+          date: addDays(now, -1),
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Cola', { price: 5, qty: 1, costPrice: 1 })],
+        }),
+        makeOrder({
+          id: 't1',
+          date: now,
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Cola', { price: 100, qty: 1, costPrice: 1 })],
+        }),
+      ]);
+      expect(service.getActiveOrdersProfitYesterday()).toBe(4);
+    });
+
+    it('BetweenDates sums profit in an explicit raw window', () => {
+      const now = new Date();
+      const start = addDays(startOfDay(now), -2);
+      const end = addDays(startOfDay(now), -1);
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'in-range',
+          date: addDays(now, -2),
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Cola', { price: 20, qty: 1, costPrice: 5 })],
+        }),
+      ]);
+      expect(service.getActiveOrdersProfitBetweenDates(start, end)).toBe(15);
+    });
+
+    it('excludes inactive orders', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'inactive',
+          date: now,
+          isActive: false,
+          orderItems: [orderItemFor('p1', 'Cola', { price: 100, qty: 5, costPrice: 1 })],
+        }),
+      ]);
+      expect(service.getActiveOrdersProfitToday()).toBe(0);
+    });
+  });
+
+  // Bug fix (angular-bugs-policy): Angular's getOrdersInDay/getActiveOrdersInDay both ignore
+  // the passed `date` param and always use `new Date()`. React honors it from day one.
+  describe('ORD-15: getOrdersInDay honors the date param and includes inactive orders', () => {
+    it('returns orders for the explicitly passed date, not always today', () => {
+      const now = new Date();
+      const threeDaysAgo = addDays(now, -3);
+      seedOrders(storeId, [
+        makeOrder({ id: 'past', date: threeDaysAgo, isActive: true }),
+        makeOrder({ id: 'today', date: now, isActive: true }),
+      ]);
+      expect(service.getOrdersInDay(threeDaysAgo).map((o) => o.id)).toEqual(['past']);
+    });
+
+    it('includes inactive orders (no isActive filter, unlike getActiveOrdersInDay)', () => {
+      const now = new Date();
+      seedOrders(storeId, [makeOrder({ id: 'inactive-today', date: now, isActive: false })]);
+      expect(service.getOrdersInDay(now).map((o) => o.id)).toEqual(['inactive-today']);
+    });
+
+    it('does not return orders from other days', () => {
+      const now = new Date();
+      seedOrders(storeId, [makeOrder({ id: 'yesterday', date: addDays(now, -1), isActive: true })]);
+      expect(service.getOrdersInDay(now)).toHaveLength(0);
+    });
+  });
+
+  // Bug fix (angular-bugs-policy): Angular's getTopProductsInLastMonth private helper
+  // hardcodes `.slice(0, 5)` regardless of the `top` param passed to it. React honors `top`.
+  describe('ORD-16: getTopProductsProfitInLastMonth/getTopProductsSaleQuantityInLastMonth honor `top`', () => {
+    // Seeded 1 hour in the past (not exactly `now`) — the window's upper bound is the
+    // method's own `new Date()` at call time, so an exact-`now` seed can land on the same
+    // millisecond as the method's internal `now` and be excluded by the strict `< now`.
+    function seedEightProducts(): void {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const items = Array.from({ length: 8 }, (_, i) =>
+        orderItemFor(`p${i}`, `Product ${i}`, { price: 10, qty: i + 1, costPrice: 2 }),
+      );
+      seedOrders(storeId, [
+        makeOrder({ id: 'o1', date: oneHourAgo, isActive: true, orderItems: items }),
+      ]);
+    }
+
+    it('defaults to top=5 when unspecified', () => {
+      seedEightProducts();
+      expect(service.getTopProductsSaleQuantityInLastMonth()).toHaveLength(5);
+    });
+
+    it('honors top=3 for getTopProductsSaleQuantityInLastMonth', () => {
+      seedEightProducts();
+      expect(service.getTopProductsSaleQuantityInLastMonth(3)).toHaveLength(3);
+    });
+
+    it('honors top=8 (more than Angular hardcoded 5) for getTopProductsSaleQuantityInLastMonth', () => {
+      seedEightProducts();
+      expect(service.getTopProductsSaleQuantityInLastMonth(8)).toHaveLength(8);
+    });
+
+    it('honors top=3 for getTopProductsProfitInLastMonth', () => {
+      seedEightProducts();
+      expect(service.getTopProductsProfitInLastMonth(3)).toHaveLength(3);
+    });
+
+    it('honors top=8 (more than Angular hardcoded 5) for getTopProductsProfitInLastMonth', () => {
+      seedEightProducts();
+      expect(service.getTopProductsProfitInLastMonth(8)).toHaveLength(8);
+    });
+
+    it('sorts by quantity desc for getTopProductsSaleQuantityInLastMonth', () => {
+      seedEightProducts();
+      const top = service.getTopProductsSaleQuantityInLastMonth(3);
+      expect(top.map((t) => t.id)).toEqual(['p7', 'p6', 'p5']); // qty 8,7,6
+    });
+
+    it('sorts by profit desc for getTopProductsProfitInLastMonth', () => {
+      seedEightProducts();
+      // profit = (10-2)*qty = 8*qty for every product, so still ordered by qty desc
+      const top = service.getTopProductsProfitInLastMonth(3);
+      expect(top.map((t) => t.id)).toEqual(['p7', 'p6', 'p5']);
+    });
+
+    it('excludes orders outside the rolling last-29-days window', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'old',
+          date: addDays(now, -40),
+          isActive: true,
+          orderItems: [orderItemFor('pOld', 'Old', { price: 5, qty: 100 })],
+        }),
+      ]);
+      expect(
+        service.getTopProductsSaleQuantityInLastMonth().find((t) => t.id === 'pOld'),
+      ).toBeUndefined();
+    });
+
+    it('excludes inactive orders', () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'inactive',
+          date: oneHourAgo,
+          isActive: false,
+          orderItems: [orderItemFor('pInactive', 'Inactive', { price: 5, qty: 100 })],
+        }),
+      ]);
+      expect(
+        service.getTopProductsSaleQuantityInLastMonth().find((t) => t.id === 'pInactive'),
+      ).toBeUndefined();
+    });
+  });
+
+  describe('ORD-17: filterOrders — sync replacement of filterOrdersObservable', () => {
+    it('isCredit=-1 returns all active orders regardless of credit status', () => {
+      seedOrders(storeId, [
+        makeOrder({ id: 'credit', isCredit: true, isActive: true }),
+        makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
+      ]);
+      expect(service.filterOrders(-1).map((o) => o.id).sort()).toEqual(['credit', 'non-credit']);
+    });
+
+    it('isCredit=1 returns only credit orders', () => {
+      seedOrders(storeId, [
+        makeOrder({ id: 'credit', isCredit: true, isActive: true }),
+        makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
+      ]);
+      expect(service.filterOrders(1).map((o) => o.id)).toEqual(['credit']);
+    });
+
+    it('isCredit=0 returns only non-credit orders', () => {
+      seedOrders(storeId, [
+        makeOrder({ id: 'credit', isCredit: true, isActive: true }),
+        makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
+      ]);
+      expect(service.filterOrders(0).map((o) => o.id)).toEqual(['non-credit']);
+    });
+
+    it('excludes inactive orders regardless of isCredit filter', () => {
+      seedOrders(storeId, [makeOrder({ id: 'inactive', isCredit: false, isActive: false })]);
+      expect(service.filterOrders(-1)).toHaveLength(0);
+    });
+
+    it('filters by paymentType when provided', () => {
+      seedOrders(storeId, [
+        makeOrder({ id: 'efectivo', paymentType: PaymentType.Efectivo, isActive: true }),
+        makeOrder({ id: 'tarjeta', paymentType: PaymentType.Tarjeta, isActive: true }),
+      ]);
+      expect(service.filterOrders(-1, PaymentType.Tarjeta).map((o) => o.id)).toEqual(['tarjeta']);
+    });
+
+    it('filters by start date (inclusive) when provided', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({ id: 'before', date: addDays(now, -5), isActive: true }),
+        makeOrder({ id: 'after', date: now, isActive: true }),
+      ]);
+      expect(
+        service.filterOrders(-1, undefined, addDays(now, -1)).map((o) => o.id),
+      ).toEqual(['after']);
+    });
+
+    it('filters by end date (exclusive) when provided', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({ id: 'before', date: addDays(now, -5), isActive: true }),
+        makeOrder({ id: 'after', date: now, isActive: true }),
+      ]);
+      expect(
+        service.filterOrders(-1, undefined, undefined, addDays(now, -1)).map((o) => o.id),
+      ).toEqual(['before']);
+    });
+  });
+
+  describe('ORD-18: create optional details param (description = details || (isCredit ? clientName : \'\'))', () => {
+    it('uses details as description when provided (credit order)', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, true, 'Ana', OrderType.Normal, true, 'Special note');
+      expect(order.description).toBe('Special note');
+    });
+
+    it('falls back to clientName when details is not provided and isCredit=true', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
+      expect(order.description).toBe('Ana');
+    });
+
+    it('falls back to empty string when details is not provided and isCredit=false', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      expect(order.description).toBe('');
+    });
+
+    it('uses details even when isCredit=false', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(
+        items,
+        PaymentType.Efectivo,
+        false,
+        '',
+        OrderType.Normal,
+        true,
+        'Merma note',
+      );
+      expect(order.description).toBe('Merma note');
     });
   });
 });

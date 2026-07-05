@@ -8,6 +8,17 @@ import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offl
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import type { CategoryCartItemsView, ProductCartItemsView } from '../category-cart-items-view';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
+import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
+
+/**
+ * TopProduct — view model for getTopProductsProfitInLastMonth/getTopProductsSaleQuantityInLastMonth.
+ * Sync equivalent of Angular's presentation TopProduct model.
+ */
+export interface TopProduct {
+  id: string;
+  name: string;
+  value: number;
+}
 
 function groupBy<T>(items: T[], key: keyof T): Map<string, T[]> {
   const groups = new Map<string, T[]>();
@@ -68,6 +79,127 @@ export class OrderOfflineService implements BaseService<Order> {
   }
 
   /**
+   * BUG FIX (angular-bugs-policy): Angular's `getOrdersInDay(date)` ignores the passed
+   * `date` param entirely and always uses `new Date()`. React honors it — the whole
+   * point of the parameter. Unlike `getActiveOrdersInDay`, this returns ALL orders in
+   * the day regardless of `isActive` (1:1 port of Angular's own filter, which has no
+   * isActive check).
+   */
+  getOrdersInDay(date: Date): Order[] {
+    const dayStart = startOfDay(date);
+    const dayEnd = startOfDay(addDays(date, 1));
+    return this.getAll().filter((o) => o.date >= dayStart && o.date < dayEnd);
+  }
+
+  /**
+   * ADR-5: financial helpers use RAW date boundaries (pre-snapped by the caller), NOT
+   * the day-snapping `getByDateRange` (which would double-snap). 1:1 port of Angular's
+   * private `getActiveOrdersBetweenDates`.
+   */
+  private activeOrdersBetween(start: Date, end: Date): Order[] {
+    return this.getAll().filter((o) => o.isActive && o.date >= start && o.date < end);
+  }
+
+  getActiveOrdersPriceBetweenDates(start: Date, end: Date): number {
+    return this.activeOrdersBetween(start, end).reduce((sum, o) => sum + o.total, 0);
+  }
+
+  getActiveOrdersPriceToday(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.getActiveOrdersPriceBetweenDates(start, end);
+  }
+
+  getActiveOrdersPriceYesterday(): number {
+    const start = startOfDay(addDays(new Date(), -1));
+    const end = startOfDay(new Date());
+    return this.getActiveOrdersPriceBetweenDates(start, end);
+  }
+
+  getActiveOrdersProfitBetweenDates(start: Date, end: Date): number {
+    let profit = 0;
+    for (const order of this.activeOrdersBetween(start, end)) {
+      for (const item of order.orderItems) {
+        profit += calculateOrderProfit(item).profit;
+      }
+    }
+    return profit;
+  }
+
+  getActiveOrdersProfitToday(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.getActiveOrdersProfitBetweenDates(start, end);
+  }
+
+  getActiveOrdersProfitYesterday(): number {
+    const start = startOfDay(addDays(new Date(), -1));
+    const end = startOfDay(new Date());
+    return this.getActiveOrdersProfitBetweenDates(start, end);
+  }
+
+  /**
+   * BUG FIX (angular-bugs-policy): Angular's private `getTopProductsInLastMonth(calculateProfit, top)`
+   * takes a `top` param but its body hardcodes `.slice(0, 5)`, ignoring it — both public
+   * callers (`getTopProductsProfitInLastMonth`/`getTopProductsSaleQuantityInLastMonth`) are
+   * therefore always capped at 5 regardless of what they pass. React honors `top` (default 5).
+   * Window: rolling last 29 days from `now` (RAW, not day-snapped — 1:1 port), active orders only.
+   */
+  private getTopProductsInLastMonth(calculateProfit: boolean, top: number): TopProduct[] {
+    const now = new Date();
+    const lastMonth = addDays(now, -29);
+    const monthOrders = this.getAll().filter(
+      (o) => o.isActive && o.date >= lastMonth && o.date < now,
+    );
+
+    const topProductsMap = new Map<string, TopProduct>();
+    for (const order of monthOrders) {
+      for (const item of order.orderItems) {
+        let entry = topProductsMap.get(item.productId);
+        if (!entry) {
+          entry = { id: item.productId, name: item.productName, value: 0 };
+          topProductsMap.set(item.productId, entry);
+        }
+        entry.value += calculateProfit ? calculateOrderProfit(item).profit : item.quantity;
+      }
+    }
+
+    return Array.from(topProductsMap.values())
+      .sort((p1, p2) => p2.value - p1.value)
+      .slice(0, top);
+  }
+
+  getTopProductsProfitInLastMonth(top: number = 5): TopProduct[] {
+    return this.getTopProductsInLastMonth(true, top);
+  }
+
+  getTopProductsSaleQuantityInLastMonth(top: number = 5): TopProduct[] {
+    return this.getTopProductsInLastMonth(false, top);
+  }
+
+  /**
+   * Sync replacement of Angular's `filterOrdersObservable`. `isCredit` is a tri-state:
+   * -1 = any, 1 = credit only, 0 = non-credit only. `paymentType`/`start`/`end` are
+   * optional and unbounded when falsy — 1:1 port, operates over active orders only,
+   * RAW date comparisons (no internal day-snapping).
+   */
+  filterOrders(
+    isCredit: number,
+    paymentType?: PaymentType,
+    start?: Date,
+    end?: Date,
+  ): Order[] {
+    return this.getAll().filter(
+      (o) =>
+        o.isActive &&
+        (isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit)) &&
+        (!paymentType || paymentType === o.paymentType) &&
+        (!start || o.date >= start) &&
+        (!end || o.date < end),
+    );
+  }
+
+  /**
    * 1:1 port of Angular's `OrderOfflineService.getCategoryCartItemsView` — aggregates
    * today's active order items by category, then by product, for the "Cuadre del día"
    * (Today Stats) view. Category `order` is resolved from `ProductCategoryOfflineService`,
@@ -123,6 +255,9 @@ export class OrderOfflineService implements BaseService<Order> {
     // module-disabled path are unaffected; the one real caller (CartShell.handleCreateOrder)
     // always passes the actual authorizationService.hasInventoryModuleAvailable() value.
     hasInventoryModule: boolean = true,
+    // Angular parity: createOrder's `details` param. Takes priority over the isCredit/
+    // clientName fallback when provided; existing callers that omit it are unaffected.
+    details?: string,
   ): Order {
     const now = new Date();
     const orderId = generateId();
@@ -177,7 +312,7 @@ export class OrderOfflineService implements BaseService<Order> {
       type: orderType,
       paymentType,
       isCredit,
-      description: isCredit ? clientName : '',
+      description: details || (isCredit ? clientName : ''),
       isActive: true,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
@@ -205,6 +340,22 @@ export class OrderOfflineService implements BaseService<Order> {
     };
     repo.upsert(this.storeId, updated);
     return updated;
+  }
+
+  /**
+   * 1:1 port of Angular's `activateOrder` (`updateOrderActive(id, true)`) — flag-only,
+   * no credit/inventory cascade (unlike deactivate). Return-type contract: void, throws
+   * on not-found (Angular's Result-command collapses to this per design ADR-1).
+   */
+  activateOrder(id: string): void {
+    const order = repo.getById(this.storeId, id);
+    if (!order) throw new Error(`Order not found: ${id}`);
+    repo.upsert(this.storeId, {
+      ...order,
+      isActive: true,
+      updatedDate: new Date(),
+      updatedByName: getCurrentUserLogin(),
+    });
   }
 
   deactivate(id: string): void {
