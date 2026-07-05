@@ -23,6 +23,8 @@
     "cookie": "^1.0.1",
     "dotenv": "^17.2.1",
     "isbot": "^5.1.27",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-intl": "^10.1.11",
