@@ -197,4 +197,116 @@ describe('ExpenseOfflineService', () => {
     const created = svc.create(makeExpenseInput({ note: '' }));
     expect(created.note).toBe('');
   });
+
+  // WU3: getActiveExpensesPriceBetweenDates/Today/Yesterday
+  describe('getActiveExpensesPriceBetweenDates/Today/Yesterday', () => {
+    it('sums active expenses within a raw date window, excluding inactive and out-of-range', () => {
+      const start = new Date('2024-02-01T00:00:00.000');
+      const end = new Date('2024-02-05T00:00:00.000');
+      const inRange1 = svc.create(makeExpenseInput({ date: new Date('2024-02-02T10:00:00.000'), total: 30 }));
+      svc.create(makeExpenseInput({ date: new Date('2024-02-03T10:00:00.000'), total: 20 }));
+      svc.create(makeExpenseInput({ date: new Date('2024-01-15T10:00:00.000'), total: 999 })); // before range
+      svc.create(makeExpenseInput({ date: new Date('2024-02-10T10:00:00.000'), total: 999 })); // after range
+      svc.delete(inRange1.id);
+      // deleted one should be excluded even though in range
+      expect(svc.getActiveExpensesPriceBetweenDates(start, end)).toBe(20);
+    });
+
+    it('getActiveExpensesPriceToday sums only expenses dated today', () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const yesterday = new Date(oneHourAgo);
+      yesterday.setDate(yesterday.getDate() - 1);
+      svc.create(makeExpenseInput({ date: oneHourAgo, total: 40 }));
+      svc.create(makeExpenseInput({ date: yesterday, total: 999 }));
+      expect(svc.getActiveExpensesPriceToday()).toBe(40);
+    });
+
+    it('getActiveExpensesPriceYesterday sums only expenses dated yesterday', () => {
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(10, 0, 0, 0);
+      svc.create(makeExpenseInput({ date: yesterday, total: 15 }));
+      svc.create(makeExpenseInput({ date: now, total: 999 }));
+      expect(svc.getActiveExpensesPriceYesterday()).toBe(15);
+    });
+  });
+
+  // WU3: getExpensesTotalBefore/Total/Yesterday
+  describe('getExpensesTotalBefore/Total/Yesterday', () => {
+    it('getExpensesTotalBefore sums active expenses strictly before threshold date', () => {
+      const threshold = new Date('2024-03-01T00:00:00.000');
+      svc.create(makeExpenseInput({ date: new Date('2024-02-01T10:00:00.000'), total: 10 }));
+      svc.create(makeExpenseInput({ date: new Date('2024-02-15T10:00:00.000'), total: 25 }));
+      svc.create(makeExpenseInput({ date: new Date('2024-03-15T10:00:00.000'), total: 999 })); // after threshold
+      expect(svc.getExpensesTotalBefore(threshold)).toBe(35);
+    });
+
+    it('getExpensesTotalBefore excludes soft-deleted expenses', () => {
+      const threshold = new Date('2024-03-01T00:00:00.000');
+      const deleted = svc.create(makeExpenseInput({ date: new Date('2024-02-01T10:00:00.000'), total: 10 }));
+      svc.delete(deleted.id);
+      svc.create(makeExpenseInput({ date: new Date('2024-02-15T10:00:00.000'), total: 25 }));
+      expect(svc.getExpensesTotalBefore(threshold)).toBe(25);
+    });
+
+    it('getExpensesTotal sums all active expenses up through end of today', () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      svc.create(makeExpenseInput({ date: oneHourAgo, total: 50 }));
+      svc.create(makeExpenseInput({ date: new Date('2024-01-01T10:00:00.000'), total: 20 }));
+      expect(svc.getExpensesTotal()).toBe(70);
+    });
+
+    it('getExpensesTotalYesterday sums only expenses strictly before today start', () => {
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+      svc.create(makeExpenseInput({ date: new Date('2024-01-01T10:00:00.000'), total: 20 }));
+      svc.create(makeExpenseInput({ date: oneHourAgo, total: 999 })); // today, excluded
+      expect(svc.getExpensesTotalYesterday()).toBe(20);
+    });
+  });
+
+  // WU3: filterExpenses (sync port of filterExpensesObservable)
+  describe('filterExpenses', () => {
+    it('filters by type when provided', () => {
+      svc.create(makeExpenseInput({ type: ExpenseType.Comida }));
+      svc.create(makeExpenseInput({ type: ExpenseType.Transporte }));
+      const result = svc.filterExpenses(ExpenseType.Comida);
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(ExpenseType.Comida);
+    });
+
+    it('filters by paymentType when provided', () => {
+      svc.create(makeExpenseInput({ paymentType: PaymentType.Efectivo }));
+      svc.create(makeExpenseInput({ paymentType: PaymentType.Tarjeta }));
+      const result = svc.filterExpenses(undefined, PaymentType.Tarjeta);
+      expect(result).toHaveLength(1);
+      expect(result[0].paymentType).toBe(PaymentType.Tarjeta);
+    });
+
+    it('filters by date range when start/end provided', () => {
+      svc.create(makeExpenseInput({ date: new Date('2024-01-01T10:00:00.000') }));
+      svc.create(makeExpenseInput({ date: new Date('2024-06-01T10:00:00.000') }));
+      const result = svc.filterExpenses(
+        undefined,
+        undefined,
+        new Date('2024-05-01T00:00:00.000'),
+        new Date('2024-07-01T00:00:00.000'),
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].date.getMonth()).toBe(5); // June
+    });
+
+    it('excludes soft-deleted expenses regardless of filters', () => {
+      const deleted = svc.create(makeExpenseInput());
+      svc.delete(deleted.id);
+      expect(svc.filterExpenses()).toHaveLength(0);
+    });
+
+    it('returns all active expenses when no filters provided', () => {
+      svc.create(makeExpenseInput());
+      svc.create(makeExpenseInput());
+      expect(svc.filterExpenses()).toHaveLength(2);
+    });
+  });
 });

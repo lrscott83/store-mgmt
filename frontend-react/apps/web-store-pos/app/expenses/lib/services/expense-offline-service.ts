@@ -43,6 +43,73 @@ export class ExpenseOfflineService implements BaseService<Expense> {
     return this.getByDateRange(new Date(), new Date());
   }
 
+  /**
+   * ADR-5: financial helpers use RAW date boundaries (pre-snapped by the caller), NOT
+   * the day-snapping `getByDateRange` (which would double-snap). 1:1 port of Angular's
+   * private `getActiveExpensesBetweenDates`.
+   */
+  private activeExpensesBetween(start: Date, end: Date): Expense[] {
+    return this.getAll().filter((e) => e.isActive && e.date >= start && e.date < end);
+  }
+
+  getActiveExpensesPriceBetweenDates(start: Date, end: Date): number {
+    return this.activeExpensesBetween(start, end).reduce((sum, e) => sum + e.total, 0);
+  }
+
+  getActiveExpensesPriceToday(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.getActiveExpensesPriceBetweenDates(start, end);
+  }
+
+  getActiveExpensesPriceYesterday(): number {
+    const start = startOfDay(addDays(new Date(), -1));
+    const end = startOfDay(new Date());
+    return this.getActiveExpensesPriceBetweenDates(start, end);
+  }
+
+  /**
+   * 1:1 port of Angular's `getExpensesTotalBefore` — sum of ALL active expenses (no
+   * upper-window constraint besides `date < threshold`, no lower bound).
+   */
+  getExpensesTotalBefore(date: Date): number {
+    return this.getAll()
+      .filter((e) => e.isActive && e.date < date)
+      .reduce((sum, e) => sum + e.total, 0);
+  }
+
+  getExpensesTotal(): number {
+    const start = startOfDay(new Date());
+    const end = addDays(start, 1);
+    return this.getExpensesTotalBefore(end);
+  }
+
+  getExpensesTotalYesterday(): number {
+    const start = startOfDay(new Date());
+    return this.getExpensesTotalBefore(start);
+  }
+
+  /**
+   * Sync replacement of Angular's `filterExpensesObservable`. All params optional and
+   * unbounded when falsy — 1:1 port, operates over active (not soft-deleted) expenses,
+   * RAW date comparisons (no internal day-snapping).
+   */
+  filterExpenses(
+    type?: ExpenseType,
+    paymentType?: PaymentType,
+    start?: Date,
+    end?: Date,
+  ): Expense[] {
+    return this.getAll().filter(
+      (e) =>
+        e.isActive &&
+        (!type || type === e.type) &&
+        (!paymentType || paymentType === e.paymentType) &&
+        (!start || e.date >= start) &&
+        (!end || e.date < end),
+    );
+  }
+
   create(input: CreateExpenseInput): Expense {
     const now = new Date();
     const expense: Expense = {
