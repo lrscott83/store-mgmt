@@ -1,4 +1,4 @@
-import type { InventoryEntry, InventoryEntryCost, InventoryEntryView, OrderItem } from '@store-mgmt/domain';
+import type { BaseService, InventoryEntry, InventoryEntryCost, InventoryEntryView, OrderItem } from '@store-mgmt/domain';
 import { InventoryRepository } from '../repositories/inventory-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import {
@@ -76,7 +76,7 @@ function generateId(): string {
  *
  * Spec §6.3; Scenarios S-I1 through S-I6.
  */
-export class InventoryOfflineService {
+export class InventoryOfflineService implements BaseService<InventoryEntryView> {
   private readonly repo: InventoryRepository;
 
   constructor(private readonly storeId: string) {
@@ -108,6 +108,26 @@ export class InventoryOfflineService {
       }
     }
     return result;
+  }
+
+  /**
+   * BaseService<InventoryEntryView> conformance. Returns the matching entry as an
+   * InventoryEntryView regardless of `isActive` (unfiltered by active status, matching
+   * the other offline services' getById behavior — only getAll() filters to active-only).
+   */
+  getById(id: string): InventoryEntryView | undefined {
+    const found = this.repo.findEntryById(this.storeId, id);
+    if (!found) return undefined;
+    const { entry, productId } = found;
+    return {
+      id: entry.id,
+      productId,
+      productName: '',
+      quantity: entry.quantity,
+      costPrice: entry.costPrice,
+      date: entry.date,
+      isActive: entry.isActive,
+    };
   }
 
   /**
@@ -379,6 +399,17 @@ export class InventoryOfflineService {
     const idx = allForProduct.findIndex((e) => e.id === entryId);
     if (idx !== -1) allForProduct[idx] = deactivated;
     this.repo.save(this.storeId, storedProductId ?? productId, allForProduct);
+  }
+
+  /**
+   * BaseService<InventoryEntryView> conformance alias for {@link deactivate}. Looks up
+   * the owning productId via `findEntryById` (deactivate normally requires the caller to
+   * already know it) and delegates — same validation, same throw on missing/partially-sold.
+   */
+  delete(id: string): void {
+    const found = this.repo.findEntryById(this.storeId, id);
+    if (!found) throw new Error(`InventoryEntry not found: ${id}`);
+    this.deactivate(id, found.productId);
   }
 
   // ─── Query helpers ───────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { Expense } from '@store-mgmt/domain';
+import type { BaseService, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
@@ -18,7 +18,7 @@ interface CreateExpenseInput {
   note?: string | null;
 }
 
-export class ExpenseOfflineService {
+export class ExpenseOfflineService implements BaseService<Expense> {
   constructor(private readonly storeId: string) {}
 
   getAll(): Expense[] {

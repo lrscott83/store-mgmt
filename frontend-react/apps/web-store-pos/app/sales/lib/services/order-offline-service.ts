@@ -1,4 +1,4 @@
-import type { Order, OrderItem } from '@store-mgmt/domain';
+import type { BaseService, Order, OrderItem } from '@store-mgmt/domain';
 import { OrderType, PaymentType } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
@@ -34,7 +34,7 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
-export class OrderOfflineService {
+export class OrderOfflineService implements BaseService<Order> {
   private readonly creditService: SaleCreditOfflineService;
   private readonly inventoryService: InventoryOfflineService;
 
@@ -235,5 +235,15 @@ export class OrderOfflineService {
       })),
     }));
     this.inventoryService.increaseQuantitiesByOrderItems(normalizedItems);
+  }
+
+  /**
+   * BaseService<Order> conformance alias for {@link deactivate}. Order has no
+   * separate "plain" soft-delete concept in Angular — the only cancellation path
+   * is the full deactivate cascade (void associated credit + restore inventory) —
+   * so `delete` delegates to it rather than inventing partial-delete semantics.
+   */
+  delete(id: string): void {
+    this.deactivate(id);
   }
 }

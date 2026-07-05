@@ -1,4 +1,4 @@
-import type { SaleCredit } from '@store-mgmt/domain';
+import type { BaseService, SaleCredit } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -26,7 +26,7 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-export class SaleCreditOfflineService {
+export class SaleCreditOfflineService implements BaseService<SaleCredit> {
   constructor(private readonly storeId: string) {}
 
   getAll(): SaleCredit[] {
@@ -163,5 +163,14 @@ export class SaleCreditOfflineService {
       updatedDate: new Date(),
       updatedByName: getCurrentUserLogin(),
     });
+  }
+
+  /**
+   * BaseService<SaleCredit> conformance alias for {@link void}. `void` already IS
+   * the plain soft-delete equivalent (isActive=false, no cascade, no-op on a
+   * missing id) — this exposes the interface-required name with zero behavior change.
+   */
+  delete(id: string): void {
+    this.void(id);
   }
 }

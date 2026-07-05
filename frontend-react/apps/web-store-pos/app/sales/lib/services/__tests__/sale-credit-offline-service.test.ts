@@ -302,4 +302,19 @@ describe('SaleCreditOfflineService', () => {
       expect(service.getPaidToday()).toHaveLength(0);
     });
   });
+
+  // WU1 (offline-online-service-parity, Slice 1): delete(id) is a BaseService<SaleCredit>
+  // conformance alias for void(id) — void already IS the plain soft-delete equivalent
+  // (isActive=false, no cascade), so this is a zero-behavior-change rename exposure.
+  describe('SC-11: delete is a BaseService<SaleCredit> alias for void', () => {
+    it('sets isActive=false, same as void', () => {
+      const credit = service.createFromOrder('order-1', 'Ana', 100);
+      service.delete(credit.id);
+      expect(service.getById(credit.id)?.isActive).toBe(false);
+    });
+
+    it('is a no-op for a missing id, same as void', () => {
+      expect(() => service.delete('missing-id')).not.toThrow();
+    });
+  });
 });

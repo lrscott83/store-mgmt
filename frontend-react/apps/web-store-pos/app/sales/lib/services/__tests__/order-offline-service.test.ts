@@ -518,4 +518,33 @@ describe('OrderOfflineService', () => {
       });
     });
   });
+
+  // WU1 (offline-online-service-parity, Slice 1): delete(id) is a BaseService<Order>
+  // conformance alias for deactivate(id) — Order has no separate "plain" soft-delete
+  // concept, so delete delegates to the full deactivate cascade (credit void + inventory
+  // restore) rather than inventing new partial-delete semantics.
+  describe('ORD-11: delete is a BaseService<Order> alias for deactivate', () => {
+    it('sets isActive=false, same as deactivate', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      service.delete(order.id);
+      expect(service.getById(order.id)?.isActive).toBe(false);
+    });
+
+    it('voids the associated credit when the order is a credit order', () => {
+      const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
+      service.delete(order.id);
+      expect(creditMock.voidByOrderId).toHaveBeenCalledWith(order.id);
+    });
+
+    it('restores inventory entries, same as deactivate', () => {
+      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      service.delete(order.id);
+      expect(inventoryMock.increaseQuantitiesByOrderItems).toHaveBeenCalledOnce();
+    });
+  });
 });
