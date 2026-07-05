@@ -11,8 +11,14 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn(),
 }));
 
+// WU6: ExpenseOfflineService is injected for daily-profit expense-netting.
+vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
+  ExpenseOfflineService: vi.fn(),
+}));
+
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import {
   StatisticsAggregationService,
 } from './statistics-aggregation-service';
@@ -67,6 +73,7 @@ describe('StatisticsAggregationService', () => {
 
   let mockOrderService: { getByDateRange: ReturnType<typeof vi.fn> };
   let mockInventoryService: { getAll: ReturnType<typeof vi.fn> };
+  let mockExpenseService: { getActiveExpensesPriceBetweenDates: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,9 +84,13 @@ describe('StatisticsAggregationService', () => {
     mockInventoryService = {
       getAll: vi.fn().mockReturnValue([]),
     };
+    mockExpenseService = {
+      getActiveExpensesPriceBetweenDates: vi.fn().mockReturnValue(0),
+    };
 
     vi.mocked(OrderOfflineService).mockImplementation(() => mockOrderService as never);
     vi.mocked(InventoryOfflineService).mockImplementation(() => mockInventoryService as never);
+    vi.mocked(ExpenseOfflineService).mockImplementation(() => mockExpenseService as never);
   });
 
   // ─── getDailySales ─────────────────────────────────────────────────────────
@@ -287,6 +298,100 @@ describe('StatisticsAggregationService', () => {
       for (const point of zeroPoints) {
         expect(point.profit).toBe(0);
       }
+    });
+
+    // WU6: Daily Profit Nets Out Expenses (spec statistics-aggregation, ADR-6).
+    describe('expense netting (WU6)', () => {
+      it('nets orders and expenses for the day: profit = orderProfit(day) - expenses(day)', () => {
+        const orderDate = makeDateAtDay(0, TODAY); // today
+        mockOrderService.getByDateRange.mockReturnValue([
+          makeOrder(orderDate, [
+            { price: 20, quantity: 3, productCosts: [{ id: 'ic1', costPrice: 12, quantity: 3 }] },
+          ]),
+        ]);
+        // orderProfit = (20*3) - (12*3) = 24
+        mockExpenseService.getActiveExpensesPriceBetweenDates.mockReturnValue(10);
+
+        const svc = new StatisticsAggregationService('store-1');
+        const result = svc.getDailyProfit(TODAY);
+
+        const todayStr = TODAY.toISOString().slice(0, 10);
+        const todayPoint = result.find((p) => p.date === todayStr);
+        // 24 - 10 = 14
+        expect(todayPoint!.profit).toBe(14);
+      });
+
+      it('a day with only expenses (no orders) yields a negative profit', () => {
+        mockExpenseService.getActiveExpensesPriceBetweenDates.mockReturnValue(30);
+
+        const svc = new StatisticsAggregationService('store-1');
+        const result = svc.getDailyProfit(TODAY);
+
+        // Every bucket has 0 order profit and 30 in expenses -> -30 everywhere.
+        for (const point of result) {
+          expect(point.profit).toBe(-30);
+        }
+      });
+
+      it('a day with 0 expenses is unaffected (matches Angular no-expense baseline)', () => {
+        const orderDate = makeDateAtDay(0, TODAY);
+        mockOrderService.getByDateRange.mockReturnValue([
+          makeOrder(orderDate, [
+            { price: 20, quantity: 3, productCosts: [{ id: 'ic1', costPrice: 12, quantity: 3 }] },
+          ]),
+        ]);
+        mockExpenseService.getActiveExpensesPriceBetweenDates.mockReturnValue(0);
+
+        const svc = new StatisticsAggregationService('store-1');
+        const result = svc.getDailyProfit(TODAY);
+
+        const todayStr = TODAY.toISOString().slice(0, 10);
+        const todayPoint = result.find((p) => p.date === todayStr);
+        expect(todayPoint!.profit).toBe(24);
+      });
+
+      it('queries expenses per-bucket with each day\'s OWN [dayStart, dayStart+1) window — NOT Angular\'s buggy always-today window (ADR-6)', () => {
+        const svc = new StatisticsAggregationService('store-1');
+        svc.getDailyProfit(TODAY);
+
+        // 30 calls, one per bucket, each with a DIFFERENT start date (proves per-day windows,
+        // not a single repeated "today" window like Angular's getLastMonthSaleProfits bug).
+        expect(mockExpenseService.getActiveExpensesPriceBetweenDates).toHaveBeenCalledTimes(30);
+        const callStarts = mockExpenseService.getActiveExpensesPriceBetweenDates.mock.calls.map(
+          (args) => (args[0] as Date).getTime(),
+        );
+        const uniqueStarts = new Set(callStarts);
+        expect(uniqueStarts.size).toBe(30);
+
+        // Each call's end = start + 1 day.
+        for (const [start, end] of mockExpenseService.getActiveExpensesPriceBetweenDates.mock.calls as [Date, Date][]) {
+          const diffMs = end.getTime() - start.getTime();
+          expect(diffMs).toBe(24 * 60 * 60 * 1000);
+        }
+      });
+
+      it('nets expenses independently per bucket (per-bucket isolation)', () => {
+        const day0 = makeDateAtDay(0, TODAY);
+        const day5 = makeDateAtDay(5, TODAY);
+        mockOrderService.getByDateRange.mockReturnValue([
+          makeOrder(day0, [{ price: 10, quantity: 1, productCosts: [] }]), // profit 10
+          makeOrder(day5, [{ price: 50, quantity: 1, productCosts: [] }]), // profit 50
+        ]);
+        mockExpenseService.getActiveExpensesPriceBetweenDates.mockImplementation((start: Date) => {
+          // Only the day-5 bucket has an expense of 20; every other bucket has 0.
+          const day5Start = new Date(day5);
+          day5Start.setHours(0, 0, 0, 0);
+          return start.getTime() === day5Start.getTime() ? 20 : 0;
+        });
+
+        const svc = new StatisticsAggregationService('store-1');
+        const result = svc.getDailyProfit(TODAY);
+
+        const todayStr = TODAY.toISOString().slice(0, 10);
+        const day5Str = day5.toISOString().slice(0, 10);
+        expect(result.find((p) => p.date === todayStr)!.profit).toBe(10); // unaffected
+        expect(result.find((p) => p.date === day5Str)!.profit).toBe(30); // 50 - 20
+      });
     });
   });
 });

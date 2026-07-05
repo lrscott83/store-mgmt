@@ -1,4 +1,5 @@
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 
@@ -38,9 +39,11 @@ export interface DailyProfitPoint {
  */
 export class StatisticsAggregationService {
   private readonly orderService: OrderOfflineService;
+  private readonly expenseService: ExpenseOfflineService;
 
   constructor(storeId: string) {
     this.orderService = new OrderOfflineService(storeId);
+    this.expenseService = new ExpenseOfflineService(storeId);
   }
 
   /**
@@ -79,13 +82,21 @@ export class StatisticsAggregationService {
 
   /**
    * Returns 30 DailyProfitPoint entries (oldest → newest, last entry = today).
-   * Profit is derived exclusively from calculateOrderProfit(orderItem).
-   * today param defaults to new Date() — injectable for testing.
+   * Order profit is derived exclusively from calculateOrderProfit(orderItem).
+   *
+   * Angular parity (spec statistics-aggregation, ADR-6): nets out that day's active
+   * expenses — value = orderProfit(day) - expenseService.getActiveExpensesPriceBetweenDates
+   * (dayStart, dayStart+1). Angular's own getLastMonthSaleProfits has a real date-window
+   * bug (it recomputes `startDate = startOfDay(today)` on every loop iteration instead of
+   * per-bucket, so every "day" in its chart actually queries TODAY's window) — that bug is
+   * NOT replicated (angular-bugs-policy): this keeps React's already-correct per-day window
+   * (each bucket queries its OWN [dayStart, dayStart+1) range) and ONLY adds the missing
+   * expense subtraction. today param defaults to new Date() — injectable for testing.
    */
   getDailyProfit(today: Date = new Date()): DailyProfitPoint[] {
-    const { days, orders } = this.loadLast30Days(today);
+    const { days, dayStarts, orders } = this.loadLast30Days(today);
 
-    // Group profit by day string
+    // Group order profit by day string
     const byDay = new Map<string, number>();
     for (const order of orders) {
       const dayStr = this.toDateStr(order.date);
@@ -96,10 +107,16 @@ export class StatisticsAggregationService {
       byDay.set(dayStr, (byDay.get(dayStr) ?? 0) + dayProfit);
     }
 
-    return days.map((dayStr) => ({
-      date: dayStr,
-      profit: byDay.get(dayStr) ?? 0,
-    }));
+    return days.map((dayStr, i) => {
+      const dayStart = dayStarts[i];
+      const dayEnd = addDays(dayStart, 1);
+      const orderProfit = byDay.get(dayStr) ?? 0;
+      const dayExpenses = this.expenseService.getActiveExpensesPriceBetweenDates(dayStart, dayEnd);
+      return {
+        date: dayStr,
+        profit: orderProfit - dayExpenses,
+      };
+    });
   }
 
   /**
@@ -108,7 +125,11 @@ export class StatisticsAggregationService {
    *
    * Index 0 = 29 days ago; index 29 = today (STAT-3, STAT-4).
    */
-  private loadLast30Days(today: Date): { days: string[]; orders: ReturnType<OrderOfflineService['getByDateRange']> } {
+  private loadLast30Days(today: Date): {
+    days: string[];
+    dayStarts: Date[];
+    orders: ReturnType<OrderOfflineService['getByDateRange']>;
+  } {
     const todayStart = startOfDay(today);
     const from = addDays(todayStart, -29);    // 29 days ago at midnight
     const to = today;                         // now — inclusive end captures all of today's orders
@@ -117,12 +138,14 @@ export class StatisticsAggregationService {
     const orders = this.orderService.getByDateRange(from, to);
 
     const days: string[] = [];
+    const dayStarts: Date[] = [];
     for (let i = 0; i < 30; i++) {
       const d = addDays(from, i);
       days.push(this.toDateStr(d));
+      dayStarts.push(d);
     }
 
-    return { days, orders };
+    return { days, dayStarts, orders };
   }
 
   /** Formats a Date as YYYY-MM-DD using UTC-safe local-date arithmetic. */
