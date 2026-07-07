@@ -1,24 +1,8 @@
 import type { Product } from '@store-mgmt/domain';
+import { ProductErrors, Result } from '@store-mgmt/domain';
 
 /**
- * 1:1 port of Angular's InventoryOfflineService.hasAvailableProductToSale
- * (frontend/src/app/application/entries/inventory-offline.service.ts:397-423), called from
- * SaleProductRowComponent.addProductToCart (sale-product-row.component.ts:58-104). Each error
- * code maps to a ProductErrors entry (frontend/src/app/domain/entities/products/product.errors.ts).
- */
-export type ProductAvailabilityErrorCode =
-  | 'NOT_EXISTS'
-  | 'INACTIVE'
-  | 'NOT_AVAILABLE_TO_SALE'
-  | 'NOT_AVAILABLE'
-  | 'QUANTITY_NOT_AVAILABLE';
-
-export interface ProductAvailabilityResult {
-  succeeded: boolean;
-  errorCode?: ProductAvailabilityErrorCode;
-}
-
-/** Result of InventoryOfflineService.getAvailableQuantity — distinguishes "no active
+ * Result of InventoryOfflineService.getAvailableQuantity — distinguishes "no active
  * entries at all" (ProductErrors.ProductNotAvailable) from "active entries but not enough"
  * (ProductErrors.ProductQuantityNotAvailable). */
 export interface ProductInventoryAvailability {
@@ -27,7 +11,7 @@ export interface ProductInventoryAvailability {
 }
 
 /**
- * The subset of Product fields checkProductAvailabilityToSale actually reads. Widened from a
+ * The subset of Product fields hasAvailableProductToSale actually reads. Widened from a
  * full `Product` so callers that only have partial product data (e.g. InventoryOfflineService's
  * eligibility gate, which doesn't otherwise depend on Product) can reuse this predicate without
  * duplicating it. A full `Product` still satisfies this type structurally.
@@ -48,44 +32,42 @@ export interface CheckProductAvailabilityParams {
   inventory: ProductInventoryAvailability;
 }
 
-/** i18n key per error code — exact Spanish text matches Angular's ProductErrors literals. */
-export const PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS: Record<ProductAvailabilityErrorCode, string> = {
-  NOT_EXISTS: 'PRODUCT_ERRORS.NOT_EXISTS',
-  INACTIVE: 'PRODUCT_ERRORS.INACTIVE',
-  NOT_AVAILABLE_TO_SALE: 'PRODUCT_ERRORS.NOT_AVAILABLE_TO_SALE',
-  // Reuses the pre-existing SALES.* key — already byte-identical to
-  // ProductErrors.ProductNotAvailable.description.
-  NOT_AVAILABLE: 'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE',
-  QUANTITY_NOT_AVAILABLE: 'PRODUCT_ERRORS.QUANTITY_NOT_AVAILABLE',
-};
-
 /**
- * Pure port of Angular's hasAvailableProductToSale 5-way branch:
- * 1. product not found -> NOT_EXISTS
- * 2. !product.isActive -> INACTIVE
- * 3. !product.availableToSale -> NOT_AVAILABLE_TO_SALE
+ * 1:1 port of Angular's `InventoryOfflineService.hasAvailableProductToSale`
+ * (frontend/src/app/application/entries/inventory-offline.service.ts:397-423) — EXACT
+ * Angular name and `Result` return shape (service-return-shape-parity correction #1;
+ * supersedes the prior bespoke `checkProductAvailabilityToSale` / `ProductAvailabilityResult`
+ * pair — single surface, no adapter). Angular's own method signature is
+ * `(productId: string, quantity: number): Result`, doing its own `productRepository` +
+ * `getProductInventoriesByProductId` lookups internally; React's `InventoryOfflineService`
+ * has no product repository (pre-existing DI-gap precedent, design ADR/mismatch #2), so this
+ * stays a pure function taking the looked-up product/inventory context explicitly — same
+ * workaround already used by `getAvailableByCategory`'s `products` param.
+ *
+ * 5-way branch:
+ * 1. product not found -> ProductErrors.NotExists
+ * 2. !product.isActive -> ProductErrors.Inactive
+ * 3. !product.availableToSale -> ProductErrors.ProductNotAvailableToSale
  * 4. GATE: !hasInventoryModule || !product.discountFromInvantory -> succeeds (skip stock check)
- * 5. no active inventory entries -> NOT_AVAILABLE
- * 6. available < (quantity + cartQuantity) -> QUANTITY_NOT_AVAILABLE
+ * 5. no active inventory entries -> ProductErrors.ProductNotAvailable
+ * 6. available < (quantity + cartQuantity) -> ProductErrors.ProductQuantityNotAvailable
  * 7. else -> succeeds
  */
-export function checkProductAvailabilityToSale(
-  params: CheckProductAvailabilityParams,
-): ProductAvailabilityResult {
+export function hasAvailableProductToSale(params: CheckProductAvailabilityParams): Result {
   const { product, quantity, cartQuantity, hasInventoryModule, inventory } = params;
 
-  if (!product) return { succeeded: false, errorCode: 'NOT_EXISTS' };
-  if (!product.isActive) return { succeeded: false, errorCode: 'INACTIVE' };
-  if (!product.availableToSale) return { succeeded: false, errorCode: 'NOT_AVAILABLE_TO_SALE' };
+  if (!product) return Result.Failure([ProductErrors.NotExists]);
+  if (!product.isActive) return Result.Failure([ProductErrors.Inactive]);
+  if (!product.availableToSale) return Result.Failure([ProductErrors.ProductNotAvailableToSale]);
 
   if (!hasInventoryModule || !product.discountFromInvantory) {
-    return { succeeded: true };
+    return Result.Success();
   }
 
-  if (!inventory.hasEntries) return { succeeded: false, errorCode: 'NOT_AVAILABLE' };
+  if (!inventory.hasEntries) return Result.Failure([ProductErrors.ProductNotAvailable]);
 
   const requestedTotal = quantity + cartQuantity;
   return inventory.available >= requestedTotal
-    ? { succeeded: true }
-    : { succeeded: false, errorCode: 'QUANTITY_NOT_AVAILABLE' };
+    ? Result.Success()
+    : Result.Failure([ProductErrors.ProductQuantityNotAvailable]);
 }

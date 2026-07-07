@@ -11,7 +11,7 @@ import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-ser
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
-import { checkProductAvailabilityToSale } from '~/sales/lib/product-availability';
+import { hasAvailableProductToSale } from '~/sales/lib/product-availability';
 import { SaleCategoryProducts } from '~/sales/components/sale-category-products';
 import { getOrderTypes } from '~/sales/lib/order-type-utils';
 
@@ -72,7 +72,7 @@ export function EgressPage() {
   function checkAvailability(productId: string, quantity: number) {
     const product = products.find((p) => p.id === productId);
     const inventoryService = new InventoryOfflineService(storeId);
-    return checkProductAvailabilityToSale({
+    return hasAvailableProductToSale({
       product,
       quantity,
       cartQuantity: getCartItemQuantity(productId),

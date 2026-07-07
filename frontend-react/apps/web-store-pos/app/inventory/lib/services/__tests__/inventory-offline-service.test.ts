@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InventoryOfflineService } from '../inventory-offline-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { InventoryErrors, Result } from '@store-mgmt/domain';
 import type { InventoryEntry, OrderItem, UserModel } from '@store-mgmt/domain';
 
 const storeId = 's1';
@@ -360,25 +361,32 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  describe('INV-03: create — S-I1', () => {
-    it('creates an entry with available=quantity', () => {
-      const entry = service.create('p1', 50, 0.8);
-      expect(entry.available).toBe(50);
-      expect(entry.quantity).toBe(50);
+  // WU2 (service-return-shape-parity Slice 1, category D): create() now returns
+  // DataResult<InventoryEntryView> (was plain InventoryEntry), matching Angular's
+  // createInventoryEntry sync DataResult return — never throws.
+  describe('INV-03: create — S-I1 (DataResult<InventoryEntryView>)', () => {
+    it('succeeds:true, data.available=data.quantity for a new entry', () => {
+      const result = service.create('p1', 50, 0.8);
+      expect(result.succeeded).toBe(true);
+      expect(result.errors).toEqual([]);
+      expect(result.data?.quantity).toBe(50);
     });
 
-    it('creates an entry with order=maxOrder+1', () => {
+    it('creates an entry with order=maxOrder+1 (verified via a subsequent read)', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { order: 2 })]);
       seedInventory(storeId, map);
 
-      const entry = service.create('p1', 10, 1.5);
-      expect(entry.order).toBe(3); // maxOrder=2, so new entry gets 3
+      service.create('p1', 10, 1.5);
+      const entries = service.getProductInventoriesByProductId('p1');
+      const created = entries.find((e) => e.id !== 'e1');
+      expect(created?.order).toBe(3); // maxOrder=2, so new entry gets 3
     });
 
     it('creates first entry with order=0 when no entries exist', () => {
-      const entry = service.create('p1', 10, 1.5);
-      expect(entry.order).toBe(0);
+      service.create('p1', 10, 1.5);
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries[0].order).toBe(0);
     });
 
     it('persists to localStorage', () => {
@@ -387,38 +395,46 @@ describe('InventoryOfflineService', () => {
       expect(raw).not.toBeNull();
     });
 
-    it('sets isActive=true on new entry', () => {
-      const entry = service.create('p1', 10, 1.5);
-      expect(entry.isActive).toBe(true);
+    it('sets isActive=true on new entry data', () => {
+      const result = service.create('p1', 10, 1.5);
+      expect(result.data?.isActive).toBe(true);
     });
 
     // Angular parity (audit-user-threading): create stamps createdByName from the
     // authenticated user's login and MUST NOT touch updatedByName/updatedDate.
-    it('stamps createdByName with the authenticated user login', () => {
-      const entry = service.create('p1', 10, 1.5);
-      expect(entry.createdByName).toBe('jdoe');
+    it('stamps createdByName with the authenticated user login (raw entry, not exposed on the view)', () => {
+      service.create('p1', 10, 1.5);
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries[0].createdByName).toBe('jdoe');
     });
 
     it('leaves updatedByName/updatedDate undefined on create', () => {
-      const entry = service.create('p1', 10, 1.5);
-      expect(entry.updatedByName).toBeUndefined();
-      expect(entry.updatedDate).toBeUndefined();
+      service.create('p1', 10, 1.5);
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries[0].updatedByName).toBeUndefined();
+      expect(entries[0].updatedDate).toBeUndefined();
     });
 
     it('stamps createdByName with "" when no user is authenticated', () => {
       useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
-      const entry = service.create('p1', 10, 1.5);
-      expect(entry.createdByName).toBe('');
+      service.create('p1', 10, 1.5);
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries[0].createdByName).toBe('');
     });
   });
 
-  describe('INV-04: update — S-I4 (fails when partially sold)', () => {
-    it('throws when entry has been partially sold (quantity !== available)', () => {
+  // WU2 (category D): update() now returns DataResult<InventoryEntryView>, guarded by
+  // isNotSoldEntry — NEVER throws (Angular's own updateInventoryEntry never throws either).
+  describe('INV-04: update — S-I4 (DataResult<InventoryEntryView>, never throws)', () => {
+    it('fails with InventoryErrors.SaleExistsWithThisEntry when entry has been partially sold', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]); // 6 sold
       seedInventory(storeId, map);
 
-      expect(() => service.update('e1', 'p1', 15, 2.0)).toThrow();
+      const result = service.update('e1', 'p1', 15, 2.0);
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([InventoryErrors.SaleExistsWithThisEntry]);
+      expect(result.data).toBeUndefined();
     });
 
     it('succeeds when no units sold (quantity === available)', () => {
@@ -426,32 +442,39 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      expect(() => service.update('e1', 'p1', 15, 2.0)).not.toThrow();
+      const result = service.update('e1', 'p1', 15, 2.0);
+      expect(result.succeeded).toBe(true);
+      expect(result.errors).toEqual([]);
     });
 
-    it('throws when entry not found', () => {
-      expect(() => service.update('nonexistent', 'p1', 10, 1.0)).toThrow();
+    it('fails with InventoryErrors.EntryNotExists when entry not found', () => {
+      const result = service.update('nonexistent', 'p1', 10, 1.0);
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([InventoryErrors.EntryNotExists]);
     });
 
     // Angular parity (audit-user-threading): update stamps updatedByName from the
     // authenticated user's login.
-    it('stamps updatedByName with the authenticated user login', () => {
+    it('stamps updatedByName with the authenticated user login (raw entry, not exposed on the view)', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      const updated = service.update('e1', 'p1', 15, 2.0);
-      expect(updated.updatedByName).toBe('jdoe');
+      service.update('e1', 'p1', 15, 2.0);
+      const raw = findRawEntry(storeId, 'e1');
+      expect(raw?.updatedByName).toBe('jdoe');
     });
   });
 
-  describe('INV-05: deactivate — S-I5 (fails when sold)', () => {
-    it('throws when entry has been partially sold', () => {
+  // WU2 (category D): deactivate() now returns Result (guarded by isNotSoldEntry) — never throws.
+  describe('INV-05: deactivate — S-I5 (Result, never throws)', () => {
+    it('fails with InventoryErrors.SaleExistsWithThisEntry when entry has been partially sold', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]);
       seedInventory(storeId, map);
 
-      expect(() => service.deactivate('e1', 'p1')).toThrow();
+      const result = service.deactivate('e1', 'p1');
+      expect(result).toEqual(Result.Failure([InventoryErrors.SaleExistsWithThisEntry]));
     });
 
     it('succeeds when no units sold', () => {
@@ -459,7 +482,13 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      expect(() => service.deactivate('e1', 'p1')).not.toThrow();
+      const result = service.deactivate('e1', 'p1');
+      expect(result).toEqual(Result.Success());
+    });
+
+    it('fails with InventoryErrors.EntryNotExists when entry not found', () => {
+      const result = service.deactivate('missing', 'p1');
+      expect(result).toEqual(Result.Failure([InventoryErrors.EntryNotExists]));
     });
 
     it('sets isActive=false after deactivation', () => {
@@ -471,8 +500,6 @@ describe('InventoryOfflineService', () => {
       const all = service.getAll();
       const found = all.find((v) => v.id === 'e1');
       // After deactivation, it should not appear in getAll (which returns active entries only)
-      // OR it should have isActive=false if getAll returns all
-      // Let's check that the entry is gone from the active list
       expect(found).toBeUndefined();
     });
 
@@ -935,30 +962,33 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU5: amortizeSoldEntry
-  describe('amortizeSoldEntry', () => {
-    it('zeroes available and reduces quantity by the amortized (previously-available) amount', () => {
+  // WU2 (category D): amortizeSoldEntry() now returns Result — never throws.
+  describe('amortizeSoldEntry — Result, never throws', () => {
+    it('zeroes available and reduces quantity by the amortized (previously-available) amount, returning Result.Success()', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 3 })]); // 7 sold
       seedInventory(storeId, map);
 
-      service.amortizeSoldEntry('p1', 'e1');
+      const result = service.amortizeSoldEntry('p1', 'e1');
+      expect(result).toEqual(Result.Success());
 
       const found = findRawEntry(storeId, 'e1');
       expect(found?.available).toBe(0);
       expect(found?.quantity).toBe(7); // 10 - 3
     });
 
-    it('throws InventoryErrors.EntryNotExists when entry is missing', () => {
-      expect(() => service.amortizeSoldEntry('p1', 'missing')).toThrow(/EntryNotExists/);
+    it('returns Result.Failure([InventoryErrors.EntryNotExists]) when entry is missing', () => {
+      const result = service.amortizeSoldEntry('p1', 'missing');
+      expect(result).toEqual(Result.Failure([InventoryErrors.EntryNotExists]));
     });
 
-    it('throws InventoryErrors.SaleNotExistsWithThisEntry when nothing has been sold (quantity === available)', () => {
+    it('returns Result.Failure([InventoryErrors.SaleNotExistsWithThisEntry]) when nothing has been sold (quantity === available)', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      expect(() => service.amortizeSoldEntry('p1', 'e1')).toThrow(/SaleNotExistsWithThisEntry/);
+      const result = service.amortizeSoldEntry('p1', 'e1');
+      expect(result).toEqual(Result.Failure([InventoryErrors.SaleNotExistsWithThisEntry]));
     });
   });
 
@@ -1011,8 +1041,10 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU5: updateInventoryEntry — BUG FIX (ADR-7): cross-product old/new-list mix-up
-  describe('updateInventoryEntry (bug fix: cross-product reassignment)', () => {
+  // WU2 (category D) + BUG FIX (ADR-7): updateInventoryEntry() now returns
+  // DataResult<InventoryEntryView> guarded by isNotSoldEntry — never throws. Cross-product
+  // old/new-list mix-up bug fix is preserved.
+  describe('updateInventoryEntry (DataResult, never throws; bug fix: cross-product reassignment)', () => {
     it('moves the entry from oldProductId bucket to newProductId bucket, leaving other entries untouched', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
@@ -1022,12 +1054,12 @@ describe('InventoryOfflineService', () => {
       map.set('p2', [makeEntry('e-existing', 'p2', { quantity: 3, available: 3 })]);
       seedInventory(storeId, map);
 
-      const updated = service.updateInventoryEntry('p1', 'e1', 'p2', 20, 4);
+      const result = service.updateInventoryEntry('p1', 'e1', 'p2', 20, 4);
 
-      expect(updated.productId).toBe('p2');
-      expect(updated.quantity).toBe(20);
-      expect(updated.available).toBe(20);
-      expect(updated.costPrice).toBe(4);
+      expect(result.succeeded).toBe(true);
+      expect(result.data?.productId).toBe('p2');
+      expect(result.data?.quantity).toBe(20);
+      expect(result.data?.costPrice).toBe(4);
 
       // p1 bucket keeps only the untouched entry
       const p1Raw = findRawEntry(storeId, 'e-other');
@@ -1044,25 +1076,29 @@ describe('InventoryOfflineService', () => {
       map.set('p2', [makeEntry('e2', 'p2', { quantity: 5, available: 5 })]);
       seedInventory(storeId, map);
 
-      const updated = service.updateInventoryEntry('p1', 'e1', 'p1', 15, 3);
-      expect(updated.quantity).toBe(15);
+      const result = service.updateInventoryEntry('p1', 'e1', 'p1', 15, 3);
+      expect(result.data?.quantity).toBe(15);
       expect(findRawEntry(storeId, 'e2')?.quantity).toBe(5); // p2 untouched
     });
 
-    it('throws when the entry has been partially sold', () => {
+    it('fails with InventoryErrors.SaleExistsWithThisEntry when the entry has been partially sold', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]);
       seedInventory(storeId, map);
 
-      expect(() => service.updateInventoryEntry('p1', 'e1', 'p2', 5, 1)).toThrow();
+      const result = service.updateInventoryEntry('p1', 'e1', 'p2', 5, 1);
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([InventoryErrors.SaleExistsWithThisEntry]);
     });
 
-    it('throws when entry not found in oldProductId bucket', () => {
+    it('fails with InventoryErrors.EntryNotExists when entry not found in oldProductId bucket', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      expect(() => service.updateInventoryEntry('p1', 'nonexistent', 'p2', 5, 1)).toThrow();
+      const result = service.updateInventoryEntry('p1', 'nonexistent', 'p2', 5, 1);
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([InventoryErrors.EntryNotExists]);
     });
 
     it('stamps updatedByName with the authenticated user login', () => {
@@ -1070,8 +1106,111 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      const updated = service.updateInventoryEntry('p1', 'e1', 'p2', 5, 1);
-      expect(updated.updatedByName).toBe('jdoe');
+      service.updateInventoryEntry('p1', 'e1', 'p2', 5, 1);
+      expect(findRawEntry(storeId, 'e1')?.updatedByName).toBe('jdoe');
+    });
+  });
+
+  // WU2 (category D, NEW method): isNotSoldEntry — 1:1 port of Angular's
+  // InventoryOfflineService.isNotSoldEntry (inventory-offline.service.ts:162-177), used as the
+  // shared guard for update/updateInventoryEntry/deactivate. DI-gap note: Angular's version
+  // also checks `!productRepository.getProductById(productId)` -> Result.Failure([ProductErrors
+  // .NotExists]) first; React's InventoryOfflineService has no product repository (same
+  // pre-existing DI gap as getInventoryCategoriesView/getInventoryEntriesInDay — design
+  // ambiguity #2), so that branch is intentionally NOT reachable here — only entry-existence
+  // and sold-status are checked. Flagged as a deviation for verify.
+  describe('isNotSoldEntry — Result guard (NEW method)', () => {
+    it('returns Result.Failure([InventoryErrors.EntryNotExists]) when the entry does not exist for productId', () => {
+      const result = service.isNotSoldEntry('p1', 'missing');
+      expect(result).toEqual(Result.Failure([InventoryErrors.EntryNotExists]));
+    });
+
+    it('returns Result.Failure([InventoryErrors.SaleExistsWithThisEntry]) when quantity !== available', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]);
+      seedInventory(storeId, map);
+
+      const result = service.isNotSoldEntry('p1', 'e1');
+      expect(result).toEqual(Result.Failure([InventoryErrors.SaleExistsWithThisEntry]));
+    });
+
+    it('returns Result.Success() when quantity === available', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      const result = service.isNotSoldEntry('p1', 'e1');
+      expect(result).toEqual(Result.Success());
+    });
+  });
+
+  // WU2 (category D): increaseQuantitiesByOrderItems now returns Result (was void) — always
+  // Result.Success() per Angular (no failure branch exists in Angular's version either).
+  describe('increaseQuantitiesByOrderItems — Result return (WU2)', () => {
+    it('always returns Result.Success()', () => {
+      const orderItems: OrderItem[] = [
+        {
+          productId: 'p1',
+          productName: 'Product',
+          categoryId: 'cat1',
+          categoryName: 'Cat',
+          name: 'Product',
+          quantity: 1,
+          price: 5,
+          productBusinessId: 'biz1',
+          order: 0,
+          productCosts: [],
+        },
+      ];
+      const result = service.increaseQuantitiesByOrderItems(orderItems);
+      expect(result).toEqual(Result.Success());
+    });
+  });
+
+  // WU2 (category D, NEW methods): addImportedEntries/updateImportedEntries — 1:1 port of
+  // Angular's InventoryOfflineService.addImportedEntries/updateImportedEntries
+  // (inventory-offline.service.ts:498-524), both always Result.Success().
+  describe('addImportedEntries / updateImportedEntries — NEW methods (WU2)', () => {
+    it('addImportedEntries replaces the productId bucket wholesale and returns Result.Success()', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e-old', 'p1')]);
+      seedInventory(storeId, map);
+
+      const incoming = [makeEntry('e-new', 'p1', { available: 3 })];
+      const result = service.addImportedEntries('p1', incoming);
+
+      expect(result).toEqual(Result.Success());
+      const stored = service.getProductInventoriesByProductId('p1');
+      expect(stored.map((e) => e.id)).toEqual(['e-new']);
+    });
+
+    it('updateImportedEntries merges matching entries (available/isActive/updatedDate/updatedByName) and appends unmatched ones, returning Result.Success()', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 5, isActive: true })]);
+      seedInventory(storeId, map);
+
+      const updatedDate = new Date('2024-05-01T00:00:00.000Z');
+      const incoming: InventoryEntry[] = [
+        { ...makeEntry('e1', 'p1', { available: 2, isActive: false }), updatedDate, updatedByName: 'importer' },
+        makeEntry('e2', 'p1', { available: 9 }),
+      ];
+      const result = service.updateImportedEntries('p1', incoming);
+
+      expect(result).toEqual(Result.Success());
+      const stored = service.getProductInventoriesByProductId('p1');
+      const e1 = stored.find((e) => e.id === 'e1');
+      const e2 = stored.find((e) => e.id === 'e2');
+      expect(e1).toMatchObject({ available: 2, isActive: false, updatedByName: 'importer' });
+      expect(e2).toMatchObject({ available: 9 });
+    });
+
+    it('updateImportedEntries sets the bucket directly when no entries previously existed for productId', () => {
+      const incoming = [makeEntry('e1', 'p1', { available: 4 })];
+      const result = service.updateImportedEntries('p1', incoming);
+
+      expect(result).toEqual(Result.Success());
+      const stored = service.getProductInventoriesByProductId('p1');
+      expect(stored.map((e) => e.id)).toEqual(['e1']);
     });
   });
 });

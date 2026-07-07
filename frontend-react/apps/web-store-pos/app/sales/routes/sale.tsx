@@ -11,7 +11,7 @@ import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-ser
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
-import { checkProductAvailabilityToSale } from '../lib/product-availability';
+import { hasAvailableProductToSale } from '../lib/product-availability';
 import { SaleCategoryProducts } from '../components/sale-category-products';
 
 export const clientLoader = featureLoader([EFeatures.Sale]);
@@ -67,7 +67,7 @@ export function SalePage() {
   function checkAvailability(productId: string, quantity: number) {
     const product = products.find((p) => p.id === productId);
     const inventoryService = new InventoryOfflineService(storeId);
-    return checkProductAvailabilityToSale({
+    return hasAvailableProductToSale({
       product,
       quantity,
       cartQuantity: getCartItemQuantity(productId),

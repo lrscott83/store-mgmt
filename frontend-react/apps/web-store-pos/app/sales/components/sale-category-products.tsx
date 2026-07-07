@@ -1,6 +1,5 @@
-import type { Product } from '@store-mgmt/domain';
+import type { Product, Result } from '@store-mgmt/domain';
 import type { OrderType } from '@store-mgmt/domain';
-import type { ProductAvailabilityResult } from '../lib/product-availability';
 import { SaleProductRow } from './sale-product-row';
 
 interface SaleCategoryProductsProps {
@@ -9,7 +8,7 @@ interface SaleCategoryProductsProps {
   products: Product[];
   orderType: OrderType;
   onAdded: (productId: string, quantity: number, price: number) => void;
-  checkAvailability?: (productId: string, quantity: number) => ProductAvailabilityResult;
+  checkAvailability?: (productId: string, quantity: number) => Result;
 }
 
 /**

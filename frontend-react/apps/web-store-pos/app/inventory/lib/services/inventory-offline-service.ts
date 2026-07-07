@@ -1,8 +1,9 @@
 import type { BaseService, InventoryEntry, InventoryEntryCost, InventoryEntryView, OrderItem } from '@store-mgmt/domain';
+import { DataResult, InventoryErrors, Result } from '@store-mgmt/domain';
 import { InventoryRepository } from '../repositories/inventory-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import {
-  checkProductAvailabilityToSale,
+  hasAvailableProductToSale,
   type ProductAvailabilityFields,
 } from '~/sales/lib/product-availability';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -16,7 +17,7 @@ import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
  * yield an empty cost list, and — when the inventory module is enabled AND the product
  * discounts from inventory — insufficient active stock also yields an empty list. When the
  * module is disabled or the product doesn't discount from inventory, Angular's own bypass
- * branch applies (matches `checkProductAvailabilityToSale` branch 4) and the FIFO computation
+ * branch applies (matches `hasAvailableProductToSale` branch 4) and the FIFO computation
  * proceeds unblocked, exactly as Angular does.
  *
  * Optional (rather than required) so the many pre-existing FIFO-mechanics unit tests that only
@@ -298,7 +299,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     if (quantity <= 0) return [];
 
     if (eligibility) {
-      const gate = checkProductAvailabilityToSale({
+      const gate = hasAvailableProductToSale({
         product: eligibility.product,
         quantity,
         cartQuantity: 0,
@@ -371,7 +372,11 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    *
    * Spec §6.3 increaseQuantitiesByOrderItems contract; S-I3.
    */
-  increaseQuantitiesByOrderItems(orderItems: OrderItem[]): void {
+  /**
+   * WU2 (category D): returns Result (was void) — always Result.Success() per Angular
+   * (no failure branch exists in Angular's own version either).
+   */
+  increaseQuantitiesByOrderItems(orderItems: OrderItem[]): Result {
     const map = this.repo.getAll(this.storeId);
     let dirty = false;
 
@@ -398,6 +403,8 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     if (dirty) {
       this.repo.saveAll(this.storeId, map);
     }
+
+    return Result.Success();
   }
 
   // ─── Write methods ───────────────────────────────────────────────────────
@@ -405,6 +412,11 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
   /**
    * Creates a new inventory entry.
    * available = quantity; order = maxOrder + 1 (or 0 if no prior entries).
+   *
+   * WU2 (category D): returns DataResult<InventoryEntryView> (was plain InventoryEntry),
+   * matching Angular's createInventoryEntry sync DataResult return — never throws.
+   * productName is '' since this service has no product repository (matches getAll's
+   * convention).
    *
    * Spec §6.3 create contract; S-I1.
    */
@@ -414,7 +426,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     costPrice: number,
     categoryId: string = '',
     date: Date = new Date(),
-  ): InventoryEntry {
+  ): DataResult<InventoryEntryView> {
     const existing = this.repo.getByProductId(this.storeId, productId);
     const maxOrder = existing.length > 0
       ? Math.max(...existing.map((e) => e.order))
@@ -438,13 +450,28 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     };
 
     this.repo.save(this.storeId, productId, [...existing, entry]);
-    return entry;
+
+    return new DataResult<InventoryEntryView>(
+      {
+        id: entry.id,
+        productId: entry.productId,
+        productName: '',
+        quantity: entry.quantity,
+        costPrice: entry.costPrice,
+        date: entry.date,
+        isActive: entry.isActive,
+      },
+      true,
+      [],
+    );
   }
 
   /**
-   * Updates an existing inventory entry.
-   * Validates that entry has not been partially sold (quantity === available).
-   * Throws InventoryErrors.SaleExistsWithThisEntry if quantity !== available.
+   * Updates an existing inventory entry (same-product edit).
+   * Guarded by {@link isNotSoldEntry} (entry-not-found / partially-sold).
+   *
+   * WU2 (category D): returns DataResult<InventoryEntryView> (was plain InventoryEntry,
+   * throwing) — NEVER throws, matching Angular's own updateInventoryEntry contract.
    *
    * Spec §6.3 update contract; S-I4.
    */
@@ -453,18 +480,14 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     productId: string,
     quantity: number,
     costPrice: number,
-  ): InventoryEntry {
-    const found = this.repo.findEntryById(this.storeId, entryId);
-    if (!found) throw new Error(`InventoryEntry not found: ${entryId}`);
-
-    const { entry, productId: storedProductId } = found;
-
-    // S-I4: cannot edit if partially sold
-    if (entry.quantity !== entry.available) {
-      throw new Error(
-        `InventoryErrors.SaleExistsWithThisEntry: entry ${entryId} has been partially sold (qty=${entry.quantity}, available=${entry.available})`,
-      );
+  ): DataResult<InventoryEntryView> {
+    const guard = this.isNotSoldEntry(productId, entryId);
+    if (!guard.succeeded) {
+      return new DataResult<InventoryEntryView>(undefined, false, guard.errors);
     }
+
+    const found = this.repo.findEntryById(this.storeId, entryId)!;
+    const { entry, productId: storedProductId } = found;
 
     const updated: InventoryEntry = {
       ...entry,
@@ -480,27 +503,35 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     if (idx !== -1) allForProduct[idx] = updated;
     this.repo.save(this.storeId, storedProductId ?? productId, allForProduct);
 
-    return updated;
+    return new DataResult<InventoryEntryView>(
+      {
+        id: updated.id,
+        productId: updated.productId,
+        productName: '',
+        quantity: updated.quantity,
+        costPrice: updated.costPrice,
+        date: updated.date,
+        isActive: updated.isActive,
+      },
+      true,
+      [],
+    );
   }
 
   /**
    * Soft-deletes an inventory entry (sets isActive = false).
-   * Validates that entry has not been sold.
+   * Guarded by {@link isNotSoldEntry} (entry-not-found / partially-sold).
+   *
+   * WU2 (category D): returns Result (was void, throwing) — NEVER throws.
    *
    * Spec §6.3 deactivate contract; S-I5.
    */
-  deactivate(entryId: string, productId: string): void {
-    const found = this.repo.findEntryById(this.storeId, entryId);
-    if (!found) throw new Error(`InventoryEntry not found: ${entryId}`);
+  deactivate(entryId: string, productId: string): Result {
+    const guard = this.isNotSoldEntry(productId, entryId);
+    if (!guard.succeeded) return Result.Failure(guard.errors);
 
+    const found = this.repo.findEntryById(this.storeId, entryId)!;
     const { entry, productId: storedProductId } = found;
-
-    // S-I5: cannot deactivate if sold
-    if (entry.quantity !== entry.available) {
-      throw new Error(
-        `InventoryErrors.SaleExistsWithThisEntry: entry ${entryId} has been sold and cannot be deactivated`,
-      );
-    }
 
     const deactivated: InventoryEntry = {
       ...entry,
@@ -513,42 +544,75 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     const idx = allForProduct.findIndex((e) => e.id === entryId);
     if (idx !== -1) allForProduct[idx] = deactivated;
     this.repo.save(this.storeId, storedProductId ?? productId, allForProduct);
+
+    return Result.Success();
   }
 
   /**
    * BaseService<InventoryEntryView> conformance alias for {@link deactivate}. Looks up
    * the owning productId via `findEntryById` (deactivate normally requires the caller to
-   * already know it) and delegates — same validation, same throw on missing/partially-sold.
+   * already know it) and delegates.
+   *
+   * WU2 (ADR-1): BaseService's `delete` seam stays a SYNC React-only contract that always
+   * throws on failure (outside the A/B/C/D category conversion) — adapted here to consume
+   * deactivate's new `Result` without leaking `Result` through the `BaseService<T>` surface.
    */
   delete(id: string): void {
     const found = this.repo.findEntryById(this.storeId, id);
     if (!found) throw new Error(`InventoryEntry not found: ${id}`);
-    this.deactivate(id, found.productId);
+
+    const result = this.deactivate(id, found.productId);
+    if (!result.succeeded) {
+      throw new Error(result.errors[0]?.description ?? `InventoryEntry could not be deleted: ${id}`);
+    }
   }
 
   /**
    * 1:1 port of Angular's `amortizeSoldEntry` — zeroes `available` and moves the
    * consumed amount into a permanently-reduced `quantity` (so the entry no longer
    * shows as "still has stock" once every unit has been sold and the sale is being
-   * amortized/written off). Throws InventoryErrors.EntryNotExists when the entry is
-   * missing, InventoryErrors.SaleNotExistsWithThisEntry when nothing has actually
-   * been sold yet (`quantity === available` — return-contract collapse per ADR-1).
+   * amortized/written off).
+   *
+   * WU2 (category D): returns Result (was void, throwing) — NEVER throws.
+   * Result.Failure([InventoryErrors.EntryNotExists]) when the entry is missing,
+   * Result.Failure([InventoryErrors.SaleNotExistsWithThisEntry]) when nothing has actually
+   * been sold yet (`quantity === available`).
    */
-  amortizeSoldEntry(productId: string, entryId: string): void {
+  amortizeSoldEntry(productId: string, entryId: string): Result {
     const entries = this.repo.getByProductId(this.storeId, productId);
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) {
-      throw new Error(`InventoryErrors.EntryNotExists: entry ${entryId} not found for product ${productId}`);
+      return Result.Failure([InventoryErrors.EntryNotExists]);
     }
     if (entry.quantity === entry.available) {
-      throw new Error(
-        `InventoryErrors.SaleNotExistsWithThisEntry: entry ${entryId} has no sold units to amortize`,
-      );
+      return Result.Failure([InventoryErrors.SaleNotExistsWithThisEntry]);
     }
 
     entry.quantity -= entry.available;
     entry.available = 0;
     this.repo.save(this.storeId, productId, entries);
+
+    return Result.Success();
+  }
+
+  /**
+   * 1:1 port of Angular's `isNotSoldEntry` (inventory-offline.service.ts:162-177) — shared
+   * guard used by update/updateInventoryEntry/deactivate. DI-gap note (design ambiguity #2,
+   * same precedent as getInventoryCategoriesView/getInventoryEntriesInDay): Angular's version
+   * first checks `!productRepository.getProductById(productId)` ->
+   * `Result.Failure([ProductErrors.NotExists])`; React's InventoryOfflineService has no
+   * product repository, so that branch is NOT reachable here — only entry-existence and
+   * sold-status are checked. Scoped to entries under `productId` (matches Angular's
+   * `getProductInventoriesByProductId(productId)` lookup).
+   */
+  public isNotSoldEntry(productId: string, entryId: string): Result {
+    const entries = this.repo.getByProductId(this.storeId, productId);
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return Result.Failure([InventoryErrors.EntryNotExists]);
+
+    return entry.quantity === entry.available
+      ? Result.Success()
+      : Result.Failure([InventoryErrors.SaleExistsWithThisEntry]);
   }
 
   /**
@@ -566,7 +630,10 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    * cross-product move relocates exactly the one entry and leaves every other entry (in
    * both buckets) untouched. Kept as a DISTINCT method (not folded into the existing
    * single-product `update`) per design — `update` still only handles same-product edits.
-   * Same partially-sold guard as `update`/`deactivate` (quantity !== available → throw).
+   *
+   * WU2 (category D): returns DataResult<InventoryEntryView> (was plain InventoryEntry,
+   * throwing) — guarded by {@link isNotSoldEntry} (entry-not-found / partially-sold),
+   * NEVER throws.
    */
   updateInventoryEntry(
     oldProductId: string,
@@ -574,16 +641,14 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     newProductId: string,
     quantity: number,
     costPrice: number,
-  ): InventoryEntry {
-    const oldEntries = this.repo.getByProductId(this.storeId, oldProductId);
-    const entry = oldEntries.find((e) => e.id === entryId);
-    if (!entry) throw new Error(`InventoryEntry not found: ${entryId}`);
-
-    if (entry.quantity !== entry.available) {
-      throw new Error(
-        `InventoryErrors.SaleExistsWithThisEntry: entry ${entryId} has been partially sold (qty=${entry.quantity}, available=${entry.available})`,
-      );
+  ): DataResult<InventoryEntryView> {
+    const guard = this.isNotSoldEntry(oldProductId, entryId);
+    if (!guard.succeeded) {
+      return new DataResult<InventoryEntryView>(undefined, false, guard.errors);
     }
+
+    const oldEntries = this.repo.getByProductId(this.storeId, oldProductId);
+    const entry = oldEntries.find((e) => e.id === entryId)!;
 
     const updated: InventoryEntry = {
       ...entry,
@@ -599,17 +664,28 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
       const idx = oldEntries.findIndex((e) => e.id === entryId);
       if (idx !== -1) oldEntries[idx] = updated;
       this.repo.save(this.storeId, oldProductId, oldEntries);
-      return updated;
+    } else {
+      // Cross-product move: remove from oldProductId's bucket, append to newProductId's.
+      const remainingOldEntries = oldEntries.filter((e) => e.id !== entryId);
+      this.repo.save(this.storeId, oldProductId, remainingOldEntries);
+
+      const newEntries = this.repo.getByProductId(this.storeId, newProductId);
+      this.repo.save(this.storeId, newProductId, [...newEntries, updated]);
     }
 
-    // Cross-product move: remove from oldProductId's bucket, append to newProductId's.
-    const remainingOldEntries = oldEntries.filter((e) => e.id !== entryId);
-    this.repo.save(this.storeId, oldProductId, remainingOldEntries);
-
-    const newEntries = this.repo.getByProductId(this.storeId, newProductId);
-    this.repo.save(this.storeId, newProductId, [...newEntries, updated]);
-
-    return updated;
+    return new DataResult<InventoryEntryView>(
+      {
+        id: updated.id,
+        productId: updated.productId,
+        productName: '',
+        quantity: updated.quantity,
+        costPrice: updated.costPrice,
+        date: updated.date,
+        isActive: updated.isActive,
+      },
+      true,
+      [],
+    );
   }
 
   // ─── Query helpers ───────────────────────────────────────────────────────
@@ -637,6 +713,45 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    */
   getProductInventoriesByProductId(productId: string): InventoryEntry[] {
     return this.repo.getByProductId(this.storeId, productId);
+  }
+
+  /**
+   * WU2 (category D, NEW method): 1:1 port of Angular's `addImportedEntries`
+   * (inventory-offline.service.ts:519-524) — replaces the productId bucket wholesale.
+   * Always Result.Success() per Angular.
+   */
+  public addImportedEntries(productId: string, entries: InventoryEntry[]): Result {
+    this.repo.save(this.storeId, productId, entries);
+    return Result.Success();
+  }
+
+  /**
+   * WU2 (category D, NEW method): 1:1 port of Angular's `updateImportedEntries`
+   * (inventory-offline.service.ts:498-517) — merges each incoming entry into the existing
+   * productId bucket by id (updating available/isActive/updatedDate/updatedByName),
+   * appending any incoming entry with no existing match. When no bucket previously existed,
+   * this is equivalent to setting it directly (Angular's `this.inventories.has(productId)`
+   * branch — both paths converge to the same result when the existing bucket is empty).
+   * Always Result.Success() per Angular.
+   */
+  public updateImportedEntries(productId: string, entries: InventoryEntry[]): Result {
+    const currentEntries = [...this.repo.getByProductId(this.storeId, productId)];
+    for (const entry of entries) {
+      const idx = currentEntries.findIndex((e) => e.id === entry.id);
+      if (idx !== -1) {
+        currentEntries[idx] = {
+          ...currentEntries[idx],
+          available: entry.available,
+          isActive: entry.isActive,
+          updatedDate: entry.updatedDate,
+          updatedByName: entry.updatedByName,
+        };
+      } else {
+        currentEntries.push(entry);
+      }
+    }
+    this.repo.save(this.storeId, productId, currentEntries);
+    return Result.Success();
   }
 
   /**

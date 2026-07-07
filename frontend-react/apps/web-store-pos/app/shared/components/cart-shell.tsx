@@ -6,7 +6,8 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
-import { checkProductAvailabilityToSale, PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS } from '~/sales/lib/product-availability';
+import { hasAvailableProductToSale } from '~/sales/lib/product-availability';
+import { ProductErrors } from '@store-mgmt/domain';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { hasCreditsModuleAvailable, hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
@@ -116,7 +117,7 @@ export function CartShell() {
     const productService = new ProductOfflineService(storeId);
     const inventoryService = new InventoryOfflineService(storeId);
     const product = productService.getById(productId);
-    const result = checkProductAvailabilityToSale({
+    const result = hasAvailableProductToSale({
       product,
       quantity: delta,
       cartQuantity: currentQuantity,
@@ -125,14 +126,10 @@ export function CartShell() {
     });
     if (!result.succeeded) {
       // Angular: Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message,
-      // icon: 'error' }) — blocking, aborts the quantity change.
-      const messageKey = result.errorCode
-        ? PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS[result.errorCode]
-        : 'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE';
-      showBlockingError(
-        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-        intl.formatMessage({ id: messageKey }),
-      );
+      // icon: 'error' }) — blocking, aborts the quantity change. Angular reads
+      // `availableResult.errors[0].description` directly (hardcoded Spanish text).
+      const message = result.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
       return;
     }
     updateQuantity(productId, currentQuantity + delta);

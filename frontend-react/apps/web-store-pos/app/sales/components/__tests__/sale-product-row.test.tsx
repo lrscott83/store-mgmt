@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import { OrderType } from '@store-mgmt/domain';
+import { OrderType, ProductErrors } from '@store-mgmt/domain';
 import type { Product } from '@store-mgmt/domain';
 import { SaleProductRow } from '../sale-product-row';
 
@@ -141,7 +141,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
   // gate lives inside the service (branch 4). React mirrors that: checkAvailability, when
   // provided, is called unconditionally.
   it('calls checkAvailability regardless of discountFromInvantory (Angular always runs hasAvailableProductToSale)', () => {
-    const checkAvailability = vi.fn().mockReturnValue({ succeeded: true });
+    const checkAvailability = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
     const onAdded = vi.fn();
     render(
       <Wrapper>
@@ -159,7 +159,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
   });
 
   it('includes the current form quantity in the checkAvailability call', () => {
-    const checkAvailability = vi.fn().mockReturnValue({ succeeded: true });
+    const checkAvailability = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
     render(
       <Wrapper>
         <SaleProductRow
@@ -188,7 +188,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
           product={makeProduct({ id: 'prod-low-stock', discountFromInvantory: true })}
           orderType={OrderType.Normal}
           onAdded={onAdded}
-          checkAvailability={() => ({ succeeded: false, errorCode: 'QUANTITY_NOT_AVAILABLE' })}
+          checkAvailability={() => ({ succeeded: false, errors: [ProductErrors.ProductQuantityNotAvailable] })}
         />
       </Wrapper>,
     );
@@ -200,30 +200,30 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     expect(text).toBe('La cantidad del producto no está disponible en el inventario.');
   });
 
-  it('resolves each error code to its exact Angular ProductErrors Spanish message', () => {
-    const cases: Array<[string, string]> = [
-      ['NOT_EXISTS', 'El producto no existe.'],
-      ['INACTIVE', 'El producto no está activo.'],
-      ['NOT_AVAILABLE_TO_SALE', 'El producto no está disponible para la venta.'],
-      ['NOT_AVAILABLE', 'El producto no está disponible en el inventario.'],
-      ['QUANTITY_NOT_AVAILABLE', 'La cantidad del producto no está disponible en el inventario.'],
+  it('resolves each ProductErrors entry to its exact Angular Spanish description', () => {
+    const cases: Array<[string, { code: string; description: string }]> = [
+      ['NotExists', ProductErrors.NotExists],
+      ['Inactive', ProductErrors.Inactive],
+      ['ProductNotAvailableToSale', ProductErrors.ProductNotAvailableToSale],
+      ['ProductNotAvailable', ProductErrors.ProductNotAvailable],
+      ['ProductQuantityNotAvailable', ProductErrors.ProductQuantityNotAvailable],
     ];
 
-    for (const [errorCode, expectedMessage] of cases) {
+    for (const [name, error] of cases) {
       showBlockingErrorMock.mockClear();
       render(
         <Wrapper>
           <SaleProductRow
-            product={makeProduct({ id: `prod-${errorCode}` })}
+            product={makeProduct({ id: `prod-${name}` })}
             orderType={OrderType.Normal}
             onAdded={vi.fn()}
-            checkAvailability={() => ({ succeeded: false, errorCode: errorCode as never })}
+            checkAvailability={() => ({ succeeded: false, errors: [error] })}
           />
         </Wrapper>,
       );
       fireEvent.click(screen.getAllByRole('button', { name: /adicionar/i }).at(-1)!);
       const [, text] = showBlockingErrorMock.mock.calls[0];
-      expect(text).toBe(expectedMessage);
+      expect(text).toBe(error.description);
     }
   });
 });

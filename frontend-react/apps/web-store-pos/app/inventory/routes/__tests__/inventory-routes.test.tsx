@@ -245,6 +245,156 @@ describe('TodayEntriesPage — edit/deactivate actions stay reachable (regressio
   });
 });
 
+// WU2 (service-return-shape-parity Slice 1): create/update/deactivate no longer throw — they
+// return DataResult<InventoryEntryView> / Result. handleSave/handleDeactivate must check
+// `.succeeded` instead of try/catch (task 2.12).
+describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2, no more try/catch)', () => {
+  beforeEach(() => {
+    mockEgressProducts = [makeEgressProduct({ id: 'p1', name: 'Ron' })];
+    mockEgressCategories = [makeCategory({ id: 'cat-1' })];
+  });
+
+  it('handleDeactivate: on Result.Failure, logs the error and does not crash (no throw to catch)', () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const todayEntries: InventoryEntryView[] = [
+      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+    ];
+    const deactivateMock = vi.fn().mockReturnValue({
+      succeeded: false,
+      errors: [{ code: 'Inventory.SaleExistsWithThisEntry', description: 'Existe una venta que corresponde con esta entrada.' }],
+    });
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getByDate: vi.fn().mockReturnValue(todayEntries),
+          getAvailableByCategory: vi.fn().mockReturnValue([]),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          create: vi.fn(),
+          update: vi.fn(),
+          deactivate: deactivateMock,
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('Eliminar'));
+
+    expect(deactivateMock).toHaveBeenCalledWith('e1', 'p1');
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('handleDeactivate: on Result.Success, reloads entries (no console.error)', () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const todayEntries: InventoryEntryView[] = [
+      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+    ];
+    const getByDateMock = vi.fn().mockReturnValue(todayEntries);
+    const deactivateMock = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getByDate: getByDateMock,
+          getAvailableByCategory: vi.fn().mockReturnValue([]),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          create: vi.fn(),
+          update: vi.fn(),
+          deactivate: deactivateMock,
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+    const callsBeforeClick = getByDateMock.mock.calls.length;
+    fireEvent.click(screen.getByText('Eliminar'));
+
+    expect(deactivateMock).toHaveBeenCalledWith('e1', 'p1');
+    expect(getByDateMock.mock.calls.length).toBeGreaterThan(callsBeforeClick);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('handleSave (create): on DataResult failure, shows the modal error from errors[0].description', () => {
+    const createMock = vi.fn().mockReturnValue({
+      succeeded: false,
+      errors: [{ code: 'Inventory.ProductNotAvailable', description: 'El producto no está disponible' }],
+      data: undefined,
+    });
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getByDate: vi.fn().mockReturnValue([]),
+          getAvailableByCategory: vi.fn().mockReturnValue([]),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          create: createMock,
+          update: vi.fn(),
+          deactivate: vi.fn(),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });
+    fireEvent.click(screen.getByText('Adicionar'));
+
+    expect(createMock).toHaveBeenCalled();
+    expect(screen.getByText('El producto no está disponible')).toBeInTheDocument();
+  });
+
+  it('handleSave (create): on DataResult success, closes the modal and reloads entries', () => {
+    const createMock = vi.fn().mockReturnValue({
+      succeeded: true,
+      errors: [],
+      data: { id: 'new-1', productId: 'p1', productName: '', quantity: 3, costPrice: 1.5, date: new Date(), isActive: true },
+    });
+    const getByDateMock = vi.fn().mockReturnValue([]);
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getAll: vi.fn().mockReturnValue([]),
+          getByDate: getByDateMock,
+          getAvailableByCategory: vi.fn().mockReturnValue([]),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          create: createMock,
+          update: vi.fn(),
+          deactivate: vi.fn(),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+    const callsBeforeClick = getByDateMock.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });
+    fireEvent.click(screen.getByText('Adicionar'));
+
+    expect(createMock).toHaveBeenCalled();
+    expect(getByDateMock.mock.calls.length).toBeGreaterThan(callsBeforeClick);
+    // Modal closed — its Insertar/Actualizar action button no longer present.
+    expect(screen.queryByText('Adicionar')).not.toBeInTheDocument();
+  });
+});
+
 // ─── EntriesPage ─────────────────────────────────────────────────────────────
 
 import { EntriesPage } from '../entries';

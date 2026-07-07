@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Product } from '@store-mgmt/domain';
+import type { Product, Result } from '@store-mgmt/domain';
 import { OrderType } from '@store-mgmt/domain';
-import type { ProductAvailabilityResult } from '../lib/product-availability';
-import { PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS } from '../lib/product-availability';
+import { ProductErrors } from '@store-mgmt/domain';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface SaleProductRowProps {
@@ -17,7 +16,7 @@ interface SaleProductRowProps {
    * at the component level, the gate lives inside the service (branch 4). Optional so
    * existing callers without inventory wiring keep working (defaults to always-available).
    */
-  checkAvailability?: (productId: string, quantity: number) => ProductAvailabilityResult;
+  checkAvailability?: (productId: string, quantity: number) => Result;
 }
 
 /**
@@ -37,14 +36,12 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
       const result = checkAvailability(product.id, quantity);
       if (!result.succeeded) {
         // Angular: Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message,
-        // icon: 'error' }) — blocking, aborts the add (sale-product-row.component.ts:62-104).
-        const messageKey = result.errorCode
-          ? PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS[result.errorCode]
-          : 'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE';
-        showBlockingError(
-          intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-          intl.formatMessage({ id: messageKey }),
-        );
+        // icon: 'error' }) — blocking, aborts the add (sale-product-row.component.ts:58-73).
+        // Angular reads `availableResult.errors[0].description` directly (already
+        // hardcoded Spanish text in ProductErrors, not an i18n key lookup), falling back to
+        // ProductErrors.ProductNotAvailable.description when errors is empty.
+        const message = result.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
+        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
         return;
       }
     }

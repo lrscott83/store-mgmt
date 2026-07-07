@@ -72,35 +72,37 @@ export function TodayEntriesPage() {
     setModalError('');
   }
 
+  // WU2 (service-return-shape-parity Slice 1): deactivate() now returns Result (never
+  // throws) — check `.succeeded` instead of try/catch.
   function handleDeactivate(entry: InventoryEntryView) {
     const svc = new InventoryOfflineService(storeId);
-    try {
-      svc.deactivate(entry.id, entry.productId);
-      loadEntries();
-    } catch (err) {
-      console.error(err);
+    const result = svc.deactivate(entry.id, entry.productId);
+    if (!result.succeeded) {
+      console.error(result.errors[0]?.description ?? 'InventoryEntry could not be deactivated');
+      return;
     }
+    loadEntries();
   }
 
+  // WU2 (service-return-shape-parity Slice 1): create()/update() now return
+  // DataResult<InventoryEntryView> (never throw) — check `.succeeded` instead of try/catch.
   function handleSave(data: EditInventoryEntryInput, entryId?: string) {
     const svc = new InventoryOfflineService(storeId);
-    try {
-      if (entryId) {
-        svc.update(entryId, data.productId, data.quantity, data.costPrice);
-      } else {
-        svc.create(data.productId, data.quantity, data.costPrice, data.categoryId, new Date(data.date));
-      }
-      loadEntries();
-      setIsModalOpen(false);
-      setEditingEntry(undefined);
-      setModalError('');
-    } catch (err) {
+    const result = entryId
+      ? svc.update(entryId, data.productId, data.quantity, data.costPrice)
+      : svc.create(data.productId, data.quantity, data.costPrice, data.categoryId, new Date(data.date));
+
+    if (!result.succeeded) {
       setModalError(
-        err instanceof Error
-          ? err.message
-          : intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? intl.formatMessage({ id: 'GENERAL.ERROR' }),
       );
+      return;
     }
+
+    loadEntries();
+    setIsModalOpen(false);
+    setEditingEntry(undefined);
+    setModalError('');
   }
 
   return (
