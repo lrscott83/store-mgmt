@@ -7,6 +7,7 @@ export * from './models/order';
 export * from './models/expense';
 export * from './models/sale-credit';
 export * from './enums';
+export * from './commons/result';
 export * from './services/base-service';
 export * from './services/product-service';
 export * from './services/product-category-service';
