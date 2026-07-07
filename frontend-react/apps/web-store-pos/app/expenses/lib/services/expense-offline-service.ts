@@ -1,5 +1,6 @@
 import type { BaseService, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { DataResult, ExpenseErrors, Result } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -110,7 +111,13 @@ export class ExpenseOfflineService implements BaseService<Expense> {
     );
   }
 
-  create(input: CreateExpenseInput): Expense {
+  /**
+   * WU2 (category D): returns DataResult<Expense> (was a bare Expense), matching Angular's
+   * `createExpense` sync `new DataResult(expense, true, [])` — always succeeds, never throws.
+   * Signature kept as the existing input-object shape (not renamed to `createExpense`),
+   * mirroring the Slice-1 Inventory precedent (only the return SHAPE changes).
+   */
+  create(input: CreateExpenseInput): DataResult<Expense> {
     const now = new Date();
     const expense: Expense = {
       id: generateId(),
@@ -126,20 +133,22 @@ export class ExpenseOfflineService implements BaseService<Expense> {
       updatedByName: undefined,
     };
     repo.upsert(this.storeId, expense);
-    return expense;
+    return new DataResult<Expense>(expense, true, []);
   }
 
+  /**
+   * WU2 (category D): returns DataResult<Expense> (was a bare Expense that threw on missing) —
+   * NEVER throws, matching Angular's `updateExpense`. On a missing record it returns SYNC
+   * `new DataResult(undefined, false, [ExpenseErrors.NotExists])` (resolve-not-reject).
+   */
   update(
     id: string,
     patch: Partial<Pick<Expense, 'type' | 'total' | 'date' | 'paymentType' | 'note'>>,
-  ): Expense {
+  ): DataResult<Expense> {
     const existing = repo.getById(this.storeId, id);
-    // Angular parity: updateExpense returns DataResult(undefined, false, [ExpenseErrors.NotExists])
-    // on a missing record. React has no Result type here, so it throws instead; callers (route
-    // components) MUST NOT surface `err.message` directly — it's an internal sentinel, not
-    // user-facing text. They translate via EXPENSE_ERRORS.NOT_EXISTS ('El gasto no existe.'),
-    // matching the ORDER_ERRORS.NOT_EXISTS/SALE_CREDIT_ERRORS.NOT_EXISTS precedent.
-    if (!existing) throw new Error('EXPENSE_NOT_FOUND');
+    if (!existing) {
+      return new DataResult<Expense>(undefined, false, [ExpenseErrors.NotExists]);
+    }
     const updated: Expense = {
       ...existing,
       ...patch,
@@ -148,20 +157,75 @@ export class ExpenseOfflineService implements BaseService<Expense> {
       updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
-    return updated;
+    return new DataResult<Expense>(updated, true, []);
   }
 
-  delete(id: string): void {
-    // Angular parity (G2): deleteExpense soft-deletes — sets isActive=false, updatedDate,
-    // keeps the record (audit trail, sync contract). No-op for a missing id, matching the
-    // prior hard-delete's no-op behavior on `repo.remove`.
+  /**
+   * WU2 (category D): 1:1 port of Angular's `deleteExpense` (expense-offline.service.ts:79-89) —
+   * the real soft-delete domain command. Sets isActive=false, stamps updatedDate/updatedByName,
+   * keeps the record (audit trail, sync contract). Returns SYNC `Result.Success()`, or
+   * `Result.Failure([ExpenseErrors.NotExists])` on a missing id — NEVER throws. Angular's own UI
+   * (expense-list.component.ts:64) calls this fire-and-forget.
+   */
+  deleteExpense(id: string): Result {
     const existing = repo.getById(this.storeId, id);
-    if (!existing) return;
+    if (!existing) {
+      return Result.Failure([ExpenseErrors.NotExists]);
+    }
     repo.upsert(this.storeId, {
       ...existing,
       isActive: false,
       updatedDate: new Date(),
       updatedByName: getCurrentUserLogin(),
     });
+    return Result.Success();
+  }
+
+  /**
+   * WU2 (category D, NEW method): 1:1 port of Angular's `addImportedExpense`
+   * (expense-offline.service.ts:176-182) — normalizes `date` to a Date, appends the expense,
+   * always returns Result.Success().
+   */
+  addImportedExpense(expense: Expense): Result {
+    repo.upsert(this.storeId, { ...expense, date: new Date(expense.date) });
+    return Result.Success();
+  }
+
+  /**
+   * WU2 (category D, NEW method): 1:1 port of Angular's `updateImportedExpense`
+   * (expense-offline.service.ts:184-198) — merges the incoming fields into the existing record
+   * by id (date/isActive/total/note/type/updatedDate/updatedByName); a no-op when the id is
+   * absent. Always returns Result.Success().
+   */
+  updateImportedExpense(importedExpense: Expense): Result {
+    const existing = repo.getById(this.storeId, importedExpense.id);
+    if (existing) {
+      repo.upsert(this.storeId, {
+        ...existing,
+        date: new Date(importedExpense.date),
+        isActive: importedExpense.isActive,
+        total: importedExpense.total,
+        note: importedExpense.note,
+        type: importedExpense.type,
+        updatedDate: importedExpense.updatedDate,
+        updatedByName: importedExpense.updatedByName,
+      });
+    }
+    return Result.Success();
+  }
+
+  /**
+   * BaseService<Expense> `delete()` seam (ADR-1, Slice-1 precedent): stays a SYNC React-only
+   * contract OUTSIDE the A/B/C/D conversion. Delegates to the real domain command
+   * {@link deleteExpense} and THROWS on failure (so a missing id surfaces as an error rather
+   * than leaking a `Result` through the `BaseService<T>` surface). Production UI uses the
+   * fire-and-forget `deleteExpense` directly (Angular parity); this seam exists for interface
+   * conformance.
+   */
+  delete(id: string): void {
+    const result = this.deleteExpense(id);
+    if (!result.succeeded) {
+      throw new Error(result.errors[0]?.description ?? `Expense could not be deleted: ${id}`);
+    }
   }
 }

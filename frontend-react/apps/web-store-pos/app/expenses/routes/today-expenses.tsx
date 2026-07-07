@@ -48,9 +48,12 @@ export function TodayExpensesPage() {
 
   function handleSave(data: ExpenseFormInput, id?: string) {
     const svc = new ExpenseOfflineService(storeId);
-    try {
-      if (id) {
-        // Angular parity: updateExpense always reuses `this.expense.date` unchanged — the
+    // Angular parity (edit-expense-modal.component.ts:60-68): create/update return
+    // DataResult<Expense>; the component branches on `.succeeded`. update's only failure branch
+    // is not-found (ExpenseErrors.NotExists) — surfaced as the localized message, never the
+    // internal error code.
+    const result = id
+      ? // Angular parity: updateExpense always reuses `this.expense.date` unchanged — the
         // `date` field is intentionally omitted from the patch so `update()`'s
         // `{...existing, ...patch}` merge preserves the original date.
         svc.update(id, {
@@ -58,9 +61,8 @@ export function TodayExpensesPage() {
           total: data.total,
           paymentType: data.paymentType,
           note: data.note,
-        });
-      } else {
-        // Angular parity: createExpense always uses `new Date()` — never a user-editable date.
+        })
+      : // Angular parity: createExpense always uses `new Date()` — never a user-editable date.
         svc.create({
           type: data.type,
           total: data.total,
@@ -68,16 +70,16 @@ export function TodayExpensesPage() {
           paymentType: data.paymentType,
           note: data.note,
         });
-      }
-      loadExpenses();
-      setIsModalOpen(false);
-      setEditingExpense(undefined);
-      setModalError('');
-    } catch {
-      // Angular parity: update's only failure branch is not-found (ExpenseErrors.NotExists).
-      // Never surface the internal Error.message sentinel to the user.
+
+    if (!result.succeeded) {
       setModalError(intl.formatMessage({ id: 'EXPENSE_ERRORS.NOT_EXISTS' }));
+      return;
     }
+
+    loadExpenses();
+    setIsModalOpen(false);
+    setEditingExpense(undefined);
+    setModalError('');
   }
 
   function handleDeleteRequest(expense: Expense) {
@@ -87,7 +89,10 @@ export function TodayExpensesPage() {
   function handleDeleteConfirm() {
     if (!deleteConfirmId) return;
     const svc = new ExpenseOfflineService(storeId);
-    svc.delete(deleteConfirmId);
+    // Angular parity (expense-list.component.ts:64): deleteExpense is the real soft-delete
+    // command, called fire-and-forget (its Result is ignored — the id always exists, coming
+    // straight from the rendered list).
+    svc.deleteExpense(deleteConfirmId);
     setDeleteConfirmId(null);
     loadExpenses();
   }

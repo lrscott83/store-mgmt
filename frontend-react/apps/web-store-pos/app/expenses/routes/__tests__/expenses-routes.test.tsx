@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
-import { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 
@@ -21,8 +21,9 @@ vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
     getAll: vi.fn().mockReturnValue([]),
     getActiveToday: vi.fn().mockReturnValue([]),
     getByDateRange: vi.fn().mockReturnValue([]),
-    create: vi.fn(),
-    update: vi.fn(),
+    create: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+    update: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+    deleteExpense: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
     delete: vi.fn(),
   })),
 }));
@@ -82,8 +83,9 @@ describe('TodayExpensesPage — smoke render', () => {
     expect(screen.queryByText(/Total del día/i)).not.toBeInTheDocument();
   });
 
-  // G-i18n: update()'s only failure branch is not-found. The route must surface the
-  // localized EXPENSE_ERRORS.NOT_EXISTS text, never the internal Error.message sentinel.
+  // G-i18n: update()'s only failure branch is not-found. Angular parity: updateExpense returns
+  // DataResult(undefined, false, [ExpenseErrors.NotExists]) — SYNC, never throws. The route
+  // branches on `.succeeded` and surfaces the localized EXPENSE_ERRORS.NOT_EXISTS text.
   it('shows the localized not-found error when update fails', () => {
     const expense = {
       id: 'e1',
@@ -102,10 +104,13 @@ describe('TodayExpensesPage — smoke render', () => {
         getAll: vi.fn().mockReturnValue([expense]),
         getActiveToday: vi.fn().mockReturnValue([expense]),
         getByDateRange: vi.fn().mockReturnValue([expense]),
-        create: vi.fn(),
-        update: vi.fn(() => {
-          throw new Error('EXPENSE_NOT_FOUND');
+        create: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+        update: vi.fn().mockReturnValue({
+          data: undefined,
+          succeeded: false,
+          errors: [ExpenseErrors.NotExists],
         }),
+        deleteExpense: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
         delete: vi.fn(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }) as any;
