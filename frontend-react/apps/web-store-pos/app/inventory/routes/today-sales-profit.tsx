@@ -7,6 +7,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Spinner } from '~/shared/components/ui/spinner';
 import { EmptyTrendingIcon } from '~/shared/components/ui/icons';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
@@ -74,7 +75,7 @@ export function InventoryTodaySalesProfitPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    const inventorySvc = new InventoryOfflineService(storeId);
+    const inventorySvc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const orderSvc = new OrderOfflineService(storeId);
     const productSvc = new ProductOfflineService(storeId);
     const categorySvc = new ProductCategoryOfflineService(storeId);

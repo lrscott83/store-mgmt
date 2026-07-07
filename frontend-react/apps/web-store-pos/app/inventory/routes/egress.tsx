@@ -9,6 +9,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 import { hasAvailableProductToSale } from '~/sales/lib/product-availability';
@@ -71,7 +72,7 @@ export function EgressPage() {
   // Mayorista sales still deduct inventory through the standard pipeline.
   function checkAvailability(productId: string, quantity: number) {
     const product = products.find((p) => p.id === productId);
-    const inventoryService = new InventoryOfflineService(storeId);
+    const inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     return hasAvailableProductToSale({
       product,
       quantity,

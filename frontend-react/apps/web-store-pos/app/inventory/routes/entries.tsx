@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
@@ -89,7 +90,7 @@ export function EntriesPage() {
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
   function loadEntries() {
-    const svc = new InventoryOfflineService(storeId);
+    const svc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const productSvc = new ProductOfflineService(storeId);
     const products = productSvc.getAll();
     const productMap = new Map(products.map((p) => [p.id, p.name]));

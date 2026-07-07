@@ -5,6 +5,7 @@ import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
 import { ProductCategoryOfflineService } from './product-category-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import type { CategoryCartItemsView, ProductCartItemsView } from '../category-cart-items-view';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -51,7 +52,7 @@ export class OrderOfflineService implements BaseService<Order> {
 
   constructor(private readonly storeId: string) {
     this.creditService = new SaleCreditOfflineService(storeId);
-    this.inventoryService = new InventoryOfflineService(storeId);
+    this.inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
   }
 
   getAll(): Order[] {

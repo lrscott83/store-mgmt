@@ -1,5 +1,6 @@
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 
 export interface ReportProductAvailable {
@@ -31,7 +32,7 @@ export class ReportAggregationService {
 
   constructor(storeId: string) {
     this.orderService = new OrderOfflineService(storeId);
-    this.inventoryService = new InventoryOfflineService(storeId);
+    this.inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
   }
 
   getTodayReport(date: Date = new Date()): ReportSummary {

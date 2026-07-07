@@ -6,8 +6,9 @@ import type {
   InventoryEntryView,
   OrderItem,
 } from '@store-mgmt/domain';
-import { DataResult, InventoryErrors, Result, success } from '@store-mgmt/domain';
+import { DataResult, InventoryErrors, ProductErrors, Result, success } from '@store-mgmt/domain';
 import { InventoryRepository } from '../repositories/inventory-repository';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import {
   hasAvailableProductToSale,
@@ -99,7 +100,16 @@ function generateId(): string {
 export class InventoryOfflineService implements BaseService<InventoryEntryView> {
   private readonly repo: InventoryRepository;
 
-  constructor(private readonly storeId: string) {
+  /**
+   * Mirrors Angular's `InventoryOfflineService` constructor DI
+   * (inventory-offline.service.ts:35 injects `ProductRepository`). The injected
+   * `ProductRepository` backs the product-existence guards on `create`,
+   * `updateInventoryEntry`, and `isNotSoldEntry`.
+   */
+  constructor(
+    private readonly storeId: string,
+    private readonly productRepository: ProductRepository,
+  ) {
     this.repo = new InventoryRepository(storeId);
   }
 
@@ -468,8 +478,12 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    *
    * WU2 (category D): returns DataResult<InventoryEntryView> (was plain InventoryEntry),
    * matching Angular's createInventoryEntry sync DataResult return — never throws.
-   * productName is '' since this service has no product repository (matches getAll's
-   * convention).
+   * productName is '' since the view here is not enriched with the product name (matches
+   * getAll's convention).
+   *
+   * Product-existence guard (Angular parity, createInventoryEntry:60-64): when the product
+   * does not exist, Angular returns bare `null` (NOT a DataResult) before creating anything —
+   * mirrored exactly here (ratified: preserve Angular's exact `null` shape).
    *
    * Spec §6.3 create contract; S-I1.
    */
@@ -479,7 +493,9 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     costPrice: number,
     categoryId: string = '',
     date: Date = new Date(),
-  ): DataResult<InventoryEntryView> {
+  ): DataResult<InventoryEntryView> | null {
+    if (!this.productRepository.getProductById(productId)) return null;
+
     const existing = this.repo.getByProductId(this.storeId, productId);
     const maxOrder = existing.length > 0
       ? Math.max(...existing.map((e) => e.order))
@@ -650,15 +666,18 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
 
   /**
    * 1:1 port of Angular's `isNotSoldEntry` (inventory-offline.service.ts:162-177) — shared
-   * guard used by update/updateInventoryEntry/deactivate. DI-gap note (design ambiguity #2,
-   * same precedent as getInventoryCategoriesView/getInventoryEntriesInDay): Angular's version
-   * first checks `!productRepository.getProductById(productId)` ->
-   * `Result.Failure([ProductErrors.NotExists])`; React's InventoryOfflineService has no
-   * product repository, so that branch is NOT reachable here — only entry-existence and
-   * sold-status are checked. Scoped to entries under `productId` (matches Angular's
+   * guard used by update/updateInventoryEntry/deactivate. Angular first checks
+   * `!productRepository.getProductById(productId)` -> `Result.Failure([ProductErrors.NotExists])`;
+   * now that `ProductRepository` is injected here (mirroring Angular's constructor DI), that
+   * product-existence branch is restored 1:1. Then entry-existence and sold-status are
+   * checked, scoped to entries under `productId` (matches Angular's
    * `getProductInventoriesByProductId(productId)` lookup).
    */
   public isNotSoldEntry(productId: string, entryId: string): Result {
+    if (!this.productRepository.getProductById(productId)) {
+      return Result.Failure([ProductErrors.NotExists]);
+    }
+
     const entries = this.repo.getByProductId(this.storeId, productId);
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return Result.Failure([InventoryErrors.EntryNotExists]);
@@ -698,6 +717,12 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     const guard = this.isNotSoldEntry(oldProductId, entryId);
     if (!guard.succeeded) {
       return new DataResult<InventoryEntryView>(undefined, false, guard.errors);
+    }
+
+    // Target-product availability guard (Angular parity, updateInventoryEntry:107-108):
+    // the product being moved TO must exist AND be active.
+    if (!this.productRepository.getAvailableProductById(newProductId)) {
+      return new DataResult<InventoryEntryView>(undefined, false, [InventoryErrors.ProductNotAvailable]);
     }
 
     const oldEntries = this.repo.getByProductId(this.storeId, oldProductId);

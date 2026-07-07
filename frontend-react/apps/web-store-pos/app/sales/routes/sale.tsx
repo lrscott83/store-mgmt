@@ -9,6 +9,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import { hasAvailableProductToSale } from '../lib/product-availability';
@@ -66,7 +67,7 @@ export function SalePage() {
   // and is gated by hasInventoryModuleAvailable + product.discountFromInvantory internally.
   function checkAvailability(productId: string, quantity: number) {
     const product = products.find((p) => p.id === productId);
-    const inventoryService = new InventoryOfflineService(storeId);
+    const inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     return hasAvailableProductToSale({
       product,
       quantity,

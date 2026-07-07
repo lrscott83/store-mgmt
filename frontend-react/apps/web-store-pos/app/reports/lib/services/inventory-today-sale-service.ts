@@ -2,6 +2,7 @@ import type { InventoryEntry, Order, OrderItem, Product } from '@store-mgmt/doma
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 
 /**
  * One row of the 13-column per-product inventory-at-sale-price ledger.
@@ -61,7 +62,7 @@ export class InventoryTodaySaleService {
   constructor(storeId: string) {
     this.productService = new ProductOfflineService(storeId);
     this.orderService = new OrderOfflineService(storeId);
-    this.inventoryService = new InventoryOfflineService(storeId);
+    this.inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
   }
 
   getProductRows(date: Date = new Date()): InventoryTodaySaleRow[] {

@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
@@ -29,7 +30,7 @@ export function TodayEntriesPage() {
   const [modalError, setModalError] = useState('');
 
   function loadEntries() {
-    const svc = new InventoryOfflineService(storeId);
+    const svc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const productSvc = new ProductOfflineService(storeId);
     const products = productSvc.getAll();
     const productMap = new Map(products.map((p) => [p.id, p.name]));
@@ -49,7 +50,7 @@ export function TodayEntriesPage() {
   function handleEdit(entry: InventoryEntryView) {
     // We need the full InventoryEntry for the modal (has order, available etc.)
     // Re-fetch from service by id
-    const svc = new InventoryOfflineService(storeId);
+    const svc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const all = svc.getAll();
     const found = all.find((e) => e.id === entry.id);
     if (found) {
@@ -77,7 +78,7 @@ export function TodayEntriesPage() {
   // WU2 (service-return-shape-parity Slice 1): deactivate() now returns Result (never
   // throws) — check `.succeeded` instead of try/catch.
   function handleDeactivate(entry: InventoryEntryView) {
-    const svc = new InventoryOfflineService(storeId);
+    const svc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const result = svc.deactivate(entry.id, entry.productId);
     if (!result.succeeded) {
       console.error(result.errors[0]?.description ?? 'InventoryEntry could not be deactivated');
@@ -89,14 +90,16 @@ export function TodayEntriesPage() {
   // WU2 (service-return-shape-parity Slice 1): create()/update() now return
   // DataResult<InventoryEntryView> (never throw) — check `.succeeded` instead of try/catch.
   function handleSave(data: EditInventoryEntryInput, entryId?: string) {
-    const svc = new InventoryOfflineService(storeId);
+    const svc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const result = entryId
       ? svc.update(entryId, data.productId, data.quantity, data.costPrice)
       : svc.create(data.productId, data.quantity, data.costPrice, data.categoryId, new Date(data.date));
 
-    if (!result.succeeded) {
+    // create() returns null (Angular parity) when the product does not exist; treat as a
+    // generic failure since there is no DataResult envelope in that branch.
+    if (!result || !result.succeeded) {
       setModalError(
-        result.errors[0]?.description ?? intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result?.errors[0]?.description ?? intl.formatMessage({ id: 'GENERAL.ERROR' }),
       );
       return;
     }

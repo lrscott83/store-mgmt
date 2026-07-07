@@ -1,10 +1,34 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InventoryOfflineService } from '../inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { InventoryErrors, Result } from '@store-mgmt/domain';
-import type { InventoryEntry, OrderItem, UserModel } from '@store-mgmt/domain';
+import { InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
+import type { InventoryEntry, OrderItem, Product, UserModel } from '@store-mgmt/domain';
 
 const storeId = 's1';
+
+function makeProduct(id: string, overrides: Partial<Product> = {}): Product {
+  return {
+    id,
+    name: `Product ${id}`,
+    categoryId: 'cat-1',
+    categoryName: 'Cat 1',
+    price: 10,
+    order: 0,
+    availableToSale: true,
+    discountFromInvantory: true,
+    businessId: '',
+    isActive: true,
+    createdDate: new Date('2024-01-01T00:00:00.000Z'),
+    createdByName: 'test',
+    ...overrides,
+  };
+}
+
+function seedProducts(storeId: string, products: Product[]): void {
+  const entries = products.map((p) => [p.id, p] as [string, Product]);
+  localStorage.setItem(`lizoft.store-products-${storeId}`, JSON.stringify(entries));
+}
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -68,7 +92,10 @@ describe('InventoryOfflineService', () => {
   beforeEach(() => {
     localStorage.clear();
     useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
-    service = new InventoryOfflineService(storeId);
+    // Seed the products the guard'd methods reference (Angular's InventoryOfflineService
+    // injects ProductRepository; the guards need real product records to exist).
+    seedProducts(storeId, [makeProduct('p1'), makeProduct('p2')]);
+    service = new InventoryOfflineService(storeId, new ProductRepository(storeId));
   });
 
   // ─── T-4-1 RED tests ───────────────────────────────────────────────────────
@@ -102,7 +129,7 @@ describe('InventoryOfflineService', () => {
       service.getAvailableInventoryCosts('p1', 7);
 
       // Re-read from localStorage to verify persistence
-      const service2 = new InventoryOfflineService(storeId);
+      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
       const allCosts = service2.getAvailableInventoryCosts('p1', 3); // only 3 left in e2
       expect(allCosts[0].id).toBe('e2');
       expect(allCosts[0].quantity).toBe(3);
@@ -118,7 +145,7 @@ describe('InventoryOfflineService', () => {
 
       service.getAvailableInventoryCosts('p1', 7);
 
-      const service2 = new InventoryOfflineService(storeId);
+      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
       const costs = service2.getAvailableInventoryCosts('p1', 0);
       // After deduction, e1 has 0 available, e2 has 3 available
       expect(costs).toHaveLength(0);
@@ -162,7 +189,7 @@ describe('InventoryOfflineService', () => {
       expect(costs).toEqual([]);
 
       // No mutation: a fresh service can still deduct the full original 6 units.
-      const service2 = new InventoryOfflineService(storeId);
+      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
       expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
     });
@@ -178,7 +205,7 @@ describe('InventoryOfflineService', () => {
       });
       expect(costs).toEqual([]);
 
-      const service2 = new InventoryOfflineService(storeId);
+      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
       expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
     });
@@ -272,7 +299,7 @@ describe('InventoryOfflineService', () => {
 
       // After restore e1 = 0 + 6 = 6 and e2 = 3 + 1 = 4 (total 10).
       // Verify the exact restored amounts via FIFO deduction from a fresh instance.
-      const service2 = new InventoryOfflineService(storeId);
+      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
       const costs = service2.getAvailableInventoryCosts('p1', 10);
       expect(costs).toHaveLength(2);
       expect(costs[0]).toMatchObject({ id: 'e1', quantity: 6 });
@@ -367,9 +394,9 @@ describe('InventoryOfflineService', () => {
   describe('INV-03: create — S-I1 (DataResult<InventoryEntryView>)', () => {
     it('succeeds:true, data.available=data.quantity for a new entry', () => {
       const result = service.create('p1', 50, 0.8);
-      expect(result.succeeded).toBe(true);
-      expect(result.errors).toEqual([]);
-      expect(result.data?.quantity).toBe(50);
+      expect(result?.succeeded).toBe(true);
+      expect(result?.errors).toEqual([]);
+      expect(result?.data?.quantity).toBe(50);
     });
 
     it('creates an entry with order=maxOrder+1 (verified via a subsequent read)', () => {
@@ -397,7 +424,7 @@ describe('InventoryOfflineService', () => {
 
     it('sets isActive=true on new entry data', () => {
       const result = service.create('p1', 10, 1.5);
-      expect(result.data?.isActive).toBe(true);
+      expect(result?.data?.isActive).toBe(true);
     });
 
     // Angular parity (audit-user-threading): create stamps createdByName from the
@@ -1294,6 +1321,60 @@ describe('InventoryOfflineService', () => {
       await expect(service.getInventoryCategoriesViewObservable()).resolves.toEqual(
         expect.objectContaining({ succeeded: true }),
       );
+    });
+  });
+
+  // ─── Product-existence guards (ProductRepository DI restored) ────────────────
+  // Angular's InventoryOfflineService injects ProductRepository and guards three methods
+  // against missing/unavailable products. React now injects a real ProductRepository too,
+  // restoring all three guards 1:1.
+
+  describe('create — product-existence guard (Angular parity: createInventoryEntry:60-64)', () => {
+    it('returns null when the product does not exist', () => {
+      // 'ghost' is not among the seeded products (p1, p2).
+      const result = service.create('ghost', 10, 1.5);
+      expect(result).toBeNull();
+    });
+
+    it('does not persist any entry when the product does not exist', () => {
+      service.create('ghost', 10, 1.5);
+      expect(service.getProductInventoriesByProductId('ghost')).toEqual([]);
+    });
+
+    it('still creates the entry (DataResult) when the product exists', () => {
+      const result = service.create('p1', 10, 1.5);
+      expect(result?.succeeded).toBe(true);
+    });
+  });
+
+  describe('updateInventoryEntry — target-product availability guard (Angular parity: :107-108)', () => {
+    it('fails with InventoryErrors.ProductNotAvailable when newProductId does not exist', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      const result = service.updateInventoryEntry('p1', 'e1', 'ghost', 5, 1);
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([InventoryErrors.ProductNotAvailable]);
+      expect(result.data).toBeUndefined();
+    });
+
+    it('fails with InventoryErrors.ProductNotAvailable when newProductId is inactive', () => {
+      seedProducts(storeId, [makeProduct('p1'), makeProduct('p-inactive', { isActive: false })]);
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      const result = service.updateInventoryEntry('p1', 'e1', 'p-inactive', 5, 1);
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([InventoryErrors.ProductNotAvailable]);
+    });
+  });
+
+  describe('isNotSoldEntry — product-existence guard (Angular parity: :162-164)', () => {
+    it('returns Result.Failure([ProductErrors.NotExists]) when the product does not exist', () => {
+      const result = service.isNotSoldEntry('ghost', 'e1');
+      expect(result).toEqual(Result.Failure([ProductErrors.NotExists]));
     });
   });
 });

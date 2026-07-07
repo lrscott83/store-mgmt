@@ -9,6 +9,7 @@ import { ProductOfflineService } from '~/sales/lib/services/product-offline-serv
 import { hasAvailableProductToSale } from '~/sales/lib/product-availability';
 import { ProductErrors } from '@store-mgmt/domain';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { hasCreditsModuleAvailable, hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
@@ -115,7 +116,7 @@ export function CartShell() {
   // productService.getProductById inside addCartItem.
   function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
     const productService = new ProductOfflineService(storeId);
-    const inventoryService = new InventoryOfflineService(storeId);
+    const inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const product = productService.getById(productId);
     const result = hasAvailableProductToSale({
       product,
