@@ -1255,42 +1255,43 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU4 (category C, NEW methods): getByDateAsync/getAvailableByCategoryAsync mirror
-  // Angular's getInventoryEntriesInDayObservable/getInventoryCategoriesViewObservable — the
-  // sync-B sibling wrapped in `of(...)` (mismatch #3: React collapsed these into the sync B
-  // methods; these are ADDED as separate methods for interface-shape completeness, no
-  // existing call-site migration needed).
-  describe('getByDateAsync / getAvailableByCategoryAsync — NEW Observable-sibling methods (WU4)', () => {
-    it('getByDateAsync resolves the same BaseResponseModel envelope as the sync getByDate for the same date', async () => {
+  // WU4 (category C): Observable siblings restored under Angular's EXACT names —
+  // getInventoryEntriesInDayObservable (inventory-offline.service.ts:213) and
+  // getInventoryCategoriesViewObservable (:260), each `of(...)`-wrapping its sync-B
+  // counterpart. (The category sibling keeps React's `products` param — the pre-existing
+  // DI-gap shape of the underlying sync getAvailableByCategory — since only the NAME was the
+  // parity defect; no existing call-site migration needed.)
+  describe('getInventoryEntriesInDayObservable / getInventoryCategoriesViewObservable — Observable siblings (WU4)', () => {
+    it('getInventoryEntriesInDayObservable resolves the same BaseResponseModel envelope as the sync getByDate for the same date', async () => {
       const date = new Date('2024-03-10T10:00:00.000Z');
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { date })]);
       seedInventory(storeId, map);
 
-      const asyncResult = await service.getByDateAsync(date);
+      const asyncResult = await service.getInventoryEntriesInDayObservable(date);
       const syncResult = service.getByDate(date);
       expect(asyncResult).toEqual(syncResult);
     });
 
-    it('getByDateAsync never rejects', async () => {
-      await expect(service.getByDateAsync(new Date())).resolves.toEqual(
+    it('getInventoryEntriesInDayObservable never rejects', async () => {
+      await expect(service.getInventoryEntriesInDayObservable(new Date())).resolves.toEqual(
         expect.objectContaining({ succeeded: true }),
       );
     });
 
-    it('getAvailableByCategoryAsync resolves the same BaseResponseModel envelope as the sync getAvailableByCategory for the same products', async () => {
+    it('getInventoryCategoriesViewObservable resolves the same BaseResponseModel envelope as the sync getAvailableByCategory for the same products', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]);
       seedInventory(storeId, map);
       const products = [{ id: 'p1', name: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas' }];
 
-      const asyncResult = await service.getAvailableByCategoryAsync(products);
+      const asyncResult = await service.getInventoryCategoriesViewObservable(products);
       const syncResult = service.getAvailableByCategory(products);
       expect(asyncResult).toEqual(syncResult);
     });
 
-    it('getAvailableByCategoryAsync never rejects', async () => {
-      await expect(service.getAvailableByCategoryAsync()).resolves.toEqual(
+    it('getInventoryCategoriesViewObservable never rejects', async () => {
+      await expect(service.getInventoryCategoriesViewObservable()).resolves.toEqual(
         expect.objectContaining({ succeeded: true }),
       );
     });

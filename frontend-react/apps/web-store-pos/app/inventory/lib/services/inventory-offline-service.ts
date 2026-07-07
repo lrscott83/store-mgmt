@@ -310,24 +310,26 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
   }
 
   /**
-   * WU4 (category C, NEW method, mismatch #3): mirrors Angular's
-   * `getInventoryEntriesInDayObservable` (`of(this.getInventoryEntriesInDay(date))`) — the
-   * Observable sibling of the sync `getByDate`/`getInventoryEntriesInDay`. React collapsed
-   * these into one method; this restores the separate async sibling for interface-shape
-   * completeness (no existing call-site needs migration).
+   * WU4 (category C): 1:1 port of Angular's `getInventoryEntriesInDayObservable`
+   * (inventory-offline.service.ts:213 — `of(this.getInventoryEntriesInDay(date))`), the
+   * Observable sibling of the sync `getByDate`/`getInventoryEntriesInDay`. Named
+   * character-for-character after Angular (exact-surface rule); same-tick `Promise.resolve`
+   * mirrors `of(...)` over synchronous storage (design ADR-7). No existing call-site migration.
    */
-  getByDateAsync(date: Date): Promise<BaseResponseModel<InventoryEntryView[]>> {
+  getInventoryEntriesInDayObservable(date: Date): Promise<BaseResponseModel<InventoryEntryView[]>> {
     return Promise.resolve(this.getByDate(date));
   }
 
   /**
-   * WU4 (category C, NEW method, mismatch #3): mirrors Angular's
-   * `getInventoryCategoriesViewObservable` (`of(this.getInventoryCategoriesView())`) — the
+   * WU4 (category C): 1:1 port of Angular's `getInventoryCategoriesViewObservable`
+   * (inventory-offline.service.ts:260 — `of(this.getInventoryCategoriesView())`), the
    * Observable sibling of the sync `getAvailableByCategory`/`getInventoryCategoriesView`.
-   * React collapsed these into one method; this restores the separate async sibling for
-   * interface-shape completeness (no existing call-site needs migration).
+   * Named character-for-character after Angular (exact-surface rule); same-tick
+   * `Promise.resolve` mirrors `of(...)`. Keeps the `products` param of React's underlying
+   * sync `getAvailableByCategory` (a pre-existing DI-gap shape of that specific method) —
+   * only the method NAME was the parity defect. No existing call-site migration.
    */
-  getAvailableByCategoryAsync(
+  getInventoryCategoriesViewObservable(
     products: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
   ): Promise<BaseResponseModel<InventoryCategoryView[]>> {
     return Promise.resolve(this.getAvailableByCategory(products));

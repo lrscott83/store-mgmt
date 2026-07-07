@@ -1,0 +1,505 @@
+# Spec: Product Service Parity (new capability: `product-service`)
+
+## Purpose
+
+Define the verifiable contract that React's `ProductService` (offline + online),
+`ProductRepository`, and a newly-extracted `ProductCategoryRepository` MUST satisfy to be a
+faithful parity port of Angular's `domain/interfaces/product.service.ts`,
+`application/products/product-offline.service.ts`, `application/products/product-online.service.ts`,
+`application/products/product.repository.ts`, and `application/categories/product-category.repository.ts`.
+Source of truth = Angular source, not a live backend. This is a NEW capability spec (no prior
+`product-service` spec exists in `openspec/specs/`).
+
+**THE NON-NEGOTIABLE EXACT-SURFACE RULE.** The React PUBLIC method surface MUST equal Angular's
+public methods EXACTLY, per layer (interface / offline service / online service / repository).
+- A method that exists in React but NOT in the corresponding Angular layer is DELETED from React.
+  It is NEVER kept as "behavior-preserving" or "a documented extra", and we NEVER invent bridge
+  methods (raw `upsert`/`remove`/etc.) to sustain it. Its call sites are re-expressed with
+  Angular-faithful methods (see "Surface Reconciliation").
+- Every Angular public method is migrated with 100% parity (same name, same params, same wrapped
+  return shape). The ONLY allowed transform is `Observable<T>` → `Promise<T>` (playbook rule 3/4).
+- "Public method" = declared on the abstract interface OR a public method on a concrete
+  service/repository class. Private methods are not surface.
+
+Three decisions are already RESOLVED and baked into this spec (do not re-open):
+1. Online `createProduct` mirrors Angular by OMITTING `barcode` from its payload while still
+   implementing the 9-param interface for type conformance (see "Online createProduct Omits
+   Barcode"). Mirrored, not fixed (rule 8).
+2. A real `ProductCategoryRepository` is EXTRACTED in React mirroring Angular's
+   `product-category.repository.ts` public surface EXACTLY (rule 6). It has NO `upsert`/`remove`
+   (Angular's repository has none). The existing `ProductCategoryOfflineService` is RECONCILED to
+   expose ONLY Angular's public category-service surface and delegate to that repository. This is
+   an accepted scope expansion that re-touches Category (see "Category Service Method Surface
+   Parity" + "ProductCategoryRepository Mirrors Angular Repo Surface").
+3. React-only methods with no Angular correlate are REMOVED, not preserved: product-service
+   `search`, `updateMany`, `getByName`, `activate`, `deactivate`; category-service `save`,
+   `addByName`, `getByName`, `hasAnyCategory`, `hasAnyAvailableCategory` (see "Surface
+   Reconciliation" for the authoritative list + call-site re-expressions).
+
+Non-goals (explicitly out of scope, not specified here): merging with the paused
+`offline-online-service-parity` change (which owns the async `BaseService` migration and the
+BaseService-level `getAll`/`getById`/`delete` name reconciliation); fixing suspected Angular bugs
+(see Suspected Bugs below — spec matches Angular's CURRENT behavior only).
+
+## Surface Reconciliation (authoritative)
+
+The single source of truth for "which methods exist". Cites Angular source. Everything below is
+enforced by the Exact-Surface Rule.
+
+### Authoritative Angular public surface — PRODUCT
+
+| Layer | Public methods |
+|-------|----------------|
+| interface `ProductService` (domain/interfaces/product.service.ts:12-50) | `hasAnyAvailableToSaleProduct`, `getProductById`, `getProductByBarcode`, `getProductsToSelect`, `getAvailableProductsByCategoryId`, `deleteProduct`, `createCsvProducts`, `getProductsToSaleByCategoryId`, `createProduct(…9)`, `updateProduct(…10)`, `getMaxOrder(categoryId)`, `createProducts(categoryId, items)` (12) |
+| offline concrete (product-offline.service.ts) | the 12 above + offline-only `setDiscountFromInvantory(id, discountFromInvantory)` (L113), `getProductsByCategoryId(categoryId)` (L118) |
+| online concrete (product-online.service.ts) | the 12 (createProduct is 8-param, omits barcode from payload); no extras |
+| repository `ProductRepository` (product.repository.ts) | `getProductById`, `getProductByName`, `getProductByBarcode`, `getAvailableProducts`, `getAvailableProductById`, `hasAnyProduct`, `getProductsByCategoryId`, `getAvailableToSaleProductsByCategoryId`, `hasAnyAvailableToSaleProduct`, `addProduct`, `addProductData`, `addImportedProduct`, `updateProduct`, `updateImportedProduct`, `deleteProduct`, `setDiscountFromInvantory`, `activateProduct`, `deactivateProduct`, `updateProducts`, `setInitProducts`, `getStorageProductsMap`, `getProductsJson` |
+
+### Authoritative Angular public surface — PRODUCT CATEGORY
+
+| Layer | Public methods |
+|-------|----------------|
+| interface `ProductCategoryService` (product-category.service.ts:11-28) | `getProductCategoriesView`, `getAvailableProductCategories`, `createProductCategory(name, order, isActive)`, `updateProductCategory(id, name, order, isActive)`, `getMaxOrder()` (5) |
+| offline concrete (product-category-offline.service.ts) | the 5 above + offline-only public `getProductCategories()` (L40) |
+| online concrete (product-category-online.service.ts) | `getAvailableProductCategories`, `getProductCategoriesView`, `createProductCategory`, `updateProductCategory`, `getMaxOrder`; no extras |
+| repository `ProductCategoryRepository` (product-category.repository.ts) | `hasAnyAvailableCategory`, `getProductCategoryById`, `getProductCategoryByName`, `getProductCategories`, `getAvailableProductCategories`, `hasAnyCategory`, `addProductCategory`, `addProductCategoryByName`, `addProductCategoryData`, `updateProductCategory`, `activateProductCategory`, `deactivateProductCategory`, `addImportedProductCategory`, `updateImportedProductCategory`, `updateCategories`, `setInitCategories`, `getStorageCategoriesMap`, `getCategoriesJson` — **NO `upsert`, NO `remove`** |
+
+### React methods to REMOVE (no Angular correlate on that layer) + call-site re-expression
+
+| React member | Layer | Verdict | Angular-faithful re-expression |
+|--------------|-------|---------|-------------------------------|
+| `search(query)` | product offline | REMOVE — dead, zero call sites | none (delete method + its unit test) |
+| `updateMany(products)` | product offline | REMOVE — no correlate | `products.tsx:97 handleBulkSave` loops `updateProduct` per item (Product slice 5) |
+| `getByName(name)` | product interface/offline | REMOVE — Angular exposes `getProductByName` on the REPOSITORY only | move to `ProductRepository.getProductByName`; zero service call sites |
+| `activate(id)` / `deactivate(id)` | product interface/offline | REMOVE — Angular exposes `activateProduct`/`deactivateProduct` on the REPOSITORY only | move to `ProductRepository`; zero service call sites |
+| `save(category)` | category interface/offline | REMOVE — Angular has no generic category save | `products.tsx handleCategorySave` → `createProductCategory` (create) / `updateProductCategory` (update) |
+| `addByName(name)` | category offline | REMOVE — Angular exposes `addProductCategoryByName` on the REPOSITORY only | `products.tsx handleCsvImport` folds into `ProductService.createCsvProducts` (Product slice 4); interim uses `ProductCategoryRepository.addProductCategoryByName` |
+| `getByName(name)` | category interface/offline | REMOVE — Angular exposes `getProductCategoryByName` on the REPOSITORY only | CSV call site (`products.tsx:125`) via `ProductCategoryRepository.getProductCategoryByName`, absorbed by `createCsvProducts` |
+| `hasAnyCategory()` | category interface/offline | REMOVE — Angular REPOSITORY-only | no service call sites |
+| `hasAnyAvailableCategory()` | category interface/offline | REMOVE — Angular REPOSITORY-only | `user-home.ts` gate → `ProductService.hasAnyAvailableToSaleProduct()` (Product slice 4) |
+
+### React methods to ADD (Angular public method missing in React) — 100% parity
+
+| Angular method | Layer | Status in React |
+|----------------|-------|-----------------|
+| `hasAnyAvailableToSaleProduct` | product | ADD (Product slice 4) |
+| `getProductsToSelect` | product | ADD (slice 4) |
+| `getProductsToSaleByCategoryId` | product | ADD (slice 4) |
+| `createCsvProducts` | product | ADD (slice 4) |
+| `createProducts` | product | ADD (slice 4) |
+| `setDiscountFromInvantory` (offline-only) | product offline | ADD (slice 4) |
+| `getProductsByCategoryId` (offline-only) | product offline | ADD (slice 4) |
+| `createProductCategory(name, order, isActive)` | category | ADD (Slice 1) |
+| `updateProductCategory(id, name, order, isActive)` | category | ADD (Slice 1) |
+| `getProductCategories()` (offline-only) | category offline | ADD (Slice 1); migrate `getAll()` call sites |
+
+### BaseService-level names — DEFERRED to `offline-online-service-parity`
+
+`getAll`/`getById`/`delete` on the reduced React `BaseService<T>` do NOT match Angular's
+`getAllItems`/`getItemById`/`delete`, and Angular's category service exposes no `getById` at all.
+Reconciling these is cross-cutting (every offline service, plus inventory/sync call sites) and is
+owned by the paused `offline-online-service-parity` change. This change renames product/category
+reads to their Angular names as each is migrated, and migrates `getAll()` category call sites to
+`getProductCategories()`, but does NOT unilaterally re-map the generic BaseService surface.
+
+## Requirements
+
+### Requirement: Service Method Signature Parity
+The abstract `ProductService` surface is EXACTLY these 12 methods (Angular
+`domain/interfaces/product.service.ts:13-49`), matching Angular's name, parameter list, and return
+shape. The only allowed transform is `Observable<BaseResponseModel<T>>` →
+`Promise<BaseResponseModel<T>>`. Both `ProductOfflineService` and `ProductOnlineService` MUST
+implement all 12.
+
+| # | Angular (source) | Required name/params | Return |
+|---|---|---|---|
+| 1 | `hasAnyAvailableToSaleProduct()` (product.service.ts:13) | same | `Promise<BaseResponseModel<boolean>>` |
+| 2 | `getProductById(id)` (L14) | same (not `getById`) | `Promise<BaseResponseModel<Product>>` |
+| 3 | `getProductByBarcode(barcode)` (L15) | same (not `getByBarcode`) | `Promise<BaseResponseModel<Product>>` |
+| 4 | `getProductsToSelect()` (L16) | same | `Promise<BaseResponseModel<ProductSelectView[]>>` |
+| 5 | `getAvailableProductsByCategoryId(categoryId)` (L17) | same | `Promise<BaseResponseModel<Product[]>>` |
+| 6 | `deleteProduct(id)` (L18) | same (not `delete`) | `Promise<BaseResponseModel<boolean>>` |
+| 7 | `createCsvProducts(csvProducts)` (L19) | same | `Promise<BaseResponseModel<boolean>>` |
+| 8 | `getProductsToSaleByCategoryId(categoryId)` (L21) | same | `Promise<BaseResponseModel<Product[]>>` |
+| 9 | `createProduct(categoryId, name, price, businessId, order, isActive, availableToSale, discountFromInvantory, barcode?)` (L23-33) | same 9 positional args (not `create(object)`). Online payload asymmetry — see "Online createProduct Omits Barcode" | `Promise<BaseResponseModel<boolean>>` |
+| 10 | `updateProduct(id, categoryId, name, price, businessId, order, isActive, availableToSale, discountFromInvantory, barcode?)` (L35-46) | same 10 positional args (not `update(entity)`) | `Promise<BaseResponseModel<boolean>>` |
+| 11 | `getMaxOrder(categoryId)` (L48) | same | `Promise<BaseResponseModel<number>>` |
+| 12 | `createProducts(categoryId, items: {name, price}[])` (L49) | same | `Promise<BaseResponseModel<boolean>>` |
+
+`setDiscountFromInvantory` and `getProductsByCategoryId` are NOT part of this abstract surface —
+they are offline-only public methods (see "Offline-Only Public Methods (Offline/Online
+Asymmetry)"). `activateProduct`/`deactivateProduct` are NOT service methods at all — they are
+`ProductRepository` members exposed by NO service (see "Repository-Only Activate/Deactivate"), so
+the React `ProductService` interface/services MUST NOT declare them.
+
+Inherited-but-dead `BaseService` members (`create`, `getAllItems`, `getItemById`, `update`,
+`delete`, `deleteItems`, `fetch`, `items$`, `isLoading$`, etc.) have zero Product call sites in
+Angular and MUST NOT be required in the React port.
+
+#### Scenario: Renamed method rejected
+- GIVEN a code reviewer diffing the React `ProductService` interface against this table
+- WHEN any required method is missing, renamed, or has a different parameter shape (e.g. `create(obj)` instead of `createProduct(...9 args)`)
+- THEN the parity check MUST fail
+
+#### Scenario: Repository-only member declared on the service rejected
+- GIVEN the React `ProductService` interface (or either implementation)
+- WHEN it declares `activateProduct`/`deactivateProduct` (which no Angular service exposes)
+- THEN the parity check MUST fail — those members belong to `ProductRepository` only
+
+### Requirement: Offline-Only Public Methods (Offline/Online Asymmetry)
+Angular's `ProductOfflineService` exposes TWO public methods beyond the 12 abstract ones:
+`setDiscountFromInvantory(id, discountFromInvantory)` (product-offline.service.ts:113) and
+`getProductsByCategoryId(categoryId)` (product-offline.service.ts:118). Neither exists on the
+abstract `ProductService` NOR on `ProductOnlineService`. The React port MUST mirror this asymmetry
+faithfully (rule 7): both methods MUST exist on `ProductOfflineService` only, and the port MUST NOT
+invent online HTTP endpoints for them (that would be an improvement, not parity — rule 2).
+
+#### Scenario: Offline-only method absent from online service
+- GIVEN the React `ProductOnlineService`
+- WHEN its method surface is compared to `ProductOfflineService`
+- THEN it MUST NOT declare `setDiscountFromInvantory` or `getProductsByCategoryId`, and no `Products/` endpoint MUST be invented for them
+
+### Requirement: Online createProduct Omits Barcode (mirrored Angular asymmetry)
+Angular's `ProductOnlineService.createProduct` (product-online.service.ts:71-93) declares only 8
+parameters — it OMITS the `barcode?` parameter that the abstract interface and
+`ProductOfflineService` both declare, and its POST body carries no `barcode` field. (Angular's
+online `updateProduct` DOES send `barcode`; only `createProduct` drops it.) This is a suspected
+Angular asymmetry that is MIRRORED, NOT fixed (rule 8, resolved decision: mirror). To satisfy
+type conformance with the shared `ProductService` interface, React's `ProductOnlineService`
+`createProduct` MUST implement the full 9-parameter signature (accepting `barcode?`), but MUST NOT
+include `barcode` in the HTTP payload — replicating Angular online's exact wire behavior.
+
+#### Scenario: Online create request excludes barcode
+- GIVEN the app is in online mode
+- WHEN `productService.createProduct(categoryId, name, price, businessId, order, true, true, false, "7501234")` is called
+- THEN the POST body sent to `Products/` MUST NOT contain a `barcode` field (mirroring Angular), even though the method accepted a `barcode` argument
+
+### Requirement: Async Contract (Offline and Online)
+Every method MUST return a `Promise` on BOTH `ProductOfflineService` and `ProductOnlineService`.
+Angular's offline implementation is itself `Observable`-based (one-shot, via `of(...)`) for all 12
+abstract methods — never a raw synchronous value and never a multi-emission stream. The React
+port MUST NOT make offline synchronous.
+
+#### Scenario: Offline read resolves asynchronously
+- GIVEN `ProductOfflineService.getProductById(id)` is called with an existing product id
+- WHEN the call resolves
+- THEN it MUST resolve a `Promise<BaseResponseModel<Product>>` with `succeeded: true` and `data` set to the product (never a synchronous return)
+
+### Requirement: Error-Envelope Contract
+On failure, every method MUST reject/resolve with the Angular `BaseResponseModel<T>` shape:
+`{ data: null, succeeded: false, message: string, actionCode: 400, errors: BaseError[] }`
+(base.model.ts:17-28, base.service.ts:218-236 `Failure`/`Failure$`). On success:
+`{ data, succeeded: true, message: "", actionCode: 200, errors: [] }` (base.service.ts:204-216).
+`BaseError` = `{ code: string, description: string }`. Errors originate from
+`ProductErrors`/`ProductCategoryErrors` static instances (product.errors.ts) — the exact `code`
+and `description` MUST be preserved, not re-flattened into a generic string/undefined.
+
+#### Scenario: Barcode not unique on create
+- GIVEN a product already exists with barcode `"7501234"`
+- WHEN `createProduct(categoryId, name, price, businessId, order, true, true, false, "7501234")` is called
+- THEN the result MUST be `{ data: null, succeeded: false, message: "", actionCode: 400, errors: [{ code: "Product.BarcodeExists", description: "El código de barras ya está asociado a otro producto." }] }`
+
+#### Scenario: Product not found on getProductById
+- GIVEN no product exists with id `"missing-id"`
+- WHEN `getProductById("missing-id")` is called
+- THEN the result MUST be a `BaseResponseModel` failure with `errors: [ProductErrors.NotExists]` (code `"Product.NotExists"`), never `undefined` or a thrown exception
+
+### Requirement: Category-Exists Validation
+`createProduct` and `updateProduct` MUST validate that `categoryId` resolves to an existing
+`ProductCategory` before persisting (product.repository.ts:112,207). If not found, MUST fail with
+`ProductCategoryErrors.NotExists` and MUST NOT create/update the product.
+
+#### Scenario: Create with non-existent category
+- GIVEN `categoryId` does not match any stored category
+- WHEN `createProduct(categoryId, ...)` is called
+- THEN it MUST fail with `errors: [ProductCategoryErrors.NotExists]` and no product MUST be persisted
+
+### Requirement: Barcode-Uniqueness Validation
+On create, if `barcode` is provided and matches an existing product's barcode, MUST fail with
+`ProductErrors.BarcodeExists` (repository.ts:115-118). On update, the same check MUST apply but
+MUST exclude the product being updated itself via id (self-exclusion, repository.ts:213-218) —
+i.e. re-saving a product with its own unchanged barcode MUST succeed.
+
+#### Scenario: Update product keeping its own barcode
+- GIVEN product `P1` has barcode `"111"`
+- WHEN `updateProduct(P1.id, ..., barcode="111")` is called
+- THEN it MUST succeed (barcode collision check MUST exclude `P1.id`)
+
+### Requirement: Name-Uniqueness-Per-Category Validation
+On create, a product with the same `name` in the same `categoryId` MUST fail with
+`ProductErrors.NameExists` (repository.ts:120-121). On update, the same rule applies excluding the
+product's own id (repository.ts:220-221).
+
+#### Scenario: Duplicate name in same category
+- GIVEN a product named `"Cola"` already exists in category `C1`
+- WHEN `createProduct(C1, "Cola", ...)` is called
+- THEN it MUST fail with `errors: [ProductErrors.NameExists]`
+
+### Requirement: Order-Shift on Create/Update
+When creating or updating a product at a given `order` within its category, every OTHER product
+in the same category with `order >= order` MUST have its `order` incremented by 1
+(`updateProductsOrderByCategory`, repository.ts:187-191, invoked at L141 create / L237 update).
+The saved product's own `order` MUST end up exactly equal to the requested `order` (Angular
+reassigns it after the shift at L142/L238 — suspected bug: redundant but currently
+correct; do not "simplify" this double-assignment without confirming with the user first).
+
+#### Scenario: Insert at existing order shifts siblings
+- GIVEN category `C1` has products at orders `[1, 2, 3]`
+- WHEN a new product is created in `C1` at `order: 2`
+- THEN the two products previously at orders `2` and `3` MUST now be at `3` and `4`, and the new product MUST be at `order: 2`
+
+### Requirement: Soft-Delete Semantics
+`deleteProduct(id)` MUST NOT remove the record. It MUST set `isActive: false` plus stamp
+`updatedDate` (now) and `updatedByName` (current user), and return `true` (repository.ts:88-98).
+If the id does not exist, MUST return `false` without throwing.
+
+#### Scenario: Delete existing product
+- GIVEN product `P1` exists and is active
+- WHEN `deleteProduct(P1.id)` is called
+- THEN `P1.isActive` MUST become `false`, `updatedDate`/`updatedByName` MUST be stamped, and the result MUST resolve `{ succeeded: true, data: true }`
+
+### Requirement: Repository-Only Activate/Deactivate (NOT service-exposed)
+`activateProduct(id)`/`deactivateProduct(id)` are `ProductRepository` members ONLY
+(repository.ts:279-285), delegating to the private `updateProductActive` (repository.ts:270-277).
+In Angular NO service (offline, online, or the abstract interface) exposes them — they have zero
+service call sites. The React `ProductRepository` MUST provide them (layer parity, rule 6) but the
+React `ProductService` interface and BOTH implementations MUST NOT declare them. On the repository
+they MUST toggle only `isActive` and MUST NOT stamp `updatedDate`/`updatedByName` — deliberately
+different from soft-delete. Missing id MUST fail with `ProductErrors.NotExists`.
+
+#### Scenario: Activate does not touch audit fields
+- GIVEN an inactive product `P1` with `updatedDate: undefined`
+- WHEN `ProductRepository.activateProduct(P1.id)` is called
+- THEN `P1.isActive` MUST become `true` and `updatedDate`/`updatedByName` MUST remain unchanged
+
+#### Scenario: No service surface for activate/deactivate
+- GIVEN the React `ProductService` interface and its offline/online implementations
+- WHEN their public method surface is inspected
+- THEN none MUST expose `activateProduct`/`deactivateProduct` — these are reachable only via `ProductRepository`
+
+### Requirement: setDiscountFromInvantory (OFFLINE-ONLY)
+`setDiscountFromInvantory(id, discountFromInvantory)` exists ONLY on `ProductOfflineService`
+(product-offline.service.ts:113-116) — it is NOT on the abstract `ProductService` and NOT on
+`ProductOnlineService`. The offline service method delegates to
+`ProductRepository.setDiscountFromInvantory` (repository.ts:261-268), which MUST update ONLY the
+`discountFromInvantory` flag on the product (no audit stamps, no order changes). Missing id MUST
+fail with `ProductErrors.NotExists`. The React port MUST NOT add an online implementation nor a
+`Products/` endpoint for this method (asymmetry mirrored, rule 7).
+
+#### Scenario: Toggle discount flag (offline)
+- GIVEN product `P1` has `discountFromInvantory: false`
+- WHEN `ProductOfflineService.setDiscountFromInvantory(P1.id, true)` is called
+- THEN `P1.discountFromInvantory` MUST become `true` and the result MUST succeed
+
+#### Scenario: Not present on the online service
+- GIVEN the React `ProductOnlineService`
+- WHEN its method surface is inspected
+- THEN it MUST NOT declare `setDiscountFromInvantory`
+
+### Requirement: hasAnyAvailableToSaleProduct
+MUST return `true` only if there is at least one available category (delegated to
+`ProductCategoryRepository.hasAnyAvailableCategory()`) AND at least one product with
+`isActive && availableToSale` (repository.ts:84-86).
+
+#### Scenario: No available category
+- GIVEN no product category is available
+- WHEN `hasAnyAvailableToSaleProduct()` is called
+- THEN it MUST resolve `{ succeeded: true, data: false }` regardless of product state
+
+### Requirement: getProductsToSelect
+MUST return a flat `ProductSelectView[]` (`{ id, fullName }` where `fullName =
+"{categoryName} - {name}"`), built only from ACTIVE products (`getAvailableProducts`), grouped by
+category in category iteration order, and within each category sorted by product `order`
+(product-offline.service.ts:133-157).
+
+#### Scenario: Grouped and ordered by category then product order
+- GIVEN two categories each with two active products at orders `[2, 1]`
+- WHEN `getProductsToSelect()` is called
+- THEN results MUST be grouped per category (in category order) with each category's products sorted ascending by `order`
+
+### Requirement: getProductsByCategoryId (OFFLINE-ONLY, unfiltered by state)
+`getProductsByCategoryId(categoryId)` is an offline-only public method
+(product-offline.service.ts:118-121) that returns ALL products in `categoryId` regardless of
+`isActive`/`availableToSale`, sorted by `order` (delegates to
+`ProductRepository.getProductsByCategoryId`, repository.ts:72-76; the offline service wraps the
+result — or `[]` — in a Success envelope). It is NOT on the abstract interface and NOT on
+`ProductOnlineService`; the port MUST NOT invent an online endpoint for it (rule 7). This is the
+LEAST-filtered of the three category-query methods:
+- `getProductsByCategoryId` → all products (no state filter)
+- `getAvailableProductsByCategoryId` → `isActive` only
+- `getProductsToSaleByCategoryId` → `isActive && availableToSale`
+
+All three MUST exist as separate methods with separate filters, not collapsed into one.
+
+#### Scenario: Returns inactive products too
+- GIVEN category `C1` has one active and one inactive product
+- WHEN `ProductOfflineService.getProductsByCategoryId(C1)` is called
+- THEN BOTH products MUST be returned (sorted by `order`), unlike `getAvailableProductsByCategoryId(C1)` which excludes the inactive one
+
+### Requirement: getProductsToSaleByCategoryId
+MUST return only products in `categoryId` with `isActive && availableToSale` (delegates to
+`getAvailableToSaleProductsByCategoryId`, repository.ts:78-82), sorted by `order`. This is
+DISTINCT from `getAvailableProductsByCategoryId` (isActive-only, no `availableToSale` filter) —
+both MUST exist as separate methods with separate filters, not collapsed into one.
+
+**Suspected Angular bug (do not fix, match current behavior):** the offline service applies a
+REDUNDANT second `.filter(p => p.availableToSale)` (product-offline.service.ts:130) on top of the
+repository query that already filters `isActive && availableToSale` (repository.ts:80). The double
+filter is currently harmless but redundant; mirror it, do not "simplify" without user confirmation.
+
+#### Scenario: availableToSale filter excludes inactive-for-sale products
+- GIVEN category `C1` has an active product with `availableToSale: false`
+- WHEN `getProductsToSaleByCategoryId(C1)` is called
+- THEN that product MUST NOT be in the result, but MUST appear in `getAvailableProductsByCategoryId(C1)`
+
+### Requirement: createProducts (bulk create with auto-order)
+For each `{name, price}` item, MUST compute the next order via `getMaxOrder(categoryId) + 1`
+(getNextOrder, product-offline.service.ts:164-167) BEFORE adding the next item (so multiple items
+in the same call get sequential increasing orders), and call the same create-with-validation path
+as `createProduct` (isActive/availableToSale/discountFromInvantory defaulted `true`, businessId
+`''`). Per-item failures MUST NOT abort remaining items (matches Angular's current best-effort
+loop, product-offline.service.ts:64-72).
+
+**Suspected Angular bug (do not fix, match current behavior):** on any per-item failure the
+overall result is `Failure$([])` — an EMPTY errors array, discarding which item(s) failed and why.
+The spec requires matching this exact (uninformative) shape unless the user explicitly confirms a
+fix.
+
+#### Scenario: Multiple items get sequential orders
+- GIVEN category `C1` currently has max order `3`
+- WHEN `createProducts(C1, [{name:"A",price:1},{name:"B",price:2}])` is called
+- THEN `"A"` MUST be created at `order: 4` and `"B"` at `order: 5`
+
+#### Scenario: Partial failure returns empty errors array (matches Angular)
+- GIVEN one of two items has a name collision
+- WHEN `createProducts(...)` is called
+- THEN the result MUST be `{ succeeded: false, data: null, errors: [] }` (not the specific validation error) — this mirrors Angular's current (suspected-buggy) behavior
+
+### Requirement: createCsvProducts (service-owned orchestration)
+MUST be implemented as a `ProductService` method (not UI/route-layer logic). For each CSV row,
+MUST resolve the category by name via `ProductCategoryRepository`, creating it if absent
+(`addProductCategoryByName`), then create the product using the same next-order + validation path
+as `createProducts` (product-offline.service.ts:74-84). Same suspected-bug note as
+`createProducts`: overall failure returns `errors: []`.
+
+#### Scenario: CSV row creates missing category
+- GIVEN no category named `"Snacks"` exists
+- WHEN `createCsvProducts([{category:"Snacks", name:"Chips", price:10}])` is called
+- THEN a new category `"Snacks"` MUST be created and the product MUST be added to it at the next order
+
+### Requirement: Repository-vs-Service Ownership Boundary
+The React port MUST split responsibilities exactly as Angular does, with a dedicated
+`ProductRepository` owning persistence + business rules and `ProductOfflineService` owning
+orchestration only. Members MUST live on the correct layer:
+
+**`ProductRepository`-owned (persistence + rules):**
+- `addProduct`/`addProductData` create path with the 3 validations (category-exists,
+  barcode-uniqueness, name-uniqueness-per-category) and order-shift
+- `updateProduct` update path (same 3 validations with self-exclusion + order-shift +
+  redundant double order-assign)
+- `deleteProduct` soft-delete (isActive=false + audit stamps)
+- `setDiscountFromInvantory` persistence
+- `activateProduct`/`deactivateProduct` (+ private `updateProductActive`) — repository-only
+- read/query helpers: `getProductById`, `getProductByName`, `getProductByBarcode`,
+  `getProductsByCategoryId`, `getAvailableToSaleProductsByCategoryId`, `getAvailableProducts`,
+  `getAvailableProductById`, `hasAnyProduct`, `hasAnyAvailableToSaleProduct`
+- `updateProductsOrderByCategory` (private order-shift)
+
+**`ProductOfflineService`-owned (orchestration, delegates to repository):**
+- `createProducts` / `createCsvProducts` loops (per-item `getNextOrder` + delegate to
+  `addProduct`; CSV also resolves/creates category via `ProductCategoryRepository`)
+- `getProductsToSelect` grouping (categories from `ProductCategoryRepository`, active products
+  from `ProductRepository`)
+- `getMaxOrder` (Math.max over `getProductsByCategoryId`) and private `getNextOrder`
+- envelope-composing wrappers over repository queries (e.g. `getAvailableProductsByCategoryId`
+  applies the `isActive` filter over `ProductRepository.getProductsByCategoryId`)
+
+The offline service MUST NOT re-implement persistence or validation inline; the repository MUST NOT
+own loop/grouping orchestration.
+
+#### Scenario: Validation lives in the repository, not the service
+- GIVEN a reviewer traces where `ProductErrors.NameExists` is produced on create
+- WHEN they inspect the layers
+- THEN the name-uniqueness check MUST be in `ProductRepository`, and `ProductOfflineService.createProduct` MUST only map the repository `Result` to a Success/Failure envelope
+
+### Requirement: ProductRepository Depends on ProductCategoryRepository
+Mirroring Angular (repository.ts:22 injects `ProductCategoryRepository`;
+product-offline.service.ts:20 also injects it), the React product layer MUST depend on a dedicated
+`ProductCategoryRepository` (extracted per the design), NOT on `ProductCategoryOfflineService`.
+The category-repository surface consumed by the product layer MUST include at least:
+`getProductCategoryById` (category-exists validation, repository.ts:112/207),
+`hasAnyAvailableCategory` (`hasAnyAvailableToSaleProduct`, repository.ts:85),
+`getProductCategories` (`getProductsToSelect`, product-offline.service.ts:134),
+`getProductCategoryByName` and `addProductCategoryByName` (`createCsvProducts`,
+product-offline.service.ts:77-78).
+
+#### Scenario: Category resolution goes through the category repository
+- GIVEN `createProduct(categoryId, ...)` is called with a non-existent `categoryId`
+- WHEN the create path runs its category-exists validation
+- THEN it MUST call `ProductCategoryRepository.getProductCategoryById(categoryId)` and fail with `ProductCategoryErrors.NotExists` when it returns nothing
+
+### Requirement: Category Service Method Surface Parity
+The React `ProductCategoryService` (interface + offline/online concretes) MUST expose EXACTLY
+Angular's public category-service surface and nothing more (Exact-Surface Rule). Abstract interface:
+`getProductCategoriesView`, `getAvailableProductCategories`, `createProductCategory(name, order,
+isActive)`, `updateProductCategory(id, name, order, isActive)`, `getMaxOrder()`. The offline
+concrete additionally exposes the offline-only public `getProductCategories()`
+(product-category-offline.service.ts:40, NOT on the abstract interface). The React-only members
+`save`, `addByName`, `getByName`, `hasAnyCategory`, `hasAnyAvailableCategory` MUST be REMOVED — they
+have no Angular category-SERVICE correlate (Angular exposes `getProductCategoryByName`,
+`addProductCategoryByName`, `hasAnyCategory`, `hasAnyAvailableCategory` on the REPOSITORY, and has no
+generic `save`). Their call sites are re-expressed per "Surface Reconciliation".
+
+#### Scenario: Non-Angular category-service method rejected
+- GIVEN a reviewer diffing the React `ProductCategoryService` surface against Angular
+- WHEN the service (or interface) declares `save`, `addByName`, `getByName`, `hasAnyCategory`, or `hasAnyAvailableCategory`
+- THEN the parity check MUST fail — those members belong to `ProductCategoryRepository`, not the service
+
+#### Scenario: Category create/update expressed as Angular methods
+- GIVEN the product-management UI saves a category (create or edit)
+- WHEN it invokes the category service
+- THEN it MUST call `createProductCategory(name, order, isActive)` or `updateProductCategory(id, name, order, isActive)` — NOT a generic `save(category)` (which MUST NOT exist)
+
+### Requirement: ProductCategoryRepository Mirrors Angular Repo Surface (no upsert/remove)
+The extracted React `ProductCategoryRepository` MUST mirror Angular's
+`application/categories/product-category.repository.ts` public surface EXACTLY:
+`hasAnyAvailableCategory`, `getProductCategoryById`, `getProductCategoryByName`,
+`getProductCategories`, `getAvailableProductCategories`, `hasAnyCategory`, `addProductCategory`,
+`addProductCategoryByName`, `updateProductCategory`, `activateProductCategory`,
+`deactivateProductCategory`, `getCategoriesJson` (+ import/sync helpers `addImportedProductCategory`,
+`updateImportedProductCategory`, `updateCategories`, `setInitCategories`, `getStorageCategoriesMap`).
+Angular's repository has NO generic `upsert` and NO `remove`; the React repository MUST NOT declare
+them. Write operations go exclusively through `addProductCategory`/`updateProductCategory`/
+`activateProductCategory`/`deactivateProductCategory`.
+
+#### Scenario: Invented repository bridge rejected
+- GIVEN the extracted React `ProductCategoryRepository`
+- WHEN it declares `upsert(category)` or `remove(id)` (to keep the old service `save`/`delete` alive)
+- THEN the parity check MUST fail — Angular's repository has neither; those bridges are forbidden
+
+### Requirement: Offline/Online DI Selection
+`ProductService` MUST support selecting between `ProductOfflineService` and `ProductOnlineService`
+implementations via a dependency-injection switch, mirroring Angular's `PRODUCT_SERVICE`
+`InjectionToken` + `productServiceFactory()` gated on `GlobalConfig.USE_ONLINE_SERVICE`
+(tokens.ts:6, factories/product-service.factory.ts). React MUST expose an equivalent selection
+mechanism (factory/token per the project's established DI convention) rather than call sites
+directly instantiating `new ProductOfflineService(...)`.
+
+#### Scenario: Online mode selects online implementation
+- GIVEN the app's online/offline flag is set to "online"
+- WHEN the DI resolver provides a `ProductService` instance
+- THEN it MUST be the `ProductOnlineService` implementation, with the same method surface as offline
+
+### Requirement: Call-Site Parity
+React call sites consuming `ProductService` MUST use the same logical operations as their Angular
+counterparts: `getMaxOrder` (edit-product modal), `getAvailableProductsByCategoryId` +
+`deleteProduct` (category product list), `getProductsToSelect` (inventory entry modal),
+`hasAnyAvailableToSaleProduct` (login gate), `getProductsToSaleByCategoryId` (sale category
+products), `getProductById` (shopping cart), `createProducts`/`createCsvProducts` (bulk/CSV
+import). Call sites MUST depend on the `ProductService` interface (via DI), not a concrete
+`ProductOfflineService` type.
+
+#### Scenario: CSV import route delegates to the service
+- GIVEN the CSV import UI receives parsed rows
+- WHEN it invokes the import operation
+- THEN it MUST call `productService.createCsvProducts(rows)` rather than re-implementing category/order logic inline in the route component
