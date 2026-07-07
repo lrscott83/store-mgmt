@@ -256,17 +256,24 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
   }
 
   /**
-   * Sync replacement of Angular's `filterInventoryEntries` Observable. All params
-   * optional and unbounded when falsy — 1:1 port, operates over active entries only
-   * (Angular's `getActiveInventoryEntriesStorage`), RAW date comparisons.
+   * WU4 (category C): converts to `Promise<BaseResponseModel<InventoryEntryView[]>>`
+   * (was a bare sync array) — matches Angular's `Observable<BaseResponseModel<T>>`
+   * (`this.Success$(...)`, same-tick `Promise.resolve`, no real I/O per design ADR-7).
+   * All params optional and unbounded when falsy — 1:1 port, operates over active entries
+   * only (Angular's `getActiveInventoryEntriesStorage`), RAW date comparisons.
    */
-  filterInventoryEntries(productId?: string, start?: Date, end?: Date): InventoryEntryView[] {
-    return this.getAll().filter(
+  filterInventoryEntries(
+    productId?: string,
+    start?: Date,
+    end?: Date,
+  ): Promise<BaseResponseModel<InventoryEntryView[]>> {
+    const entries = this.getAll().filter(
       (v) =>
         (!productId || productId === v.productId) &&
         (!start || v.date >= start) &&
         (!end || v.date < end),
     );
+    return Promise.resolve(success(entries));
   }
 
   /**
@@ -276,8 +283,12 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    * (offline-online-service-parity, spec-slice1); `productName` defaults to `''`
    * (matches `getAll()`'s convention — this service has no ProductRepository
    * dependency; containers that need names enrich separately).
+   *
+   * WU4 (category C): converts to `Promise<BaseResponseModel<InventoryEntriesView[]>>`
+   * (was a bare sync array) — matches Angular's `Success$(...)`, same-tick
+   * `Promise.resolve`, no real I/O.
    */
-  getInventoryEntriesView(): InventoryEntriesView[] {
+  getInventoryEntriesView(): Promise<BaseResponseModel<InventoryEntriesView[]>> {
     const result: InventoryEntriesView[] = [];
     for (const [productId, entries] of this.repo.getAll(this.storeId)) {
       const availableEntries: InventoryEntryCost[] = entries
@@ -295,7 +306,31 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
         availableEntries,
       });
     }
-    return result;
+    return Promise.resolve(success(result));
+  }
+
+  /**
+   * WU4 (category C, NEW method, mismatch #3): mirrors Angular's
+   * `getInventoryEntriesInDayObservable` (`of(this.getInventoryEntriesInDay(date))`) — the
+   * Observable sibling of the sync `getByDate`/`getInventoryEntriesInDay`. React collapsed
+   * these into one method; this restores the separate async sibling for interface-shape
+   * completeness (no existing call-site needs migration).
+   */
+  getByDateAsync(date: Date): Promise<BaseResponseModel<InventoryEntryView[]>> {
+    return Promise.resolve(this.getByDate(date));
+  }
+
+  /**
+   * WU4 (category C, NEW method, mismatch #3): mirrors Angular's
+   * `getInventoryCategoriesViewObservable` (`of(this.getInventoryCategoriesView())`) — the
+   * Observable sibling of the sync `getAvailableByCategory`/`getInventoryCategoriesView`.
+   * React collapsed these into one method; this restores the separate async sibling for
+   * interface-shape completeness (no existing call-site needs migration).
+   */
+  getAvailableByCategoryAsync(
+    products: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
+  ): Promise<BaseResponseModel<InventoryCategoryView[]>> {
+    return Promise.resolve(this.getAvailableByCategory(products));
   }
 
   // ─── FIFO deduction ──────────────────────────────────────────────────────

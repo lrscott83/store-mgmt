@@ -887,52 +887,70 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU5: filterInventoryEntries
-  describe('filterInventoryEntries', () => {
-    it('filters by productId when provided', () => {
+  // WU4 (category C): filterInventoryEntries now returns
+  // Promise<BaseResponseModel<InventoryEntryView[]>> (was a bare sync array), same-tick
+  // resolved — never rejects.
+  describe('filterInventoryEntries (Promise<BaseResponseModel<T>>, WU4)', () => {
+    it('resolves a BaseResponseModel envelope: succeeded:true, message:"", actionCode:200, errors:[]', async () => {
+      await expect(service.filterInventoryEntries()).resolves.toEqual(
+        expect.objectContaining({ succeeded: true, message: '', actionCode: 200, errors: [] }),
+      );
+    });
+
+    it('filters by productId when provided', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1')]);
       map.set('p2', [makeEntry('e2', 'p2')]);
       seedInventory(storeId, map);
-      const result = service.filterInventoryEntries('p1');
-      expect(result).toHaveLength(1);
-      expect(result[0].productId).toBe('p1');
+      const result = await service.filterInventoryEntries('p1');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].productId).toBe('p1');
     });
 
-    it('filters by date range when start/end provided', () => {
+    it('filters by date range when start/end provided', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
         makeEntry('e1', 'p1', { date: new Date('2024-01-01T10:00:00.000') }),
         makeEntry('e2', 'p1', { date: new Date('2024-06-01T10:00:00.000') }),
       ]);
       seedInventory(storeId, map);
-      const result = service.filterInventoryEntries(
+      const result = await service.filterInventoryEntries(
         undefined,
         new Date('2024-05-01T00:00:00.000'),
         new Date('2024-07-01T00:00:00.000'),
       );
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('e2');
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].id).toBe('e2');
     });
 
-    it('excludes inactive entries regardless of filters', () => {
+    it('excludes inactive entries regardless of filters', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { isActive: false })]);
       seedInventory(storeId, map);
-      expect(service.filterInventoryEntries()).toHaveLength(0);
+      const result = await service.filterInventoryEntries();
+      expect(result.data).toHaveLength(0);
     });
 
-    it('returns all active entries when no filters provided', () => {
+    it('returns all active entries when no filters provided', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1'), makeEntry('e2', 'p1', { order: 1 })]);
       seedInventory(storeId, map);
-      expect(service.filterInventoryEntries()).toHaveLength(2);
+      const result = await service.filterInventoryEntries();
+      expect(result.data).toHaveLength(2);
     });
   });
 
-  // WU5: getInventoryEntriesView
-  describe('getInventoryEntriesView', () => {
-    it('returns per-product FIFO breakdown sorted by order asc, emitting `id` not `inventoryId`', () => {
+  // WU4 (category C): getInventoryEntriesView now returns
+  // Promise<BaseResponseModel<InventoryEntriesView[]>> (was a bare sync array), same-tick
+  // resolved — never rejects.
+  describe('getInventoryEntriesView (Promise<BaseResponseModel<T>>, WU4)', () => {
+    it('resolves a BaseResponseModel envelope: succeeded:true, message:"", actionCode:200, errors:[]', async () => {
+      await expect(service.getInventoryEntriesView()).resolves.toEqual(
+        expect.objectContaining({ succeeded: true, message: '', actionCode: 200, errors: [] }),
+      );
+    });
+
+    it('returns per-product FIFO breakdown sorted by order asc, emitting `id` not `inventoryId`', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
         makeEntry('e2', 'p1', { order: 1, available: 4, costPrice: 3.0 }),
@@ -940,7 +958,8 @@ describe('InventoryOfflineService', () => {
       ]);
       seedInventory(storeId, map);
 
-      const views = service.getInventoryEntriesView();
+      const result = await service.getInventoryEntriesView();
+      const views = result.data;
       expect(views).toHaveLength(1);
       expect(views[0].productId).toBe('p1');
       expect(views[0].productAvailable).toBe(10);
@@ -950,7 +969,7 @@ describe('InventoryOfflineService', () => {
       ]);
     });
 
-    it('excludes entries with available=0 and inactive entries', () => {
+    it('excludes entries with available=0 and inactive entries', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
         makeEntry('e1', 'p1', { available: 0 }),
@@ -959,24 +978,28 @@ describe('InventoryOfflineService', () => {
       ]);
       seedInventory(storeId, map);
 
-      const views = service.getInventoryEntriesView();
+      const result = await service.getInventoryEntriesView();
+      const views = result.data;
       expect(views[0].availableEntries).toEqual([{ id: 'e3', costPrice: 2.5, quantity: 3 }]);
       expect(views[0].productAvailable).toBe(3);
     });
 
-    it('returns one view per product', () => {
+    it('returns one view per product', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { available: 5 })]);
       map.set('p2', [makeEntry('e2', 'p2', { available: 8 })]);
       seedInventory(storeId, map);
 
-      const views = service.getInventoryEntriesView();
+      const result = await service.getInventoryEntriesView();
+      const views = result.data;
       expect(views).toHaveLength(2);
       expect(views.map((v) => v.productId).sort()).toEqual(['p1', 'p2']);
     });
 
-    it('returns empty array when no entries exist', () => {
-      expect(service.getInventoryEntriesView()).toEqual([]);
+    it('resolves an empty .data array when no entries exist (never rejects)', async () => {
+      await expect(service.getInventoryEntriesView()).resolves.toEqual(
+        expect.objectContaining({ data: [] }),
+      );
     });
   });
 
@@ -1229,6 +1252,47 @@ describe('InventoryOfflineService', () => {
       expect(result).toEqual(Result.Success());
       const stored = service.getProductInventoriesByProductId('p1');
       expect(stored.map((e) => e.id)).toEqual(['e1']);
+    });
+  });
+
+  // WU4 (category C, NEW methods): getByDateAsync/getAvailableByCategoryAsync mirror
+  // Angular's getInventoryEntriesInDayObservable/getInventoryCategoriesViewObservable — the
+  // sync-B sibling wrapped in `of(...)` (mismatch #3: React collapsed these into the sync B
+  // methods; these are ADDED as separate methods for interface-shape completeness, no
+  // existing call-site migration needed).
+  describe('getByDateAsync / getAvailableByCategoryAsync — NEW Observable-sibling methods (WU4)', () => {
+    it('getByDateAsync resolves the same BaseResponseModel envelope as the sync getByDate for the same date', async () => {
+      const date = new Date('2024-03-10T10:00:00.000Z');
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { date })]);
+      seedInventory(storeId, map);
+
+      const asyncResult = await service.getByDateAsync(date);
+      const syncResult = service.getByDate(date);
+      expect(asyncResult).toEqual(syncResult);
+    });
+
+    it('getByDateAsync never rejects', async () => {
+      await expect(service.getByDateAsync(new Date())).resolves.toEqual(
+        expect.objectContaining({ succeeded: true }),
+      );
+    });
+
+    it('getAvailableByCategoryAsync resolves the same BaseResponseModel envelope as the sync getAvailableByCategory for the same products', async () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]);
+      seedInventory(storeId, map);
+      const products = [{ id: 'p1', name: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas' }];
+
+      const asyncResult = await service.getAvailableByCategoryAsync(products);
+      const syncResult = service.getAvailableByCategory(products);
+      expect(asyncResult).toEqual(syncResult);
+    });
+
+    it('getAvailableByCategoryAsync never rejects', async () => {
+      await expect(service.getAvailableByCategoryAsync()).resolves.toEqual(
+        expect.objectContaining({ succeeded: true }),
+      );
     });
   });
 });
