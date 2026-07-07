@@ -397,6 +397,8 @@ describe('InventoryOfflineService', () => {
       expect(result?.succeeded).toBe(true);
       expect(result?.errors).toEqual([]);
       expect(result?.data?.quantity).toBe(50);
+      // Angular parity (createInventoryEntry:94): productName from the fetched product
+      expect(result?.data?.productName).toBe('Product p1');
     });
 
     it('creates an entry with order=maxOrder+1 (verified via a subsequent read)', () => {
@@ -472,6 +474,8 @@ describe('InventoryOfflineService', () => {
       const result = service.update('e1', 'p1', 15, 2.0);
       expect(result.succeeded).toBe(true);
       expect(result.errors).toEqual([]);
+      // Angular parity (updateInventoryEntry:134): productName from the entry's product
+      expect(result.data?.productName).toBe('Product p1');
     });
 
     it('fails with InventoryErrors.EntryNotExists when entry not found', () => {
@@ -1128,6 +1132,8 @@ describe('InventoryOfflineService', () => {
       expect(result.data?.productId).toBe('p2');
       expect(result.data?.quantity).toBe(20);
       expect(result.data?.costPrice).toBe(4);
+      // Angular parity (updateInventoryEntry:134): productName from getProductById(oldProductId)
+      expect(result.data?.productName).toBe('Product p1');
 
       // p1 bucket keeps only the untouched entry
       const p1Raw = findRawEntry(storeId, 'e-other');

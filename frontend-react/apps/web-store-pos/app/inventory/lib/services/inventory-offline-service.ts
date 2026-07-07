@@ -494,7 +494,8 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     categoryId: string = '',
     date: Date = new Date(),
   ): DataResult<InventoryEntryView> | null {
-    if (!this.productRepository.getProductById(productId)) return null;
+    const product = this.productRepository.getProductById(productId);
+    if (!product) return null;
 
     const existing = this.repo.getByProductId(this.storeId, productId);
     const maxOrder = existing.length > 0
@@ -524,7 +525,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
       {
         id: entry.id,
         productId: entry.productId,
-        productName: '',
+        productName: product.name,
         quantity: entry.quantity,
         costPrice: entry.costPrice,
         date: entry.date,
@@ -572,11 +573,13 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     if (idx !== -1) allForProduct[idx] = updated;
     this.repo.save(this.storeId, storedProductId ?? productId, allForProduct);
 
+    // Angular parity (updateInventoryEntry:130,134): productName from the entry's product
+    const product = this.productRepository.getProductById(storedProductId ?? productId);
     return new DataResult<InventoryEntryView>(
       {
         id: updated.id,
         productId: updated.productId,
-        productName: '',
+        productName: product!.name,
         quantity: updated.quantity,
         costPrice: updated.costPrice,
         date: updated.date,
@@ -751,11 +754,13 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
       this.repo.save(this.storeId, newProductId, [...newEntries, updated]);
     }
 
+    // Angular parity (updateInventoryEntry:130,134): productName from getProductById(oldProductId)
+    const product = this.productRepository.getProductById(oldProductId);
     return new DataResult<InventoryEntryView>(
       {
         id: updated.id,
         productId: updated.productId,
-        productName: '',
+        productName: product!.name,
         quantity: updated.quantity,
         costPrice: updated.costPrice,
         date: updated.date,
