@@ -101,7 +101,9 @@ export function InventoryTodaySalesProfitPage() {
     const todayOrders = orderSvc.getActiveOrdersInDay(today);
 
     // Angular line 87 (read-only, non-mutating): today's inventory entries.
-    const todayEntries = inventorySvc.getByDate(today);
+    // WU3 (service-return-shape-parity Slice 1, category B): getByDate now returns
+    // BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`.
+    const todayEntries = inventorySvc.getByDate(today).data;
 
     // Angular lines 79-120: build a profit row per candidate product.
     const productProfits: ProductProfitRow[] = products.map((prod) => {

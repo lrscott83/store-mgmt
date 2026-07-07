@@ -21,6 +21,12 @@ import { OrderOfflineService } from '~/sales/lib/services/order-offline-service'
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { InventoryTodaySaleService } from './inventory-today-sale-service';
 
+// WU3 (service-return-shape-parity Slice 1, category B): getByDate now returns sync
+// BaseResponseModel<InventoryEntryView[]> (was a bare array).
+function bm<T>(data: T): { data: T; succeeded: true; message: ''; actionCode: 200; errors: [] } {
+  return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
@@ -121,7 +127,7 @@ describe('InventoryTodaySaleService', () => {
     mockProductService = { getAll: vi.fn().mockReturnValue([]) };
     mockOrderService = { getActiveOrdersInDay: vi.fn().mockReturnValue([]) };
     mockInventoryService = {
-      getByDate: vi.fn().mockReturnValue([]),
+      getByDate: vi.fn().mockReturnValue(bm([])),
       getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
       getProductInventoriesByProductId: vi.fn().mockReturnValue([]),
       getAvailableInventoryCosts: vi.fn().mockReturnValue([]),
@@ -170,11 +176,11 @@ describe('InventoryTodaySaleService', () => {
 
   it('IT-04: Entrada = sum of today\'s inventory entry quantities for the product', () => {
     mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
-    mockInventoryService.getByDate.mockReturnValue([
+    mockInventoryService.getByDate.mockReturnValue(bm([
       makeEntryView({ productId: 'p1', quantity: 2 }),
       makeEntryView({ productId: 'p1', quantity: 3 }),
       makeEntryView({ productId: 'other', quantity: 100 }),
-    ]);
+    ]));
 
     const svc = new InventoryTodaySaleService('store-1');
     const rows = svc.getProductRows();
@@ -198,7 +204,7 @@ describe('InventoryTodaySaleService', () => {
   it('IT-06: Disponible = available + Vendido; Inicio = Disponible - Entrada (spec scenario: available=10, entry=5, sold=3 -> Disponible=13, Inicio=8)', () => {
     mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getAvailableQuantity.mockReturnValue({ hasEntries: true, available: 10 });
-    mockInventoryService.getByDate.mockReturnValue([makeEntryView({ productId: 'p1', quantity: 5 })]);
+    mockInventoryService.getByDate.mockReturnValue(bm([makeEntryView({ productId: 'p1', quantity: 5 })]));
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
       makeOrder([makeOrderItem({ productId: 'p1', quantity: 3 })]),
     ]);

@@ -8,6 +8,7 @@ export * from './models/expense';
 export * from './models/sale-credit';
 export * from './enums';
 export * from './commons/result';
+export * from './commons/envelope';
 export * from './errors/product-errors';
 export * from './errors/inventory-errors';
 export * from './services/base-service';

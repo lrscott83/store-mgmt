@@ -67,7 +67,11 @@ export class InventoryTodaySaleService {
   getProductRows(date: Date = new Date()): InventoryTodaySaleRow[] {
     const products: Product[] = this.productService.getAll().filter((p) => p.isActive);
     const todayOrders: Order[] = this.orderService.getActiveOrdersInDay(date);
-    const todayEntries = this.inventoryService.getByDate(date);
+    // WU3 (service-return-shape-parity Slice 1, category B): getByDate now returns
+    // BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`. This
+    // service is scheduled for removal per ADR-6 (aggregation inlining), kept working here
+    // ahead of that later slice.
+    const todayEntries = this.inventoryService.getByDate(date).data;
 
     return products.map((prod) => {
       const orderItems: OrderItem[] = todayOrders

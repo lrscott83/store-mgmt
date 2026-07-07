@@ -33,7 +33,9 @@ export function InventoryAvailablePage() {
       categoryName: cats.find((c) => c.id === p.categoryId)?.name ?? '',
     }));
 
-    setCategories(inventorySvc.getAvailableByCategory(enriched));
+    // WU3 (category B): getAvailableByCategory now returns
+    // BaseResponseModel<InventoryCategoryView[]> (was a bare array) — unwrap `.data`.
+    setCategories(inventorySvc.getAvailableByCategory(enriched).data);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 

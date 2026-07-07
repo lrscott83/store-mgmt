@@ -33,7 +33,9 @@ export function TodayEntriesPage() {
     const productSvc = new ProductOfflineService(storeId);
     const products = productSvc.getAll();
     const productMap = new Map(products.map((p) => [p.id, p.name]));
-    const raw = svc.getByDate(new Date());
+    // WU3 (category B): getByDate now returns BaseResponseModel<InventoryEntryView[]>
+    // (was a bare array) — unwrap `.data`.
+    const raw = svc.getByDate(new Date()).data;
     setEntries(
       raw.map((e) => ({ ...e, productName: productMap.get(e.productId) ?? e.productName })),
     );

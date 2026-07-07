@@ -605,6 +605,14 @@ describe('InventoryOfflineService', () => {
       categoryName,
     });
 
+    it('returns a BaseResponseModel envelope: succeeded:true, message:"", actionCode:200, errors:[]', () => {
+      const result = service.getAvailableByCategory([]);
+      expect(result.succeeded).toBe(true);
+      expect(result.message).toBe('');
+      expect(result.actionCode).toBe(200);
+      expect(result.errors).toEqual([]);
+    });
+
     it('computes weighted-average cost price per product: Σ(available·costPrice)/Σavailable', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
@@ -613,7 +621,7 @@ describe('InventoryOfflineService', () => {
       ]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]);
+      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]).data;
 
       // (10*2 + 10*4) / 20 = 3
       expect(categories[0].products[0].avgCostPrice).toBe(3);
@@ -629,7 +637,7 @@ describe('InventoryOfflineService', () => {
       ]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]);
+      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]).data;
 
       // (2*2 + 8*5) / 10 = 4.4
       expect(categories[0].products[0].avgCostPrice).toBeCloseTo(4.4, 5);
@@ -644,7 +652,7 @@ describe('InventoryOfflineService', () => {
       const categories = service.getAvailableByCategory([
         enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
         enrichedProduct('p2', 'Vodka', 'cat-1', 'Bebidas'),
-      ]);
+      ]).data;
 
       expect(categories).toHaveLength(1);
       expect(categories[0].totalQuantity).toBe(15);
@@ -659,7 +667,7 @@ describe('InventoryOfflineService', () => {
       const categories = service.getAvailableByCategory([
         enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
         enrichedProduct('p2', 'Vodka', 'cat-1', 'Bebidas'),
-      ]);
+      ]).data;
 
       expect(categories[0].totalCostPrice).toBe(35);
     });
@@ -673,7 +681,7 @@ describe('InventoryOfflineService', () => {
       const categories = service.getAvailableByCategory([
         enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
         enrichedProduct('p2', 'Papas', 'cat-2', 'Snacks'),
-      ]);
+      ]).data;
 
       const bebidas = categories.find((c) => c.categoryId === 'cat-1');
       const snacks = categories.find((c) => c.categoryId === 'cat-2');
@@ -686,7 +694,7 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 0, costPrice: 2 })]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]);
+      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]).data;
 
       // Fully-depleted product is excluded entirely — pre-existing divergence, not this gap's concern.
       expect(categories).toHaveLength(0);
@@ -737,26 +745,36 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  describe('INV-08: getByDate filters by date', () => {
-    it('returns entries matching the given date', () => {
+  // WU3 (category B): getByDate/getAvailableByCategory now return SYNC
+  // BaseResponseModel<T> (was a bare array) — never Promise, never Result/DataResult.
+  describe('INV-08: getByDate filters by date (BaseResponseModel<T>, WU3)', () => {
+    it('returns a BaseResponseModel envelope: succeeded:true, message:"", actionCode:200, errors:[]', () => {
+      const result = service.getByDate(new Date());
+      expect(result.succeeded).toBe(true);
+      expect(result.message).toBe('');
+      expect(result.actionCode).toBe(200);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('returns entries matching the given date in .data', () => {
       const date = new Date('2024-03-10T10:00:00.000Z');
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { date })]);
       seedInventory(storeId, map);
 
-      const results = service.getByDate(date);
+      const results = service.getByDate(date).data;
       expect(results.length).toBeGreaterThanOrEqual(1);
       expect(results[0].id).toBe('e1');
     });
 
-    it('returns empty when no entries match the date', () => {
+    it('returns empty .data when no entries match the date', () => {
       const date = new Date('2024-03-10T10:00:00.000Z');
       const otherDate = new Date('2024-03-11T10:00:00.000Z');
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { date })]);
       seedInventory(storeId, map);
 
-      const results = service.getByDate(otherDate);
+      const results = service.getByDate(otherDate).data;
       expect(results).toHaveLength(0);
     });
   });

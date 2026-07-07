@@ -78,7 +78,9 @@ export function InventoryTodayQuantitiesPage() {
     const todayOrders = orderSvc.getActiveOrdersInDay(today);
 
     // Angular line 75: today's inventory entries.
-    const todayEntries = inventorySvc.getByDate(today);
+    // WU3 (service-return-shape-parity Slice 1, category B): getByDate now returns
+    // BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`.
+    const todayEntries = inventorySvc.getByDate(today).data;
 
     // Angular lines 78-81: getInventoryCategoriesView() equivalent — reuse the existing
     // getAvailableByCategory (enriched with the products' own categoryId/categoryName, same
@@ -90,7 +92,7 @@ export function InventoryTodayQuantitiesPage() {
       categoryName: p.categoryName,
     }));
     const availableByProduct = new Map<string, number>();
-    for (const cat of inventorySvc.getAvailableByCategory(enriched)) {
+    for (const cat of inventorySvc.getAvailableByCategory(enriched).data) {
       for (const prod of cat.products) {
         availableByProduct.set(prod.productId, prod.totalAvailable);
       }

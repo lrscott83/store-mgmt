@@ -1,5 +1,12 @@
-import type { BaseService, InventoryEntry, InventoryEntryCost, InventoryEntryView, OrderItem } from '@store-mgmt/domain';
-import { DataResult, InventoryErrors, Result } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  BaseService,
+  InventoryEntry,
+  InventoryEntryCost,
+  InventoryEntryView,
+  OrderItem,
+} from '@store-mgmt/domain';
+import { DataResult, InventoryErrors, Result, success } from '@store-mgmt/domain';
 import { InventoryRepository } from '../repositories/inventory-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import {
@@ -145,13 +152,18 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
 
   /**
    * Returns active entries for a specific calendar day.
+   *
+   * WU3 (category B): returns SYNC BaseResponseModel<InventoryEntryView[]> (was a bare
+   * array), matching Angular's getInventoryEntriesInDay (`this.Success(...)`, sync,
+   * never async).
    */
-  getByDate(date: Date): InventoryEntryView[] {
+  getByDate(date: Date): BaseResponseModel<InventoryEntryView[]> {
     const dayStart = startOfDay(date);
     const dayEnd = startOfDay(addDays(date, 1));
-    return this.getAll().filter(
+    const entries = this.getAll().filter(
       (v) => v.date >= dayStart && v.date < dayEnd,
     );
+    return success(entries);
   }
 
   /**
@@ -159,10 +171,14 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    * Requires product records to be passed in so we can read categoryId/categoryName.
    * When called without products (default), returns an empty array —
    * containers should call the product service separately and use getAll().
+   *
+   * WU3 (category B): returns SYNC BaseResponseModel<InventoryCategoryView[]> (was a bare
+   * array), matching Angular's getInventoryCategoriesView (`this.Success(...)`, sync,
+   * never async).
    */
   getAvailableByCategory(
     products: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
-  ): InventoryCategoryView[] {
+  ): BaseResponseModel<InventoryCategoryView[]> {
     const map = this.repo.getAll(this.storeId);
     const productMap = new Map(products.map((p) => [p.id, p]));
     const categoryMap = new Map<string, InventoryCategoryView>();
@@ -211,7 +227,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
       cat.totalCostPrice = cat.products.reduce((sum, p) => sum + p.avgCostPrice * p.totalAvailable, 0);
     }
 
-    return Array.from(categoryMap.values());
+    return success(Array.from(categoryMap.values()));
   }
 
   /**
