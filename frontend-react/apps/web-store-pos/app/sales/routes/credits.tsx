@@ -67,7 +67,7 @@ export function SaleCreditsPage() {
   // rewired here instead of bypassing the service filter with getAll().filter(isActive).
   async function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
-    const response = await service.filterSaleCredits(undefined, undefined, undefined, undefined);
+    const response = await service.filterSaleCredits(null, null, null, null);
     setDateSaleCredits(groupSaleCredits(response.data));
   }
 

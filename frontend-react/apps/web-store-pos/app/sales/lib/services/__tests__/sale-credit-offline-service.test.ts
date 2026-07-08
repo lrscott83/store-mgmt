@@ -666,7 +666,7 @@ describe('SaleCreditOfflineService', () => {
       const paid = createCredit('o1', 'Ana', 50);
       service.paidSaleCredit(paid.id, PaymentType.Efectivo, '');
       createCredit('o2', 'Bob', 30);
-      const response = await service.filterSaleCredits(true);
+      const response = await service.filterSaleCredits(true, null, null, null);
       expect(response.succeeded).toBe(true);
       expect(response.data).toHaveLength(1);
       expect(response.data[0].isPaid).toBe(true);
@@ -676,14 +676,14 @@ describe('SaleCreditOfflineService', () => {
       const paid = createCredit('o1', 'Ana', 50);
       service.paidSaleCredit(paid.id, PaymentType.Efectivo, '');
       createCredit('o2', 'Bob', 30);
-      const response = await service.filterSaleCredits(false);
+      const response = await service.filterSaleCredits(false, null, null, null);
       expect(response.data).toHaveLength(2);
     });
 
     it('filters by client substring match', async () => {
       createCredit('o1', 'Juan Perez', 50);
       createCredit('o2', 'Maria Lopez', 30);
-      const response = await service.filterSaleCredits(false, 'Perez');
+      const response = await service.filterSaleCredits(false, 'Perez', null, null);
       expect(response.data).toHaveLength(1);
       expect(response.data[0].client).toBe('Juan Perez');
     });
@@ -695,7 +695,7 @@ describe('SaleCreditOfflineService', () => {
       setCreditDate(c2.id, new Date('2024-06-01T10:00:00.000'));
       const response = await service.filterSaleCredits(
         false,
-        undefined,
+        null,
         new Date('2024-05-01T00:00:00.000'),
         new Date('2024-07-01T00:00:00.000'),
       );
@@ -706,12 +706,12 @@ describe('SaleCreditOfflineService', () => {
     it('excludes voided credits regardless of filters', async () => {
       createCredit('o1', 'Ana', 10);
       service.deactivateSaleCreditByOrderId('o1');
-      await expect(service.filterSaleCredits(false)).resolves.toMatchObject({ data: [] });
+      await expect(service.filterSaleCredits(false, null, null, null)).resolves.toMatchObject({ data: [] });
     });
 
-    it('no-argument call defaults all params (Angular parity: undefined/undefined/undefined/undefined)', async () => {
+    it('all-null call returns every active credit (Angular parity: filterSaleCredits(null, null, null, null))', async () => {
       createCredit('o1', 'Ana', 10);
-      const response = await service.filterSaleCredits();
+      const response = await service.filterSaleCredits(null, null, null, null);
       expect(response.data).toHaveLength(1);
     });
   });

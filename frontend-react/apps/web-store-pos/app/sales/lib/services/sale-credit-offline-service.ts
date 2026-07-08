@@ -185,24 +185,28 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * WU4 (category C): 1:1 port of Angular's `filterSaleCredits`
    * (sale-credit-offline.service.ts:149-157) — non-suffixed Observable, verified
    * `Observable<BaseResponseModel<SaleCredit[]>>`. Same-tick `Promise.resolve` mirrors
-   * `of(...)`. Quirk (1:1 port): `isPaid` only constrains when truthy — `isPaid=false`
-   * behaves as "no filter" on paid status (Angular: `!isPaid || credit.isPaid ===
-   * isPaid`). `client` is a case-sensitive substring match (Angular:
-   * `credit.client.includes(client)`).
+   * `of(...)`. Signature matches Angular EXACTLY: four REQUIRED params
+   * `(isPaid, client, startDate, endDate)`. Angular's sole caller passes them all as `null`
+   * (`sale-credits.component.ts:51-52`), so each is typed `X | null` — Angular's loose config
+   * lets `null` flow into its declared `boolean/string/Date` params; under React's strict config
+   * that null is made explicit here (required arity preserved, no `?` optionals).
+   * Quirk (1:1 port): `isPaid` only constrains when truthy — `isPaid=false` behaves as "no
+   * filter" on paid status (Angular: `!isPaid || credit.isPaid === isPaid`). `client` is a
+   * case-sensitive substring match (Angular: `credit.client.includes(client)`).
    */
   filterSaleCredits(
-    isPaid?: boolean,
-    client?: string,
-    start?: Date,
-    end?: Date,
+    isPaid: boolean | null,
+    client: string | null,
+    startDate: Date | null,
+    endDate: Date | null,
   ): Promise<BaseResponseModel<SaleCredit[]>> {
     const filtered = this.getAll().filter(
       (c) =>
         c.isActive &&
         (!client || c.client.includes(client)) &&
         (!isPaid || c.isPaid === isPaid) &&
-        (!start || c.date >= start) &&
-        (!end || c.date < end),
+        (!startDate || c.date >= startDate) &&
+        (!endDate || c.date < endDate),
     );
     return Promise.resolve(success(filtered));
   }
