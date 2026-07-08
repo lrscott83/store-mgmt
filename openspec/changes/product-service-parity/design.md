@@ -119,7 +119,7 @@ async `ProductService`. Call sites move from `new ProductOfflineService(storeId)
 **Rationale**: Angular's base is async; React's `BaseService` is the shared SYNC contract used by other
 services (ProductCategory). Reconciling the generic `BaseService` is cross-cutting and belongs to `service-return-shape-parity` (as a sync, React-only seam).
 Product goes standalone async now to avoid blocking. During coexistence it may still extend `BaseService`;
-the `extends` and old members are removed in the cleanup slice (slice 7).
+the `extends` and old members are removed in the cleanup slice (Phase 2, step 8).
 - **`ProductCategoryService` ALSO drops `extends BaseService<ProductCategory>`** (symmetric): Angular's
   category interface (product-category.service.ts:11-27) has `getProductCategoryById` COMMENTED OUT (L21)
   and NO `getAll`/`delete` correlate — its public surface is only `getProductCategoriesView`,
@@ -146,7 +146,7 @@ the `extends` and old members are removed in the cleanup slice (slice 7).
 
 | File | Action | Description |
 |------|--------|-------------|
-| `packages/domain/src/services/product-service.ts` | Modify | Rewrite to full async Angular parity surface (12 methods, `Promise<BaseResponseModel<T>>`, Angular names); standalone by slice 7 |
+| `packages/domain/src/services/product-service.ts` | Modify | Rewrite to full async Angular parity surface (12 methods, `Promise<BaseResponseModel<T>>`, Angular names); standalone by the Phase 2 cleanup (step 8) |
 | `packages/domain/src/models/product.ts` | Modify | Add `ProductSelectView`; reuse/confirm `CsvProduct` (parser already exists) |
 | `packages/domain/src/errors/product-errors.ts` | No action / already exists | `ProductErrors` is already a byte-identical Angular port and a SUPERSET of the needed codes (NotExists, BarcodeExists, NameExists + more), already exported from `packages/domain/src/index.ts`. Do NOT recreate. |
 | `packages/domain/src/errors/product-category-errors.ts` | Create | `ProductCategoryErrors.{NameExists, NotExists}` — byte-identical port of Angular `product-categories/product-category.errors.ts`. Export from `packages/domain/src/index.ts` (sibling errors files already exported there). |
@@ -190,15 +190,27 @@ on both interfaces entirely in the cleanup slice — no re-extension, since the 
 100%-category-C services.
 Do not merge scopes.
 
-## Slicing (refines proposal's 6, preserves order + independent shippability)
+## Slicing — LAYER-FIRST (repo/DI foundation, then service return-shapes)
 
-1. Extract `ProductCategoryRepository` (mirror Angular repo surface EXACTLY, no upsert/remove) + reconcile `ProductCategoryOfflineService` to Angular's exact category-service surface (add createProductCategory/updateProductCategory/getProductCategories; remove save/addByName/getByName/hasAny*) + re-express call sites + tests. Establishes the layer `ProductRepository` will depend on. (See tasks-slice1.md; Open Ambiguities on async timing + CSV/gate ordering.)
-2. `ProductRepository` (depends on `ProductCategoryRepository`) + `ProductErrors` + validations/order-shift/soft-delete/activate-deactivate (repo-only) + tests (no call-site impact).
-3. Add async Angular-named core methods (getProductById/getProductByBarcode/deleteProduct/createProduct/updateProduct/getMaxOrder/getAvailableProductsByCategoryId) + `base-response` helpers, coexisting; tests.
-4. Add remaining methods (hasAnyAvailableToSaleProduct/getProductsToSelect/getProductsToSaleByCategoryId/createProducts/createCsvProducts) + offline-only `setDiscountFromInvantory`/`getProductsByCategoryId` + `ProductSelectView`; tests.
-5. Migrate call sites to the async surface (await + envelope handling; CSV orchestration into service).
-6. `ProductOnlineService` (createProduct omits barcode; no setDiscountFromInvantory/getProductsByCategoryId) + `product-service.factory.ts` (GlobalConfig gate); call sites → factory.
-7. Cleanup: remove dead sync methods, drop `extends BaseService`; DELETE `search`/`updateMany`/`getByName`/`activate`/`deactivate` from the product service (RESOLVED = REMOVE, Exact-Surface Rule).
+**Decision (2026-07-08, user-ratified)**: slice by LAYER, not by service. Rationale: the cross-service
+churn we hit ("service X can't close because repo/service Y isn't ready") is a **repository/DI
+availability** problem, not a return-shape problem — and the repository layer is SYNC (localStorage),
+fully separable from the async service-shape work. So build the entire repo + DI foundation FIRST
+(sync, no service return-shape changes, nothing to undo), which removes the dependency tangle; THEN
+migrate each service's return shapes (async category C) one at a time, each closing cleanly because
+its repo/DI dependency already exists. This supersedes the earlier per-service (category-first) slicing.
+
+### Phase 1 — Repository + DI foundation (SYNC, cross-cutting; NO service return-shape changes)
+1. Extract `ProductCategoryRepository` (mirror Angular repo surface EXACTLY, no upsert/remove) + tests. Sync.
+2. Port `ProductCategoryErrors` (NameExists/NotExists) to `packages/domain`; `ProductErrors` already exists (reuse). Sync.
+3. Extend the EXISTING `ProductRepository` (depends on `ProductCategoryRepository`): add validations (category-exists, barcode/name-uniqueness w/ self-exclusion), order-shift, soft-delete, repo-only activate/deactivate, `setDiscountFromInvantory`, remaining repo queries + tests. Do NOT recreate. Sync.
+4. Re-point DI/call-sites that Angular wires to a REPOSITORY (report/inventory components — e.g. `today-quantities.tsx`, `today-sales-profit.tsx`, category-by-id reads) from the current `ProductOfflineService.getAll()` etc. to the SYNC repository directly, mirroring Angular's constructor injection. No service return-shape change; these consumers leave the service entirely.
+
+### Phase 2 — Service return-shapes (async category C, ONE service at a time)
+5. Reconcile `ProductCategoryOfflineService` (+ interface, drops `extends BaseService`) to Angular's exact surface, ALL category C (`Promise<BaseResponseModel<T>>`, resolve-never-reject): add createProductCategory/updateProductCategory/getProductCategories; the KEEP bucket (getAvailableProductCategories/getProductCategoriesView/getMaxOrder) also Promise-wrapped; remove save/addByName/getByName/hasAny*. Re-express its async service call-sites + tests.
+6. Reconcile `ProductOfflineService` (+ interface, drops `extends BaseService`) to the 12+2 async category-C surface, delegating to the Phase-1 `ProductRepository`; remove React-only search/updateMany/getByName/activate/deactivate/old sync create/update/delete/getAll/getById. Re-express its async service call-sites + tests.
+7. `ProductOnlineService` (createProduct omits barcode; no setDiscountFromInvantory/getProductsByCategoryId) + `product-service.factory.ts` (GlobalConfig gate); call sites → factory.
+8. Cleanup / final regression gate: confirm no `extends BaseService` on either interface, no dead sync methods, no residual upsert/remove on either repository.
 
 ## Resolved Decisions (previously open, now settled — do not re-ask)
 
@@ -206,8 +218,8 @@ Do not merge scopes.
 - [x] Online `createProduct` barcode handling — RESOLVED: MIRROR. Implement the 9-param interface but omit `barcode` from the payload (Angular asymmetry, rule 8; `ANGULAR-BUG-SUSPECT #4`).
 - [x] Exact-Surface Rule (non-negotiable) — RESOLVED: React public surface = Angular public surface EXACTLY, per layer. Non-Angular React methods are DELETED (never kept "behavior-preserving"); no invented bridges (`upsert`/`remove`). Only allowed transform: `Observable<T>`→`Promise<T>`. See "Surface Reconciliation" in spec.md.
 - [x] Category layer collapse — RESOLVED: EXTRACT a real `ProductCategoryRepository` (Angular repo surface EXACTLY, NO `upsert`/`remove`) and RECONCILE `ProductCategoryOfflineService` to Angular's exact category-service surface (add `createProductCategory`/`updateProductCategory`/`getProductCategories`; remove `save`/`addByName`/`getByName`/`hasAnyCategory`/`hasAnyAvailableCategory`). `ProductRepository` depends on the category *repository*, not the service (rule 6). Accepted scope expansion re-touching Category.
-- [x] `search` (product, React-only, no Angular correlate) — RESOLVED: REMOVE in the cleanup slice (slice 7). Dead code — zero UI/route call sites, exercised only by its own unit test.
-- [x] `updateMany` (product, React-only, no Angular correlate) — RESOLVED: REMOVE the service method in the cleanup slice (slice 7); re-express `handleBulkSave` (`apps/web-store-pos/app/sales/routes/products.tsx:97`) as a loop calling `updateProduct` per item in the call-site migration slice (slice 5). The bulk price-edit UI feature (per-category "Nuevo Productos" bulk edit) is UNCHANGED — only the service-level `updateMany` method is retired.
+- [x] `search` (product, React-only, no Angular correlate) — RESOLVED: REMOVE in the cleanup slice (Phase 2, step 8). Dead code — zero UI/route call sites, exercised only by its own unit test.
+- [x] `updateMany` (product, React-only, no Angular correlate) — RESOLVED: REMOVE the service method in the cleanup slice (Phase 2, step 8); re-express `handleBulkSave` (`apps/web-store-pos/app/sales/routes/products.tsx:97`) as a loop calling `updateProduct` per item in the Product service call-site migration (Phase 2, step 6). The bulk price-edit UI feature (per-category "Nuevo Productos" bulk edit) is UNCHANGED — only the service-level `updateMany` method is retired.
 - [x] `getByName`/`activate`/`deactivate` (product service, React-only) — RESOLVED: REMOVE from the service. Angular exposes `getProductByName`/`activateProduct`/`deactivateProduct` on the REPOSITORY only. Zero service call sites.
 
 ## Open Questions (forced assumptions per rule 11 — resolve BEFORE apply)
@@ -215,4 +227,4 @@ Do not merge scopes.
 - [x] Category-by-id report call sites (`today-sales-profit.tsx:86`, `today-quantities.tsx:63`, `products.tsx:130`) — RESOLVED (was tasks-slice1 Open Ambiguity #3): re-express via `ProductCategoryRepository.getProductCategoryById(id)` — SYNC, repository-layer. Angular's category SERVICE never had this method (product-category.service.ts:21 commented out); ONLY the repository exposes `getProductCategoryById`. These reads are plain synchronous lookups (no envelope, no async needed) — do NOT route them through the async category service. Chosen over `getProductCategories().find` because Angular's repository has the dedicated method.
 - [ ] `ProductService`/`ProductCategoryService` dropping `extends BaseService` and the BaseService-level `getAll`/`getById`/`delete` names — the DROP itself is now decided (see the symmetric "drops `extends BaseService`" decision above; removed in the cleanup slice). What remains owned by `service-return-shape-parity` (the async foundation) is the cross-cutting BaseService-level `getAll`/`getById`/`delete` NAME reconciliation for the other offline services — a sync, React-only seam, not owned here.
 - [x] Category-service return primitive / async timing — the NEW `createProductCategory`/`updateProductCategory`/`getProductCategories`: RESOLVED — async `Promise<BaseResponseModel<T>>` (category C, resolve-never-reject) NOW, not sync. Angular's category service is verified 100% category C (every method `Success$`/`Failure$`); the fold-in delivers that classification in a single pass (see spec.md "Category Service Method Surface Parity"). Supersedes tasks-slice1's earlier SYNC-now assumption (Open Ambiguity #1), which contradicted the verified classification.
-- [ ] CSV / login-gate ordering — faithful re-expression of `handleCsvImport`/`user-home` needs Product `createCsvProducts`/`hasAnyAvailableToSaleProduct` (Product slice 4). Removing category `getByName`/`addByName`/`hasAnyAvailableCategory` in Slice 1 forces an interim repository-direct re-expression, unless those Product methods are pulled earlier — CONFIRM.
+- [ ] CSV / login-gate ordering — faithful re-expression of `handleCsvImport`/`user-home` needs Product `createCsvProducts`/`hasAnyAvailableToSaleProduct` (Phase 2, step 6). Removing category `getByName`/`addByName`/`hasAnyAvailableCategory` (Phase 2, step 5) forces an interim repository-direct re-expression until step 6 lands — CONFIRM at apply.
