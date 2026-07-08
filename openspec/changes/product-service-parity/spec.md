@@ -489,7 +489,7 @@ The extracted React `ProductCategoryRepository` MUST mirror Angular's
 `application/categories/product-category.repository.ts` public surface EXACTLY:
 `hasAnyAvailableCategory`, `getProductCategoryById`, `getProductCategoryByName`,
 `getProductCategories`, `getAvailableProductCategories`, `hasAnyCategory`, `addProductCategory`,
-`addProductCategoryByName`, `updateProductCategory`, `activateProductCategory`,
+`addProductCategoryByName`, `addProductCategoryData`, `updateProductCategory`, `activateProductCategory`,
 `deactivateProductCategory`, `getCategoriesJson` (+ import/sync helpers `addImportedProductCategory`,
 `updateImportedProductCategory`, `updateCategories`, `setInitCategories`, `getStorageCategoriesMap`).
 Angular's repository has NO generic `upsert` and NO `remove`; the React repository MUST NOT declare

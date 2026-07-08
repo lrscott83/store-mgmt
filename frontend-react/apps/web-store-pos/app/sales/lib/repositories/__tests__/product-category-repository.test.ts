@@ -314,4 +314,20 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
       expect((repo as unknown as Record<string, unknown>).remove).toBeUndefined();
     });
   });
+
+  // ─── 1.12 addProductCategoryData is PUBLIC (Angular repo.ts:71-88, public by default) ────
+  describe('addProductCategoryData (repo.ts:71-88) — PUBLIC, matches Angular + spec.md:77 authoritative surface', () => {
+    it('is callable directly as a public method and persists the new category', () => {
+      const result = repo.addProductCategoryData('c1', 'Category c1', 0, true);
+      expect(result.succeeded).toBe(true);
+      expect(repo.getProductCategoryById('c1')).toEqual(makeCategory('c1', { order: 0 }));
+    });
+
+    it('fails without persisting when the name already exists', () => {
+      repo.addProductCategoryData('c1', 'Duplicate', 0, true);
+      const result = repo.addProductCategoryData('c2', 'Duplicate', 1, true);
+      expect(result.succeeded).toBe(false);
+      expect(repo.getProductCategoryById('c2')).toBeUndefined();
+    });
+  });
 });

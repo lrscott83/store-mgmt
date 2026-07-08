@@ -16,10 +16,9 @@ function generateId(): string {
  * SECOND `isActive` parameter that the body never reads (always hardcodes `true`/`false`) — a
  * dead param. React drops it: 1-param `activateProductCategory(id)`/`deactivateProductCategory(id)`.
  *
- * `addProductCategoryData` (Angular repo.ts:71-88, technically public there) is intentionally
- * NOT part of the React public surface — spec.md's "ProductCategoryRepository Mirrors Angular
- * Repo Surface" authoritative list omits it; kept here as a private helper shared by
- * `addProductCategory`/`addImportedProductCategory`.
+ * `addProductCategoryData` (Angular repo.ts:71-88) is PUBLIC, matching Angular's default
+ * visibility and spec.md's authoritative surface table (spec.md:77); shared by
+ * `addProductCategory`/`addProductCategoryByName`/`addImportedProductCategory`.
  *
  * Backed by the same storage-only `BaseRepository<ProductCategory>('product-categories', ...)`
  * that `ProductCategoryOfflineService` writes through today, so both layers share one store
@@ -73,12 +72,12 @@ export class ProductCategoryRepository {
   }
 
   /**
-   * 1:1 port of Angular `addProductCategoryData` (repo.ts:71-88) — private in React (see class
-   * doc). Name-collision fails with NO persistence; else creates + shifts siblings with
+   * 1:1 port of Angular `addProductCategoryData` (repo.ts:71-88) — PUBLIC (see class doc).
+   * Name-collision fails with NO persistence; else creates + shifts siblings with
    * `order >= order` by `+1`, then reassigns the new category's own order (redundant
    * double-assign — mirror do-not-simplify, matches Angular lines 83-84).
    */
-  private addProductCategoryData(id: string, name: string, order: number, isActive: boolean): Result {
+  addProductCategoryData(id: string, name: string, order: number, isActive: boolean): Result {
     const categories = this.getStorageCategoriesMap();
     const existing = [...categories.values()].find((c) => c.name === name);
     if (existing) return Result.Failure([ProductCategoryErrors.NameExists]);

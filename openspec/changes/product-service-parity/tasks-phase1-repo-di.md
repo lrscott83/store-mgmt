@@ -66,6 +66,18 @@ Chain strategy: size-exception
    `ProductCategoryOfflineService` today (it's Angular's `categoryRepository.
    getProductCategoryById(id)?.order ?? 999`, inventory-today-quantities.component.ts:139-141).
    WU4 re-points both to `new ProductCategoryRepository(storeId).getProductCategoryById(categoryId)`.
+5. **`ProductRepository` constructor's `categoryRepository` param is optional-with-default in
+   Phase 1** (`categoryRepository?: ProductCategoryRepository`, defaults to
+   `new ProductCategoryRepository(storeId)` when omitted), diverging from Angular's mandatory DI
+   (Angular's DI container always injects `ProductCategoryRepository`; React has no DI container
+   convention anywhere in this codebase). Ratified by user 2026-07-08. Verified not a
+   data-integrity risk: `BaseRepository.getAll()` reads fresh from localStorage on every call (no
+   in-memory cache), so a default-constructed instance sees identical persisted state to a shared
+   one — category-existence guards (`getProductCategoryById`, `hasAnyAvailableCategory`) are not
+   weakened. ~12 single-arg call sites (`available.tsx`, `egress.tsx`, `sale.tsx`,
+   `cart-shell.tsx`, `import.tsx`, `order-offline-service.ts`, `report-aggregation-service.ts`,
+   `inventory-today-sale-service.ts`, etc.) are out of Phase 1 scope. Phase 2 tightens this
+   constructor param to mandatory when those call sites migrate (see Phase 2 outline below).
 
 ## WU1: Extract `ProductCategoryRepository` — Req: "ProductCategoryRepository Mirrors Angular Repo Surface"
 
@@ -201,7 +213,7 @@ No service return-shape change. These consumers leave `ProductOfflineService`/
 | WU | Commit | Note |
 |----|--------|------|
 | WU2 (ported first — WU1's own validations require `ProductCategoryErrors`, which WU2 creates; both units are marked "Dependency: None" in the Suggested Work Units table, so this is a sequencing choice, not a scope change) | `b00ea1b` feat(domain): port ProductCategoryErrors (byte-identical Angular parity) | |
-| WU1 | `8416a75` feat(web-store-pos): extract ProductCategoryRepository (mirror Angular repo surface, no upsert/remove) | `addProductCategoryData` implemented as a PRIVATE helper (not public) — matches spec.md's "ProductCategoryRepository Mirrors Angular Repo Surface" authoritative list, which omits it (unlike Product's `addProductData`, which IS on the authoritative list and stays public) |
+| WU1 | `8416a75` feat(web-store-pos): extract ProductCategoryRepository (mirror Angular repo surface, no upsert/remove) | `addProductCategoryData` was initially implemented as a PRIVATE helper, contradicting spec.md's authoritative surface table (spec.md:77), which lists it as public. Fixed as a fast-follow to Phase 1 verify (2 WARNINGs) — made PUBLIC to match Angular (repo.ts:71, public by default) + spec.md:77; spec.md:487-497 and design.md:155 corrected to include it |
 | WU3 | `971819a` feat(web-store-pos): extend ProductRepository with validations, order-shift, soft-delete, activate/deactivate | Constructor gained an OPTIONAL `categoryRepository?: ProductCategoryRepository` param (defaults to `new ProductCategoryRepository(storeId)` when omitted) instead of a mandatory one — Angular's DI container makes it mandatory there, but React has no DI container and ~13 other call sites construct `new ProductRepository(storeId)` with a single arg; making it optional keeps every one of them compiling unchanged while WU3's own tests and WU4's call sites pass an explicit instance |
 | WU4 | `100b904` refactor(web-store-pos): re-point report/inventory reads to SYNC ProductRepository/ProductCategoryRepository (Angular DI parity) | |
 
@@ -225,3 +237,8 @@ the Phase 1 repositories being closed:
    (`GlobalConfig.USE_ONLINE_SERVICE` gate); migrate remaining async call sites to the factory.
 8. Cleanup / final regression gate: confirm no `extends BaseService` on either interface, no dead
    sync methods, no residual `upsert`/`remove` on either repository.
+9. Tighten `ProductRepository`'s constructor `categoryRepository` param from optional-with-default
+   to mandatory (Angular DI parity — flagged decision #5 above), and update all ~12 single-arg
+   call sites (`available.tsx`, `egress.tsx`, `sale.tsx`, `cart-shell.tsx`, `import.tsx`,
+   `order-offline-service.ts`, `report-aggregation-service.ts`, `inventory-today-sale-service.ts`,
+   etc.) to pass an explicit `ProductCategoryRepository` instance.
