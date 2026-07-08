@@ -8,8 +8,10 @@ import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
+import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import { CategoryProductList } from '../components/category-product-list';
 import { CreateProductModal } from '../components/create-product-modal';
 import { EditProductModal } from '../components/edit-product-modal';
@@ -100,34 +102,41 @@ export function ProductsPage() {
   }
 
   // --- Category save ---
-  function handleCategorySave(data: { name: string; order: number; isActive: boolean; id?: string }) {
-    if (data.id) {
-      const existing = categoryService.getById(data.id);
-      if (existing) {
-        categoryService.save({ ...existing, name: data.name, order: data.order, isActive: data.isActive });
-      }
-    } else {
-      const id = categoryService.addByName(data.name);
-      const created = categoryService.getById(id);
-      if (created) {
-        categoryService.save({ ...created, order: data.order, isActive: data.isActive });
-      }
+  // Angular parity (edit-product-category-modal.component.ts:50-80): create ->
+  // createProductCategory, update -> updateProductCategory, each a single call (no
+  // fetch-then-save two/three-step). On failure, surface it via the same
+  // Swal-error shape Angular uses (`icon: 'error', title: GENERAL.ERROR, text:
+  // errors[0].description`) instead of silently swallowing it.
+  async function handleCategorySave(data: { name: string; order: number; isActive: boolean; id?: string }) {
+    const result = data.id
+      ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
+      : await categoryService.createProductCategory(data.name, data.order, data.isActive);
+
+    if (!result.succeeded) {
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      return;
     }
+
     loadData();
     setModal(null);
   }
 
   // --- CSV import ---
+  // Interim shape (spec.md "Surface Reconciliation" — folds into
+  // ProductService.createCsvProducts once Phase 2 step 6 lands): category lookup/create goes
+  // directly through ProductCategoryRepository (categoryService.getByName/addByName no longer
+  // exist, per the Exact-Surface Rule — Angular exposes those only on the repository).
   function handleCsvImport(rows: { name: string; price: number; barcode?: string; category?: string }[]) {
+    const categoryRepository = new ProductCategoryRepository(storeId);
     for (const row of rows) {
       let categoryId: string;
       if (row.category) {
-        const existing = categoryService.getByName(row.category);
-        categoryId = existing ? existing.id : categoryService.addByName(row.category);
+        const existing = categoryRepository.getProductCategoryByName(row.category);
+        categoryId = existing ? existing.id : (categoryRepository.addProductCategoryByName(row.category) ?? '');
       } else {
         categoryId = categories[0]?.id ?? '';
       }
-      const cat = categoryService.getById(categoryId);
+      const cat = categoryRepository.getProductCategoryById(categoryId);
       productService.create({
         name: row.name,
         price: row.price,

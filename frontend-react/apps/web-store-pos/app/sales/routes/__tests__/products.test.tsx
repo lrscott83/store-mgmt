@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Product, ProductCategory } from '@store-mgmt/domain';
+import type { BaseResponseModel, Product, ProductCategory } from '@store-mgmt/domain';
 
 // --- Mutable in-memory fixtures, controlled per-test ---
 let mockCategories: ProductCategory[] = [];
@@ -37,14 +37,53 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
   })),
 }));
 
+// Async category-C surface (Phase 2 slice 5) — createProductCategory/updateProductCategory
+// resolve BaseResponseModel envelopes, never reject. Tests set `.mockResolvedValueOnce(...)`
+// per case; the default here is an always-succeeding envelope.
+const categoryServiceSpies = vi.hoisted(() => ({
+  createProductCategory: vi.fn<() => Promise<BaseResponseModel<boolean>>>(async () => ({
+    data: true,
+    succeeded: true,
+    message: '',
+    actionCode: 200,
+    errors: [],
+  })),
+  updateProductCategory: vi.fn<() => Promise<BaseResponseModel<boolean>>>(async () => ({
+    data: true,
+    succeeded: true,
+    message: '',
+    actionCode: 200,
+    errors: [],
+  })),
+}));
+
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn(() => mockCategories),
-    getById: vi.fn((id: string) => mockCategories.find((c) => c.id === id)),
-    getByName: vi.fn((name: string) => mockCategories.find((c) => c.name === name)),
-    save: vi.fn(),
-    addByName: vi.fn(() => 'new-cat-id'),
+    createProductCategory: categoryServiceSpies.createProductCategory,
+    updateProductCategory: categoryServiceSpies.updateProductCategory,
   })),
+}));
+
+// handleCsvImport's interim shape (spec.md) goes directly through ProductCategoryRepository,
+// bypassing the service (categoryService.getByName/addByName no longer exist).
+const categoryRepositorySpies = vi.hoisted(() => ({
+  getProductCategoryByName: vi.fn((name: string) => mockCategories.find((c) => c.name === name)),
+  addProductCategoryByName: vi.fn(() => 'new-cat-id'),
+  getProductCategoryById: vi.fn((id: string) => mockCategories.find((c) => c.id === id)),
+}));
+
+vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
+  ProductCategoryRepository: vi.fn().mockImplementation(() => ({
+    getProductCategoryByName: categoryRepositorySpies.getProductCategoryByName,
+    addProductCategoryByName: categoryRepositorySpies.addProductCategoryByName,
+    getProductCategoryById: categoryRepositorySpies.getProductCategoryById,
+  })),
+}));
+
+const showBlockingErrorMock = vi.fn();
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -88,6 +127,27 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     productServiceSpies.update.mockClear();
     productServiceSpies.updateMany.mockClear();
     productServiceSpies.delete.mockClear();
+    categoryServiceSpies.createProductCategory.mockClear();
+    categoryServiceSpies.createProductCategory.mockResolvedValue({
+      data: true,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+    categoryServiceSpies.updateProductCategory.mockClear();
+    categoryServiceSpies.updateProductCategory.mockResolvedValue({
+      data: true,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+    categoryRepositorySpies.getProductCategoryByName.mockClear();
+    categoryRepositorySpies.addProductCategoryByName.mockClear();
+    categoryRepositorySpies.addProductCategoryByName.mockReturnValue('new-cat-id');
+    categoryRepositorySpies.getProductCategoryById.mockClear();
+    showBlockingErrorMock.mockClear();
   });
 
   it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {
@@ -239,5 +299,140 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     const payload = productServiceSpies.create.mock.calls[0][0] as Record<string, unknown>;
     expect(payload).not.toHaveProperty('createdByName');
     expect(payload).not.toHaveProperty('createdDate');
+  });
+
+  // Angular parity (edit-product-category-modal.component.ts:50-63): creating a category
+  // calls createProductCategory(name, order, isActive) directly — no fetch-then-save steps.
+  describe('handleCategorySave — Angular async category-C parity', () => {
+    it('calls createProductCategory(name, order, isActive) and reloads on create', async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+      fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(categoryServiceSpies.createProductCategory).toHaveBeenCalledWith('Snacks', 1, true),
+      );
+      expect(categoryServiceSpies.updateProductCategory).not.toHaveBeenCalled();
+      // Modal closes on success.
+      await waitFor(() => expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument());
+    });
+
+    it('calls updateProductCategory(id, name, order, isActive) directly (no getById+save two-step) on edit', async () => {
+      mockCategories = [makeCategory()];
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+      fireEvent.click(screen.getByTestId('edit-category-button'));
+      fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas Frías' } });
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(categoryServiceSpies.updateProductCategory).toHaveBeenCalledWith('cat-1', 'Bebidas Frías', 1, true),
+      );
+      expect(categoryServiceSpies.createProductCategory).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a failure via showBlockingError and keeps the modal open (does not silently swallow it)', async () => {
+      categoryServiceSpies.createProductCategory.mockResolvedValueOnce({
+        data: null,
+        succeeded: false,
+        message: '',
+        actionCode: 400,
+        errors: [{ code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' }],
+      } as unknown as BaseResponseModel<boolean>);
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+      fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas' } });
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El nombre de la categoría ya existe.'),
+      );
+      // Modal stays open on failure — not force-closed.
+      expect(screen.getByTestId('category-name-input')).toBeInTheDocument();
+    });
+  });
+
+  // Interim shape (spec.md): category lookup/create for CSV rows goes through
+  // ProductCategoryRepository directly (categoryService.getByName/addByName removed).
+  describe('handleCsvImport — interim ProductCategoryRepository call site', () => {
+    function makeCsvFile(): File {
+      return new File(['name,price,category\nChips,10,Snacks'], 'products.csv', { type: 'text/csv' });
+    }
+
+    it('creates a missing category via ProductCategoryRepository.addProductCategoryByName and uses it on the product', async () => {
+      categoryRepositorySpies.getProductCategoryByName.mockReturnValueOnce(undefined);
+      categoryRepositorySpies.getProductCategoryById.mockReturnValueOnce({
+        id: 'new-cat-id',
+        name: 'Snacks',
+        order: 2,
+        isActive: true,
+      });
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(productServiceSpies.create).toHaveBeenCalledTimes(1));
+      expect(categoryRepositorySpies.getProductCategoryByName).toHaveBeenCalledWith('Snacks');
+      expect(categoryRepositorySpies.addProductCategoryByName).toHaveBeenCalledWith('Snacks');
+      const payload = productServiceSpies.create.mock.calls[0][0] as Record<string, unknown>;
+      expect(payload.categoryId).toBe('new-cat-id');
+      expect(payload.categoryName).toBe('Snacks');
+    });
+
+    it('reuses an existing category via ProductCategoryRepository.getProductCategoryByName without creating a new one', async () => {
+      categoryRepositorySpies.getProductCategoryByName.mockReturnValueOnce({
+        id: 'existing-cat-id',
+        name: 'Snacks',
+        order: 1,
+        isActive: true,
+      });
+      categoryRepositorySpies.getProductCategoryById.mockReturnValueOnce({
+        id: 'existing-cat-id',
+        name: 'Snacks',
+        order: 1,
+        isActive: true,
+      });
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(productServiceSpies.create).toHaveBeenCalledTimes(1));
+      expect(categoryRepositorySpies.addProductCategoryByName).not.toHaveBeenCalled();
+      const payload = productServiceSpies.create.mock.calls[0][0] as Record<string, unknown>;
+      expect(payload.categoryId).toBe('existing-cat-id');
+    });
   });
 });
