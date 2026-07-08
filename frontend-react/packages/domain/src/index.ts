@@ -2,6 +2,7 @@ export * from './models/base';
 export * from './models/auth';
 export * from './models/store';
 export * from './models/product';
+export * from './models/csv-product';
 export * from './models/inventory';
 export * from './models/order';
 export * from './models/expense';
