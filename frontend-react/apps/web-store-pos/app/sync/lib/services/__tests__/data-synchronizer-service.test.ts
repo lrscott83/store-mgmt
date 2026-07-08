@@ -4,8 +4,10 @@ import type {
   NameUniqueRepo,
   GenericUpsertRepo,
   InventoryRepo,
+  ExpenseImportService,
 } from '../data-synchronizer-service';
 import type { ParsedData } from '../data-serializer-service';
+import { Result } from '@store-mgmt/domain';
 import type {
   ProductCategory,
   Product,
@@ -147,6 +149,32 @@ function makeGenericRepo<T extends { id: string }>(
   };
 }
 
+/**
+ * Mock of the offline ExpenseOfflineService's import surface. Expenses sync through the
+ * SERVICE (Angular parity), so the synchronizer drives `addImportedExpense`/`updateImportedExpense`
+ * (both always Result.Success in the port), not a raw repo `upsert`.
+ */
+function makeExpenseImportServiceMock(
+  initial: Expense[] = [],
+): ExpenseImportService & { _imported: Expense[] } {
+  const store = new Map(initial.map((v) => [v.id, v]));
+  const _imported: Expense[] = [];
+  return {
+    _imported,
+    getAll: () => Array.from(store.values()),
+    addImportedExpense: (expense: Expense) => {
+      store.set(expense.id, expense);
+      _imported.push(expense);
+      return Result.Success();
+    },
+    updateImportedExpense: (expense: Expense) => {
+      store.set(expense.id, expense);
+      _imported.push(expense);
+      return Result.Success();
+    },
+  };
+}
+
 function makeInventoryRepoMock(
   initial: Map<string, InventoryEntry[]> = new Map(),
 ): InventoryRepo & { _saves: { productId: string; entries: InventoryEntry[] }[] } {
@@ -174,7 +202,7 @@ function makeService(opts?: {
   const prodRepo = makeNameUniqueRepo<Product>(opts?.existingProducts ?? []);
   const invRepo = makeInventoryRepoMock(opts?.existingInventory ?? new Map());
   const orderRepo = makeGenericRepo<Order>(opts?.existingOrders ?? []);
-  const expenseRepo = makeGenericRepo<Expense>(opts?.existingExpenses ?? []);
+  const expenseService = makeExpenseImportServiceMock(opts?.existingExpenses ?? []);
   const saleCreditRepo = makeGenericRepo<SaleCredit>(opts?.existingSaleCredits ?? []);
 
   const svc = new DataSynchronizerService(
@@ -183,10 +211,10 @@ function makeService(opts?: {
     prodRepo,
     invRepo,
     orderRepo,
-    expenseRepo,
+    expenseService,
     saleCreditRepo,
   );
-  return { svc, catRepo, prodRepo, invRepo, orderRepo, expenseRepo, saleCreditRepo };
+  return { svc, catRepo, prodRepo, invRepo, orderRepo, expenseService, saleCreditRepo };
 }
 
 function emptyData(): ParsedData {
@@ -229,9 +257,16 @@ describe('DataSynchronizerService', () => {
         getAll: () => new Map(),
         upsert: (_s, item) => writeOrder.push('order:' + item.id),
       };
-      const expenseRepo: GenericUpsertRepo<Expense> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => writeOrder.push('expense:' + item.id),
+      const expenseService: ExpenseImportService = {
+        getAll: () => [],
+        addImportedExpense: (item) => {
+          writeOrder.push('expense:' + item.id);
+          return Result.Success();
+        },
+        updateImportedExpense: (item) => {
+          writeOrder.push('expense:' + item.id);
+          return Result.Success();
+        },
       };
       const saleCreditRepo: GenericUpsertRepo<SaleCredit> = {
         getAll: () => new Map(),
@@ -244,7 +279,7 @@ describe('DataSynchronizerService', () => {
         prodRepo,
         invRepo,
         orderRepo,
-        expenseRepo,
+        expenseService,
         saleCreditRepo,
       );
 
@@ -421,11 +456,11 @@ describe('DataSynchronizerService', () => {
     });
 
     it('synchronizeFiles/sync aggregates errors across entity types and continues (not abort-on-first)', async () => {
-      const { svc, orderRepo, expenseRepo } = makeService();
+      const { svc, orderRepo, expenseService } = makeService();
       orderRepo.upsert = () => {
         throw new Error('order storage exploded');
       };
-      expenseRepo.upsert = () => {
+      expenseService.addImportedExpense = () => {
         throw new Error('expense storage exploded');
       };
 
@@ -457,8 +492,8 @@ describe('DataSynchronizerService', () => {
 
   describe('T3b — per-type error codes (Angular bug fixed, not replicated)', () => {
     it('emits ExpensesUnexpectedError (not OrdersUnexpectedError) when an expense write fails', async () => {
-      const { svc, expenseRepo } = makeService();
-      expenseRepo.upsert = () => {
+      const { svc, expenseService } = makeService();
+      expenseService.addImportedExpense = () => {
         throw new Error('expense storage exploded');
       };
       const data: ParsedData = { ...emptyData(), expenses: [makeExpense('exp-1')] };
@@ -597,7 +632,7 @@ describe('DataSynchronizerService', () => {
     });
 
     it('syncing empty data does NOT call any repo write methods', async () => {
-      const { svc, catRepo, prodRepo, invRepo, orderRepo, expenseRepo, saleCreditRepo } =
+      const { svc, catRepo, prodRepo, invRepo, orderRepo, expenseService, saleCreditRepo } =
         makeService();
       let writes = 0;
       catRepo.upsert = () => {
@@ -612,8 +647,13 @@ describe('DataSynchronizerService', () => {
       orderRepo.upsert = () => {
         writes++;
       };
-      expenseRepo.upsert = () => {
+      expenseService.addImportedExpense = () => {
         writes++;
+        return Result.Success();
+      };
+      expenseService.updateImportedExpense = () => {
+        writes++;
+        return Result.Success();
       };
       saleCreditRepo.upsert = () => {
         writes++;
@@ -621,6 +661,50 @@ describe('DataSynchronizerService', () => {
 
       await svc.sync(emptyData());
       expect(writes).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Expense import goes through the SERVICE, not a raw repo (Angular parity).
+  // Angular `synchronizeExpenses` calls expenseService.addImportedExpense for a
+  // NEW expense and updateImportedExpense for an EXISTING one; the synchronizer
+  // never touches the expense repository directly.
+  // -------------------------------------------------------------------------
+
+  describe('T7 — expense import routes through the offline service (Angular parity)', () => {
+    it('calls addImportedExpense for a new expense and updateImportedExpense for an existing one', async () => {
+      const existing = makeExpense('exp-existing');
+      const expenseService = makeExpenseImportServiceMock([existing]);
+      const added: string[] = [];
+      const updated: string[] = [];
+      expenseService.addImportedExpense = (e) => {
+        added.push(e.id);
+        return Result.Success();
+      };
+      expenseService.updateImportedExpense = (e) => {
+        updated.push(e.id);
+        return Result.Success();
+      };
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeNameUniqueRepo<ProductCategory>(),
+        makeNameUniqueRepo<Product>(),
+        makeInventoryRepoMock(),
+        makeGenericRepo<Order>(),
+        expenseService,
+        makeGenericRepo<SaleCredit>(),
+      );
+
+      const result = await svc.sync({
+        ...emptyData(),
+        expenses: [makeExpense('exp-new'), existing],
+      });
+
+      expect(added).toEqual(['exp-new']);
+      expect(updated).toEqual(['exp-existing']);
+      const merge = result.merges.find((m) => m.entity === 'expenses');
+      expect(merge).toEqual({ entity: 'expenses', inserted: 1, updated: 1 });
     });
   });
 });

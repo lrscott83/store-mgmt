@@ -8,7 +8,7 @@ import { OrderOfflineService } from '~/sales/lib/services/order-offline-service'
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
-import type { Product, ProductCategory, Order, Expense, SaleCredit } from '@store-mgmt/domain';
+import type { Product, ProductCategory, Order, SaleCredit } from '@store-mgmt/domain';
 import { DataSerializerService, WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -59,7 +59,8 @@ export function ImportPage() {
     const categoryRepo = new BaseRepository<ProductCategory>('product-categories');
     const productRepo = new BaseRepository<Product>('products', ['createdDate', 'updatedDate']);
     const orderRepo = new BaseRepository<Order>('orders', ['date', 'createdDate', 'updatedDate']);
-    const expenseRepo = new BaseRepository<Expense>('expenses', ['date', 'createdDate', 'updatedDate']);
+    // Expenses route through the offline SERVICE (Angular parity: the synchronizer calls
+    // expenseSvc.addImportedExpense/updateImportedExpense, not a raw expense repo).
     const saleCreditRepo = new BaseRepository<SaleCredit>('saleCredits', [
       'date',
       'paidDate',
@@ -73,7 +74,7 @@ export function ImportPage() {
       productRepo,
       inventoryRepo,
       orderRepo,
-      expenseRepo,
+      expenseSvc,
       saleCreditRepo,
     );
 

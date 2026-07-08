@@ -1,4 +1,4 @@
-import type { InventoryEntry } from '@store-mgmt/domain';
+import type { Expense, InventoryEntry, Result } from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
 
 // ---------------------------------------------------------------------------
@@ -103,6 +103,19 @@ export interface InventoryRepo {
   save(storeId: string, productId: string, entries: InventoryEntry[]): void;
 }
 
+/**
+ * Expense import routes through the offline SERVICE, not the raw repo — Angular parity:
+ * `data-synchronizer.service.ts` `synchronizeExpenses` (:210-226) calls
+ * `expenseService.addImportedExpense` / `updateImportedExpense` (the domain-command layer),
+ * never the repository directly. Mirrors Angular's dependency structure (the service owns the
+ * import command; the synchronizer only orchestrates).
+ */
+export interface ExpenseImportService {
+  getAll(): Expense[];
+  addImportedExpense(expense: Expense): Result;
+  updateImportedExpense(expense: Expense): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -141,7 +154,7 @@ export class DataSynchronizerService {
     private readonly productRepo: NameUniqueRepo<import('@store-mgmt/domain').Product>,
     private readonly inventoryRepo: InventoryRepo,
     private readonly orderRepo: GenericUpsertRepo<import('@store-mgmt/domain').Order>,
-    private readonly expenseRepo: GenericUpsertRepo<import('@store-mgmt/domain').Expense>,
+    private readonly expenseService: ExpenseImportService,
     private readonly saleCreditRepo: GenericUpsertRepo<import('@store-mgmt/domain').SaleCredit>,
   ) {}
 
@@ -189,16 +202,10 @@ export class DataSynchronizerService {
       ),
     );
 
-    // 5. Expenses — break-only (no revert). Emits its own ExpensesUnexpectedError
-    // (Angular's copy-paste bug of reusing OrdersUnexpectedError is fixed here).
-    push(
-      this.mergeBreakOnly(
-        'expenses',
-        this.expenseRepo,
-        data.expenses,
-        SynchronizerErrors.ExpensesUnexpectedError,
-      ),
-    );
+    // 5. Expenses — routed through the offline SERVICE (Angular parity), break-only (no
+    // revert). Emits its own ExpensesUnexpectedError (Angular's copy-paste bug of reusing
+    // OrdersUnexpectedError is fixed here).
+    push(this.mergeExpensesViaService(data.expenses));
 
     // 6. SaleCredits — break-only (no revert). Emits its own
     // SaleCreditsUnexpectedError (Angular's copy-paste bug is fixed here).
@@ -291,6 +298,63 @@ export class DataSynchronizerService {
       return {
         merge: { entity, inserted, updated },
         error: { entity, code: unexpectedError.code, message: unexpectedError.message },
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Expenses — routed through the offline SERVICE (Angular parity, not raw repo)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Mirrors Angular `data-synchronizer.service.ts` `synchronizeExpenses` (:202-227): builds a
+   * map of stored expenses, then routes each imported expense through the SERVICE —
+   * `addImportedExpense` when new, `updateImportedExpense` when it already exists — breaking on
+   * the first non-succeeded Result. Break-only (no revert); an unexpected throw yields
+   * `ExpensesUnexpectedError` (Angular's copy-paste OrdersUnexpectedError bug stays fixed here).
+   */
+  private mergeExpensesViaService(incoming: Expense[]): MergeOutcome {
+    if (incoming.length === 0) {
+      return { merge: { entity: 'expenses', inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    try {
+      const existing = new Map(this.expenseService.getAll().map((e) => [e.id, e]));
+      for (const expense of incoming) {
+        const isNew = !existing.has(expense.id);
+        if (isNew) {
+          existing.set(expense.id, expense);
+          inserted++;
+        } else {
+          updated++;
+        }
+        const result = isNew
+          ? this.expenseService.addImportedExpense(expense)
+          : this.expenseService.updateImportedExpense(expense);
+        if (!result.succeeded) {
+          return {
+            merge: { entity: 'expenses', inserted, updated },
+            error: {
+              entity: 'expenses',
+              code: SynchronizerErrors.ExpensesUnexpectedError.code,
+              message: SynchronizerErrors.ExpensesUnexpectedError.message,
+            },
+          };
+        }
+      }
+      return { merge: { entity: 'expenses', inserted, updated } };
+    } catch {
+      // Break-only: no revert — writes already applied before the failure persist.
+      return {
+        merge: { entity: 'expenses', inserted, updated },
+        error: {
+          entity: 'expenses',
+          code: SynchronizerErrors.ExpensesUnexpectedError.code,
+          message: SynchronizerErrors.ExpensesUnexpectedError.message,
+        },
       };
     }
   }
