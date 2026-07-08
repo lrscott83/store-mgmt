@@ -16,22 +16,26 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
 // Mock SaleCreditOfflineService BEFORE importing OrderOfflineService
 vi.mock('../sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
-    createFromOrder: vi.fn().mockReturnValue({
-      id: 'credit-1',
-      orderId: 'order-1',
-      client: 'Test',
-      total: 100,
-      paid: 0,
-      isPaid: false,
-      isActive: true,
-      date: new Date(),
-      paidDate: null,
-      paidType: null,
-      note: '',
-      createdDate: new Date(),
-      createdByName: '',
+    createSaleCredit: vi.fn().mockReturnValue({
+      data: {
+        id: 'credit-1',
+        orderId: 'order-1',
+        client: 'Test',
+        total: 100,
+        paid: 0,
+        isPaid: false,
+        isActive: true,
+        date: new Date(),
+        paidDate: null,
+        paidType: null,
+        note: '',
+        createdDate: new Date(),
+        createdByName: '',
+      },
+      succeeded: true,
+      errors: [],
     }),
-    voidByOrderId: vi.fn(),
+    deactivateSaleCreditByOrderId: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
   })),
 }));
 
@@ -281,27 +285,27 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  describe('ORD-02: create with isCredit=true calls SaleCreditOfflineService.createFromOrder', () => {
-    it('calls createFromOrder when isCredit=true', () => {
+  describe('ORD-02: create with isCredit=true calls SaleCreditOfflineService.createSaleCredit', () => {
+    it('calls createSaleCredit when isCredit=true', () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct({ price: 10 }), quantity: 1 }]);
       service.create(items, PaymentType.Efectivo, true, 'Juan Perez');
-      expect(creditMock.createFromOrder).toHaveBeenCalledOnce();
+      expect(creditMock.createSaleCredit).toHaveBeenCalledOnce();
     });
 
-    it('passes the clientName to createFromOrder', () => {
+    it('passes the clientName to createSaleCredit', () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct({ price: 10 }), quantity: 1 }]);
       service.create(items, PaymentType.Efectivo, true, 'Maria Lopez');
-      const callArgs = creditMock.createFromOrder.mock.calls[0];
+      const callArgs = creditMock.createSaleCredit.mock.calls[0];
       expect(callArgs[1]).toBe('Maria Lopez');
     });
 
-    it('passes the order total to createFromOrder', () => {
+    it('passes the order total to createSaleCredit', () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct({ price: 15 }), quantity: 2 }]);
       service.create(items, PaymentType.Efectivo, true, 'Carlos');
-      const callArgs = creditMock.createFromOrder.mock.calls[0];
+      const callArgs = creditMock.createSaleCredit.mock.calls[0];
       expect(callArgs[2]).toBe(30); // 15 * 2
     });
 
@@ -312,11 +316,11 @@ describe('OrderOfflineService', () => {
       expect(order.description).toBe('Pedro');
     });
 
-    it('does NOT call createFromOrder when isCredit=false', () => {
+    it('does NOT call createSaleCredit when isCredit=false', () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       service.create(items, PaymentType.Efectivo, false, '');
-      expect(creditMock.createFromOrder).not.toHaveBeenCalled();
+      expect(creditMock.createSaleCredit).not.toHaveBeenCalled();
     });
   });
 
@@ -340,12 +344,12 @@ describe('OrderOfflineService', () => {
   });
 
   describe('ORD-04: deactivate voids associated credit', () => {
-    it('calls voidByOrderId when order is a credit order', () => {
+    it('calls deactivateSaleCreditByOrderId when order is a credit order', () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
       service.deactivate(order.id);
-      expect(creditMock.voidByOrderId).toHaveBeenCalledWith(order.id);
+      expect(creditMock.deactivateSaleCreditByOrderId).toHaveBeenCalledWith(order.id);
     });
 
     it('sets order.isActive=false after deactivation', () => {
@@ -357,7 +361,7 @@ describe('OrderOfflineService', () => {
     });
 
     // Angular parity (audit-user-threading): deactivate stamps updatedByName from the
-    // authenticated user's login — the nested creditService.voidByOrderId call stamps
+    // authenticated user's login — the nested creditService.deactivateSaleCreditByOrderId call stamps
     // ITS OWN SaleCredit entity separately (mocked here, verified in the SaleCredit suite).
     it('stamps updatedByName with the authenticated user login', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
@@ -587,7 +591,7 @@ describe('OrderOfflineService', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
       service.delete(order.id);
-      expect(creditMock.voidByOrderId).toHaveBeenCalledWith(order.id);
+      expect(creditMock.deactivateSaleCreditByOrderId).toHaveBeenCalledWith(order.id);
     });
 
     it('restores inventory entries, same as deactivate', () => {
@@ -621,7 +625,7 @@ describe('OrderOfflineService', () => {
       const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
       vi.clearAllMocks();
       service.activateOrder(order.id);
-      expect(creditMock.voidByOrderId).not.toHaveBeenCalled();
+      expect(creditMock.deactivateSaleCreditByOrderId).not.toHaveBeenCalled();
       expect(inventoryMock.increaseQuantitiesByOrderItems).not.toHaveBeenCalled();
     });
 

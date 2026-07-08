@@ -63,8 +63,8 @@ vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
     getActiveToday: vi.fn().mockReturnValue([]),
     getUnpaidCreatedToday: vi.fn().mockReturnValue([]),
     getPaidToday: vi.fn().mockReturnValue([]),
-    pay: vi.fn(),
-    update: vi.fn(),
+    paidSaleCredit: vi.fn(),
+    updateSaleCredit: vi.fn(),
   })),
 }));
 

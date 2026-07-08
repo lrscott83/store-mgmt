@@ -1,5 +1,5 @@
 import type { BaseService, SaleCredit } from '@store-mgmt/domain';
-import { PaymentType } from '@store-mgmt/domain';
+import { DataResult, PaymentType, Result, SaleCreditErrors } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
@@ -163,7 +163,13 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
     );
   }
 
-  createFromOrder(orderId: string, client: string, total: number): SaleCredit {
+  /**
+   * WU2 (category D): 1:1 port of Angular's `createSaleCredit`
+   * (sale-credit-offline.service.ts:41-65) — renamed from `createFromOrder`
+   * (flagged mismatch #5). Always succeeds, returns SYNC `DataResult<SaleCredit>`
+   * (`new DataResult(credit, true, [])`) — never throws.
+   */
+  createSaleCredit(orderId: string, client: string, total: number, note: string): DataResult<SaleCredit> {
     const now = new Date();
     const credit: SaleCredit = {
       id: generateId(),
@@ -176,19 +182,27 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
       isActive: true,
       paidDate: null as unknown as Date,
       paidType: null as unknown as PaymentType,
-      note: '',
+      note,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
       updatedByName: undefined,
     };
     repo.upsert(this.storeId, credit);
-    return credit;
+    return new DataResult<SaleCredit>(credit, true, []);
   }
 
-  update(id: string, client: string, note: string): SaleCredit {
+  /**
+   * WU2 (category D): 1:1 port of Angular's `updateSaleCredit`
+   * (sale-credit-offline.service.ts:67-79) — renamed from `update` (flagged mismatch #5).
+   * NEVER throws — missing id returns SYNC `new DataResult(undefined, false,
+   * [SaleCreditErrors.NotExists])` (removes the current `throw new Error`).
+   */
+  updateSaleCredit(id: string, client: string, note: string): DataResult<SaleCredit> {
     const credit = repo.getById(this.storeId, id);
-    if (!credit) throw new Error(`SaleCredit not found: ${id}`);
+    if (!credit) {
+      return new DataResult<SaleCredit>(undefined, false, [SaleCreditErrors.NotExists]);
+    }
     const updated: SaleCredit = {
       ...credit,
       client,
@@ -197,12 +211,19 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
       updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
-    return updated;
+    return new DataResult<SaleCredit>(updated, true, []);
   }
 
-  pay(id: string, paidType: PaymentType, note: string): SaleCredit {
+  /**
+   * WU2 (category D): 1:1 port of Angular's `paidSaleCredit`
+   * (sale-credit-offline.service.ts:81-97) — renamed from `pay` (flagged mismatch #5).
+   * NEVER throws — same success/failure shape as {@link updateSaleCredit}.
+   */
+  paidSaleCredit(id: string, paidType: PaymentType, note: string): DataResult<SaleCredit> {
     const credit = repo.getById(this.storeId, id);
-    if (!credit) throw new Error(`SaleCredit not found: ${id}`);
+    if (!credit) {
+      return new DataResult<SaleCredit>(undefined, false, [SaleCreditErrors.NotExists]);
+    }
     const now = new Date();
     // C-7: Full payment only — paid = total regardless of any entered amount
     const updated: SaleCredit = {
@@ -211,50 +232,107 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
       isPaid: true,
       paidDate: now,
       paidType,
-      note: note || credit.note,
+      note,
       updatedDate: now,
       updatedByName: getCurrentUserLogin(),
     };
     repo.upsert(this.storeId, updated);
-    return updated;
+    return new DataResult<SaleCredit>(updated, true, []);
   }
 
-  voidByOrderId(orderId: string): void {
-    const all = repo.getAll(this.storeId);
-    let changed = false;
-    for (const [key, credit] of all) {
-      if (credit.orderId === orderId) {
-        all.set(key, {
-          ...credit,
-          isActive: false,
-          updatedDate: new Date(),
-          updatedByName: getCurrentUserLogin(),
-        });
-        changed = true;
-      }
-    }
-    if (changed) {
-      repo.save(this.storeId, all);
-    }
-  }
-
-  void(id: string): void {
+  /**
+   * WU2 (category D): 1:1 port of Angular's `deleteSaleCredit`
+   * (sale-credit-offline.service.ts:99-109) — the real soft-delete domain command.
+   * Sets isActive=false, stamps updatedDate/updatedByName. Returns SYNC
+   * `Result.Success()`, or `Result.Failure([SaleCreditErrors.NotExists])` on a missing
+   * id — NEVER throws (flagged mismatch #7).
+   */
+  deleteSaleCredit(id: string): Result {
     const credit = repo.getById(this.storeId, id);
-    if (!credit) return;
+    if (!credit) {
+      return Result.Failure([SaleCreditErrors.NotExists]);
+    }
     repo.upsert(this.storeId, {
       ...credit,
       isActive: false,
       updatedDate: new Date(),
       updatedByName: getCurrentUserLogin(),
     });
+    return Result.Success();
   }
 
   /**
-   * BaseService<SaleCredit> conformance alias for {@link void}. `void` already IS
-   * the plain soft-delete equivalent (isActive=false, no cascade, no-op on a
-   * missing id) — this exposes the interface-required name with zero behavior change.
+   * ADR-5/flagged mismatch #6: private helper mirroring Angular's
+   * `getSaleCreditByOrderId` (sale-credit-offline.service.ts:111-113) — finds the FIRST
+   * ACTIVE credit for the given orderId via `.find()`, NOT a loop over all matches.
+   */
+  private getSaleCreditByOrderId(orderId: string): SaleCredit | undefined {
+    return this.getAll().find((c) => c.isActive && c.orderId === orderId);
+  }
+
+  /**
+   * WU2 (category D): 1:1 port of Angular's `deactivateSaleCreditByOrderId`
+   * (sale-credit-offline.service.ts:115-118) — renamed from `voidByOrderId`. Behavior
+   * fix (flagged mismatch #6, angular-bugs-policy): finds only the FIRST active credit
+   * for `orderId` (`.find()`, not a loop over every match) and soft-deletes just that
+   * one via {@link deleteSaleCredit}. Always resolves `Result.Success()` — even when no
+   * credit is found (no-op success), matching Angular's ternary fallback.
+   */
+  deactivateSaleCreditByOrderId(orderId: string): Result {
+    const credit = this.getSaleCreditByOrderId(orderId);
+    return credit != null ? this.deleteSaleCredit(credit.id) : Result.Success();
+  }
+
+  /**
+   * WU2 (category D, NEW method): 1:1 port of Angular's `addImportedSaleCredit`
+   * (sale-credit-offline.service.ts:249-255) — normalizes `date` to a Date, appends the
+   * credit, always returns Result.Success(). No call-site migration in this slice
+   * (flagged mismatch #8).
+   */
+  addImportedSaleCredit(saleCredit: SaleCredit): Result {
+    repo.upsert(this.storeId, { ...saleCredit, date: new Date(saleCredit.date) });
+    return Result.Success();
+  }
+
+  /**
+   * WU2 (category D, NEW method): 1:1 port of Angular's `updateImportedSaleCredit`
+   * (sale-credit-offline.service.ts:257-274) — merges the incoming
+   * isActive/client/note/updatedDate/updatedByName fields into the existing record by
+   * id; ONLY overwrites paid/isPaid/paidDate when the existing record is unpaid
+   * (`!saleCredit.paid`) — a no-op when the id is absent. Always returns
+   * Result.Success().
+   */
+  updateImportedSaleCredit(importedSaleCredit: SaleCredit): Result {
+    const existing = repo.getById(this.storeId, importedSaleCredit.id);
+    if (existing) {
+      const merged: SaleCredit = {
+        ...existing,
+        isActive: importedSaleCredit.isActive,
+        client: importedSaleCredit.client,
+        note: importedSaleCredit.note,
+        updatedDate: importedSaleCredit.updatedDate,
+        updatedByName: importedSaleCredit.updatedByName,
+      };
+      if (!existing.paid) {
+        merged.paid = importedSaleCredit.paid;
+        merged.isPaid = importedSaleCredit.isPaid;
+        merged.paidDate = importedSaleCredit.paidDate;
+      }
+      repo.upsert(this.storeId, merged);
+    }
+    return Result.Success();
+  }
+
+  /**
+   * BaseService<SaleCredit> `delete()` seam (ADR-1, Expense-slice precedent): stays a
+   * SYNC React-only contract OUTSIDE the A/B/C/D conversion. Delegates to the real
+   * domain command {@link deleteSaleCredit} and THROWS on failure — behavior change
+   * (silent no-op → throw), flagged mismatch #7.
    */
   delete(id: string): void {
-    this.void(id);
+    const result = this.deleteSaleCredit(id);
+    if (!result.succeeded) {
+      throw new Error(result.errors[0]?.description ?? `SaleCredit could not be deleted: ${id}`);
+    }
   }
 }

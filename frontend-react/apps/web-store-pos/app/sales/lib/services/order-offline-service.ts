@@ -324,7 +324,9 @@ export class OrderOfflineService implements BaseService<Order> {
     repo.upsert(this.storeId, order);
 
     if (isCredit) {
-      this.creditService.createFromOrder(orderId, clientName, total);
+      // Angular always passes '' for note (order-offline.service.ts:63); the returned
+      // DataResult is ignored, mirroring Angular's own fire-and-forget call.
+      this.creditService.createSaleCredit(orderId, clientName, total, '');
     }
 
     return order;
@@ -372,9 +374,13 @@ export class OrderOfflineService implements BaseService<Order> {
     };
     repo.upsert(this.storeId, updated);
 
-    // Step 2: Void associated credit if credit order
+    // Step 2: Void associated credit if credit order. Angular's own deactivateOrder DOES
+    // check this Result (order-offline.service.ts:317-324), but wiring that check into
+    // Order's own deactivate() belongs to the Order slice (design ADR-4 dependency
+    // order) — this slice only renames the SaleCredit-side method, keeping Order's
+    // current fire-and-forget call pattern (flagged mismatch #6).
     if (order.isCredit) {
-      this.creditService.voidByOrderId(id);
+      this.creditService.deactivateSaleCreditByOrderId(id);
     }
 
     // Step 3: Restore inventory entries
