@@ -1,21 +1,32 @@
 import type { ProductCategory, ProductCategoryView } from '../models/product';
+import type { BaseResponseModel } from '../models/base';
 import type { BaseService } from './base-service';
 
 /**
- * ProductCategoryService — sync equivalent of Angular's ProductCategoryService
- * (application/categories/product-category.service.ts). Angular never declares
- * getProductCategories() abstract (commented out), causing its own two impls to
- * diverge — this interface declares the full read surface explicitly (bug fix,
- * spec #673 requirement). Slice 1 declares only the surface the current offline
- * implementation already satisfies (design ADR-3); Slice 2 extends this with
- * getMaxOrder, getProductCategoriesView, getAvailableProductCategories.
+ * ProductCategoryService — React mirror of Angular's abstract `ProductCategoryService`
+ * (application/categories/product-category.service.ts:11-27) — Exact-Surface Rule
+ * (openspec/changes/product-service-parity/spec.md "Category Service Method Surface
+ * Parity"). Angular's abstract surface is exactly `getProductCategoriesView`,
+ * `getAvailableProductCategories`, `createProductCategory`, `updateProductCategory`,
+ * `getMaxOrder` — all category C (`Promise<BaseResponseModel<T>>`, resolve-never-reject).
+ * The React-only members `getByName`/`save`/`hasAnyCategory`/`hasAnyAvailableCategory` have
+ * no Angular category-SERVICE correlate (Angular exposes the equivalents on the
+ * REPOSITORY only) and are REMOVED, unconditionally, no grace period.
+ *
+ * `extends BaseService<ProductCategory>` (hence `getAll`/`getById`/`delete`) intentionally
+ * STAYS through this slice — dropping it is deferred to Phase 2 step 8's cross-cutting
+ * cleanup (see design.md's "`ProductCategoryService` ALSO drops `extends BaseService`"
+ * Decision), NOT done here.
  */
 export interface ProductCategoryService extends BaseService<ProductCategory> {
-  getByName(name: string): ProductCategory | undefined;
-  save(category: ProductCategory): ProductCategory;
-  hasAnyCategory(): boolean;
-  hasAnyAvailableCategory(): boolean;
-  getMaxOrder(): number;
-  getAvailableProductCategories(): ProductCategory[];
-  getProductCategoriesView(): ProductCategoryView[];
+  createProductCategory(name: string, order: number, isActive: boolean): Promise<BaseResponseModel<boolean>>;
+  updateProductCategory(
+    id: string,
+    name: string,
+    order: number,
+    isActive: boolean,
+  ): Promise<BaseResponseModel<boolean>>;
+  getMaxOrder(): Promise<BaseResponseModel<number>>;
+  getAvailableProductCategories(): Promise<BaseResponseModel<ProductCategory[]>>;
+  getProductCategoriesView(): Promise<BaseResponseModel<ProductCategoryView[]>>;
 }

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ProductCategoryService } from '../product-category-service';
 import type { ProductCategory, ProductCategoryView } from '../../models/product';
+import type { BaseResponseModel } from '../../models/base';
+import { success, failure } from '../../commons/envelope';
 
 function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory {
   return {
@@ -23,56 +25,86 @@ class FakeProductCategoryService implements ProductCategoryService {
     return this.items.find((c) => c.id === id);
   }
 
-  getByName(name: string): ProductCategory | undefined {
-    return this.items.find((c) => c.name === name);
-  }
-
-  save(category: ProductCategory): ProductCategory {
-    this.items = [...this.items.filter((c) => c.id !== category.id), category];
-    return category;
-  }
-
   delete(id: string): void {
     this.items = this.items.filter((c) => c.id !== id);
   }
 
-  hasAnyCategory(): boolean {
-    return this.items.length > 0;
+  async createProductCategory(name: string, order: number, isActive: boolean): Promise<BaseResponseModel<boolean>> {
+    if (this.items.some((c) => c.name === name)) {
+      return failure([{ code: 'ProductCategory.NameExists', description: 'exists' }]);
+    }
+    this.items.push({ id: `c${this.items.length + 1}`, name, order, isActive });
+    return success(true);
   }
 
-  hasAnyAvailableCategory(): boolean {
-    return this.items.some((c) => c.isActive);
+  async updateProductCategory(
+    id: string,
+    name: string,
+    order: number,
+    isActive: boolean,
+  ): Promise<BaseResponseModel<boolean>> {
+    const existing = this.items.find((c) => c.id === id);
+    if (!existing) {
+      return failure([{ code: 'ProductCategory.NotExists', description: 'not found' }]);
+    }
+    existing.name = name;
+    existing.order = order;
+    existing.isActive = isActive;
+    return success(true);
   }
 
-  getMaxOrder(): number {
-    return this.items.length > 0 ? Math.max(...this.items.map((c) => c.order)) : 0;
+  async getMaxOrder(): Promise<BaseResponseModel<number>> {
+    return success(this.items.length > 0 ? Math.max(...this.items.map((c) => c.order)) : 0);
   }
 
-  getAvailableProductCategories(): ProductCategory[] {
-    return this.items.filter((c) => c.isActive).sort((a, b) => a.order - b.order);
+  async getAvailableProductCategories(): Promise<BaseResponseModel<ProductCategory[]>> {
+    return success(this.items.filter((c) => c.isActive).sort((a, b) => a.order - b.order));
   }
 
-  getProductCategoriesView(): ProductCategoryView[] {
-    return this.getAvailableProductCategories().map((c) => ({ ...c, productsCount: 0 }));
+  async getProductCategoriesView(): Promise<BaseResponseModel<ProductCategoryView[]>> {
+    const available = await this.getAvailableProductCategories();
+    return success(available.data.map((c) => ({ ...c, productsCount: 0 })));
   }
 }
 
 describe('ProductCategoryService', () => {
-  it('is implementable with getAll/getById/getByName/save/delete', () => {
+  it('is implementable with getAll/getById/delete (BaseService, retained through Phase 2 step 8)', () => {
     const svc: ProductCategoryService = new FakeProductCategoryService();
-    expect(svc.getByName('Bebidas')?.id).toBe('c1');
-    const saved = svc.save(makeCategory({ id: 'c2', name: 'Snacks' }));
-    expect(saved.name).toBe('Snacks');
+    expect(svc.getAll()).toHaveLength(1);
+    expect(svc.getById('c1')?.name).toBe('Bebidas');
     svc.delete('c1');
-    expect(svc.getAll().map((c) => c.id)).toEqual(['c2']);
+    expect(svc.getAll()).toEqual([]);
   });
 
-  it('is implementable with hasAnyCategory/hasAnyAvailableCategory/getMaxOrder/getAvailableProductCategories/getProductCategoriesView', () => {
+  it('is implementable with the async category-C surface: createProductCategory/updateProductCategory/getMaxOrder/getAvailableProductCategories/getProductCategoriesView', async () => {
     const svc: ProductCategoryService = new FakeProductCategoryService();
-    expect(svc.hasAnyCategory()).toBe(true);
-    expect(svc.hasAnyAvailableCategory()).toBe(true);
-    expect(svc.getMaxOrder()).toBe(1);
-    expect(svc.getAvailableProductCategories()).toHaveLength(1);
-    expect(svc.getProductCategoriesView()).toHaveLength(1);
+
+    const created = await svc.createProductCategory('Snacks', 2, true);
+    expect(created).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+
+    const maxOrder = await svc.getMaxOrder();
+    expect(maxOrder.data).toBe(2);
+
+    const updated = await svc.updateProductCategory('c1', 'Bebidas Updated', 1, true);
+    expect(updated.succeeded).toBe(true);
+
+    const available = await svc.getAvailableProductCategories();
+    expect(available.data.map((c) => c.name)).toEqual(['Bebidas Updated', 'Snacks']);
+
+    const view = await svc.getProductCategoriesView();
+    expect(view.data).toHaveLength(2);
+    expect(view.data[0]).toHaveProperty('productsCount', 0);
+  });
+
+  it('rejects create on a duplicate name via a failure envelope, not a thrown error', async () => {
+    const svc: ProductCategoryService = new FakeProductCategoryService();
+    const result = await svc.createProductCategory('Bebidas', 2, true);
+    expect(result).toEqual({
+      data: null,
+      succeeded: false,
+      message: '',
+      actionCode: 400,
+      errors: [{ code: 'ProductCategory.NameExists', description: 'exists' }],
+    });
   });
 });
