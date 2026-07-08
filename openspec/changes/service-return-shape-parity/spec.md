@@ -65,6 +65,14 @@ SYNCHRONOUSLY for category-D methods, as a type distinct from `BaseResponseModel
 Bold entries are corrections found by reading Angular source directly, not the proposal's prose.
 Order's table is fully verified with no corrections. `+` marks non-exhaustive A groupings.
 
+**Delivery note — Product & ProductCategory (folded into product-service-parity).** The Product and
+ProductCategory rows above (both 100% category C) are DELIVERED via the `product-service-parity`
+change as a single combined pass (return-shape conversion + exact-surface repo extraction +
+validations), NOT built as a standalone slice in THIS change. After Inventory, Expense, and
+SaleCredit (already shipped), this change's remaining own scope is: Order (step-4) and the
+aggregation-layer removal (step-5). Product/ProductCategory are owned by product-service-parity and
+are not re-touched here.
+
 #### Scenario: Corrected category-C scope for Expense/SaleCredit
 - GIVEN `Expense.getExpensesInDayObservable` or any of the 4 SaleCredit `*Observable` methods
 - WHEN their Angular return type is inspected
@@ -112,5 +120,8 @@ is the ONLINE surface, already faithfully mirrored by the `*-http-service.ts` la
   route through Angular's Observable base CRUD, so no Angular offline correlate exists to mirror
 
 ## Out of Scope
-Real async I/O (`BaseRepository` stays sync localStorage — category-C Promises are same-tick);
-`product-service-parity` exact-surface work (resumes after, on this corrected base).
+Real async I/O (`BaseRepository` stays sync localStorage — category-C Promises are same-tick).
+Product and ProductCategory return-shape delivery (both 100% category C) is FOLDED INTO and OWNED
+by `product-service-parity`'s single combined pass (return-shape + exact-surface repo extraction +
+validations) — this change does NOT build or re-touch them. `product-service-parity`'s broader
+exact-surface work likewise stays out of scope here.

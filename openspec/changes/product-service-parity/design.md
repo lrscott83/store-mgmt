@@ -94,6 +94,7 @@ Success and domain-failure BOTH resolve the envelope (`succeeded:false`, `data:n
 **Rationale**: Mirrors Angular's `Success$`/`Failure$` (never throws on domain failure) AND the existing
 http-service precedent (returns `response.data` envelope). Repository throws typed domain errors;
 offline service try/catch maps them to a Failure envelope, preserving error codes → no flattening (rule 9).
+**Shared mechanic**: this is IDENTICAL to `service-return-shape-parity/design.md` ADR-2's category-C rule — success `Promise.resolve(success(x))`, domain failure `Promise.resolve(failure(errors))` over sync localStorage (same-tick fake async). Product/ProductCategory are 100% category C, so both changes share one mechanic; reuse the `commons/envelope.ts` `success`/`failure` factories verbatim.
 **Rule-4 check**: all 12 abstract methods are one-shot — no multi-emission stream needs a Promise. The
 inherited `BaseService` BehaviorSubject streams (`items$` etc.) are unused for Product (zero call sites),
 handled by Zustand per ADR-1 — safely dropped, not an "ask" trigger.
@@ -116,9 +117,16 @@ async `ProductService`. Call sites move from `new ProductOfflineService(storeId)
 
 ### Decision: `ProductService` becomes standalone async (drops `extends BaseService<Product>` in cleanup)
 **Rationale**: Angular's base is async; React's `BaseService` is the shared SYNC contract used by other
-services (ProductCategory). Changing `BaseService` is cross-cutting and belongs to `offline-online-service-parity`.
+services (ProductCategory). Reconciling the generic `BaseService` is cross-cutting and belongs to `service-return-shape-parity` (as a sync, React-only seam).
 Product goes standalone async now to avoid blocking. During coexistence it may still extend `BaseService`;
 the `extends` and old members are removed in the cleanup slice (slice 7).
+- **`ProductCategoryService` ALSO drops `extends BaseService<ProductCategory>`** (symmetric): Angular's
+  category interface (product-category.service.ts:11-27) has `getProductCategoryById` COMMENTED OUT (L21)
+  and NO `getAll`/`delete` correlate — its public surface is only `getProductCategoriesView`,
+  `getAvailableProductCategories`, `createProductCategory`, `updateProductCategory`, `getMaxOrder`. The
+  inherited sync `BaseService` seam (`getAll`/`getById`/`delete`) is therefore dead weight for Category
+  too; it is dropped in the cleanup slice alongside Product. Since Category is 100% category C, its final
+  surface is async `Promise<BaseResponseModel<T>>` (resolves the Slice-1 SYNC-now assumption below).
 
 ## Data Flow
 
@@ -140,9 +148,10 @@ the `extends` and old members are removed in the cleanup slice (slice 7).
 |------|--------|-------------|
 | `packages/domain/src/services/product-service.ts` | Modify | Rewrite to full async Angular parity surface (12 methods, `Promise<BaseResponseModel<T>>`, Angular names); standalone by slice 7 |
 | `packages/domain/src/models/product.ts` | Modify | Add `ProductSelectView`; reuse/confirm `CsvProduct` (parser already exists) |
-| `packages/domain/src/errors/product-errors.ts` | Create | `ProductErrors`/`ProductCategoryErrors` codes (NotExists, BarcodeExists, NameExists) |
-| `packages/domain/src/lib/base-response.ts` | Create | `Success`/`Failure` envelope factories (mirror Angular `Success$`/`Failure$`) |
-| `apps/web-store-pos/app/sales/lib/repositories/product-repository.ts` | Create | Business rules: validations, order-shift, soft-delete, activate/deactivate (repo-only, not service-exposed), setDiscountFromInvantory, repo queries. Depends on `ProductCategoryRepository` |
+| `packages/domain/src/errors/product-errors.ts` | No action / already exists | `ProductErrors` is already a byte-identical Angular port and a SUPERSET of the needed codes (NotExists, BarcodeExists, NameExists + more), already exported from `packages/domain/src/index.ts`. Do NOT recreate. |
+| `packages/domain/src/errors/product-category-errors.ts` | Create | `ProductCategoryErrors.{NameExists, NotExists}` — byte-identical port of Angular `product-categories/product-category.errors.ts`. Export from `packages/domain/src/index.ts` (sibling errors files already exported there). |
+| envelope factories — `packages/domain/src/commons/envelope.ts` (`success`/`failure`) + `packages/domain/src/commons/result.ts` (`Result`/`DataResult`) | No action / already exist | Reuse VERBATIM. The earlier `packages/domain/src/lib/base-response.ts` row was an invented wrong path — deleted. `success`/`failure` are the sync `BaseResponseModel<T>` factories (Angular `Success`/`Failure`); wrap with `Promise.resolve(...)` for async C parity. |
+| `apps/web-store-pos/app/sales/lib/repositories/product-repository.ts` | Modify (extend existing) | Already EXISTS (created by the Inventory guards slice) exposing only Angular category-A read helpers (`getStorageProductsMap`, `getProductById`, `getAvailableProductById`). This change EXTENDS it — adds the command/validation surface: validations, order-shift, soft-delete, activate/deactivate (repo-only, not service-exposed), setDiscountFromInvantory, remaining repo queries. Depends on `ProductCategoryRepository`. Do NOT recreate. |
 | `apps/web-store-pos/app/sales/lib/repositories/product-category-repository.ts` | Create | Extracted category repository mirroring Angular `product-category.repository.ts` public surface EXACTLY (getProductCategoryById, getProductCategoryByName, addProductCategoryByName, getProductCategories, getAvailableProductCategories, hasAnyCategory, hasAnyAvailableCategory, addProductCategory, updateProductCategory, activate/deactivate, getCategoriesJson). **NO `upsert`/`remove`** |
 | `packages/domain/src/services/product-category-service.ts` | Modify | Reconcile to Angular's exact category-service surface: ADD `createProductCategory`/`updateProductCategory` (abstract); REMOVE `save`/`getByName`/`hasAnyCategory`/`hasAnyAvailableCategory` |
 | `apps/web-store-pos/app/sales/lib/services/product-category-offline-service.ts` | Modify | Reconcile surface: ADD `createProductCategory`/`updateProductCategory`/`getProductCategories`; REMOVE `save`/`addByName`/`getByName`/`hasAnyCategory`/`hasAnyAvailableCategory`; delegate to `ProductCategoryRepository` (same storage keys). Accepted scope expansion re-touching Category |
@@ -173,9 +182,12 @@ behavior so parity is locked; a future confirmed fix flips the test. All four ar
 
 ## Coordination (alignment, NOT merge)
 
-`offline-online-service-parity` (paused) owns the same async/envelope cross-cutting decision and the eventual
-async `BaseService`. This change adopts the SAME `Promise<BaseResponseModel<T>>` resolve-with-envelope shape to
-stay consistent, keeps Product standalone async, and re-extends an async `BaseService` if/when that change lands.
+`service-return-shape-parity` (the async foundation, which superseded `offline-online-service-parity`'s overruled
+sync-ADR-1) owns the shared A/B/C/D mechanic and the generic `BaseService<T>` seam — resolved there as a SYNC,
+React-only seam, NOT an eventual async `BaseService`. This change adopts the SAME `Promise<BaseResponseModel<T>>`
+resolve-with-envelope shape for Product/ProductCategory's category-C methods, and RETIRES `extends BaseService<T>`
+on both interfaces entirely in the cleanup slice — no re-extension, since the seam is dead weight for two
+100%-category-C services.
 Do not merge scopes.
 
 ## Slicing (refines proposal's 6, preserves order + independent shippability)
@@ -200,6 +212,7 @@ Do not merge scopes.
 
 ## Open Questions (forced assumptions per rule 11 — resolve BEFORE apply)
 
-- [ ] `ProductService`/`ProductCategoryService` dropping `extends BaseService` and the BaseService-level `getAll`/`getById`/`delete` names — deferred to alignment with the paused `offline-online-service-parity` change (cross-cutting; not owned here). Angular's category service has NO `getById`; category-by-id call sites (`today-sales-profit.tsx:86`, `today-quantities.tsx:63`, `products.tsx:130`) need a re-expression decision (repository `getProductCategoryById` vs `getProductCategories().find`).
-- [ ] Category-service return primitive / async timing — the NEW `createProductCategory`/`updateProductCategory`/`getProductCategories` (Slice 1): SYNC-now (matching the still-sync category service, async folded into `offline-online-service-parity`) or async `Promise<BaseResponseModel<T>>` now? Slice 1 assumes SYNC-now for consistency — CONFIRM.
+- [x] Category-by-id report call sites (`today-sales-profit.tsx:86`, `today-quantities.tsx:63`, `products.tsx:130`) — RESOLVED (was tasks-slice1 Open Ambiguity #3): re-express via `ProductCategoryRepository.getProductCategoryById(id)` — SYNC, repository-layer. Angular's category SERVICE never had this method (product-category.service.ts:21 commented out); ONLY the repository exposes `getProductCategoryById`. These reads are plain synchronous lookups (no envelope, no async needed) — do NOT route them through the async category service. Chosen over `getProductCategories().find` because Angular's repository has the dedicated method.
+- [ ] `ProductService`/`ProductCategoryService` dropping `extends BaseService` and the BaseService-level `getAll`/`getById`/`delete` names — the DROP itself is now decided (see the symmetric "drops `extends BaseService`" decision above; removed in the cleanup slice). What remains owned by `service-return-shape-parity` (the async foundation) is the cross-cutting BaseService-level `getAll`/`getById`/`delete` NAME reconciliation for the other offline services — a sync, React-only seam, not owned here.
+- [x] Category-service return primitive / async timing — the NEW `createProductCategory`/`updateProductCategory`/`getProductCategories`: RESOLVED — async `Promise<BaseResponseModel<T>>` (category C, resolve-never-reject) NOW, not sync. Angular's category service is verified 100% category C (every method `Success$`/`Failure$`); the fold-in delivers that classification in a single pass (see spec.md "Category Service Method Surface Parity"). Supersedes tasks-slice1's earlier SYNC-now assumption (Open Ambiguity #1), which contradicted the verified classification.
 - [ ] CSV / login-gate ordering — faithful re-expression of `handleCsvImport`/`user-home` needs Product `createCsvProducts`/`hasAnyAvailableToSaleProduct` (Product slice 4). Removing category `getByName`/`addByName`/`hasAnyAvailableCategory` in Slice 1 forces an interim repository-direct re-expression, unless those Product methods are pulled earlier — CONFIRM.

@@ -39,7 +39,18 @@ Restore Angular's exact per-method return shapes across the 7 React offline serv
 
 ### ADR-4: Dependency-ordered slicing
 
-**Choice**: `1 Inventory → 2 {Product, Expense, SaleCredit} → 3 ProductCategory → 4 Order → 5 aggregation (remove+inline)`.
+**Choice**: `1 Inventory → 2 {Expense, SaleCredit} → 4 Order → 5 aggregation (remove+inline)`.
+
+**Removed from THIS change's execution**: step-2 Product and step-3 ProductCategory are NO LONGER
+executed here — both are 100% category C and are DELIVERED via `product-service-parity`'s single
+combined pass (return-shape + exact-surface repo extraction + validations). This change ships
+Inventory (done), Expense (done), SaleCredit (done), then Order and aggregation removal.
+
+**Cross-change dependency (Order)**: because ProductCategory's final async category-C shape is now
+landed by `product-service-parity` (not here), Order gains a CROSS-CHANGE dependency — it cannot
+convert its ProductCategory-consuming call-sites until `product-service-parity` lands ProductCategory's
+final async C shape. Sequence Order's slice AFTER that milestone (in addition to its existing
+in-change dependency on the shipped Inventory/SaleCredit shapes).
 
 **Rationale**: Order = reverse dependency. Inventory is a leaf; Order depends on SaleCredit+ProductCategory+Inventory, so it converts last once its dependencies' shapes are final. Each slice migrates a service AND its call-sites AND its tests together, so no sync↔async boundary is ever half-converted across a slice edge. Rollback = revert one slice; earlier slices remain valid.
 

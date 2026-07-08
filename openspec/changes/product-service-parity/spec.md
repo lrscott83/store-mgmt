@@ -36,9 +36,21 @@ Three decisions are already RESOLVED and baked into this spec (do not re-open):
    `addByName`, `getByName`, `hasAnyCategory`, `hasAnyAvailableCategory` (see "Surface
    Reconciliation" for the authoritative list + call-site re-expressions).
 
-Non-goals (explicitly out of scope, not specified here): merging with the paused
-`offline-online-service-parity` change (which owns the async `BaseService` migration and the
-BaseService-level `getAll`/`getById`/`delete` name reconciliation); fixing suspected Angular bugs
+**Return-shape classification (fold-in).** The async contract required throughout this spec —
+`Promise<BaseResponseModel<T>>`, resolve-never-reject, never a bare value or thrown sentinel —
+corresponds 1:1 to **category C** in `service-return-shape-parity`'s A/B/C/D return-shape
+taxonomy. That change independently verified Product and ProductCategory as the two services that
+are 100% category C, across every interface method on both. This change DELIVERS that
+classification as part of its exact-surface work, in a single combined pass — there is no separate
+"make it async" decision left to make. This retires the proposal's stale "async both sides"
+framing: async-everywhere was never a `product-service-parity`-local choice to re-litigate; it is
+the ratified category-C classification, and every Requirement below already conforms to it.
+
+Non-goals (explicitly out of scope, not specified here): the cross-cutting generic
+`BaseService<T>` seam (`getAll`/`getById`/`delete` name reconciliation) used by the OTHER offline
+services — owned by `service-return-shape-parity` as a sync, React-only seam (see "BaseService-level
+`extends` — RETIRED for Product/ProductCategory" below; Product/ProductCategory retire that seam
+entirely rather than reconcile it); fixing suspected Angular bugs
 (see Suspected Bugs below — spec matches Angular's CURRENT behavior only).
 
 ## Surface Reconciliation (authoritative)
@@ -93,14 +105,23 @@ enforced by the Exact-Surface Rule.
 | `updateProductCategory(id, name, order, isActive)` | category | ADD (Slice 1) |
 | `getProductCategories()` (offline-only) | category offline | ADD (Slice 1); migrate `getAll()` call sites |
 
-### BaseService-level names — DEFERRED to `offline-online-service-parity`
+### BaseService-level `extends` — RETIRED for Product/ProductCategory (not deferred)
 
 `getAll`/`getById`/`delete` on the reduced React `BaseService<T>` do NOT match Angular's
-`getAllItems`/`getItemById`/`delete`, and Angular's category service exposes no `getById` at all.
-Reconciling these is cross-cutting (every offline service, plus inventory/sync call sites) and is
-owned by the paused `offline-online-service-parity` change. This change renames product/category
-reads to their Angular names as each is migrated, and migrates `getAll()` category call sites to
-`getProductCategories()`, but does NOT unilaterally re-map the generic BaseService surface.
+`getAllItems`/`getItemById`/`delete`, and Angular's category service exposes no `getById`/`getAll`/
+`delete` correlate at all (`product-category.service.ts:21` even comments out
+`getProductCategoryById`). Reconciling the GENERIC `BaseService<T>` surface used by the OTHER
+offline services (Inventory, Order, Expense, SaleCredit) remains cross-cutting and is owned by
+`service-return-shape-parity`, which resolves it there as a sync, React-only seam OUTSIDE its
+A/B/C/D conversion. For Product AND ProductCategory SPECIFICALLY, though, the seam is dead weight,
+not a name left to reconcile: both interfaces are 100% category C
+(`Promise<BaseResponseModel<T>>`), neither ever calls the inherited sync
+`getAll`/`getById`/`delete`/`create`/`update` members, and the abstract `ProductCategoryService`
+has no method for them to map onto. This change therefore RETIRES `extends BaseService<T>` on BOTH
+`ProductService` and `ProductCategoryService` in the cleanup slice (per design.md's resolved
+decision) — it does NOT wait on `service-return-shape-parity` to unblock this. This change renames
+product/category reads to their Angular names as each is migrated, and migrates `getAll()` category
+call sites to `getProductCategories()`.
 
 ## Requirements
 
@@ -444,7 +465,10 @@ Angular's public category-service surface and nothing more (Exact-Surface Rule).
 `getProductCategoriesView`, `getAvailableProductCategories`, `createProductCategory(name, order,
 isActive)`, `updateProductCategory(id, name, order, isActive)`, `getMaxOrder()`. The offline
 concrete additionally exposes the offline-only public `getProductCategories()`
-(product-category-offline.service.ts:40, NOT on the abstract interface). The React-only members
+(product-category-offline.service.ts:40, NOT on the abstract interface). ALL of these methods —
+the 5 abstract methods plus the offline-only `getProductCategories()` — are category C per
+`service-return-shape-parity`'s taxonomy: each MUST return `Promise<BaseResponseModel<T>>`,
+resolve-never-reject, never a bare synchronous value. The React-only members
 `save`, `addByName`, `getByName`, `hasAnyCategory`, `hasAnyAvailableCategory` MUST be REMOVED — they
 have no Angular category-SERVICE correlate (Angular exposes `getProductCategoryByName`,
 `addProductCategoryByName`, `hasAnyCategory`, `hasAnyAvailableCategory` on the REPOSITORY, and has no
