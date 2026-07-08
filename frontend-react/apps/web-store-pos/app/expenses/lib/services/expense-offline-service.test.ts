@@ -260,54 +260,81 @@ describe('ExpenseOfflineService', () => {
     expect(svc.getAll()).toHaveLength(1);
   });
 
-  // G1: getActiveToday/getByDateRange must exclude soft-deleted (isActive=false) expenses,
-  // matching Angular's getExpensesInDay/getActiveExpensesBetweenDates (both filter
-  // `expense.isActive`).
-  it('G1: getActiveToday excludes soft-deleted expenses', () => {
+  // ─── Category B: getExpensesInDay returns BaseResponseModel<Expense[]> SYNC ──
+
+  // Angular parity: getExpensesInDay returns `this.Success(...)` SYNC — a BaseResponseModel<T>,
+  // not a bare array. `.data` holds the day's active expenses.
+  it('getExpensesInDay returns a SYNC BaseResponseModel (succeeded, data, message/actionCode)', () => {
+    const today = new Date();
+    create({ date: today, total: 50 });
+    const response = svc.getExpensesInDay(today);
+    expect(response.succeeded).toBe(true);
+    expect(Array.isArray(response.data)).toBe(true);
+    // Distinct from a Result/DataResult — BaseResponseModel carries message/actionCode.
+    expect('message' in response).toBe(true);
+    expect('actionCode' in response).toBe(true);
+  });
+
+  // G1: getExpensesInDay excludes soft-deleted (isActive=false) expenses, matching Angular's
+  // `expense.isActive` filter.
+  it('G1: getExpensesInDay excludes soft-deleted expenses', () => {
     const today = new Date();
     const created = create({ date: today });
     svc.deleteExpense(created.id);
-    expect(svc.getActiveToday()).toHaveLength(0);
+    expect(svc.getExpensesInDay(today).data).toHaveLength(0);
   });
 
-  it('G1: getByDateRange excludes soft-deleted expenses', () => {
-    const d1 = new Date('2024-01-01T10:00:00.000');
-    const created = create({ date: d1, total: 10 });
-    create({ date: d1, total: 20 });
-    svc.deleteExpense(created.id);
-    const range = svc.getByDateRange(new Date('2024-01-01'), new Date('2024-01-01'));
-    expect(range).toHaveLength(1);
-    expect(range[0].total).toBe(20);
+  // BUG FIX (angular-bugs-policy, ADR-7): Angular's getExpensesInDay IGNORES its own `date`
+  // param and always computes "today" (`startOfDay(new Date())`). React honors the passed date,
+  // filtering to THAT day's window. Both current callers pass `new Date()` so today's callers see
+  // no behavior change.
+  it('BUG FIX: getExpensesInDay filters to the PASSED date window, not always "today"', () => {
+    const target = new Date('2024-03-15T10:00:00.000');
+    const dayBefore = new Date('2024-03-14T23:00:00.000');
+    const dayAfter = new Date('2024-03-16T01:00:00.000');
+    create({ date: target, total: 50 });
+    create({ date: dayBefore, total: 111 });
+    create({ date: dayAfter, total: 222 });
+
+    const result = svc.getExpensesInDay(target).data;
+    expect(result).toHaveLength(1);
+    expect(result[0].total).toBe(50);
   });
 
-  // S-EXP-5: getActiveToday filters to current calendar day
-  it('S-EXP-5: getActiveToday returns only today expenses', () => {
+  // Angular parity: getExpensesInDay sorts DESC by date (most recent first) —
+  // `.sort((e1, e2) => e2.date.getTime() - e1.date.getTime())`. React's removed
+  // getByDateRange/getActiveToday never sorted; the Angular-faithful method does.
+  it('getExpensesInDay sorts the day window DESC by date (most recent first)', () => {
+    const day = '2024-03-15';
+    create({ date: new Date(`${day}T09:00:00.000`), total: 10 });
+    create({ date: new Date(`${day}T18:00:00.000`), total: 30 });
+    create({ date: new Date(`${day}T12:00:00.000`), total: 20 });
+
+    const result = svc.getExpensesInDay(new Date(`${day}T10:00:00.000`)).data;
+    expect(result.map((e) => e.total)).toEqual([30, 20, 10]);
+  });
+
+  // ─── Category C: getExpensesInDayObservable resolves BaseResponseModel ───────
+
+  // Angular parity: getExpensesInDayObservable is `of(this.getExpensesInDay(date))` — the
+  // Observable sibling. React returns a same-tick `Promise<BaseResponseModel<Expense[]>>` that
+  // RESOLVES (never rejects), carrying the exact same envelope as the sync method.
+  it('getExpensesInDayObservable resolves the same BaseResponseModel as getExpensesInDay', async () => {
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    create({ date: today });
-    create({ date: yesterday, total: 100 });
-
-    const todayExpenses = svc.getActiveToday();
-    expect(todayExpenses).toHaveLength(1);
-    expect(todayExpenses[0].total).toBe(50);
+    create({ date: today, total: 50 });
+    const response = await svc.getExpensesInDayObservable(today);
+    expect(response.succeeded).toBe(true);
+    expect(response.data).toHaveLength(1);
+    expect(response.data[0].total).toBe(50);
   });
 
-  // S-EXP-6: getByDateRange is inclusive on both ends
-  it('S-EXP-6: getByDateRange is inclusive on both ends', () => {
-    const d1 = new Date('2024-01-01T10:00:00.000');
-    const d2 = new Date('2024-01-05T10:00:00.000');
-    const d3 = new Date('2024-01-10T10:00:00.000');
-
-    create({ date: d1, total: 10 });
-    create({ date: d2, total: 20 });
-    create({ date: d3, total: 30 });
-
-    const range = svc.getByDateRange(new Date('2024-01-01'), new Date('2024-01-05'));
-    expect(range).toHaveLength(2);
-    const totals = range.map((e) => e.total).sort();
-    expect(totals).toEqual([10, 20]);
+  it('getExpensesInDayObservable honors the passed date (BUG FIX carried through)', async () => {
+    const target = new Date('2024-03-15T10:00:00.000');
+    create({ date: target, total: 50 });
+    create({ date: new Date('2024-03-16T01:00:00.000'), total: 222 });
+    const response = await svc.getExpensesInDayObservable(target);
+    expect(response.data).toHaveLength(1);
+    expect(response.data[0].total).toBe(50);
   });
 
   // S-EXP-7: note defaults to '' when not provided
@@ -388,47 +415,60 @@ describe('ExpenseOfflineService', () => {
     });
   });
 
-  // WU4: filterExpenses (sync port of filterExpensesObservable)
-  describe('filterExpenses', () => {
-    it('filters by type when provided', () => {
+  // Category C: filterExpensesObservable resolves Promise<BaseResponseModel<Expense[]>>.
+  // Angular parity: `of(this.Success(filtered))` over getStorageActiveExpenses() — RESOLVES,
+  // never rejects; operates over active-only expenses; RAW date comparisons.
+  describe('filterExpensesObservable', () => {
+    it('resolves a BaseResponseModel envelope (not a bare array)', async () => {
+      create();
+      const response = await svc.filterExpensesObservable();
+      expect(response.succeeded).toBe(true);
+      expect('message' in response).toBe(true);
+      expect('actionCode' in response).toBe(true);
+      expect(Array.isArray(response.data)).toBe(true);
+    });
+
+    it('filters by type when provided', async () => {
       create({ type: ExpenseType.Comida });
       create({ type: ExpenseType.Transporte });
-      const result = svc.filterExpenses(ExpenseType.Comida);
-      expect(result).toHaveLength(1);
-      expect(result[0].type).toBe(ExpenseType.Comida);
+      const response = await svc.filterExpensesObservable(ExpenseType.Comida);
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].type).toBe(ExpenseType.Comida);
     });
 
-    it('filters by paymentType when provided', () => {
+    it('filters by paymentType when provided', async () => {
       create({ paymentType: PaymentType.Efectivo });
       create({ paymentType: PaymentType.Tarjeta });
-      const result = svc.filterExpenses(undefined, PaymentType.Tarjeta);
-      expect(result).toHaveLength(1);
-      expect(result[0].paymentType).toBe(PaymentType.Tarjeta);
+      const response = await svc.filterExpensesObservable(undefined, PaymentType.Tarjeta);
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].paymentType).toBe(PaymentType.Tarjeta);
     });
 
-    it('filters by date range when start/end provided', () => {
+    it('filters by date range when startDate/endDate provided', async () => {
       create({ date: new Date('2024-01-01T10:00:00.000') });
       create({ date: new Date('2024-06-01T10:00:00.000') });
-      const result = svc.filterExpenses(
+      const response = await svc.filterExpensesObservable(
         undefined,
         undefined,
         new Date('2024-05-01T00:00:00.000'),
         new Date('2024-07-01T00:00:00.000'),
       );
-      expect(result).toHaveLength(1);
-      expect(result[0].date.getMonth()).toBe(5); // June
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].date.getMonth()).toBe(5); // June
     });
 
-    it('excludes soft-deleted expenses regardless of filters', () => {
+    it('excludes soft-deleted expenses regardless of filters', async () => {
       const deleted = create();
       svc.deleteExpense(deleted.id);
-      expect(svc.filterExpenses()).toHaveLength(0);
+      const response = await svc.filterExpensesObservable();
+      expect(response.data).toHaveLength(0);
     });
 
-    it('returns all active expenses when no filters provided', () => {
+    it('returns all active expenses when no filters provided', async () => {
       create();
       create();
-      expect(svc.filterExpenses()).toHaveLength(2);
+      const response = await svc.filterExpensesObservable();
+      expect(response.data).toHaveLength(2);
     });
   });
 });

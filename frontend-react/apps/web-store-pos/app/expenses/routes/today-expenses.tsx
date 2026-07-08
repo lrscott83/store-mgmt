@@ -24,13 +24,16 @@ export function TodayExpensesPage() {
   const [modalError, setModalError] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  function loadExpenses() {
+  // Angular parity (expenses-today.component.ts:28): loads today's expenses via
+  // getExpensesInDayObservable(new Date()) and unwraps the BaseResponseModel `.data`.
+  async function loadExpenses() {
     const svc = new ExpenseOfflineService(storeId);
-    setExpenses(svc.getActiveToday());
+    const response = await svc.getExpensesInDayObservable(new Date());
+    setExpenses(response.data);
   }
 
   useEffect(() => {
-    loadExpenses();
+    void loadExpenses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
@@ -76,7 +79,7 @@ export function TodayExpensesPage() {
       return;
     }
 
-    loadExpenses();
+    void loadExpenses();
     setIsModalOpen(false);
     setEditingExpense(undefined);
     setModalError('');
@@ -94,7 +97,7 @@ export function TodayExpensesPage() {
     // straight from the rendered list).
     svc.deleteExpense(deleteConfirmId);
     setDeleteConfirmId(null);
-    loadExpenses();
+    void loadExpenses();
   }
 
   return (

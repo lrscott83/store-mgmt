@@ -89,16 +89,23 @@ export function ExpensesHistoryPage() {
   const [dayGroups, setDayGroups] = useState<DayExpenseGroup[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
-  function loadExpenses() {
+  // Angular parity (expenses.component.ts `loadExpenses` → `loadExpensesFiltered`): always calls
+  // `filterExpensesObservable(this.expenseType=null, paymentType, null, null)` — only `paymentType`
+  // is ever wired by the UI (expenseType/date-range params are dead capability). React mirrors this
+  // via the category-C async envelope and unwraps `.data`, replacing the old inline `getAll`+filter.
+  async function loadExpenses() {
     const svc = new ExpenseOfflineService(storeId);
-    const all = svc
-      .getAll()
-      .filter((e) => e.isActive && (paymentType === null || e.paymentType === paymentType));
-    setDayGroups(groupExpensesByDay(all));
+    const response = await svc.filterExpensesObservable(
+      undefined,
+      paymentType ?? undefined,
+      undefined,
+      undefined,
+    );
+    setDayGroups(groupExpensesByDay(response.data));
   }
 
   useEffect(() => {
-    loadExpenses();
+    void loadExpenses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, paymentType]);
 

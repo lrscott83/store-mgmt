@@ -71,7 +71,10 @@ vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
 vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
   ExpenseOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
-    getActiveToday: vi.fn().mockReturnValue([]),
+    // Category-C: TodayStatsPage loads expenses via the async getExpensesInDayObservable.
+    getExpensesInDayObservable: vi
+      .fn()
+      .mockResolvedValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
   })),
 }));
 

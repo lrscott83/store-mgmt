@@ -2,8 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
+import type { Expense } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
+
+// Category-C envelope helper: getExpensesInDayObservable resolves a BaseResponseModel<Expense[]>.
+function expensesResponse(expenses: Expense[] = []) {
+  return Promise.resolve({ data: expenses, succeeded: true, message: '', actionCode: 200, errors: [] });
+}
 
 // ─── Global mocks ────────────────────────────────────────────────────────────
 
@@ -19,8 +25,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
   ExpenseOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
-    getActiveToday: vi.fn().mockReturnValue([]),
-    getByDateRange: vi.fn().mockReturnValue([]),
+    getExpensesInDayObservable: vi.fn().mockReturnValue(expensesResponse([])),
     create: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
     update: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
     deleteExpense: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
@@ -86,7 +91,7 @@ describe('TodayExpensesPage — smoke render', () => {
   // G-i18n: update()'s only failure branch is not-found. Angular parity: updateExpense returns
   // DataResult(undefined, false, [ExpenseErrors.NotExists]) — SYNC, never throws. The route
   // branches on `.succeeded` and surfaces the localized EXPENSE_ERRORS.NOT_EXISTS text.
-  it('shows the localized not-found error when update fails', () => {
+  it('shows the localized not-found error when update fails', async () => {
     const expense = {
       id: 'e1',
       type: ExpenseType.Comida,
@@ -97,13 +102,12 @@ describe('TodayExpensesPage — smoke render', () => {
       isActive: true,
       createdDate: new Date(),
       createdByName: '',
-    };
+    } as Expense;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockImpl = () =>
       ({
         getAll: vi.fn().mockReturnValue([expense]),
-        getActiveToday: vi.fn().mockReturnValue([expense]),
-        getByDateRange: vi.fn().mockReturnValue([expense]),
+        getExpensesInDayObservable: vi.fn().mockReturnValue(expensesResponse([expense])),
         create: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
         update: vi.fn().mockReturnValue({
           data: undefined,
@@ -123,7 +127,8 @@ describe('TodayExpensesPage — smoke render', () => {
         <TodayExpensesPage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByText('Editar'));
+    // loadExpenses is now async (getExpensesInDayObservable) — wait for the row to appear.
+    fireEvent.click(await screen.findByText('Editar'));
     fireEvent.click(screen.getByText('Guardar'));
     expect(screen.getByText('El gasto no existe.')).toBeInTheDocument();
   });
@@ -161,9 +166,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     vi.mocked(ExpenseOfflineService).mockImplementation(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
-          getActiveToday: vi.fn().mockReturnValue([]),
-          getByDateRange: vi.fn().mockReturnValue([]),
+          filterExpensesObservable: vi.fn().mockReturnValue(expensesResponse([])),
           create: vi.fn(),
           update: vi.fn(),
           delete: vi.fn(),
@@ -242,16 +245,14 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.getByText('Zelle')).toBeInTheDocument();
   });
 
-  it('groups expenses by day (collapsed by default), shows per-day count + total, and never renders edit/delete', () => {
+  it('groups expenses by day (collapsed by default), shows per-day count + total, and never renders edit/delete', async () => {
     const day1 = makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 });
     const day1b = makeExpense({ id: 'b', date: new Date('2024-03-15T14:00:00.000'), total: 15 });
     const day2 = makeExpense({ id: 'c', date: new Date('2024-03-14T09:00:00.000'), total: 5 });
     vi.mocked(ExpenseOfflineService).mockImplementation(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([day1, day1b, day2]),
-          getActiveToday: vi.fn().mockReturnValue([]),
-          getByDateRange: vi.fn().mockReturnValue([]),
+          filterExpensesObservable: vi.fn().mockReturnValue(expensesResponse([day1, day1b, day2])),
           create: vi.fn(),
           update: vi.fn(),
           delete: vi.fn(),
@@ -266,7 +267,8 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     );
 
     // Overall header count/total (all-time, unbounded — no 30-day window).
-    expect(screen.getByText('(3)')).toBeInTheDocument();
+    // loadExpenses is now async (filterExpensesObservable) — wait for the grouped data to render.
+    expect(await screen.findByText('(3)')).toBeInTheDocument();
     expect(screen.getByText('$30.00')).toBeInTheDocument();
 
     // Day panels present; content collapsed by default.
@@ -280,15 +282,17 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
   });
 
-  it('filters by payment type', () => {
+  it('filters by payment type', async () => {
     const cash = makeExpense({ id: 'a', paymentType: PaymentType.Efectivo, total: 10 });
     const card = makeExpense({ id: 'b', paymentType: PaymentType.Tarjeta, total: 25 });
     vi.mocked(ExpenseOfflineService).mockImplementation(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([cash, card]),
-          getActiveToday: vi.fn().mockReturnValue([]),
-          getByDateRange: vi.fn().mockReturnValue([]),
+          // Mirror the real filterExpensesObservable: filter the day's expenses by the
+          // paymentType arg the page passes (Angular's only wired filter control).
+          filterExpensesObservable: vi.fn((_type: unknown, pt: PaymentType | undefined) =>
+            expensesResponse([cash, card].filter((e) => !pt || e.paymentType === pt)),
+          ),
           create: vi.fn(),
           update: vi.fn(),
           delete: vi.fn(),
@@ -301,10 +305,10 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
         <ExpensesHistoryPage />
       </Wrapper>,
     );
-    expect(screen.getByText('(2)')).toBeInTheDocument();
+    expect(await screen.findByText('(2)')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Tarjeta'));
-    expect(screen.getByText('(1)')).toBeInTheDocument();
+    expect(await screen.findByText('(1)')).toBeInTheDocument();
     // $25.00 now appears twice: the header total and the (single) day-panel total.
     expect(screen.getAllByText('$25.00')).toHaveLength(2);
   });

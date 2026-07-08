@@ -100,8 +100,12 @@ export function TodayStatsPage() {
     );
 
     if (hasExpensesModule) {
+      // Angular parity (today-stats.component.ts:79): loads today's expenses via
+      // getExpensesInDayObservable(new Date()) and unwraps the BaseResponseModel `.data`.
       const expenseService = new ExpenseOfflineService(storeId);
-      setExpenses(expenseService.getActiveToday());
+      void expenseService
+        .getExpensesInDayObservable(new Date())
+        .then((response) => setExpenses(response.data));
     }
 
     if (hasCreditsModule) {

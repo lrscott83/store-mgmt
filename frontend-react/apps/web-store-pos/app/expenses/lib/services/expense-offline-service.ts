@@ -1,6 +1,6 @@
-import type { BaseService, Expense } from '@store-mgmt/domain';
+import type { BaseResponseModel, BaseService, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
-import { DataResult, ExpenseErrors, Result } from '@store-mgmt/domain';
+import { DataResult, ExpenseErrors, Result, success } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -30,18 +30,25 @@ export class ExpenseOfflineService implements BaseService<Expense> {
     return repo.getById(this.storeId, id);
   }
 
-  getByDateRange(from: Date, to: Date): Expense[] {
-    const start = startOfDay(from);
-    const end = startOfDay(addDays(to, 1));
-    // Angular parity (G1): getExpensesInDay/getActiveExpensesBetweenDates both filter
-    // `expense.isActive` — soft-deleted expenses must never appear in date-range queries.
-    return this.getAll().filter(
-      (e) => e.isActive && e.date >= start && e.date < end,
-    );
-  }
-
-  getActiveToday(): Expense[] {
-    return this.getByDateRange(new Date(), new Date());
+  /**
+   * WU3 (category B): returns SYNC `BaseResponseModel<Expense[]>` (via `success(...)`), matching
+   * Angular's `getExpensesInDay` (`this.Success(...)`, sync — never async). Emits the day's ACTIVE
+   * expenses sorted DESC by date (most recent first), mirroring Angular's
+   * `.sort((e1, e2) => e2.date.getTime() - e1.date.getTime())`.
+   *
+   * BUG FIX (angular-bugs-policy, ADR-7): Angular's `getExpensesInDay` IGNORES its own `date`
+   * param and always computes `startOfDay(new Date())` ("today"). React honors the passed `date`
+   * (`startOfDay(date)`), so the method actually filters to the requested day. Both current
+   * callers pass `new Date()` (computing "today" themselves), so this fix is invisible to them —
+   * it only removes the latent defect for any future non-today caller.
+   */
+  getExpensesInDay(date: Date): BaseResponseModel<Expense[]> {
+    const startDate = startOfDay(date);
+    const endDate = addDays(startDate, 1);
+    const filtered = this.getAll()
+      .filter((e) => e.isActive && e.date >= startDate && e.date < endDate)
+      .sort((e1, e2) => e2.date.getTime() - e1.date.getTime());
+    return success(filtered);
   }
 
   /**
@@ -91,24 +98,38 @@ export class ExpenseOfflineService implements BaseService<Expense> {
   }
 
   /**
-   * Sync replacement of Angular's `filterExpensesObservable`. All params optional and
-   * unbounded when falsy — 1:1 port, operates over active (not soft-deleted) expenses,
-   * RAW date comparisons (no internal day-snapping).
+   * WU4 (category C): 1:1 port of Angular's `filterExpensesObservable`
+   * (expense-offline.service.ts:97-104) — `of(this.Success(filtered))`. React returns a same-tick
+   * `Promise<BaseResponseModel<Expense[]>>` that RESOLVES (never rejects), carrying the envelope.
+   * All params optional and unbounded when falsy; operates over ACTIVE (not soft-deleted)
+   * expenses; RAW date comparisons (no internal day-snapping). Param names/order match Angular.
    */
-  filterExpenses(
-    type?: ExpenseType,
+  filterExpensesObservable(
+    expenseType?: ExpenseType,
     paymentType?: PaymentType,
-    start?: Date,
-    end?: Date,
-  ): Expense[] {
-    return this.getAll().filter(
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<BaseResponseModel<Expense[]>> {
+    const filtered = this.getAll().filter(
       (e) =>
         e.isActive &&
-        (!type || type === e.type) &&
+        (!expenseType || expenseType === e.type) &&
         (!paymentType || paymentType === e.paymentType) &&
-        (!start || e.date >= start) &&
-        (!end || e.date < end),
+        (!startDate || e.date >= startDate) &&
+        (!endDate || e.date < endDate),
     );
+    return Promise.resolve(success(filtered));
+  }
+
+  /**
+   * WU4 (category C): 1:1 port of Angular's `getExpensesInDayObservable`
+   * (expense-offline.service.ts:93-95 — `of(this.getExpensesInDay(date))`), the Observable sibling
+   * of the sync `getExpensesInDay`. Named character-for-character after Angular (exact-surface
+   * rule); same-tick `Promise.resolve` mirrors `of(...)` over synchronous storage (design ADR-7).
+   * Carries the BUG FIX (honors `date`) through from `getExpensesInDay`.
+   */
+  getExpensesInDayObservable(date: Date): Promise<BaseResponseModel<Expense[]>> {
+    return Promise.resolve(this.getExpensesInDay(date));
   }
 
   /**
