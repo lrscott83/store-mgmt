@@ -10,6 +10,7 @@ export * from './enums';
 export * from './commons/result';
 export * from './commons/envelope';
 export * from './errors/product-errors';
+export * from './errors/product-category-errors';
 export * from './errors/inventory-errors';
 export * from './errors/expense-errors';
 export * from './errors/sale-credit-errors';
