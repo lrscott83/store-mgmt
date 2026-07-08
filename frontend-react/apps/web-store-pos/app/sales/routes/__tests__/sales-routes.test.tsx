@@ -60,9 +60,18 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
-    getActiveToday: vi.fn().mockReturnValue([]),
-    getUnpaidCreatedToday: vi.fn().mockReturnValue([]),
-    getPaidToday: vi.fn().mockReturnValue([]),
+    getSaleCreditsInDayObservable: vi
+      .fn()
+      .mockResolvedValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
+    getUnPaidSaleCreditsInDayObservable: vi
+      .fn()
+      .mockResolvedValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
+    getPaidSaleCreditsInDayObservable: vi
+      .fn()
+      .mockResolvedValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
+    filterSaleCredits: vi
+      .fn()
+      .mockResolvedValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
     paidSaleCredit: vi.fn(),
     updateSaleCredit: vi.fn(),
   })),

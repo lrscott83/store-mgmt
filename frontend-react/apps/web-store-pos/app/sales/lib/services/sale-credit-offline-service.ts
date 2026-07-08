@@ -1,5 +1,5 @@
-import type { BaseService, SaleCredit } from '@store-mgmt/domain';
-import { DataResult, PaymentType, Result, SaleCreditErrors } from '@store-mgmt/domain';
+import type { BaseResponseModel, BaseService, SaleCredit } from '@store-mgmt/domain';
+import { DataResult, PaymentType, Result, SaleCreditErrors, success } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
@@ -37,46 +37,81 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
     return repo.getById(this.storeId, id);
   }
 
-  getByDateRange(from: Date, to: Date): SaleCredit[] {
-    const start = startOfDay(from);
-    const end = startOfDay(addDays(to, 1));
-    return this.getAll().filter((c) => c.date >= start && c.date < end);
-  }
-
-  getActiveToday(): SaleCredit[] {
-    const todayStart = startOfDay(new Date());
-    const tomorrowStart = startOfDay(addDays(new Date(), 1));
-    return this.getAll().filter(
-      (c) => c.isActive && c.date >= todayStart && c.date < tomorrowStart,
-    );
+  /**
+   * WU3 (category B): returns SYNC `BaseResponseModel<SaleCredit[]>` (via `success(...)`),
+   * matching Angular's `getSaleCreditsInDay` (`this.Success(...)`, sync — never async).
+   * Emits the day's ACTIVE credits sorted ASC by date, mirroring Angular's
+   * `.sort((e1, e2) => e1.date.getTime() - e2.date.getTime())`. Replaces the removed
+   * `getByDateRange`/`getActiveToday` (no Angular correlate, flagged mismatch #2).
+   */
+  getSaleCreditsInDay(date: Date): BaseResponseModel<SaleCredit[]> {
+    const startDate = startOfDay(date);
+    const endDate = addDays(startDate, 1);
+    const filtered = this.getAll()
+      .filter((c) => c.isActive && c.date >= startDate && c.date < endDate)
+      .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
+    return success(filtered);
   }
 
   /**
-   * 1:1 port of Angular's `getUnPaidSaleCreditsInDayObservable`: active credits CREATED
-   * today (via `date`, not `paidDate`), filtered to `!isPaid`. Feeds the "Créditos Por
+   * WU4 (category C): 1:1 port of Angular's `getSaleCreditsInDayObservable`
+   * (sale-credit-offline.service.ts:122-124 — `of(this.getSaleCreditsInDay(date))`).
+   * Same-tick `Promise.resolve` mirrors `of(...)` over synchronous storage (design ADR-7).
+   */
+  getSaleCreditsInDayObservable(date: Date): Promise<BaseResponseModel<SaleCredit[]>> {
+    return Promise.resolve(this.getSaleCreditsInDay(date));
+  }
+
+  /**
+   * WU4 (category C): 1:1 port of Angular's `getUnPaidSaleCreditsInDayObservable`
+   * (sale-credit-offline.service.ts:126-132) — renamed from `getUnpaidCreatedToday`
+   * (flagged mismatch #3). Reuses {@link getSaleCreditsInDay} (active credits CREATED on
+   * `date`, via `date` not `paidDate`) then filters `!isPaid`. Feeds the "Créditos Por
    * Cobrar" panel on the Today Stats view.
    */
-  getUnpaidCreatedToday(): SaleCredit[] {
-    return this.getActiveToday().filter((c) => !c.isPaid);
+  getUnPaidSaleCreditsInDayObservable(date: Date): Promise<BaseResponseModel<SaleCredit[]>> {
+    const activeCreditsResponse = this.getSaleCreditsInDay(date);
+    return Promise.resolve(
+      success(
+        activeCreditsResponse.succeeded
+          ? activeCreditsResponse.data.filter((c) => !c.isPaid)
+          : [],
+      ),
+    );
   }
 
   /**
-   * 1:1 port of Angular's `getPaidSaleCreditsInDayObservable`: active credits whose
-   * `paidDate` falls within today's range, REGARDLESS of when they were created (unlike
-   * `getUnpaidCreatedToday`, which filters by creation `date`). Feeds the "Créditos
+   * WU4 (category C): 1:1 port of Angular's `getPaidSaleCreditsInDayObservable`
+   * (sale-credit-offline.service.ts:134-143) — renamed from `getPaidToday` (flagged
+   * mismatch #3). Active credits whose `paidDate` falls within the given day's range,
+   * REGARDLESS of when they were created (unlike the unpaid sibling, which filters by
+   * creation `date`), sorted ASC by `date` (not `paidDate`). Feeds the "Créditos
    * Pagados" panel on the Today Stats view.
    */
-  getPaidToday(): SaleCredit[] {
-    const todayStart = startOfDay(new Date());
-    const tomorrowStart = startOfDay(addDays(new Date(), 1));
-    return this.getAll().filter(
-      (c) =>
-        c.isActive &&
-        c.isPaid &&
-        c.paidDate &&
-        c.paidDate >= todayStart &&
-        c.paidDate < tomorrowStart,
-    );
+  getPaidSaleCreditsInDayObservable(date: Date): Promise<BaseResponseModel<SaleCredit[]>> {
+    const startDate = startOfDay(date);
+    const endDate = addDays(startDate, 1);
+    const filtered = this.getAll()
+      .filter(
+        (c) =>
+          c.isActive &&
+          c.isPaid &&
+          c.paidDate &&
+          c.paidDate >= startDate &&
+          c.paidDate < endDate,
+      )
+      .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
+    return Promise.resolve(success(filtered));
+  }
+
+  /**
+   * WU4 (category C, NEW method): 1:1 port of Angular's `getSaleCreditsObservable`
+   * (sale-credit-offline.service.ts:145-147) — all ACTIVE credits, no other filter/sort.
+   * No current Angular consumer (dead method in Angular too); ported for surface parity
+   * only, no call-site to migrate.
+   */
+  getSaleCreditsObservable(): Promise<BaseResponseModel<SaleCredit[]>> {
+    return Promise.resolve(success(this.getAll().filter((c) => c.isActive)));
   }
 
   /**
@@ -107,7 +142,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
 
   /**
    * ADR-5: financial helpers use RAW date boundaries (pre-snapped by the caller), NOT
-   * the day-snapping `getByDateRange`/`getActiveToday`. 1:1 port of Angular's private
+   * the day-snapping {@link getSaleCreditsInDay}. 1:1 port of Angular's private
    * `getActiveSaleCreditsBetweenDates`.
    */
   private activeSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
@@ -147,13 +182,21 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
   }
 
   /**
-   * Sync replacement of Angular's `filterSaleCredits` Observable. Quirk (1:1 port):
-   * `isPaid` only constrains when truthy — `isPaid=false` behaves as "no filter" on
-   * paid status (Angular: `!isPaid || credit.isPaid === isPaid`). `client` is a
-   * case-sensitive substring match (Angular: `credit.client.includes(client)`).
+   * WU4 (category C): 1:1 port of Angular's `filterSaleCredits`
+   * (sale-credit-offline.service.ts:149-157) — non-suffixed Observable, verified
+   * `Observable<BaseResponseModel<SaleCredit[]>>`. Same-tick `Promise.resolve` mirrors
+   * `of(...)`. Quirk (1:1 port): `isPaid` only constrains when truthy — `isPaid=false`
+   * behaves as "no filter" on paid status (Angular: `!isPaid || credit.isPaid ===
+   * isPaid`). `client` is a case-sensitive substring match (Angular:
+   * `credit.client.includes(client)`).
    */
-  filterSaleCredits(isPaid: boolean, client?: string, start?: Date, end?: Date): SaleCredit[] {
-    return this.getAll().filter(
+  filterSaleCredits(
+    isPaid?: boolean,
+    client?: string,
+    start?: Date,
+    end?: Date,
+  ): Promise<BaseResponseModel<SaleCredit[]>> {
+    const filtered = this.getAll().filter(
       (c) =>
         c.isActive &&
         (!client || c.client.includes(client)) &&
@@ -161,6 +204,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
         (!start || c.date >= start) &&
         (!end || c.date < end),
     );
+    return Promise.resolve(success(filtered));
   }
 
   /**

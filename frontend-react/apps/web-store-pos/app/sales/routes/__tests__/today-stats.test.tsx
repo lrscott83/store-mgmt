@@ -40,12 +40,21 @@ vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
   })),
 }));
 
-const mockGetUnpaidCreatedToday = vi.fn().mockReturnValue([] as SaleCredit[]);
-const mockGetPaidToday = vi.fn().mockReturnValue([] as SaleCredit[]);
+// Category-C envelope helper: getUn/PaidSaleCreditsInDayObservable resolve a
+// BaseResponseModel<SaleCredit[]>.
+function creditsEnvelope(data: SaleCredit[] = []) {
+  return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
+}
+const mockGetUnPaidSaleCreditsInDayObservable = vi
+  .fn()
+  .mockResolvedValue(creditsEnvelope([]));
+const mockGetPaidSaleCreditsInDayObservable = vi
+  .fn()
+  .mockResolvedValue(creditsEnvelope([]));
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
-    getUnpaidCreatedToday: mockGetUnpaidCreatedToday,
-    getPaidToday: mockGetPaidToday,
+    getUnPaidSaleCreditsInDayObservable: mockGetUnPaidSaleCreditsInDayObservable,
+    getPaidSaleCreditsInDayObservable: mockGetPaidSaleCreditsInDayObservable,
   })),
 }));
 
@@ -118,8 +127,8 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
     mockGetActiveOrdersInDay.mockReturnValue([]);
     mockGetCategoryCartItemsView.mockReturnValue([]);
     mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([]));
-    mockGetUnpaidCreatedToday.mockReturnValue([]);
-    mockGetPaidToday.mockReturnValue([]);
+    mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(creditsEnvelope([]));
+    mockGetPaidSaleCreditsInDayObservable.mockResolvedValue(creditsEnvelope([]));
   });
 
   it('renders the Angular header (Cuadre del día)', () => {
@@ -195,8 +204,12 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
 
   it('renders Gastos and Créditos panels when the user has those modules', async () => {
     mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
-    mockGetUnpaidCreatedToday.mockReturnValue([makeCredit({ total: 40 })]);
-    mockGetPaidToday.mockReturnValue([makeCredit({ id: 'c2', isPaid: true, total: 60 })]);
+    mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(
+      creditsEnvelope([makeCredit({ total: 40 })]),
+    );
+    mockGetPaidSaleCreditsInDayObservable.mockResolvedValue(
+      creditsEnvelope([makeCredit({ id: 'c2', isPaid: true, total: 60 })]),
+    );
 
     render(
       <Wrapper>
@@ -204,11 +217,11 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
       </Wrapper>,
     );
 
-    // Expenses now load via the async getExpensesInDayObservable — wait for the count to settle.
+    // Expenses/credits now load via async *Observable methods — wait for each to settle.
     expect(await screen.findByText('Gastos (1)')).toBeInTheDocument();
-    expect(screen.getByText('Créditos Por Cobrar (1)')).toBeInTheDocument();
+    expect(await screen.findByText('Créditos Por Cobrar (1)')).toBeInTheDocument();
     // Angular's literal template bug: header shows getPaidSaleCreditsTotal() (a currency
     // sum), not a count, inside the "(...)" slot — preserved verbatim, see today-stats.tsx.
-    expect(screen.getByText('Créditos Pagados (60)')).toBeInTheDocument();
+    expect(await screen.findByText('Créditos Pagados (60)')).toBeInTheDocument();
   });
 });

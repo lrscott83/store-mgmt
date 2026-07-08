@@ -109,9 +109,16 @@ export function TodayStatsPage() {
     }
 
     if (hasCreditsModule) {
+      // Angular parity (today-stats.component.ts:92,102): loads via
+      // getUnPaidSaleCreditsInDayObservable/getPaidSaleCreditsInDayObservable and unwraps
+      // the BaseResponseModel `.data` (flagged mismatch #3).
       const creditService = new SaleCreditOfflineService(storeId);
-      setSaleCredits(creditService.getUnpaidCreatedToday());
-      setPaidSaleCredits(creditService.getPaidToday());
+      void creditService
+        .getUnPaidSaleCreditsInDayObservable(new Date())
+        .then((response) => setSaleCredits(response.data));
+      void creditService
+        .getPaidSaleCreditsInDayObservable(new Date())
+        .then((response) => setPaidSaleCredits(response.data));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, hasExpensesModule, hasCreditsModule]);

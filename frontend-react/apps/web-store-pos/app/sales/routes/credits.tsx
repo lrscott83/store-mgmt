@@ -62,14 +62,17 @@ export function SaleCreditsPage() {
   const [dateSaleCredits, setDateSaleCredits] = useState<DateSaleCredit[]>([]);
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
 
-  function loadSaleCredits() {
+  // WU4 (flagged mismatch #4): Angular's SaleCreditsComponent.loadSaleCredits() always
+  // calls filterSaleCredits(null, null, null, null) (sale-credits.component.ts:51-52) —
+  // rewired here instead of bypassing the service filter with getAll().filter(isActive).
+  async function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
-    const credits = service.getAll().filter((c) => c.isActive);
-    setDateSaleCredits(groupSaleCredits(credits));
+    const response = await service.filterSaleCredits(undefined, undefined, undefined, undefined);
+    setDateSaleCredits(groupSaleCredits(response.data));
   }
 
   useEffect(() => {
-    loadSaleCredits();
+    void loadSaleCredits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 

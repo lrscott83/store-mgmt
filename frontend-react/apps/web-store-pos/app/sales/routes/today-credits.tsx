@@ -22,13 +22,16 @@ export function TodaySaleCreditsPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
   const [saleCredits, setSaleCredits] = useState<SaleCredit[]>([]);
 
-  function loadSaleCredits() {
+  // WU4 (flagged mismatch #2): Angular's real call pattern
+  // (today-sale-credits.component.ts:27) is `getSaleCreditsInDayObservable(new Date())`.
+  async function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
-    setSaleCredits(service.getActiveToday());
+    const response = await service.getSaleCreditsInDayObservable(new Date());
+    setSaleCredits(response.data);
   }
 
   useEffect(() => {
-    loadSaleCredits();
+    void loadSaleCredits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
@@ -38,7 +41,7 @@ export function TodaySaleCreditsPage() {
     const service = new SaleCreditOfflineService(storeId);
     const result = service.updateSaleCredit(creditId, client, note);
     if (!result.succeeded) return false;
-    loadSaleCredits();
+    void loadSaleCredits();
     return true;
   }
 
@@ -46,7 +49,7 @@ export function TodaySaleCreditsPage() {
     const service = new SaleCreditOfflineService(storeId);
     const result = service.paidSaleCredit(creditId, paidType, note);
     if (!result.succeeded) return false;
-    loadSaleCredits();
+    void loadSaleCredits();
     return true;
   }
 

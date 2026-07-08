@@ -413,39 +413,40 @@ describe('SaleCreditOfflineService', () => {
     });
   });
 
-  describe('SC-06: getByDateRange', () => {
-    it('returns credits within the date range', () => {
+  describe('SC-06: getSaleCreditsInDay (category B, sync BaseResponseModel)', () => {
+    it('returns a succeeded BaseResponseModel with credits within the given day', () => {
       createCredit('o1', 'Ana', 100);
-      const from = new Date();
-      from.setHours(0, 0, 0, 0);
-      const to = new Date();
-      to.setHours(23, 59, 59, 999);
-      const results = service.getByDateRange(from, to);
-      expect(results).toHaveLength(1);
+      const response = service.getSaleCreditsInDay(new Date());
+      expect(response.succeeded).toBe(true);
+      expect(response.data).toHaveLength(1);
     });
 
-    it('excludes credits outside the date range', () => {
-      createCredit('o1', 'Ana', 100);
+    it('is a BaseResponseModel, not a Result/DataResult (has message/actionCode)', () => {
+      const response = service.getSaleCreditsInDay(new Date());
+      expect(response).toHaveProperty('message');
+      expect(response).toHaveProperty('actionCode');
+    });
+
+    it('excludes credits outside the given day', () => {
+      const credit = createCredit('o1', 'Ana', 100);
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-      const yesterdayEnd = new Date(yesterday);
-      yesterdayEnd.setHours(23, 59, 59, 999);
-      const results = service.getByDateRange(yesterday, yesterdayEnd);
-      expect(results).toHaveLength(0);
-    });
-  });
-
-  describe('SC-07: getActiveToday', () => {
-    it('returns active credits created today', () => {
-      createCredit('o1', 'Ana', 100);
-      expect(service.getActiveToday()).toHaveLength(1);
+      setCreditDate(credit.id, yesterday);
+      expect(service.getSaleCreditsInDay(new Date()).data).toHaveLength(0);
     });
 
-    it('excludes voided credits', () => {
+    it('excludes voided (inactive) credits', () => {
       createCredit('o1', 'Ana', 100);
       service.deactivateSaleCreditByOrderId('o1');
-      expect(service.getActiveToday()).toHaveLength(0);
+      expect(service.getSaleCreditsInDay(new Date()).data).toHaveLength(0);
+    });
+
+    it('sorts results ASC by date', () => {
+      const later = createCredit('o1', 'Later', 10);
+      const earlier = createCredit('o2', 'Earlier', 20);
+      setCreditDate(earlier.id, new Date(Date.now() - 60_000));
+      const response = service.getSaleCreditsInDay(new Date());
+      expect(response.data.map((c) => c.id)).toEqual([earlier.id, later.id]);
     });
   });
 
@@ -457,51 +458,79 @@ describe('SaleCreditOfflineService', () => {
     });
   });
 
-  describe('SC-09: getUnpaidCreatedToday (Angular getUnPaidSaleCreditsInDayObservable 1:1 port)', () => {
-    it('returns active unpaid credits created today', () => {
+  describe('SC-09: getSaleCreditsInDayObservable (category C, async envelope)', () => {
+    it('resolves a succeeded BaseResponseModel wrapping getSaleCreditsInDay', async () => {
       createCredit('o1', 'Ana', 100);
-      expect(service.getUnpaidCreatedToday()).toHaveLength(1);
-    });
-
-    it('excludes credits that were already paid', () => {
-      const credit = createCredit('o1', 'Ana', 100);
-      service.paidSaleCredit(credit.id, PaymentType.Efectivo, '');
-      expect(service.getUnpaidCreatedToday()).toHaveLength(0);
-    });
-
-    it('excludes credits not created today', () => {
-      createCredit('o1', 'Ana', 100);
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
-      const entries: [string, Record<string, unknown>][] = JSON.parse(raw ?? '[]');
-      const backdated = entries.map(([key, value]) => [
-        key,
-        { ...value, date: yesterday.toISOString() },
-      ]);
-      localStorage.setItem('lizoft.store-saleCredits-s1', JSON.stringify(backdated));
-
-      expect(service.getUnpaidCreatedToday()).toHaveLength(0);
+      await expect(service.getSaleCreditsInDayObservable(new Date())).resolves.toMatchObject({
+        succeeded: true,
+        data: [expect.objectContaining({ client: 'Ana' })],
+      });
     });
   });
 
-  describe('SC-10: getPaidToday (Angular getPaidSaleCreditsInDayObservable 1:1 port)', () => {
-    it('returns active credits paid today', () => {
+  describe('SC-09b: getUnPaidSaleCreditsInDayObservable (Angular exact name, category C)', () => {
+    it('resolves active unpaid credits created today', async () => {
+      createCredit('o1', 'Ana', 100);
+      const response = await service.getUnPaidSaleCreditsInDayObservable(new Date());
+      expect(response.succeeded).toBe(true);
+      expect(response.data).toHaveLength(1);
+    });
+
+    it('excludes credits that were already paid', async () => {
       const credit = createCredit('o1', 'Ana', 100);
       service.paidSaleCredit(credit.id, PaymentType.Efectivo, '');
-      expect(service.getPaidToday()).toHaveLength(1);
+      const response = await service.getUnPaidSaleCreditsInDayObservable(new Date());
+      expect(response.data).toHaveLength(0);
     });
 
-    it('excludes unpaid credits', () => {
+    it('excludes credits not created on the given date', async () => {
+      const credit = createCredit('o1', 'Ana', 100);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      setCreditDate(credit.id, yesterday);
+      const response = await service.getUnPaidSaleCreditsInDayObservable(new Date());
+      expect(response.data).toHaveLength(0);
+    });
+  });
+
+  describe('SC-10: getPaidSaleCreditsInDayObservable (Angular exact name, category C)', () => {
+    it('resolves active credits paid today', async () => {
+      const credit = createCredit('o1', 'Ana', 100);
+      service.paidSaleCredit(credit.id, PaymentType.Efectivo, '');
+      const response = await service.getPaidSaleCreditsInDayObservable(new Date());
+      expect(response.succeeded).toBe(true);
+      expect(response.data).toHaveLength(1);
+    });
+
+    it('excludes unpaid credits', async () => {
       createCredit('o1', 'Ana', 100);
-      expect(service.getPaidToday()).toHaveLength(0);
+      const response = await service.getPaidSaleCreditsInDayObservable(new Date());
+      expect(response.data).toHaveLength(0);
     });
 
-    it('excludes voided (inactive) credits even if paid', () => {
+    it('excludes voided (inactive) credits even if paid', async () => {
       const credit = createCredit('o1', 'Ana', 100);
       service.paidSaleCredit(credit.id, PaymentType.Efectivo, '');
       service.deleteSaleCredit(credit.id);
-      expect(service.getPaidToday()).toHaveLength(0);
+      const response = await service.getPaidSaleCreditsInDayObservable(new Date());
+      expect(response.data).toHaveLength(0);
+    });
+  });
+
+  describe('getSaleCreditsObservable (category C, NEW method, dead in Angular too)', () => {
+    it('resolves all active credits, no other filter/sort', async () => {
+      createCredit('o1', 'Ana', 100);
+      createCredit('o2', 'Bob', 50);
+      const response = await service.getSaleCreditsObservable();
+      expect(response.succeeded).toBe(true);
+      expect(response.data).toHaveLength(2);
+    });
+
+    it('excludes voided credits', async () => {
+      createCredit('o1', 'Ana', 100);
+      service.deactivateSaleCreditByOrderId('o1');
+      const response = await service.getSaleCreditsObservable();
+      expect(response.data).toHaveLength(0);
     });
   });
 
@@ -631,52 +660,59 @@ describe('SaleCreditOfflineService', () => {
     });
   });
 
-  // WU4: filterSaleCredits (sync port of filterSaleCredits Observable)
+  // WU4: filterSaleCredits (category C, async envelope port of Angular's Observable)
   describe('filterSaleCredits', () => {
-    it('isPaid=true constrains to paid credits only', () => {
+    it('isPaid=true constrains to paid credits only', async () => {
       const paid = createCredit('o1', 'Ana', 50);
       service.paidSaleCredit(paid.id, PaymentType.Efectivo, '');
       createCredit('o2', 'Bob', 30);
-      const result = service.filterSaleCredits(true);
-      expect(result).toHaveLength(1);
-      expect(result[0].isPaid).toBe(true);
+      const response = await service.filterSaleCredits(true);
+      expect(response.succeeded).toBe(true);
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].isPaid).toBe(true);
     });
 
-    it('isPaid=false behaves as no filter on paid status (Angular quirk: !isPaid || ...)', () => {
+    it('isPaid=false behaves as no filter on paid status (Angular quirk: !isPaid || ...)', async () => {
       const paid = createCredit('o1', 'Ana', 50);
       service.paidSaleCredit(paid.id, PaymentType.Efectivo, '');
       createCredit('o2', 'Bob', 30);
-      const result = service.filterSaleCredits(false);
-      expect(result).toHaveLength(2);
+      const response = await service.filterSaleCredits(false);
+      expect(response.data).toHaveLength(2);
     });
 
-    it('filters by client substring match', () => {
+    it('filters by client substring match', async () => {
       createCredit('o1', 'Juan Perez', 50);
       createCredit('o2', 'Maria Lopez', 30);
-      const result = service.filterSaleCredits(false, 'Perez');
-      expect(result).toHaveLength(1);
-      expect(result[0].client).toBe('Juan Perez');
+      const response = await service.filterSaleCredits(false, 'Perez');
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].client).toBe('Juan Perez');
     });
 
-    it('filters by date range when start/end provided', () => {
+    it('filters by date range when start/end provided', async () => {
       const c1 = createCredit('o1', 'Ana', 10);
       setCreditDate(c1.id, new Date('2024-01-01T10:00:00.000'));
       const c2 = createCredit('o2', 'Bob', 20);
       setCreditDate(c2.id, new Date('2024-06-01T10:00:00.000'));
-      const result = service.filterSaleCredits(
+      const response = await service.filterSaleCredits(
         false,
         undefined,
         new Date('2024-05-01T00:00:00.000'),
         new Date('2024-07-01T00:00:00.000'),
       );
-      expect(result).toHaveLength(1);
-      expect(result[0].total).toBe(20);
+      expect(response.data).toHaveLength(1);
+      expect(response.data[0].total).toBe(20);
     });
 
-    it('excludes voided credits regardless of filters', () => {
+    it('excludes voided credits regardless of filters', async () => {
       createCredit('o1', 'Ana', 10);
       service.deactivateSaleCreditByOrderId('o1');
-      expect(service.filterSaleCredits(false)).toHaveLength(0);
+      await expect(service.filterSaleCredits(false)).resolves.toMatchObject({ data: [] });
+    });
+
+    it('no-argument call defaults all params (Angular parity: undefined/undefined/undefined/undefined)', async () => {
+      createCredit('o1', 'Ana', 10);
+      const response = await service.filterSaleCredits();
+      expect(response.data).toHaveLength(1);
     });
   });
 });
