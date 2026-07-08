@@ -141,6 +141,16 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
   }
 
   /**
+   * 1:1 port of Angular's `getStorageInventoriesMap` (inventory-offline.service.ts:39-41):
+   * returns the RAW per-product entry map straight from storage — no isActive filtering, no
+   * view mapping. Used by the import synchronizer to decide add-vs-update per product
+   * (Angular's `synchronizeInventoryEntries` reads it the same way).
+   */
+  getStorageInventoriesMap(): Map<string, InventoryEntry[]> {
+    return this.repo.getAll(this.storeId);
+  }
+
+  /**
    * BaseService<InventoryEntryView> conformance. Returns the matching entry as an
    * InventoryEntryView regardless of `isActive` (unfiltered by active status, matching
    * the other offline services' getById behavior — only getAll() filters to active-only).

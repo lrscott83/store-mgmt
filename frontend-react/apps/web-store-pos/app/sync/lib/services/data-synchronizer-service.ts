@@ -98,9 +98,19 @@ export interface GenericUpsertRepo<T extends { id: string }> {
   upsert(storeId: string, item: T): void;
 }
 
-export interface InventoryRepo {
-  getAll(storeId: string): Map<string, InventoryEntry[]>;
-  save(storeId: string, productId: string, entries: InventoryEntry[]): void;
+/**
+ * Inventory import routes through the offline SERVICE, not the raw repo — Angular parity:
+ * `data-synchronizer.service.ts` `synchronizeInventoryEntries` (:142-155) reads the raw
+ * per-product map via `getStorageInventoriesMap`, then calls `addImportedEntries` for a new
+ * productId bucket / `updateImportedEntries` for an existing one. Routing through the service
+ * also restores the correct field-level merge (the service's `updateImportedEntries` merges
+ * available/isActive/updatedDate/updatedByName; the old inline sync merge wrongly replaced the
+ * whole entry).
+ */
+export interface InventoryImportService {
+  getStorageInventoriesMap(): Map<string, InventoryEntry[]>;
+  addImportedEntries(productId: string, entries: InventoryEntry[]): Result;
+  updateImportedEntries(productId: string, entries: InventoryEntry[]): Result;
 }
 
 /**
@@ -152,7 +162,7 @@ export class DataSynchronizerService {
     private readonly storeId: string,
     private readonly categoryRepo: NameUniqueRepo<import('@store-mgmt/domain').ProductCategory>,
     private readonly productRepo: NameUniqueRepo<import('@store-mgmt/domain').Product>,
-    private readonly inventoryRepo: InventoryRepo,
+    private readonly inventoryService: InventoryImportService,
     private readonly orderRepo: GenericUpsertRepo<import('@store-mgmt/domain').Order>,
     private readonly expenseService: ExpenseImportService,
     private readonly saleCreditRepo: GenericUpsertRepo<import('@store-mgmt/domain').SaleCredit>,
@@ -380,24 +390,33 @@ export class DataSynchronizerService {
     let updated = 0;
 
     try {
-      const existingMap = this.inventoryRepo.getAll(this.storeId);
+      // Angular `synchronizeInventoryEntries` (:142-155): read the raw storage map from the
+      // SERVICE, then route each product bucket through addImportedEntries (NEW productId) or
+      // updateImportedEntries (EXISTING productId). The service owns the merge logic
+      // (field-level for updates) — the synchronizer only decides add-vs-update and counts.
+      const existingMap = this.inventoryService.getStorageInventoriesMap();
       for (const [productId, newEntries] of byProduct) {
-        const existingEntries = existingMap.get(productId) ?? [];
-        const existingById = new Map(existingEntries.map((e) => [e.id, e]));
-        const merged = [...existingEntries];
-
+        const existingById = new Map(
+          (existingMap.get(productId) ?? []).map((e) => [e.id, e]),
+        );
         for (const newEntry of newEntries) {
-          if (existingById.has(newEntry.id)) {
-            const idx = merged.findIndex((e) => e.id === newEntry.id);
-            if (idx >= 0) merged[idx] = newEntry;
-            updated++;
-          } else {
-            merged.push(newEntry);
-            inserted++;
-          }
+          if (existingById.has(newEntry.id)) updated++;
+          else inserted++;
         }
 
-        this.inventoryRepo.save(this.storeId, productId, merged);
+        const result = existingMap.has(productId)
+          ? this.inventoryService.updateImportedEntries(productId, newEntries)
+          : this.inventoryService.addImportedEntries(productId, newEntries);
+        if (!result.succeeded) {
+          return {
+            merge: { entity, inserted, updated },
+            error: {
+              entity,
+              code: SynchronizerErrors.InventoryUnexpectedError.code,
+              message: SynchronizerErrors.InventoryUnexpectedError.message,
+            },
+          };
+        }
       }
       return { merge: { entity, inserted, updated } };
     } catch {

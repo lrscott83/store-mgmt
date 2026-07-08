@@ -3,7 +3,7 @@ import { DataSynchronizerService } from '../data-synchronizer-service';
 import type {
   NameUniqueRepo,
   GenericUpsertRepo,
-  InventoryRepo,
+  InventoryImportService,
   ExpenseImportService,
 } from '../data-synchronizer-service';
 import type { ParsedData } from '../data-serializer-service';
@@ -175,17 +175,35 @@ function makeExpenseImportServiceMock(
   };
 }
 
-function makeInventoryRepoMock(
+/**
+ * Mock of the InventoryOfflineService import surface. Inventory syncs through the SERVICE
+ * (Angular parity): the synchronizer reads via getStorageInventoriesMap and writes via
+ * addImportedEntries (new productId bucket) / updateImportedEntries (existing bucket, field
+ * merge). `_saves` records every write for assertions.
+ */
+function makeInventoryImportServiceMock(
   initial: Map<string, InventoryEntry[]> = new Map(),
-): InventoryRepo & { _saves: { productId: string; entries: InventoryEntry[] }[] } {
+): InventoryImportService & { _saves: { productId: string; entries: InventoryEntry[] }[] } {
   const store = new Map(initial);
   const _saves: { productId: string; entries: InventoryEntry[] }[] = [];
   return {
     _saves,
-    getAll: (_storeId: string) => new Map(store),
-    save: (_storeId: string, productId: string, entries: InventoryEntry[]) => {
+    getStorageInventoriesMap: () => new Map(store),
+    addImportedEntries: (productId: string, entries: InventoryEntry[]) => {
       store.set(productId, entries);
       _saves.push({ productId, entries });
+      return Result.Success();
+    },
+    updateImportedEntries: (productId: string, entries: InventoryEntry[]) => {
+      const current = [...(store.get(productId) ?? [])];
+      for (const entry of entries) {
+        const idx = current.findIndex((e) => e.id === entry.id);
+        if (idx !== -1) current[idx] = { ...current[idx], ...entry };
+        else current.push(entry);
+      }
+      store.set(productId, current);
+      _saves.push({ productId, entries });
+      return Result.Success();
     },
   };
 }
@@ -200,7 +218,7 @@ function makeService(opts?: {
 }) {
   const catRepo = makeNameUniqueRepo<ProductCategory>(opts?.existingCategories ?? []);
   const prodRepo = makeNameUniqueRepo<Product>(opts?.existingProducts ?? []);
-  const invRepo = makeInventoryRepoMock(opts?.existingInventory ?? new Map());
+  const inventoryService = makeInventoryImportServiceMock(opts?.existingInventory ?? new Map());
   const orderRepo = makeGenericRepo<Order>(opts?.existingOrders ?? []);
   const expenseService = makeExpenseImportServiceMock(opts?.existingExpenses ?? []);
   const saleCreditRepo = makeGenericRepo<SaleCredit>(opts?.existingSaleCredits ?? []);
@@ -209,12 +227,12 @@ function makeService(opts?: {
     STORE_ID,
     catRepo,
     prodRepo,
-    invRepo,
+    inventoryService,
     orderRepo,
     expenseService,
     saleCreditRepo,
   );
-  return { svc, catRepo, prodRepo, invRepo, orderRepo, expenseService, saleCreditRepo };
+  return { svc, catRepo, prodRepo, inventoryService, orderRepo, expenseService, saleCreditRepo };
 }
 
 function emptyData(): ParsedData {
@@ -249,9 +267,16 @@ describe('DataSynchronizerService', () => {
         upsert: (_s, item) => writeOrder.push('product:' + item.id),
         save: () => {},
       };
-      const invRepo: InventoryRepo = {
-        getAll: () => new Map(),
-        save: (_s, productId) => writeOrder.push('inventory:' + productId),
+      const inventoryService: InventoryImportService = {
+        getStorageInventoriesMap: () => new Map(),
+        addImportedEntries: (productId) => {
+          writeOrder.push('inventory:' + productId);
+          return Result.Success();
+        },
+        updateImportedEntries: (productId) => {
+          writeOrder.push('inventory:' + productId);
+          return Result.Success();
+        },
       };
       const orderRepo: GenericUpsertRepo<Order> = {
         getAll: () => new Map(),
@@ -277,7 +302,7 @@ describe('DataSynchronizerService', () => {
         STORE_ID,
         catRepo,
         prodRepo,
-        invRepo,
+        inventoryService,
         orderRepo,
         expenseService,
         saleCreditRepo,
@@ -433,11 +458,11 @@ describe('DataSynchronizerService', () => {
     });
 
     it('breaks the inventory loop on first failure without reverting prior product groups', async () => {
-      const { svc, invRepo } = makeService();
-      const originalSave = invRepo.save.bind(invRepo);
-      invRepo.save = (storeId: string, productId: string, entries: InventoryEntry[]) => {
+      const { svc, inventoryService } = makeService();
+      const originalAdd = inventoryService.addImportedEntries.bind(inventoryService);
+      inventoryService.addImportedEntries = (productId: string, entries: InventoryEntry[]) => {
         if (productId === 'prod-bad') throw new Error('storage exploded');
-        originalSave(storeId, productId, entries);
+        return originalAdd(productId, entries);
       };
 
       const data: ParsedData = {
@@ -452,7 +477,7 @@ describe('DataSynchronizerService', () => {
       expect(result.succeeded).toBe(false);
       const invError = result.errors.find((e) => e.entity === 'inventoryEntries');
       expect(invError?.code).toBe('Synchronizer.InventoryUnexpectedError');
-      expect(invRepo._saves.some((s) => s.productId === 'prod-ok')).toBe(true);
+      expect(inventoryService._saves.some((s) => s.productId === 'prod-ok')).toBe(true);
     });
 
     it('synchronizeFiles/sync aggregates errors across entity types and continues (not abort-on-first)', async () => {
@@ -632,7 +657,7 @@ describe('DataSynchronizerService', () => {
     });
 
     it('syncing empty data does NOT call any repo write methods', async () => {
-      const { svc, catRepo, prodRepo, invRepo, orderRepo, expenseService, saleCreditRepo } =
+      const { svc, catRepo, prodRepo, inventoryService, orderRepo, expenseService, saleCreditRepo } =
         makeService();
       let writes = 0;
       catRepo.upsert = () => {
@@ -641,8 +666,13 @@ describe('DataSynchronizerService', () => {
       prodRepo.upsert = () => {
         writes++;
       };
-      invRepo.save = () => {
+      inventoryService.addImportedEntries = () => {
         writes++;
+        return Result.Success();
+      };
+      inventoryService.updateImportedEntries = () => {
+        writes++;
+        return Result.Success();
       };
       orderRepo.upsert = () => {
         writes++;
@@ -690,7 +720,7 @@ describe('DataSynchronizerService', () => {
         STORE_ID,
         makeNameUniqueRepo<ProductCategory>(),
         makeNameUniqueRepo<Product>(),
-        makeInventoryRepoMock(),
+        makeInventoryImportServiceMock(),
         makeGenericRepo<Order>(),
         expenseService,
         makeGenericRepo<SaleCredit>(),
@@ -705,6 +735,56 @@ describe('DataSynchronizerService', () => {
       expect(updated).toEqual(['exp-existing']);
       const merge = result.merges.find((m) => m.entity === 'expenses');
       expect(merge).toEqual({ entity: 'expenses', inserted: 1, updated: 1 });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Inventory import goes through the SERVICE, not a raw repo (Angular parity).
+  // Angular `synchronizeInventoryEntries` reads getStorageInventoriesMap, then calls
+  // addImportedEntries for a NEW productId bucket / updateImportedEntries for an EXISTING
+  // one — the synchronizer never touches the inventory repository directly, and the
+  // service owns the field-level merge (no wholesale entry replacement).
+  // -------------------------------------------------------------------------
+
+  describe('T8 — inventory import routes through the offline service (Angular parity)', () => {
+    it('calls addImportedEntries for a new productId and updateImportedEntries for an existing one', async () => {
+      const existingMap = new Map<string, InventoryEntry[]>([
+        ['prod-existing', [makeInventoryEntry('inv-existing', 'prod-existing')]],
+      ]);
+      const inventoryService = makeInventoryImportServiceMock(existingMap);
+      const addedProducts: string[] = [];
+      const updatedProducts: string[] = [];
+      inventoryService.addImportedEntries = (productId) => {
+        addedProducts.push(productId);
+        return Result.Success();
+      };
+      inventoryService.updateImportedEntries = (productId) => {
+        updatedProducts.push(productId);
+        return Result.Success();
+      };
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeNameUniqueRepo<ProductCategory>(),
+        makeNameUniqueRepo<Product>(),
+        inventoryService,
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        makeGenericRepo<SaleCredit>(),
+      );
+
+      const result = await svc.sync({
+        ...emptyData(),
+        inventoryEntries: [
+          makeInventoryEntry('inv-new', 'prod-new'),
+          makeInventoryEntry('inv-existing', 'prod-existing'),
+        ],
+      });
+
+      expect(addedProducts).toEqual(['prod-new']);
+      expect(updatedProducts).toEqual(['prod-existing']);
+      const merge = result.merges.find((m) => m.entity === 'inventoryEntries');
+      expect(merge).toEqual({ entity: 'inventoryEntries', inserted: 1, updated: 1 });
     });
   });
 });

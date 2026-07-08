@@ -4,6 +4,8 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { InventoryRepository } from '~/inventory/lib/repositories/inventory-repository';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
@@ -59,8 +61,10 @@ export function ImportPage() {
     const categoryRepo = new BaseRepository<ProductCategory>('product-categories');
     const productRepo = new BaseRepository<Product>('products', ['createdDate', 'updatedDate']);
     const orderRepo = new BaseRepository<Order>('orders', ['date', 'createdDate', 'updatedDate']);
-    // Expenses route through the offline SERVICE (Angular parity: the synchronizer calls
-    // expenseSvc.addImportedExpense/updateImportedExpense, not a raw expense repo).
+    // Inventory + Expenses route through their offline SERVICES (Angular parity: the
+    // synchronizer calls inventorySvc.addImportedEntries/updateImportedEntries and
+    // expenseSvc.addImportedExpense/updateImportedExpense, not raw repos).
+    const inventorySvc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const saleCreditRepo = new BaseRepository<SaleCredit>('saleCredits', [
       'date',
       'paidDate',
@@ -72,7 +76,7 @@ export function ImportPage() {
       storeId,
       categoryRepo,
       productRepo,
-      inventoryRepo,
+      inventorySvc,
       orderRepo,
       expenseSvc,
       saleCreditRepo,

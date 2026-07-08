@@ -1288,6 +1288,23 @@ describe('InventoryOfflineService', () => {
     });
   });
 
+  describe('getStorageInventoriesMap — raw per-product storage map (Angular parity)', () => {
+    it('returns the RAW map keyed by productId, including inactive entries (no isActive/view filtering)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { isActive: true }),
+        makeEntry('e2', 'p1', { isActive: false }),
+      ]);
+      map.set('p2', [makeEntry('e3', 'p2', { isActive: false })]);
+      seedInventory(storeId, map);
+
+      const result = service.getStorageInventoriesMap();
+
+      expect(result.get('p1')?.map((e) => e.id)).toEqual(['e1', 'e2']);
+      expect(result.get('p2')?.map((e) => e.id)).toEqual(['e3']);
+    });
+  });
+
   // WU4 (category C): Observable siblings restored under Angular's EXACT names —
   // getInventoryEntriesInDayObservable (inventory-offline.service.ts:213) and
   // getInventoryCategoriesViewObservable (:260), each `of(...)`-wrapping its sync-B
