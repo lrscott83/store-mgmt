@@ -7,7 +7,6 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
@@ -30,9 +29,9 @@ export function TodayEntriesPage() {
   const [modalError, setModalError] = useState('');
 
   function loadEntries() {
-    const svc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
-    const productSvc = new ProductOfflineService(storeId);
-    const products = productSvc.getAll();
+    const productRepository = new ProductRepository(storeId);
+    const svc = new InventoryOfflineService(storeId, productRepository);
+    const products = [...productRepository.getStorageProductsMap().values()];
     const productMap = new Map(products.map((p) => [p.id, p.name]));
     // WU3 (category B): getByDate now returns BaseResponseModel<InventoryEntryView[]>
     // (was a bare array) — unwrap `.data`.

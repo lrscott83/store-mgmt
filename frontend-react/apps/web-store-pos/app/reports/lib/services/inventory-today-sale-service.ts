@@ -1,5 +1,4 @@
 import type { InventoryEntry, Order, OrderItem, Product } from '@store-mgmt/domain';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -45,7 +44,10 @@ export interface InventoryTodaySaleRow {
  * the intended 13-column per-product inventory-at-sale-price ledger (Stage 7, spec Slice A).
  *
  * Composes EXISTING offline services — no FIFO/cost duplication:
- * - ProductOfflineService.getAll() [inline isActive filter — React has no getAvailableProducts, ADR-4]
+ * - ProductRepository.getAvailableProducts() [WU3/WU4 (product-service-parity Phase 1): the
+ *   Angular correlate (inventory-today-sale.component.ts:39,178) injects the REPOSITORY, not
+ *   the service — the field there is misleadingly named `productService` but typed
+ *   `ProductRepository`. React mirrors this directly.]
  * - OrderOfflineService.getActiveOrdersInDay(date)
  * - InventoryOfflineService.getByDate(date) [today's entries]
  * - InventoryOfflineService.getAvailableQuantity(productId) [Σ active available]
@@ -55,18 +57,18 @@ export interface InventoryTodaySaleRow {
  * `getAvailableInventoryCosts` (FIFO deduction — mutates/persists stock).
  */
 export class InventoryTodaySaleService {
-  private readonly productService: ProductOfflineService;
+  private readonly productRepository: ProductRepository;
   private readonly orderService: OrderOfflineService;
   private readonly inventoryService: InventoryOfflineService;
 
   constructor(storeId: string) {
-    this.productService = new ProductOfflineService(storeId);
+    this.productRepository = new ProductRepository(storeId);
     this.orderService = new OrderOfflineService(storeId);
-    this.inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    this.inventoryService = new InventoryOfflineService(storeId, this.productRepository);
   }
 
   getProductRows(date: Date = new Date()): InventoryTodaySaleRow[] {
-    const products: Product[] = this.productService.getAll().filter((p) => p.isActive);
+    const products: Product[] = this.productRepository.getAvailableProducts();
     const todayOrders: Order[] = this.orderService.getActiveOrdersInDay(date);
     // WU3 (service-return-shape-parity Slice 1, category B): getByDate now returns
     // BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`. This

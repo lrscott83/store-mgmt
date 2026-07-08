@@ -8,9 +8,8 @@ import { Spinner } from '~/shared/components/ui/spinner';
 import { EmptyBoxesIcon } from '~/shared/components/ui/icons';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
-import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 
 export const clientLoader = featureLoader([EFeatures.InventoryTodayQuantities]);
 
@@ -52,21 +51,23 @@ export function InventoryTodayQuantitiesPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    const inventorySvc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    const productRepository = new ProductRepository(storeId);
+    const categoryRepository = new ProductCategoryRepository(storeId);
+    const inventorySvc = new InventoryOfflineService(storeId, productRepository);
     const orderSvc = new OrderOfflineService(storeId);
-    const productSvc = new ProductOfflineService(storeId);
-    const categorySvc = new ProductCategoryOfflineService(storeId);
 
     const today = new Date();
 
     // Angular line 139-142: getCategoryOrder — falls back to 999 when category not found.
+    // Angular's category SERVICE never had this method (product-category.service.ts:21
+    // commented out) — ONLY the repository exposes getProductCategoryById, so this reads the
+    // repository directly (SYNC, no envelope needed).
     const getCategoryOrder = (categoryId: string): number =>
-      categorySvc.getById(categoryId)?.order ?? 999;
+      categoryRepository.getProductCategoryById(categoryId)?.order ?? 999;
 
     // Angular lines 62-69: active & availableToSale products, sorted by category order then
     // product order.
-    const products = productSvc
-      .getAll()
+    const products = [...productRepository.getStorageProductsMap().values()]
       .filter((p) => p.isActive && p.availableToSale)
       .sort((a, b) => {
         const catOrderA = getCategoryOrder(a.categoryId);

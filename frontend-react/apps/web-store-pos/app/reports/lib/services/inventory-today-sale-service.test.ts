@@ -4,8 +4,12 @@ import type { Order, OrderItem, Product, InventoryEntry, InventoryEntryView } fr
 
 // ─── Mock dependencies (report-aggregation-service.test.ts precedent) ────────
 
-vi.mock('~/sales/lib/services/product-offline-service', () => ({
-  ProductOfflineService: vi.fn(),
+// WU4 (product-service-parity Phase 1): InventoryTodaySaleService now depends on
+// ProductRepository directly (Angular's inventory-today-sale.component.ts:39,178 injects the
+// REPOSITORY, not the service) — mock the repository's getAvailableProducts(), not
+// ProductOfflineService.getAll().
+vi.mock('~/sales/lib/repositories/product-repository', () => ({
+  ProductRepository: vi.fn(),
 }));
 
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
@@ -16,7 +20,7 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn(),
 }));
 
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { InventoryTodaySaleService } from './inventory-today-sale-service';
@@ -112,7 +116,7 @@ function makeEntryView(overrides: Partial<InventoryEntryView> = {}): InventoryEn
 }
 
 describe('InventoryTodaySaleService', () => {
-  let mockProductService: { getAll: ReturnType<typeof vi.fn> };
+  let mockProductRepository: { getAvailableProducts: ReturnType<typeof vi.fn> };
   let mockOrderService: { getActiveOrdersInDay: ReturnType<typeof vi.fn> };
   let mockInventoryService: {
     getByDate: ReturnType<typeof vi.fn>;
@@ -124,7 +128,7 @@ describe('InventoryTodaySaleService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockProductService = { getAll: vi.fn().mockReturnValue([]) };
+    mockProductRepository = { getAvailableProducts: vi.fn().mockReturnValue([]) };
     mockOrderService = { getActiveOrdersInDay: vi.fn().mockReturnValue([]) };
     mockInventoryService = {
       getByDate: vi.fn().mockReturnValue(bm([])),
@@ -133,17 +137,19 @@ describe('InventoryTodaySaleService', () => {
       getAvailableInventoryCosts: vi.fn().mockReturnValue([]),
     };
 
-    vi.mocked(ProductOfflineService).mockImplementation(() => mockProductService as never);
+    vi.mocked(ProductRepository).mockImplementation(() => mockProductRepository as never);
     vi.mocked(OrderOfflineService).mockImplementation(() => mockOrderService as never);
     vi.mocked(InventoryOfflineService).mockImplementation(() => mockInventoryService as never);
   });
 
   // ─── Row composition / product filtering ──────────────────────────────────
 
-  it('IT-01: returns exactly one row per active product, excluding inactive products', () => {
-    mockProductService.getAll.mockReturnValue([
+  // WU4 (product-service-parity Phase 1): the active-only filter now lives in
+  // ProductRepository.getAvailableProducts() itself (tested at the repository level) — this
+  // service simply composes whatever the repository returns, one row per product.
+  it('IT-01: returns exactly one row per product returned by ProductRepository.getAvailableProducts()', () => {
+    mockProductRepository.getAvailableProducts.mockReturnValue([
       makeProduct({ id: 'p1', isActive: true }),
-      makeProduct({ id: 'p2', isActive: false }),
       makeProduct({ id: 'p3', isActive: true }),
     ]);
 
@@ -155,7 +161,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-02: Producto column carries the product name', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1', name: 'Vodka Premium' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1', name: 'Vodka Premium' })]);
 
     const svc = new InventoryTodaySaleService('store-1');
     const rows = svc.getProductRows();
@@ -164,7 +170,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-03: U column is the hardcoded literal "U" (not a product unit-of-measure field)', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
 
     const svc = new InventoryTodaySaleService('store-1');
     const rows = svc.getProductRows();
@@ -175,7 +181,7 @@ describe('InventoryTodaySaleService', () => {
   // ─── Stock-movement columns (spec scenario: available=10, entry qty=5, sold qty=3) ──
 
   it('IT-04: Entrada = sum of today\'s inventory entry quantities for the product', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getByDate.mockReturnValue(bm([
       makeEntryView({ productId: 'p1', quantity: 2 }),
       makeEntryView({ productId: 'p1', quantity: 3 }),
@@ -189,7 +195,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-05: Vendido = sum of today\'s order-item quantities for the product', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
       makeOrder([makeOrderItem({ productId: 'p1', quantity: 2 })]),
       makeOrder([makeOrderItem({ productId: 'p1', quantity: 1 })]),
@@ -202,7 +208,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-06: Disponible = available + Vendido; Inicio = Disponible - Entrada (spec scenario: available=10, entry=5, sold=3 -> Disponible=13, Inicio=8)', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getAvailableQuantity.mockReturnValue({ hasEntries: true, available: 10 });
     mockInventoryService.getByDate.mockReturnValue(bm([makeEntryView({ productId: 'p1', quantity: 5 })]));
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
@@ -219,7 +225,7 @@ describe('InventoryTodaySaleService', () => {
   // ─── Sale-valuation columns ────────────────────────────────────────────────
 
   it('IT-07: Precio Venta and Importe Venta are 0.00 when there are no sales today', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
 
     const svc = new InventoryTodaySaleService('store-1');
     const rows = svc.getProductRows();
@@ -229,7 +235,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-08: Precio Venta = avg(order-item prices); Importe Venta = Vendido x Precio Venta', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
       makeOrder([
         makeOrderItem({ productId: 'p1', price: 12, quantity: 2 }),
@@ -248,7 +254,7 @@ describe('InventoryTodaySaleService', () => {
   // ─── Cost-valuation columns (spec scenario: entries {qty2,cost10},{qty3,cost20} -> 16.00) ──
 
   it('IT-09: Costo Unitario = quantity-weighted avg costPrice across active (available>0) entries', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getProductInventoriesByProductId.mockReturnValue([
       makeInventoryEntry({ id: 'e1', quantity: 2, available: 2, costPrice: 10 }),
       makeInventoryEntry({ id: 'e2', quantity: 3, available: 3, costPrice: 20 }),
@@ -262,7 +268,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-10: Costo Unitario is 0 (guard) when the product has no active entries', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getProductInventoriesByProductId.mockReturnValue([]);
 
     const svc = new InventoryTodaySaleService('store-1');
@@ -272,7 +278,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-11: Costo Total = Vendido x Costo Unitario', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
       makeOrder([makeOrderItem({ productId: 'p1', price: 20, quantity: 3 })]),
     ]);
@@ -289,7 +295,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-12: C.P Venta = Costo Total / Importe Venta when Importe Venta > 0, else 0 (guard)', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
       makeOrder([makeOrderItem({ productId: 'p1', price: 10, quantity: 3 })]),
     ]);
@@ -306,7 +312,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('IT-12b: C.P Venta guard is 0 when Importe Venta is 0 (no sales, entries still exist)', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getProductInventoriesByProductId.mockReturnValue([
       makeInventoryEntry({ quantity: 2, available: 2, costPrice: 10 }),
     ]);
@@ -320,7 +326,7 @@ describe('InventoryTodaySaleService', () => {
   // ─── Closing-balance columns (spec scenario: Disponible=13, Vendido=3, CostoUnitario=16 -> Final=10, ImporteFinal=160.00) ──
 
   it('IT-13: Final = Disponible - Vendido; Importe Final = Final x Costo Unitario', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getAvailableQuantity.mockReturnValue({ hasEntries: true, available: 10 });
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
       makeOrder([makeOrderItem({ productId: 'p1', price: 10, quantity: 3 })]),
@@ -342,7 +348,7 @@ describe('InventoryTodaySaleService', () => {
   // ─── Col-9 divergence guard (design ADR-2 / CRITICAL) ─────────────────────
 
   it('DIVERGENCE GUARD: Costo Unitario is quantity-weighted, NOT available-weighted — diverges for a partially-sold entry', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     // Entry received 10 units @ cost 2, 8 already sold -> only 2 still available.
     // Quantity-weighted (Angular's live behavior, what col 9 MUST use): weight = quantity = 10.
     // Available-weighted (getAvailableByCategory's avgCostPrice, must NOT be used): weight = available = 2.
@@ -365,7 +371,7 @@ describe('InventoryTodaySaleService', () => {
   });
 
   it('MUTATION SAFETY: getProductRows never calls getAvailableInventoryCosts (which mutates/deducts stock via FIFO)', () => {
-    mockProductService.getAll.mockReturnValue([makeProduct({ id: 'p1' })]);
+    mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getProductInventoriesByProductId.mockReturnValue([
       makeInventoryEntry({ quantity: 5, available: 5, costPrice: 3 }),
     ]);

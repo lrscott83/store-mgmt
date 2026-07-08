@@ -46,6 +46,9 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
 let mockEgressProducts: Product[] = [];
 let mockEgressCategories: ProductCategory[] = [];
 
+// Still consumed by InventoryAvailablePage / EgressPage — unrelated routes, out of WU4 scope
+// (product-service-parity Phase 1, flagged mismatch #2: no confirmed Angular correlate injects
+// a repository there, so they stay on the service).
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn(() => mockEgressProducts),
@@ -57,6 +60,27 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn(() => mockEgressCategories),
     getById: vi.fn((id: string) => mockEgressCategories.find((c) => c.id === id)),
+  })),
+}));
+
+// WU4 (product-service-parity Phase 1): TodayEntriesPage/EntriesPage/
+// InventoryTodayQuantitiesPage/InventoryTodaySalesProfitPage now read products/categories
+// directly from the SYNC repositories (Angular DI parity) instead of the offline services —
+// backed by the SAME mutable fixtures as the service mocks above so existing test scenarios
+// keep working unchanged.
+vi.mock('~/sales/lib/repositories/product-repository', () => ({
+  ProductRepository: vi.fn().mockImplementation(() => ({
+    getStorageProductsMap: vi.fn(() => new Map(mockEgressProducts.map((p) => [p.id, p]))),
+    getAvailableProducts: vi.fn(() => mockEgressProducts.filter((p) => p.isActive)),
+    getProductById: vi.fn((id: string) => mockEgressProducts.find((p) => p.id === id)),
+  })),
+}));
+
+vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
+  ProductCategoryRepository: vi.fn().mockImplementation(() => ({
+    getProductCategoryById: vi.fn((id: string) => mockEgressCategories.find((c) => c.id === id)),
+    getProductCategories: vi.fn(() => [...mockEgressCategories].sort((a, b) => a.order - b.order)),
+    getAvailableProductCategories: vi.fn(() => mockEgressCategories.filter((c) => c.isActive)),
   })),
 }));
 
