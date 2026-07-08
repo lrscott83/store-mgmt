@@ -1,15 +1,45 @@
-import type { ProductCategory, ProductCategoryService, ProductCategoryView } from '@store-mgmt/domain';
+import type { BaseResponseModel, ProductCategory, ProductCategoryService, ProductCategoryView } from '@store-mgmt/domain';
+import { failure, success } from '@store-mgmt/domain';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
-import { ProductOfflineService } from './product-offline-service';
+import { ProductCategoryRepository } from '../repositories/product-category-repository';
+import { ProductRepository } from '../repositories/product-repository';
 
 const repo = new BaseRepository<ProductCategory>('product-categories');
 
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
+/**
+ * ProductCategoryOfflineService — React mirror of Angular's
+ * `application/categories/product-category-offline.service.ts`. Reconciled (Phase 2,
+ * slice 5) to Angular's exact category-service surface: the 5 abstract methods
+ * (`createProductCategory`/`updateProductCategory`/`getMaxOrder`/
+ * `getAvailableProductCategories`/`getProductCategoriesView`) plus the offline-only
+ * public `getProductCategories()`, ALL category C (`Promise<BaseResponseModel<T>>`,
+ * resolve-never-reject) — delegating persistence to `ProductCategoryRepository` (and,
+ * for `getProductCategoriesView`'s per-category product count, `ProductRepository`),
+ * mirroring Angular's 3-arg constructor (`http, categoryRepository, productRepository`,
+ * product-category-offline.service.ts:21).
+ *
+ * `extends BaseService<ProductCategory>` (hence `getAll`/`getById`/`delete`, still backed
+ * directly by the module-level `BaseRepository`) intentionally STAYS through this slice —
+ * dropped in Phase 2 step 8's cleanup, alongside `ProductService` (design.md).
+ *
+ * The React-only members `save`/`addByName`/`getByName`/`hasAnyCategory`/
+ * `hasAnyAvailableCategory` are REMOVED — Angular exposes their equivalents on the
+ * REPOSITORY only (`ProductCategoryRepository.addProductCategoryByName`/
+ * `getProductCategoryByName`/`hasAnyCategory`/`hasAnyAvailableCategory`), never on the
+ * service (spec.md "Category Service Method Surface Parity").
+ */
 export class ProductCategoryOfflineService implements ProductCategoryService {
-  constructor(private readonly storeId: string) {}
+  private readonly categoryRepository: ProductCategoryRepository;
+  private readonly productRepository: ProductRepository;
+
+  constructor(
+    private readonly storeId: string,
+    categoryRepository?: ProductCategoryRepository,
+    productRepository?: ProductRepository,
+  ) {
+    this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
+    this.productRepository = productRepository ?? new ProductRepository(storeId);
+  }
 
   getAll(): ProductCategory[] {
     // Angular parity (parity fix, not a bug): ProductCategoryRepository.getProductCategories()
@@ -21,70 +51,65 @@ export class ProductCategoryOfflineService implements ProductCategoryService {
     return repo.getById(this.storeId, id);
   }
 
-  getByName(name: string): ProductCategory | undefined {
-    return this.getAll().find((c) => c.name === name);
-  }
-
-  save(category: ProductCategory): ProductCategory {
-    repo.upsert(this.storeId, category);
-    return category;
-  }
-
   delete(id: string): void {
     repo.remove(this.storeId, id);
   }
 
-  addByName(name: string): string {
-    const id = generateId();
-    const categories = this.getAll();
-    const nextOrder = categories.length > 0 ? Math.max(...categories.map((c) => c.order)) + 1 : 1;
-    const newCategory: ProductCategory = {
-      id,
-      name,
-      order: nextOrder,
-      isActive: true,
-    };
-    repo.upsert(this.storeId, newCategory);
-    return id;
+  /** 1:1 port of Angular `createProductCategory` (product-category-offline.service.ts:30-33). */
+  createProductCategory(name: string, order: number, isActive: boolean): Promise<BaseResponseModel<boolean>> {
+    const result = this.categoryRepository.addProductCategory(name, order, isActive);
+    return Promise.resolve(result.succeeded ? success(true) : failure(result.errors));
   }
 
-  hasAnyCategory(): boolean {
-    return this.getAll().length > 0;
+  /** 1:1 port of Angular `updateProductCategory` (product-category-offline.service.ts:35-38). */
+  updateProductCategory(
+    id: string,
+    name: string,
+    order: number,
+    isActive: boolean,
+  ): Promise<BaseResponseModel<boolean>> {
+    const result = this.categoryRepository.updateProductCategory(id, name, order, isActive);
+    return Promise.resolve(result.succeeded ? success(true) : failure(result.errors));
   }
 
-  hasAnyAvailableCategory(): boolean {
-    return this.getAll().some((c) => c.isActive);
+  /**
+   * Offline-only public method (NOT on the abstract interface), 1:1 port of Angular
+   * `getProductCategories` (product-category-offline.service.ts:40-43) — never fails.
+   */
+  getProductCategories(): Promise<BaseResponseModel<ProductCategory[]>> {
+    return Promise.resolve(success(this.categoryRepository.getProductCategories()));
   }
 
-  getMaxOrder(): number {
-    // GLOBAL max across ALL categories (store-wide scope) — distinct from
-    // ProductService.getMaxOrder(categoryId), which is per-category. Do not unify.
-    const categories = this.getAll();
-    return categories.length > 0 ? Math.max(...categories.map((c) => c.order)) : 0;
+  /** 1:1 port of Angular `getAvailableProductCategories` (product-category-offline.service.ts:45-48) — never fails. */
+  getAvailableProductCategories(): Promise<BaseResponseModel<ProductCategory[]>> {
+    return Promise.resolve(success(this.categoryRepository.getAvailableProductCategories()));
   }
 
-  getAvailableProductCategories(): ProductCategory[] {
-    return this.getAll().filter((c) => c.isActive);
-  }
-
-  getProductCategoriesView(): ProductCategoryView[] {
-    // Single-pass composition (ADR-3): instantiate ProductOfflineService for this
-    // store, call getAll() ONCE, build a categoryId -> count map using the
-    // STRICTER isActive && availableToSale predicate (NOT the isActive-only
-    // predicate used by getAvailableProductsByCategoryId). O(P+C), no N+1.
-    const productService = new ProductOfflineService(this.storeId);
-    const counts = new Map<string, number>();
-    for (const product of productService.getAll()) {
-      if (product.isActive && product.availableToSale) {
-        counts.set(product.categoryId, (counts.get(product.categoryId) ?? 0) + 1);
-      }
-    }
-    return this.getAvailableProductCategories().map((category) => ({
+  /**
+   * 1:1 port of Angular `getProductCategoriesView` (product-category-offline.service.ts:50-65) —
+   * never fails. `productsCount` uses the STRICTER `isActive && availableToSale` predicate via
+   * `ProductRepository.getAvailableToSaleProductsByCategoryId` (Angular-source-confirmed,
+   * product-category-offline.service.ts:55).
+   */
+  getProductCategoriesView(): Promise<BaseResponseModel<ProductCategoryView[]>> {
+    const categories = this.categoryRepository.getAvailableProductCategories();
+    const categoriesView: ProductCategoryView[] = categories.map((category) => ({
       id: category.id,
       name: category.name,
       order: category.order,
       isActive: category.isActive,
-      productsCount: counts.get(category.id) ?? 0,
+      productsCount: this.productRepository.getAvailableToSaleProductsByCategoryId(category.id).length,
     }));
+    return Promise.resolve(success(categoriesView));
+  }
+
+  /**
+   * 1:1 port of Angular `getMaxOrder` (product-category-offline.service.ts:100-103) — GLOBAL
+   * max across ALL categories (store-wide scope), never fails. Distinct from
+   * `ProductService.getMaxOrder(categoryId)`, which is per-category. Do not unify.
+   */
+  getMaxOrder(): Promise<BaseResponseModel<number>> {
+    const categories = this.categoryRepository.getProductCategories();
+    return Promise.resolve(success(Math.max(...categories.map((c) => c.order), 0)));
   }
 }

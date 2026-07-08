@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { UserModel } from '@store-mgmt/domain';
 import { ProductCategoryOfflineService } from '../product-category-offline-service';
-import { ProductOfflineService } from '../product-offline-service';
+import { ProductCategoryRepository } from '../../repositories/product-category-repository';
+import { ProductRepository } from '../../repositories/product-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
@@ -27,7 +28,7 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
-describe('ProductCategoryOfflineService', () => {
+describe('ProductCategoryOfflineService — async category-C surface (Angular parity, Phase 2 slice 5)', () => {
   let service: ProductCategoryOfflineService;
   const storeId = 's1';
 
@@ -37,165 +38,122 @@ describe('ProductCategoryOfflineService', () => {
     service = new ProductCategoryOfflineService(storeId);
   });
 
-  describe('CAT-01: addByName creates a category and returns its id', () => {
-    it('returns a non-empty string id', () => {
-      const id = service.addByName('Bebidas');
-      expect(typeof id).toBe('string');
-      expect(id.length).toBeGreaterThan(0);
+  describe('CAT-01: createProductCategory', () => {
+    it('resolves a success envelope with data: true on create', async () => {
+      const result = await service.createProductCategory('Bebidas', 1, true);
+      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
     });
 
-    it('creates a category that can be retrieved by name', () => {
-      service.addByName('Bebidas');
-      const cat = service.getByName('Bebidas');
-      expect(cat).not.toBeUndefined();
-      expect(cat?.name).toBe('Bebidas');
+    it('persists the category, retrievable via getAll', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      const all = service.getAll();
+      expect(all).toHaveLength(1);
+      expect(all[0].name).toBe('Bebidas');
+      expect(all[0].isActive).toBe(true);
     });
 
-    it('creates a category with isActive=true', () => {
-      service.addByName('Bebidas');
-      const cat = service.getByName('Bebidas');
-      expect(cat?.isActive).toBe(true);
-    });
-
-    it('creates two categories with different ids', () => {
-      const id1 = service.addByName('Bebidas');
-      const id2 = service.addByName('Snacks');
-      expect(id1).not.toBe(id2);
-    });
-
-    it('assigns incrementing order values to new categories', () => {
-      service.addByName('Bebidas');
-      service.addByName('Snacks');
-      const a = service.getByName('Bebidas');
-      const b = service.getByName('Snacks');
-      expect(b!.order).toBeGreaterThan(a!.order);
+    it('resolves a failure envelope (never rejects) on a duplicate name', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      const result = await service.createProductCategory('Bebidas', 2, true);
+      expect(result.succeeded).toBe(false);
+      expect(result.data).toBeNull();
+      expect(result.errors).toEqual([{ code: 'ProductCategory.NameExists', description: 'El nombre de la categoría ya existe.' }]);
     });
   });
 
-  describe('CAT-02: getByName', () => {
-    it('returns undefined for unknown name', () => {
-      const cat = service.getByName('Unknown');
-      expect(cat).toBeUndefined();
+  describe('CAT-02: updateProductCategory', () => {
+    it('resolves a success envelope and persists the change', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      const [existing] = service.getAll();
+
+      const result = await service.updateProductCategory(existing.id, 'Bebidas Frías', 2, false);
+      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+
+      const updated = service.getById(existing.id);
+      expect(updated?.name).toBe('Bebidas Frías');
+      expect(updated?.order).toBe(2);
+      expect(updated?.isActive).toBe(false);
     });
 
-    it('returns the correct category by name', () => {
-      service.addByName('Galletas');
-      const cat = service.getByName('Galletas');
-      expect(cat?.name).toBe('Galletas');
+    it('resolves a failure envelope for a non-existent id', async () => {
+      const result = await service.updateProductCategory('missing-id', 'X', 1, true);
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
     });
   });
 
-  describe('CAT-03: getAll returns list of categories', () => {
+  describe('CAT-03: getAll returns list of categories (BaseService, kept through step 8)', () => {
     it('returns empty array when no categories', () => {
-      const all = service.getAll();
-      expect(all).toEqual([]);
+      expect(service.getAll()).toEqual([]);
     });
 
-    it('returns all created categories', () => {
-      service.addByName('Bebidas');
-      service.addByName('Snacks');
-      const all = service.getAll();
-      expect(all).toHaveLength(2);
+    it('returns all created categories', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      await service.createProductCategory('Snacks', 2, true);
+      expect(service.getAll()).toHaveLength(2);
     });
   });
 
-  describe('CAT-04: save (upsert)', () => {
-    it('creates a new category via save', () => {
-      const id = service.addByName('Test');
-      const cat = service.getById(id);
-      expect(cat).not.toBeUndefined();
-      cat!.name = 'Updated';
-      service.save(cat!);
-      const updated = service.getById(id);
-      expect(updated?.name).toBe('Updated');
-    });
-  });
-
-  describe('CAT-05: delete', () => {
-    it('removes a category by id', () => {
-      const id = service.addByName('ToDelete');
-      service.delete(id);
-      const cat = service.getById(id);
-      expect(cat).toBeUndefined();
+  describe('CAT-05: delete (BaseService, kept through step 8)', () => {
+    it('removes a category by id', async () => {
+      await service.createProductCategory('ToDelete', 1, true);
+      const [cat] = service.getAll();
+      service.delete(cat.id);
+      expect(service.getById(cat.id)).toBeUndefined();
     });
   });
 
   describe('CAT-06: storage key', () => {
-    it('uses the correct localStorage key pattern', () => {
-      service.addByName('Test');
+    it('uses the correct localStorage key pattern', async () => {
+      await service.createProductCategory('Test', 1, true);
       const raw = localStorage.getItem('lizoft.store-product-categories-s1');
       expect(raw).not.toBeNull();
     });
   });
 
-  describe('CAT-07: hasAnyCategory', () => {
-    it('returns false when no categories exist', () => {
-      expect(service.hasAnyCategory()).toBe(false);
-    });
-
-    it('returns true when at least one category exists, active or not', () => {
-      const id = service.addByName('Bebidas');
-      const cat = service.getById(id)!;
-      service.save({ ...cat, isActive: false });
-      expect(service.hasAnyCategory()).toBe(true);
-    });
-  });
-
-  describe('CAT-08: hasAnyAvailableCategory', () => {
-    it('returns false when no active categories exist', () => {
-      const id = service.addByName('Bebidas');
-      const cat = service.getById(id)!;
-      service.save({ ...cat, isActive: false });
-      expect(service.hasAnyAvailableCategory()).toBe(false);
-    });
-
-    it('returns true when at least one active category exists', () => {
-      service.addByName('Bebidas');
-      expect(service.hasAnyAvailableCategory()).toBe(true);
-    });
-  });
-
   describe('CAT-09: getMaxOrder (global, distinct from Product per-category getMaxOrder)', () => {
-    it('returns 0 when there are no categories', () => {
-      expect(service.getMaxOrder()).toBe(0);
+    it('resolves 0 when there are no categories', async () => {
+      const result = await service.getMaxOrder();
+      expect(result).toEqual({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
     });
 
-    it('returns the global max order across all categories', () => {
-      service.addByName('Bebidas');
-      service.addByName('Snacks');
-      service.addByName('Galletas');
-      expect(service.getMaxOrder()).toBe(3);
+    it('resolves the global max order across all categories', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      await service.createProductCategory('Snacks', 2, true);
+      await service.createProductCategory('Galletas', 3, true);
+      const result = await service.getMaxOrder();
+      expect(result.data).toBe(3);
     });
   });
 
   describe('CAT-10: getAvailableProductCategories', () => {
-    it('returns only active categories, sorted ascending by order', () => {
-      const id1 = service.addByName('Bebidas');
-      const id2 = service.addByName('Snacks');
-      service.addByName('Galletas');
-      const cat2 = service.getById(id2)!;
-      service.save({ ...cat2, isActive: false });
+    it('resolves only active categories, sorted ascending by order', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      await service.createProductCategory('Snacks', 2, true);
+      await service.createProductCategory('Galletas', 3, true);
+      const [, snacks] = service.getAll();
+      await service.updateProductCategory(snacks.id, snacks.name, snacks.order, false);
 
-      const results = service.getAvailableProductCategories();
-      expect(results.map((c) => c.name)).toEqual(['Bebidas', 'Galletas']);
-      expect(results.every((c) => c.isActive)).toBe(true);
-      void id1;
+      const result = await service.getAvailableProductCategories();
+      expect(result.succeeded).toBe(true);
+      expect(result.data.map((c) => c.name)).toEqual(['Bebidas', 'Galletas']);
+      expect(result.data.every((c) => c.isActive)).toBe(true);
     });
   });
 
-  describe('CAT-11: getAll sort fix — sorted ascending by order (parity fix, not Angular bug)', () => {
-    it('returns categories sorted ascending by order regardless of insertion order', () => {
-      const idA = service.addByName('C');
-      const catA = service.getById(idA)!;
-      service.save({ ...catA, order: 3 });
-
-      const idB = service.addByName('A');
-      const catB = service.getById(idB)!;
-      service.save({ ...catB, order: 1 });
-
-      const idC = service.addByName('B');
-      const catC = service.getById(idC)!;
-      service.save({ ...catC, order: 2 });
+  describe('CAT-11: getAll sort — sorted ascending by order regardless of insertion order', () => {
+    it('returns categories sorted ascending by order', async () => {
+      // Seed via `updateCategories` (raw positional write, no order-shift business rule) to
+      // isolate getAll's SORT behavior from addProductCategoryData's order-shift-on-insert
+      // rule (covered separately by CAT-01 above / product-category-repository.test.ts).
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      categoryRepository.updateCategories(
+        new Map([
+          ['c-c', { id: 'c-c', name: 'C', order: 3, isActive: true }],
+          ['c-a', { id: 'c-a', name: 'A', order: 1, isActive: true }],
+          ['c-b', { id: 'c-b', name: 'B', order: 2, isActive: true }],
+        ]),
+      );
 
       const all = service.getAll();
       expect(all.map((c) => c.order)).toEqual([1, 2, 3]);
@@ -204,85 +162,77 @@ describe('ProductCategoryOfflineService', () => {
   });
 
   describe('CAT-12: getProductCategoriesView', () => {
-    it('projects active categories with productsCount using isActive && availableToSale (STRICTER than getAvailableProductsByCategoryId)', () => {
-      const catId1 = service.addByName('Bebidas');
-      const catId2 = service.addByName('Snacks');
-      const catId3 = service.addByName('Inactive');
-      const inactiveCat = service.getById(catId3)!;
-      service.save({ ...inactiveCat, isActive: false });
+    it('projects active categories with productsCount using isActive && availableToSale (STRICTER than getAvailableProductsByCategoryId)', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      await service.createProductCategory('Snacks', 2, true);
+      await service.createProductCategory('Inactive', 3, true);
+      const [bebidas, snacks, inactive] = service.getAll();
+      await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
-      const productService = new ProductOfflineService(storeId);
-      // isActive && availableToSale -> counted
-      productService.create({
-        name: 'Coca Cola',
-        barcode: '1',
-        categoryId: catId1,
-        categoryName: 'Bebidas',
-        price: 1,
-        order: 1,
-        availableToSale: true,
-        discountFromInvantory: false,
-        businessId: '',
-        isActive: true,
-      });
-      // isActive but NOT availableToSale -> excluded from view count, but INCLUDED
-      // by getAvailableProductsByCategoryId (isActive-only) — the trap this test guards.
-      const p2 = productService.create({
-        name: 'Fanta',
-        barcode: '2',
-        categoryId: catId1,
-        categoryName: 'Bebidas',
-        price: 1,
-        order: 2,
-        availableToSale: false,
-        discountFromInvantory: false,
-        businessId: '',
-        isActive: true,
-      });
-      // Not active at all -> excluded from both
-      productService.create({
-        name: 'Sprite',
-        barcode: '3',
-        categoryId: catId1,
-        categoryName: 'Bebidas',
-        price: 1,
-        order: 3,
-        availableToSale: true,
-        discountFromInvantory: false,
-        businessId: '',
-        isActive: false,
-      });
-      // Category 2 has no products
-      void catId2;
+      const productRepository = new ProductRepository(storeId);
+      // isActive && availableToSale -> counted (getAvailableToSaleProductsByCategoryId)
+      productRepository.addProduct(bebidas.id, 'Coca Cola', 1, 'biz', 1, true, true, false, '1');
+      // isActive but NOT availableToSale -> excluded from the view's stricter count
+      productRepository.addProduct(bebidas.id, 'Fanta', 1, 'biz', 2, true, false, false, '2');
+      void snacks;
 
-      const view = service.getProductCategoriesView();
-
-      expect(view.map((v) => v.name)).toEqual(['Bebidas', 'Snacks']);
-      const bebidasView = view.find((v) => v.id === catId1)!;
+      const view = await service.getProductCategoriesView();
+      expect(view.succeeded).toBe(true);
+      expect(view.data.map((v) => v.name)).toEqual(['Bebidas', 'Snacks']);
+      const bebidasView = view.data.find((v) => v.id === bebidas.id)!;
       expect(bebidasView.productsCount).toBe(1);
-
-      const snacksView = view.find((v) => v.id === catId2)!;
+      const snacksView = view.data.find((v) => v.name === 'Snacks')!;
       expect(snacksView.productsCount).toBe(0);
-
-      // The excluded-from-view product IS included by getAvailableProductsByCategoryId
-      // (isActive-only predicate) — proving the two predicates are intentionally distinct.
-      const availableProducts = productService.getAvailableProductsByCategoryId(catId1);
-      expect(availableProducts.map((p) => p.id)).toContain(p2.id);
-      expect(availableProducts).toHaveLength(2);
     });
 
-    it('excludes inactive categories entirely from the view result', () => {
-      const catId = service.addByName('ActiveCat');
-      const inactiveId = service.addByName('InactiveCat');
-      const inactiveCat = service.getById(inactiveId)!;
-      service.save({ ...inactiveCat, isActive: false });
+    it('excludes inactive categories entirely from the view result', async () => {
+      await service.createProductCategory('ActiveCat', 1, true);
+      await service.createProductCategory('InactiveCat', 2, true);
+      const [active, inactive] = service.getAll();
+      await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
-      const view = service.getProductCategoriesView();
-      expect(view.map((v) => v.id)).toEqual([catId]);
+      const view = await service.getProductCategoriesView();
+      expect(view.data.map((v) => v.id)).toEqual([active.id]);
     });
 
-    it('returns empty array when there are no active categories', () => {
-      expect(service.getProductCategoriesView()).toEqual([]);
+    it('resolves an empty array when there are no active categories', async () => {
+      const view = await service.getProductCategoriesView();
+      expect(view).toEqual({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] });
+    });
+  });
+
+  describe('getProductCategories (offline-only, NOT on the abstract interface)', () => {
+    it('resolves all categories including inactive ones, never fails', async () => {
+      await service.createProductCategory('Active', 1, true);
+      await service.createProductCategory('Inactive', 2, true);
+      const [, inactive] = service.getAll();
+      await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
+
+      const result = await service.getProductCategories();
+      expect(result.succeeded).toBe(true);
+      expect(result.data).toHaveLength(2);
+    });
+  });
+
+  describe('constructor accepts optional categoryRepository/productRepository (Angular 3-arg parity)', () => {
+    it('delegates to an explicitly-injected ProductCategoryRepository instance', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const injected = new ProductCategoryOfflineService(storeId, categoryRepository);
+
+      await injected.createProductCategory('Injected', 1, true);
+      // Reading through the SAME repository instance confirms delegation, not a fresh one.
+      expect(categoryRepository.getProductCategories().map((c) => c.name)).toContain('Injected');
+    });
+  });
+
+  describe('removed methods (Exact-Surface Rule — no Angular category-SERVICE correlate)', () => {
+    it('does not expose save/addByName/getByName/hasAnyCategory/hasAnyAvailableCategory', () => {
+      const svc = service as unknown as Record<string, unknown>;
+      expect(svc.save).toBeUndefined();
+      expect(svc.addByName).toBeUndefined();
+      expect(svc.getByName).toBeUndefined();
+      expect(svc.hasAnyCategory).toBeUndefined();
+      expect(svc.hasAnyAvailableCategory).toBeUndefined();
     });
   });
 });
