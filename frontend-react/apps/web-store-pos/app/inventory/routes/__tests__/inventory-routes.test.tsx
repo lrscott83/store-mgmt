@@ -53,8 +53,7 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     // WU9 (product-service-parity step 8): EgressPage now loads its category-scoped sellable
     // products via the async getProductsToSaleByCategoryId (Angular SaleCategoryProductsComponent
-    // parity), not the flat sync getAll. getAll is retained only for InventoryAvailablePage (WU10,
-    // still sync) which never populates these fixtures, so it keeps seeing [].
+    // parity), not the flat sync getAll.
     getAll: vi.fn(() => []),
     getById: vi.fn().mockReturnValue(undefined),
     getProductsToSaleByCategoryId: vi.fn(async (categoryId: string) =>
@@ -63,6 +62,13 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
           .filter((p) => p.categoryId === categoryId && p.isActive && p.availableToSale)
           .sort((a, b) => a.order - b.order),
       ),
+    ),
+    // WU10 (product-service-parity step 8): InventoryAvailablePage now loads active products
+    // per-category via the async getAvailableProductsByCategoryId (isActive-only, no
+    // availableToSale gate — matches product-offline-service.ts's real filter), not the flat
+    // sync getAll. This route never populates mockEgressProducts, so it keeps seeing [].
+    getAvailableProductsByCategoryId: vi.fn(async (categoryId: string) =>
+      bm(mockEgressProducts.filter((p) => p.categoryId === categoryId && p.isActive)),
     ),
     // Flag #4: EditInventoryEntryModal loads its dropdown via getProductsToSelect (async).
     getProductsToSelect: vi.fn(async () => ({
@@ -78,13 +84,16 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
     // WU9: EgressPage now loads active categories via the async getAvailableProductCategories
-    // (drops the client-side isActive filter/sort). getAll retained for InventoryAvailablePage
-    // (WU10) which never populates these fixtures.
+    // (drops the client-side isActive filter/sort).
     getAll: vi.fn(() => []),
     getById: vi.fn((id: string) => mockEgressCategories.find((c) => c.id === id)),
     getAvailableProductCategories: vi.fn(async () =>
       bm(mockEgressCategories.filter((c) => c.isActive).sort((a, b) => a.order - b.order)),
     ),
+    // WU10: InventoryAvailablePage now loads ALL categories (active + inactive, same unfiltered
+    // set as the previous sync getAll) via the async offline-only getProductCategories. This
+    // route never populates mockEgressCategories, so it keeps seeing [].
+    getProductCategories: vi.fn(async () => bm([...mockEgressCategories].sort((a, b) => a.order - b.order))),
   })),
 }));
 
@@ -177,7 +186,7 @@ describe('InventoryAvailablePage — smoke render', () => {
 // currency chip, `| currency:'USD':'symbol':'1.2-2'`).
 
 describe('InventoryAvailablePage — header total inventory value', () => {
-  it('shows the sum of all categories totalCostPrice as the header chip', () => {
+  it('shows the sum of all categories totalCostPrice as the header chip', async () => {
     const categories: InventoryCategoryView[] = [
       {
         categoryId: 'cat-1',
@@ -226,8 +235,8 @@ describe('InventoryAvailablePage — header total inventory value', () => {
       </Wrapper>,
     );
 
-    // 60 + 40 = 100.00
-    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    // 60 + 40 = 100.00 — loadData is now async (WU10), await the resolved effect.
+    expect(await screen.findByText('$100.00')).toBeInTheDocument();
   });
 
   it('shows $0.00 when there is no inventory yet', () => {

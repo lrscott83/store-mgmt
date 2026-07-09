@@ -311,15 +311,18 @@ duplicate file structure) — same two-effect split, same `products` state narro
 
 `apps/web-store-pos/app/inventory/routes/available.tsx` + its test.
 
-- [ ] 10.1 RED/GREEN: `categorySvc.getAll()` → `categorySvc.getProductCategories()`.
-- [ ] 10.2 RED/GREEN: `productSvc.getAll()` →
+- [x] 10.1 RED/GREEN: `categorySvc.getAll()` → `categorySvc.getProductCategories()`.
+- [x] 10.2 RED/GREEN: `productSvc.getAll()` →
       `Promise.all(cats.map(c => productSvc.getAvailableProductsByCategoryId(c.id)))`, flattened
       into one array before building `enriched` (preserves current enrichment logic unchanged).
-- [ ] 10.3 GREEN: effect becomes `async` (IIFE or `useEffect` + async helper, matching this app's
+- [x] 10.3 GREEN: effect becomes `async` (IIFE or `useEffect` + async helper, matching this app's
       established pattern elsewhere).
-- [ ] 10.4 Update the test: mock `getProductCategories`/`getAvailableProductsByCategoryId`.
-- [ ] 10.5 Gate + commit
+- [x] 10.4 Update the test: mock `getProductCategories`/`getAvailableProductsByCategoryId`.
+- [x] 10.5 Gate + commit
       `refactor(web-store-pos): re-express available.tsx category/product loading against async getProductCategories + getAvailableProductsByCategoryId (Flag #1)`.
+      All green (40/40 route tests, 1559/1560 full suite — the 1 failure is a PRE-EXISTING
+      unrelated regression in sale.tsx/sales-routes.test.tsx from WU8, confirmed present before
+      this WU via `git stash`; tsc clean, build clean).
 
 ## WU11: Re-point `import.tsx`/`export.tsx`/`data-serializer-service.ts` to repositories — Req: Flag #2
 

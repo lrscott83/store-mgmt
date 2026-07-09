@@ -23,20 +23,35 @@ export function InventoryAvailablePage() {
     const productSvc = new ProductOfflineService(storeId);
     const categorySvc = new ProductCategoryOfflineService(storeId);
 
-    const products = productSvc.getAll();
-    const cats = categorySvc.getAll();
+    async function loadData() {
+      // WU10 (product-service-parity Flag #1, minimal in-scope fix): categorySvc.getAll() /
+      // productSvc.getAll() dropped (Exact-Surface Rule, no bare getAll on the async surface).
+      // getProductCategories() is offline-only, ALL categories, same unfiltered set as before —
+      // zero behavior change. Products are fetched per-category via
+      // getAvailableProductsByCategoryId (isActive-only) and flattened back into one array,
+      // preserving the pre-existing enrichment logic unchanged.
+      const catsResult = await categorySvc.getProductCategories();
+      const cats = catsResult.data ?? [];
 
-    // Build enriched product list for getAvailableByCategory
-    const enriched = products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      categoryId: p.categoryId,
-      categoryName: cats.find((c) => c.id === p.categoryId)?.name ?? '',
-    }));
+      const productLists = await Promise.all(
+        cats.map((c) => productSvc.getAvailableProductsByCategoryId(c.id)),
+      );
+      const products = productLists.flatMap((r) => r.data ?? []);
 
-    // WU3 (category B): getAvailableByCategory now returns
-    // BaseResponseModel<InventoryCategoryView[]> (was a bare array) — unwrap `.data`.
-    setCategories(inventorySvc.getAvailableByCategory(enriched).data);
+      // Build enriched product list for getAvailableByCategory
+      const enriched = products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        categoryId: p.categoryId,
+        categoryName: cats.find((c) => c.id === p.categoryId)?.name ?? '',
+      }));
+
+      // WU3 (category B): getAvailableByCategory now returns
+      // BaseResponseModel<InventoryCategoryView[]> (was a bare array) — unwrap `.data`.
+      setCategories(inventorySvc.getAvailableByCategory(enriched).data);
+    }
+
+    loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
