@@ -416,6 +416,30 @@ their tests.
       `createProductService(storeId)`" will need those 4 rewired too if that count is meant to be
       literal; WU13's own scope (tasks file, this WU) named only the 3 sites above.
 
+### WU13b: Rewire the 4 remaining route files (`available.tsx`/`sale.tsx`/`products.tsx`/`egress.tsx`) to the factory — Req: completes F.4
+
+Emergent follow-up to WU13 (this WU's body only named 3 sites; F.4 requires ALL production
+call sites, including the WU7-WU10 route files, to route through the factory).
+
+- [x] 13b.1 RED/GREEN (verified no test edits needed):
+      `available.tsx:23` — `new ProductOfflineService(storeId)` → `createProductService(storeId)`
+      (import from `~/sales/lib/services/product-service.factory`).
+- [x] 13b.2 RED/GREEN: `sale.tsx:59` — same swap (import from `../lib/services/product-service.factory`).
+- [x] 13b.3 RED/GREEN: `products.tsx:40` — same swap (import from `../lib/services/product-service.factory`).
+- [x] 13b.4 RED/GREEN: `egress.tsx:65` — same swap (import from `~/sales/lib/services/product-service.factory`).
+- [x] 13b.5 Confirmed all 4 files' method calls (`getAvailableProductsByCategoryId`,
+      `getProductsToSaleByCategoryId`, `createProduct`, `updateProduct`, `deleteProduct`,
+      `createCsvProducts`) are on `AsyncProductService` — pure type-clean swap, no bridge needed.
+      Dropped the now-unused `ProductOfflineService` import in all 4 files (`ProductCategoryOfflineService`
+      import left untouched per scope — no factory exists for it).
+- [x] 13b.6 Gate + commit
+      `refactor(web-store-pos): route products/sale/egress/available through createProductService factory (complete F.4, Angular DI parity)`.
+      All green: 1561/1561 full suite (0 regressions, zero test-mock edits needed — same
+      `vi.mock('~/sales/lib/services/product-offline-service', ...)` pattern as WU13 transparently
+      backs the factory's offline branch), `tsc --noEmit` clean, `pnpm build` clean.
+      Grep-confirmed F.4: zero production `new ProductOfflineService(` remain outside
+      `product-service.factory.ts` and test files.
+
 ## WU4: Remove `ProductOfflineService`'s sync method BODIES — Req: Exact-Surface Rule, design.md cleanup
 
 `apps/web-store-pos/app/sales/lib/services/product-offline-service.ts` +
@@ -468,6 +492,8 @@ remaining callers first).
 - [ ] F.4 Grep-confirm no `new ProductOfflineService(` remains outside
       `product-service.factory.ts`, `product-offline-service.ts` itself, and test files — all 9
       production call sites route through `createProductService(storeId)`.
+      (Re-verify at Final time — as of WU13b, grep already confirms 0 production sites
+      outside the factory; only `product-service.factory.ts` and test files match.)
 - [ ] F.5 Grep-confirm no residual `upsert`/`remove` on `ProductRepository`/
       `ProductCategoryRepository` (regression check, should already be clean since Phase 1).
 - [ ] F.6 Confirm `product-repository.ts`'s `categoryRepository` param is STILL optional

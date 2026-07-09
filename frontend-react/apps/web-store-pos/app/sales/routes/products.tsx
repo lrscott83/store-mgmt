@@ -9,7 +9,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
-import { ProductOfflineService } from '../lib/services/product-offline-service';
+import { createProductService } from '../lib/services/product-service.factory';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { CategoryProductList } from '../components/category-product-list';
@@ -37,7 +37,7 @@ export function ProductsPage() {
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<Modal | null>(null);
 
-  const productService = new ProductOfflineService(storeId);
+  const productService = createProductService(storeId);
   const categoryService = new ProductCategoryOfflineService(storeId);
 
   // Angular parity (products.component.ts:30-40): categories via getProductCategoriesView

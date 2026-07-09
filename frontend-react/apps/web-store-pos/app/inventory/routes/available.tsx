@@ -7,7 +7,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { createProductService } from '~/sales/lib/services/product-service.factory';
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 import { InventoryProductList } from '../components/inventory-product-list';
 
@@ -20,7 +20,7 @@ export function InventoryAvailablePage() {
 
   useEffect(() => {
     const inventorySvc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
-    const productSvc = new ProductOfflineService(storeId);
+    const productSvc = createProductService(storeId);
     const categorySvc = new ProductCategoryOfflineService(storeId);
 
     async function loadData() {

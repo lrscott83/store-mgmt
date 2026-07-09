@@ -10,7 +10,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
-import { ProductOfflineService } from '../lib/services/product-offline-service';
+import { createProductService } from '../lib/services/product-service.factory';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import { hasAvailableProductToSale } from '../lib/product-availability';
 import { SaleCategoryProducts } from '../components/sale-category-products';
@@ -56,7 +56,7 @@ export function SalePage() {
       setProducts([]);
       return;
     }
-    const productService = new ProductOfflineService(storeId);
+    const productService = createProductService(storeId);
     productService.getProductsToSaleByCategoryId(selectedCategoryId).then((result) => {
       setProducts(result.data ?? []);
     });
