@@ -1,40 +1,23 @@
 import type { BaseResponseModel, CsvProduct, Product, ProductService, ProductSelectView } from '@store-mgmt/domain';
 import { failure, ProductErrors, success } from '@store-mgmt/domain';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
-import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { ProductRepository } from '../repositories/product-repository';
 import { ProductCategoryRepository } from '../repositories/product-category-repository';
 
-const repo = new BaseRepository<Product>('products', ['createdDate', 'updatedDate']);
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-type CreateProductInput = Omit<
-  Product,
-  'id' | 'createdDate' | 'createdByName' | 'updatedDate' | 'updatedByName'
-> & { id?: string };
-
 /**
  * ProductOfflineService — React mirror of Angular's
- * `application/products/product-offline.service.ts`. Being reconciled (Phase
- * 2, slice 6) to Angular's exact 12-method async surface plus the two
+ * `application/products/product-offline.service.ts`. Reconciled (Phase 2,
+ * step 8 cleanup) to Angular's exact 12-method async surface plus the two
  * offline-only public extras (`setDiscountFromInvantory`,
  * `getProductsByCategoryId`), delegating persistence to `ProductRepository`
  * (and, for `getProductsToSelect`'s category grouping,
  * `ProductCategoryRepository`) — all category C
  * (`Promise<BaseResponseModel<T>>`, resolve-never-reject).
  *
- * The legacy sync surface (`create`/`update`/`updateMany`/`delete`/`search`/
- * `getByName`/`getMaxOrder`(sync)/`getAvailableProductsByCategoryId`(sync)/
- * `activate`/`deactivate`, still backed by the module-level `repo`)
- * intentionally STAYS alive through WU2 — `extends BaseService<Product>` plus
- * `getByBarcode`/`update` are kept per Flag #1 (dropped in Phase 2 step 8);
- * `getMaxOrder`/`getAvailableProductsByCategoryId` are flipped to async and
- * `search`/`updateMany`/`getByName`/`activate`/`deactivate` are removed in
- * WU3, matching the domain interface's WU1 change (Slice 5 precedent: interface
- * flips land ahead of the concrete class's own flip commit).
+ * The legacy sync surface (`getAll`/`getById`/`getByBarcode`/`create`/
+ * `update`/`delete`, previously backed by a module-level `BaseRepository`)
+ * has been fully retired — every call site was re-expressed against the
+ * async surface (Phase 2 step 8, WU7-WU13b) before this removal landed, so
+ * no production code depended on it (grep-confirmed at WU4).
  */
 export class ProductOfflineService implements ProductService {
   private readonly productRepository: ProductRepository;
@@ -47,56 +30,6 @@ export class ProductOfflineService implements ProductService {
   ) {
     this.productRepository = productRepository ?? new ProductRepository(storeId);
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
-  }
-
-  getAll(): Product[] {
-    return Array.from(repo.getAll(this.storeId).values());
-  }
-
-  getById(id: string): Product | undefined {
-    return repo.getById(this.storeId, id);
-  }
-
-  getByBarcode(barcode: string): Product | undefined {
-    if (!barcode) return undefined;
-    return this.getAll().find((p) => p.barcode === barcode);
-  }
-
-  create(data: CreateProductInput): Product {
-    const product: Product = {
-      ...data,
-      id: data.id ?? generateId(),
-      createdDate: new Date(),
-      createdByName: getCurrentUserLogin(),
-      updatedDate: undefined,
-      updatedByName: undefined,
-    };
-    repo.upsert(this.storeId, product);
-    return product;
-  }
-
-  update(product: Product): Product {
-    const updated: Product = {
-      ...product,
-      updatedDate: new Date(),
-      updatedByName: getCurrentUserLogin(),
-    };
-    repo.upsert(this.storeId, updated);
-    return updated;
-  }
-
-  delete(id: string): void {
-    // Angular parity (ADR-3): deleteProduct soft-deletes — sets isActive=false,
-    // updatedDate/updatedByName, keeps the record (audit trail, sync contract).
-    // No-op for a missing id, matching the prior hard-delete's no-op behavior.
-    const existing = repo.getById(this.storeId, id);
-    if (!existing) return;
-    repo.upsert(this.storeId, {
-      ...existing,
-      isActive: false,
-      updatedDate: new Date(),
-      updatedByName: getCurrentUserLogin(),
-    });
   }
 
   /** 1:1 port of Angular `getMaxOrder` (product-offline.service.ts:159-162) — async, delegates repo. */
