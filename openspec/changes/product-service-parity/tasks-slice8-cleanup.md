@@ -393,14 +393,28 @@ their tests.
 `apps/web-store-pos/app/shared/lib/auth/user-home.ts`,
 `apps/web-store-pos/app/inventory/components/edit-inventory-entry-modal.tsx` + their tests.
 
-- [ ] 13.1 RED/GREEN: `cart-shell.tsx:118` — `new ProductOfflineService(storeId)` →
+- [x] 13.1 RED/GREEN: `cart-shell.tsx:118` — `new ProductOfflineService(storeId)` →
       `createProductService(storeId)`; drop the now-unused `ProductOfflineService` import, add the
       factory import.
-- [ ] 13.2 RED/GREEN: `user-home.ts:24` — same swap for `resolveUserHomePath`.
-- [ ] 13.3 RED/GREEN: `edit-inventory-entry-modal.tsx:55` — same swap.
-- [ ] 13.4 Update the 3 tests' mock targets.
-- [ ] 13.5 Gate + commit
+- [x] 13.2 RED/GREEN: `user-home.ts:24` — same swap for `resolveUserHomePath`.
+- [x] 13.3 RED/GREEN: `edit-inventory-entry-modal.tsx:55` — same swap.
+- [x] 13.4 Update the 3 tests' mock targets.
+      Confirmed no mock changes were needed: all 3 tests (`cart-shell.test.tsx`,
+      `user-home.test.ts`, `inventory-components.test.tsx`'s `EditInventoryEntryModal` block, plus
+      `inventory-routes.test.tsx`'s shared fixture) already `vi.mock('~/sales/lib/services/
+      product-offline-service', ...)` — the exact module the factory's offline branch
+      (`GlobalConfig.USE_ONLINE_SERVICE === false`, the untouched test default) delegates to
+      internally. Since `vi.mock` intercepts by module specifier regardless of which file performs
+      the import, the existing mocks transparently back `createProductService(storeId)` with zero
+      edits — verified all 4 test files green before AND after the production swap.
+- [x] 13.5 Gate + commit
       `refactor(web-store-pos): rewire cart-shell/user-home/edit-inventory-entry-modal to createProductService factory (Slice 7 Flag A follow-through)`.
+      All green: 1561/1561 full suite (0 regressions), `tsc --noEmit` clean, `pnpm build` clean.
+      Note for whoever picks up **Final** (F.4): `sale.tsx`/`available.tsx`/`egress.tsx`/
+      `products.tsx` still construct `new ProductOfflineService(storeId)` directly (WU7-WU10
+      scope, untouched here) — F.4's "9 production call sites route through
+      `createProductService(storeId)`" will need those 4 rewired too if that count is meant to be
+      literal; WU13's own scope (tasks file, this WU) named only the 3 sites above.
 
 ## WU4: Remove `ProductOfflineService`'s sync method BODIES — Req: Exact-Surface Rule, design.md cleanup
 

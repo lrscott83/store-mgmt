@@ -5,7 +5,7 @@ import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { createProductService } from '~/sales/lib/services/product-service.factory';
 import { hasAvailableProductToSale } from '~/sales/lib/product-availability';
 import { ProductErrors } from '@store-mgmt/domain';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
@@ -115,7 +115,7 @@ export function CartShell() {
   // possibly-stale one cached on the cart item) exactly like Angular's
   // productService.getProductById inside addCartItem.
   async function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
-    const productService = new ProductOfflineService(storeId);
+    const productService = createProductService(storeId);
     const inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const lookup = await productService.getProductById(productId);
     const product = lookup.succeeded ? lookup.data : undefined;

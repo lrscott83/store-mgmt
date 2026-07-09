@@ -3,7 +3,7 @@ import { useIntl } from 'react-intl';
 import type { InventoryEntry, ProductSelectView } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { createProductService } from '~/sales/lib/services/product-service.factory';
 
 export interface EditInventoryEntryInput {
   productId: string;
@@ -36,7 +36,7 @@ export function EditInventoryEntryModal({
 }: EditInventoryEntryModalProps) {
   const intl = useIntl();
   // Angular parity (Flag #4): the product dropdown is loaded via
-  // ProductOfflineService.getProductsToSelect() (ProductSelectView = { id, fullName }),
+  // createProductService(storeId).getProductsToSelect() (ProductSelectView = { id, fullName }),
   // exactly as Angular's EditInventoryEntryModalComponent does. Angular has NO category
   // field on this modal, so the React-only read-only "Category" display was dropped.
   const [products, setProducts] = useState<ProductSelectView[]>([]);
@@ -52,7 +52,7 @@ export function EditInventoryEntryModal({
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
-    new ProductOfflineService(storeId).getProductsToSelect().then((result) => {
+    createProductService(storeId).getProductsToSelect().then((result) => {
       if (!cancelled && result.succeeded) setProducts(result.data);
     });
     return () => {
