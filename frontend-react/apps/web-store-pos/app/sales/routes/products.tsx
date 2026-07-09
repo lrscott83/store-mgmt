@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Product, ProductCategory } from '@store-mgmt/domain';
+import type { Product, ProductCategory, ProductCategoryView } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -32,17 +32,31 @@ export function ProductsPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [categories, setCategories] = useState<ProductCategoryView[]>([]);
+  const [productsByCategory, setProductsByCategory] = useState<Record<string, Product[]>>({});
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<Modal | null>(null);
 
   const productService = new ProductOfflineService(storeId);
   const categoryService = new ProductCategoryOfflineService(storeId);
 
-  function loadData() {
-    setProducts(productService.getAll());
-    setCategories(categoryService.getAll());
+  // Angular parity (products.component.ts:30-40): categories via getProductCategoriesView
+  // (active-only, WITH productsCount); mirrors Angular's eager-mount-all
+  // CategoryProductListComponent behavior by fetching every category's product list up front
+  // via getAvailableProductsByCategoryId, cached per category id (Flag #1).
+  async function loadData() {
+    const categoriesResult = await categoryService.getProductCategoriesView();
+    const categoriesData = categoriesResult.data ?? [];
+    setCategories(categoriesData);
+
+    const productLists = await Promise.all(
+      categoriesData.map((c) => productService.getAvailableProductsByCategoryId(c.id)),
+    );
+    const cache: Record<string, Product[]> = {};
+    categoriesData.forEach((c, i) => {
+      cache[c.id] = productLists[i].data ?? [];
+    });
+    setProductsByCategory(cache);
   }
 
   useEffect(() => {
@@ -218,7 +232,7 @@ export function ProductsPage() {
         {/* Accordion: one panel per category, collapsed by default */}
         <div className="space-y-2">
           {sortedCategories.map((category) => {
-            const categoryProducts = products.filter((p) => p.categoryId === category.id && p.isActive);
+            const categoryProducts = productsByCategory[category.id] ?? [];
             const isExpanded = expandedCategoryIds.has(category.id);
             return (
               <div key={category.id} className="rounded-lg border border-border bg-surface">
@@ -230,7 +244,11 @@ export function ProductsPage() {
                   aria-expanded={isExpanded}
                 >
                   <span className="flex-1 text-base font-medium text-text">{category.name}</span>
-                  <span className="text-sm text-text-muted">{categoryProducts.length}</span>
+                  {/* Angular parity (products.component.ts:30-40): badge uses
+                      getProductCategoriesView's productsCount (isActive && availableToSale) —
+                      a DIFFERENT filter than the panel's own product list below (isActive-only),
+                      a deliberate Angular quirk (spec.md "three separate filters"). */}
+                  <span className="text-sm text-text-muted">{category.productsCount}</span>
                   {/* Angular's mat-expansion-panel toggle indicator (rotates when open). */}
                   <svg
                     className={`h-5 w-5 shrink-0 text-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -282,7 +300,7 @@ export function ProductsPage() {
 
       {modal?.type === 'bulk' && (
         <EditProductsModal
-          products={products.filter((p) => p.isActive && p.categoryId === modal.category.id)}
+          products={productsByCategory[modal.category.id] ?? []}
           onSave={handleBulkSave}
           onClose={() => setModal(null)}
         />

@@ -28,9 +28,15 @@ const productServiceSpies = vi.hoisted(() => ({
   createCsvProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
 }));
 
+const { bm } = vi.hoisted(() => ({
+  bm: <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] }),
+}));
+
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn(() => mockProducts),
+    getAvailableProductsByCategoryId: vi.fn(async (categoryId: string) =>
+      bm(mockProducts.filter((p) => p.categoryId === categoryId && p.isActive)),
+    ),
     createProduct: productServiceSpies.createProduct,
     updateProduct: productServiceSpies.updateProduct,
     deleteProduct: productServiceSpies.deleteProduct,
@@ -60,7 +66,16 @@ const categoryServiceSpies = vi.hoisted(() => ({
 
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn(() => mockCategories),
+    getProductCategoriesView: vi.fn(async () =>
+      bm(
+        mockCategories.map((c) => ({
+          ...c,
+          productsCount: mockProducts.filter(
+            (p) => p.categoryId === c.id && p.isActive && p.availableToSale,
+          ).length,
+        })),
+      ),
+    ),
     createProductCategory: categoryServiceSpies.createProductCategory,
     updateProductCategory: categoryServiceSpies.updateProductCategory,
   })),
@@ -164,16 +179,18 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     ).toBeInTheDocument();
   });
 
-  it('hides the info-box once a category exists', () => {
+  it('hides the info-box once a category exists', async () => {
     mockCategories = [makeCategory()];
     render(
       <Wrapper>
         <ProductsPage />
       </Wrapper>,
     );
-    expect(
-      screen.queryByText('Para adicionar un producto debe primero adicionar una categoría'),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Para adicionar un producto debe primero adicionar una categoría'),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it('renders the "Importar Productos" FAB (PRODUCT_CATEGORY.IMPORT_PRODUCTS)', () => {
@@ -186,7 +203,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(button).toHaveTextContent('Importar Productos');
   });
 
-  it('renders one collapsed accordion panel per category with a product-count badge', () => {
+  it('renders one collapsed accordion panel per category with a product-count badge', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
 
@@ -196,13 +213,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    expect(screen.getByText('Bebidas')).toBeInTheDocument();
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+    // badge count comes from getProductCategoriesView's productsCount (isActive &&
+    // availableToSale), not a derived length.
     expect(screen.getByText('1')).toBeInTheDocument();
     // collapsed by default -> product name not visible yet
     expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
   });
 
-  it('expands a category panel on click to reveal its products', () => {
+  it('expands a category panel on click to reveal its products', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
 
@@ -212,11 +231,11 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
   });
 
-  it('shows the per-category empty state inside an expanded panel with no products', () => {
+  it('shows the per-category empty state inside an expanded panel with no products', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [];
 
@@ -226,36 +245,39 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     // PRODUCT_CATEGORY.NO_PRODUCT_FOUND
-    expect(screen.getByText('No hay productos en esta categoría.')).toBeInTheDocument();
+    expect(await screen.findByText('No hay productos en esta categoría.')).toBeInTheDocument();
   });
 
-  it('does NOT render a page-level bulk-edit ("Edición masiva") button', () => {
+  it('does NOT render a page-level bulk-edit ("Edición masiva") button', async () => {
     render(
       <Wrapper>
         <ProductsPage />
       </Wrapper>,
     );
+    await waitFor(() => expect(screen.getByTestId('import-csv-button')).toBeInTheDocument());
     expect(screen.queryByTestId('bulk-edit-button')).not.toBeInTheDocument();
     expect(screen.queryByText('Edición masiva')).not.toBeInTheDocument();
   });
 
-  it('does NOT render a page-level "Crear producto" button', () => {
+  it('does NOT render a page-level "Crear producto" button', async () => {
     render(
       <Wrapper>
         <ProductsPage />
       </Wrapper>,
     );
+    await waitFor(() => expect(screen.getByTestId('import-csv-button')).toBeInTheDocument());
     expect(screen.queryByTestId('create-product-button')).not.toBeInTheDocument();
   });
 
-  it('does NOT render a page-level search input', () => {
+  it('does NOT render a page-level search input', async () => {
     render(
       <Wrapper>
         <ProductsPage />
       </Wrapper>,
     );
+    await waitFor(() => expect(screen.getByTestId('import-csv-button')).toBeInTheDocument());
     expect(screen.queryByTestId('products-search-input')).not.toBeInTheDocument();
   });
 
@@ -272,7 +294,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
 
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
@@ -302,8 +324,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
-    fireEvent.click(screen.getByLabelText('Acciones'));
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
     fireEvent.click(screen.getByText('Editar Producto'));
     fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
     fireEvent.click(screen.getByTestId('edit-product-submit'));
@@ -326,8 +348,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
-    fireEvent.click(screen.getByLabelText('Acciones'));
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
     fireEvent.click(screen.getByText('Eliminar Producto'));
 
     await waitFor(() => expect(productServiceSpies.deleteProduct).toHaveBeenCalledWith('prod-1'));
@@ -345,9 +367,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-products-button'));
-    fireEvent.change(screen.getByTestId('price-input-prod-1'), { target: { value: '9.99' } });
+    fireEvent.change(await screen.findByTestId('price-input-prod-1'), { target: { value: '9.99' } });
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
     await waitFor(() => expect(productServiceSpies.updateProduct).toHaveBeenCalledTimes(1));
@@ -374,7 +396,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
@@ -415,7 +437,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
         </Wrapper>,
       );
 
-      fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+      fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
       fireEvent.click(screen.getByTestId('edit-category-button'));
       fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas Frías' } });
       fireEvent.click(screen.getByTestId('category-save-button'));
