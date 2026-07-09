@@ -296,28 +296,29 @@ WU1 (interface must already be the bare 12-method shape).
 
 `apps/web-store-pos/app/sales/routes/sale.tsx` + its test.
 
-- [ ] 8.1 RED/GREEN: categories `useEffect` → `categoryService.getAvailableProductCategories()`
+- [x] 8.1 RED/GREEN: categories `useEffect` → `categoryService.getAvailableProductCategories()`
       (drop the manual `.filter(isActive)` — already filtered), sorted by `order` (method may
       already sort; confirm against `ProductCategoryRepository.getAvailableProductCategories`).
-- [ ] 8.2 RED/GREEN: SECOND `useEffect` keyed on `[storeId, selectedCategoryId]` →
+- [x] 8.2 RED/GREEN: SECOND `useEffect` keyed on `[storeId, selectedCategoryId]` →
       `productService.getProductsToSaleByCategoryId(selectedCategoryId)`; `products` state becomes
       category-scoped (delete the `categoryProducts` derived-filter — `products` IS the scoped
       list now).
-- [ ] 8.3 GREEN: `handleAdded`/`checkAvailability` keep `products.find(p => p.id === productId)`
+- [x] 8.3 GREEN: `handleAdded`/`checkAvailability` keep `products.find(p => p.id === productId)`
       unchanged (now searching the narrower, correct-for-current-category array).
-- [ ] 8.4 Update the test: mock `getAvailableProductCategories`/`getProductsToSaleByCategoryId`;
-      assert refetch fires on category switch.
-- [ ] 8.5 Gate + commit
-      `refactor(web-store-pos): re-express sale.tsx category/product loading against getAvailableProductCategories + per-category getProductsToSaleByCategoryId (Flag #1)`.
+- [x] 8.4 Update the test: mock `getAvailableProductCategories`/`getProductsToSaleByCategoryId`;
+      assert refetch fires on category switch. (Committed `ad7fc5e`; smoke-mock gap in
+      `sales-routes.test.tsx` closed separately in `ae68317`.)
+- [x] 8.5 Gate + commit
+      `refactor(web-store-pos): re-express sale.tsx category/product loading against getAvailableProductCategories + per-category getProductsToSaleByCategoryId (Flag #1)`. Commit `ad7fc5e`.
 
 ## WU9: Re-express `egress.tsx` — Req: Flag #1 (same pattern as WU8)
 
 `apps/web-store-pos/app/inventory/routes/egress.tsx` + its test. Identical shape to WU8 (near-
 duplicate file structure) — same two-effect split, same `products` state narrowing.
 
-- [ ] 9.1-9.4 Mirror WU8.1-8.4 for `egress.tsx`.
-- [ ] 9.5 Gate + commit
-      `refactor(web-store-pos): re-express egress.tsx category/product loading against getAvailableProductCategories + per-category getProductsToSaleByCategoryId (Flag #1)`.
+- [x] 9.1-9.4 Mirror WU8.1-8.4 for `egress.tsx`.
+- [x] 9.5 Gate + commit
+      `refactor(web-store-pos): re-express egress.tsx category/product loading against getAvailableProductCategories + per-category getProductsToSaleByCategoryId (Flag #1)`. Commit `b0ed531`.
 
 ## WU10: Re-express `available.tsx` — Req: Flag #1 (minimal in-scope fix)
 
