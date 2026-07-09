@@ -60,12 +60,12 @@ export class ProductRepository {
 
   /**
    * 1:1 port of Angular `getAvailableProductById` (product.repository.ts:50-53): returns
-   * the product only when it exists AND `isActive`, else `undefined`. Angular returns
-   * `null`; React uses `undefined` (both falsy — the existence guards check truthiness).
+   * the product only when it exists AND `isActive`, else `null` — mirrors Angular exactly,
+   * matching sibling methods `getProductByName`/`getProductByBarcode`.
    */
-  getAvailableProductById(id: string): Product | undefined {
+  getAvailableProductById(id: string): Product | null {
     const product = this.repo.getById(this.storeId, id);
-    return product && product.isActive ? product : undefined;
+    return product && product.isActive ? product : null;
   }
 
   /** 1:1 port of Angular `getProductByName` (product.repository.ts:59-61) — returns `null` (Angular parity). */

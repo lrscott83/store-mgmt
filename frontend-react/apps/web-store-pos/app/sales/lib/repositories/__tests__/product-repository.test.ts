@@ -105,14 +105,14 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
       expect(repo.getAvailableProductById('p1')?.id).toBe('p1');
     });
 
-    it('returns undefined when the product is inactive', () => {
+    it('returns null when the product is inactive', () => {
       seedProducts(storeId, [makeProduct('p1', { isActive: false })]);
-      expect(repo.getAvailableProductById('p1')).toBeUndefined();
+      expect(repo.getAvailableProductById('p1')).toBeNull();
     });
 
-    it('returns undefined when the product does not exist', () => {
+    it('returns null when the product does not exist', () => {
       seedProducts(storeId, [makeProduct('p1')]);
-      expect(repo.getAvailableProductById('nope')).toBeUndefined();
+      expect(repo.getAvailableProductById('nope')).toBeNull();
     });
   });
 
