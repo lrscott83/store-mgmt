@@ -458,37 +458,64 @@ call sites, including the WU7-WU10 route files, to route through the factory).
 `.../__tests__/product-offline-service.test.ts`. **Must land AFTER WU7-WU13** (grep-confirm zero
 remaining callers first).
 
-- [ ] 4.1 Grep-confirm zero remaining callers of `.getAll()`/`.getById()`/`.getByBarcode()`/
+- [x] 4.1 Grep-confirm zero remaining callers of `.getAll()`/`.getById()`/`.getByBarcode()`/
       `.create()`/`.update()`/`.delete()` on any `ProductOfflineService`/`ProductService`-typed
       variable under `apps/web-store-pos/app` (excluding this file's own now-dead bodies and the
       repository layer, which keeps its own same-named sync members by design).
-- [ ] 4.2 GREEN: remove `getAll`/`getById`/`getByBarcode`/`create`/`update`/`delete` method
-      bodies; remove the module-level `const repo = new BaseRepository<Product>(...)` and
-      `generateId`/`getCurrentUserLogin` imports if now unused (confirm — async methods delegate
+      Grep-confirmed: `rg "product(Service|Svc)\.(getAll|getById|getByBarcode|create|update|delete)\("`
+      across all production (non-test) files under `apps/web-store-pos/app` returned zero matches;
+      the only 2 textual hits (`available.tsx`) are comments documenting the WU10 removal, not
+      live calls. `cart-shell.tsx`'s `orderService.create(...)` and `products.tsx`'s
+      `next.delete(categoryId)` (a `Set.delete`) are unrelated identifiers, confirmed by reading
+      both call sites.
+- [x] 4.2 GREEN: removed `getAll`/`getById`/`getByBarcode`/`create`/`update`/`delete` method
+      bodies; removed the module-level `const repo = new BaseRepository<Product>(...)` and the
+      `generateId`/`getCurrentUserLogin` imports (confirmed unused — the async methods delegate
       to `ProductRepository`, which owns its own audit-stamping).
-- [ ] 4.3 GREEN: remove the corresponding `PROD-0x` sync-method test blocks from
-      `product-offline-service.test.ts` (whichever remain — Slice 6 already removed
-      search/updateMany/getByName/activate/deactivate; this removes create/getByBarcode/getAll/
-      update/delete's own describe blocks).
-- [ ] 4.4 GREEN: update the class doc comment — the "legacy sync surface ... intentionally STAYS
-      alive" paragraph is now false; rewrite or remove it.
-- [ ] 4.5 Gate + commit
+- [x] 4.3 GREEN: removed the `PROD-01`/`PROD-02`/`PROD-04`/`PROD-05`/`PROD-06` sync-method
+      describe blocks from `product-offline-service.test.ts`. Several OTHER blocks (`PROD-08`,
+      `PROD-14`, `PROD-15`, `PROD-16`, `PROD-19`) had used `service.create()`/`service.getById()`
+      purely as SETUP/assertion helpers (not testing the sync surface itself) — rewired those to
+      construct explicit `ProductRepository`/`ProductCategoryRepository` instances and call
+      `productRepository.addProduct(...)`/`getProductById(...)` directly, matching the pattern
+      already used by `PROD-10`/`PROD-11`/etc. Dropped the now-fully-unused `makeProduct` helper
+      and its `Product` import (only consumer was the removed `create`-based setup calls).
+- [x] 4.4 GREEN: rewrote the class doc comment — the "legacy sync surface ... intentionally STAYS
+      alive" paragraph now states the surface has been fully retired, with the WU4 grep-confirm
+      cross-referenced.
+- [x] 4.5 Gate + commit
       `refactor(web-store-pos): remove ProductOfflineService's dead sync surface (getAll/getById/getByBarcode/create/update/delete) and its backing repo const`.
+      All green: full web-store-pos suite 1540/1540 (0 regressions vs the 1561 baseline — delta is
+      test-count reduction from removed sync-surface describe blocks, not failures), `tsc --noEmit`
+      clean, `pnpm build` clean. Commit `5edbda6`.
 
 ## WU5: Remove `ProductCategoryOfflineService`'s sync method BODIES — Req: Exact-Surface Rule, Flag #3
 
 `apps/web-store-pos/app/sales/lib/services/product-category-offline-service.ts` +
 `.../__tests__/product-category-offline-service.test.ts`. **Must land AFTER WU7/WU10/WU11/WU12**.
 
-- [ ] 5.1 Grep-confirm zero remaining callers of `.getAll()`/`.getById()`/`.delete()` on any
+- [x] 5.1 Grep-confirm zero remaining callers of `.getAll()`/`.getById()`/`.delete()` on any
       `ProductCategoryOfflineService`/`ProductCategoryService`-typed variable under
-      `apps/web-store-pos/app`.
-- [ ] 5.2 GREEN: remove `getAll`/`getById`/`delete` method bodies; remove the module-level `const
-      repo = new BaseRepository<ProductCategory>(...)` if now unused.
-- [ ] 5.3 GREEN: remove the corresponding sync-method test blocks.
-- [ ] 5.4 GREEN: update the class doc comment (same as WU4.4).
-- [ ] 5.5 Gate + commit
+      `apps/web-store-pos/app`. Grep-confirmed: `rg "category(Service|Svc)\.(getAll|getById|delete)\("`
+      returned only 1 hit (`available.tsx`), a comment documenting the WU10 removal, not a live
+      call. WU7-WU10 already re-expressed all 4 route files off `categorySvc.getAll()`; WU12
+      re-pointed `order-offline-service.ts` to `ProductCategoryRepository` directly.
+- [x] 5.2 GREEN: removed `getAll`/`getById`/`delete` method bodies; removed the module-level
+      `const repo = new BaseRepository<ProductCategory>(...)` (confirmed unused).
+- [x] 5.3 GREEN: removed the `CAT-03` (getAll) and `CAT-05` (delete) describe blocks. `CAT-01`,
+      `CAT-02`, `CAT-10`, `CAT-11`, `CAT-12`, and the `getProductCategories` block had used
+      `service.getAll()`/`service.getById()` purely as setup/assertion helpers — rewired those to
+      an explicit `categoryRepository` instance (constructed in `beforeEach`, injected into the
+      service) calling `getProductCategories()`/`getProductCategoryById()` directly. Added a new
+      assertion to the "removed methods" block confirming `getAll`/`getById`/`delete` are now
+      `undefined` on the service instance.
+- [x] 5.4 GREEN: rewrote the class doc comment (same treatment as WU4.4), also recording the
+      Flag #3 grep-confirm (zero call sites for the local `delete` override, never ported from
+      Angular).
+- [x] 5.5 Gate + commit
       `refactor(web-store-pos): remove ProductCategoryOfflineService's dead sync surface (getAll/getById/delete) and its backing repo const (Flag #3)`.
+      All green: full web-store-pos suite 1540/1540 (0 regressions), `tsc --noEmit` clean,
+      `pnpm build` clean. Commit `2c180a1`.
 
 ## Final: Slice 8 / Phase 2 Regression Gate
 

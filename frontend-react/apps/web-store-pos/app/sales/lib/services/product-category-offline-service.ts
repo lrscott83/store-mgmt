@@ -1,16 +1,13 @@
 import type { BaseResponseModel, ProductCategory, ProductCategoryService, ProductCategoryView } from '@store-mgmt/domain';
 import { failure, success } from '@store-mgmt/domain';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { ProductCategoryRepository } from '../repositories/product-category-repository';
 import { ProductRepository } from '../repositories/product-repository';
-
-const repo = new BaseRepository<ProductCategory>('product-categories');
 
 /**
  * ProductCategoryOfflineService — React mirror of Angular's
  * `application/categories/product-category-offline.service.ts`. Reconciled (Phase 2,
- * slice 5) to Angular's exact category-service surface: the 5 abstract methods
- * (`createProductCategory`/`updateProductCategory`/`getMaxOrder`/
+ * slice 5 + step 8 cleanup) to Angular's exact category-service surface: the 5 abstract
+ * methods (`createProductCategory`/`updateProductCategory`/`getMaxOrder`/
  * `getAvailableProductCategories`/`getProductCategoriesView`) plus the offline-only
  * public `getProductCategories()`, ALL category C (`Promise<BaseResponseModel<T>>`,
  * resolve-never-reject) — delegating persistence to `ProductCategoryRepository` (and,
@@ -18,9 +15,10 @@ const repo = new BaseRepository<ProductCategory>('product-categories');
  * mirroring Angular's 3-arg constructor (`http, categoryRepository, productRepository`,
  * product-category-offline.service.ts:21).
  *
- * `extends BaseService<ProductCategory>` (hence `getAll`/`getById`/`delete`, still backed
- * directly by the module-level `BaseRepository`) intentionally STAYS through this slice —
- * dropped in Phase 2 step 8's cleanup, alongside `ProductService` (design.md).
+ * `extends BaseService<ProductCategory>` (hence the legacy `getAll`/`getById`/`delete`
+ * sync surface, previously backed by a module-level `BaseRepository`) has been fully
+ * retired (Phase 2 step 8, Flag #3) — the local `delete` override had zero call sites
+ * anywhere in `app/` (never ported from Angular), confirmed by grep at WU5.
  *
  * The React-only members `save`/`addByName`/`getByName`/`hasAnyCategory`/
  * `hasAnyAvailableCategory` are REMOVED — Angular exposes their equivalents on the
@@ -39,20 +37,6 @@ export class ProductCategoryOfflineService implements ProductCategoryService {
   ) {
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
     this.productRepository = productRepository ?? new ProductRepository(storeId);
-  }
-
-  getAll(): ProductCategory[] {
-    // Angular parity (parity fix, not a bug): ProductCategoryRepository.getProductCategories()
-    // sorts ascending by order — this was previously Map-insertion order.
-    return Array.from(repo.getAll(this.storeId).values()).sort((a, b) => a.order - b.order);
-  }
-
-  getById(id: string): ProductCategory | undefined {
-    return repo.getById(this.storeId, id);
-  }
-
-  delete(id: string): void {
-    repo.remove(this.storeId, id);
   }
 
   /** 1:1 port of Angular `createProductCategory` (product-category-offline.service.ts:30-33). */

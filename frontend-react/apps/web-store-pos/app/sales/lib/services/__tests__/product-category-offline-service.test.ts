@@ -30,12 +30,14 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 
 describe('ProductCategoryOfflineService — async category-C surface (Angular parity, Phase 2 slice 5)', () => {
   let service: ProductCategoryOfflineService;
+  let categoryRepository: ProductCategoryRepository;
   const storeId = 's1';
 
   beforeEach(() => {
     localStorage.clear();
     useAuthStore.setState({ user: makeUser(), isAuthenticated: true, isLoading: false, error: null });
-    service = new ProductCategoryOfflineService(storeId);
+    categoryRepository = new ProductCategoryRepository(storeId);
+    service = new ProductCategoryOfflineService(storeId, categoryRepository);
   });
 
   describe('CAT-01: createProductCategory', () => {
@@ -44,9 +46,9 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
     });
 
-    it('persists the category, retrievable via getAll', async () => {
+    it('persists the category, retrievable via the repository', async () => {
       await service.createProductCategory('Bebidas', 1, true);
-      const all = service.getAll();
+      const all = categoryRepository.getProductCategories();
       expect(all).toHaveLength(1);
       expect(all[0].name).toBe('Bebidas');
       expect(all[0].isActive).toBe(true);
@@ -64,12 +66,12 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
   describe('CAT-02: updateProductCategory', () => {
     it('resolves a success envelope and persists the change', async () => {
       await service.createProductCategory('Bebidas', 1, true);
-      const [existing] = service.getAll();
+      const [existing] = categoryRepository.getProductCategories();
 
       const result = await service.updateProductCategory(existing.id, 'Bebidas Frías', 2, false);
       expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
 
-      const updated = service.getById(existing.id);
+      const updated = categoryRepository.getProductCategoryById(existing.id);
       expect(updated?.name).toBe('Bebidas Frías');
       expect(updated?.order).toBe(2);
       expect(updated?.isActive).toBe(false);
@@ -79,27 +81,6 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       const result = await service.updateProductCategory('missing-id', 'X', 1, true);
       expect(result.succeeded).toBe(false);
       expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
-    });
-  });
-
-  describe('CAT-03: getAll returns list of categories (BaseService, kept through step 8)', () => {
-    it('returns empty array when no categories', () => {
-      expect(service.getAll()).toEqual([]);
-    });
-
-    it('returns all created categories', async () => {
-      await service.createProductCategory('Bebidas', 1, true);
-      await service.createProductCategory('Snacks', 2, true);
-      expect(service.getAll()).toHaveLength(2);
-    });
-  });
-
-  describe('CAT-05: delete (BaseService, kept through step 8)', () => {
-    it('removes a category by id', async () => {
-      await service.createProductCategory('ToDelete', 1, true);
-      const [cat] = service.getAll();
-      service.delete(cat.id);
-      expect(service.getById(cat.id)).toBeUndefined();
     });
   });
 
@@ -131,7 +112,7 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       await service.createProductCategory('Bebidas', 1, true);
       await service.createProductCategory('Snacks', 2, true);
       await service.createProductCategory('Galletas', 3, true);
-      const [, snacks] = service.getAll();
+      const [, snacks] = categoryRepository.getProductCategories();
       await service.updateProductCategory(snacks.id, snacks.name, snacks.order, false);
 
       const result = await service.getAvailableProductCategories();
@@ -141,12 +122,11 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
     });
   });
 
-  describe('CAT-11: getAll sort — sorted ascending by order regardless of insertion order', () => {
+  describe('CAT-11: getProductCategories sort — sorted ascending by order regardless of insertion order', () => {
     it('returns categories sorted ascending by order', async () => {
       // Seed via `updateCategories` (raw positional write, no order-shift business rule) to
-      // isolate getAll's SORT behavior from addProductCategoryData's order-shift-on-insert
+      // isolate the repository's SORT behavior from addProductCategoryData's order-shift-on-insert
       // rule (covered separately by CAT-01 above / product-category-repository.test.ts).
-      const categoryRepository = new ProductCategoryRepository(storeId);
       categoryRepository.updateCategories(
         new Map([
           ['c-c', { id: 'c-c', name: 'C', order: 3, isActive: true }],
@@ -155,7 +135,7 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
         ]),
       );
 
-      const all = service.getAll();
+      const all = categoryRepository.getProductCategories();
       expect(all.map((c) => c.order)).toEqual([1, 2, 3]);
       expect(all.map((c) => c.name)).toEqual(['A', 'B', 'C']);
     });
@@ -166,7 +146,7 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       await service.createProductCategory('Bebidas', 1, true);
       await service.createProductCategory('Snacks', 2, true);
       await service.createProductCategory('Inactive', 3, true);
-      const [bebidas, snacks, inactive] = service.getAll();
+      const [bebidas, snacks, inactive] = categoryRepository.getProductCategories();
       await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
       const productRepository = new ProductRepository(storeId);
@@ -188,7 +168,7 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
     it('excludes inactive categories entirely from the view result', async () => {
       await service.createProductCategory('ActiveCat', 1, true);
       await service.createProductCategory('InactiveCat', 2, true);
-      const [active, inactive] = service.getAll();
+      const [active, inactive] = categoryRepository.getProductCategories();
       await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
       const view = await service.getProductCategoriesView();
@@ -205,7 +185,7 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
     it('resolves all categories including inactive ones, never fails', async () => {
       await service.createProductCategory('Active', 1, true);
       await service.createProductCategory('Inactive', 2, true);
-      const [, inactive] = service.getAll();
+      const [, inactive] = categoryRepository.getProductCategories();
       await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
       const result = await service.getProductCategories();
@@ -216,12 +196,12 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
 
   describe('constructor accepts optional categoryRepository/productRepository (Angular 3-arg parity)', () => {
     it('delegates to an explicitly-injected ProductCategoryRepository instance', async () => {
-      const categoryRepository = new ProductCategoryRepository(storeId);
-      const injected = new ProductCategoryOfflineService(storeId, categoryRepository);
+      const injectedRepository = new ProductCategoryRepository(storeId);
+      const injected = new ProductCategoryOfflineService(storeId, injectedRepository);
 
       await injected.createProductCategory('Injected', 1, true);
       // Reading through the SAME repository instance confirms delegation, not a fresh one.
-      expect(categoryRepository.getProductCategories().map((c) => c.name)).toContain('Injected');
+      expect(injectedRepository.getProductCategories().map((c) => c.name)).toContain('Injected');
     });
   });
 
@@ -233,6 +213,13 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       expect(svc.getByName).toBeUndefined();
       expect(svc.hasAnyCategory).toBeUndefined();
       expect(svc.hasAnyAvailableCategory).toBeUndefined();
+    });
+
+    it('does not expose the retired getAll/getById/delete sync surface (Phase 2 step 8 cleanup)', () => {
+      const svc = service as unknown as Record<string, unknown>;
+      expect(svc.getAll).toBeUndefined();
+      expect(svc.getById).toBeUndefined();
+      expect(svc.delete).toBeUndefined();
     });
   });
 });
