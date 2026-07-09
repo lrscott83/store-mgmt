@@ -19,7 +19,7 @@ export function ExportPage() {
     // Categories/products are read via the repositories directly (Angular
     // parity, Flag #2 — raw stored-JSON pass-through), not the offline services.
     const categoryRepo = new ProductCategoryRepository(storeId);
-    const productRepo = new ProductRepository(storeId);
+    const productRepo = new ProductRepository(storeId, categoryRepo);
     const inventoryRepo = new InventoryRepository(storeId);
     const orderSvc = new OrderOfflineService(storeId);
     const expenseSvc = new ExpenseOfflineService(storeId);

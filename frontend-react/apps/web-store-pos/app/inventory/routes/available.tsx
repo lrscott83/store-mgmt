@@ -7,6 +7,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { createProductService } from '~/sales/lib/services/product-service.factory';
 import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 import { InventoryProductList } from '../components/inventory-product-list';
@@ -19,7 +20,10 @@ export function InventoryAvailablePage() {
   const [categories, setCategories] = useState<InventoryCategoryView[]>([]);
 
   useEffect(() => {
-    const inventorySvc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    const inventorySvc = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
     const productSvc = createProductService(storeId);
     const categorySvc = new ProductCategoryOfflineService(storeId);
 

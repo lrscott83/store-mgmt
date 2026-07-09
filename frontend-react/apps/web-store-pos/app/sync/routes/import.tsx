@@ -31,7 +31,7 @@ export function ImportPage() {
     // repositories directly (Angular parity, Flag #2 — raw stored-JSON
     // pass-through), not the offline services.
     const categoryRepoForSerializer = new ProductCategoryRepository(storeId);
-    const productRepoForSerializer = new ProductRepository(storeId);
+    const productRepoForSerializer = new ProductRepository(storeId, categoryRepoForSerializer);
     const inventoryRepo = new InventoryRepository(storeId);
     const orderSvc = new OrderOfflineService(storeId);
     const expenseSvc = new ExpenseOfflineService(storeId);
@@ -65,7 +65,10 @@ export function ImportPage() {
     // Inventory + Expenses route through their offline SERVICES (Angular parity: the
     // synchronizer calls inventorySvc.addImportedEntries/updateImportedEntries and
     // expenseSvc.addImportedExpense/updateImportedExpense, not raw repos).
-    const inventorySvc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    const inventorySvc = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
     const saleCreditRepo = new BaseRepository<SaleCredit>('saleCredits', [
       'date',
       'paidDate',

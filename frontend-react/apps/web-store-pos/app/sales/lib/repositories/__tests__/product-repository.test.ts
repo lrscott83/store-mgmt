@@ -79,7 +79,7 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
 
   beforeEach(() => {
     localStorage.clear();
-    repo = new ProductRepository(storeId);
+    repo = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
   });
 
   describe('getProductById — 1:1 port of Angular getProductById (may be undefined)', () => {

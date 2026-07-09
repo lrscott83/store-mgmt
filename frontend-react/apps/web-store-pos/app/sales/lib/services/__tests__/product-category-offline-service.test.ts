@@ -149,7 +149,7 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       const [bebidas, snacks, inactive] = categoryRepository.getProductCategories();
       await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
-      const productRepository = new ProductRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
       // isActive && availableToSale -> counted (getAvailableToSaleProductsByCategoryId)
       productRepository.addProduct(bebidas.id, 'Coca Cola', 1, 'biz', 1, true, true, false, '1');
       // isActive but NOT availableToSale -> excluded from the view's stricter count

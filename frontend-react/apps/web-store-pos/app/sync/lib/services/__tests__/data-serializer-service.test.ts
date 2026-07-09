@@ -178,7 +178,7 @@ function makeService(
   seedCategories(storeId, cats);
   seedProducts(storeId, prods);
   const categoryRepository = new ProductCategoryRepository(storeId);
-  const productRepository = new ProductRepository(storeId);
+  const productRepository = new ProductRepository(storeId, categoryRepository);
   const inventoryReader: InventoryReader = {
     getAll: (_storeId: string) => makeInventoryMap(inv),
   };
@@ -219,7 +219,7 @@ function makeServiceWithUnseededCategoriesAndProducts(
   const creds = overrides?.saleCredits ?? [mockSaleCredit];
 
   const categoryRepository = new ProductCategoryRepository(storeId);
-  const productRepository = new ProductRepository(storeId);
+  const productRepository = new ProductRepository(storeId, categoryRepository);
   const inventoryReader: InventoryReader = {
     getAll: (_storeId: string) => makeInventoryMap(inv),
   };

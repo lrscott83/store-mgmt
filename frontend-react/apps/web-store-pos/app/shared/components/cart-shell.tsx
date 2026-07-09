@@ -10,6 +10,7 @@ import { hasAvailableProductToSale } from '~/sales/lib/product-availability';
 import { ProductErrors } from '@store-mgmt/domain';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { hasCreditsModuleAvailable, hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
@@ -116,7 +117,10 @@ export function CartShell() {
   // productService.getProductById inside addCartItem.
   async function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
     const productService = createProductService(storeId);
-    const inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    const inventoryService = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
     const lookup = await productService.getProductById(productId);
     const product = lookup.succeeded ? lookup.data : undefined;
     const result = hasAvailableProductToSale({

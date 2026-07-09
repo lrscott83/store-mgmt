@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InventoryOfflineService } from '../inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
 import type { InventoryEntry, OrderItem, Product, UserModel } from '@store-mgmt/domain';
@@ -95,7 +96,10 @@ describe('InventoryOfflineService', () => {
     // Seed the products the guard'd methods reference (Angular's InventoryOfflineService
     // injects ProductRepository; the guards need real product records to exist).
     seedProducts(storeId, [makeProduct('p1'), makeProduct('p2')]);
-    service = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    service = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
   });
 
   // ─── T-4-1 RED tests ───────────────────────────────────────────────────────
@@ -129,7 +133,10 @@ describe('InventoryOfflineService', () => {
       service.getAvailableInventoryCosts('p1', 7);
 
       // Re-read from localStorage to verify persistence
-      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+      const service2 = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
       const allCosts = service2.getAvailableInventoryCosts('p1', 3); // only 3 left in e2
       expect(allCosts[0].id).toBe('e2');
       expect(allCosts[0].quantity).toBe(3);
@@ -145,7 +152,10 @@ describe('InventoryOfflineService', () => {
 
       service.getAvailableInventoryCosts('p1', 7);
 
-      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+      const service2 = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
       const costs = service2.getAvailableInventoryCosts('p1', 0);
       // After deduction, e1 has 0 available, e2 has 3 available
       expect(costs).toHaveLength(0);
@@ -189,7 +199,10 @@ describe('InventoryOfflineService', () => {
       expect(costs).toEqual([]);
 
       // No mutation: a fresh service can still deduct the full original 6 units.
-      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+      const service2 = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
       expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
     });
@@ -205,7 +218,10 @@ describe('InventoryOfflineService', () => {
       });
       expect(costs).toEqual([]);
 
-      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+      const service2 = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
       expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
     });
@@ -299,7 +315,10 @@ describe('InventoryOfflineService', () => {
 
       // After restore e1 = 0 + 6 = 6 and e2 = 3 + 1 = 4 (total 10).
       // Verify the exact restored amounts via FIFO deduction from a fresh instance.
-      const service2 = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+      const service2 = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
       const costs = service2.getAvailableInventoryCosts('p1', 10);
       expect(costs).toHaveLength(2);
       expect(costs[0]).toMatchObject({ id: 'e1', quantity: 6 });

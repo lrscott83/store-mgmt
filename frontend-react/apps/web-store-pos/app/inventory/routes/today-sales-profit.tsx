@@ -74,8 +74,8 @@ export function InventoryTodaySalesProfitPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    const productRepository = new ProductRepository(storeId);
     const categoryRepository = new ProductCategoryRepository(storeId);
+    const productRepository = new ProductRepository(storeId, categoryRepository);
     const inventorySvc = new InventoryOfflineService(storeId, productRepository);
     const orderSvc = new OrderOfflineService(storeId);
 

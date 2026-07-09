@@ -52,7 +52,10 @@ export class OrderOfflineService implements BaseService<Order> {
 
   constructor(private readonly storeId: string) {
     this.creditService = new SaleCreditOfflineService(storeId);
-    this.inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    this.inventoryService = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
   }
 
   getAll(): Order[] {

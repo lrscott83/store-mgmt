@@ -10,6 +10,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { createProductService } from '../lib/services/product-service.factory';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
 import { hasAvailableProductToSale } from '../lib/product-availability';
@@ -79,7 +80,10 @@ export function SalePage() {
   // and is gated by hasInventoryModuleAvailable + product.discountFromInvantory internally.
   function checkAvailability(productId: string, quantity: number) {
     const product = products.find((p) => p.id === productId);
-    const inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
+    const inventoryService = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
     return hasAvailableProductToSale({
       product,
       quantity,

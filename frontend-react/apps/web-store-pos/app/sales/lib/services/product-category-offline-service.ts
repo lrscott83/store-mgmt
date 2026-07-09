@@ -36,7 +36,7 @@ export class ProductCategoryOfflineService implements ProductCategoryService {
     productRepository?: ProductRepository,
   ) {
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
-    this.productRepository = productRepository ?? new ProductRepository(storeId);
+    this.productRepository = productRepository ?? new ProductRepository(storeId, new ProductCategoryRepository(storeId));
   }
 
   /** 1:1 port of Angular `createProductCategory` (product-category-offline.service.ts:30-33). */

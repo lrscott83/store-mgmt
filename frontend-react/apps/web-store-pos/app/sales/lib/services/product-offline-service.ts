@@ -28,7 +28,7 @@ export class ProductOfflineService implements ProductService {
     productRepository?: ProductRepository,
     categoryRepository?: ProductCategoryRepository,
   ) {
-    this.productRepository = productRepository ?? new ProductRepository(storeId);
+    this.productRepository = productRepository ?? new ProductRepository(storeId, new ProductCategoryRepository(storeId));
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
   }
 

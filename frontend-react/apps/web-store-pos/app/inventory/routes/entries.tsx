@@ -7,6 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isOwnerAdmin as checkIsOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { EntryList } from '../components/entry-list';
@@ -89,7 +90,7 @@ export function EntriesPage() {
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
   function loadEntries() {
-    const productRepository = new ProductRepository(storeId);
+    const productRepository = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
     const svc = new InventoryOfflineService(storeId, productRepository);
     const products = [...productRepository.getStorageProductsMap().values()];
     const productMap = new Map(products.map((p) => [p.id, p.name]));

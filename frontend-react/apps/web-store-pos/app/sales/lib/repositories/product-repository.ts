@@ -13,12 +13,12 @@ function generateId(): string {
  * `frontend/src/app/application/products/product.repository.ts` — EXACT public surface
  * (no `upsert`/`remove`; those are forbidden bridges per the Exact-Surface Rule).
  *
- * Depends on `ProductCategoryRepository` (Angular repo.ts:22 injects it via DI). React has
- * no DI container, so the dependency is an OPTIONAL constructor param defaulting to a
- * fresh `new ProductCategoryRepository(storeId)` — this keeps every existing single-arg
- * `new ProductRepository(storeId)` call site (InventoryOfflineService, OrderOfflineService,
- * sale/cart/report call sites, sync) compiling unchanged; only WU3's own tests and WU4's
- * call sites need to pass an explicit instance.
+ * Depends on `ProductCategoryRepository` (Angular repo.ts:21-23 injects it via DI,
+ * a REQUIRED constructor param — no default). React mirrors this exactly: the
+ * `categoryRepository` param is MANDATORY (Phase 2 step 9 — retired the Phase-1 temporary
+ * optional-with-default divergence). Every call site now constructs its own
+ * `new ProductCategoryRepository(storeId)` explicitly, reproducing the old default's
+ * runtime behavior byte-for-byte (zero behavior change, signature-only tightening).
  *
  * Backed by the same storage-only `BaseRepository<Product>('products', ...)` that
  * `ProductOfflineService` writes through, so both layers share a single product store.
@@ -29,10 +29,10 @@ export class ProductRepository {
 
   constructor(
     private readonly storeId: string,
-    categoryRepository?: ProductCategoryRepository,
+    categoryRepository: ProductCategoryRepository,
   ) {
     this.repo = new BaseRepository<Product>('products', ['createdDate', 'updatedDate']);
-    this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
+    this.categoryRepository = categoryRepository;
   }
 
   /** 1:1 port of Angular `getStorageProductsMap` (product.repository.ts:36-40). */
