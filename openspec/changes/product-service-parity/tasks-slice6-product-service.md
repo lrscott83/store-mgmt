@@ -19,6 +19,22 @@ product-service.ts`, `apps/web-store-pos/app/sales/lib/services/product-offline-
 Delivery: commits-only on `feat/frontend-parity-audit`, one commit per work unit, conventional
 messages, no PR/branches/stacking, no AI attribution. size-exception pre-approved.
 
+## Commits (landed on feat/frontend-parity-audit, pushed)
+
+WU boundaries were NOT green-in-isolation (WU1 `2898d62` flipped the interface signatures only,
+leaving the app tsc red until the concrete bodies flipped in WU3; WU3's `updateMany` removal broke
+`products.tsx` until WU4.4). First green snapshot = WU3+WU4 together. Final grouping:
+
+- `2898d62` — WU1: `ProductService` interface + `ProductSelectView`/`CsvProduct` models (earlier session).
+- `704b125` — WU3 + WU4: async service surface + removals + `products.tsx` re-expression + CSV barcode rip.
+- `9ece02f` — WU5: `cart-shell` quantity-change → `getProductById`.
+- `001677a` — WU6: `resolveUserHomePath` → `hasAnyAvailableToSaleProduct` (+ login/loaders callers).
+- `dc22b50` — WU7: `edit-inventory-entry-modal` → `getProductsToSelect`, drop Category field.
+
+Verify (sdd-verify, fresh context): PASS WITH WARNINGS — both WARNINGs closed post-verify
+(WU4.2/4.3/4.4 route-level RED/GREEN tests backfilled in `products.test.tsx`; this checklist ticked
++ hashes recorded). Engram: `sdd/product-service-parity/verify-report-slice6`.
+
 ## Review Workload Forecast
 
 | Field | Value |
@@ -154,29 +170,29 @@ price: number }` — byte-identical to Angular, NO `barcode` per Flag #2 RATIFIE
 Test file: `packages/domain/src/services/__tests__/product-service.test.ts` (rewrite fake to
 match; scoped `tsc --noEmit` on this file is the real gate for signature-shape assertions).
 
-- [ ] 1.1 RED/GREEN: add `ProductSelectView` to `models/product.ts`; add `CsvProduct` to new
+- [x] 1.1 RED/GREEN: add `ProductSelectView` to `models/product.ts`; add `CsvProduct` to new
       `models/csv-product.ts`; export both from `index.ts`.
-- [ ] 1.2 RED/GREEN: interface declares `hasAnyAvailableToSaleProduct():
+- [x] 1.2 RED/GREEN: interface declares `hasAnyAvailableToSaleProduct():
       Promise<BaseResponseModel<boolean>>`, `getProductById(id): Promise<BaseResponseModel<Product>>`,
       `getProductByBarcode(barcode): Promise<BaseResponseModel<Product>>`.
-- [ ] 1.3 RED/GREEN: `getProductsToSelect(): Promise<BaseResponseModel<ProductSelectView[]>>`,
+- [x] 1.3 RED/GREEN: `getProductsToSelect(): Promise<BaseResponseModel<ProductSelectView[]>>`,
       `deleteProduct(id): Promise<BaseResponseModel<boolean>>`,
       `createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<boolean>>`.
-- [ ] 1.4 RED/GREEN: `getProductsToSaleByCategoryId(categoryId):
+- [x] 1.4 RED/GREEN: `getProductsToSaleByCategoryId(categoryId):
       Promise<BaseResponseModel<Product[]>>`, `createProduct(...9 args):
       Promise<BaseResponseModel<boolean>>`, `updateProduct(...10 args):
       Promise<BaseResponseModel<boolean>>`, `createProducts(categoryId, items: {name,price}[]):
       Promise<BaseResponseModel<boolean>>`.
-- [ ] 1.5 RED/GREEN: FLIP `getMaxOrder(categoryId): number` →
+- [x] 1.5 RED/GREEN: FLIP `getMaxOrder(categoryId): number` →
       `getMaxOrder(categoryId): Promise<BaseResponseModel<number>>` (signature change in place,
       same name — confirm `tsc --noEmit` catches every un-migrated caller).
-- [ ] 1.6 RED/GREEN: FLIP `getAvailableProductsByCategoryId(categoryId): Product[]` →
+- [x] 1.6 RED/GREEN: FLIP `getAvailableProductsByCategoryId(categoryId): Product[]` →
       `Promise<BaseResponseModel<Product[]>>` (same-name signature change).
-- [ ] 1.7 GREEN: remove `getByName`/`activate`/`deactivate` member declarations (spec.md
+- [x] 1.7 GREEN: remove `getByName`/`activate`/`deactivate` member declarations (spec.md
       unconditional removal list — zero Angular service correlate).
-- [ ] 1.8 GREEN: `extends BaseService<Product>`, `getByBarcode`, `update` member declarations
+- [x] 1.8 GREEN: `extends BaseService<Product>`, `getByBarcode`, `update` member declarations
       STAY unchanged (Flag #1).
-- [ ] 1.9 Gate: `pnpm -C packages/domain test`, `pnpm -C packages/domain exec tsc --noEmit`,
+- [x] 1.9 Gate: `pnpm -C packages/domain test`, `pnpm -C packages/domain exec tsc --noEmit`,
       `pnpm -C packages/domain build`; commit
       `feat(domain): add async ProductService 12-method surface (getMaxOrder/getAvailableProductsByCategoryId flipped in place), ProductSelectView/CsvProduct models, remove getByName/activate/deactivate`.
 
@@ -187,29 +203,29 @@ match; scoped `tsc --noEmit` on this file is the real gate for signature-shape a
 #6). Test file: `.../services/__tests__/product-offline-service.test.ts` — ADD new describe
 blocks only (no removals yet, that's WU3).
 
-- [ ] 2.1 RED/GREEN: `hasAnyAvailableToSaleProduct()` — delegates
+- [x] 2.1 RED/GREEN: `hasAnyAvailableToSaleProduct()` — delegates
       `productRepository.hasAnyAvailableToSaleProduct()`, always
       `Promise.resolve(success(...))`.
-- [ ] 2.2 RED/GREEN: `getProductById(id)` — `productRepository.getProductById(id)`; found →
+- [x] 2.2 RED/GREEN: `getProductById(id)` — `productRepository.getProductById(id)`; found →
       Success; missing → `Failure([ProductErrors.NotExists])`.
-- [ ] 2.3 RED/GREEN: `getProductByBarcode(barcode)` — same shape via
+- [x] 2.3 RED/GREEN: `getProductByBarcode(barcode)` — same shape via
       `productRepository.getProductByBarcode`.
-- [ ] 2.4 RED/GREEN: `deleteProduct(id)` — `Success(productRepository.deleteProduct(id))` (always
+- [x] 2.4 RED/GREEN: `deleteProduct(id)` — `Success(productRepository.deleteProduct(id))` (always
       resolves true/false, never fails per repo contract).
-- [ ] 2.5 RED/GREEN: `getProductsToSaleByCategoryId(categoryId)` — delegates
+- [x] 2.5 RED/GREEN: `getProductsToSaleByCategoryId(categoryId)` — delegates
       `productRepository.getAvailableToSaleProductsByCategoryId(categoryId)`, mirror Angular's
       REDUNDANT second `.filter(p => p.availableToSale)` (ANGULAR-BUG-SUSPECT #3, do not
       simplify), `Success$` always.
-- [ ] 2.6 RED/GREEN: offline-only `getProductsByCategoryId(categoryId)` (NOT on the interface) —
+- [x] 2.6 RED/GREEN: offline-only `getProductsByCategoryId(categoryId)` (NOT on the interface) —
       delegates `productRepository.getProductsByCategoryId(categoryId)`, unfiltered by state,
       `Success([])` when empty (never fails).
-- [ ] 2.7 RED/GREEN: offline-only `setDiscountFromInvantory(id, flag)` (NOT on the interface) —
+- [x] 2.7 RED/GREEN: offline-only `setDiscountFromInvantory(id, flag)` (NOT on the interface) —
       delegates `productRepository.setDiscountFromInvantory`, Result→Success/Failure mapping.
-- [ ] 2.8 RED/GREEN: `getProductsToSelect()` — groups `productRepository.getAvailableProducts()`
+- [x] 2.8 RED/GREEN: `getProductsToSelect()` — groups `productRepository.getAvailableProducts()`
       by category in `categoryRepository.getProductCategories()` iteration order, sorted by
       product `order` within each category, maps to `{id, fullName: categoryName + ' - ' +
       name}` (1:1 port of product-offline.service.ts:133-157).
-- [ ] 2.9 Gate: `pnpm test`, `pnpm -C apps/web-store-pos exec tsc --noEmit`,
+- [x] 2.9 Gate: `pnpm test`, `pnpm -C apps/web-store-pos exec tsc --noEmit`,
       `pnpm -C apps/web-store-pos build`; commit
       `feat(web-store-pos): add ProductOfflineService async read/orchestration methods (hasAnyAvailableToSaleProduct/getProductById/getProductByBarcode/deleteProduct/getProductsToSaleByCategoryId/getProductsByCategoryId/setDiscountFromInvantory/getProductsToSelect)`.
 
@@ -217,42 +233,42 @@ blocks only (no removals yet, that's WU3).
 
 Same files as WU2, continued.
 
-- [ ] 3.1 RED/GREEN: `createProduct(...9 args)` — delegates `productRepository.addProduct(...)`,
+- [x] 3.1 RED/GREEN: `createProduct(...9 args)` — delegates `productRepository.addProduct(...)`,
       Result→Success(true)/Failure(result.errors) mapping (1:1 port of
       product-offline.service.ts:39-62).
-- [ ] 3.2 RED/GREEN: `updateProduct(...10 args)` — delegates `productRepository.updateProduct(...)`,
+- [x] 3.2 RED/GREEN: `updateProduct(...10 args)` — delegates `productRepository.updateProduct(...)`,
       same mapping.
-- [ ] 3.3 RED/GREEN: private `getNextOrder(categoryId)` helper —
+- [x] 3.3 RED/GREEN: private `getNextOrder(categoryId)` helper —
       `Math.max(...productRepository.getProductsByCategoryId(categoryId).map(p => p.order), 0) + 1`
       (1:1 port, product-offline.service.ts:164-167).
-- [ ] 3.4 RED/GREEN: FLIP `getMaxOrder(categoryId)` body to async — delegates
+- [x] 3.4 RED/GREEN: FLIP `getMaxOrder(categoryId)` body to async — delegates
       `productRepository.getProductsByCategoryId(categoryId)` + `Math.max(...,0)`,
       `Success(...)`. Update PROD-10's existing sync test to await the new signature.
-- [ ] 3.5 RED/GREEN: FLIP `getAvailableProductsByCategoryId(categoryId)` body to async —
+- [x] 3.5 RED/GREEN: FLIP `getAvailableProductsByCategoryId(categoryId)` body to async —
       delegates `productRepository.getProductsByCategoryId(categoryId)` filtered `.isActive`,
       `Success(...)`. Update PROD-11's existing sync test to await the new signature.
-- [ ] 3.6 RED/GREEN: `createProducts(categoryId, items)` — per-item `getNextOrder` BEFORE each
+- [x] 3.6 RED/GREEN: `createProducts(categoryId, items)` — per-item `getNextOrder` BEFORE each
       `addProduct` call (sequential increasing orders within one call), hardcoded
       `isActive:true, availableToSale:true, discountFromInvantory:true, businessId:''`
       (Flag #3); per-item failure sets `hasError`, overall `Failure([])` on any failure
       (ANGULAR-BUG-SUSPECT #1, empty errors array, mirror do-not-fix).
-- [ ] 3.7 RED/GREEN: `createCsvProducts(csvProducts)` — per row, resolve category via
+- [x] 3.7 RED/GREEN: `createCsvProducts(csvProducts)` — per row, resolve category via
       `categoryRepository.getProductCategoryByName`, create via
       `categoryRepository.addProductCategoryByName` if absent; `getNextOrder` + `addProduct`
       with the SAME hardcoded flags as 3.6 (Flag #3); NO barcode passed (Flag #2 RATIFIED — DROP);
       same `Failure([])`-on-any-failure shape (ANGULAR-BUG-SUSPECT #1).
-- [ ] 3.8 GREEN: remove `search`/`updateMany`/`getByName`/`activate`/`deactivate` method bodies
+- [x] 3.8 GREEN: remove `search`/`updateMany`/`getByName`/`activate`/`deactivate` method bodies
       from the concrete class (unconditional, spec.md — zero Angular correlate at any layer).
-- [ ] 3.9 GREEN: `create`/`update`/`delete`/`getAll`/`getById`/`getByBarcode` bodies stay EXACTLY
+- [x] 3.9 GREEN: `create`/`update`/`delete`/`getAll`/`getById`/`getByBarcode` bodies stay EXACTLY
       as-is (Flag #1) — no changes, still backed by the private module-level `repo`.
-- [ ] 3.10 Confirm class still `implements ProductService` cleanly against WU1's updated
+- [x] 3.10 Confirm class still `implements ProductService` cleanly against WU1's updated
       interface (`tsc --noEmit` is the real gate — vitest alone won't catch a missing/mistyped
       async member).
-- [ ] 3.11 Update `product-offline-service.test.ts`: remove PROD-07 (search)/PROD-09
+- [x] 3.11 Update `product-offline-service.test.ts`: remove PROD-07 (search)/PROD-09
       (getByName)/PROD-12 (activate/deactivate) describe blocks entirely; PROD-03 (updateMany)
       describe block removed (re-expressed as a call-site loop in WU4, not a service method);
       PROD-01/02/04/05/06/08 (create/getByBarcode/getAll/update/delete/storage-key) untouched.
-- [ ] 3.12 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
+- [x] 3.12 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
       `feat(web-store-pos): add ProductOfflineService createProduct/updateProduct/createProducts/createCsvProducts, flip getMaxOrder/getAvailableProductsByCategoryId to async, remove search/updateMany/getByName/activate/deactivate`.
 
 ## WU4: Re-express `products.tsx` — Req: "Call-Site Parity" (createCsvProducts), spec.md resolved decision #3 (updateMany)
@@ -260,26 +276,26 @@ Same files as WU2, continued.
 `apps/web-store-pos/app/sales/routes/products.tsx` + `.../__tests__/products.test.tsx`.
 `loadData`'s `productService.getAll()`/`categoryService.getAll()` STAY unchanged (Flag #1/#7).
 
-- [ ] 4.1 RED/GREEN: `handleCreateProduct` becomes `async`; replace `productService.create({...})`
+- [x] 4.1 RED/GREEN: `handleCreateProduct` becomes `async`; replace `productService.create({...})`
       with `await productService.createProduct(data.categoryId, data.name, data.price,
       /*businessId*/ '', /*order*/ 1, /*isActive*/ true, data.availableToSale,
       data.discountFromInvantory, data.barcode)`; on `!result.succeeded`, surface the failure
       (match `handleCategorySave`'s `showBlockingError` pattern already in this file — do not
       silently swallow).
-- [ ] 4.2 RED/GREEN: `handleEditProduct` becomes `async`; replace `productService.update(product)`
+- [x] 4.2 RED/GREEN: `handleEditProduct` becomes `async`; replace `productService.update(product)`
       with `await productService.updateProduct(product.id, product.categoryId, product.name,
       product.price, product.businessId, product.order, product.isActive,
       product.availableToSale, product.discountFromInvantory, product.barcode)`; same failure
       surfacing.
-- [ ] 4.3 RED/GREEN: `handleDeleteProduct` becomes `async`; replace `productService.delete(id)`
+- [x] 4.3 RED/GREEN: `handleDeleteProduct` becomes `async`; replace `productService.delete(id)`
       with `await productService.deleteProduct(id)`; same failure surfacing (or silent — match
       existing UX for delete-confirm flows if a stricter pattern exists elsewhere in the app).
-- [ ] 4.4 RED/GREEN: `handleBulkSave` becomes `async`; replace `productService.updateMany(...)`
+- [x] 4.4 RED/GREEN: `handleBulkSave` becomes `async`; replace `productService.updateMany(...)`
       with a loop: `for (const p of updatedProducts) await productService.updateProduct(p.id,
       p.categoryId, p.name, p.price, p.businessId, p.order, p.isActive, p.availableToSale,
       p.discountFromInvantory, p.barcode)` (spec.md resolved decision #3 — bulk price-edit UI
       feature unchanged, only the service call re-expressed).
-- [ ] 4.5 RED/GREEN — **Flag #2 RATIFIED (DROP barcode)**: `handleCsvImport` collapses to a single
+- [x] 4.5 RED/GREEN — **Flag #2 RATIFIED (DROP barcode)**: `handleCsvImport` collapses to a single
       `await productService.createCsvProducts(rows)` call, where each row is mapped to
       `{category, name, price}` ONLY (drop the `barcode?` field from the parsed rows — remove the
       barcode column from the CSV-import path in `csv-product-parser.ts`/its consumer). REMOVE the
@@ -288,20 +304,20 @@ Same files as WU2, continued.
       interim ProductCategoryRepository call site" describe block in `products.test.tsx` to assert
       `productService.createCsvProducts` was called with the parsed `{category,name,price}` rows,
       and drop any assertion on a barcode column.
-- [ ] 4.6 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
+- [x] 4.6 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
       `refactor(web-store-pos): re-express products.tsx create/edit/delete/bulk/CSV against the async ProductOfflineService surface`.
 
 ## WU5: Re-express `cart-shell.tsx` — Req: "Call-Site Parity" (getProductById, shopping cart)
 
 `apps/web-store-pos/app/shared/components/cart-shell.tsx` + `.../__tests__/cart-shell.test.tsx`.
 
-- [ ] 5.1 RED/GREEN: `handleQuantityChange` becomes `async`; replace
+- [x] 5.1 RED/GREEN: `handleQuantityChange` becomes `async`; replace
       `productService.getById(productId)` with `const result =
       await productService.getProductById(productId); const product = result.succeeded ?
       result.data : undefined;`. Its two `onClick` callers (`() =>
       handleQuantityChange(...)`) need no wrapper change — a fire-and-forget async handler is
       already an established pattern in this file (`handleCreateOrder`).
-- [ ] 5.2 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
+- [x] 5.2 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
       `refactor(web-store-pos): re-express cart-shell.tsx quantity-change product lookup against ProductOfflineService.getProductById`.
 
 ## WU6: Re-express `user-home.ts` + callers — Req: "Call-Site Parity" (hasAnyAvailableToSaleProduct, login gate)
@@ -310,7 +326,7 @@ Same files as WU2, continued.
 `apps/web-store-pos/app/auth/routes/login.tsx`, `apps/web-store-pos/app/auth/routes/loaders.ts` +
 their tests.
 
-- [ ] 6.1 RED/GREEN: `resolveUserHomePath` becomes `async function ...: Promise<string>`; replace
+- [x] 6.1 RED/GREEN: `resolveUserHomePath` becomes `async function ...: Promise<string>`; replace
       the two-step `ProductCategoryOfflineService(storeId).getAll().some(isActive)` +
       `ProductOfflineService(storeId).getAll().some(...)` with a SINGLE
       `await new ProductOfflineService(storeId).hasAnyAvailableToSaleProduct()` call (mirrors
@@ -319,13 +335,13 @@ their tests.
       `ProductRepository.hasAnyAvailableToSaleProduct` per Phase 1 WU3.4, so the standalone
       `ProductCategoryOfflineService` call becomes redundant and is dropped); drop the now-unused
       `ProductCategoryOfflineService` import.
-- [ ] 6.2 GREEN: `login.tsx:61` → `navigate(await resolveUserHomePath(user))` (already inside an
+- [x] 6.2 GREEN: `login.tsx:61` → `navigate(await resolveUserHomePath(user))` (already inside an
       `async handleSubmit`, no wrapper change needed).
-- [ ] 6.3 GREEN: `auth/routes/loaders.ts:32` → `return redirect(await resolveUserHomePath(user))`
+- [x] 6.3 GREEN: `auth/routes/loaders.ts:32` → `return redirect(await resolveUserHomePath(user))`
       (already inside `async guestOnlyLoader`, no wrapper change needed).
-- [ ] 6.4 Update `user-home.test.ts` (mock `hasAnyAvailableToSaleProduct` instead of `getAll`
+- [x] 6.4 Update `user-home.test.ts` (mock `hasAnyAvailableToSaleProduct` instead of `getAll`
       twice) and any `login.test.tsx`/loader test asserting the sync call shape.
-- [ ] 6.5 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
+- [x] 6.5 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
       `refactor(web-store-pos): re-express resolveUserHomePath against ProductOfflineService.hasAnyAvailableToSaleProduct`.
 
 ## WU7 — Re-express `edit-inventory-entry-modal.tsx` (Flag #4 RATIFIED, option (a)) — Req: "Call-Site Parity" (getProductsToSelect, inventory entry modal)
@@ -335,39 +351,39 @@ caller/`EditInventoryEntryInput` consumer affected by dropping `categoryId`. Ful
 swap the product list source to `getProductsToSelect()`/`ProductSelectView` AND DROP the read-only
 Category display field entirely. NO secondary `getProductById` lookup.
 
-- [ ] 7.1 RED/GREEN: replace the product-list load (`productService.getAll()` → derive options)
+- [x] 7.1 RED/GREEN: replace the product-list load (`productService.getAll()` → derive options)
       with `const result = await productService.getProductsToSelect();` inside the existing async
       load effect; render the `<select>` options from `ProductSelectView[]` (`value={id}`,
       label=`fullName`) instead of the current `Product[]`-derived options.
-- [ ] 7.2 GREEN: remove the read-only "Category" input block and its
+- [x] 7.2 GREEN: remove the read-only "Category" input block and its
       `categoryId`/`selectedCategory` derivation (`products.find(p => p.id === productId)?.categoryId`)
       entirely — `ProductSelectView` has no `categoryId`.
-- [ ] 7.3 GREEN: drop `categoryId` from `EditInventoryEntryInput` if it becomes unused, and update
+- [x] 7.3 GREEN: drop `categoryId` from `EditInventoryEntryInput` if it becomes unused, and update
       `handleSave` + the route caller / `InventoryOfflineService.create` call site accordingly
       (Angular's `createInventoryEntry` is a 3-arg call with no categoryId — this converges to it).
-- [ ] 7.4 Update the modal's test: mock `getProductsToSelect` (returns `{id, fullName}[]`) instead
+- [x] 7.4 Update the modal's test: mock `getProductsToSelect` (returns `{id, fullName}[]`) instead
       of `getAll`; drop any assertion on the Category display field.
-- [ ] 7.5 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
+- [x] 7.5 Gate: `pnpm test`, `tsc --noEmit`, `pnpm build`; commit
       `refactor(web-store-pos): re-express edit-inventory-entry-modal product list against ProductOfflineService.getProductsToSelect, drop React-only Category field`.
 
 ## Final: Slice 6 Regression Gate
 
-- [ ] 8.1 Grep-confirm `search`/`updateMany`/`getByName`/`activate`/`deactivate` no longer exist
+- [x] 8.1 Grep-confirm `search`/`updateMany`/`getByName`/`activate`/`deactivate` no longer exist
       on `apps/web-store-pos/app/sales/lib/services/product-offline-service.ts` or
       `packages/domain/src/services/product-service.ts`.
-- [ ] 8.2 Grep-confirm zero remaining call sites reference the five removed methods anywhere
+- [x] 8.2 Grep-confirm zero remaining call sites reference the five removed methods anywhere
       under `apps/web-store-pos/app`.
-- [ ] 8.3 Confirm `ProductOfflineService`'s constructor accepts optional
+- [x] 8.3 Confirm `ProductOfflineService`'s constructor accepts optional
       `productRepository`/`categoryRepository` (Flag #6) and every existing single-arg
       `new ProductOfflineService(storeId)` call site still compiles.
-- [ ] 8.4 Confirm the Flag-#1-deferred surface (`extends BaseService`,
+- [x] 8.4 Confirm the Flag-#1-deferred surface (`extends BaseService`,
       `create`/`update`/`delete`/`getAll`/`getById`/`getByBarcode`) is UNCHANGED and its
       remaining call sites (`sale.tsx`, `egress.tsx`, `available.tsx`, `import.tsx`/`export.tsx`,
       `products.tsx` `loadData`) still compile and pass. (`edit-inventory-entry-modal.tsx` is NO
       LONGER on this list — WU7 swapped it to `getProductsToSelect()` per Flag #4 RATIFIED.)
-- [ ] 8.5 Full gate — domain: `pnpm test`, `tsc --noEmit`, build. web-store-pos: `pnpm test`,
+- [x] 8.5 Full gate — domain: `pnpm test`, `tsc --noEmit`, build. web-store-pos: `pnpm test`,
       `tsc --noEmit`, `pnpm build` — all green.
-- [ ] 8.6 Update this file with commit hashes; record the confirmed resolution of Flags #1, #2,
+- [x] 8.6 Update this file with commit hashes; record the confirmed resolution of Flags #1, #2,
       #4 at the top of the Flagged section for the historical record.
 
 ## Deferred to Phase 2 step 7 / step 8 (do NOT pull into this slice)

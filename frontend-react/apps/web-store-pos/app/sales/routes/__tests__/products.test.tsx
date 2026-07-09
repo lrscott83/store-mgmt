@@ -289,6 +289,102 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[5]).toBe(true); // isActive
   });
 
+  // Angular parity (edit-product-modal.component.ts:113-138): handleEditProduct routes through
+  // the async updateProduct(id, categoryId, name, price, businessId, order, isActive,
+  // availableToSale, discountFromInvantory, barcode?) positional surface.
+  it('calls updateProduct with the edited product positional args (WU4.2)', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()]; // id prod-1, name Coca Cola, cat-1
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(screen.getByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Editar Producto'));
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    await waitFor(() => expect(productServiceSpies.updateProduct).toHaveBeenCalledTimes(1));
+    const args = productServiceSpies.updateProduct.mock.calls[0];
+    expect(args[0]).toBe('prod-1'); // id
+    expect(args[1]).toBe('cat-1'); // categoryId
+    expect(args[2]).toBe('Coca Cola Zero'); // name
+  });
+
+  // Angular parity: handleDeleteProduct routes through the async deleteProduct(id) surface.
+  it('calls deleteProduct(id) from the product row action menu (WU4.3)', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(screen.getByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Eliminar Producto'));
+
+    await waitFor(() => expect(productServiceSpies.deleteProduct).toHaveBeenCalledWith('prod-1'));
+  });
+
+  // Angular has no updateMany (removed): the bulk price-edit UI re-expresses as a per-item
+  // updateProduct loop (WU4.4). One product -> one updateProduct call carrying the edited price.
+  it('re-expresses bulk save as a per-item updateProduct loop carrying the edited price (WU4.4)', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(screen.getByTestId('price-input-prod-1'), { target: { value: '9.99' } });
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    await waitFor(() => expect(productServiceSpies.updateProduct).toHaveBeenCalledTimes(1));
+    const args = productServiceSpies.updateProduct.mock.calls[0];
+    expect(args[0]).toBe('prod-1'); // id
+    expect(args[3]).toBe(9.99); // price
+  });
+
+  // Angular parity (edit-product-modal.component.ts:106-110): a failed createProduct surfaces
+  // errors[0].description via showBlockingError and keeps the modal open (no silent swallow).
+  it('surfaces a createProduct failure via showBlockingError and keeps the modal open (WU4.1)', async () => {
+    mockCategories = [makeCategory()];
+    productServiceSpies.createProduct.mockResolvedValueOnce({
+      data: null,
+      succeeded: false,
+      message: '',
+      actionCode: 400,
+      errors: [{ code: 'Product.NameExists', description: 'El nombre del producto ya existe.' }],
+    } as unknown as Awaited<ReturnType<typeof productServiceSpies.createProduct>>);
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-product-button'));
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El nombre del producto ya existe.'));
+    // Modal stays open on failure — not force-closed.
+    expect(screen.getByTestId('create-product-submit')).toBeInTheDocument();
+  });
+
   // Angular parity (edit-product-category-modal.component.ts:50-63): creating a category
   // calls createProductCategory(name, order, isActive) directly — no fetch-then-save steps.
   describe('handleCategorySave — Angular async category-C parity', () => {
