@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
@@ -246,6 +246,112 @@ describe('InventoryAvailablePage — header total inventory value', () => {
       </Wrapper>,
     );
     expect(screen.getByText('$0.00')).toBeInTheDocument();
+  });
+});
+
+// ─── InventoryAvailablePage — isActive-only narrowing (regression lock, verify WARNING 1) ────
+//
+// Regression lock for product-service-parity Slice 8 WU10 / verify WARNING 1 — Inventario
+// Disponible is isActive-only; inactive-but-in-stock products are intentionally excluded
+// (ratified 2026-07-09). Restoring all-products behavior belongs to the Inventory-parity SDD.
+//
+// This exercises the REAL seam available.tsx's loadData actually calls (categorySvc /
+// productSvc), NOT a canned InventoryOfflineService.getAvailableByCategory mock that ignores its
+// input — the module-level mock above (line ~34) returns a fixed `bm([])` regardless of
+// argument, which would bypass the very filtering behavior this test locks. The
+// getAvailableByCategory override below mirrors the real method's enriched→view mapping
+// (inventory-offline-service.ts:199-249) against a canned stock table, so its output is a
+// genuine function of the `enriched` array available.tsx builds from
+// ProductOfflineService.getAvailableProductsByCategoryId's (isActive-only) result.
+describe('InventoryAvailablePage — isActive-only narrowing (regression lock, verify WARNING 1)', () => {
+  beforeEach(() => {
+    mockEgressCategories = [makeCategory({ id: 'cat-1', name: 'Bebidas' })];
+    mockEgressProducts = [
+      makeEgressProduct({
+        id: 'p-active',
+        name: 'Ron Activo',
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        isActive: true,
+      }),
+      makeEgressProduct({
+        id: 'p-inactive',
+        name: 'Ron Inactivo',
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        isActive: false,
+      }),
+    ];
+  });
+
+  afterEach(() => {
+    mockEgressCategories = [];
+    mockEgressProducts = [];
+  });
+
+  it('shows the active in-stock product and excludes the inactive in-stock product from the same category', async () => {
+    // Both products are "in stock" per this table — proves the exclusion of the inactive one
+    // comes from available.tsx's real product-loading seam (isActive-only), not from the stock
+    // table itself.
+    const stock: Record<string, { available: number; costPrice: number }> = {
+      'p-active': { available: 10, costPrice: 2 },
+      'p-inactive': { available: 5, costPrice: 3 },
+    };
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getAvailableByCategory: vi.fn(
+            (
+              enriched: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
+            ) => {
+              const categoryMap = new Map<string, InventoryCategoryView>();
+              for (const p of enriched) {
+                const s = stock[p.id];
+                if (!s || s.available === 0) continue;
+                let cat = categoryMap.get(p.categoryId);
+                if (!cat) {
+                  cat = {
+                    categoryId: p.categoryId,
+                    categoryName: p.categoryName,
+                    totalQuantity: 0,
+                    totalCostPrice: 0,
+                    products: [],
+                  };
+                  categoryMap.set(p.categoryId, cat);
+                }
+                cat.products.push({
+                  productId: p.id,
+                  productName: p.name,
+                  categoryId: p.categoryId,
+                  categoryName: p.categoryName,
+                  totalAvailable: s.available,
+                  avgCostPrice: s.costPrice,
+                });
+              }
+              for (const cat of categoryMap.values()) {
+                cat.totalQuantity = cat.products.reduce((sum, pp) => sum + pp.totalAvailable, 0);
+                cat.totalCostPrice = cat.products.reduce(
+                  (sum, pp) => sum + pp.avgCostPrice * pp.totalAvailable,
+                  0,
+                );
+              }
+              return bm(Array.from(categoryMap.values()));
+            },
+          ),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryAvailablePage />
+      </Wrapper>,
+    );
+
+    const toggle = await screen.findByTestId('inventory-category-toggle-cat-1');
+    fireEvent.click(toggle);
+
+    expect(screen.getByText('Ron Activo')).toBeInTheDocument();
+    expect(screen.queryByText('Ron Inactivo')).not.toBeInTheDocument();
   });
 });
 

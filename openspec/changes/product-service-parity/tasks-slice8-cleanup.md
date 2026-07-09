@@ -141,6 +141,21 @@ same per-category `Promise.all(categories.map(c => productSvc.getAvailableProduc
 pattern as `products.tsx`, flattened back into one array before building `enriched` (preserves
 current behavior: all active products, enriched with category name).
 
+> **Correction (2026-07-09, sdd-verify WARNING 1, ratified):** "preserves current behavior" above
+> is factually wrong on the product-SET dimension — it was only checked against the NEW
+> implementation, not the OLD one. The OLD sync `productSvc.getAll()` returned ALL products
+> (active + inactive); the NEW `getAvailableProductsByCategoryId` is isActive-only
+> (`product-repository.ts:49` / `product-offline-service.ts:41`). So an inactive-but-in-stock
+> product that previously appeared in the "Inventario Disponible" report is now EXCLUDED — a real
+> narrowing, not a preservation. This was ACCEPTED: Angular's real `InventoryAvailableComponent`
+> doesn't use `productService`/`categoryService` here at all (out of this SDD's scope, see above),
+> so neither old nor new `available.tsx` is true Angular parity either way; restoring
+> all-products behavior belongs to a separate Inventory-parity SDD. The enrichment LOGIC
+> (mapping id/name/categoryId/categoryName) is unchanged — only the input product SET narrowed.
+> Locked by a regression test in
+> `apps/web-store-pos/app/inventory/routes/__tests__/inventory-routes.test.tsx`
+> ("InventoryAvailablePage — isActive-only narrowing (regression lock, verify WARNING 1)").
+
 **Options ratified into this plan** (present for sign-off, not re-litigation): the above is the
 ONE Angular-source-grounded design per route — there is no (a)/(b) branch to choose between,
 unlike Slice 6/7's flags. What needs explicit go-ahead is the SCOPE: this restructures 4 route
@@ -327,7 +342,10 @@ duplicate file structure) — same two-effect split, same `products` state narro
 - [x] 10.1 RED/GREEN: `categorySvc.getAll()` → `categorySvc.getProductCategories()`.
 - [x] 10.2 RED/GREEN: `productSvc.getAll()` →
       `Promise.all(cats.map(c => productSvc.getAvailableProductsByCategoryId(c.id)))`, flattened
-      into one array before building `enriched` (preserves current enrichment logic unchanged).
+      into one array before building `enriched` (preserves current enrichment logic unchanged —
+      but NOTE: the product SET narrowed from all-products to isActive-only; see the 2026-07-09
+      correction note under Flag #1's `available.tsx` paragraph above, ratified + regression-test
+      locked).
 - [x] 10.3 GREEN: effect becomes `async` (IIFE or `useEffect` + async helper, matching this app's
       established pattern elsewhere).
 - [x] 10.4 Update the test: mock `getProductCategories`/`getAvailableProductsByCategoryId`.
