@@ -8,20 +8,6 @@ import type {
 import { apiClient } from '~/shared/lib/http/api-client';
 
 /**
- * The 12-method async surface of `ProductService`, minus the sync members the interface still
- * carries during the Flag-#1 coexistence (`getAll`/`getById`/`delete` from `BaseService` +
- * `getByBarcode`/`update`). Angular's `ProductOnlineService` has NO correlate for those five, so
- * literally `implements ProductService` would force inventing throw-stubs with zero Angular
- * correlate (Exact-Surface Rule violation). This local alias is the online/factory contract until
- * Phase 2 step 8 drops the sync members from `ProductService` itself and retires this alias.
- * (Flag C, ratified — domain package untouched.)
- */
-export type AsyncProductService = Omit<
-  ProductService,
-  'getAll' | 'getById' | 'delete' | 'getByBarcode' | 'update'
->;
-
-/**
  * ProductOnlineService — React mirror of Angular's
  * `application/products/product-online.service.ts`. REFERENCE-ONLY (parity rule 1): it is never
  * validated against a live backend. Each method calls the shared `apiClient` with the EXACT URL
@@ -35,11 +21,15 @@ export type AsyncProductService = Omit<
  * `getProductByBarcode`/`createCsvProducts`/`createProducts`/`createProduct` are the only clean
  * ones, matching Angular's own inconsistency.
  *
- * `createProduct` accepts `barcode?` for type conformance with `AsyncProductService` but OMITS it
+ * `createProduct` accepts `barcode?` for type conformance with `ProductService` but OMITS it
  * from the POST body (ANGULAR-BUG-SUSPECT #4); `updateProduct` DOES send it. No `setDiscountFrom-
  * Invantory`/`getProductsByCategoryId` (offline-only extras, not on Angular's abstract surface).
+ *
+ * `ProductService` is now standalone async (Phase 2 step 8 dropped `extends BaseService<Product>`
+ * + the legacy sync `getByBarcode`/`update` members), so this class implements it directly — the
+ * Flag-C `AsyncProductService` coexistence alias has been retired.
  */
-export class ProductOnlineService implements AsyncProductService {
+export class ProductOnlineService implements ProductService {
   private readonly API_URL = '/v1/Products/';
 
   async hasAnyAvailableToSaleProduct(): Promise<BaseResponseModel<boolean>> {

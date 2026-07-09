@@ -251,13 +251,18 @@ verify against spec.md's own table before touching).
 `apps/web-store-pos/app/sales/lib/services/product-service.factory.ts` + their tests. Depends on
 WU1 (interface must already be the bare 12-method shape).
 
-- [ ] 3.1 RED/GREEN: remove the `export type AsyncProductService = Omit<ProductService, ...>`
+- [x] 3.1 RED/GREEN: remove the `export type AsyncProductService = Omit<ProductService, ...>`
       alias; `class ProductOnlineService implements ProductService` directly (no behavior change —
       the 5 omitted members no longer exist on `ProductService` to omit).
-- [ ] 3.2 RED/GREEN: `product-service.factory.ts`'s `createProductService(storeId): ProductService`
+- [x] 3.2 RED/GREEN: `product-service.factory.ts`'s `createProductService(storeId): ProductService`
       (return type, not `AsyncProductService`); update its test's type assertions if any.
-- [ ] 3.3 Gate: `pnpm -C apps/web-store-pos test`, `tsc --noEmit`, `pnpm build`; commit
+      Confirmed no test type assertions referenced `AsyncProductService` — zero test edits needed.
+- [x] 3.3 Gate: `pnpm -C apps/web-store-pos test`, `tsc --noEmit`, `pnpm build`; commit
       `refactor(web-store-pos): retire AsyncProductService alias now that ProductService is standalone async (Flag C follow-through)`.
+      All green: 1561/1561 full suite (0 regressions), `tsc --noEmit` clean, `pnpm build` clean.
+      Grep-confirmed `AsyncProductService` no longer appears in any production code (only 2
+      historical-record doc-comment mentions remain, in `product-online-service.ts` and
+      `product-service.factory.ts`).
 
 ## WU7: Re-express `products.tsx` — Req: Flag #1, "Call-Site Parity" (getProductCategoriesView, getAvailableProductsByCategoryId)
 
