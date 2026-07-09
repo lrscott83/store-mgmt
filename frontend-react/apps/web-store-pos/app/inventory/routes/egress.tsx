@@ -38,24 +38,36 @@ export function EgressPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [orderType, setOrderType] = useState<OrderType>(OrderType.Mayorista);
 
+  // Angular parity (egress.component.ts / sale.component.ts:39-40): getAvailableProductCategories()
+  // already returns active-only categories sorted by order (ProductCategoryRepository.
+  // getAvailableProductCategories) — no manual filter/sort needed.
   useEffect(() => {
     const categoryService = new ProductCategoryOfflineService(storeId);
-    const productService = new ProductOfflineService(storeId);
-
-    // Angular: getAvailableProductCategories() -> active categories, sorted by order
-    const availableCategories = categoryService
-      .getAll()
-      .filter((c) => c.isActive)
-      .sort((a, b) => a.order - b.order);
-
-    setCategories(availableCategories);
-    setProducts(productService.getAll());
-
-    if (availableCategories.length > 0) {
-      setSelectedCategoryId(availableCategories[0].id);
-    }
+    categoryService.getAvailableProductCategories().then((result) => {
+      const availableCategories = result.data ?? [];
+      setCategories(availableCategories);
+      if (availableCategories.length > 0) {
+        setSelectedCategoryId(availableCategories[0].id);
+      }
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
+
+  // Angular parity (sale-category-products.component.ts:31-43): refetches
+  // getProductsToSaleByCategoryId every time the selected category changes — `products` is
+  // CATEGORY-SCOPED (only the selected category's sellable products), matching Angular's
+  // `products$`, not a client-side filter over a flat list.
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      setProducts([]);
+      return;
+    }
+    const productService = new ProductOfflineService(storeId);
+    productService.getProductsToSaleByCategoryId(selectedCategoryId).then((result) => {
+      setProducts(result.data ?? []);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, selectedCategoryId]);
 
   function selectCategory(category: ProductCategory) {
     setSelectedCategoryId(category.id);
@@ -81,14 +93,6 @@ export function EgressPage() {
       inventory: inventoryService.getAvailableQuantity(productId),
     });
   }
-
-  // Angular: getProductsToSaleByCategoryId -> categoryId + isActive + availableToSale,
-  // sorted by order (product-category.repository.ts / product.repository.ts equivalents)
-  const categoryProducts = selectedCategoryId
-    ? products
-        .filter((p) => p.categoryId === selectedCategoryId && p.isActive && p.availableToSale)
-        .sort((a, b) => a.order - b.order)
-    : [];
 
   return (
     <Card title={intl.formatMessage({ id: 'INVENTORY_EGRESS.HEADER' })}>
@@ -130,7 +134,7 @@ export function EgressPage() {
       </div>
 
       <SaleCategoryProducts
-        products={categoryProducts}
+        products={products}
         orderType={orderType}
         onAdded={handleAdded}
         checkAvailability={checkAvailability}

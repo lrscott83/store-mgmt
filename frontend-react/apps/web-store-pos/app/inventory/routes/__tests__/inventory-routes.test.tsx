@@ -51,8 +51,19 @@ let mockEgressCategories: ProductCategory[] = [];
 // a repository there, so they stay on the service).
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn(() => mockEgressProducts),
+    // WU9 (product-service-parity step 8): EgressPage now loads its category-scoped sellable
+    // products via the async getProductsToSaleByCategoryId (Angular SaleCategoryProductsComponent
+    // parity), not the flat sync getAll. getAll is retained only for InventoryAvailablePage (WU10,
+    // still sync) which never populates these fixtures, so it keeps seeing [].
+    getAll: vi.fn(() => []),
     getById: vi.fn().mockReturnValue(undefined),
+    getProductsToSaleByCategoryId: vi.fn(async (categoryId: string) =>
+      bm(
+        mockEgressProducts
+          .filter((p) => p.categoryId === categoryId && p.isActive && p.availableToSale)
+          .sort((a, b) => a.order - b.order),
+      ),
+    ),
     // Flag #4: EditInventoryEntryModal loads its dropdown via getProductsToSelect (async).
     getProductsToSelect: vi.fn(async () => ({
       data: mockEgressProducts.map((p: { id: string; name: string }) => ({ id: p.id, fullName: p.name })),
@@ -66,8 +77,14 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
 
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn(() => mockEgressCategories),
+    // WU9: EgressPage now loads active categories via the async getAvailableProductCategories
+    // (drops the client-side isActive filter/sort). getAll retained for InventoryAvailablePage
+    // (WU10) which never populates these fixtures.
+    getAll: vi.fn(() => []),
     getById: vi.fn((id: string) => mockEgressCategories.find((c) => c.id === id)),
+    getAvailableProductCategories: vi.fn(async () =>
+      bm(mockEgressCategories.filter((c) => c.isActive).sort((a, b) => a.order - b.order)),
+    ),
   })),
 }));
 
@@ -1233,18 +1250,18 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
     }
   });
 
-  it('renders one category button per active category', () => {
+  it('renders one category button per active category', async () => {
     mockEgressCategories = [makeCategory({ id: 'c1', name: 'Bebidas' }), makeCategory({ id: 'c2', name: 'Snacks' })];
     render(
       <Wrapper>
         <EgressPage />
       </Wrapper>,
     );
-    expect(screen.getByRole('button', { name: 'Bebidas' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Bebidas' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Snacks' })).toBeInTheDocument();
   });
 
-  it('renders an editable price input by default (Mayorista is non-Normal, SaleProductRow parity)', () => {
+  it('renders an editable price input by default (Mayorista is non-Normal, SaleProductRow parity)', async () => {
     mockEgressCategories = [makeCategory()];
     mockEgressProducts = [makeEgressProduct()];
     render(
@@ -1252,10 +1269,10 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
         <EgressPage />
       </Wrapper>,
     );
-    expect(screen.getByLabelText('Precio')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Precio')).toBeInTheDocument();
   });
 
-  it('threads productId, quantity, orderType (Mayorista) and the edited price into cart-store.addItem', () => {
+  it('threads productId, quantity, orderType (Mayorista) and the edited price into cart-store.addItem', async () => {
     mockEgressCategories = [makeCategory()];
     mockEgressProducts = [makeEgressProduct({ id: 'p1', price: 10 })];
     render(
@@ -1263,7 +1280,7 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
         <EgressPage />
       </Wrapper>,
     );
-    fireEvent.change(screen.getByLabelText('Precio'), { target: { value: '12' } });
+    fireEvent.change(await screen.findByLabelText('Precio'), { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     expect(addItemMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'p1' }),
@@ -1273,7 +1290,7 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
     );
   });
 
-  it('threads the newly-selected orderType (not the stale default) when the selector is changed before adding', () => {
+  it('threads the newly-selected orderType (not the stale default) when the selector is changed before adding', async () => {
     mockEgressCategories = [makeCategory()];
     mockEgressProducts = [makeEgressProduct({ id: 'p1' })];
     render(
@@ -1282,7 +1299,7 @@ describe('EgressPage — Mayorista wholesale-sale screen (Angular egress.compone
       </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText('Tipo'), { target: { value: String(OrderType.Merma) } });
-    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /adicionar/i }));
     expect(addItemMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'p1' }),
       1,
