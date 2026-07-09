@@ -11,7 +11,7 @@ import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { ProductOfflineService } from '../lib/services/product-offline-service';
 import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
-import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
+import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { CategoryProductList } from '../components/category-product-list';
 import { CreateProductModal } from '../components/create-product-modal';
 import { EditProductModal } from '../components/edit-product-modal';
@@ -60,7 +60,11 @@ export function ProductsPage() {
   }
 
   // --- Create product ---
-  function handleCreateProduct(data: {
+  // Angular parity (edit-product-modal.component.ts:88-112): createProduct(...) positional
+  // async surface; on failure surface errors[0].description via the same blocking-error path as
+  // handleCategorySave (Angular's Swal error). Order stays 1 (pre-existing React value, not part
+  // of this slice's service reconciliation).
+  async function handleCreateProduct(data: {
     name: string;
     price: number;
     barcode?: string;
@@ -68,35 +72,76 @@ export function ProductsPage() {
     availableToSale: boolean;
     discountFromInvantory: boolean;
   }) {
-    const cat = categories.find((c) => c.id === data.categoryId);
-    productService.create({
-      ...data,
-      categoryName: cat?.name ?? '',
-      order: 1,
-      isActive: true,
-      businessId: '',
-    });
+    const result = await productService.createProduct(
+      data.categoryId,
+      data.name,
+      data.price,
+      '',
+      1,
+      true,
+      data.availableToSale,
+      data.discountFromInvantory,
+      data.barcode,
+    );
+    if (!result.succeeded) {
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      return;
+    }
     loadData();
     setModal(null);
   }
 
   // --- Edit product ---
-  function handleEditProduct(product: Product) {
-    productService.update(product);
+  // Angular parity (edit-product-modal.component.ts:113-138): updateProduct(...) positional
+  // async surface; same failure surfacing.
+  async function handleEditProduct(product: Product) {
+    const result = await productService.updateProduct(
+      product.id,
+      product.categoryId,
+      product.name,
+      product.price,
+      product.businessId,
+      product.order,
+      product.isActive,
+      product.availableToSale,
+      product.discountFromInvantory,
+      product.barcode,
+    );
+    if (!result.succeeded) {
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      return;
+    }
     loadData();
     setModal(null);
   }
 
   // --- Delete product ---
-  function handleDeleteProduct(id: string) {
-    productService.delete(id);
+  // Angular parity: deleteProduct always resolves success (soft-delete, never fails) — silent.
+  async function handleDeleteProduct(id: string) {
+    await productService.deleteProduct(id);
     loadData();
     setModal(null);
   }
 
   // --- Bulk edit (per-category "Nuevo Productos" -> bulk price edit) ---
-  function handleBulkSave(updatedProducts: Product[]) {
-    productService.updateMany(updatedProducts);
+  // Angular has no `updateMany` on ProductService (removed, Phase 2 step 6 / spec.md decision
+  // #3): the bulk price-edit UI feature stays, re-expressed as a per-item `updateProduct` loop
+  // against the async surface.
+  async function handleBulkSave(updatedProducts: Product[]) {
+    for (const p of updatedProducts) {
+      await productService.updateProduct(
+        p.id,
+        p.categoryId,
+        p.name,
+        p.price,
+        p.businessId,
+        p.order,
+        p.isActive,
+        p.availableToSale,
+        p.discountFromInvantory,
+        p.barcode,
+      );
+    }
     loadData();
     setModal(null);
   }
@@ -122,39 +167,19 @@ export function ProductsPage() {
   }
 
   // --- CSV import ---
-  // Interim shape (spec.md "Surface Reconciliation" — folds into
-  // ProductService.createCsvProducts once Phase 2 step 6 lands): category lookup/create goes
-  // directly through ProductCategoryRepository (categoryService.getByName/addByName no longer
-  // exist, per the Exact-Surface Rule — Angular exposes those only on the repository).
-  function handleCsvImport(rows: { name: string; price: number; barcode?: string; category?: string }[]) {
-    const categoryRepository = new ProductCategoryRepository(storeId);
-    for (const row of rows) {
-      let categoryId: string;
-      if (row.category) {
-        const existing = categoryRepository.getProductCategoryByName(row.category);
-        categoryId = existing ? existing.id : (categoryRepository.addProductCategoryByName(row.category) ?? '');
-      } else {
-        categoryId = categories[0]?.id ?? '';
-      }
-      const cat = categoryRepository.getProductCategoryById(categoryId);
-      productService.create({
-        name: row.name,
-        price: row.price,
-        barcode: row.barcode,
-        categoryId,
-        categoryName: cat?.name ?? '',
-        order: 1,
-        isActive: true,
-        availableToSale: true,
-        discountFromInvantory: false,
-        businessId: '',
-      });
-    }
+  // Angular parity (product-offline.service.ts:74-84 createCsvProducts + csv-product.service.ts
+  // validateProducts): category resolution/creation happens INSIDE createCsvProducts (per row,
+  // by name). Rows without a category are filtered out here, mirroring Angular's
+  // `validateProducts` (`item['category'] && item['name'] && price`). No barcode (Flag #2).
+  async function handleCsvImport(rows: ParsedProductRow[]) {
+    const csvProducts = rows
+      .filter((row) => row.category)
+      .map((row) => ({ category: row.category as string, name: row.name, price: row.price }));
+    await productService.createCsvProducts(csvProducts);
     loadData();
     setModal(null);
   }
 
-  const existingBarcodes = products.filter((p) => p.barcode).map((p) => p.barcode as string);
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
 
   return (
@@ -273,7 +298,6 @@ export function ProductsPage() {
 
       {modal?.type === 'csv' && (
         <CsvProductImporterModal
-          existingBarcodes={existingBarcodes}
           onImport={handleCsvImport}
           onClose={() => setModal(null)}
         />

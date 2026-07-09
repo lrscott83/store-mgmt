@@ -20,20 +20,21 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 // Hoisted so the mock factory below (which runs before module-scope const
 // declarations) and the tests can both reference the same spy instances —
 // lets tests inspect ProductOfflineService.create's call args directly.
+const okEnvelope = { data: true, succeeded: true, message: '', actionCode: 200, errors: [] };
 const productServiceSpies = vi.hoisted(() => ({
-  create: vi.fn(),
-  update: vi.fn(),
-  updateMany: vi.fn(),
-  delete: vi.fn(),
+  createProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  updateProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  deleteProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  createCsvProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
 }));
 
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn(() => mockProducts),
-    create: productServiceSpies.create,
-    update: productServiceSpies.update,
-    updateMany: productServiceSpies.updateMany,
-    delete: productServiceSpies.delete,
+    createProduct: productServiceSpies.createProduct,
+    updateProduct: productServiceSpies.updateProduct,
+    deleteProduct: productServiceSpies.deleteProduct,
+    createCsvProducts: productServiceSpies.createCsvProducts,
   })),
 }));
 
@@ -62,22 +63,6 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
     getAll: vi.fn(() => mockCategories),
     createProductCategory: categoryServiceSpies.createProductCategory,
     updateProductCategory: categoryServiceSpies.updateProductCategory,
-  })),
-}));
-
-// handleCsvImport's interim shape (spec.md) goes directly through ProductCategoryRepository,
-// bypassing the service (categoryService.getByName/addByName no longer exist).
-const categoryRepositorySpies = vi.hoisted(() => ({
-  getProductCategoryByName: vi.fn((name: string) => mockCategories.find((c) => c.name === name)),
-  addProductCategoryByName: vi.fn(() => 'new-cat-id'),
-  getProductCategoryById: vi.fn((id: string) => mockCategories.find((c) => c.id === id)),
-}));
-
-vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
-  ProductCategoryRepository: vi.fn().mockImplementation(() => ({
-    getProductCategoryByName: categoryRepositorySpies.getProductCategoryByName,
-    addProductCategoryByName: categoryRepositorySpies.addProductCategoryByName,
-    getProductCategoryById: categoryRepositorySpies.getProductCategoryById,
   })),
 }));
 
@@ -123,10 +108,11 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
   beforeEach(() => {
     mockCategories = [];
     mockProducts = [];
-    productServiceSpies.create.mockClear();
-    productServiceSpies.update.mockClear();
-    productServiceSpies.updateMany.mockClear();
-    productServiceSpies.delete.mockClear();
+    productServiceSpies.createProduct.mockClear();
+    productServiceSpies.createProduct.mockResolvedValue(okEnvelope);
+    productServiceSpies.updateProduct.mockClear();
+    productServiceSpies.updateProduct.mockResolvedValue(okEnvelope);
+    productServiceSpies.deleteProduct.mockClear();
     categoryServiceSpies.createProductCategory.mockClear();
     categoryServiceSpies.createProductCategory.mockResolvedValue({
       data: true,
@@ -143,10 +129,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       actionCode: 200,
       errors: [],
     });
-    categoryRepositorySpies.getProductCategoryByName.mockClear();
-    categoryRepositorySpies.addProductCategoryByName.mockClear();
-    categoryRepositorySpies.addProductCategoryByName.mockReturnValue('new-cat-id');
-    categoryRepositorySpies.getProductCategoryById.mockClear();
+    productServiceSpies.createCsvProducts.mockClear();
     showBlockingErrorMock.mockClear();
   });
 
@@ -276,10 +259,11 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.queryByTestId('products-search-input')).not.toBeInTheDocument();
   });
 
-  // Angular parity (audit-user-threading-followup): the route MUST NOT supply
-  // audit fields anymore — ProductOfflineService.create owns createdByName/
-  // createdDate stamping internally.
-  it('does not pass a hardcoded createdByName on create (service owns stamping)', () => {
+  // Angular parity (edit-product-modal.component.ts:88-100): create routes through the async
+  // createProduct(categoryId, name, price, businessId, order, isActive, availableToSale,
+  // discountFromInvantory, barcode?) positional surface — no audit fields (the service owns
+  // createdByName/createdDate stamping).
+  it('calls createProduct with positional args (service owns audit stamping)', async () => {
     mockCategories = [makeCategory()];
 
     render(
@@ -295,10 +279,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
-    expect(productServiceSpies.create).toHaveBeenCalledTimes(1);
-    const payload = productServiceSpies.create.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload).not.toHaveProperty('createdByName');
-    expect(payload).not.toHaveProperty('createdDate');
+    await waitFor(() => expect(productServiceSpies.createProduct).toHaveBeenCalledTimes(1));
+    const args = productServiceSpies.createProduct.mock.calls[0];
+    expect(args[0]).toBe('cat-1'); // categoryId
+    expect(args[1]).toBe('Sprite'); // name
+    expect(args[2]).toBe(2.5); // price
+    expect(args[3]).toBe(''); // businessId
+    expect(args[4]).toBe(1); // order
+    expect(args[5]).toBe(true); // isActive
   });
 
   // Angular parity (edit-product-category-modal.component.ts:50-63): creating a category
@@ -369,22 +357,16 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     });
   });
 
-  // Interim shape (spec.md): category lookup/create for CSV rows goes through
-  // ProductCategoryRepository directly (categoryService.getByName/addByName removed).
-  describe('handleCsvImport — interim ProductCategoryRepository call site', () => {
+  // Angular parity (product-offline.service.ts createCsvProducts + csv-product.service.ts
+  // validateProducts): the whole file routes through ProductService.createCsvProducts, which
+  // resolves/creates categories by NAME internally. Category-less rows are filtered out
+  // (Angular's validateProducts). No barcode column (Flag #2 RATIFIED).
+  describe('handleCsvImport — ProductService.createCsvProducts call site', () => {
     function makeCsvFile(): File {
       return new File(['name,price,category\nChips,10,Snacks'], 'products.csv', { type: 'text/csv' });
     }
 
-    it('creates a missing category via ProductCategoryRepository.addProductCategoryByName and uses it on the product', async () => {
-      categoryRepositorySpies.getProductCategoryByName.mockReturnValueOnce(undefined);
-      categoryRepositorySpies.getProductCategoryById.mockReturnValueOnce({
-        id: 'new-cat-id',
-        name: 'Snacks',
-        order: 2,
-        isActive: true,
-      });
-
+    it('calls createCsvProducts with the parsed {category,name,price} rows', async () => {
       render(
         <Wrapper>
           <ProductsPage />
@@ -396,28 +378,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await waitFor(() => expect(productServiceSpies.create).toHaveBeenCalledTimes(1));
-      expect(categoryRepositorySpies.getProductCategoryByName).toHaveBeenCalledWith('Snacks');
-      expect(categoryRepositorySpies.addProductCategoryByName).toHaveBeenCalledWith('Snacks');
-      const payload = productServiceSpies.create.mock.calls[0][0] as Record<string, unknown>;
-      expect(payload.categoryId).toBe('new-cat-id');
-      expect(payload.categoryName).toBe('Snacks');
+      await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
+      expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
+        { category: 'Snacks', name: 'Chips', price: 10 },
+      ]);
     });
 
-    it('reuses an existing category via ProductCategoryRepository.getProductCategoryByName without creating a new one', async () => {
-      categoryRepositorySpies.getProductCategoryByName.mockReturnValueOnce({
-        id: 'existing-cat-id',
-        name: 'Snacks',
-        order: 1,
-        isActive: true,
-      });
-      categoryRepositorySpies.getProductCategoryById.mockReturnValueOnce({
-        id: 'existing-cat-id',
-        name: 'Snacks',
-        order: 1,
-        isActive: true,
-      });
-
+    it('filters out rows without a category before calling createCsvProducts (Angular validateProducts parity)', async () => {
       render(
         <Wrapper>
           <ProductsPage />
@@ -425,14 +392,18 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), {
+        target: {
+          files: [new File(['name,price,category\nChips,10,Snacks\nNoCat,5,'], 'products.csv', { type: 'text/csv' })],
+        },
+      });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await waitFor(() => expect(productServiceSpies.create).toHaveBeenCalledTimes(1));
-      expect(categoryRepositorySpies.addProductCategoryByName).not.toHaveBeenCalled();
-      const payload = productServiceSpies.create.mock.calls[0][0] as Record<string, unknown>;
-      expect(payload.categoryId).toBe('existing-cat-id');
+      await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
+      expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
+        { category: 'Snacks', name: 'Chips', price: 10 },
+      ]);
     });
   });
 });

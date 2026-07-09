@@ -31,7 +31,7 @@ describe('CsvProductImporterModal — error text parity (Angular generic import-
     });
     render(
       <Wrapper>
-        <CsvProductImporterModal existingBarcodes={[]} onImport={vi.fn()} onClose={vi.fn()} />
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
@@ -46,7 +46,7 @@ describe('CsvProductImporterModal — error text parity (Angular generic import-
 
     render(
       <Wrapper>
-        <CsvProductImporterModal existingBarcodes={[]} onImport={vi.fn()} onClose={vi.fn()} />
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
@@ -64,7 +64,7 @@ describe('CsvProductImporterModal — preview table text is Spanish (no hardcode
   it('renders Spanish column headers and a Spanish "Válido" status badge for a valid row', async () => {
     render(
       <Wrapper>
-        <CsvProductImporterModal existingBarcodes={[]} onImport={vi.fn()} onClose={vi.fn()} />
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     const csv = ['name,price,barcode,category', 'Coca Cola,1.50,123456,Bebidas'].join('\n');
@@ -84,7 +84,7 @@ describe('CsvProductImporterModal — preview table text is Spanish (no hardcode
   it('renders the Spanish PRODUCTS.CSV.ERROR message (not a raw English errorCode) for an invalid row', async () => {
     render(
       <Wrapper>
-        <CsvProductImporterModal existingBarcodes={[]} onImport={vi.fn()} onClose={vi.fn()} />
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     const csv = ['name,price', ',1.50'].join('\n');

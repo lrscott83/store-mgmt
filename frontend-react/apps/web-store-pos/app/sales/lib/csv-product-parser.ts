@@ -1,11 +1,10 @@
 export interface ParsedProductRow {
   name: string;
   price: number;
-  barcode?: string;
   category?: string;
 }
 
-export type CsvRowErrorCode = 'MISSING_NAME' | 'MISSING_PRICE' | 'INVALID_PRICE' | 'DUPLICATE_BARCODE';
+export type CsvRowErrorCode = 'MISSING_NAME' | 'MISSING_PRICE' | 'INVALID_PRICE';
 
 export interface CsvRowError {
   row: number;
@@ -23,7 +22,7 @@ export interface CsvParseResult {
   errors: CsvRowError[];
 }
 
-export function parseCsvProducts(csvText: string, existingBarcodes: string[]): CsvParseResult {
+export function parseCsvProducts(csvText: string): CsvParseResult {
   const products: ParsedProductRow[] = [];
   const errors: CsvRowError[] = [];
 
@@ -42,11 +41,7 @@ export function parseCsvProducts(csvText: string, existingBarcodes: string[]): C
 
   const nameIdx = headers.indexOf('name');
   const priceIdx = headers.indexOf('price');
-  const barcodeIdx = headers.indexOf('barcode');
   const categoryIdx = headers.indexOf('category');
-
-  // Track barcodes seen in this CSV to detect intra-file duplicates
-  const seenBarcodes = new Set<string>(existingBarcodes);
 
   let dataRowNum = 0;
   for (let i = headerIndex + 1; i < lines.length; i++) {
@@ -75,21 +70,10 @@ export function parseCsvProducts(csvText: string, existingBarcodes: string[]): C
       continue;
     }
 
-    // --- Validate barcode uniqueness ---
-    const rawBarcode = barcodeIdx >= 0 ? (fields[barcodeIdx] ?? '') : '';
-    const barcode = rawBarcode || undefined;
-    if (barcode) {
-      if (seenBarcodes.has(barcode)) {
-        errors.push({ row: dataRowNum, errorCode: 'DUPLICATE_BARCODE' });
-        continue;
-      }
-      seenBarcodes.add(barcode);
-    }
-
     // --- Optional category ---
     const category = categoryIdx >= 0 ? (fields[categoryIdx] ?? '') || undefined : undefined;
 
-    products.push({ name, price, barcode, category });
+    products.push({ name, price, category });
   }
 
   return { products, errors };

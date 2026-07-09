@@ -9,16 +9,14 @@ const CSV_ROW_ERROR_MESSAGE_KEYS: Record<CsvRowError['errorCode'], string> = {
   MISSING_NAME: 'PRODUCTS.CSV.ERROR.MISSING_NAME',
   MISSING_PRICE: 'PRODUCTS.CSV.ERROR.MISSING_PRICE',
   INVALID_PRICE: 'PRODUCTS.CSV.ERROR.INVALID_PRICE',
-  DUPLICATE_BARCODE: 'PRODUCTS.CSV.ERROR.DUPLICATE_BARCODE',
 };
 
 interface CsvProductImporterModalProps {
-  existingBarcodes: string[];
   onImport: (products: ParsedProductRow[]) => void;
   onClose: () => void;
 }
 
-export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }: CsvProductImporterModalProps) {
+export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporterModalProps) {
   const intl = useIntl();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [products, setProducts] = useState<ParsedProductRow[]>([]);
@@ -34,7 +32,7 @@ export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }:
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
-        const result = parseCsvProducts(text, existingBarcodes);
+        const result = parseCsvProducts(text);
         setProducts(result.products);
         setErrors(result.errors);
         setParseError(null);
@@ -113,9 +111,6 @@ export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }:
                     {intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' })}
                   </th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">
-                    {intl.formatMessage({ id: 'PRODUCTS.FORM.BARCODE' })}
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">
                     {intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' })}
                   </th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">
@@ -129,7 +124,6 @@ export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }:
                     <td className="px-3 py-1.5 text-gray-500">{i + 1}</td>
                     <td className="px-3 py-1.5 text-gray-800">{product.name}</td>
                     <td className="px-3 py-1.5 text-gray-800">${product.price.toFixed(2)}</td>
-                    <td className="px-3 py-1.5 text-gray-500">{product.barcode ?? '-'}</td>
                     <td className="px-3 py-1.5 text-gray-500">{product.category ?? '-'}</td>
                     <td className="px-3 py-1.5">
                       <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
@@ -141,7 +135,7 @@ export function CsvProductImporterModal({ existingBarcodes, onImport, onClose }:
                 {errors.map((err) => (
                   <tr key={`err-${err.row}`} className="bg-red-50">
                     <td className="px-3 py-1.5 text-gray-500">{err.row}</td>
-                    <td colSpan={4} className="px-3 py-1.5 text-red-700">
+                    <td colSpan={3} className="px-3 py-1.5 text-red-700">
                       {intl.formatMessage({ id: CSV_ROW_ERROR_MESSAGE_KEYS[err.errorCode] })}
                     </td>
                     <td className="px-3 py-1.5">
