@@ -15,6 +15,8 @@ import type {
   Expense,
   SaleCredit,
 } from '@store-mgmt/domain';
+import type { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import type { ProductRepository } from '~/sales/lib/repositories/product-repository';
 
 // ---------------------------------------------------------------------------
 // zip.js runtime configuration
@@ -77,14 +79,6 @@ export interface ParsedData {
 // Service dependencies (injected as interfaces to keep service unit-testable)
 // ---------------------------------------------------------------------------
 
-export interface CategoryReader {
-  getAll(): ProductCategory[];
-}
-
-export interface ProductReader {
-  getAll(): Product[];
-}
-
 export interface InventoryReader {
   getAll(storeId: string): Map<string, InventoryEntry[]>;
 }
@@ -104,10 +98,6 @@ export interface SaleCreditReader {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function toMapEntriesJson<T>(items: T[], idOf: (item: T) => string): string {
-  return JSON.stringify(items.map((item) => [idOf(item), item]));
-}
 
 function parseJson<T>(contents: Map<string, string>, name: string, fallback: T): T {
   const raw = contents.get(name);
@@ -137,8 +127,8 @@ function parseJson<T>(contents: Map<string, string>, name: string, fallback: T):
 export class DataSerializerService {
   constructor(
     private readonly storeId: string,
-    private readonly categoryReader: CategoryReader,
-    private readonly productReader: ProductReader,
+    private readonly categoryRepository: ProductCategoryRepository,
+    private readonly productRepository: ProductRepository,
     private readonly inventoryRepo: InventoryReader,
     private readonly orderReader: OrderReader,
     private readonly expenseReader: ExpenseReader,
@@ -156,15 +146,25 @@ export class DataSerializerService {
    * entries in a single ZIP, matching Angular's `serializeEncryptedZip`.
    */
   async export(password: string): Promise<Uint8Array> {
-    const categories = this.categoryReader.getAll();
-    const products = this.productReader.getAll();
     const inventoryMap = this.inventoryRepo.getAll(this.storeId);
     const orders = this.orderReader.getAll();
     const expenses = this.expenseReader.getAll();
     const saleCredits = this.saleCreditReader.getAll();
 
-    const categoriesJson = toMapEntriesJson(categories, (c) => c.id);
-    const productsJson = toMapEntriesJson(products, (p) => p.id);
+    // Angular parity (data-serializer.service.ts:83-84): reads the RAW stored
+    // JSON string straight from the repository, no re-derivation via
+    // toMapEntriesJson — byte-preserving pass-through, not a neutral refactor
+    // (see Flag #2, product-service-parity tasks-slice8-cleanup.md).
+    //
+    // Angular's own repo signature lies about nullability (`getCategoriesJson():
+    // string` when the body is a plain `localStorage.getItem`, which is
+    // `string | null`) and never guards it — on a never-synced/empty store
+    // this null is Blob-coerced into the literal 4-char text "null", which
+    // fails to round-trip as a valid entity array on import. Per
+    // angular-bugs-policy (fix, don't replicate), React guards this null with
+    // a valid empty-array fallback instead of reproducing that crash.
+    const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
+    const productsJson = this.productRepository.getProductsJson() ?? '[]';
     const inventoryJson = JSON.stringify(Array.from(inventoryMap.entries()));
     const ordersJson = JSON.stringify(orders);
     const expensesJson = JSON.stringify(expenses);

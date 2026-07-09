@@ -1,8 +1,8 @@
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { InventoryRepository } from '~/inventory/lib/repositories/inventory-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -16,8 +16,10 @@ export function ExportPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   async function handleExport(password: string): Promise<Uint8Array> {
-    const categorySvc = new ProductCategoryOfflineService(storeId);
-    const productSvc = new ProductOfflineService(storeId);
+    // Categories/products are read via the repositories directly (Angular
+    // parity, Flag #2 — raw stored-JSON pass-through), not the offline services.
+    const categoryRepo = new ProductCategoryRepository(storeId);
+    const productRepo = new ProductRepository(storeId);
     const inventoryRepo = new InventoryRepository(storeId);
     const orderSvc = new OrderOfflineService(storeId);
     const expenseSvc = new ExpenseOfflineService(storeId);
@@ -25,8 +27,8 @@ export function ExportPage() {
 
     const serializer = new DataSerializerService(
       storeId,
-      categorySvc,
-      productSvc,
+      categoryRepo,
+      productRepo,
       inventoryRepo,
       orderSvc,
       expenseSvc,

@@ -330,23 +330,49 @@ duplicate file structure) — same two-effect split, same `products` state narro
 `apps/web-store-pos/app/sync/routes/import.tsx`, `apps/web-store-pos/app/sync/routes/export.tsx` +
 their tests.
 
-- [ ] 11.1 RED/GREEN: `DataSerializerService`'s constructor — replace `categoryReader:
+- [x] 11.1 RED/GREEN: `DataSerializerService`'s constructor — replace `categoryReader:
       CategoryReader`/`productReader: ProductReader` structural params with
       `categoryRepository: ProductCategoryRepository`/`productRepository: ProductRepository`
       (drop the two structural interfaces entirely if now unused).
-- [ ] 11.2 RED/GREEN: `export()` — replace `toMapEntriesJson(this.categoryReader.getAll(), ...)` /
+      Confirmed unused — both interfaces removed; `toMapEntriesJson` also became fully dead
+      (its only 2 call sites were categories/products) and was removed too.
+- [x] 11.2 RED/GREEN: `export()` — replace `toMapEntriesJson(this.categoryReader.getAll(), ...)` /
       `toMapEntriesJson(this.productReader.getAll(), ...)` with direct
       `this.categoryRepository.getCategoriesJson()` / `this.productRepository.getProductsJson()`
       raw-string pass-through (drop `toMapEntriesJson`'s category/product call sites if now
       unused there — `order`/`expense`/`saleCredit` keep using it).
-- [ ] 11.3 GREEN: `import.tsx`/`export.tsx` — construct `new ProductCategoryRepository(storeId)` /
+      **Deviation from pure pass-through, flagged and resolved (angular-bugs-policy)**: Angular's
+      real `getCategoriesJson()`/`getProductsJson()` are typed `(): string` but their body is a
+      plain `localStorage.getItem(...)` (`string | null`) with NO null guard anywhere in Angular's
+      `DataSerializerService`/`DataFile.content: string`. On a genuinely never-synced/empty store
+      that `null` gets `Blob`-coerced (zip.js `TextReader` → `new Blob([text], ...)`) into the
+      literal 4-char text `"null"`, which is not a valid `[id, entity][]` array — Angular's own
+      `getDataFiles()` would silently write a corrupt entry, and re-importing it would crash
+      (`null.map is not a function`). This is an Angular-own latent bug (confirmed by reading
+      `data-serializer.service.ts:81-90`, `product.repository.ts:301-303`,
+      `product-category.repository.ts:172-174`, and zip.js's `TextReader`/`Blob` source), not
+      something to mirror per angular-bugs-policy. React guards it: `getCategoriesJson() ?? '[]'` /
+      `getProductsJson() ?? '[]'` — a valid empty-array fallback, tested explicitly (new T5 test
+      "a never-synced store ... still exports/imports valid empty arrays").
+- [x] 11.3 GREEN: `import.tsx`/`export.tsx` — construct `new ProductCategoryRepository(storeId)` /
       `new ProductRepository(storeId)` instead of the offline services for the
       `DataSerializerService` constructor call; leave `import.tsx`'s OTHER offline-service/
-      repository usages (synchronizer write-side) untouched.
-- [ ] 11.4 Update `data-serializer-service.test.ts` (if it exists) — mock
+      repository usages (synchronizer write-side) untouched. `ProductCategoryOfflineService`/
+      `ProductOfflineService` imports dropped from both route files (now fully unused there).
+- [x] 11.4 Update `data-serializer-service.test.ts` (if it exists) — mock
       `getCategoriesJson`/`getProductsJson` instead of `getAll`.
-- [ ] 11.5 Gate + commit
+      Existing file found; rewritten to seed real `localStorage` (map-entries JSON, same shape
+      `BaseRepository`/`toMapEntriesJson` always produced) and construct real
+      `ProductCategoryRepository`/`ProductRepository` instances instead of `CategoryReader`/
+      `ProductReader` fakes — `InventoryReader`/`OrderReader`/`ExpenseReader`/`SaleCreditReader`
+      fakes are untouched (Flag #2: those readers are out of scope). Added a new regression test
+      for the never-seeded-store null-fallback decision above. Also cleaned the now-stale
+      `ProductCategoryOfflineService`/`ProductOfflineService` `vi.mock`s out of
+      `sync-routes.test.tsx` (dead mocks for modules the routes no longer import).
+- [x] 11.5 Gate + commit
       `refactor(web-store-pos): re-point DataSerializerService to ProductRepository/ProductCategoryRepository (getCategoriesJson/getProductsJson raw pass-through, Angular parity, Flag #2)`.
+      All green: 1561/1561 full suite (1560 baseline + 1 new regression test, 0 regressions),
+      `tsc --noEmit` clean, `pnpm build` clean.
 
 ## WU12: Re-point `order-offline-service.ts`'s `getCategoryCartItemsView` — Req: non-flag confirmation
 

@@ -38,19 +38,12 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 });
 
 // ─── Service mocks ────────────────────────────────────────────────────────────
-
-vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
-  ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
-    save: vi.fn(),
-  })),
-}));
-
-vi.mock('~/sales/lib/services/product-offline-service', () => ({
-  ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
-  })),
-}));
+//
+// NOTE: import.tsx/export.tsx no longer construct ProductCategoryOfflineService/
+// ProductOfflineService for the DataSerializerService (Flag #2 re-point —
+// ProductCategoryRepository/ProductRepository now, real classes backed by
+// jsdom localStorage; no mock needed since these smoke tests never invoke
+// handleExport/handleImport).
 
 vi.mock('~/inventory/lib/repositories/inventory-repository', () => ({
   InventoryRepository: vi.fn().mockImplementation(() => ({

@@ -1,11 +1,10 @@
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
-import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
 import { InventoryRepository } from '~/inventory/lib/repositories/inventory-repository';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
@@ -28,9 +27,11 @@ export function ImportPage() {
    * The synchronizer is NOT invoked if serializer.import throws.
    */
   async function handleImport(file: File, password: string): Promise<SyncResult> {
-    // Build serializer (read-only side)
-    const categorySvc = new ProductCategoryOfflineService(storeId);
-    const productSvc = new ProductOfflineService(storeId);
+    // Build serializer (read-only side). Categories/products are read via the
+    // repositories directly (Angular parity, Flag #2 — raw stored-JSON
+    // pass-through), not the offline services.
+    const categoryRepoForSerializer = new ProductCategoryRepository(storeId);
+    const productRepoForSerializer = new ProductRepository(storeId);
     const inventoryRepo = new InventoryRepository(storeId);
     const orderSvc = new OrderOfflineService(storeId);
     const expenseSvc = new ExpenseOfflineService(storeId);
@@ -38,8 +39,8 @@ export function ImportPage() {
 
     const serializer = new DataSerializerService(
       storeId,
-      categorySvc,
-      productSvc,
+      categoryRepoForSerializer,
+      productRepoForSerializer,
       inventoryRepo,
       orderSvc,
       expenseSvc,

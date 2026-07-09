@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
 import type { Entry } from '@zip.js/zip.js';
 import {
@@ -7,13 +7,13 @@ import {
   CorruptFileError,
 } from '../data-serializer-service';
 import type {
-  CategoryReader,
-  ProductReader,
   InventoryReader,
   OrderReader,
   ExpenseReader,
   SaleCreditReader,
 } from '../data-serializer-service';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import type {
   ProductCategory,
   Product,
@@ -139,6 +139,24 @@ function makeInventoryMap(entries: InventoryEntry[]): Map<string, InventoryEntry
   return map;
 }
 
+/**
+ * Categories/products are now read by `DataSerializerService` straight from
+ * the repository's raw stored JSON (Flag #2 re-point — no more in-memory
+ * `getAll()` reader mocks), so fixtures seed real `localStorage` in the exact
+ * `BaseRepository`/repo-layer map-entries shape, then a real
+ * `ProductCategoryRepository`/`ProductRepository` instance is constructed on
+ * top — mirroring how `import.tsx`/`export.tsx` build the serializer.
+ */
+function seedCategories(storeId: string, categories: ProductCategory[]): void {
+  const entries = categories.map((c) => [c.id, c] as [string, ProductCategory]);
+  localStorage.setItem(`lizoft.store-product-categories-${storeId}`, JSON.stringify(entries));
+}
+
+function seedProducts(storeId: string, products: Product[]): void {
+  const entries = products.map((p) => [p.id, p] as [string, Product]);
+  localStorage.setItem(`lizoft.store-products-${storeId}`, JSON.stringify(entries));
+}
+
 function makeService(
   overrides?: {
     categories?: ProductCategory[];
@@ -157,8 +175,10 @@ function makeService(
   const exps = overrides?.expenses ?? [mockExpense];
   const creds = overrides?.saleCredits ?? [mockSaleCredit];
 
-  const categoryReader: CategoryReader = { getAll: () => cats };
-  const productReader: ProductReader = { getAll: () => prods };
+  seedCategories(storeId, cats);
+  seedProducts(storeId, prods);
+  const categoryRepository = new ProductCategoryRepository(storeId);
+  const productRepository = new ProductRepository(storeId);
   const inventoryReader: InventoryReader = {
     getAll: (_storeId: string) => makeInventoryMap(inv),
   };
@@ -168,8 +188,49 @@ function makeService(
 
   return new DataSerializerService(
     storeId,
-    categoryReader,
-    productReader,
+    categoryRepository,
+    productRepository,
+    inventoryReader,
+    orderReader,
+    expenseReader,
+    saleCreditReader,
+  );
+}
+
+/**
+ * Builds a `DataSerializerService` for a store whose categories/products
+ * `localStorage` keys were NEVER written — the real "empty/never-synced
+ * store" case (as opposed to `makeService({ categories: [], products: [] })`,
+ * which persists a valid empty array). `getCategoriesJson()`/
+ * `getProductsJson()` return `null` here.
+ */
+function makeServiceWithUnseededCategoriesAndProducts(
+  overrides?: {
+    inventoryEntries?: InventoryEntry[];
+    orders?: Order[];
+    expenses?: Expense[];
+    saleCredits?: SaleCredit[];
+  },
+  storeId: string = STORE_ID,
+): DataSerializerService {
+  const inv = overrides?.inventoryEntries ?? [mockInventoryEntry];
+  const ords = overrides?.orders ?? [mockOrder];
+  const exps = overrides?.expenses ?? [mockExpense];
+  const creds = overrides?.saleCredits ?? [mockSaleCredit];
+
+  const categoryRepository = new ProductCategoryRepository(storeId);
+  const productRepository = new ProductRepository(storeId);
+  const inventoryReader: InventoryReader = {
+    getAll: (_storeId: string) => makeInventoryMap(inv),
+  };
+  const orderReader: OrderReader = { getAll: () => ords };
+  const expenseReader: ExpenseReader = { getAll: () => exps };
+  const saleCreditReader: SaleCreditReader = { getAll: () => creds };
+
+  return new DataSerializerService(
+    storeId,
+    categoryRepository,
+    productRepository,
     inventoryReader,
     orderReader,
     expenseReader,
@@ -199,6 +260,10 @@ async function getEntryText(entry: Entry): Promise<string> {
 // ---------------------------------------------------------------------------
 
 describe('DataSerializerService', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   // -------------------------------------------------------------------------
   // T1: Envelope round-trip — data arrays survive export→import unchanged
   // -------------------------------------------------------------------------
@@ -425,6 +490,27 @@ describe('DataSerializerService', () => {
       const parsed = await svc.import(payload, PASSWORD);
       expect(parsed.categories).toEqual([]);
       expect(parsed.inventoryEntries).toEqual([]);
+    });
+
+    it('a never-synced store (categories/products localStorage keys never written) still exports/imports valid empty arrays, not Angular\'s null->"null" string crash', async () => {
+      // Angular's own `getCategoriesJson()`/`getProductsJson()` are typed
+      // `(): string` but their body is a plain `localStorage.getItem`
+      // (`string | null`) with no guard — a genuinely never-synced store
+      // (repo.ts never called for this key) would Blob-coerce that `null`
+      // into the literal text "null", which is not a valid `[id, entity][]`
+      // array on import. Per angular-bugs-policy this is fixed, not mirrored:
+      // React falls back to a valid `'[]'` JSON string instead.
+      const svc = makeServiceWithUnseededCategoriesAndProducts();
+      const payload = await svc.export(PASSWORD);
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.categories).toEqual([]);
+      expect(parsed.products).toEqual([]);
+
+      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const catEntry = entries.find((e) => e.filename === 'categories.json')!;
+      const prodEntry = entries.find((e) => e.filename === 'products.json')!;
+      expect(await getEntryText(catEntry)).toBe('[]');
+      expect(await getEntryText(prodEntry)).toBe('[]');
     });
   });
 
