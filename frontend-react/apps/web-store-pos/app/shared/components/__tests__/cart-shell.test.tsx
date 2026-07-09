@@ -22,7 +22,14 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
 let mockProductLookup: Record<string, Product | undefined> = {};
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getById: vi.fn((id: string) => mockProductLookup[id]),
+    // Async category-C surface (Phase 2 slice 6): getProductById resolves an envelope —
+    // success(product) when found, failure otherwise (mirrors ProductErrors.NotExists).
+    getProductById: vi.fn(async (id: string) => {
+      const product = mockProductLookup[id];
+      return product
+        ? { data: product, succeeded: true, message: '', actionCode: 200, errors: [] }
+        : { data: null, succeeded: false, message: '', actionCode: 400, errors: [] };
+    }),
   })),
 }));
 
@@ -315,7 +322,7 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     localStorage.clear();
   });
 
-  it('CART-STOCK-01: blocks increasing quantity and shows a blocking alert when the product is no longer active', () => {
+  it('CART-STOCK-01: blocks increasing quantity and shows a blocking alert when the product is no longer active', async () => {
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', isActive: false });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
@@ -325,14 +332,14 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     openCart();
     fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
 
+    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
     expect(updateQuantity).not.toHaveBeenCalled();
-    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
     const [title, text] = showBlockingErrorMock.mock.calls[0];
     expect(title).toBe('Error');
     expect(text).toBe('El producto no está activo.');
   });
 
-  it('CART-STOCK-02: blocks decreasing quantity too — same validation applies to both directions', () => {
+  it('CART-STOCK-02: blocks decreasing quantity too — same validation applies to both directions', async () => {
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', isActive: false });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
@@ -342,13 +349,13 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     openCart();
     fireEvent.click(screen.getByLabelText('Disminuir cantidad de Coca Cola'));
 
+    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
     expect(updateQuantity).not.toHaveBeenCalled();
-    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
     const [, text] = showBlockingErrorMock.mock.calls[0];
     expect(text).toBe('El producto no está activo.');
   });
 
-  it('CART-STOCK-03: blocks increasing quantity when the new total exceeds available stock', () => {
+  it('CART-STOCK-03: blocks increasing quantity when the new total exceeds available stock', async () => {
     mockUser = { selectedStoreId: 's1', storeModuleIds: [EModules.Inventory] };
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true });
     mockProductLookup = { p1: product };
@@ -383,13 +390,13 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     openCart();
     fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
 
+    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
     expect(updateQuantity).not.toHaveBeenCalled();
-    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
     const [, text] = showBlockingErrorMock.mock.calls[0];
     expect(text).toBe('La cantidad del producto no está disponible en el inventario.');
   });
 
-  it('CART-STOCK-04: allows increasing quantity when stock covers the new total', () => {
+  it('CART-STOCK-04: allows increasing quantity when stock covers the new total', async () => {
     mockUser = { selectedStoreId: 's1', storeModuleIds: [EModules.Inventory] };
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true });
     mockProductLookup = { p1: product };
@@ -423,11 +430,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     openCart();
     fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
 
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('p1', 3));
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
-    expect(updateQuantity).toHaveBeenCalledWith('p1', 3);
   });
 
-  it('CART-STOCK-05: allows decreasing quantity when validation passes', () => {
+  it('CART-STOCK-05: allows decreasing quantity when validation passes', async () => {
     const product = makeProduct({ id: 'p1', name: 'Coca Cola' });
     mockProductLookup = { p1: product };
     const updateQuantity = vi.fn();
@@ -437,11 +444,11 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     openCart();
     fireEvent.click(screen.getByLabelText('Disminuir cantidad de Coca Cola'));
 
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('p1', 1));
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
-    expect(updateQuantity).toHaveBeenCalledWith('p1', 1);
   });
 
-  it('CART-STOCK-06: skips the stock check entirely when the inventory module is unavailable (matches hasAvailableProductToSale gate)', () => {
+  it('CART-STOCK-06: skips the stock check entirely when the inventory module is unavailable (matches hasAvailableProductToSale gate)', async () => {
     // No inventory module in storeModuleIds, discountFromInvantory true but gated off —
     // hasAvailableProductToSale short-circuits to Success() (branch 4).
     const product = makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true });
@@ -453,8 +460,8 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
     openCart();
     fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
 
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('p1', 3));
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
-    expect(updateQuantity).toHaveBeenCalledWith('p1', 3);
   });
 });
 

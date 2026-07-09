@@ -114,10 +114,11 @@ export function CartShell() {
   // shopping-cart.service.ts:78-123) — re-fetches the LATEST product state (not the
   // possibly-stale one cached on the cart item) exactly like Angular's
   // productService.getProductById inside addCartItem.
-  function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
+  async function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
     const productService = new ProductOfflineService(storeId);
     const inventoryService = new InventoryOfflineService(storeId, new ProductRepository(storeId));
-    const product = productService.getById(productId);
+    const lookup = await productService.getProductById(productId);
+    const product = lookup.succeeded ? lookup.data : undefined;
     const result = hasAvailableProductToSale({
       product,
       quantity: delta,
