@@ -204,7 +204,7 @@ export class ProductOfflineService implements ProductService {
     let hasError = false;
     csvProducts.forEach((csvProduct) => {
       const category = this.categoryRepository.getProductCategoryByName(csvProduct.category);
-      const categoryId = category ? category.id : (this.categoryRepository.addProductCategoryByName(csvProduct.category) as string);
+      const categoryId = category ? category.id : this.categoryRepository.addProductCategoryByName(csvProduct.category);
       const order = this.getNextOrder(categoryId);
       const result = this.productRepository.addProduct(categoryId, csvProduct.name, csvProduct.price, '', order, true, true, true);
       if (!result.succeeded) hasError = true;

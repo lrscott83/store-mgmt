@@ -97,13 +97,17 @@ export class ProductCategoryRepository {
 
   /**
    * 1:1 port of Angular `addProductCategoryByName` (repo.ts:94-98) — generated id, next order
-   * via private `getNextOrder`, always `isActive: true`. Returns the new id or `null`.
+   * via private `getNextOrder`, always `isActive: true`. Ratified literal-parity exception to
+   * angular-bugs-policy (engram #842 / `repository-parity-fixes` spec delta): ALWAYS returns the
+   * generated `id`, even when `addProductCategoryData` fails internally (e.g. name collision) —
+   * the `Result` is discarded, exactly matching Angular's always-truthy-Result dead-branch
+   * behavior. No call-site in Angular or React branches on a falsy/null result.
    */
-  addProductCategoryByName(name: string): string | null {
+  addProductCategoryByName(name: string): string {
     const id = generateId();
     const order = this.getNextOrder();
-    const result = this.addProductCategoryData(id, name, order, true);
-    return result.succeeded ? id : null;
+    this.addProductCategoryData(id, name, order, true);
+    return id;
   }
 
   /** Private port of Angular `getNextOrder` (repo.ts:100-103). */
