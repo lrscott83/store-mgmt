@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
@@ -19,15 +19,30 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 let mockCategories: ProductCategory[] = [];
 let mockProducts: Product[] = [];
 
+const { bm } = vi.hoisted(() => ({
+  bm: <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] }),
+}));
+
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn(() => mockProducts),
+    // Angular parity: getProductsToSaleByCategoryId -> categoryId + isActive + availableToSale,
+    // sorted by order.
+    getProductsToSaleByCategoryId: vi.fn(async (categoryId: string) =>
+      bm(
+        mockProducts
+          .filter((p) => p.categoryId === categoryId && p.isActive && p.availableToSale)
+          .sort((a, b) => a.order - b.order),
+      ),
+    ),
   })),
 }));
 
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn(() => mockCategories),
+    // Angular parity: getAvailableProductCategories -> active-only, sorted by order.
+    getAvailableProductCategories: vi.fn(async () =>
+      bm(mockCategories.filter((c) => c.isActive).sort((a, b) => a.order - b.order)),
+    ),
   })),
 }));
 
@@ -114,18 +129,18 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(screen.queryByText(/Escaneando/i)).not.toBeInTheDocument();
   });
 
-  it('renders one category button per active category', () => {
+  it('renders one category button per active category', async () => {
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' }), makeCategory({ id: 'c2', name: 'Snacks' })];
     render(
       <Wrapper>
         <SalePage />
       </Wrapper>,
     );
-    expect(screen.getByRole('button', { name: 'Bebidas' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Bebidas' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Snacks' })).toBeInTheDocument();
   });
 
-  it('auto-selects the first category and shows its products, without the no-selection alert', () => {
+  it('auto-selects the first category and shows its products, without the no-selection alert', async () => {
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' })];
     render(
@@ -133,13 +148,13 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         <SalePage />
       </Wrapper>,
     );
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
     expect(
       screen.queryByText('Seleccione primero una categoría para adicionar productos a la venta.'),
     ).not.toBeInTheDocument();
   });
 
-  it('switches products shown when a different category button is clicked', () => {
+  it('switches products shown when a different category button is clicked', async () => {
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' }), makeCategory({ id: 'c2', name: 'Snacks' })];
     mockProducts = [
       makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' }),
@@ -150,28 +165,29 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         <SalePage />
       </Wrapper>,
     );
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
     expect(screen.queryByText('Papas')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Snacks' }));
 
-    expect(screen.getByText('Papas')).toBeInTheDocument();
+    expect(await screen.findByText('Papas')).toBeInTheDocument();
     expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
   });
 
-  it('shows the no-selected-category alert when categories exist and none is selected yet', () => {
+  it('shows the no-selected-category alert when categories exist and none is selected yet', async () => {
     // Zero categories -> no alert (Angular's condition requires categories.length > 0)
     render(
       <Wrapper>
         <SalePage />
       </Wrapper>,
     );
+    await waitFor(() => expect(screen.getByText('Productos para vender')).toBeInTheDocument());
     expect(
       screen.queryByText('Seleccione primero una categoría para adicionar productos a la venta.'),
     ).not.toBeInTheDocument();
   });
 
-  it('only filters products by categoryId, isActive and availableToSale (matches Angular repository filter)', () => {
+  it('only filters products by categoryId, isActive and availableToSale (matches Angular repository filter)', async () => {
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [
       makeProduct({ id: 'p1', name: 'Visible', categoryId: 'c1', isActive: true, availableToSale: true }),
@@ -184,13 +200,13 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         <SalePage />
       </Wrapper>,
     );
-    expect(screen.getByText('Visible')).toBeInTheDocument();
+    expect(await screen.findByText('Visible')).toBeInTheDocument();
     expect(screen.queryByText('Inactive')).not.toBeInTheDocument();
     expect(screen.queryByText('NotForSale')).not.toBeInTheDocument();
     expect(screen.queryByText('OtherCategory')).not.toBeInTheDocument();
   });
 
-  it('adds a product to the cart via the shared cart-store addItem action', () => {
+  it('adds a product to the cart via the shared cart-store addItem action', async () => {
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', price: 1.5 })];
     render(
@@ -198,14 +214,14 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         <SalePage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /adicionar/i }));
     expect(addItemMock).toHaveBeenCalled();
   });
 
   // End-to-end wiring check for checkAvailability: sale.tsx -> SaleCategoryProducts ->
   // SaleProductRow, mirroring Angular's addProductToCart -> hasAvailableProductToSale
   // (sale-product-row.component.ts:58-104).
-  it('blocks overselling: shows a blocking alert and does not add to cart when stock is insufficient', () => {
+  it('blocks overselling: shows a blocking alert and does not add to cart when stock is insufficient', async () => {
     mockUser.storeModuleIds = [EModules.Inventory];
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [
@@ -218,7 +234,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         <SalePage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /adicionar/i }));
 
     expect(addItemMock).not.toHaveBeenCalled();
     expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
@@ -226,7 +242,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(text).toBe('El producto no está disponible en el inventario.');
   });
 
-  it('allows the sale when the inventory module is available, discountFromInvantory is set, and stock covers the quantity', () => {
+  it('allows the sale when the inventory module is available, discountFromInvantory is set, and stock covers the quantity', async () => {
     mockUser.storeModuleIds = [EModules.Inventory];
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
     mockProducts = [
@@ -257,7 +273,7 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
         <SalePage />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /adicionar/i }));
 
     expect(addItemMock).toHaveBeenCalled();
   });
