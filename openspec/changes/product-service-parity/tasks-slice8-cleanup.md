@@ -607,8 +607,14 @@ remaining callers first).
 
 ## Remaining after this slice (Phase 2 / product-service-parity fully closes)
 
-- Phase 2 step 9: tighten `ProductRepository`'s `categoryRepository` param to mandatory (deferred
+- [x] Phase 2 step 9: tighten `ProductRepository`'s `categoryRepository` param to mandatory (deferred
   by Phase 1, engram #758; explicitly kept OUT of this slice, see "Non-flag confirmations").
+  **DONE** — commit `0afb789` on `feat/frontend-parity-audit` (engram
+  `sdd/product-service-parity/apply-progress`, obs #756). Dropped the `?`/`??` default; fixed all
+  18 call-site files (20 files total incl. the repository itself). tsc RED (29 errors) → GREEN,
+  vitest 1541/1541, build clean, zero remaining single-arg `new ProductRepository(storeId)` calls.
 - The cross-cutting generic `BaseService<T>` seam for the OTHER offline services (Inventory,
   Order, Expense, SaleCredit) remains owned by `service-return-shape-parity`, not this change
   (spec.md's Non-goals) — untouched by this slice.
+
+**product-service-parity Phase 2 is now fully closed (all 9 steps landed). Ready for sdd-verify.**
