@@ -515,33 +515,76 @@ remaining callers first).
 - [x] 5.5 Gate + commit
       `refactor(web-store-pos): remove ProductCategoryOfflineService's dead sync surface (getAll/getById/delete) and its backing repo const (Flag #3)`.
       All green: full web-store-pos suite 1540/1540 (0 regressions), `tsc --noEmit` clean,
-      `pnpm build` clean. Commit `2c180a1`.
+      `pnpm build` clean. Commit `dc4ae4a` (amended in-session to fold in the tasks-file markup;
+      earlier note said `2c180a1`, the pre-amend hash — `dc4ae4a` is authoritative).
 
-## Final: Slice 8 / Phase 2 Regression Gate
+## Final: Slice 8 / Phase 2 Regression Gate — PASS (all gates green, 2026-07-09)
 
-- [ ] F.1 Grep-confirm `extends BaseService` no longer appears in either
+- [x] F.1 Grep-confirm `extends BaseService` no longer appears in either
       `packages/domain/src/services/product-service.ts` or
       `packages/domain/src/services/product-category-service.ts`.
-- [ ] F.2 Grep-confirm zero remaining `.getAll()`/`.getById()`/`.getByBarcode()`/`.create()`/
+      CONFIRMED: zero `interface … extends BaseService` declarations (only historical doc-comment
+      mentions remain, expected).
+- [x] F.2 Grep-confirm zero remaining `.getAll()`/`.getById()`/`.getByBarcode()`/`.create()`/
       `.update()`/`.delete()` calls against `ProductOfflineService`/`ProductCategoryOfflineService`/
       `ProductService`/`ProductCategoryService`-typed values anywhere under `apps/web-store-pos/app`
       (repository-layer same-named sync members are OUT of this check — they're a different,
       intentional surface).
-- [ ] F.3 Grep-confirm `AsyncProductService` no longer exists anywhere.
-- [ ] F.4 Grep-confirm no `new ProductOfflineService(` remains outside
-      `product-service.factory.ts`, `product-offline-service.ts` itself, and test files — all 9
+      CONFIRMED: zero live calls (only 2 comment lines in `available.tsx` documenting WU10's removal).
+- [x] F.3 Grep-confirm `AsyncProductService` no longer exists anywhere.
+      CONFIRMED: zero type/code usages (2 doc-comment mentions documenting the retirement remain).
+- [x] F.4 Grep-confirm no `new ProductOfflineService(` remains outside
+      `product-service.factory.ts`, `product-offline-service.ts` itself, and test files — all
       production call sites route through `createProductService(storeId)`.
-      (Re-verify at Final time — as of WU13b, grep already confirms 0 production sites
-      outside the factory; only `product-service.factory.ts` and test files match.)
-- [ ] F.5 Grep-confirm no residual `upsert`/`remove` on `ProductRepository`/
+      CONFIRMED: zero production sites outside the factory (7 total sites migrated: WU13's 3 +
+      WU13b's 4 route files; the "9" in the original forecast was an over-count).
+- [x] F.5 Grep-confirm no residual `upsert`/`remove` on `ProductRepository`/
       `ProductCategoryRepository` (regression check, should already be clean since Phase 1).
-- [ ] F.6 Confirm `product-repository.ts`'s `categoryRepository` param is STILL optional
+      CONFIRMED: zero (only doc-comment mentions of "no upsert/remove").
+- [x] F.6 Confirm `product-repository.ts`'s `categoryRepository` param is STILL optional
       (untouched — deferred to step 9).
-- [ ] F.7 Full gate — domain: `pnpm -C packages/domain exec vitest run`, `tsc --noEmit`, build.
+      CONFIRMED: `categoryRepository?: ProductCategoryRepository` with
+      `?? new ProductCategoryRepository(storeId)` default — untouched.
+- [x] F.7 Full gate — domain: `pnpm -C packages/domain exec vitest run`, `tsc --noEmit`, build.
       web-store-pos: `pnpm -C apps/web-store-pos exec vitest run`, `tsc --noEmit`, `pnpm build` —
       all green.
-- [ ] F.8 Update this file with commit hashes; record the ratified Flag #1/#2/#3 resolutions at
-      the top of the Flagged section for the historical record.
+      RESULT: domain 95/95 + tsc clean + build clean; web-store-pos 1540/1540 + tsc clean + build clean.
+- [x] F.8 Update this file with commit hashes; record the ratified Flag #1/#2/#3 resolutions.
+
+### Slice 8 commit ledger (feat/frontend-parity-audit, commits-only, not pushed)
+
+| WU | Commit | Subject |
+|----|--------|---------|
+| (pre) factory | `0841792` | add createProductService factory |
+| WU7 products.tsx | `9032140` | re-express products.tsx loadData (getProductCategoriesView + per-category) |
+| WU8 sale.tsx | `ad7fc5e` | re-express sale.tsx to category-scoped async surface |
+| WU9 egress.tsx | `b0ed531` | re-express egress.tsx to category-scoped async surface |
+| WU10 available.tsx | `dd9e327` | re-express available.tsx to async getProductCategories + per-category |
+| WU8 test-gap fix | `ae68317` | add async methods to sales-routes smoke mocks (close WU8 red suite) |
+| WU11 data-serializer | `5c3a7d9` | re-point DataSerializerService to repositories (Flag #2, raw JSON pass-through) |
+| WU12 order-offline | `bb966be` | re-point OrderOfflineService.getCategoryCartItemsView to ProductCategoryRepository |
+| WU13 factory rewire (3) | `7c53b28` | rewire cart-shell/user-home/edit-inventory-entry-modal to factory |
+| WU13b factory rewire (4 routes) | `3f7bd4c` | route products/sale/egress/available through factory (complete F.4) |
+| WU1 ProductService trim | `40fa5aa` | drop extends BaseService<Product> + sync getByBarcode/update |
+| WU2 ProductCategoryService trim | `5a9d355` | drop extends BaseService<ProductCategory> (Flag #3) |
+| WU3 alias retire | `12069d4` | retire AsyncProductService alias |
+| WU4 remove product sync bodies | `5edbda6` | remove ProductOfflineService dead sync surface |
+| WU5 remove category sync bodies | `dc4ae4a` | remove ProductCategoryOfflineService dead sync surface (Flag #3) |
+
+### Ratified flag resolutions (historical record)
+
+- **Flag #1 (RESOLVED)** — the 4 routes (products/sale/egress/available) had no async "flat getAll"
+  to bridge to; each was re-expressed per its Angular-source-grounded design (category-scoped async
+  fetches, per-category `Promise.all`). Landed WU7-WU10. No bridge method invented.
+- **Flag #2 (RESOLVED)** — `DataSerializerService` re-pointed to `ProductRepository`/
+  `ProductCategoryRepository` with raw `getCategoriesJson()`/`getProductsJson()` pass-through
+  (Angular-faithful, more so than the prior re-derived impl). One documented deviation: a `?? '[]'`
+  null-guard added per angular-bugs-policy (Angular's own `getXJson()` returns `string | null`
+  unguarded → `"null"` re-import crash); covered by a new regression test. Landed WU11.
+- **Flag #3 (RESOLVED)** — `ProductCategoryService` dropped `extends BaseService`; recorded the
+  correction that Angular's inherited category `delete` DOES have a call site
+  (`products.component.ts:89`) but is non-functional offline, so React's DROP (zero call sites,
+  never ported) is still correct. Landed WU2 + WU5.
 
 ## Remaining after this slice (Phase 2 / product-service-parity fully closes)
 
