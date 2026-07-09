@@ -29,7 +29,7 @@ export async function guestOnlyLoader(): Promise<Response | null> {
   // An already-authenticated user hitting /login is sent to their real home view
   // (Angular's navigateToUserHome()), NOT to a bare '/' landing.
   if (isAuthenticated && user) {
-    return redirect(resolveUserHomePath(user));
+    return redirect(await resolveUserHomePath(user));
   }
   return null;
 }

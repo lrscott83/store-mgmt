@@ -58,7 +58,7 @@ export default function LoginPage() {
     try {
       const user = await login(form.email, form.password);
       // Mirror Angular's navigateToUserHome() (shared with guestOnlyLoader).
-      navigate(resolveUserHomePath(user));
+      navigate(await resolveUserHomePath(user));
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 401) {

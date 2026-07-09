@@ -1,13 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const getAllCategories = vi.fn();
-const getAllProducts = vi.fn();
+const hasAnyAvailableToSaleProduct = vi.fn();
 
-vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
-  ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({ getAll: getAllCategories })),
-}));
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
-  ProductOfflineService: vi.fn().mockImplementation(() => ({ getAll: getAllProducts })),
+  ProductOfflineService: vi.fn().mockImplementation(() => ({ hasAnyAvailableToSaleProduct })),
 }));
 
 import { resolveUserHomePath } from '../user-home';
@@ -36,39 +32,38 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
+function envelope(data: boolean) {
+  return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
+}
+
 // Mirrors Angular's login.component.ts navigateToUserHome():
 // resellers/superadmins -> owners admin; other users -> the sale screen when the
-// store can sell (active category AND active sellable product), else products.
+// store can sell, else products. "Can sell" is now a single
+// ProductOfflineService.hasAnyAvailableToSaleProduct() call (async, category-C) — the
+// active-category + sellable-product logic lives inside ProductRepository (Phase 1).
 describe('resolveUserHomePath', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getAllCategories.mockReturnValue([]);
-    getAllProducts.mockReturnValue([]);
+    hasAnyAvailableToSaleProduct.mockResolvedValue(envelope(false));
   });
 
-  it('sends a reseller to /admin/owners', () => {
-    expect(resolveUserHomePath(makeUser({ isReSeller: true }))).toBe('/admin/owners');
+  it('sends a reseller to /admin/owners (no product lookup)', async () => {
+    await expect(resolveUserHomePath(makeUser({ isReSeller: true }))).resolves.toBe('/admin/owners');
+    expect(hasAnyAvailableToSaleProduct).not.toHaveBeenCalled();
   });
 
-  it('sends a superadmin to /admin/owners', () => {
-    expect(resolveUserHomePath(makeUser({ isSuperAdmin: true }))).toBe('/admin/owners');
+  it('sends a superadmin to /admin/owners (no product lookup)', async () => {
+    await expect(resolveUserHomePath(makeUser({ isSuperAdmin: true }))).resolves.toBe('/admin/owners');
+    expect(hasAnyAvailableToSaleProduct).not.toHaveBeenCalled();
   });
 
-  it('sends a normal user with no sellable products to /sales/products', () => {
-    getAllCategories.mockReturnValue([{ isActive: true }]);
-    getAllProducts.mockReturnValue([]);
-    expect(resolveUserHomePath(makeUser())).toBe('/sales/products');
+  it('sends a normal user with no sellable products to /sales/products', async () => {
+    hasAnyAvailableToSaleProduct.mockResolvedValue(envelope(false));
+    await expect(resolveUserHomePath(makeUser())).resolves.toBe('/sales/products');
   });
 
-  it('sends a normal user with an active category and a sellable product to /sales/new', () => {
-    getAllCategories.mockReturnValue([{ isActive: true }]);
-    getAllProducts.mockReturnValue([{ isActive: true, availableToSale: true }]);
-    expect(resolveUserHomePath(makeUser())).toBe('/sales/new');
-  });
-
-  it('requires an ACTIVE category — sellable product with no active category still goes to /sales/products', () => {
-    getAllCategories.mockReturnValue([{ isActive: false }]);
-    getAllProducts.mockReturnValue([{ isActive: true, availableToSale: true }]);
-    expect(resolveUserHomePath(makeUser())).toBe('/sales/products');
+  it('sends a normal user whose store can sell to /sales/new', async () => {
+    hasAnyAvailableToSaleProduct.mockResolvedValue(envelope(true));
+    await expect(resolveUserHomePath(makeUser())).resolves.toBe('/sales/new');
   });
 });
