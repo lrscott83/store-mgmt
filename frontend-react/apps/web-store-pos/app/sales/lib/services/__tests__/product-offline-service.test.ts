@@ -43,7 +43,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
 
       const raw = localStorage.getItem('lizoft.store-products-s1');
@@ -61,7 +61,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       productRepository.addProduct(categoryId, 'Fanta', 1.5, '', 5, false, true, true);
 
@@ -75,7 +75,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       // Add in ascending order to avoid the repository's order-shift reordering the setup.
       productRepository.addProduct(categoryId, 'B', 1, '', 1, true, true, true);
       productRepository.addProduct(categoryId, 'A', 1, '', 2, true, false, true);
@@ -98,7 +98,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
 
       const result = await service.hasAnyAvailableToSaleProduct();
@@ -116,7 +116,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       const created = productRepository.getProductsByCategoryId(categoryId)[0];
 
@@ -142,7 +142,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true, 'ABC123');
 
       const result = await service.getProductByBarcode('ABC123');
@@ -162,7 +162,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       const created = productRepository.getProductsByCategoryId(categoryId)[0];
 
@@ -182,7 +182,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       productRepository.addProduct(categoryId, 'Fanta', 1.5, '', 2, true, false, true);
 
@@ -202,7 +202,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, false, false, true);
 
       const result = await service.getProductsByCategoryId(categoryId);
@@ -220,7 +220,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, false);
       const created = productRepository.getProductsByCategoryId(categoryId)[0];
 
@@ -247,8 +247,8 @@ describe('ProductOfflineService', () => {
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
 
-      const bebidasId = categoryRepository.addProductCategoryByName('Bebidas') as string;
-      const snacksId = categoryRepository.addProductCategoryByName('Snacks') as string;
+      const bebidasId = categoryRepository.addProductCategoryByName('Bebidas');
+      const snacksId = categoryRepository.addProductCategoryByName('Snacks');
       productRepository.addProduct(bebidasId, 'Fanta', 1, '', 2, true, true, true);
       productRepository.addProduct(bebidasId, 'Coca Cola', 1, '', 1, true, true, true);
       productRepository.addProduct(snacksId, 'Papas', 1, '', 1, true, true, true);
@@ -272,7 +272,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
 
       const result = await service.createProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, false, '123');
       expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
@@ -291,7 +291,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       const id = productRepository.getProductsByCategoryId(categoryId)[0].id;
 
@@ -304,7 +304,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
 
       const result = await service.updateProduct('missing-id', categoryId, 'X', 1, '', 1, true, true, true);
       expect(result.succeeded).toBe(false);
@@ -317,7 +317,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const categoryId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
 
       const result = await service.createProducts(categoryId, [
         { name: 'Coca Cola', price: 1.5 },
@@ -354,7 +354,7 @@ describe('ProductOfflineService', () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
-      const existingId = categoryRepository.addProductCategoryByName('Bebidas') as string;
+      const existingId = categoryRepository.addProductCategoryByName('Bebidas');
 
       await service.createCsvProducts([{ category: 'Bebidas', name: 'Coca Cola', price: 1.5 }]);
       expect(categoryRepository.getProductCategories()).toHaveLength(1);
