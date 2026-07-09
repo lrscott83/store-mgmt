@@ -467,12 +467,16 @@ describe('EntryList — isOwnerAdmin gating (Angular parity)', () => {
 
 // ─── EditInventoryEntryModal ─────────────────────────────────────────────────
 
+// Flag #4: the modal loads its product dropdown via getProductsToSelect() (async,
+// ProductSelectView[]) and no longer touches ProductCategoryOfflineService.
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getProductsToSelect: vi.fn(async () => ({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] })),
   })),
 }));
 
+// Retained (hoisted, file-wide) for any other component in this suite — the modal itself
+// no longer uses it.
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
@@ -595,13 +599,17 @@ describe('EditInventoryEntryModal — validation messages (Angular parity)', () 
     expect(screen.getByText('Producto es requerido')).toBeInTheDocument();
   });
 
-  it('shows the quantity-minimum message using GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE', () => {
+  it('shows the quantity-minimum message using GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE', async () => {
     vi.mocked(ProductOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([
-            { id: 'p1', name: 'Ron', categoryId: 'cat1' },
-          ]),
+          getProductsToSelect: vi.fn(async () => ({
+            data: [{ id: 'p1', fullName: 'Bebidas - Ron' }],
+            succeeded: true,
+            message: '',
+            actionCode: 200,
+            errors: [],
+          })),
         }) as unknown as InstanceType<typeof ProductOfflineService>,
     );
     render(
@@ -609,18 +617,23 @@ describe('EditInventoryEntryModal — validation messages (Angular parity)', () 
         <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
       </Wrapper>,
     );
+    await screen.findByRole('option', { name: 'Bebidas - Ron' });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
     expect(screen.getByText('Cantidad mínimo valor es 1')).toBeInTheDocument();
   });
 
-  it('shows the cost-price-minimum message using GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO', () => {
+  it('shows the cost-price-minimum message using GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO', async () => {
     vi.mocked(ProductOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([
-            { id: 'p1', name: 'Ron', categoryId: 'cat1' },
-          ]),
+          getProductsToSelect: vi.fn(async () => ({
+            data: [{ id: 'p1', fullName: 'Bebidas - Ron' }],
+            succeeded: true,
+            message: '',
+            actionCode: 200,
+            errors: [],
+          })),
         }) as unknown as InstanceType<typeof ProductOfflineService>,
     );
     render(
@@ -628,6 +641,7 @@ describe('EditInventoryEntryModal — validation messages (Angular parity)', () 
         <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
       </Wrapper>,
     );
+    await screen.findByRole('option', { name: 'Bebidas - Ron' });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '-1' } });

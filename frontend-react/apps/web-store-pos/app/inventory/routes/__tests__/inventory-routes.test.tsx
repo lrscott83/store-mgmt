@@ -53,6 +53,14 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn(() => mockEgressProducts),
     getById: vi.fn().mockReturnValue(undefined),
+    // Flag #4: EditInventoryEntryModal loads its dropdown via getProductsToSelect (async).
+    getProductsToSelect: vi.fn(async () => ({
+      data: mockEgressProducts.map((p: { id: string; name: string }) => ({ id: p.id, fullName: p.name })),
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    })),
   })),
 }));
 
@@ -353,7 +361,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     consoleErrorSpy.mockRestore();
   });
 
-  it('handleSave (create): on DataResult failure, shows the modal error from errors[0].description', () => {
+  it('handleSave (create): on DataResult failure, shows the modal error from errors[0].description', async () => {
     const createMock = vi.fn().mockReturnValue({
       succeeded: false,
       errors: [{ code: 'Inventory.ProductNotAvailable', description: 'El producto no está disponible' }],
@@ -378,6 +386,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    await screen.findByRole('option', { name: 'Ron' });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });
@@ -387,7 +396,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     expect(screen.getByText('El producto no está disponible')).toBeInTheDocument();
   });
 
-  it('handleSave (create): on DataResult success, closes the modal and reloads entries', () => {
+  it('handleSave (create): on DataResult success, closes the modal and reloads entries', async () => {
     const createMock = vi.fn().mockReturnValue({
       succeeded: true,
       errors: [],
@@ -414,6 +423,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     );
     const callsBeforeClick = getByDateMock.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    await screen.findByRole('option', { name: 'Ron' });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });

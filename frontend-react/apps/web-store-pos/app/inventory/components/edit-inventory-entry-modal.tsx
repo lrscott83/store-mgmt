@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
-import type { InventoryEntry, Product, ProductCategory } from '@store-mgmt/domain';
+import type { InventoryEntry, ProductSelectView } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { ProductOfflineService } from '~/sales/lib/services/product-offline-service';
-import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 
 export interface EditInventoryEntryInput {
   productId: string;
-  categoryId: string;
   quantity: number;
   costPrice: number;
   date: string;
@@ -37,11 +35,13 @@ export function EditInventoryEntryModal({
   error,
 }: EditInventoryEntryModalProps) {
   const intl = useIntl();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  // Angular parity (Flag #4): the product dropdown is loaded via
+  // ProductOfflineService.getProductsToSelect() (ProductSelectView = { id, fullName }),
+  // exactly as Angular's EditInventoryEntryModalComponent does. Angular has NO category
+  // field on this modal, so the React-only read-only "Category" display was dropped.
+  const [products, setProducts] = useState<ProductSelectView[]>([]);
 
   const [productId, setProductId] = useState(entry?.productId ?? '');
-  const [categoryId, setCategoryId] = useState(entry?.categoryId ?? '');
   const [quantity, setQuantity] = useState(entry?.quantity.toString() ?? '');
   const [costPrice, setCostPrice] = useState(entry?.costPrice.toString() ?? '');
   const [date, setDate] = useState(
@@ -51,18 +51,14 @@ export function EditInventoryEntryModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const productSvc = new ProductOfflineService(storeId);
-    const categorySvc = new ProductCategoryOfflineService(storeId);
-    setProducts(productSvc.getAll());
-    setCategories(categorySvc.getAll());
+    let cancelled = false;
+    new ProductOfflineService(storeId).getProductsToSelect().then((result) => {
+      if (!cancelled && result.succeeded) setProducts(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, storeId]);
-
-  // Auto-fill category when product changes
-  useEffect(() => {
-    if (!productId) return;
-    const product = products.find((p) => p.id === productId);
-    if (product) setCategoryId(product.categoryId);
-  }, [productId, products]);
 
   if (!isOpen) return null;
 
@@ -106,12 +102,11 @@ export function EditInventoryEntryModal({
     }
 
     onSave(
-      { productId, categoryId, quantity: qty, costPrice: cost, date },
+      { productId, quantity: qty, costPrice: cost, date },
       entry?.id,
     );
   }
 
-  const selectedCategory = categories.find((c) => c.id === categoryId);
   const inputClass =
     'w-full rounded border border-border px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary';
   const labelClass = 'mb-1 block text-sm font-medium text-text';
@@ -163,23 +158,10 @@ export function EditInventoryEntryModal({
                 </option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {p.fullName}
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Category (auto-filled) */}
-            <div>
-              <label className={labelClass}>
-                {intl.formatMessage({ id: 'INVENTORY.ENTRY.CATEGORY' })}
-              </label>
-              <input
-                type="text"
-                readOnly
-                value={selectedCategory?.name ?? ''}
-                className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-muted"
-              />
             </div>
 
             {/* Quantity */}

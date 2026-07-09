@@ -92,7 +92,7 @@ export function TodayEntriesPage() {
     const svc = new InventoryOfflineService(storeId, new ProductRepository(storeId));
     const result = entryId
       ? svc.update(entryId, data.productId, data.quantity, data.costPrice)
-      : svc.create(data.productId, data.quantity, data.costPrice, data.categoryId, new Date(data.date));
+      : svc.create(data.productId, data.quantity, data.costPrice, '', new Date(data.date));
 
     // create() returns null (Angular parity) when the product does not exist; treat as a
     // generic failure since there is no DataResult envelope in that branch.
