@@ -429,10 +429,27 @@ orchestration only. Members MUST live on the correct layer:
 The offline service MUST NOT re-implement persistence or validation inline; the repository MUST NOT
 own loop/grouping orchestration.
 
+`getAvailableProductById(id: string)` MUST return type `Product | null` — NOT `Product | undefined`
+— returning `null` (not `undefined`) whenever the product does not exist or is inactive, mirroring
+Angular's `product.repository.ts:50-53` literally and matching its own React siblings
+`getProductByName`/`getProductByBarcode` (both already `Product | null`). This closes a React-only
+internal inconsistency (2 of 3 "not found" repository methods already returned `null`; this was the
+outlier).
+
 #### Scenario: Validation lives in the repository, not the service
 - GIVEN a reviewer traces where `ProductErrors.NameExists` is produced on create
 - WHEN they inspect the layers
 - THEN the name-uniqueness check MUST be in `ProductRepository`, and `ProductOfflineService.createProduct` MUST only map the repository `Result` to a Success/Failure envelope
+
+#### Scenario: getAvailableProductById returns null for an inactive product
+- GIVEN a product `P1` exists with `isActive: false`
+- WHEN `getAvailableProductById("P1")` is called
+- THEN it MUST return `null` (not `undefined`)
+
+#### Scenario: getAvailableProductById returns null for a non-existent product
+- GIVEN no product with id `"missing"` exists
+- WHEN `getAvailableProductById("missing")` is called
+- THEN it MUST return `null` (not `undefined`)
 
 ### Requirement: ProductRepository Depends on ProductCategoryRepository
 Mirroring Angular (repository.ts:22 injects `ProductCategoryRepository`;
@@ -488,10 +505,31 @@ Angular's repository has NO generic `upsert` and NO `remove`; the React reposito
 them. Write operations go exclusively through `addProductCategory`/`updateProductCategory`/
 `activateProductCategory`/`deactivateProductCategory`.
 
+`addProductCategoryByName(name: string)` MUST return type `string` — NOT `string | null` — and
+MUST always return the generated id, even when the internal `addProductCategoryData` call fails
+(e.g. on a name collision), mirroring Angular's `product-category.repository.ts:94-98` literally
+including its always-truthy-Result dead-branch behavior. This is a DELIBERATE, user-ratified
+exception to the project's default angular-bugs-policy (bugs are normally fixed, not replicated) —
+see decision engram #842: no call-site in either Angular or React branches on a `null` result, so
+literal 1:1 parity was chosen over silently keeping React's (unratified) fix. `activateProductCategory`/
+`deactivateProductCategory` remain 1-param (dead 2nd `isActive` param dropped) — unchanged,
+previously ratified (Phase 1 WU1.9).
+
 #### Scenario: Invented repository bridge rejected
 - GIVEN the extracted React `ProductCategoryRepository`
 - WHEN it declares `upsert(category)` or `remove(id)` (to keep the old service `save`/`delete` alive)
 - THEN the parity check MUST fail — Angular's repository has neither; those bridges are forbidden
+
+#### Scenario: addProductCategoryByName always returns the id, even on collision
+- GIVEN a category named `"Bebidas"` already exists
+- WHEN `addProductCategoryByName("Bebidas")` is called
+- THEN it MUST return a `string` id (never `null`), matching Angular's literal behavior — the
+  internal collision failure is silent to the caller, exactly as in Angular
+
+#### Scenario: addProductCategoryByName return type has no null branch
+- GIVEN the React `ProductCategoryRepository.addProductCategoryByName` signature
+- WHEN its return type is inspected
+- THEN it MUST be `string`, not `string | null` — no caller may rely on a `null` return
 
 ### Requirement: Offline/Online DI Selection
 `ProductService` MUST support selecting between `ProductOfflineService` and `ProductOnlineService`
