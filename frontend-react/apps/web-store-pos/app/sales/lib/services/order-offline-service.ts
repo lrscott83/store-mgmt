@@ -3,9 +3,9 @@ import { OrderType, PaymentType } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { BaseRepository } from '~/shared/lib/storage/base-repository';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
-import { ProductCategoryOfflineService } from './product-category-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import type { CategoryCartItemsView, ProductCartItemsView } from '../category-cart-items-view';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -203,15 +203,17 @@ export class OrderOfflineService implements BaseService<Order> {
   /**
    * 1:1 port of Angular's `OrderOfflineService.getCategoryCartItemsView` — aggregates
    * today's active order items by category, then by product, for the "Cuadre del día"
-   * (Today Stats) view. Category `order` is resolved from `ProductCategoryOfflineService`,
-   * falling back to `Number.MAX_VALUE` when not found (Angular's exact fallback, so
-   * ghost/deleted categories sort last if ever rendered in `order`).
+   * (Today Stats) view. Category `order` is resolved from `ProductCategoryRepository`
+   * (Angular parity — `OrderOfflineService` injects `ProductCategoryRepository` directly,
+   * `order-offline.service.ts:38,79`, never the offline service), falling back to
+   * `Number.MAX_VALUE` when not found (Angular's exact fallback, so ghost/deleted categories
+   * sort last if ever rendered in `order`).
    * NOTE: matches Angular's quirk of NOT explicitly sorting the returned array by `order`
    * — iteration order follows Map insertion order (first-seen category in orderItems).
    */
   getCategoryCartItemsView(date: Date): CategoryCartItemsView[] {
-    const categoryService = new ProductCategoryOfflineService(this.storeId);
-    const storageCategories = categoryService.getAll();
+    const categoryRepository = new ProductCategoryRepository(this.storeId);
+    const storageCategories = categoryRepository.getProductCategories();
     const orderItems: OrderItem[] = this.getActiveOrdersInDay(date).flatMap(
       (order) => order.orderItems,
     );

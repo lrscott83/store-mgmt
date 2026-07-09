@@ -378,11 +378,14 @@ their tests.
 
 `apps/web-store-pos/app/sales/lib/services/order-offline-service.ts` + its test.
 
-- [ ] 12.1 RED/GREEN: `new ProductCategoryOfflineService(this.storeId).getAll()` → `new
+- [x] 12.1 RED/GREEN: `new ProductCategoryOfflineService(this.storeId).getAll()` → `new
       ProductCategoryRepository(this.storeId).getProductCategories()`.
-- [ ] 12.2 Update the test's mock target.
-- [ ] 12.3 Gate + commit
+- [x] 12.2 Update the test's mock target.
+- [x] 12.3 Gate + commit
       `refactor(web-store-pos): re-point OrderOfflineService.getCategoryCartItemsView to ProductCategoryRepository (Angular parity)`.
+      All green: 1561/1561 full suite (0 regressions, same shape confirmed — both `getAll()`
+      and `getProductCategories()` return `ProductCategory[]` sorted ascending by `order`, no
+      destructuring change needed at the call site), `tsc --noEmit` clean, `pnpm build` clean.
 
 ## WU13: Rewire `cart-shell.tsx`/`user-home.ts`/`edit-inventory-entry-modal.tsx` to the factory — Req: Slice 7 Flag A follow-through
 

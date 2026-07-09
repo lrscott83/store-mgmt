@@ -39,13 +39,15 @@ vi.mock('../sale-credit-offline-service', () => ({
   })),
 }));
 
-// Mock ProductCategoryOfflineService BEFORE importing OrderOfflineService — used by
+// Mock ProductCategoryRepository BEFORE importing OrderOfflineService — used by
 // getCategoryCartItemsView to resolve each category's `order` field (falls back to
-// Number.MAX_VALUE when the category isn't found, matching Angular).
+// Number.MAX_VALUE when the category isn't found, matching Angular's real
+// `OrderOfflineService`, which injects `ProductCategoryRepository` directly
+// (`order-offline.service.ts:38,79`), not the offline service.
 const mockCategoryGetAll = vi.fn().mockReturnValue([]);
-vi.mock('../product-category-offline-service', () => ({
-  ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: mockCategoryGetAll,
+vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
+  ProductCategoryRepository: vi.fn().mockImplementation(() => ({
+    getProductCategories: mockCategoryGetAll,
   })),
 }));
 
