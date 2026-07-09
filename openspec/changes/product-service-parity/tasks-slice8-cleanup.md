@@ -234,13 +234,16 @@ non-abstract; matches spec.md's "offline concrete additionally exposes ... `getP
 ... NOT on the abstract interface" — do NOT add it to the interface if spec.md says offline-only;
 verify against spec.md's own table before touching).
 
-- [ ] 2.1 RED/GREEN: remove `extends BaseService<ProductCategory>` — interface becomes standalone,
+- [x] 2.1 RED/GREEN: remove `extends BaseService<ProductCategory>` — interface becomes standalone,
       exactly the 5 async methods it already declares.
-      (Flag #3 — record the `products.component.ts:89` `delete()` correction in this WU's commit
-      body or a code comment referencing this tasks file, for the historical record.)
-- [ ] 2.2 GREEN: rewrite the test fake accordingly.
-- [ ] 2.3 Gate: same as WU1; commit
+      (Flag #3 — recorded the `products.component.ts:89` `delete()` correction in the interface's
+      doc comment, for the historical record. Confirmed `getProductCategories()` stays
+      offline-concrete-only per spec.md's method-surface table — NOT added to this interface.)
+- [x] 2.2 GREEN: rewrite the test fake accordingly.
+- [x] 2.3 Gate: same as WU1; commit
       `refactor(domain): drop extends BaseService<ProductCategory> from ProductCategoryService (Flag #3: correct design.md's incomplete "no delete correlate" premise)`.
+      All green: domain vitest 95/95, domain `tsc --noEmit` clean, domain build clean, scoped
+      app `tsc --noEmit` clean.
 
 ## WU3: Retire the Flag-C `AsyncProductService` alias — Req: Slice 7 Flag C follow-through
 

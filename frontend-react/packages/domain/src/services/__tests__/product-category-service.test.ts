@@ -17,18 +17,6 @@ function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory
 class FakeProductCategoryService implements ProductCategoryService {
   private items: ProductCategory[] = [makeCategory()];
 
-  getAll(): ProductCategory[] {
-    return this.items;
-  }
-
-  getById(id: string): ProductCategory | undefined {
-    return this.items.find((c) => c.id === id);
-  }
-
-  delete(id: string): void {
-    this.items = this.items.filter((c) => c.id !== id);
-  }
-
   async createProductCategory(name: string, order: number, isActive: boolean): Promise<BaseResponseModel<boolean>> {
     if (this.items.some((c) => c.name === name)) {
       return failure([{ code: 'ProductCategory.NameExists', description: 'exists' }]);
@@ -68,15 +56,7 @@ class FakeProductCategoryService implements ProductCategoryService {
 }
 
 describe('ProductCategoryService', () => {
-  it('is implementable with getAll/getById/delete (BaseService, retained through Phase 2 step 8)', () => {
-    const svc: ProductCategoryService = new FakeProductCategoryService();
-    expect(svc.getAll()).toHaveLength(1);
-    expect(svc.getById('c1')?.name).toBe('Bebidas');
-    svc.delete('c1');
-    expect(svc.getAll()).toEqual([]);
-  });
-
-  it('is implementable with the async category-C surface: createProductCategory/updateProductCategory/getMaxOrder/getAvailableProductCategories/getProductCategoriesView', async () => {
+  it('is implementable with exactly the standalone async category-C surface: createProductCategory/updateProductCategory/getMaxOrder/getAvailableProductCategories/getProductCategoriesView', async () => {
     const svc: ProductCategoryService = new FakeProductCategoryService();
 
     const created = await svc.createProductCategory('Snacks', 2, true);
