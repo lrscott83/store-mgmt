@@ -209,16 +209,20 @@ before dropping it, since the original justification ("no correlate") was factua
 `packages/domain/src/services/product-service.ts` +
 `packages/domain/src/services/__tests__/product-service.test.ts` (fake).
 
-- [ ] 1.1 RED/GREEN: remove `extends BaseService<Product>` and the `getByBarcode(barcode):
+- [x] 1.1 RED/GREEN: remove `extends BaseService<Product>` and the `getByBarcode(barcode):
       Product | undefined` / `update(product): Product` sync member declarations — interface
       becomes standalone, exactly the 12 async methods (no supertype).
-- [ ] 1.2 GREEN: update the file's doc comment (currently says these "intentionally STAY through
+- [x] 1.2 GREEN: update the file's doc comment (currently says these "intentionally STAY through
       this slice") to reflect the drop is now DONE, not deferred.
-- [ ] 1.3 GREEN: rewrite the test fake to implement only the 12 methods (drop any sync stub
+- [x] 1.3 GREEN: rewrite the test fake to implement only the 12 methods (drop any sync stub
       implementations of `getByBarcode`/`update`/inherited `BaseService` members).
-- [ ] 1.4 Gate: `pnpm -C packages/domain exec vitest run`, `pnpm -C packages/domain exec tsc
+- [x] 1.4 Gate: `pnpm -C packages/domain exec vitest run`, `pnpm -C packages/domain exec tsc
       --noEmit`, `pnpm -C packages/domain build`; commit
       `refactor(domain): drop extends BaseService<Product> + sync getByBarcode/update from ProductService`.
+      All green: domain vitest 96/96, domain `tsc --noEmit` clean, domain build clean, scoped
+      app `tsc --noEmit` clean (confirms `AsyncProductService = Omit<ProductService, 'getAll' |
+      'getById' | 'delete' | 'getByBarcode' | 'update'>` still typechecks — `Omit` tolerates keys
+      no longer present on `ProductService`, no call site broke).
 
 ## WU2: Domain `ProductCategoryService` interface — drop `extends BaseService<ProductCategory>` — Req: "Category Service Method Surface Parity", Flag #3
 

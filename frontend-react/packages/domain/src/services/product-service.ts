@@ -1,7 +1,6 @@
 import type { Product, ProductSelectView } from '../models/product';
 import type { CsvProduct } from '../models/csv-product';
 import type { BaseResponseModel } from '../models/base';
-import type { BaseService } from './base-service';
 
 /**
  * ProductService — React mirror of Angular's abstract `ProductService`
@@ -19,15 +18,12 @@ import type { BaseService } from './base-service';
  * unconditionally, no grace period.
  *
  * `extends BaseService<Product>` (hence `getAll`/`getById`/`delete`) plus the
- * legacy sync `getByBarcode`/`update` members intentionally STAY through this
- * slice — dropping them is deferred to Phase 2 step 8's cross-cutting cleanup
- * (design.md's Decision section, ratified precedent from Slice 5's Flag #1),
- * NOT done here.
+ * legacy sync `getByBarcode`/`update` members have been DROPPED (Phase 2 step
+ * 8's cross-cutting cleanup, design.md's Decision section, ratified precedent
+ * from Slice 5's Flag #1) — the interface is now standalone, exactly these 12
+ * async methods, no supertype.
  */
-export interface ProductService extends BaseService<Product> {
-  getByBarcode(barcode: string): Product | undefined;
-  update(product: Product): Product;
-
+export interface ProductService {
   hasAnyAvailableToSaleProduct(): Promise<BaseResponseModel<boolean>>;
   getProductById(id: string): Promise<BaseResponseModel<Product>>;
   getProductByBarcode(barcode: string): Promise<BaseResponseModel<Product>>;

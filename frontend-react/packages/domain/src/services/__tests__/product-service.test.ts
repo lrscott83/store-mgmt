@@ -27,27 +27,6 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
 class FakeProductService implements ProductService {
   private items: Product[] = [makeProduct()];
 
-  getAll(): Product[] {
-    return this.items;
-  }
-
-  getById(id: string): Product | undefined {
-    return this.items.find((p) => p.id === id);
-  }
-
-  getByBarcode(barcode: string): Product | undefined {
-    return this.items.find((p) => p.barcode === barcode);
-  }
-
-  update(product: Product): Product {
-    this.items = this.items.map((p) => (p.id === product.id ? product : p));
-    return product;
-  }
-
-  delete(id: string): void {
-    this.items = this.items.filter((p) => p.id !== id);
-  }
-
   async hasAnyAvailableToSaleProduct(): Promise<BaseResponseModel<boolean>> {
     return success(this.items.some((p) => p.isActive && p.availableToSale));
   }
@@ -173,16 +152,7 @@ class FakeProductService implements ProductService {
 }
 
 describe('ProductService', () => {
-  it('is implementable with getAll/getById/getByBarcode/update/delete (BaseService, retained through Phase 2 step 8)', () => {
-    const svc: ProductService = new FakeProductService();
-    expect(svc.getByBarcode('123')?.id).toBe('p1');
-    const updated = svc.update(makeProduct({ price: 9 }));
-    expect(updated.price).toBe(9);
-    svc.delete('p1');
-    expect(svc.getAll()).toHaveLength(0);
-  });
-
-  it('is implementable with the async 12-method surface: hasAnyAvailableToSaleProduct/getProductById/getProductByBarcode/getProductsToSelect/getAvailableProductsByCategoryId/deleteProduct/createCsvProducts/getProductsToSaleByCategoryId/createProduct/updateProduct/getMaxOrder/createProducts', async () => {
+  it('is implementable with exactly the standalone async 12-method surface: hasAnyAvailableToSaleProduct/getProductById/getProductByBarcode/getProductsToSelect/getAvailableProductsByCategoryId/deleteProduct/createCsvProducts/getProductsToSaleByCategoryId/createProduct/updateProduct/getMaxOrder/createProducts', async () => {
     const svc: ProductService = new FakeProductService();
 
     const hasAny = await svc.hasAnyAvailableToSaleProduct();
