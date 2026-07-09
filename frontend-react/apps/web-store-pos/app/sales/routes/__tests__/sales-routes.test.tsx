@@ -37,12 +37,14 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
     getById: vi.fn().mockReturnValue(undefined),
+    getProductsToSaleByCategoryId: vi.fn().mockResolvedValue({ data: [] }),
   })),
 }));
 
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
     getAll: vi.fn().mockReturnValue([]),
+    getAvailableProductCategories: vi.fn().mockResolvedValue({ data: [] }),
   })),
 }));
 
