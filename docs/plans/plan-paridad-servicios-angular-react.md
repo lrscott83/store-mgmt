@@ -87,6 +87,46 @@ L6  data-serializer ................... agrega casi todo el dominio
 
 ---
 
+## Roadmap de ejecución (orden de tareas)
+
+Ordenado bottom-up: cada grupo se resuelve por SDD + TDD estricto, y no se abre un grupo hasta que sus dependencias estén ✅. Los cimientos van primero porque todo hereda de ellos.
+
+### Fase 0 — Cimientos (base compartida) ← PRIMERO
+
+0.1 **`BaseRepository` — ELIMINAR (regla 12).** Angular NO tiene clase base de repos. Se elimina la abstracción React y se inlinea en cada repo que la hereda (product, category, inventory) los helpers de storage, **incluido el caché en memoria y el auto-init de localStorage al leer** (los dos comportamientos que hoy `BaseRepository` no replica bien). Esto desbloquea los tres repos y cierra los CONCERN de causa raíz sistémica. → habilita categories/products/inventory.
+
+0.2 **`BaseService` — VERIFICAR paridad.** Angular SÍ tiene `_services/base.service.ts`; acá no se elimina, se espeja método a método. Es la base de casi todos los L1+, así que su paridad debe confirmarse antes de auditar cualquier servicio que herede de ella.
+
+### Fase 1 — auth/user/store
+
+storage.service · auth-http.service → **auth.service** → authorization.service · store-usage-tracker.service; + store · store-user · user · owner · reseller · usage · module · feature · message.
+
+### Fase 2 — categories
+
+product-category.service `[abs]` → product-category.repository *(resolver hallazgo regla 3: param `isActive`)* → product-category-online → product-category-offline.
+
+### Fase 3 — products
+
+product.service `[abs]` → product.repository *(resolver bypass de orquestación del sync/import + CONCERN de caché/auto-init ya cubiertos por Fase 0)* → product-online → product-offline.
+
+### Fase 4 — inventory
+
+**inventory-offline.service:** primero **mover/inline `InventoryRepository` a donde vive el offline-service** (regla 12 — Angular persiste inline, no hay repo), eliminando `remove`/`clear` muertos y los fixes silenciosos (`reviveEntry`, forzado de `[]`). Luego verificar paridad del offline contra Angular.
+
+### Fase 5 — credits / expenses
+
+sale-credit-offline · expense-offline. Solo dependen de `auth`, así que pueden adelantarse a la Fase 1 si conviene paralelizar.
+
+### Fase 6 — orders / cart
+
+order-offline (el más pesado) · shopping-cart.
+
+### Fase 7 — sync (el techo)
+
+data-serializer · data-synchronizer. Se hacen al final: agregan casi todo el dominio.
+
+---
+
 ## Servicios infra/framework (FUERA de la fila de paridad de negocio)
 
 Plumbing de Angular; varios ni tienen equivalente React. Revisar solo si aparece un correlato React.
