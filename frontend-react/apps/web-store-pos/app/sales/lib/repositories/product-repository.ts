@@ -1,6 +1,6 @@
 import type { Product } from '@store-mgmt/domain';
 import { ProductCategoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
+import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { ProductCategoryRepository } from './product-category-repository';
 
@@ -20,24 +20,30 @@ function generateId(): string {
  * `new ProductCategoryRepository(storeId)` explicitly, reproducing the old default's
  * runtime behavior byte-for-byte (zero behavior change, signature-only tightening).
  *
- * Backed by the same storage-only `BaseRepository<Product>('products', ...)` that
- * `ProductOfflineService` writes through, so both layers share a single product store.
+ * Persistence is inlined (no shared `BaseRepository<T>` — that base class has no Angular
+ * correlate, playbook rule 12): per-instance cache (`products`/`lastProductsKey`), reloaded
+ * only when empty or the store key changes, auto-init on empty read, Map-entries wire
+ * format, and NO date revival — 1:1 port of `product.repository.ts:36-40,287-499`.
  */
 export class ProductRepository {
-  private readonly repo: BaseRepository<Product>;
   private readonly categoryRepository: ProductCategoryRepository;
+
+  private products: Map<string, Product> | null = null;
+  private lastProductsKey: string | undefined;
 
   constructor(
     private readonly storeId: string,
     categoryRepository: ProductCategoryRepository,
   ) {
-    this.repo = new BaseRepository<Product>('products', ['createdDate', 'updatedDate']);
     this.categoryRepository = categoryRepository;
   }
 
   /** 1:1 port of Angular `getStorageProductsMap` (product.repository.ts:36-40). */
   getStorageProductsMap(): Map<string, Product> {
-    return this.repo.getAll(this.storeId);
+    if (!this.products || this.products.size === 0 || this.getCurrentStorageKey() !== this.lastProductsKey) {
+      this.products = this.getProductsFromLocalStorage();
+    }
+    return this.products;
   }
 
   private getStorageProducts(): Product[] {
@@ -55,7 +61,7 @@ export class ProductRepository {
    * which is `undefined` for a missing key).
    */
   getProductById(id: string): Product | undefined {
-    return this.repo.getById(this.storeId, id);
+    return this.getStorageProductsMap().get(id);
   }
 
   /**
@@ -64,7 +70,7 @@ export class ProductRepository {
    * matching sibling methods `getProductByName`/`getProductByBarcode`.
    */
   getAvailableProductById(id: string): Product | null {
-    const product = this.repo.getById(this.storeId, id);
+    const product = this.getStorageProductsMap().get(id);
     return product && product.isActive ? product : null;
   }
 
@@ -126,7 +132,7 @@ export class ProductRepository {
     product.isActive = false;
     product.updatedDate = new Date();
     product.updatedByName = getCurrentUserLogin();
-    this.repo.save(this.storeId, products);
+    this.setProductsLocalStorage(products);
     return true;
   }
 
@@ -182,7 +188,7 @@ export class ProductRepository {
     this.updateProductsOrderByCategory(products, categoryId, order);
     newProduct.order = order;
     products.set(newProduct.id, newProduct);
-    this.repo.save(this.storeId, products);
+    this.setProductsLocalStorage(products);
     return Result.Success();
   }
 
@@ -290,7 +296,7 @@ export class ProductRepository {
     this.updateProductsOrderByCategory(products, categoryId, order);
     product.order = order;
 
-    this.repo.save(this.storeId, products);
+    this.setProductsLocalStorage(products);
     return Result.Success();
   }
 
@@ -322,7 +328,7 @@ export class ProductRepository {
     if (!product) return Result.Failure([ProductErrors.NotExists]);
 
     product.discountFromInvantory = discountFromInvantory;
-    this.repo.save(this.storeId, products);
+    this.setProductsLocalStorage(products);
     return Result.Success();
   }
 
@@ -333,7 +339,7 @@ export class ProductRepository {
     if (!product) return Result.Failure([ProductErrors.NotExists]);
 
     product.isActive = isActive;
-    this.repo.save(this.storeId, products);
+    this.setProductsLocalStorage(products);
     return Result.Success();
   }
 
@@ -352,17 +358,54 @@ export class ProductRepository {
 
   /** 1:1 port of Angular `updateProducts` (product.repository.ts:26-29). */
   updateProducts(productsMap: Map<string, Product>): void {
-    this.repo.save(this.storeId, productsMap);
+    this.setProductsLocalStorage(productsMap);
+    this.products = this.getProductsFromLocalStorage();
   }
 
   /** 1:1 port of Angular `setInitProducts` (product.repository.ts:31-34). */
   setInitProducts(productsMap: Map<string, Product>): void {
     const current = this.getStorageProductsMap();
-    if (current.size === 0) this.repo.save(this.storeId, productsMap);
+    if (current.size === 0) this.setProductsLocalStorage(productsMap);
   }
 
   /** 1:1 port of Angular `getProductsJson` (product.repository.ts:301-303). */
   getProductsJson(): string | null {
-    return localStorage.getItem(`lizoft.store-products-${this.storeId}`);
+    return localStorage.getItem(this.getStorageKey());
+  }
+
+  /** Private port of Angular `setProductsLocalStorage` (product.repository.ts:287-290) — Map-entries write. */
+  private setProductsLocalStorage(products: Map<string, Product>): void {
+    const productMapJson = JSON.stringify(Array.from(products.entries()));
+    localStorage.setItem(this.getStorageKey(), productMapJson);
+  }
+
+  /** Private port of Angular `getStorageKey` (product.repository.ts:292-295) — records the last-used key. */
+  private getStorageKey(): string {
+    this.lastProductsKey = this.getCurrentStorageKey();
+    return this.lastProductsKey;
+  }
+
+  /** Private port of Angular `getCurrentStorageKey` (product.repository.ts:297-299). */
+  private getCurrentStorageKey(): string {
+    return StorageKeys.entityKey('products', this.storeId);
+  }
+
+  /**
+   * Private port of Angular `getProductsFromLocalStorage` (product.repository.ts:305-320) —
+   * on empty/missing/unparsable storage, auto-initializes by writing an empty Map before
+   * returning it. NO date revival (Angular revives no dates here).
+   */
+  private getProductsFromLocalStorage(): Map<string, Product> {
+    try {
+      const productMapJson = localStorage.getItem(this.getStorageKey());
+      if (productMapJson && productMapJson !== '{}') {
+        return new Map(JSON.parse(productMapJson));
+      }
+    } catch {
+      // ignore — fall through to auto-init
+    }
+    const products = new Map<string, Product>();
+    this.setProductsLocalStorage(products);
+    return products;
   }
 }

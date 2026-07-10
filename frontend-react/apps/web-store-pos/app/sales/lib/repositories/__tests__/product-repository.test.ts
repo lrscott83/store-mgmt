@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Product, ProductCategory, UserModel } from '@store-mgmt/domain';
 import { ProductRepository } from '../product-repository';
 import { ProductCategoryRepository } from '../product-category-repository';
@@ -80,6 +80,56 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
   beforeEach(() => {
     localStorage.clear();
     repo = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
+  });
+
+  // ─── Persistence — Map-entries wire-format, cache, auto-init (inlined, no BaseRepository; product.repository.ts:36-40) ─
+  describe('Persistence — Map-entries wire-format, cache, auto-init (product.repository.ts:36-40)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('persists products on-disk as Map-entries ([[id, product], ...]), never a plain array of product objects', () => {
+      const products = new Map<string, Product>([
+        ['p1', makeProduct('p1', { name: 'Ron' })],
+        ['p2', makeProduct('p2', { name: 'Vodka' })],
+      ]);
+      repo.updateProducts(products);
+
+      const raw = localStorage.getItem(`lizoft.store-products-${storeId}`);
+      const parsed = JSON.parse(raw!);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(2);
+      expect(parsed.every((entry: unknown) => Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string')).toBe(
+        true,
+      );
+    });
+
+    it('auto-writes an empty Map-entries array on the first empty read, without throwing', () => {
+      expect(() => repo.getStorageProductsMap()).not.toThrow();
+      const raw = localStorage.getItem(`lizoft.store-products-${storeId}`);
+      expect(raw).toBe('[]');
+    });
+
+    it('reuses the in-memory cache across two reads without an intervening write (localStorage.getItem hit once)', () => {
+      seedProducts(storeId, [makeProduct('p1')]);
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+
+      repo.getStorageProductsMap();
+      repo.getStorageProductsMap();
+
+      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === `lizoft.store-products-${storeId}`);
+      expect(callsForKey).toHaveLength(1);
+    });
+
+    it('does NOT revive createdDate/updatedDate to Date instances on a fresh instance re-read (Angular repo revives no dates)', () => {
+      seedProducts(storeId, [
+        makeProduct('p1', { createdDate: new Date('2024-01-01T00:00:00.000Z') }),
+      ]);
+      const freshRepo = new ProductRepository(storeId, new ProductCategoryRepository(storeId));
+      const product = freshRepo.getProductById('p1');
+      expect(typeof product?.createdDate).toBe('string');
+      expect(product?.createdDate).not.toBeInstanceOf(Date);
+    });
   });
 
   describe('getProductById — 1:1 port of Angular getProductById (may be undefined)', () => {
