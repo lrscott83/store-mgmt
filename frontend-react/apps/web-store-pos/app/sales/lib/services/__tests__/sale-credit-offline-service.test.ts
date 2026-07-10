@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SaleCreditOfflineService } from '../sale-credit-offline-service';
 import { PaymentType } from '@store-mgmt/domain';
 import type { SaleCredit, UserModel } from '@store-mgmt/domain';
@@ -553,15 +553,87 @@ describe('SaleCreditOfflineService', () => {
   // Test-only helper: `createSaleCredit` always stamps `date: now`, so to exercise
   // financial-window methods we backdate the persisted record directly (same
   // localStorage-rewrite technique already used by SC-09's "excludes credits not
-  // created today" test).
+  // created today" test). WU4 (eliminate-base-repository): plain-array wire format
+  // (Angular parity, sale-credit-offline.service.ts:276-279), NOT Map-entries.
+  // Writing straight to localStorage bypasses the service's per-instance cache (Angular
+  // parity — getStorageSaleCredits only reloads when empty/key-changed), so we rebuild
+  // `service` afterward to force a fresh read; every subsequent `service.*` call in the
+  // outer describe closes over this same `let service` binding.
   function setCreditDate(id: string, date: Date) {
     const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
-    const entries: [string, Record<string, unknown>][] = JSON.parse(raw ?? '[]');
-    const patched = entries.map(([key, value]) =>
-      value.id === id ? [key, { ...value, date: date.toISOString() }] : [key, value],
-    );
+    const credits: Record<string, unknown>[] = JSON.parse(raw ?? '[]');
+    const patched = credits.map((c) => (c.id === id ? { ...c, date: date.toISOString() } : c));
     localStorage.setItem('lizoft.store-saleCredits-s1', JSON.stringify(patched));
+    service = new SaleCreditOfflineService(storeId);
   }
+
+  // WU4 (eliminate-base-repository): inlined persistence — plain-array wire-format, cache,
+  // auto-init, 1:1 port of Angular's sale-credit-offline.service.ts:285-302. Revival fields
+  // (date/paidDate/createdDate/updatedDate) are UNCHANGED from current React behavior
+  // (Decision Gate — SaleCredit revival bugs in Angular are explicitly OUT OF SCOPE).
+  describe('Persistence — plain-array wire-format, cache, auto-init (sale-credit-offline.service.ts:285-302)', () => {
+    it('persists sale credits on-disk as a PLAIN array of objects, never [id, credit] Map-entries pairs', () => {
+      service.createSaleCredit('order-1', 'Ana', 100, '');
+
+      const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
+      const parsed = JSON.parse(raw!);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(1);
+      expect(Array.isArray(parsed[0])).toBe(false);
+      expect(typeof parsed[0]).toBe('object');
+      expect(parsed[0].id).toBeTruthy();
+    });
+
+    it('auto-writes an empty array on the first empty read, without throwing', () => {
+      expect(() => service.getAll()).not.toThrow();
+      const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
+      expect(raw).toBe('[]');
+    });
+
+    it('reuses the in-memory cache across two reads without an intervening write (localStorage.getItem hit once)', () => {
+      localStorage.setItem(
+        'lizoft.store-saleCredits-s1',
+        JSON.stringify([{ id: 'sc1', orderId: 'o1', client: 'Ana', total: 10, isActive: true }]),
+      );
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+
+      service.getAll();
+      service.getAll();
+
+      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === 'lizoft.store-saleCredits-s1');
+      expect(callsForKey).toHaveLength(1);
+    });
+
+    it('STILL revives date/paidDate/createdDate/updatedDate to Date instances on a fresh instance re-read (unchanged React behavior — Decision Gate)', () => {
+      const raw = JSON.stringify([
+        {
+          id: 'sc1',
+          orderId: 'order-1',
+          client: 'Ana',
+          total: 100,
+          date: '2024-01-01T00:00:00.000Z',
+          paid: 0,
+          isPaid: false,
+          isActive: true,
+          paidDate: '2024-01-02T00:00:00.000Z',
+          paidType: PaymentType.Efectivo,
+          note: '',
+          createdDate: '2024-01-01T00:00:00.000Z',
+          createdByName: 'test',
+          updatedDate: '2024-01-03T00:00:00.000Z',
+          updatedByName: 'test',
+        },
+      ]);
+      localStorage.setItem('lizoft.store-saleCredits-s1', raw);
+
+      const freshService = new SaleCreditOfflineService(storeId);
+      const found = freshService.getById('sc1');
+      expect(found?.date).toBeInstanceOf(Date);
+      expect(found?.paidDate).toBeInstanceOf(Date);
+      expect(found?.createdDate).toBeInstanceOf(Date);
+      expect(found?.updatedDate).toBeInstanceOf(Date);
+    });
+  });
 
   // WU4: getActiveSaleCreditsPriceBetweenDates/Today/Yesterday
   describe('getActiveSaleCreditsPriceBetweenDates/Today/Yesterday', () => {

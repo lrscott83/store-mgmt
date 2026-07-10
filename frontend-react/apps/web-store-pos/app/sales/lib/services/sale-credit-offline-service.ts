@@ -1,14 +1,7 @@
 import type { BaseResponseModel, BaseService, SaleCredit } from '@store-mgmt/domain';
 import { DataResult, PaymentType, Result, SaleCreditErrors, success } from '@store-mgmt/domain';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
+import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
-
-const repo = new BaseRepository<SaleCredit>('saleCredits', [
-  'date',
-  'paidDate',
-  'createdDate',
-  'updatedDate',
-]);
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -26,15 +19,40 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
+/**
+ * SaleCreditOfflineService — persistence is inlined (no shared `BaseRepository<T>`; that base
+ * class has no Angular correlate, playbook rule 12). Per-instance cache
+ * (`saleCredits`/`lastSaleCreditsKey`), reloaded only when empty or the store key changes,
+ * auto-init on empty read, PLAIN-ARRAY wire format — 1:1 port of
+ * `sale-credit-offline.service.ts:285-302`. Revival fields
+ * (`date`/`paidDate`/`createdDate`/`updatedDate`) are UNCHANGED from current React behavior
+ * (Decision Gate — SaleCredit revival bugs in Angular are a separate, out-of-scope
+ * fix-vs-replicate call, NOT resolved here).
+ */
 export class SaleCreditOfflineService implements BaseService<SaleCredit> {
+  private saleCredits: SaleCredit[] | null = null;
+  private lastSaleCreditsKey: string | undefined;
+
   constructor(private readonly storeId: string) {}
 
+  /** 1:1 port of Angular `getStorageSaleCredits` (sale-credit-offline.service.ts:28-33). */
+  getStorageSaleCredits(): SaleCredit[] {
+    if (
+      !this.saleCredits ||
+      this.saleCredits.length === 0 ||
+      this.getCurrentStorageKey() !== this.lastSaleCreditsKey
+    ) {
+      this.saleCredits = this.getSaleCreditsFromLocalStorage();
+    }
+    return this.saleCredits;
+  }
+
   getAll(): SaleCredit[] {
-    return Array.from(repo.getAll(this.storeId).values());
+    return this.getStorageSaleCredits();
   }
 
   getById(id: string): SaleCredit | undefined {
-    return repo.getById(this.storeId, id);
+    return this.getStorageSaleCredits().find((c) => c.id === id);
   }
 
   /**
@@ -236,7 +254,8 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
       updatedDate: undefined,
       updatedByName: undefined,
     };
-    repo.upsert(this.storeId, credit);
+    this.getStorageSaleCredits().push(credit);
+    this.setSaleCreditsLocalStorage(this.saleCredits!);
     return new DataResult<SaleCredit>(credit, true, []);
   }
 
@@ -247,19 +266,16 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * [SaleCreditErrors.NotExists])` (removes the current `throw new Error`).
    */
   updateSaleCredit(id: string, client: string, note: string): DataResult<SaleCredit> {
-    const credit = repo.getById(this.storeId, id);
+    const credit = this.getStorageSaleCredits().find((c) => c.id === id);
     if (!credit) {
       return new DataResult<SaleCredit>(undefined, false, [SaleCreditErrors.NotExists]);
     }
-    const updated: SaleCredit = {
-      ...credit,
-      client,
-      note,
-      updatedDate: new Date(),
-      updatedByName: getCurrentUserLogin(),
-    };
-    repo.upsert(this.storeId, updated);
-    return new DataResult<SaleCredit>(updated, true, []);
+    credit.client = client;
+    credit.note = note;
+    credit.updatedDate = new Date();
+    credit.updatedByName = getCurrentUserLogin();
+    this.setSaleCreditsLocalStorage(this.saleCredits!);
+    return new DataResult<SaleCredit>(credit, true, []);
   }
 
   /**
@@ -268,24 +284,21 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * NEVER throws — same success/failure shape as {@link updateSaleCredit}.
    */
   paidSaleCredit(id: string, paidType: PaymentType, note: string): DataResult<SaleCredit> {
-    const credit = repo.getById(this.storeId, id);
+    const credit = this.getStorageSaleCredits().find((c) => c.id === id);
     if (!credit) {
       return new DataResult<SaleCredit>(undefined, false, [SaleCreditErrors.NotExists]);
     }
     const now = new Date();
     // C-7: Full payment only — paid = total regardless of any entered amount
-    const updated: SaleCredit = {
-      ...credit,
-      paid: credit.total,
-      isPaid: true,
-      paidDate: now,
-      paidType,
-      note,
-      updatedDate: now,
-      updatedByName: getCurrentUserLogin(),
-    };
-    repo.upsert(this.storeId, updated);
-    return new DataResult<SaleCredit>(updated, true, []);
+    credit.paid = credit.total;
+    credit.isPaid = true;
+    credit.paidDate = now;
+    credit.paidType = paidType;
+    credit.note = note;
+    credit.updatedDate = now;
+    credit.updatedByName = getCurrentUserLogin();
+    this.setSaleCreditsLocalStorage(this.saleCredits!);
+    return new DataResult<SaleCredit>(credit, true, []);
   }
 
   /**
@@ -296,16 +309,14 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * id — NEVER throws (flagged mismatch #7).
    */
   deleteSaleCredit(id: string): Result {
-    const credit = repo.getById(this.storeId, id);
+    const credit = this.getStorageSaleCredits().find((c) => c.id === id);
     if (!credit) {
       return Result.Failure([SaleCreditErrors.NotExists]);
     }
-    repo.upsert(this.storeId, {
-      ...credit,
-      isActive: false,
-      updatedDate: new Date(),
-      updatedByName: getCurrentUserLogin(),
-    });
+    credit.isActive = false;
+    credit.updatedDate = new Date();
+    credit.updatedByName = getCurrentUserLogin();
+    this.setSaleCreditsLocalStorage(this.saleCredits!);
     return Result.Success();
   }
 
@@ -338,7 +349,9 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * (flagged mismatch #8).
    */
   addImportedSaleCredit(saleCredit: SaleCredit): Result {
-    repo.upsert(this.storeId, { ...saleCredit, date: new Date(saleCredit.date) });
+    const imported: SaleCredit = { ...saleCredit, date: new Date(saleCredit.date) };
+    this.getStorageSaleCredits().push(imported);
+    this.setSaleCreditsLocalStorage(this.saleCredits!);
     return Result.Success();
   }
 
@@ -351,22 +364,19 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * Result.Success().
    */
   updateImportedSaleCredit(importedSaleCredit: SaleCredit): Result {
-    const existing = repo.getById(this.storeId, importedSaleCredit.id);
+    const existing = this.getStorageSaleCredits().find((c) => c.id === importedSaleCredit.id);
     if (existing) {
-      const merged: SaleCredit = {
-        ...existing,
-        isActive: importedSaleCredit.isActive,
-        client: importedSaleCredit.client,
-        note: importedSaleCredit.note,
-        updatedDate: importedSaleCredit.updatedDate,
-        updatedByName: importedSaleCredit.updatedByName,
-      };
+      existing.isActive = importedSaleCredit.isActive;
+      existing.client = importedSaleCredit.client;
+      existing.note = importedSaleCredit.note;
+      existing.updatedDate = importedSaleCredit.updatedDate;
+      existing.updatedByName = importedSaleCredit.updatedByName;
       if (!existing.paid) {
-        merged.paid = importedSaleCredit.paid;
-        merged.isPaid = importedSaleCredit.isPaid;
-        merged.paidDate = importedSaleCredit.paidDate;
+        existing.paid = importedSaleCredit.paid;
+        existing.isPaid = importedSaleCredit.isPaid;
+        existing.paidDate = importedSaleCredit.paidDate;
       }
-      repo.upsert(this.storeId, merged);
+      this.setSaleCreditsLocalStorage(this.saleCredits!);
     }
     return Result.Success();
   }
@@ -382,5 +392,52 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
     if (!result.succeeded) {
       throw new Error(result.errors[0]?.description ?? `SaleCredit could not be deleted: ${id}`);
     }
+  }
+
+  /** Private port of Angular `setSaleCreditsLocalStorage` (sale-credit-offline.service.ts:276-279) — plain-array write. */
+  private setSaleCreditsLocalStorage(saleCredits: SaleCredit[]): void {
+    localStorage.setItem(this.getStorageKey(), JSON.stringify(saleCredits));
+  }
+
+  /** Private port of Angular `getStorageKey` (sale-credit-offline.service.ts:236-239) — records the last-used key. */
+  private getStorageKey(): string {
+    this.lastSaleCreditsKey = this.getCurrentStorageKey();
+    return this.lastSaleCreditsKey;
+  }
+
+  /** Private port of Angular `getCurrentStorageKey` (sale-credit-offline.service.ts:241-243). */
+  private getCurrentStorageKey(): string {
+    return StorageKeys.entityKey('saleCredits', this.storeId);
+  }
+
+  /**
+   * Private port of Angular `getSaleCreditsFromLocalStorage` (sale-credit-offline.service.ts:285-302) —
+   * on empty/missing/unparsable storage, auto-initializes by writing an empty array before
+   * returning it. Revives `date`/`paidDate`/`createdDate`/`updatedDate` to `Date` instances —
+   * SAME fields the pre-existing `BaseRepository<SaleCredit>` revived (Decision Gate:
+   * unchanged; Angular's own revival of `paidDate`/nonexistent `paymentDate` has known bugs
+   * that are a separate, out-of-scope fix-vs-replicate call).
+   */
+  private getSaleCreditsFromLocalStorage(): SaleCredit[] {
+    try {
+      const saleCreditsJson = localStorage.getItem(this.getStorageKey());
+      if (saleCreditsJson) {
+        const saleCredits = JSON.parse(saleCreditsJson) as SaleCredit[];
+        return saleCredits.map((c) => this.reviveSaleCreditDates(c));
+      }
+    } catch {
+      // ignore — fall through to auto-init
+    }
+    this.setSaleCreditsLocalStorage([]);
+    return [];
+  }
+
+  private reviveSaleCreditDates(saleCredit: SaleCredit): SaleCredit {
+    const revived = { ...saleCredit } as Record<string, unknown>;
+    for (const field of ['date', 'paidDate', 'createdDate', 'updatedDate']) {
+      const value = revived[field];
+      if (typeof value === 'string') revived[field] = new Date(value);
+    }
+    return revived as unknown as SaleCredit;
   }
 }
