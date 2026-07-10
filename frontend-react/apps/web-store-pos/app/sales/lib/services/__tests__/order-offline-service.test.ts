@@ -145,12 +145,10 @@ function orderItemFor(
   };
 }
 
+// WU3 (eliminate-base-repository): plain-array wire format (Angular parity,
+// order-offline.service.ts:420-423 `JSON.stringify(orders)`), NOT Map-entries.
 function seedOrders(storeId: string, orders: Order[]): void {
-  const map = new Map(orders.map((o) => [o.id, o] as [string, Order]));
-  localStorage.setItem(
-    `lizoft.store-orders-${storeId}`,
-    JSON.stringify(Array.from(map.entries())),
-  );
+  localStorage.setItem(`lizoft.store-orders-${storeId}`, JSON.stringify(orders));
 }
 
 describe('OrderOfflineService', () => {
@@ -446,6 +444,65 @@ describe('OrderOfflineService', () => {
       service.create(items, PaymentType.Efectivo, false, '');
       const raw = localStorage.getItem('lizoft.store-orders-s1');
       expect(raw).not.toBeNull();
+    });
+  });
+
+  // WU3 (eliminate-base-repository): inlined persistence — plain-array wire-format, cache,
+  // auto-init, 1:1 port of Angular's order-offline.service.ts:400-451. Revival fields
+  // (date/createdDate/updatedDate) are UNCHANGED from current React behavior (Decision Gate —
+  // Angular itself only revives `date`, but that gap is explicitly OUT OF SCOPE for this WU).
+  describe('Persistence — plain-array wire-format, cache, auto-init (order-offline.service.ts:400-451)', () => {
+    // NOTE: does NOT use `vi.restoreAllMocks()` in an afterEach — this test file's
+    // module-level `vi.mock()` factories (InventoryOfflineService/SaleCreditOfflineService)
+    // would get their `mockImplementation` wiped by a blanket restore, breaking every
+    // later test in the file. The outer `beforeEach`'s `vi.clearAllMocks()` already resets
+    // call history; the `getItem` spy below is left as a pass-through spy (calls the real
+    // implementation), so no explicit restore is needed.
+
+    it('persists orders on-disk as a PLAIN array of order objects, never [id, order] Map-entries pairs', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      service.create(items, PaymentType.Efectivo, false, '');
+
+      const raw = localStorage.getItem('lizoft.store-orders-s1');
+      const parsed = JSON.parse(raw!);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(1);
+      expect(Array.isArray(parsed[0])).toBe(false);
+      expect(typeof parsed[0]).toBe('object');
+      expect(parsed[0].id).toBeTruthy();
+    });
+
+    it('auto-writes an empty array on the first empty read, without throwing', () => {
+      expect(() => service.getAll()).not.toThrow();
+      const raw = localStorage.getItem('lizoft.store-orders-s1');
+      expect(raw).toBe('[]');
+    });
+
+    it('reuses the in-memory cache across two reads without an intervening write (localStorage.getItem hit once)', () => {
+      seedOrders(storeId, [makeOrder({ id: 'o1' })]);
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+
+      service.getAll();
+      service.getAll();
+
+      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === 'lizoft.store-orders-s1');
+      expect(callsForKey).toHaveLength(1);
+    });
+
+    it('STILL revives date/createdDate/updatedDate to Date instances on a fresh instance re-read (unchanged React behavior — Decision Gate)', () => {
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: new Date('2024-01-01T00:00:00.000Z'),
+          createdDate: new Date('2024-01-01T00:00:00.000Z'),
+          updatedDate: new Date('2024-01-02T00:00:00.000Z'),
+        }),
+      ]);
+      const freshService = new OrderOfflineService(storeId);
+      const found = freshService.getById('o1');
+      expect(found?.date).toBeInstanceOf(Date);
+      expect(found?.createdDate).toBeInstanceOf(Date);
+      expect(found?.updatedDate).toBeInstanceOf(Date);
     });
   });
 

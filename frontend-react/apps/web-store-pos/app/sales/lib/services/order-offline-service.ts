@@ -1,7 +1,7 @@
 import type { BaseService, Order, OrderItem } from '@store-mgmt/domain';
 import { OrderType, PaymentType } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
+import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -40,15 +40,24 @@ function getOrderItemsCount(items: OrderItem[]): number {
   return items.reduce((sum, item) => sum + item.quantity, 0);
 }
 
-const repo = new BaseRepository<Order>('orders', ['date', 'createdDate', 'updatedDate']);
-
 function generateId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * OrderOfflineService — persistence is inlined (no shared `BaseRepository<T>`; that base
+ * class has no Angular correlate, playbook rule 12). Per-instance cache
+ * (`orders`/`lastOrdersKey`), reloaded only when empty or the store key changes, auto-init
+ * on empty read, PLAIN-ARRAY wire format — 1:1 port of `order-offline.service.ts:400-451`.
+ * Revival fields (`date`/`createdDate`/`updatedDate`) are UNCHANGED from current React
+ * behavior (Decision Gate — pending fix-vs-replicate call, NOT resolved here).
+ */
 export class OrderOfflineService implements BaseService<Order> {
   private readonly creditService: SaleCreditOfflineService;
   private readonly inventoryService: InventoryOfflineService;
+
+  private orders: Order[] | null = null;
+  private lastOrdersKey: string | undefined;
 
   constructor(private readonly storeId: string) {
     this.creditService = new SaleCreditOfflineService(storeId);
@@ -58,12 +67,20 @@ export class OrderOfflineService implements BaseService<Order> {
     );
   }
 
+  /** 1:1 port of Angular `getStorageOrders` (order-offline.service.ts:400-405). */
+  getStorageOrders(): Order[] {
+    if (!this.orders || this.orders.length === 0 || this.getCurrentStorageKey() !== this.lastOrdersKey) {
+      this.orders = this.getOrdersFromLocalStorage();
+    }
+    return this.orders;
+  }
+
   getAll(): Order[] {
-    return Array.from(repo.getAll(this.storeId).values());
+    return this.getStorageOrders();
   }
 
   getById(id: string): Order | undefined {
-    return repo.getById(this.storeId, id);
+    return this.getStorageOrders().find((o) => o.id === id);
   }
 
   getByDateRange(from: Date, to: Date): Order[] {
@@ -326,7 +343,10 @@ export class OrderOfflineService implements BaseService<Order> {
       updatedByName: undefined,
     };
 
-    repo.upsert(this.storeId, order);
+    // 1:1 port of Angular `createOrder` (order-offline.service.ts:60-61): push onto the
+    // cached array, then persist the whole array.
+    this.getStorageOrders().push(order);
+    this.setOrdersLocalStorage(this.orders!);
 
     if (isCredit) {
       // Angular always passes '' for note (order-offline.service.ts:63); the returned
@@ -338,16 +358,13 @@ export class OrderOfflineService implements BaseService<Order> {
   }
 
   update(id: string, paymentType: PaymentType): Order {
-    const order = repo.getById(this.storeId, id);
+    const order = this.getStorageOrders().find((o) => o.id === id);
     if (!order) throw new Error(`Order not found: ${id}`);
-    const updated: Order = {
-      ...order,
-      paymentType,
-      updatedDate: new Date(),
-      updatedByName: getCurrentUserLogin(),
-    };
-    repo.upsert(this.storeId, updated);
-    return updated;
+    order.paymentType = paymentType;
+    order.updatedDate = new Date();
+    order.updatedByName = getCurrentUserLogin();
+    this.setOrdersLocalStorage(this.orders!);
+    return order;
   }
 
   /**
@@ -356,28 +373,23 @@ export class OrderOfflineService implements BaseService<Order> {
    * on not-found (Angular's Result-command collapses to this per design ADR-1).
    */
   activateOrder(id: string): void {
-    const order = repo.getById(this.storeId, id);
+    const order = this.getStorageOrders().find((o) => o.id === id);
     if (!order) throw new Error(`Order not found: ${id}`);
-    repo.upsert(this.storeId, {
-      ...order,
-      isActive: true,
-      updatedDate: new Date(),
-      updatedByName: getCurrentUserLogin(),
-    });
+    order.isActive = true;
+    order.updatedDate = new Date();
+    order.updatedByName = getCurrentUserLogin();
+    this.setOrdersLocalStorage(this.orders!);
   }
 
   deactivate(id: string): void {
-    const order = repo.getById(this.storeId, id);
+    const order = this.getStorageOrders().find((o) => o.id === id);
     if (!order) throw new Error(`Order not found: ${id}`);
 
     // Step 1: Mark order inactive
-    const updated: Order = {
-      ...order,
-      isActive: false,
-      updatedDate: new Date(),
-      updatedByName: getCurrentUserLogin(),
-    };
-    repo.upsert(this.storeId, updated);
+    order.isActive = false;
+    order.updatedDate = new Date();
+    order.updatedByName = getCurrentUserLogin();
+    this.setOrdersLocalStorage(this.orders!);
 
     // Step 2: Void associated credit if credit order. Angular's own deactivateOrder DOES
     // check this Result (order-offline.service.ts:317-324), but wiring that check into
@@ -408,5 +420,52 @@ export class OrderOfflineService implements BaseService<Order> {
    */
   delete(id: string): void {
     this.deactivate(id);
+  }
+
+  /** Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) — plain-array write. */
+  private setOrdersLocalStorage(orders: Order[]): void {
+    localStorage.setItem(this.getStorageKey(), JSON.stringify(orders));
+  }
+
+  /** Private port of Angular `getStorageKey` (order-offline.service.ts:407-410) — records the last-used key. */
+  private getStorageKey(): string {
+    this.lastOrdersKey = this.getCurrentStorageKey();
+    return this.lastOrdersKey;
+  }
+
+  /** Private port of Angular `getCurrentStorageKey` (order-offline.service.ts:412-414). */
+  private getCurrentStorageKey(): string {
+    return StorageKeys.entityKey('orders', this.storeId);
+  }
+
+  /**
+   * Private port of Angular `getOrdersFromLocalStorage` (order-offline.service.ts:451-470) —
+   * on empty/missing/unparsable storage, auto-initializes by writing an empty array before
+   * returning it. Revives `date`/`createdDate`/`updatedDate` to `Date` instances — SAME
+   * fields the pre-existing `BaseRepository<Order>` revived (Decision Gate: unchanged;
+   * Angular itself only revives `date` here, but closing that gap is a separate,
+   * out-of-scope fix-vs-replicate call).
+   */
+  private getOrdersFromLocalStorage(): Order[] {
+    try {
+      const ordersJson = localStorage.getItem(this.getStorageKey());
+      if (ordersJson) {
+        const orders = JSON.parse(ordersJson) as Order[];
+        return orders.map((order) => this.reviveOrderDates(order));
+      }
+    } catch {
+      // ignore — fall through to auto-init
+    }
+    this.setOrdersLocalStorage([]);
+    return [];
+  }
+
+  private reviveOrderDates(order: Order): Order {
+    const revived = { ...order } as Record<string, unknown>;
+    for (const field of ['date', 'createdDate', 'updatedDate']) {
+      const value = revived[field];
+      if (typeof value === 'string') revived[field] = new Date(value);
+    }
+    return revived as unknown as Order;
   }
 }
