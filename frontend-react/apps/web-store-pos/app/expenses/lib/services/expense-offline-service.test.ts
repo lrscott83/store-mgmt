@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
 import type { Expense, UserModel } from '@store-mgmt/domain';
 import { ExpenseOfflineService } from './expense-offline-service';
@@ -53,6 +53,71 @@ describe('ExpenseOfflineService', () => {
     localStorage.clear();
     useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
     svc = new ExpenseOfflineService(storeId);
+  });
+
+  // WU5 (eliminate-base-repository): inlined persistence — plain-array wire-format, cache,
+  // auto-init, 1:1 port of Angular's expense-offline.service.ts:173-224. Revival fields
+  // (date/createdDate/updatedDate) are UNCHANGED from current React behavior (Decision Gate —
+  // Angular itself only revives `date` + normalizes `paymentType`, both OUT OF SCOPE here).
+  describe('Persistence — plain-array wire-format, cache, auto-init (expense-offline.service.ts:173-224)', () => {
+    it('persists expenses on-disk as a PLAIN array of objects, never [id, expense] Map-entries pairs', () => {
+      create();
+
+      const raw = localStorage.getItem(`lizoft.store-expenses-${storeId}`);
+      const parsed = JSON.parse(raw!);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(1);
+      expect(Array.isArray(parsed[0])).toBe(false);
+      expect(typeof parsed[0]).toBe('object');
+      expect(parsed[0].id).toBeTruthy();
+    });
+
+    it('auto-writes an empty array on the first empty read, without throwing', () => {
+      expect(() => svc.getAll()).not.toThrow();
+      const raw = localStorage.getItem(`lizoft.store-expenses-${storeId}`);
+      expect(raw).toBe('[]');
+    });
+
+    it('reuses the in-memory cache across two reads without an intervening write (localStorage.getItem hit once)', () => {
+      localStorage.setItem(
+        `lizoft.store-expenses-${storeId}`,
+        JSON.stringify([{ id: 'e1', type: ExpenseType.Comida, total: 10, isActive: true }]),
+      );
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+
+      svc.getAll();
+      svc.getAll();
+
+      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === `lizoft.store-expenses-${storeId}`);
+      expect(callsForKey).toHaveLength(1);
+    });
+
+    it('STILL revives date/createdDate/updatedDate to Date instances on a fresh instance re-read (unchanged React behavior — Decision Gate)', () => {
+      localStorage.setItem(
+        `lizoft.store-expenses-${storeId}`,
+        JSON.stringify([
+          {
+            id: 'e1',
+            type: ExpenseType.Comida,
+            total: 10,
+            note: '',
+            date: '2024-01-01T00:00:00.000Z',
+            paymentType: PaymentType.Efectivo,
+            isActive: true,
+            createdDate: '2024-01-01T00:00:00.000Z',
+            createdByName: 'test',
+            updatedDate: '2024-01-02T00:00:00.000Z',
+            updatedByName: 'test',
+          },
+        ]),
+      );
+
+      const freshSvc = new ExpenseOfflineService(storeId);
+      const found = freshSvc.getById('e1');
+      expect(found?.date).toBeInstanceOf(Date);
+      expect(found?.createdDate).toBeInstanceOf(Date);
+      expect(found?.updatedDate).toBeInstanceOf(Date);
+    });
   });
 
   // ─── Category D: create/update return DataResult<Expense> ───────────────────
