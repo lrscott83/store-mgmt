@@ -38,3 +38,11 @@ Uso en Angular sin correlato en React → lo reporto antes de crearlo.
 
 ### 11. Cualquier duda que fuerce una suposición → se pregunta.
 Streams, DI ambigua, algo que parece bug, un uso sin correlato: todo eso frena la migración y se consulta.
+
+### 12. La migración NO genera NADA nuevo. (INNEGOCIABLE)
+Migrar es ESPEJAR Angular, no rediseñarlo. **Si Angular no lo tiene, React NO lo tiene.** Esto aplica a TODO, no solo a métodos:
+- **Clases y abstracciones:** si Angular no tiene una clase base compartida, React no la tiene. Extraer un `BaseRepository`/`BaseService` común porque "queda más limpio" es MEJORAR → prohibido. Si Angular repite lógica inline en cada repo, React repite lógica inline en cada repo.
+- **Capas y artefactos:** si Angular no tiene un `repository` para un dominio (p. ej. inventory, cuya persistencia vive inline en el offline-service), React NO crea `InventoryRepository`. Se espeja la MISMA ubicación de la lógica.
+- **Helpers, utilidades, normalizaciones:** ningún helper nuevo, ninguna normalización "de paso" (p. ej. forzar `[]` donde Angular devuelve `undefined`) que Angular no haga.
+
+La pregunta correcta ante cualquier artefacto React NUNCA es "¿debería esta cosa nueva replicar el comportamiento X de Angular?". La pregunta es: **"¿Angular tiene esta cosa? Si no, se ELIMINA."** Cualquier estructura nueva que aparezca es un hallazgo de paridad (regla 2 + 10): se reporta y se elimina/inlinea para espejar Angular. Nunca se justifica como decisión de diseño.
