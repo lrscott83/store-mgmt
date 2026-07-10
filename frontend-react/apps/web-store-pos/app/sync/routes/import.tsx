@@ -8,8 +8,12 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
-import type { Product, ProductCategory, Order, SaleCredit } from '@store-mgmt/domain';
+import {
+  makeCategoryRepoShim,
+  makeOrderRepoShim,
+  makeProductRepoShim,
+  makeSaleCreditRepoShim,
+} from '~/sync/lib/storage/sync-repo-shims';
 import { DataSerializerService, WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -54,14 +58,15 @@ export function ImportPage() {
     // Decrypt + parse — throws WrongPasswordError or CorruptFileError before any write
     const parsedData = await serializer.import(payload, password);
 
-    // Build synchronizer (write side). Categories/Products go through the
-    // raw BaseRepository (not the read-oriented offline services), because
-    // the domain-validated whole-type revert on a name clash needs a bulk
-    // map overwrite (`save`), which BaseRepository exposes and the
-    // per-item offline-service wrappers do not.
-    const categoryRepo = new BaseRepository<ProductCategory>('product-categories');
-    const productRepo = new BaseRepository<Product>('products', ['createdDate', 'updatedDate']);
-    const orderRepo = new BaseRepository<Order>('orders', ['date', 'createdDate', 'updatedDate']);
+    // Build synchronizer (write side). Categories/Products go through sync-local storage
+    // shims (not the read-oriented offline services), because the domain-validated
+    // whole-type revert on a name clash needs a bulk map overwrite (`save`), which the
+    // shims expose and the per-item offline-service wrappers do not. The shims re-home
+    // the storage the removed `BaseRepository` used to provide (rule 12) without
+    // reintroducing a shared base class — see `sync/lib/storage/sync-repo-shims.ts`.
+    const categoryRepo = makeCategoryRepoShim();
+    const productRepo = makeProductRepoShim();
+    const orderRepo = makeOrderRepoShim();
     // Inventory + Expenses route through their offline SERVICES (Angular parity: the
     // synchronizer calls inventorySvc.addImportedEntries/updateImportedEntries and
     // expenseSvc.addImportedExpense/updateImportedExpense, not raw repos).
@@ -69,12 +74,7 @@ export function ImportPage() {
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
-    const saleCreditRepo = new BaseRepository<SaleCredit>('saleCredits', [
-      'date',
-      'paidDate',
-      'createdDate',
-      'updatedDate',
-    ]);
+    const saleCreditRepo = makeSaleCreditRepoShim();
 
     const synchronizer = new DataSynchronizerService(
       storeId,
