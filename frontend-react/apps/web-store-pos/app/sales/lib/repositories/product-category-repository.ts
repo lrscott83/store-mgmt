@@ -1,6 +1,6 @@
 import type { ProductCategory } from '@store-mgmt/domain';
 import { ProductCategoryErrors, Result } from '@store-mgmt/domain';
-import { BaseRepository } from '~/shared/lib/storage/base-repository';
+import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -20,21 +20,27 @@ function generateId(): string {
  * visibility and spec.md's authoritative surface table (spec.md:77); shared by
  * `addProductCategory`/`addProductCategoryByName`/`addImportedProductCategory`.
  *
- * Backed by the same storage-only `BaseRepository<ProductCategory>('product-categories', ...)`
- * that `ProductCategoryOfflineService` writes through today, so both layers share one store
- * (storage key `lizoft.store-product-categories-{storeId}`, confirmed via
- * `StorageKeys.entityKey`, matches Angular exactly).
+ * Persistence is inlined (no shared `BaseRepository<T>` — that base class has no Angular
+ * correlate, playbook rule 12): per-instance cache (`categories`/`lastCategoriesKey`),
+ * reloaded only when empty or the store key changes, auto-init on empty read, Map-entries
+ * wire format — 1:1 port of `product-category.repository.ts:40-45,167-229`.
  */
 export class ProductCategoryRepository {
-  private readonly repo: BaseRepository<ProductCategory>;
+  private categories: Map<string, ProductCategory> | null = null;
+  private lastCategoriesKey: string | undefined;
 
-  constructor(private readonly storeId: string) {
-    this.repo = new BaseRepository<ProductCategory>('product-categories');
-  }
+  constructor(private readonly storeId: string) {}
 
   /** 1:1 port of Angular `getStorageCategoriesMap` (product-category.repository.ts:40-45). */
   getStorageCategoriesMap(): Map<string, ProductCategory> {
-    return this.repo.getAll(this.storeId);
+    if (
+      !this.categories ||
+      this.categories.size === 0 ||
+      this.getCurrentStorageKey() !== this.lastCategoriesKey
+    ) {
+      this.categories = this.getProductCategoriesFromLocalStorage();
+    }
+    return this.categories;
   }
 
   private getStorageCategories(): ProductCategory[] {
@@ -86,7 +92,7 @@ export class ProductCategoryRepository {
     this.updateCategoriesOrder(categories, order);
     newCategory.order = order;
     categories.set(newCategory.id, newCategory);
-    this.repo.save(this.storeId, categories);
+    this.setProductCategoriesLocalStorage(categories);
     return Result.Success();
   }
 
@@ -151,7 +157,7 @@ export class ProductCategoryRepository {
     category.isActive = isActive;
     this.updateCategoriesOrder(categories, order);
     category.order = order;
-    this.repo.save(this.storeId, categories);
+    this.setProductCategoriesLocalStorage(categories);
     return Result.Success();
   }
 
@@ -162,7 +168,7 @@ export class ProductCategoryRepository {
     if (!category) return Result.Failure([ProductCategoryErrors.NotExists]);
 
     category.isActive = isActive;
-    this.repo.save(this.storeId, categories);
+    this.setProductCategoriesLocalStorage(categories);
     return Result.Success();
   }
 
@@ -181,17 +187,54 @@ export class ProductCategoryRepository {
 
   /** 1:1 port of Angular `updateCategories` (repo.ts:29-32). */
   updateCategories(categoriesMap: Map<string, ProductCategory>): void {
-    this.repo.save(this.storeId, categoriesMap);
+    this.setProductCategoriesLocalStorage(categoriesMap);
+    this.categories = this.getProductCategoriesFromLocalStorage();
   }
 
   /** 1:1 port of Angular `setInitCategories` (repo.ts:34-38). */
   setInitCategories(categoriesMap: Map<string, ProductCategory>): void {
     const current = this.getStorageCategoriesMap();
-    if (current.size === 0) this.repo.save(this.storeId, categoriesMap);
+    if (current.size === 0) this.setProductCategoriesLocalStorage(categoriesMap);
   }
 
   /** 1:1 port of Angular `getCategoriesJson` (repo.ts:172-174). */
   getCategoriesJson(): string | null {
-    return localStorage.getItem(`lizoft.store-product-categories-${this.storeId}`);
+    return localStorage.getItem(this.getStorageKey());
+  }
+
+  /** Private port of Angular `getStorageKey` (repo.ts:158-161) — records the last-used key. */
+  private getStorageKey(): string {
+    this.lastCategoriesKey = this.getCurrentStorageKey();
+    return this.lastCategoriesKey;
+  }
+
+  /** Private port of Angular `getCurrentStorageKey` (repo.ts:163-165). */
+  private getCurrentStorageKey(): string {
+    return StorageKeys.entityKey('product-categories', this.storeId);
+  }
+
+  /** Private port of Angular `setProductCategoriesLocalStorage` (repo.ts:167-170) — Map-entries write. */
+  private setProductCategoriesLocalStorage(categories: Map<string, ProductCategory>): void {
+    const categoryMapJson = JSON.stringify(Array.from(categories.entries()));
+    localStorage.setItem(this.getStorageKey(), categoryMapJson);
+  }
+
+  /**
+   * Private port of Angular `getProductCategoriesFromLocalStorage` (repo.ts:176-229) —
+   * on empty/missing/unparsable storage, auto-initializes by writing an empty Map before
+   * returning it.
+   */
+  private getProductCategoriesFromLocalStorage(): Map<string, ProductCategory> {
+    try {
+      const categoryMapJson = localStorage.getItem(this.getStorageKey());
+      if (categoryMapJson && categoryMapJson !== '{}') {
+        return new Map(JSON.parse(categoryMapJson));
+      }
+    } catch {
+      // ignore — fall through to auto-init
+    }
+    const categories = new Map<string, ProductCategory>();
+    this.setProductCategoriesLocalStorage(categories);
+    return categories;
   }
 }

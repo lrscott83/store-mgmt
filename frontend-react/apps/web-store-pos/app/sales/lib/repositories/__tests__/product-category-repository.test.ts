@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProductCategory } from '@store-mgmt/domain';
 import { ProductCategoryRepository } from '../product-category-repository';
 
@@ -33,6 +33,46 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
   beforeEach(() => {
     localStorage.clear();
     repo = new ProductCategoryRepository(storeId);
+  });
+
+  // ─── Persistence — Map-entries wire-format, cache, auto-init (inlined, no BaseRepository; product-category.repository.ts:40-45) ─
+  describe('Persistence — Map-entries wire-format, cache, auto-init (product-category.repository.ts:40-45)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('persists categories on-disk as Map-entries ([[id, category], ...]), never a plain array of category objects', () => {
+      const categories = new Map<string, ProductCategory>([
+        ['c1', makeCategory('c1', { name: 'Bebidas' })],
+        ['c2', makeCategory('c2', { name: 'Snacks' })],
+      ]);
+      repo.updateCategories(categories);
+
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed = JSON.parse(raw!);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(2);
+      expect(parsed.every((entry: unknown) => Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'string')).toBe(
+        true,
+      );
+    });
+
+    it('auto-writes an empty Map-entries array on the first empty read, without throwing', () => {
+      expect(() => repo.getStorageCategoriesMap()).not.toThrow();
+      const raw = localStorage.getItem(STORAGE_KEY);
+      expect(raw).toBe('[]');
+    });
+
+    it('reuses the in-memory cache across two reads without an intervening write (localStorage.getItem hit once)', () => {
+      seedCategories([makeCategory('c1')]);
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+
+      repo.getStorageCategoriesMap();
+      repo.getStorageCategoriesMap();
+
+      const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === STORAGE_KEY);
+      expect(callsForKey).toHaveLength(1);
+    });
   });
 
   // ─── 1.1 getProductCategoryById ──────────────────────────────────────────
