@@ -1,4 +1,4 @@
-import type { BaseResponseModel, BaseService, SaleCredit } from '@store-mgmt/domain';
+import type { BaseResponseModel, SaleCredit } from '@store-mgmt/domain';
 import { DataResult, PaymentType, Result, SaleCreditErrors, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -29,7 +29,7 @@ function addDays(date: Date, days: number): Date {
  * (Decision Gate — SaleCredit revival bugs in Angular are a separate, out-of-scope
  * fix-vs-replicate call, NOT resolved here).
  */
-export class SaleCreditOfflineService implements BaseService<SaleCredit> {
+export class SaleCreditOfflineService {
   private saleCredits: SaleCredit[] | null = null;
   private lastSaleCreditsKey: string | undefined;
 
@@ -47,14 +47,6 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
     return this.saleCredits;
   }
 
-  getAll(): SaleCredit[] {
-    return this.getStorageSaleCredits();
-  }
-
-  getById(id: string): SaleCredit | undefined {
-    return this.getStorageSaleCredits().find((c) => c.id === id);
-  }
-
   /**
    * WU3 (category B): returns SYNC `BaseResponseModel<SaleCredit[]>` (via `success(...)`),
    * matching Angular's `getSaleCreditsInDay` (`this.Success(...)`, sync — never async).
@@ -65,7 +57,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
   getSaleCreditsInDay(date: Date): BaseResponseModel<SaleCredit[]> {
     const startDate = startOfDay(date);
     const endDate = addDays(startDate, 1);
-    const filtered = this.getAll()
+    const filtered = this.getStorageSaleCredits()
       .filter((c) => c.isActive && c.date >= startDate && c.date < endDate)
       .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
     return success(filtered);
@@ -109,7 +101,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
   getPaidSaleCreditsInDayObservable(date: Date): Promise<BaseResponseModel<SaleCredit[]>> {
     const startDate = startOfDay(date);
     const endDate = addDays(startDate, 1);
-    const filtered = this.getAll()
+    const filtered = this.getStorageSaleCredits()
       .filter(
         (c) =>
           c.isActive &&
@@ -129,7 +121,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * only, no call-site to migrate.
    */
   getSaleCreditsObservable(): Promise<BaseResponseModel<SaleCredit[]>> {
-    return Promise.resolve(success(this.getAll().filter((c) => c.isActive)));
+    return Promise.resolve(success(this.getStorageSaleCredits().filter((c) => c.isActive)));
   }
 
   /**
@@ -137,7 +129,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * with `date < threshold` (no lower bound).
    */
   getSaleCreditsTotalBefore(date: Date): number {
-    return this.getAll()
+    return this.getStorageSaleCredits()
       .filter((c) => c.isActive && c.date < date)
       .reduce((sum, c) => sum + c.total, 0);
   }
@@ -164,7 +156,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * `getActiveSaleCreditsBetweenDates`.
    */
   private activeSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
-    return this.getAll().filter((c) => c.isActive && c.date >= start && c.date < end);
+    return this.getStorageSaleCredits().filter((c) => c.isActive && c.date >= start && c.date < end);
   }
 
   private activeUnpaidSaleCreditsBetween(start: Date, end: Date): SaleCredit[] {
@@ -218,7 +210,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
     startDate: Date | null,
     endDate: Date | null,
   ): Promise<BaseResponseModel<SaleCredit[]>> {
-    const filtered = this.getAll().filter(
+    const filtered = this.getStorageSaleCredits().filter(
       (c) =>
         c.isActive &&
         (!client || c.client.includes(client)) &&
@@ -326,7 +318,7 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
    * ACTIVE credit for the given orderId via `.find()`, NOT a loop over all matches.
    */
   private getSaleCreditByOrderId(orderId: string): SaleCredit | undefined {
-    return this.getAll().find((c) => c.isActive && c.orderId === orderId);
+    return this.getStorageSaleCredits().find((c) => c.isActive && c.orderId === orderId);
   }
 
   /**
@@ -379,19 +371,6 @@ export class SaleCreditOfflineService implements BaseService<SaleCredit> {
       this.setSaleCreditsLocalStorage(this.saleCredits!);
     }
     return Result.Success();
-  }
-
-  /**
-   * BaseService<SaleCredit> `delete()` seam (ADR-1, Expense-slice precedent): stays a
-   * SYNC React-only contract OUTSIDE the A/B/C/D conversion. Delegates to the real
-   * domain command {@link deleteSaleCredit} and THROWS on failure — behavior change
-   * (silent no-op → throw), flagged mismatch #7.
-   */
-  delete(id: string): void {
-    const result = this.deleteSaleCredit(id);
-    if (!result.succeeded) {
-      throw new Error(result.errors[0]?.description ?? `SaleCredit could not be deleted: ${id}`);
-    }
   }
 
   /** Private port of Angular `setSaleCreditsLocalStorage` (sale-credit-offline.service.ts:276-279) — plain-array write. */

@@ -43,6 +43,12 @@ describe('SaleCreditOfflineService', () => {
     return service.createSaleCredit(orderId, client, total, note).data!;
   }
 
+  // WU4 (baseservice-parity): getById() was removed (zero prod call-sites, rule 12) — tests
+  // that only needed a by-id lookup (not testing getById itself) use this helper instead.
+  function findCredit(id: string): SaleCredit | undefined {
+    return service.getStorageSaleCredits().find((c) => c.id === id);
+  }
+
   describe('SC-01: createSaleCredit returns a succeeded DataResult (paid=0, isPaid=false)', () => {
     it('returns a succeeded DataResult with paid=0', () => {
       const result = service.createSaleCredit('order-1', 'Juan Perez', 150, '');
@@ -143,7 +149,7 @@ describe('SaleCreditOfflineService', () => {
     it('persists the updated credit', () => {
       const credit = createCredit('order-1', 'Luis', 300);
       service.paidSaleCredit(credit.id, PaymentType.Efectivo, '');
-      const retrieved = service.getById(credit.id);
+      const retrieved = findCredit(credit.id);
       expect(retrieved?.isPaid).toBe(true);
       expect(retrieved?.paid).toBe(300);
     });
@@ -171,7 +177,7 @@ describe('SaleCreditOfflineService', () => {
       createCredit('order-x', 'Maria', 100);
       const result = service.deactivateSaleCreditByOrderId('order-x');
       expect(result.succeeded).toBe(true);
-      const all = service.getAll();
+      const all = service.getStorageSaleCredits();
       const credit = all.find((c) => c.orderId === 'order-x');
       expect(credit?.isActive).toBe(false);
     });
@@ -182,7 +188,7 @@ describe('SaleCreditOfflineService', () => {
       // Angular scenario is edge-case, but the FIRST-match semantics must hold regardless.
       const second = createCredit('order-1', 'Ana Segundo', 60);
       service.deactivateSaleCreditByOrderId('order-1');
-      const all = service.getAll();
+      const all = service.getStorageSaleCredits();
       const firstAfter = all.find((c) => c.id === first.id);
       const secondAfter = all.find((c) => c.id === second.id);
       // .find() returns the first ACTIVE match in storage insertion order — only ONE is
@@ -194,7 +200,7 @@ describe('SaleCreditOfflineService', () => {
       createCredit('order-1', 'Ana', 50);
       createCredit('order-2', 'Bob', 75);
       service.deactivateSaleCreditByOrderId('order-1');
-      const all = service.getAll();
+      const all = service.getStorageSaleCredits();
       const creditForOrder2 = all.find((c) => c.orderId === 'order-2');
       expect(creditForOrder2?.isActive).toBe(true);
     });
@@ -212,7 +218,7 @@ describe('SaleCreditOfflineService', () => {
     it('stamps updatedByName with the authenticated user login', () => {
       createCredit('order-x', 'Maria', 100);
       service.deactivateSaleCreditByOrderId('order-x');
-      const all = service.getAll();
+      const all = service.getStorageSaleCredits();
       const credit = all.find((c) => c.orderId === 'order-x');
       expect(credit?.updatedByName).toBe('jdoe');
     });
@@ -248,7 +254,7 @@ describe('SaleCreditOfflineService', () => {
       const credit = createCredit('order-1', 'Ana', 50);
       const result = service.deleteSaleCredit(credit.id);
       expect(result.succeeded).toBe(true);
-      const found = service.getById(credit.id);
+      const found = findCredit(credit.id);
       expect(found?.isActive).toBe(false);
       expect(found?.updatedByName).toBe('jdoe');
     });
@@ -290,7 +296,7 @@ describe('SaleCreditOfflineService', () => {
       };
       const result = service.addImportedSaleCredit(credit);
       expect(result.succeeded).toBe(true);
-      expect(service.getById('imported-1')).toBeDefined();
+      expect(findCredit('imported-1')).toBeDefined();
     });
 
     it('normalizes the incoming date to a Date instance', () => {
@@ -312,7 +318,7 @@ describe('SaleCreditOfflineService', () => {
         updatedByName: undefined,
       };
       service.addImportedSaleCredit(credit);
-      expect(service.getById('imported-2')?.date).toBeInstanceOf(Date);
+      expect(findCredit('imported-2')?.date).toBeInstanceOf(Date);
     });
   });
 
@@ -328,7 +334,7 @@ describe('SaleCreditOfflineService', () => {
         updatedByName: 'importer',
       });
       expect(result.succeeded).toBe(true);
-      const found = service.getById(credit.id);
+      const found = findCredit(credit.id);
       expect(found?.isActive).toBe(false);
       expect(found?.client).toBe('Ana Updated');
       expect(found?.note).toBe('imported note');
@@ -344,7 +350,7 @@ describe('SaleCreditOfflineService', () => {
         isPaid: true,
         paidDate,
       });
-      const found = service.getById(credit.id);
+      const found = findCredit(credit.id);
       expect(found?.paid).toBe(50);
       expect(found?.isPaid).toBe(true);
       expect(found?.paidDate).toEqual(paidDate);
@@ -353,14 +359,14 @@ describe('SaleCreditOfflineService', () => {
     it('does NOT overwrite paid/isPaid/paidDate when the existing record is already paid', () => {
       const credit = createCredit('order-1', 'Ana', 50);
       service.paidSaleCredit(credit.id, PaymentType.Efectivo, '');
-      const paidBefore = service.getById(credit.id)!;
+      const paidBefore = findCredit(credit.id)!;
       service.updateImportedSaleCredit({
         ...paidBefore,
         paid: 999,
         isPaid: false,
         paidDate: new Date('2024-05-01T00:00:00.000'),
       });
-      const found = service.getById(credit.id);
+      const found = findCredit(credit.id);
       expect(found?.paid).toBe(paidBefore.paid);
       expect(found?.isPaid).toBe(paidBefore.isPaid);
       expect(found?.paidDate).toEqual(paidBefore.paidDate);
@@ -385,31 +391,7 @@ describe('SaleCreditOfflineService', () => {
         updatedByName: undefined,
       });
       expect(result.succeeded).toBe(true);
-      expect(service.getById('missing-id')).toBeUndefined();
-    });
-  });
-
-  describe('SC-04: getAll', () => {
-    it('returns empty array initially', () => {
-      expect(service.getAll()).toEqual([]);
-    });
-
-    it('returns all created credits', () => {
-      createCredit('o1', 'A', 10);
-      createCredit('o2', 'B', 20);
-      expect(service.getAll()).toHaveLength(2);
-    });
-  });
-
-  describe('SC-05: getById', () => {
-    it('returns undefined for unknown id', () => {
-      expect(service.getById('nonexistent')).toBeUndefined();
-    });
-
-    it('returns the correct credit', () => {
-      const c = createCredit('o1', 'Ana', 100);
-      const found = service.getById(c.id);
-      expect(found?.id).toBe(c.id);
+      expect(findCredit('missing-id')).toBeUndefined();
     });
   });
 
@@ -534,22 +516,6 @@ describe('SaleCreditOfflineService', () => {
     });
   });
 
-  // WU2 (offline-online-service-parity, Slice 2b): delete(id) is a BaseService<SaleCredit>
-  // seam OUTSIDE the A/B/C/D conversion (ADR-1). Delegates to the real domain command
-  // deleteSaleCredit and THROWS on failure — behavior change (silent no-op → throw),
-  // flagged mismatch #7 (mirrors the Expense-slice precedent).
-  describe('SC-13: delete is a BaseService<SaleCredit> seam over deleteSaleCredit (throws on missing id)', () => {
-    it('sets isActive=false, same as deleteSaleCredit', () => {
-      const credit = createCredit('order-1', 'Ana', 100);
-      service.delete(credit.id);
-      expect(service.getById(credit.id)?.isActive).toBe(false);
-    });
-
-    it('throws for a missing id (behavior change: was a silent no-op)', () => {
-      expect(() => service.delete('missing-id')).toThrow();
-    });
-  });
-
   // Test-only helper: `createSaleCredit` always stamps `date: now`, so to exercise
   // financial-window methods we backdate the persisted record directly (same
   // localStorage-rewrite technique already used by SC-09's "excludes credits not
@@ -585,7 +551,7 @@ describe('SaleCreditOfflineService', () => {
     });
 
     it('auto-writes an empty array on the first empty read, without throwing', () => {
-      expect(() => service.getAll()).not.toThrow();
+      expect(() => service.getStorageSaleCredits()).not.toThrow();
       const raw = localStorage.getItem('lizoft.store-saleCredits-s1');
       expect(raw).toBe('[]');
     });
@@ -597,8 +563,8 @@ describe('SaleCreditOfflineService', () => {
       );
       const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
 
-      service.getAll();
-      service.getAll();
+      service.getStorageSaleCredits();
+      service.getStorageSaleCredits();
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === 'lizoft.store-saleCredits-s1');
       expect(callsForKey).toHaveLength(1);
@@ -627,7 +593,7 @@ describe('SaleCreditOfflineService', () => {
       localStorage.setItem('lizoft.store-saleCredits-s1', raw);
 
       const freshService = new SaleCreditOfflineService(storeId);
-      const found = freshService.getById('sc1');
+      const found = freshService.getStorageSaleCredits().find((c) => c.id === 'sc1');
       expect(found?.date).toBeInstanceOf(Date);
       expect(found?.paidDate).toBeInstanceOf(Date);
       expect(found?.createdDate).toBeInstanceOf(Date);
