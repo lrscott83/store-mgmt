@@ -158,6 +158,20 @@ change.
 - WHEN the same import runs after `BaseRepository` is replaced by sync-local shims
 - THEN the same revert MUST occur with the same resulting merged/reverted data
 
+### Requirement: Sync Structural Readers Re-Point To Faithful Accessors
+
+`data-synchronizer-service.ts:335` and the structural `OrderReader`/`ExpenseReader`/`SaleCreditReader` interfaces declared in `data-serializer-service.ts` (lines 87/91/95, invoked at 150-152) MUST call the injected offline service's Angular-faithful accessor instead of `getAll()`, with sync orchestration, wire format, and import behavior unchanged. The offline service `ExpenseImportService.getAll()` method (line 123 in data-synchronizer-service.ts) MUST ALSO be renamed to `getStorageExpenses()` to maintain consistency. This mirrors the sync re-home pattern established in the BaseRepository elimination (commit 355b31b) — re-point without altering orchestration.
+
+#### Scenario: Data synchronizer re-points its expense call
+- GIVEN `data-synchronizer-service.ts:335` currently calling `expenseService.getAll()`
+- WHEN re-pointed to `expenseService.getStorageExpenses()`
+- THEN sync orchestration output is unchanged
+
+#### Scenario: Structural readers satisfy their interface via the faithful method
+- GIVEN `OrderReader`/`ExpenseReader`/`SaleCreditReader` interfaces currently requiring a `getAll()`-shaped method
+- WHEN the interfaces are updated to require the Angular-faithful method name, satisfied by the already-injected offline services
+- THEN `data-serializer-service.ts:150-152` compiles and serializes with no behavior change
+
 ## Out of Scope
 
 The following Angular features are DEAD (no live call sites or never-rendered UI) and MUST NOT be ported:
