@@ -1492,4 +1492,25 @@ describe('InventoryOfflineService', () => {
       expect(p2Entry.isActive).toBe(true);
     });
   });
+
+  describe('getInventoryEntriesJson — raw passthrough (WU2, inventory-offline.service.ts:494-496)', () => {
+    it('returns the literal "{}" fallback when no key exists in storage', () => {
+      expect(service.getInventoryEntriesJson()).toBe('{}');
+    });
+
+    it('returns the raw stored string unmodified when data exists (no parse/re-serialize round-trip)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1')]);
+      seedInventory(storeId, map);
+      const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`)!;
+
+      expect(service.getInventoryEntriesJson()).toBe(raw);
+    });
+
+    it('returns corrupt/malformed stored data AS-IS — raw passthrough, NOT silently emptied (unlike the deleted InventoryRepository.getAll, which swallowed parse errors into an empty Map)', () => {
+      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, '{not valid json');
+
+      expect(service.getInventoryEntriesJson()).toBe('{not valid json');
+    });
+  });
 });

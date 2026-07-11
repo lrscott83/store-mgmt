@@ -1,7 +1,6 @@
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { InventoryRepository } from '~/inventory/lib/repositories/inventory-repository';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -33,10 +32,17 @@ export function ImportPage() {
   async function handleImport(file: File, password: string): Promise<SyncResult> {
     // Build serializer (read-only side). Categories/products are read via the
     // repositories directly (Angular parity, Flag #2 — raw stored-JSON
-    // pass-through), not the offline services.
+    // pass-through), not the offline services. Inventory's read side reuses the
+    // same InventoryOfflineService instance the write side constructs below
+    // (rule 12 — InventoryRepository has no Angular correlate, deleted; serializer.import()
+    // never actually calls getInventoryEntriesJson(), only serializer.export() does, so any
+    // valid instance satisfies the constructor — no second instance needed).
     const categoryRepoForSerializer = new ProductCategoryRepository(storeId);
     const productRepoForSerializer = new ProductRepository(storeId, categoryRepoForSerializer);
-    const inventoryRepo = new InventoryRepository(storeId);
+    const inventorySvc = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
     const orderSvc = new OrderOfflineService(storeId);
     const expenseSvc = new ExpenseOfflineService(storeId);
     const creditSvc = new SaleCreditOfflineService(storeId);
@@ -45,7 +51,7 @@ export function ImportPage() {
       storeId,
       categoryRepoForSerializer,
       productRepoForSerializer,
-      inventoryRepo,
+      inventorySvc,
       orderSvc,
       expenseSvc,
       creditSvc,
@@ -69,11 +75,8 @@ export function ImportPage() {
     const orderRepo = makeOrderRepoShim();
     // Inventory + Expenses route through their offline SERVICES (Angular parity: the
     // synchronizer calls inventorySvc.addImportedEntries/updateImportedEntries and
-    // expenseSvc.addImportedExpense/updateImportedExpense, not raw repos).
-    const inventorySvc = new InventoryOfflineService(
-      storeId,
-      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
-    );
+    // expenseSvc.addImportedExpense/updateImportedExpense, not raw repos). `inventorySvc`
+    // is the same instance constructed above for the serializer's read side (WU2).
     const saleCreditRepo = makeSaleCreditRepoShim();
 
     const synchronizer = new DataSynchronizerService(

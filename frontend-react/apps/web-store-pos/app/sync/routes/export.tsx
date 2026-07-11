@@ -3,7 +3,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
-import { InventoryRepository } from '~/inventory/lib/repositories/inventory-repository';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
@@ -18,9 +18,14 @@ export function ExportPage() {
   async function handleExport(password: string): Promise<Uint8Array> {
     // Categories/products are read via the repositories directly (Angular
     // parity, Flag #2 — raw stored-JSON pass-through), not the offline services.
+    // Inventory's read side goes through InventoryOfflineService.getInventoryEntriesJson()
+    // (rule 12 — InventoryRepository has no Angular correlate, deleted).
     const categoryRepo = new ProductCategoryRepository(storeId);
     const productRepo = new ProductRepository(storeId, categoryRepo);
-    const inventoryRepo = new InventoryRepository(storeId);
+    const inventorySvc = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
     const orderSvc = new OrderOfflineService(storeId);
     const expenseSvc = new ExpenseOfflineService(storeId);
     const creditSvc = new SaleCreditOfflineService(storeId);
@@ -29,7 +34,7 @@ export function ExportPage() {
       storeId,
       categoryRepo,
       productRepo,
-      inventoryRepo,
+      inventorySvc,
       orderSvc,
       expenseSvc,
       creditSvc,

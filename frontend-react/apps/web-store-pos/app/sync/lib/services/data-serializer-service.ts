@@ -79,8 +79,14 @@ export interface ParsedData {
 // Service dependencies (injected as interfaces to keep service unit-testable)
 // ---------------------------------------------------------------------------
 
+/**
+ * WU2 (rule 12 — eliminate-inventory-repository): mirrors Angular's
+ * `InventoryOfflineService.getInventoryEntriesJson()` (a raw-string reader),
+ * not a repository `getAll()` (Map-returning) reader — matches the
+ * already-ratified `getCategoriesJson`/`getProductsJson` pattern (Flag #2).
+ */
 export interface InventoryReader {
-  getAll(storeId: string): Map<string, InventoryEntry[]>;
+  getInventoryEntriesJson(): string;
 }
 
 export interface OrderReader {
@@ -129,7 +135,7 @@ export class DataSerializerService {
     private readonly storeId: string,
     private readonly categoryRepository: ProductCategoryRepository,
     private readonly productRepository: ProductRepository,
-    private readonly inventoryRepo: InventoryReader,
+    private readonly inventoryService: InventoryReader,
     private readonly orderReader: OrderReader,
     private readonly expenseReader: ExpenseReader,
     private readonly saleCreditReader: SaleCreditReader,
@@ -146,7 +152,6 @@ export class DataSerializerService {
    * entries in a single ZIP, matching Angular's `serializeEncryptedZip`.
    */
   async export(password: string): Promise<Uint8Array> {
-    const inventoryMap = this.inventoryRepo.getAll(this.storeId);
     const orders = this.orderReader.getStorageOrders();
     const expenses = this.expenseReader.getStorageExpenses();
     const saleCredits = this.saleCreditReader.getStorageSaleCredits();
@@ -165,7 +170,12 @@ export class DataSerializerService {
     // a valid empty-array fallback instead of reproducing that crash.
     const categoriesJson = this.categoryRepository.getCategoriesJson() ?? '[]';
     const productsJson = this.productRepository.getProductsJson() ?? '[]';
-    const inventoryJson = JSON.stringify(Array.from(inventoryMap.entries()));
+    // Angular parity (data-serializer.service.ts:85): raw passthrough from
+    // InventoryOfflineService.getInventoryEntriesJson() — no Map rebuild, no
+    // re-serialize. Matches the Flag #2 pattern above; fixes the rule-10/12
+    // defect where the deleted InventoryRepository.getAll() silently
+    // swallowed corrupt localStorage into an empty Map on export.
+    const inventoryJson = this.inventoryService.getInventoryEntriesJson();
     const ordersJson = JSON.stringify(orders);
     const expensesJson = JSON.stringify(expenses);
     const saleCreditsJson = JSON.stringify(saleCredits);

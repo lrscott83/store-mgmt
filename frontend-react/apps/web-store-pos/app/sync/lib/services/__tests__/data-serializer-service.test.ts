@@ -140,6 +140,16 @@ function makeInventoryMap(entries: InventoryEntry[]): Map<string, InventoryEntry
 }
 
 /**
+ * WU2: `InventoryReader` is now a raw-JSON-string reader (mirrors
+ * `InventoryOfflineService.getInventoryEntriesJson()`), not a Map-returning
+ * `getAll()` reader — build the exact Map-entries wire-format string a real
+ * service would produce.
+ */
+function makeInventoryJson(entries: InventoryEntry[]): string {
+  return JSON.stringify(Array.from(makeInventoryMap(entries).entries()));
+}
+
+/**
  * Categories/products are now read by `DataSerializerService` straight from
  * the repository's raw stored JSON (Flag #2 re-point — no more in-memory
  * `getAll()` reader mocks), so fixtures seed real `localStorage` in the exact
@@ -180,7 +190,7 @@ function makeService(
   const categoryRepository = new ProductCategoryRepository(storeId);
   const productRepository = new ProductRepository(storeId, categoryRepository);
   const inventoryReader: InventoryReader = {
-    getAll: (_storeId: string) => makeInventoryMap(inv),
+    getInventoryEntriesJson: () => makeInventoryJson(inv),
   };
   const orderReader: OrderReader = { getStorageOrders: () => ords };
   const expenseReader: ExpenseReader = { getStorageExpenses: () => exps };
@@ -221,7 +231,7 @@ function makeServiceWithUnseededCategoriesAndProducts(
   const categoryRepository = new ProductCategoryRepository(storeId);
   const productRepository = new ProductRepository(storeId, categoryRepository);
   const inventoryReader: InventoryReader = {
-    getAll: (_storeId: string) => makeInventoryMap(inv),
+    getInventoryEntriesJson: () => makeInventoryJson(inv),
   };
   const orderReader: OrderReader = { getStorageOrders: () => ords };
   const expenseReader: ExpenseReader = { getStorageExpenses: () => exps };
@@ -389,6 +399,52 @@ describe('DataSerializerService', () => {
       const creditsEntry = entries.find((e) => e.filename === 'sale-credits.json');
       const creditsParsed = JSON.parse(await getEntryText(creditsEntry!)) as SaleCredit[];
       expect(creditsParsed[0].id).toBe('credit-1');
+    });
+
+    it('exports inventory-entries.json as the RAW string returned by getInventoryEntriesJson() — passthrough, not a repository getAll()+Map-rebuild+stringify sequence (WU2)', async () => {
+      const categoryRepository = new ProductCategoryRepository(STORE_ID);
+      const productRepository = new ProductRepository(STORE_ID, categoryRepository);
+      seedCategories(STORE_ID, [mockCategory]);
+      seedProducts(STORE_ID, [mockProduct]);
+      const rawInventoryJson = '[["prod-1",[{"id":"inv-1","weird":true}]]]';
+      const inventoryReader: InventoryReader = { getInventoryEntriesJson: () => rawInventoryJson };
+      const svc = new DataSerializerService(
+        STORE_ID,
+        categoryRepository,
+        productRepository,
+        inventoryReader,
+        { getStorageOrders: () => [] },
+        { getStorageExpenses: () => [] },
+        { getStorageSaleCredits: () => [] },
+      );
+
+      const payload = await svc.export(PASSWORD);
+      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const invEntry = entries.find((e) => e.filename === 'inventory-entries.json')!;
+      expect(await getEntryText(invEntry)).toBe(rawInventoryJson);
+    });
+
+    it('exports corrupt/malformed inventory JSON AS-IS, NOT silently emptied (parity fix vs the deleted InventoryRepository.getAll, which swallowed parse errors to an empty Map)', async () => {
+      const categoryRepository = new ProductCategoryRepository(STORE_ID);
+      const productRepository = new ProductRepository(STORE_ID, categoryRepository);
+      seedCategories(STORE_ID, [mockCategory]);
+      seedProducts(STORE_ID, [mockProduct]);
+      const corrupt = '{not valid json';
+      const inventoryReader: InventoryReader = { getInventoryEntriesJson: () => corrupt };
+      const svc = new DataSerializerService(
+        STORE_ID,
+        categoryRepository,
+        productRepository,
+        inventoryReader,
+        { getStorageOrders: () => [] },
+        { getStorageExpenses: () => [] },
+        { getStorageSaleCredits: () => [] },
+      );
+
+      const payload = await svc.export(PASSWORD);
+      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const invEntry = entries.find((e) => e.filename === 'inventory-entries.json')!;
+      expect(await getEntryText(invEntry)).toBe(corrupt);
     });
   });
 

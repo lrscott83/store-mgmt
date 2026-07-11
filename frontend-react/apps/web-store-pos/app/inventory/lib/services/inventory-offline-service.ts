@@ -880,6 +880,20 @@ export class InventoryOfflineService {
   }
 
   /**
+   * 1:1 port of Angular's `getInventoryEntriesJson` (inventory-offline.service.ts:494-496).
+   * Raw passthrough of the stored value — no parse, no Map rebuild, no re-serialize
+   * round-trip. Used by the sync export path (DataSerializerService) so corrupt/malformed
+   * stored data is exported AS-IS instead of being silently swallowed to an empty result
+   * (that was the deleted InventoryRepository.getAll's behavior — a rule-10/12 defect).
+   * Unlike getProductsJson/getCategoriesJson (raw `string | null`, no fallback), this one has
+   * a genuine Angular quirk: `|| "{}"` returns the literal string `"{}"` (NOT `"[]"`) when the
+   * key is missing — ported literally, not "fixed".
+   */
+  getInventoryEntriesJson(): string {
+    return localStorage.getItem(this.getStorageKey()) || '{}';
+  }
+
+  /**
    * Private port of Angular `getInventoriesFromLocalStorage`
    * (inventory-offline.service.ts:535-554) — on empty/missing/`'{}'`/unparsable storage,
    * auto-initializes by writing an empty Map before returning it. Revives ONLY `date` to a

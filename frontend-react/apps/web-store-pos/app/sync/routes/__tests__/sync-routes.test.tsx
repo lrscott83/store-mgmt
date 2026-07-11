@@ -43,14 +43,9 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 // ProductOfflineService for the DataSerializerService (Flag #2 re-point —
 // ProductCategoryRepository/ProductRepository now, real classes backed by
 // jsdom localStorage; no mock needed since these smoke tests never invoke
-// handleExport/handleImport).
-
-vi.mock('~/inventory/lib/repositories/inventory-repository', () => ({
-  InventoryRepository: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue(new Map()),
-    save: vi.fn(),
-  })),
-}));
+// handleExport/handleImport). Inventory's read side is InventoryOfflineService
+// (rule 12 — InventoryRepository has no Angular correlate, deleted in WU3) —
+// also unmocked, real class backed by jsdom localStorage, same reasoning.
 
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
