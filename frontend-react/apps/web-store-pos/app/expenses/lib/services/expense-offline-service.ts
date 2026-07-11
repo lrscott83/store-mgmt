@@ -1,4 +1,4 @@
-import type { BaseResponseModel, BaseService, Expense } from '@store-mgmt/domain';
+import type { BaseResponseModel, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
 import { DataResult, ExpenseErrors, Result, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
@@ -26,7 +26,7 @@ interface CreateExpenseInput {
  * are UNCHANGED from current React behavior (Decision Gate — Angular's own `date`-only
  * revival + `paymentType` normalization are a separate, out-of-scope fix-vs-replicate call).
  */
-export class ExpenseOfflineService implements BaseService<Expense> {
+export class ExpenseOfflineService {
   private expenses: Expense[] | null = null;
   private lastExpensesKey: string | undefined;
 
@@ -44,14 +44,6 @@ export class ExpenseOfflineService implements BaseService<Expense> {
     return this.expenses;
   }
 
-  getAll(): Expense[] {
-    return this.getStorageExpenses();
-  }
-
-  getById(id: string): Expense | undefined {
-    return this.getStorageExpenses().find((e) => e.id === id);
-  }
-
   /**
    * WU3 (category B): returns SYNC `BaseResponseModel<Expense[]>` (via `success(...)`), matching
    * Angular's `getExpensesInDay` (`this.Success(...)`, sync — never async). Emits the day's ACTIVE
@@ -67,7 +59,7 @@ export class ExpenseOfflineService implements BaseService<Expense> {
   getExpensesInDay(date: Date): BaseResponseModel<Expense[]> {
     const startDate = startOfDay(date);
     const endDate = addDays(startDate, 1);
-    const filtered = this.getAll()
+    const filtered = this.getStorageExpenses()
       .filter((e) => e.isActive && e.date >= startDate && e.date < endDate)
       .sort((e1, e2) => e2.date.getTime() - e1.date.getTime());
     return success(filtered);
@@ -79,7 +71,7 @@ export class ExpenseOfflineService implements BaseService<Expense> {
    * private `getActiveExpensesBetweenDates`.
    */
   private activeExpensesBetween(start: Date, end: Date): Expense[] {
-    return this.getAll().filter((e) => e.isActive && e.date >= start && e.date < end);
+    return this.getStorageExpenses().filter((e) => e.isActive && e.date >= start && e.date < end);
   }
 
   getActiveExpensesPriceBetweenDates(start: Date, end: Date): number {
@@ -103,7 +95,7 @@ export class ExpenseOfflineService implements BaseService<Expense> {
    * upper-window constraint besides `date < threshold`, no lower bound).
    */
   getExpensesTotalBefore(date: Date): number {
-    return this.getAll()
+    return this.getStorageExpenses()
       .filter((e) => e.isActive && e.date < date)
       .reduce((sum, e) => sum + e.total, 0);
   }
@@ -132,7 +124,7 @@ export class ExpenseOfflineService implements BaseService<Expense> {
     startDate?: Date,
     endDate?: Date,
   ): Promise<BaseResponseModel<Expense[]>> {
-    const filtered = this.getAll().filter(
+    const filtered = this.getStorageExpenses().filter(
       (e) =>
         e.isActive &&
         (!expenseType || expenseType === e.type) &&
@@ -254,21 +246,6 @@ export class ExpenseOfflineService implements BaseService<Expense> {
       this.setExpensesLocalStorage(this.expenses!);
     }
     return Result.Success();
-  }
-
-  /**
-   * BaseService<Expense> `delete()` seam (ADR-1, Slice-1 precedent): stays a SYNC React-only
-   * contract OUTSIDE the A/B/C/D conversion. Delegates to the real domain command
-   * {@link deleteExpense} and THROWS on failure (so a missing id surfaces as an error rather
-   * than leaking a `Result` through the `BaseService<T>` surface). Production UI uses the
-   * fire-and-forget `deleteExpense` directly (Angular parity); this seam exists for interface
-   * conformance.
-   */
-  delete(id: string): void {
-    const result = this.deleteExpense(id);
-    if (!result.succeeded) {
-      throw new Error(result.errors[0]?.description ?? `Expense could not be deleted: ${id}`);
-    }
   }
 
   /** Private port of Angular `setExpensesLocalStorage` (expense-offline.service.ts:200-203) — plain-array write. */

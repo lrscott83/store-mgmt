@@ -49,6 +49,12 @@ describe('ExpenseOfflineService', () => {
     return svc.create(makeExpenseInput(overrides)).data!;
   }
 
+  // WU2 (baseservice-parity): getById() was removed (zero prod call-sites, rule 12) — tests
+  // that only needed a by-id lookup (not testing getById itself) use this helper instead.
+  function findExpense(id: string): Expense | undefined {
+    return svc.getStorageExpenses().find((e) => e.id === id);
+  }
+
   beforeEach(() => {
     localStorage.clear();
     useAuthStore.setState({ user: makeUser({ login: 'jdoe' }), isAuthenticated: true, isLoading: false, error: null });
@@ -73,7 +79,7 @@ describe('ExpenseOfflineService', () => {
     });
 
     it('auto-writes an empty array on the first empty read, without throwing', () => {
-      expect(() => svc.getAll()).not.toThrow();
+      expect(() => svc.getStorageExpenses()).not.toThrow();
       const raw = localStorage.getItem(`lizoft.store-expenses-${storeId}`);
       expect(raw).toBe('[]');
     });
@@ -85,8 +91,8 @@ describe('ExpenseOfflineService', () => {
       );
       const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
 
-      svc.getAll();
-      svc.getAll();
+      svc.getStorageExpenses();
+      svc.getStorageExpenses();
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === `lizoft.store-expenses-${storeId}`);
       expect(callsForKey).toHaveLength(1);
@@ -113,7 +119,7 @@ describe('ExpenseOfflineService', () => {
       );
 
       const freshSvc = new ExpenseOfflineService(storeId);
-      const found = freshSvc.getById('e1');
+      const found = freshSvc.getStorageExpenses().find((e) => e.id === 'e1');
       expect(found?.date).toBeInstanceOf(Date);
       expect(found?.createdDate).toBeInstanceOf(Date);
       expect(found?.updatedDate).toBeInstanceOf(Date);
@@ -131,7 +137,7 @@ describe('ExpenseOfflineService', () => {
     expect(result.data!.id).toBeTruthy();
     expect(result.data!.type).toBe(ExpenseType.Comida);
     expect(result.data!.total).toBe(50);
-    const all = svc.getAll();
+    const all = svc.getStorageExpenses();
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe(result.data!.id);
   });
@@ -144,15 +150,6 @@ describe('ExpenseOfflineService', () => {
     expect('actionCode' in result).toBe(false);
   });
 
-  // S-EXP-2: getById returns created expense
-  it('S-EXP-2: getById returns the correct expense', () => {
-    const created = create();
-    const found = svc.getById(created.id);
-    expect(found).toBeDefined();
-    expect(found!.id).toBe(created.id);
-    expect(found!.total).toBe(50);
-  });
-
   // S-EXP-3: update returns a succeeded DataResult with the modified fields.
   it('S-EXP-3: update returns a succeeded DataResult and modifies expense fields', () => {
     const created = create();
@@ -160,7 +157,7 @@ describe('ExpenseOfflineService', () => {
     expect(result.succeeded).toBe(true);
     expect(result.data!.total).toBe(99);
     expect(result.data!.note).toBe('updated');
-    expect(svc.getById(created.id)!.total).toBe(99);
+    expect(findExpense(created.id)!.total).toBe(99);
   });
 
   // Angular parity (audit-user-threading): create stamps createdByName from the
@@ -195,7 +192,7 @@ describe('ExpenseOfflineService', () => {
   it('update does not persist changes for a missing id', () => {
     create();
     svc.update('nonexistent-id', { total: 5 });
-    expect(svc.getAll()).toHaveLength(1);
+    expect(svc.getStorageExpenses()).toHaveLength(1);
   });
 
   // ─── Category D: deleteExpense returns Result (soft-delete) ─────────────────
@@ -208,11 +205,11 @@ describe('ExpenseOfflineService', () => {
     const result = svc.deleteExpense(created.id);
     expect(result.succeeded).toBe(true);
     expect(result.errors).toEqual([]);
-    const all = svc.getAll();
+    const all = svc.getStorageExpenses();
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe(created.id);
     expect(all[0].isActive).toBe(false);
-    expect(svc.getById(created.id)?.isActive).toBe(false);
+    expect(findExpense(created.id)?.isActive).toBe(false);
   });
 
   // deleteExpense's Result MUST NOT be a BaseResponseModel/DataResult (no data/message fields).
@@ -227,14 +224,14 @@ describe('ExpenseOfflineService', () => {
   it('S-EXP-4a: deleteExpense sets updatedDate', () => {
     const created = create();
     svc.deleteExpense(created.id);
-    expect(svc.getById(created.id)?.updatedDate).toBeInstanceOf(Date);
+    expect(findExpense(created.id)?.updatedDate).toBeInstanceOf(Date);
   });
 
   // Angular parity (audit-user-threading): deleteExpense (soft-delete) stamps updatedByName.
   it('stamps updatedByName with the authenticated user login on deleteExpense', () => {
     const created = create();
     svc.deleteExpense(created.id);
-    expect(svc.getById(created.id)?.updatedByName).toBe('jdoe');
+    expect(findExpense(created.id)?.updatedByName).toBe('jdoe');
   });
 
   // Angular parity: deleteExpense returns Result.Failure([ExpenseErrors.NotExists]) on a missing
@@ -244,21 +241,7 @@ describe('ExpenseOfflineService', () => {
     const result = svc.deleteExpense('nonexistent-id');
     expect(result.succeeded).toBe(false);
     expect(result.errors).toEqual([ExpenseErrors.NotExists]);
-    expect(svc.getAll()).toHaveLength(1);
-  });
-
-  // ─── BaseService<Expense> delete() seam (ADR-1, Slice-1 precedent) ──────────
-  // delete() stays a SYNC React-only seam that delegates to deleteExpense and THROWS on failure
-  // (outside the A/B/C/D conversion). Behavior change vs. the old hard-delete no-op: it now throws
-  // for a missing id (the real domain command deleteExpense is the fire-and-forget UI path).
-  it('delete() seam soft-deletes via deleteExpense', () => {
-    const created = create();
-    svc.delete(created.id);
-    expect(svc.getById(created.id)?.isActive).toBe(false);
-  });
-
-  it('delete() seam throws for a missing id (Slice-1 precedent)', () => {
-    expect(() => svc.delete('nonexistent-id')).toThrow();
+    expect(svc.getStorageExpenses()).toHaveLength(1);
   });
 
   // ─── Category D: addImportedExpense / updateImportedExpense return Result ────
@@ -281,7 +264,7 @@ describe('ExpenseOfflineService', () => {
     const result = svc.addImportedExpense(imported);
     expect(result.succeeded).toBe(true);
     expect(result.errors).toEqual([]);
-    const all = svc.getAll();
+    const all = svc.getStorageExpenses();
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe('imp-1');
     expect(all[0].date).toBeInstanceOf(Date);
@@ -299,7 +282,7 @@ describe('ExpenseOfflineService', () => {
     };
     const result = svc.updateImportedExpense(patch);
     expect(result.succeeded).toBe(true);
-    const stored = svc.getById(created.id)!;
+    const stored = findExpense(created.id)!;
     expect(stored.total).toBe(77);
     expect(stored.note).toBe('merged');
     expect(stored.isActive).toBe(false);
@@ -322,7 +305,7 @@ describe('ExpenseOfflineService', () => {
     };
     const result = svc.updateImportedExpense(patch);
     expect(result.succeeded).toBe(true);
-    expect(svc.getAll()).toHaveLength(1);
+    expect(svc.getStorageExpenses()).toHaveLength(1);
   });
 
   // ─── Category B: getExpensesInDay returns BaseResponseModel<Expense[]> SYNC ──
