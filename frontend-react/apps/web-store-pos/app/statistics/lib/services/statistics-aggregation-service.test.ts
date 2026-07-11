@@ -72,7 +72,7 @@ describe('StatisticsAggregationService', () => {
   const TODAY = new Date('2026-05-28T12:00:00.000Z');
 
   let mockOrderService: { getByDateRange: ReturnType<typeof vi.fn> };
-  let mockInventoryService: { getAll: ReturnType<typeof vi.fn> };
+  let mockInventoryService: { getActiveInventoryEntriesStorage: ReturnType<typeof vi.fn> };
   let mockExpenseService: { getActiveExpensesPriceBetweenDates: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -82,7 +82,7 @@ describe('StatisticsAggregationService', () => {
       getByDateRange: vi.fn().mockReturnValue([]),
     };
     mockInventoryService = {
-      getAll: vi.fn().mockReturnValue([]),
+      getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
     };
     mockExpenseService = {
       getActiveExpensesPriceBetweenDates: vi.fn().mockReturnValue(0),

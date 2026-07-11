@@ -56,11 +56,11 @@ export class ReportAggregationService {
     const totalProfit = totalRevenue - totalCost;
 
     // available = sum of InventoryEntry.available per productId (REP-5).
-    // InventoryOfflineService.getAll() returns InventoryEntryView[] which
-    // includes productName. We access the underlying available field via cast
-    // since InventoryEntryView deliberately omits it (UI view only).
+    // InventoryOfflineService.getActiveInventoryEntriesStorage() returns
+    // InventoryEntryView[] which includes productName. We access the underlying
+    // available field via cast since InventoryEntryView deliberately omits it (UI view only).
     type EntryWithAvailable = { productId: string; productName: string; available: number };
-    const inventoryEntries = this.inventoryService.getAll() as unknown as EntryWithAvailable[];
+    const inventoryEntries = this.inventoryService.getActiveInventoryEntriesStorage() as unknown as EntryWithAvailable[];
 
     const availableMap = new Map<string, { productName: string; available: number }>();
     for (const entry of inventoryEntries) {

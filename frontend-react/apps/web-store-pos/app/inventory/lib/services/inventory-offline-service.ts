@@ -1,6 +1,5 @@
 import type {
   BaseResponseModel,
-  BaseService,
   InventoryEntry,
   InventoryEntryCost,
   InventoryEntryView,
@@ -97,7 +96,7 @@ function generateId(): string {
  *
  * Spec §6.3; Scenarios S-I1 through S-I6.
  */
-export class InventoryOfflineService implements BaseService<InventoryEntryView> {
+export class InventoryOfflineService {
   private readonly repo: InventoryRepository;
 
   /**
@@ -116,11 +115,14 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
   // ─── Read methods ────────────────────────────────────────────────────────
 
   /**
-   * Returns all active inventory entries as InventoryEntryView[].
-   * productName is empty string since we don't have a product service here —
-   * callers that need product names should enrich at the container level.
+   * 1:1 port of Angular's `getActiveInventoryEntriesStorage`
+   * (inventory-offline.service.ts:226) — returns all active inventory entries as
+   * InventoryEntryView[]. productName is empty string since we don't have a product
+   * service here — callers that need product names should enrich at the container
+   * level (pre-existing body divergence vs. Angular's own productName enrichment,
+   * out of scope for this rename — migrate ≠ optimize).
    */
-  getAll(): InventoryEntryView[] {
+  getActiveInventoryEntriesStorage(): InventoryEntryView[] {
     const map = this.repo.getAll(this.storeId);
     const result: InventoryEntryView[] = [];
     for (const [productId, entries] of map) {
@@ -151,26 +153,6 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
   }
 
   /**
-   * BaseService<InventoryEntryView> conformance. Returns the matching entry as an
-   * InventoryEntryView regardless of `isActive` (unfiltered by active status, matching
-   * the other offline services' getById behavior — only getAll() filters to active-only).
-   */
-  getById(id: string): InventoryEntryView | undefined {
-    const found = this.repo.findEntryById(this.storeId, id);
-    if (!found) return undefined;
-    const { entry, productId } = found;
-    return {
-      id: entry.id,
-      productId,
-      productName: '',
-      quantity: entry.quantity,
-      costPrice: entry.costPrice,
-      date: entry.date,
-      isActive: entry.isActive,
-    };
-  }
-
-  /**
    * Returns active entries for a specific calendar day.
    *
    * WU3 (category B): returns SYNC BaseResponseModel<InventoryEntryView[]> (was a bare
@@ -180,7 +162,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
   getByDate(date: Date): BaseResponseModel<InventoryEntryView[]> {
     const dayStart = startOfDay(date);
     const dayEnd = startOfDay(addDays(date, 1));
-    const entries = this.getAll().filter(
+    const entries = this.getActiveInventoryEntriesStorage().filter(
       (v) => v.date >= dayStart && v.date < dayEnd,
     );
     return success(entries);
@@ -190,7 +172,8 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    * Returns available stock grouped by category → product.
    * Requires product records to be passed in so we can read categoryId/categoryName.
    * When called without products (default), returns an empty array —
-   * containers should call the product service separately and use getAll().
+   * containers should call the product service separately and use
+   * getActiveInventoryEntriesStorage().
    *
    * WU3 (category B): returns SYNC BaseResponseModel<InventoryCategoryView[]> (was a bare
    * array), matching Angular's getInventoryCategoriesView (`this.Success(...)`, sync,
@@ -287,7 +270,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     start?: Date,
     end?: Date,
   ): Promise<BaseResponseModel<InventoryEntryView[]>> {
-    const entries = this.getAll().filter(
+    const entries = this.getActiveInventoryEntriesStorage().filter(
       (v) =>
         (!productId || productId === v.productId) &&
         (!start || v.date >= start) &&
@@ -301,7 +284,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    * ACTIVE entries with `available > 0`, sorted by `order` ascending. Emits `id` (not
    * Angular's `inventoryId`) via domain's InventoryEntryCost. Zero-arg per spec
    * (offline-online-service-parity, spec-slice1); `productName` defaults to `''`
-   * (matches `getAll()`'s convention — this service has no ProductRepository
+   * (matches `getActiveInventoryEntriesStorage()`'s convention — this service has no ProductRepository
    * dependency; containers that need names enrich separately).
    *
    * WU4 (category C): converts to `Promise<BaseResponseModel<InventoryEntriesView[]>>`
@@ -489,7 +472,7 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
    * WU2 (category D): returns DataResult<InventoryEntryView> (was plain InventoryEntry),
    * matching Angular's createInventoryEntry sync DataResult return — never throws.
    * productName is '' since the view here is not enriched with the product name (matches
-   * getAll's convention).
+   * getActiveInventoryEntriesStorage's convention).
    *
    * Product-existence guard (Angular parity, createInventoryEntry:60-64): when the product
    * does not exist, Angular returns bare `null` (NOT a DataResult) before creating anything —
@@ -628,25 +611,6 @@ export class InventoryOfflineService implements BaseService<InventoryEntryView> 
     this.repo.save(this.storeId, storedProductId ?? productId, allForProduct);
 
     return Result.Success();
-  }
-
-  /**
-   * BaseService<InventoryEntryView> conformance alias for {@link deactivate}. Looks up
-   * the owning productId via `findEntryById` (deactivate normally requires the caller to
-   * already know it) and delegates.
-   *
-   * WU2 (ADR-1): BaseService's `delete` seam stays a SYNC React-only contract that always
-   * throws on failure (outside the A/B/C/D category conversion) — adapted here to consume
-   * deactivate's new `Result` without leaking `Result` through the `BaseService<T>` surface.
-   */
-  delete(id: string): void {
-    const found = this.repo.findEntryById(this.storeId, id);
-    if (!found) throw new Error(`InventoryEntry not found: ${id}`);
-
-    const result = this.deactivate(id, found.productId);
-    if (!result.succeeded) {
-      throw new Error(result.errors[0]?.description ?? `InventoryEntry could not be deleted: ${id}`);
-    }
   }
 
   /**

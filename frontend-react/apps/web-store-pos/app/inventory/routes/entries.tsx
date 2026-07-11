@@ -94,7 +94,7 @@ export function EntriesPage() {
     const svc = new InventoryOfflineService(storeId, productRepository);
     const products = [...productRepository.getStorageProductsMap().values()];
     const productMap = new Map(products.map((p) => [p.id, p.name]));
-    const all = svc.getAll();
+    const all = svc.getActiveInventoryEntriesStorage();
     const enriched = all.map((e) => ({
       ...e,
       productName: productMap.get(e.productId) ?? e.productName,

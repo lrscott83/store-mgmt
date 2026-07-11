@@ -54,7 +54,7 @@ export function TodayEntriesPage() {
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
-    const all = svc.getAll();
+    const all = svc.getActiveInventoryEntriesStorage();
     const found = all.find((e) => e.id === entry.id);
     if (found) {
       // InventoryEntryView has different shape; reconstruct minimal InventoryEntry

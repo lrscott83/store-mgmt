@@ -547,9 +547,10 @@ describe('InventoryOfflineService', () => {
       seedInventory(storeId, map);
 
       service.deactivate('e1', 'p1');
-      const all = service.getAll();
+      const all = service.getActiveInventoryEntriesStorage();
       const found = all.find((v) => v.id === 'e1');
-      // After deactivation, it should not appear in getAll (which returns active entries only)
+      // After deactivation, it should not appear in getActiveInventoryEntriesStorage
+      // (which returns active entries only)
       expect(found).toBeUndefined();
     });
 
@@ -629,9 +630,9 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  describe('INV-07: getAll returns InventoryEntryView[] for active entries', () => {
+  describe('INV-07: getActiveInventoryEntriesStorage returns InventoryEntryView[] for active entries', () => {
     it('returns empty array when no entries', () => {
-      expect(service.getAll()).toEqual([]);
+      expect(service.getActiveInventoryEntriesStorage()).toEqual([]);
     });
 
     it('returns only active entries', () => {
@@ -642,7 +643,7 @@ describe('InventoryOfflineService', () => {
       ]);
       seedInventory(storeId, map);
 
-      const all = service.getAll();
+      const all = service.getActiveInventoryEntriesStorage();
       expect(all.every((v) => v.id !== 'e2')).toBe(true);
     });
   });
@@ -826,66 +827,6 @@ describe('InventoryOfflineService', () => {
 
       const results = service.getByDate(otherDate).data;
       expect(results).toHaveLength(0);
-    });
-  });
-
-  // WU1 (offline-online-service-parity, Slice 1): BaseService<InventoryEntryView>
-  // conformance. getAll() already returns InventoryEntryView[] and matches the
-  // interface as-is; getById/delete are new — delete is a thin wrapper over the
-  // existing deactivate(entryId, productId) validated soft-delete (looks up productId
-  // via findEntryById internally), preserving deactivate's exact semantics
-  // (throws when partially sold, stamps updatedByName).
-  describe('INV-11: getById — BaseService<InventoryEntryView> conformance', () => {
-    it('returns the matching entry as an InventoryEntryView', () => {
-      const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 7 })]);
-      seedInventory(storeId, map);
-
-      const found = service.getById('e1');
-      expect(found).toEqual({
-        id: 'e1',
-        productId: 'p1',
-        productName: '',
-        quantity: 10,
-        costPrice: 2.5,
-        date: new Date('2024-01-15T10:00:00.000Z'),
-        isActive: true,
-      });
-    });
-
-    it('returns undefined for a missing id', () => {
-      expect(service.getById('missing')).toBeUndefined();
-    });
-
-    it('returns an inactive entry too (unfiltered by isActive, matching other services getById)', () => {
-      const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { isActive: false })]);
-      seedInventory(storeId, map);
-
-      expect(service.getById('e1')?.isActive).toBe(false);
-    });
-  });
-
-  describe('INV-12: delete — BaseService<InventoryEntryView> conformance alias for deactivate', () => {
-    it('sets isActive=false, same as deactivate', () => {
-      const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
-      seedInventory(storeId, map);
-
-      service.delete('e1');
-      expect(service.getById('e1')?.isActive).toBe(false);
-    });
-
-    it('throws when the entry has been partially sold, same as deactivate', () => {
-      const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]);
-      seedInventory(storeId, map);
-
-      expect(() => service.delete('e1')).toThrow();
-    });
-
-    it('throws for a missing id', () => {
-      expect(() => service.delete('missing')).toThrow();
     });
   });
 

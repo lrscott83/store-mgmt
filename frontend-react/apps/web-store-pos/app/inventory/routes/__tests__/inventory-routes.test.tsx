@@ -29,7 +29,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
     getByDate: vi.fn().mockReturnValue(bm([])),
     getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
     getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
@@ -437,7 +437,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     vi.mocked(InventoryOfflineService).mockImplementation(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
           getByDate: vi.fn().mockReturnValue(bm(todayEntries)),
           getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
@@ -469,7 +469,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     vi.mocked(InventoryOfflineService).mockImplementation(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
           getByDate: getByDateMock,
           getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
@@ -502,7 +502,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     vi.mocked(InventoryOfflineService).mockImplementation(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
           getByDate: vi.fn().mockReturnValue(bm([])),
           getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
@@ -538,7 +538,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     vi.mocked(InventoryOfflineService).mockImplementation(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
           getByDate: getByDateMock,
           getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
@@ -634,7 +634,7 @@ function mockEntries(entries: InventoryEntryView[]) {
   vi.mocked(InventoryOfflineService).mockImplementationOnce(
     () =>
       ({
-        getAll: vi.fn().mockReturnValue(entries),
+        getActiveInventoryEntriesStorage: vi.fn().mockReturnValue(entries),
       }) as unknown as InstanceType<typeof InventoryOfflineService>,
   );
 }
@@ -1087,7 +1087,7 @@ describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)
     vi.mocked(InventoryOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
           getByDate: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
           getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
@@ -1113,7 +1113,7 @@ describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)
     vi.mocked(InventoryOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
           getByDate: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
           getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
@@ -1172,7 +1172,7 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
     vi.mocked(InventoryOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
           getByDate: vi.fn().mockReturnValue(bm([
             makeEntryView({ id: 'e1', productId: 'p1', quantity: 10, costPrice: 2 }),
             makeEntryView({ id: 'e2', productId: 'p1', quantity: 10, costPrice: 4 }),

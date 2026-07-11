@@ -70,7 +70,7 @@ function makeInventoryEntry(productId: string, available: number, id: string = '
 
 describe('ReportAggregationService', () => {
   let mockOrderService: { getActiveOrdersInDay: ReturnType<typeof vi.fn> };
-  let mockInventoryService: { getAll: ReturnType<typeof vi.fn> };
+  let mockInventoryService: { getActiveInventoryEntriesStorage: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,7 +79,7 @@ describe('ReportAggregationService', () => {
       getActiveOrdersInDay: vi.fn().mockReturnValue([]),
     };
     mockInventoryService = {
-      getAll: vi.fn().mockReturnValue([]),
+      getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
     };
 
     vi.mocked(OrderOfflineService).mockImplementation(() => mockOrderService as never);
@@ -183,7 +183,7 @@ describe('ReportAggregationService', () => {
     });
 
     it('available is empty array when no inventory entries exist', () => {
-      mockInventoryService.getAll.mockReturnValue([]);
+      mockInventoryService.getActiveInventoryEntriesStorage.mockReturnValue([]);
 
       const svc = new ReportAggregationService('store-1');
       const report = svc.getTodayReport();
@@ -193,7 +193,7 @@ describe('ReportAggregationService', () => {
 
     it('available sums InventoryEntry.available per productId (NOT product field)', () => {
       // Two entries for the same product with different available quantities
-      mockInventoryService.getAll.mockReturnValue([
+      mockInventoryService.getActiveInventoryEntriesStorage.mockReturnValue([
         { id: 'e1', productId: 'p1', productName: 'Product 1', quantity: 10, available: 7, costPrice: 5, date: new Date(), order: 0, isActive: true, createdDate: new Date(), createdByName: '', updatedDate: new Date(), updatedByName: '' },
         { id: 'e2', productId: 'p1', productName: 'Product 1', quantity: 5, available: 3, costPrice: 5, date: new Date(), order: 1, isActive: true, createdDate: new Date(), createdByName: '', updatedDate: new Date(), updatedByName: '' },
       ]);
@@ -208,7 +208,7 @@ describe('ReportAggregationService', () => {
     });
 
     it('available groups multiple products correctly', () => {
-      mockInventoryService.getAll.mockReturnValue([
+      mockInventoryService.getActiveInventoryEntriesStorage.mockReturnValue([
         { id: 'e1', productId: 'p1', productName: 'Product 1', quantity: 10, available: 5, costPrice: 5, date: new Date(), order: 0, isActive: true, createdDate: new Date(), createdByName: '', updatedDate: new Date(), updatedByName: '' },
         { id: 'e2', productId: 'p2', productName: 'Product 2', quantity: 8, available: 8, costPrice: 3, date: new Date(), order: 0, isActive: true, createdDate: new Date(), createdByName: '', updatedDate: new Date(), updatedByName: '' },
       ]);
@@ -224,7 +224,7 @@ describe('ReportAggregationService', () => {
     });
 
     it('available entries have productId and productName', () => {
-      mockInventoryService.getAll.mockReturnValue([
+      mockInventoryService.getActiveInventoryEntriesStorage.mockReturnValue([
         { id: 'e1', productId: 'prod-abc', productName: 'Manzana', quantity: 10, available: 4, costPrice: 2, date: new Date(), order: 0, isActive: true, createdDate: new Date(), createdByName: '', updatedDate: new Date(), updatedByName: '' },
       ]);
 
@@ -236,7 +236,7 @@ describe('ReportAggregationService', () => {
     });
 
     it('excludes products with zero available from the list', () => {
-      mockInventoryService.getAll.mockReturnValue([
+      mockInventoryService.getActiveInventoryEntriesStorage.mockReturnValue([
         { id: 'e1', productId: 'p1', productName: 'Product 1', quantity: 10, available: 0, costPrice: 5, date: new Date(), order: 0, isActive: true, createdDate: new Date(), createdByName: '', updatedDate: new Date(), updatedByName: '' },
         { id: 'e2', productId: 'p2', productName: 'Product 2', quantity: 5, available: 3, costPrice: 3, date: new Date(), order: 0, isActive: true, createdDate: new Date(), createdByName: '', updatedDate: new Date(), updatedByName: '' },
       ]);
