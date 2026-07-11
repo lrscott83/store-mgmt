@@ -24,12 +24,11 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
   ExpenseOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageExpenses: vi.fn().mockReturnValue([]),
     getExpensesInDayObservable: vi.fn().mockReturnValue(expensesResponse([])),
     create: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
     update: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
     deleteExpense: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
-    delete: vi.fn(),
   })),
 }));
 
@@ -106,7 +105,7 @@ describe('TodayExpensesPage — smoke render', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockImpl = () =>
       ({
-        getAll: vi.fn().mockReturnValue([expense]),
+        getStorageExpenses: vi.fn().mockReturnValue([expense]),
         getExpensesInDayObservable: vi.fn().mockReturnValue(expensesResponse([expense])),
         create: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
         update: vi.fn().mockReturnValue({
@@ -115,7 +114,6 @@ describe('TodayExpensesPage — smoke render', () => {
           errors: [ExpenseErrors.NotExists],
         }),
         deleteExpense: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
-        delete: vi.fn(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }) as any;
     // Scoped to exactly the 2 constructor calls this test triggers (mount load + save), so
@@ -169,7 +167,6 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
           filterExpensesObservable: vi.fn().mockReturnValue(expensesResponse([])),
           create: vi.fn(),
           update: vi.fn(),
-          delete: vi.fn(),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any,
     );
@@ -255,7 +252,6 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
           filterExpensesObservable: vi.fn().mockReturnValue(expensesResponse([day1, day1b, day2])),
           create: vi.fn(),
           update: vi.fn(),
-          delete: vi.fn(),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any,
     );
@@ -295,7 +291,6 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
           ),
           create: vi.fn(),
           update: vi.fn(),
-          delete: vi.fn(),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any,
     );

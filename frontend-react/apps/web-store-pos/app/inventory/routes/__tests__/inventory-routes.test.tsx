@@ -120,7 +120,7 @@ vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
 
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageOrders: vi.fn().mockReturnValue([]),
     getActiveOrdersInDay: vi.fn().mockReturnValue([]),
   })),
 }));
@@ -856,7 +856,7 @@ describe('InventoryTodayQuantitiesPage — Angular inicio/entradas/disponible/ve
     vi.mocked(OrderOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getStorageOrders: vi.fn().mockReturnValue([]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
         }) as unknown as InstanceType<typeof OrderOfflineService>,
     );
@@ -1027,7 +1027,7 @@ describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular pa
     vi.mocked(OrderOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getStorageOrders: vi.fn().mockReturnValue([]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
         }) as unknown as InstanceType<typeof OrderOfflineService>,
     );
@@ -1187,7 +1187,7 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
     vi.mocked(OrderOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getStorageOrders: vi.fn().mockReturnValue([]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([]),
         }) as unknown as InstanceType<typeof OrderOfflineService>,
     );
@@ -1271,7 +1271,7 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
     vi.mocked(OrderOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getStorageOrders: vi.fn().mockReturnValue([]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([makeOrderWithFifoSale()]),
         }) as unknown as InstanceType<typeof OrderOfflineService>,
     );
@@ -1298,7 +1298,7 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
     vi.mocked(OrderOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getStorageOrders: vi.fn().mockReturnValue([]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
         }) as unknown as InstanceType<typeof OrderOfflineService>,
     );
@@ -1313,7 +1313,7 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
     vi.mocked(OrderOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAll: vi.fn().mockReturnValue([]),
+          getStorageOrders: vi.fn().mockReturnValue([]),
           getActiveOrdersInDay: vi.fn().mockReturnValue([order]),
         }) as unknown as InstanceType<typeof OrderOfflineService>,
     );

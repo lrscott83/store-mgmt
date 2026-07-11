@@ -54,19 +54,19 @@ vi.mock('~/inventory/lib/repositories/inventory-repository', () => ({
 
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageOrders: vi.fn().mockReturnValue([]),
   })),
 }));
 
 vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
   ExpenseOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageExpenses: vi.fn().mockReturnValue([]),
   })),
 }));
 
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageSaleCredits: vi.fn().mockReturnValue([]),
   })),
 }));
 

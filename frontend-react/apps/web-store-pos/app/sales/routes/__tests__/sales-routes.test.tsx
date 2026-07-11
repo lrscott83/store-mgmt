@@ -61,7 +61,7 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
 
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageSaleCredits: vi.fn().mockReturnValue([]),
     getSaleCreditsInDayObservable: vi
       .fn()
       .mockResolvedValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
@@ -81,7 +81,7 @@ vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
 
 vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
   ExpenseOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageExpenses: vi.fn().mockReturnValue([]),
     // Category-C: TodayStatsPage loads expenses via the async getExpensesInDayObservable.
     getExpensesInDayObservable: vi
       .fn()
