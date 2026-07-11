@@ -206,6 +206,6 @@ El `BaseRepository` compartido de React **no replica** dos comportamientos de An
 
 - [x] `BaseRepository`: ELIMINADO (regla 12) — SDD `eliminate-base-repository`, archive `c69019c`. Cada repo React reproduce inline los helpers de storage (caché + auto-init) como Angular.
 - [x] `BaseService` (interface React): ELIMINADA (regla 12) — SDD `baseservice-parity`, archive `a612fb5`. No espejaba a Angular; era invención. Los 4 offline exponen solo su `getStorageX()`.
-- [ ] `InventoryRepository`: **Angular NO tiene repo de inventory** (persistencia inline en `inventory-offline.service.ts`) → por regla 12 se ELIMINA/inlinea en el offline-service. No se mantiene la capa nueva.
+- [x] `InventoryRepository`: ELIMINADO/inlineado (reglas 6/12) — SDD `eliminate-inventory-repository`, archive `8dbc992`, verify PASS. Persistencia inline en InventoryOfflineService espejando Angular (cache + auto-init + reviveEntry date-only); export sync re-homed via `getInventoryEntriesJson`. Falta aún la VERIFICACIÓN de paridad del offline-service en sí (pasada bottom-up).
 - [ ] `product` sync bypass: ¿se cablea el import/sync a través de `ProductRepository` para recuperar la validación por-categoría + barcode?
 - [ ] `activate/deactivateProductCategory`: ¿se ratifica el drop del param `isActive` o se restaura?
