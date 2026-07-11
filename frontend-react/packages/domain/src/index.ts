@@ -15,6 +15,5 @@ export * from './errors/product-category-errors';
 export * from './errors/inventory-errors';
 export * from './errors/expense-errors';
 export * from './errors/sale-credit-errors';
-export * from './services/base-service';
 export * from './services/product-service';
 export * from './services/product-category-service';
