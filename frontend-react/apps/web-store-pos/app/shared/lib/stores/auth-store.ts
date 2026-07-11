@@ -67,7 +67,10 @@ export const useAuthStore = create<AuthState>((set) => ({
               .catch(() => {
                 // Silently ignore — spec AUTH-03: MUST NOT display any error on failure
               })
-          );
+          ).catch(() => {
+            // AUTH-03: the background refresh must never surface errors — including
+            // module-import or wiring failures that reject the outer promise.
+          });
         }
       }
     } else {

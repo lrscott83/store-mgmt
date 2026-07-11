@@ -228,5 +228,32 @@ describe('useAuthStore', () => {
       const state = useAuthStore.getState();
       expect(state.isAuthenticated).toBe(true); // still authenticated from cache
     });
+
+    it('does not leak an unhandled rejection when the background /me wiring fails — AUTH-03', async () => {
+      const user = makeUser();
+      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(user));
+      localStorage.setItem(StorageKeys.TOKEN, 'token123');
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      // Force the background refresh wiring to fail: apiClient has no `get`, so the
+      // outer import().then() callback throws synchronously. Without an outer .catch,
+      // that rejection is unhandled (AUTH-03: background refresh must never surface errors).
+      vi.doMock('~/shared/lib/http/api-client', () => ({ apiClient: {} }));
+
+      const rejections: unknown[] = [];
+      const onRejection = (reason: unknown): void => {
+        rejections.push(reason);
+      };
+      process.on('unhandledRejection', onRejection);
+      try {
+        useAuthStore.getState().initialize();
+        // Flush microtasks + a macrotask so any unhandled rejection would surface.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      } finally {
+        process.off('unhandledRejection', onRejection);
+      }
+
+      expect(rejections).toHaveLength(0);
+    });
   });
 });
