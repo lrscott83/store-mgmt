@@ -121,7 +121,7 @@ export interface InventoryImportService {
  * import command; the synchronizer only orchestrates).
  */
 export interface ExpenseImportService {
-  getAll(): Expense[];
+  getStorageExpenses(): Expense[];
   addImportedExpense(expense: Expense): Result;
   updateImportedExpense(expense: Expense): Result;
 }
@@ -332,7 +332,7 @@ export class DataSynchronizerService {
     let updated = 0;
 
     try {
-      const existing = new Map(this.expenseService.getAll().map((e) => [e.id, e]));
+      const existing = new Map(this.expenseService.getStorageExpenses().map((e) => [e.id, e]));
       for (const expense of incoming) {
         const isNew = !existing.has(expense.id);
         if (isNew) {

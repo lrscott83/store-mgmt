@@ -182,9 +182,9 @@ function makeService(
   const inventoryReader: InventoryReader = {
     getAll: (_storeId: string) => makeInventoryMap(inv),
   };
-  const orderReader: OrderReader = { getAll: () => ords };
-  const expenseReader: ExpenseReader = { getAll: () => exps };
-  const saleCreditReader: SaleCreditReader = { getAll: () => creds };
+  const orderReader: OrderReader = { getStorageOrders: () => ords };
+  const expenseReader: ExpenseReader = { getStorageExpenses: () => exps };
+  const saleCreditReader: SaleCreditReader = { getStorageSaleCredits: () => creds };
 
   return new DataSerializerService(
     storeId,
@@ -223,9 +223,9 @@ function makeServiceWithUnseededCategoriesAndProducts(
   const inventoryReader: InventoryReader = {
     getAll: (_storeId: string) => makeInventoryMap(inv),
   };
-  const orderReader: OrderReader = { getAll: () => ords };
-  const expenseReader: ExpenseReader = { getAll: () => exps };
-  const saleCreditReader: SaleCreditReader = { getAll: () => creds };
+  const orderReader: OrderReader = { getStorageOrders: () => ords };
+  const expenseReader: ExpenseReader = { getStorageExpenses: () => exps };
+  const saleCreditReader: SaleCreditReader = { getStorageSaleCredits: () => creds };
 
   return new DataSerializerService(
     storeId,

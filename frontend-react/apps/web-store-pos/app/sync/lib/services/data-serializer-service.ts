@@ -84,15 +84,15 @@ export interface InventoryReader {
 }
 
 export interface OrderReader {
-  getAll(): Order[];
+  getStorageOrders(): Order[];
 }
 
 export interface ExpenseReader {
-  getAll(): Expense[];
+  getStorageExpenses(): Expense[];
 }
 
 export interface SaleCreditReader {
-  getAll(): SaleCredit[];
+  getStorageSaleCredits(): SaleCredit[];
 }
 
 // ---------------------------------------------------------------------------
@@ -147,9 +147,9 @@ export class DataSerializerService {
    */
   async export(password: string): Promise<Uint8Array> {
     const inventoryMap = this.inventoryRepo.getAll(this.storeId);
-    const orders = this.orderReader.getAll();
-    const expenses = this.expenseReader.getAll();
-    const saleCredits = this.saleCreditReader.getAll();
+    const orders = this.orderReader.getStorageOrders();
+    const expenses = this.expenseReader.getStorageExpenses();
+    const saleCredits = this.saleCreditReader.getStorageSaleCredits();
 
     // Angular parity (data-serializer.service.ts:83-84): reads the RAW stored
     // JSON string straight from the repository, no re-derivation via

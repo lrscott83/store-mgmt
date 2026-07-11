@@ -219,7 +219,7 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
       updateImportedEntries: () => Result.Success(),
     };
     const noopExpenseService: ExpenseImportService = {
-      getAll: () => [],
+      getStorageExpenses: () => [],
       addImportedExpense: () => Result.Success(),
       updateImportedExpense: () => Result.Success(),
     };

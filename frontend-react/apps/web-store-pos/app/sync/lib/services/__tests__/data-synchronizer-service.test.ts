@@ -161,7 +161,7 @@ function makeExpenseImportServiceMock(
   const _imported: Expense[] = [];
   return {
     _imported,
-    getAll: () => Array.from(store.values()),
+    getStorageExpenses: () => Array.from(store.values()),
     addImportedExpense: (expense: Expense) => {
       store.set(expense.id, expense);
       _imported.push(expense);
@@ -283,7 +283,7 @@ describe('DataSynchronizerService', () => {
         upsert: (_s, item) => writeOrder.push('order:' + item.id),
       };
       const expenseService: ExpenseImportService = {
-        getAll: () => [],
+        getStorageExpenses: () => [],
         addImportedExpense: (item) => {
           writeOrder.push('expense:' + item.id);
           return Result.Success();
