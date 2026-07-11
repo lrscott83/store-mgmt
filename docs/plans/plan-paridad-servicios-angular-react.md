@@ -93,9 +93,9 @@ Ordenado bottom-up: cada grupo se resuelve por SDD + TDD estricto, y no se abre 
 
 ### Fase 0 — Cimientos (base compartida) ← PRIMERO
 
-0.1 **`BaseRepository` — ELIMINAR (regla 12).** Angular NO tiene clase base de repos. Se elimina la abstracción React y se inlinea en cada repo que la hereda (product, category, inventory) los helpers de storage, **incluido el caché en memoria y el auto-init de localStorage al leer** (los dos comportamientos que hoy `BaseRepository` no replica bien). Esto desbloquea los tres repos y cierra los CONCERN de causa raíz sistémica. → habilita categories/products/inventory.
+0.1 **`BaseRepository` — ELIMINAR (regla 12). ✅ HECHO** (SDD `eliminate-base-repository`, archive `c69019c`). Angular NO tiene clase base de repos. Se eliminó la abstracción React y se inlinó en cada repo que la hereda (product, category, inventory) los helpers de storage, **incluido el caché en memoria y el auto-init de localStorage al leer**. → habilita categories/products/inventory.
 
-0.2 **`BaseService` — VERIFICAR paridad.** Angular SÍ tiene `_services/base.service.ts`; acá no se elimina, se espeja método a método. Es la base de casi todos los L1+, así que su paridad debe confirmarse antes de auditar cualquier servicio que herede de ella.
+0.2 **`BaseService` — ✅ HECHO** (SDD `baseservice-parity`, archive `a612fb5`, verify PASS). **GIRO vs. la hipótesis original:** la hipótesis era "Angular SÍ tiene `_services/base.service.ts`, no se elimina, se espeja". Pero la verificación del source probó que la interface `BaseService<T>` de React (`packages/domain/src/services/base-service.ts`) **NO espejaba** a Angular — era una invención que conflacionaba el BaseService HTTP heredado-muerto + el `getStorageX()` per-service (sin base compartida en Angular). Por regla 12 → se ELIMINÓ (como BaseRepository). Los 4 offline exponen solo su `getStorageX()` fiel. NOTA: la paridad de la `_services/base.service.ts` REAL de Angular re-emerge cuando se migren los L1 online (store/user/owner/etc.) en Fase 1 — hoy no están migrados o dropearon el `extends`.
 
 ### Fase 1 — auth/user/store
 
@@ -141,7 +141,7 @@ Estado: ⬜ pendiente · 🔎 en revisión · ⚠️ hallazgos · ✅ paridad co
 
 | Nivel | Servicio Angular | Ruta Angular | Estado | Hallazgos |
 |---|---|---|---|---|
-| L0 | base.service | `_services/base.service.ts` | ⬜ | — |
+| L0 | base.service | `_services/base.service.ts` | ✅ | Invención React `BaseService<T>` ELIMINADA (SDD baseservice-parity, `a612fb5`). Angular base.service real se audita cuando se migren L1 online. |
 | L0 | storage.service | `_services/storage/storage.service.ts` | ⬜ | — |
 | L0 | auth-http.service | `_services/auth/auth-http/auth-http.service.ts` | ⬜ | — |
 | L0 | currency.service | `application/entries/currency.service.ts` | ⬜ | — |
@@ -204,7 +204,8 @@ El `BaseRepository` compartido de React **no replica** dos comportamientos de An
 
 ## Decisiones pendientes (requieren consulta — reglas 2/8/11)
 
-- [ ] `BaseRepository`: **Angular NO tiene clase base compartida** → por regla 12 se ELIMINA y cada repo React reproduce inline los helpers de storage como hace Angular. NO es "¿debe replicar comportamiento X?"; es "Angular no lo tiene → se elimina". El caché en memoria y el auto-init pasan a vivir dentro de cada repo, igual que Angular.
+- [x] `BaseRepository`: ELIMINADO (regla 12) — SDD `eliminate-base-repository`, archive `c69019c`. Cada repo React reproduce inline los helpers de storage (caché + auto-init) como Angular.
+- [x] `BaseService` (interface React): ELIMINADA (regla 12) — SDD `baseservice-parity`, archive `a612fb5`. No espejaba a Angular; era invención. Los 4 offline exponen solo su `getStorageX()`.
 - [ ] `InventoryRepository`: **Angular NO tiene repo de inventory** (persistencia inline en `inventory-offline.service.ts`) → por regla 12 se ELIMINA/inlinea en el offline-service. No se mantiene la capa nueva.
 - [ ] `product` sync bypass: ¿se cablea el import/sync a través de `ProductRepository` para recuperar la validación por-categoría + barcode?
 - [ ] `activate/deactivateProductCategory`: ¿se ratifica el drop del param `isActive` o se restaura?
