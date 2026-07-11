@@ -6,8 +6,8 @@ import type {
   OrderItem,
 } from '@store-mgmt/domain';
 import { DataResult, InventoryErrors, ProductErrors, Result, success } from '@store-mgmt/domain';
-import { InventoryRepository } from '../repositories/inventory-repository';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import {
   hasAvailableProductToSale,
@@ -91,13 +91,18 @@ function generateId(): string {
 
 /**
  * InventoryOfflineService — full Batch 3 implementation.
- * Backed by InventoryRepository (Map<productId, InventoryEntry[]>).
- * Replaces the Batch 2 stub.
+ * Persistence is inlined (no shared `InventoryRepository` — that class has no Angular
+ * correlate, playbook rule 12): per-instance cache (`inventories`/`lastInventoriesKey`),
+ * reloaded only when empty or the store key changes, auto-init on empty read, Map-entries
+ * wire format, and date-only revival — 1:1 port of Angular's
+ * `inventory-offline.service.ts:39-44,485-554`. Same inline template as the already-shipped
+ * `ProductRepository` (sales/lib/repositories/product-repository.ts).
  *
  * Spec §6.3; Scenarios S-I1 through S-I6.
  */
 export class InventoryOfflineService {
-  private readonly repo: InventoryRepository;
+  private inventories: Map<string, InventoryEntry[]> | null = null;
+  private lastInventoriesKey: string | undefined;
 
   /**
    * Mirrors Angular's `InventoryOfflineService` constructor DI
@@ -108,9 +113,7 @@ export class InventoryOfflineService {
   constructor(
     private readonly storeId: string,
     private readonly productRepository: ProductRepository,
-  ) {
-    this.repo = new InventoryRepository(storeId);
-  }
+  ) {}
 
   // ─── Read methods ────────────────────────────────────────────────────────
 
@@ -123,7 +126,7 @@ export class InventoryOfflineService {
    * out of scope for this rename — migrate ≠ optimize).
    */
   getActiveInventoryEntriesStorage(): InventoryEntryView[] {
-    const map = this.repo.getAll(this.storeId);
+    const map = this.getStorageInventoriesMap();
     const result: InventoryEntryView[] = [];
     for (const [productId, entries] of map) {
       for (const entry of entries) {
@@ -149,7 +152,14 @@ export class InventoryOfflineService {
    * (Angular's `synchronizeInventoryEntries` reads it the same way).
    */
   getStorageInventoriesMap(): Map<string, InventoryEntry[]> {
-    return this.repo.getAll(this.storeId);
+    if (
+      !this.inventories ||
+      this.inventories.size === 0 ||
+      this.getCurrentStorageKey() !== this.lastInventoriesKey
+    ) {
+      this.inventories = this.getInventoriesFromLocalStorage();
+    }
+    return this.inventories;
   }
 
   /**
@@ -182,7 +192,7 @@ export class InventoryOfflineService {
   getAvailableByCategory(
     products: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
   ): BaseResponseModel<InventoryCategoryView[]> {
-    const map = this.repo.getAll(this.storeId);
+    const map = this.getStorageInventoriesMap();
     const productMap = new Map(products.map((p) => [p.id, p]));
     const categoryMap = new Map<string, InventoryCategoryView>();
 
@@ -239,7 +249,7 @@ export class InventoryOfflineService {
    */
   getInventoryCostTotalBefore(date: Date): number {
     let total = 0;
-    for (const [, entries] of this.repo.getAll(this.storeId)) {
+    for (const [, entries] of this.getStorageInventoriesMap()) {
       for (const entry of entries) {
         if (entry.isActive && entry.date < date) total += entry.available * entry.costPrice;
       }
@@ -293,7 +303,7 @@ export class InventoryOfflineService {
    */
   getInventoryEntriesView(): Promise<BaseResponseModel<InventoryEntriesView[]>> {
     const result: InventoryEntriesView[] = [];
-    for (const [productId, entries] of this.repo.getAll(this.storeId)) {
+    for (const [productId, entries] of this.getStorageInventoriesMap()) {
       const availableEntries: InventoryEntryCost[] = entries
         .filter((e) => e.available > 0 && e.isActive)
         .sort((a, b) => a.order - b.order)
@@ -365,7 +375,7 @@ export class InventoryOfflineService {
       if (!gate.succeeded) return [];
     }
 
-    const map = this.repo.getAll(this.storeId);
+    const map = this.getStorageInventoriesMap();
     const entries = (map.get(productId) ?? [])
       .filter((e) => e.isActive && e.available > 0)
       .sort((a, b) => a.order - b.order);
@@ -382,7 +392,7 @@ export class InventoryOfflineService {
     }
 
     // Persist the mutated map (entries are mutated in-place above)
-    this.repo.saveAll(this.storeId, map);
+    this.setInventoriesLocalStorage(map);
 
     return costs;
   }
@@ -402,7 +412,7 @@ export class InventoryOfflineService {
    * Angular's own contract (boolean success/failure only).
    */
   updateAvailableInventories(productId: string, quantity: number): boolean {
-    const map = this.repo.getAll(this.storeId);
+    const map = this.getStorageInventoriesMap();
     const entries = (map.get(productId) ?? [])
       .filter((e) => e.isActive && e.available > 0)
       .sort((a, b) => a.order - b.order);
@@ -417,7 +427,7 @@ export class InventoryOfflineService {
       remaining -= consumed;
     }
 
-    this.repo.saveAll(this.storeId, map);
+    this.setInventoriesLocalStorage(map);
     return true;
   }
 
@@ -433,7 +443,7 @@ export class InventoryOfflineService {
    * (no failure branch exists in Angular's own version either).
    */
   increaseQuantitiesByOrderItems(orderItems: OrderItem[]): Result {
-    const map = this.repo.getAll(this.storeId);
+    const map = this.getStorageInventoriesMap();
     let dirty = false;
 
     for (const orderItem of orderItems) {
@@ -457,7 +467,7 @@ export class InventoryOfflineService {
     }
 
     if (dirty) {
-      this.repo.saveAll(this.storeId, map);
+      this.setInventoriesLocalStorage(map);
     }
 
     return Result.Success();
@@ -490,7 +500,7 @@ export class InventoryOfflineService {
     const product = this.productRepository.getProductById(productId);
     if (!product) return null;
 
-    const existing = this.repo.getByProductId(this.storeId, productId);
+    const existing = this.getStorageInventoriesMap().get(productId) ?? [];
     const maxOrder = existing.length > 0
       ? Math.max(...existing.map((e) => e.order))
       : -1;
@@ -512,7 +522,9 @@ export class InventoryOfflineService {
       updatedByName: undefined,
     };
 
-    this.repo.save(this.storeId, productId, [...existing, entry]);
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, [...existing, entry]);
+    this.setInventoriesLocalStorage(map);
 
     return new DataResult<InventoryEntryView>(
       {
@@ -549,8 +561,11 @@ export class InventoryOfflineService {
       return new DataResult<InventoryEntryView>(undefined, false, guard.errors);
     }
 
-    const found = this.repo.findEntryById(this.storeId, entryId)!;
-    const { entry, productId: storedProductId } = found;
+    // Product-scoped lookup (rule 12): Angular never scans across products for an entry —
+    // every caller already knows `productId`, so the entry is looked up within that exact
+    // bucket (isNotSoldEntry above already guarantees it exists there).
+    const allForProduct = this.getProductInventoriesByProductId(productId);
+    const entry = allForProduct.find((e) => e.id === entryId)!;
 
     const updated: InventoryEntry = {
       ...entry,
@@ -561,13 +576,14 @@ export class InventoryOfflineService {
       updatedByName: getCurrentUserLogin(),
     };
 
-    const allForProduct = this.repo.getByProductId(this.storeId, storedProductId ?? productId);
     const idx = allForProduct.findIndex((e) => e.id === entryId);
     if (idx !== -1) allForProduct[idx] = updated;
-    this.repo.save(this.storeId, storedProductId ?? productId, allForProduct);
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, allForProduct);
+    this.setInventoriesLocalStorage(map);
 
     // Angular parity (updateInventoryEntry:130,134): productName from the entry's product
-    const product = this.productRepository.getProductById(storedProductId ?? productId);
+    const product = this.productRepository.getProductById(productId);
     return new DataResult<InventoryEntryView>(
       {
         id: updated.id,
@@ -595,8 +611,9 @@ export class InventoryOfflineService {
     const guard = this.isNotSoldEntry(productId, entryId);
     if (!guard.succeeded) return Result.Failure(guard.errors);
 
-    const found = this.repo.findEntryById(this.storeId, entryId)!;
-    const { entry, productId: storedProductId } = found;
+    // Product-scoped lookup (rule 12): mirrors update() — no cross-product scan.
+    const allForProduct = this.getProductInventoriesByProductId(productId);
+    const entry = allForProduct.find((e) => e.id === entryId)!;
 
     const deactivated: InventoryEntry = {
       ...entry,
@@ -605,10 +622,11 @@ export class InventoryOfflineService {
       updatedByName: getCurrentUserLogin(),
     };
 
-    const allForProduct = this.repo.getByProductId(this.storeId, storedProductId ?? productId);
     const idx = allForProduct.findIndex((e) => e.id === entryId);
     if (idx !== -1) allForProduct[idx] = deactivated;
-    this.repo.save(this.storeId, storedProductId ?? productId, allForProduct);
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, allForProduct);
+    this.setInventoriesLocalStorage(map);
 
     return Result.Success();
   }
@@ -625,7 +643,7 @@ export class InventoryOfflineService {
    * been sold yet (`quantity === available`).
    */
   amortizeSoldEntry(productId: string, entryId: string): Result {
-    const entries = this.repo.getByProductId(this.storeId, productId);
+    const entries = this.getProductInventoriesByProductId(productId);
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) {
       return Result.Failure([InventoryErrors.EntryNotExists]);
@@ -636,7 +654,9 @@ export class InventoryOfflineService {
 
     entry.quantity -= entry.available;
     entry.available = 0;
-    this.repo.save(this.storeId, productId, entries);
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, entries);
+    this.setInventoriesLocalStorage(map);
 
     return Result.Success();
   }
@@ -655,7 +675,7 @@ export class InventoryOfflineService {
       return Result.Failure([ProductErrors.NotExists]);
     }
 
-    const entries = this.repo.getByProductId(this.storeId, productId);
+    const entries = this.getProductInventoriesByProductId(productId);
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return Result.Failure([InventoryErrors.EntryNotExists]);
 
@@ -702,7 +722,7 @@ export class InventoryOfflineService {
       return new DataResult<InventoryEntryView>(undefined, false, [InventoryErrors.ProductNotAvailable]);
     }
 
-    const oldEntries = this.repo.getByProductId(this.storeId, oldProductId);
+    const oldEntries = this.getProductInventoriesByProductId(oldProductId);
     const entry = oldEntries.find((e) => e.id === entryId)!;
 
     const updated: InventoryEntry = {
@@ -715,17 +735,20 @@ export class InventoryOfflineService {
       updatedByName: getCurrentUserLogin(),
     };
 
+    const map = this.getStorageInventoriesMap();
     if (oldProductId === newProductId) {
       const idx = oldEntries.findIndex((e) => e.id === entryId);
       if (idx !== -1) oldEntries[idx] = updated;
-      this.repo.save(this.storeId, oldProductId, oldEntries);
+      map.set(oldProductId, oldEntries);
+      this.setInventoriesLocalStorage(map);
     } else {
       // Cross-product move: remove from oldProductId's bucket, append to newProductId's.
       const remainingOldEntries = oldEntries.filter((e) => e.id !== entryId);
-      this.repo.save(this.storeId, oldProductId, remainingOldEntries);
+      map.set(oldProductId, remainingOldEntries);
 
-      const newEntries = this.repo.getByProductId(this.storeId, newProductId);
-      this.repo.save(this.storeId, newProductId, [...newEntries, updated]);
+      const newEntries = map.get(newProductId) ?? [];
+      map.set(newProductId, [...newEntries, updated]);
+      this.setInventoriesLocalStorage(map);
     }
 
     // Angular parity (updateInventoryEntry:130,134): productName from getProductById(oldProductId)
@@ -751,7 +774,7 @@ export class InventoryOfflineService {
    * Returns true if the sum of available quantities for a product >= requested quantity.
    */
   hasAvailableStock(productId: string, quantity: number): boolean {
-    const entries = this.repo.getByProductId(this.storeId, productId);
+    const entries = this.getProductInventoriesByProductId(productId);
     const total = entries
       .filter((e) => e.isActive)
       .reduce((sum, e) => sum + e.available, 0);
@@ -769,7 +792,7 @@ export class InventoryOfflineService {
    * partially-sold entries) or `getAvailableInventoryCosts` (mutates/deducts stock via FIFO).
    */
   getProductInventoriesByProductId(productId: string): InventoryEntry[] {
-    return this.repo.getByProductId(this.storeId, productId);
+    return this.getStorageInventoriesMap().get(productId) ?? [];
   }
 
   /**
@@ -778,7 +801,9 @@ export class InventoryOfflineService {
    * Always Result.Success() per Angular.
    */
   public addImportedEntries(productId: string, entries: InventoryEntry[]): Result {
-    this.repo.save(this.storeId, productId, entries);
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, entries);
+    this.setInventoriesLocalStorage(map);
     return Result.Success();
   }
 
@@ -792,7 +817,7 @@ export class InventoryOfflineService {
    * Always Result.Success() per Angular.
    */
   public updateImportedEntries(productId: string, entries: InventoryEntry[]): Result {
-    const currentEntries = [...this.repo.getByProductId(this.storeId, productId)];
+    const currentEntries = [...this.getProductInventoriesByProductId(productId)];
     for (const entry of entries) {
       const idx = currentEntries.findIndex((e) => e.id === entry.id);
       if (idx !== -1) {
@@ -807,7 +832,9 @@ export class InventoryOfflineService {
         currentEntries.push(entry);
       }
     }
-    this.repo.save(this.storeId, productId, currentEntries);
+    const map = this.getStorageInventoriesMap();
+    map.set(productId, currentEntries);
+    this.setInventoriesLocalStorage(map);
     return Result.Success();
   }
 
@@ -822,10 +849,61 @@ export class InventoryOfflineService {
    * to the quantity check, which fails with 0 available) rather than the "no entries" branch.
    */
   getAvailableQuantity(productId: string): { hasEntries: boolean; available: number } {
-    const allEntries = this.repo.getByProductId(this.storeId, productId);
+    const allEntries = this.getProductInventoriesByProductId(productId);
     const available = allEntries
       .filter((e) => e.isActive)
       .reduce((sum, e) => sum + e.available, 0);
     return { hasEntries: allEntries.length > 0, available };
+  }
+
+  // ─── Inline persistence (rule 12 — no InventoryRepository correlate in Angular) ──────────
+
+  /**
+   * 1:1 port of Angular's `setInventoriesLocalStorage` (inventory-offline.service.ts:526-529).
+   */
+  private setInventoriesLocalStorage(inventories: Map<string, InventoryEntry[]>): void {
+    localStorage.setItem(this.getStorageKey(), JSON.stringify(Array.from(inventories.entries())));
+  }
+
+  /**
+   * Private port of Angular `getStorageKey` (inventory-offline.service.ts:485-488) — records
+   * the last-used key (side-effecting), unlike {@link getCurrentStorageKey} (pure).
+   */
+  private getStorageKey(): string {
+    this.lastInventoriesKey = this.getCurrentStorageKey();
+    return this.lastInventoriesKey;
+  }
+
+  /** Private port of Angular `getCurrentStorageKey` (inventory-offline.service.ts:490-492). */
+  private getCurrentStorageKey(): string {
+    return StorageKeys.entityKey('inventory-entries', this.storeId);
+  }
+
+  /**
+   * Private port of Angular `getInventoriesFromLocalStorage`
+   * (inventory-offline.service.ts:535-554) — on empty/missing/`'{}'`/unparsable storage,
+   * auto-initializes by writing an empty Map before returning it. Revives ONLY `date` to a
+   * `Date` instance (Angular parity, lines 540-544) — `createdDate`/`updatedDate` are left as
+   * the raw stored (string) values, unlike the deleted `InventoryRepository`, which revived
+   * all three.
+   */
+  private getInventoriesFromLocalStorage(): Map<string, InventoryEntry[]> {
+    try {
+      const inventoriesJson = localStorage.getItem(this.getStorageKey());
+      if (inventoriesJson && inventoriesJson !== '{}') {
+        const inventoryMap: Map<string, InventoryEntry[]> = new Map(JSON.parse(inventoriesJson));
+        inventoryMap.forEach((entries) => {
+          entries.forEach((entry) => {
+            (entry as unknown as { date: Date }).date = new Date(entry.date);
+          });
+        });
+        return inventoryMap;
+      }
+    } catch {
+      // ignore — fall through to auto-init
+    }
+    const inventories = new Map<string, InventoryEntry[]>();
+    this.setInventoriesLocalStorage(inventories);
+    return inventories;
   }
 }

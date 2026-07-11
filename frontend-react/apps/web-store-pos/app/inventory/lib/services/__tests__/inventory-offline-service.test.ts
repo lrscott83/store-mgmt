@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InventoryOfflineService } from '../inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
@@ -1358,6 +1358,138 @@ describe('InventoryOfflineService', () => {
     it('returns Result.Failure([ProductErrors.NotExists]) when the product does not exist', () => {
       const result = service.isNotSoldEntry('ghost', 'e1');
       expect(result).toEqual(Result.Failure([ProductErrors.NotExists]));
+    });
+  });
+
+  // WU1 (eliminate-inventory-repository): InventoryRepository persistence inlined into
+  // InventoryOfflineService — per-instance cache (`inventories`/`lastInventoriesKey`),
+  // auto-init, date-only reviveEntry, shared-reference reads, product-scoped entry lookup
+  // (no cross-product `findEntryById` scan). 1:1 port of Angular
+  // inventory-offline.service.ts:39-44,485-554.
+  describe('Persistence — Map-entries wire-format, cache, auto-init, reviveEntry (WU1, inventory-offline.service.ts:39-44,485-554)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('auto-writes an empty Map-entries array ("[]") on the first empty read, without throwing', () => {
+      expect(() => service.getStorageInventoriesMap()).not.toThrow();
+      const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`);
+      expect(raw).toBe('[]');
+    });
+
+    it('auto-writes an empty Map-entries array when the stored value is the literal "{}" sentinel', () => {
+      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, '{}');
+      const map = service.getStorageInventoriesMap();
+      expect(map.size).toBe(0);
+      const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`);
+      expect(raw).toBe('[]');
+    });
+
+    it('auto-writes an empty Map-entries array when the stored value is corrupt/unparsable JSON', () => {
+      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, '{not valid json');
+      expect(() => service.getStorageInventoriesMap()).not.toThrow();
+      const map = service.getStorageInventoriesMap();
+      expect(map.size).toBe(0);
+      const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`);
+      expect(raw).toBe('[]');
+    });
+
+    it('reuses the in-memory cache across two reads without an intervening write (localStorage.getItem hit once)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1')]);
+      seedInventory(storeId, map);
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+
+      service.getStorageInventoriesMap();
+      service.getStorageInventoriesMap();
+
+      const callsForKey = getItemSpy.mock.calls.filter(
+        ([key]) => key === `lizoft.store-inventory-entries-${storeId}`,
+      );
+      expect(callsForKey).toHaveLength(1);
+    });
+
+    it('reviveEntry revives ONLY `date` to a Date instance — createdDate/updatedDate stay strings (Angular parity, inventory-offline.service.ts:540-544)', () => {
+      const raw: [string, unknown[]][] = [
+        [
+          'p1',
+          [
+            {
+              id: 'e1',
+              productId: 'p1',
+              categoryId: 'cat-1',
+              quantity: 10,
+              available: 10,
+              costPrice: 2.5,
+              date: '2024-01-15T10:00:00.000Z',
+              order: 0,
+              isActive: true,
+              createdDate: '2024-01-15T10:00:00.000Z',
+              createdByName: 'test',
+              updatedDate: '2024-01-16T10:00:00.000Z',
+              updatedByName: 'test',
+            },
+          ],
+        ],
+      ];
+      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, JSON.stringify(raw));
+
+      const freshService = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
+      const entry = freshService.getProductInventoriesByProductId('p1')[0] as InventoryEntry & Record<string, unknown>;
+      expect(entry.date).toBeInstanceOf(Date);
+      expect(typeof entry.createdDate).toBe('string');
+      expect(entry.createdDate).not.toBeInstanceOf(Date);
+      expect(typeof entry.updatedDate).toBe('string');
+      expect(entry.updatedDate).not.toBeInstanceOf(Date);
+    });
+
+    it('shared-reference semantics: two reads without an intervening write return the SAME array reference (Angular-faithful — was a fresh copy per repo.getAll)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1')]);
+      seedInventory(storeId, map);
+
+      const first = service.getProductInventoriesByProductId('p1');
+      const second = service.getProductInventoriesByProductId('p1');
+      expect(first).toBe(second);
+    });
+
+    it('getProductInventoriesByProductId still returns [] (not undefined) for an unknown product (Stage-7 ADR-2 contract preserved)', () => {
+      expect(service.getProductInventoriesByProductId('unknown-product')).toEqual([]);
+    });
+
+    it('product-scoped lookup: update() only touches the entry under the given productId, even when another product has an entry sharing the same id (no cross-product `findEntryById` scan)', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10, costPrice: 2 })]);
+      map.set('p2', [makeEntry('e1', 'p2', { quantity: 20, available: 20, costPrice: 9 })]);
+      seedInventory(storeId, map);
+
+      const result = service.update('e1', 'p1', 15, 3);
+
+      expect(result.succeeded).toBe(true);
+      expect(result.data?.productId).toBe('p1');
+      expect(result.data?.quantity).toBe(15);
+      // p2's same-id entry must be untouched.
+      const p2Entry = service.getProductInventoriesByProductId('p2')[0];
+      expect(p2Entry.quantity).toBe(20);
+      expect(p2Entry.costPrice).toBe(9);
+    });
+
+    it('product-scoped lookup: deactivate() only touches the entry under the given productId, even when another product has an entry sharing the same id', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      map.set('p2', [makeEntry('e1', 'p2', { quantity: 20, available: 20 })]);
+      seedInventory(storeId, map);
+
+      const result = service.deactivate('e1', 'p1');
+
+      expect(result).toEqual(Result.Success());
+      const p1Entry = service.getProductInventoriesByProductId('p1')[0];
+      const p2Entry = service.getProductInventoriesByProductId('p2')[0];
+      expect(p1Entry.isActive).toBe(false);
+      expect(p2Entry.isActive).toBe(true);
     });
   });
 });
