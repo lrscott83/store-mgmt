@@ -282,7 +282,7 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
       expect(parsed[0].id).toBe('o1');
 
       const realService = new OrderOfflineService(storeId);
-      expect(realService.getById('o1')?.total).toBe(777);
+      expect(realService.getStorageOrders().find((o) => o.id === 'o1')?.total).toBe(777);
     });
   });
 });

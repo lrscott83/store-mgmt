@@ -50,7 +50,7 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
 
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
-    getAll: vi.fn().mockReturnValue([]),
+    getStorageOrders: vi.fn().mockReturnValue([]),
     getActiveOrdersInDay: vi.fn().mockReturnValue([]),
     getByDateRange: vi.fn().mockReturnValue([]),
     getCategoryCartItemsView: vi.fn().mockReturnValue([]),

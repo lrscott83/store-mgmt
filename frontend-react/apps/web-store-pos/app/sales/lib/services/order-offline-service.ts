@@ -1,4 +1,4 @@
-import type { BaseService, Order, OrderItem } from '@store-mgmt/domain';
+import type { Order, OrderItem } from '@store-mgmt/domain';
 import { OrderType, PaymentType } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
@@ -52,7 +52,7 @@ function generateId(): string {
  * Revival fields (`date`/`createdDate`/`updatedDate`) are UNCHANGED from current React
  * behavior (Decision Gate — pending fix-vs-replicate call, NOT resolved here).
  */
-export class OrderOfflineService implements BaseService<Order> {
+export class OrderOfflineService {
   private readonly creditService: SaleCreditOfflineService;
   private readonly inventoryService: InventoryOfflineService;
 
@@ -75,18 +75,10 @@ export class OrderOfflineService implements BaseService<Order> {
     return this.orders;
   }
 
-  getAll(): Order[] {
-    return this.getStorageOrders();
-  }
-
-  getById(id: string): Order | undefined {
-    return this.getStorageOrders().find((o) => o.id === id);
-  }
-
   getByDateRange(from: Date, to: Date): Order[] {
     const start = startOfDay(from);
     const end = startOfDay(addDays(to, 1));
-    return this.getAll().filter(
+    return this.getStorageOrders().filter(
       (o) => o.isActive && o.date >= start && o.date < end,
     );
   }
@@ -94,7 +86,7 @@ export class OrderOfflineService implements BaseService<Order> {
   getActiveOrdersInDay(date: Date): Order[] {
     const dayStart = startOfDay(date);
     const dayEnd = startOfDay(addDays(date, 1));
-    return this.getAll().filter(
+    return this.getStorageOrders().filter(
       (o) => o.isActive && o.date >= dayStart && o.date < dayEnd,
     );
   }
@@ -109,7 +101,7 @@ export class OrderOfflineService implements BaseService<Order> {
   getOrdersInDay(date: Date): Order[] {
     const dayStart = startOfDay(date);
     const dayEnd = startOfDay(addDays(date, 1));
-    return this.getAll().filter((o) => o.date >= dayStart && o.date < dayEnd);
+    return this.getStorageOrders().filter((o) => o.date >= dayStart && o.date < dayEnd);
   }
 
   /**
@@ -118,7 +110,7 @@ export class OrderOfflineService implements BaseService<Order> {
    * private `getActiveOrdersBetweenDates`.
    */
   private activeOrdersBetween(start: Date, end: Date): Order[] {
-    return this.getAll().filter((o) => o.isActive && o.date >= start && o.date < end);
+    return this.getStorageOrders().filter((o) => o.isActive && o.date >= start && o.date < end);
   }
 
   getActiveOrdersPriceBetweenDates(start: Date, end: Date): number {
@@ -169,7 +161,7 @@ export class OrderOfflineService implements BaseService<Order> {
   private getTopProductsInLastMonth(calculateProfit: boolean, top: number): TopProduct[] {
     const now = new Date();
     const lastMonth = addDays(now, -29);
-    const monthOrders = this.getAll().filter(
+    const monthOrders = this.getStorageOrders().filter(
       (o) => o.isActive && o.date >= lastMonth && o.date < now,
     );
 
@@ -210,7 +202,7 @@ export class OrderOfflineService implements BaseService<Order> {
     start?: Date,
     end?: Date,
   ): Order[] {
-    return this.getAll().filter(
+    return this.getStorageOrders().filter(
       (o) =>
         o.isActive &&
         (isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit)) &&
@@ -410,16 +402,6 @@ export class OrderOfflineService implements BaseService<Order> {
       })),
     }));
     this.inventoryService.increaseQuantitiesByOrderItems(normalizedItems);
-  }
-
-  /**
-   * BaseService<Order> conformance alias for {@link deactivate}. Order has no
-   * separate "plain" soft-delete concept in Angular — the only cancellation path
-   * is the full deactivate cascade (void associated credit + restore inventory) —
-   * so `delete` delegates to it rather than inventing partial-delete semantics.
-   */
-  delete(id: string): void {
-    this.deactivate(id);
   }
 
   /** Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) — plain-array write. */

@@ -162,6 +162,12 @@ describe('OrderOfflineService', () => {
     service = new OrderOfflineService(storeId);
   });
 
+  // WU3 (baseservice-parity): getById() was removed (zero prod call-sites, rule 12) — tests
+  // that only needed a by-id lookup (not testing getById itself) use this helper instead.
+  function findOrder(id: string): Order | undefined {
+    return service.getStorageOrders().find((o) => o.id === id);
+  }
+
   describe('ORD-01: create builds correct orderItems (FIFO mock)', () => {
     it('creates an order with correct total', () => {
       const items = makeCartItems([
@@ -356,7 +362,7 @@ describe('OrderOfflineService', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       const order = service.create(items, PaymentType.Efectivo, false, '');
       service.deactivate(order.id);
-      const found = service.getById(order.id);
+      const found = findOrder(order.id);
       expect(found?.isActive).toBe(false);
     });
 
@@ -367,7 +373,7 @@ describe('OrderOfflineService', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       const order = service.create(items, PaymentType.Efectivo, false, '');
       service.deactivate(order.id);
-      const found = service.getById(order.id);
+      const found = findOrder(order.id);
       expect(found?.updatedByName).toBe('jdoe');
     });
   });
@@ -418,18 +424,7 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  describe('ORD-06: getAll / getById / getActiveOrdersInDay', () => {
-    it('getAll returns empty initially', () => {
-      expect(service.getAll()).toEqual([]);
-    });
-
-    it('getById returns the correct order', () => {
-      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      const found = service.getById(order.id);
-      expect(found?.id).toBe(order.id);
-    });
-
+  describe('ORD-06: getActiveOrdersInDay', () => {
     it('getActiveOrdersInDay returns today orders', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       service.create(items, PaymentType.Efectivo, false, '');
@@ -473,7 +468,7 @@ describe('OrderOfflineService', () => {
     });
 
     it('auto-writes an empty array on the first empty read, without throwing', () => {
-      expect(() => service.getAll()).not.toThrow();
+      expect(() => service.getStorageOrders()).not.toThrow();
       const raw = localStorage.getItem('lizoft.store-orders-s1');
       expect(raw).toBe('[]');
     });
@@ -482,8 +477,8 @@ describe('OrderOfflineService', () => {
       seedOrders(storeId, [makeOrder({ id: 'o1' })]);
       const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
 
-      service.getAll();
-      service.getAll();
+      service.getStorageOrders();
+      service.getStorageOrders();
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === 'lizoft.store-orders-s1');
       expect(callsForKey).toHaveLength(1);
@@ -499,7 +494,7 @@ describe('OrderOfflineService', () => {
         }),
       ]);
       const freshService = new OrderOfflineService(storeId);
-      const found = freshService.getById('o1');
+      const found = freshService.getStorageOrders().find((o) => o.id === 'o1');
       expect(found?.date).toBeInstanceOf(Date);
       expect(found?.createdDate).toBeInstanceOf(Date);
       expect(found?.updatedDate).toBeInstanceOf(Date);
@@ -637,31 +632,6 @@ describe('OrderOfflineService', () => {
   // conformance alias for deactivate(id) — Order has no separate "plain" soft-delete
   // concept, so delete delegates to the full deactivate cascade (credit void + inventory
   // restore) rather than inventing new partial-delete semantics.
-  describe('ORD-11: delete is a BaseService<Order> alias for deactivate', () => {
-    it('sets isActive=false, same as deactivate', () => {
-      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.delete(order.id);
-      expect(service.getById(order.id)?.isActive).toBe(false);
-    });
-
-    it('voids the associated credit when the order is a credit order', () => {
-      const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
-      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
-      service.delete(order.id);
-      expect(creditMock.deactivateSaleCreditByOrderId).toHaveBeenCalledWith(order.id);
-    });
-
-    it('restores inventory entries, same as deactivate', () => {
-      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
-      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.delete(order.id);
-      expect(inventoryMock.increaseQuantitiesByOrderItems).toHaveBeenCalledOnce();
-    });
-  });
-
   // WU2 (offline-online-service-parity, Slice 1): activateOrder is flag-only
   // (Angular's updateOrderActive(id, true)) — no credit/inventory cascade, unlike deactivate.
   describe('ORD-12: activateOrder — flag-only, no cascade', () => {
@@ -670,7 +640,7 @@ describe('OrderOfflineService', () => {
       const order = service.create(items, PaymentType.Efectivo, false, '');
       service.deactivate(order.id);
       service.activateOrder(order.id);
-      expect(service.getById(order.id)?.isActive).toBe(true);
+      expect(findOrder(order.id)?.isActive).toBe(true);
     });
 
     it('throws for a missing id', () => {
@@ -692,7 +662,7 @@ describe('OrderOfflineService', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       const order = service.create(items, PaymentType.Efectivo, false, '');
       service.activateOrder(order.id);
-      expect(service.getById(order.id)?.updatedByName).toBe('jdoe');
+      expect(findOrder(order.id)?.updatedByName).toBe('jdoe');
     });
   });
 

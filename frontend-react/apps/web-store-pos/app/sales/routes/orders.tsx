@@ -69,7 +69,7 @@ export function OrdersPage() {
   function loadOrders() {
     const service = new OrderOfflineService(storeId);
     const filtered = service
-      .getAll()
+      .getStorageOrders()
       .filter((o) => o.isActive)
       .filter((o) => !paymentType || paymentType === o.paymentType)
       .filter((o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit));
