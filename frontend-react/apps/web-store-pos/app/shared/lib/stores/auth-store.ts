@@ -63,7 +63,12 @@ export const useAuthStore = create<AuthState>((set) => ({
                 if (updated) {
                   const expiresIn = Date.now() + THIRTY_FIVE_DAYS_MS;
                   const userWithExpiry: UserModel = { ...updated, expiresIn, password: '' };
-                  localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(userWithExpiry));
+                  // Split layout (Option A): profile → currentUser; AUTH_MODEL stays minimal.
+                  StorageService.setCurrentUser(userWithExpiry);
+                  localStorage.setItem(
+                    StorageKeys.AUTH_MODEL,
+                    JSON.stringify({ authToken: token, expiresIn })
+                  );
                   set({ user: userWithExpiry });
                 }
               })

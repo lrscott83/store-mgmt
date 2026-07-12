@@ -31,7 +31,6 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 describe('useAuthStore', () => {
   beforeEach(() => {
     localStorage.clear();
-    document.cookie = 'hasSession=; Max-Age=0; path=/';
     useAuthStore.setState({
       user: null,
       isAuthenticated: false,
@@ -280,5 +279,12 @@ describe('useAuthStore', () => {
 
       expect(rejections).toHaveLength(0);
     });
+
+    // NOTE: the background /me SUCCESS write path (initialize → apiClient.get('/me') →
+    // StorageService.setCurrentUser + minimal AUTH_MODEL) is not asserted here because the
+    // async dynamic `import('../http/api-client')` cannot be mock-intercepted deterministically
+    // across full-suite run order (module caching). Its split-layout persistence uses the exact
+    // same StorageService.setCurrentUser + minimal-AUTH_MODEL pattern that `setUser`/`updateUser`
+    // already cover deterministically above.
   });
 });
