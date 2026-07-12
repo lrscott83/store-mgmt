@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { guestOnlyLoader } from './loaders';
@@ -8,16 +8,20 @@ export const clientLoader = guestOnlyLoader;
 
 interface FormState {
   fullName: string;
+  login: string;
   email: string;
   cellPhone: string;
+  storeName: string;
   password: string;
   passwordConfirmation: string;
 }
 
 interface FormErrors {
   fullName?: string;
+  login?: string;
   email?: string;
   cellPhone?: string;
+  storeName?: string;
   password?: string;
   passwordConfirmation?: string;
   form?: string;
@@ -25,11 +29,15 @@ interface FormErrors {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const code = searchParams.get('code') ?? undefined;
 
   const [form, setForm] = useState<FormState>({
     fullName: '',
+    login: '',
     email: '',
     cellPhone: '',
+    storeName: '',
     password: '',
     passwordConfirmation: '',
   });
@@ -41,8 +49,10 @@ export default function RegisterPage() {
   function validate(): FormErrors {
     const errs: FormErrors = {};
     if (!form.fullName.trim()) errs.fullName = 'Full name is required';
+    if (!form.login.trim()) errs.login = 'Login is required';
     if (!form.email.trim()) errs.email = 'Email is required';
     if (!form.cellPhone.trim()) errs.cellPhone = 'Phone number is required';
+    if (!form.storeName.trim()) errs.storeName = 'Store name is required';
     if (!form.password) errs.password = 'Password is required';
     if (!form.passwordConfirmation) {
       errs.passwordConfirmation = 'Please confirm your password';
@@ -70,15 +80,21 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     try {
-      await authHttpService.register({
+      const response = await authHttpService.register({
         fullName: form.fullName,
+        login: form.login,
         email: form.email,
         cellPhone: form.cellPhone,
+        storeName: form.storeName,
         password: form.password,
-        passwordConfirmation: form.passwordConfirmation,
+        code,
       });
-      setSuccess(true);
-      setTimeout(() => navigate('/login'), 1500);
+      if (response.succeeded) {
+        setSuccess(true);
+        navigate('/login');
+      } else {
+        setErrors({ form: response.errors[0].description });
+      }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status: number; data?: { message?: string } } };
       const status = axiosErr.response?.status;
@@ -140,6 +156,23 @@ export default function RegisterPage() {
         </div>
 
         <div className="mb-4">
+          <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-1">
+            Login
+          </label>
+          <input
+            id="login"
+            type="text"
+            autoComplete="username"
+            value={form.login}
+            onChange={(e) => setForm((f) => ({ ...f, login: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          />
+          {errors.login && (
+            <p className="mt-1 text-xs text-red-600">{errors.login}</p>
+          )}
+        </div>
+
+        <div className="mb-4">
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
             Email
           </label>
@@ -170,6 +203,23 @@ export default function RegisterPage() {
           />
           {errors.cellPhone && (
             <p className="mt-1 text-xs text-red-600">{errors.cellPhone}</p>
+          )}
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-1">
+            Store name
+          </label>
+          <input
+            id="storeName"
+            type="text"
+            autoComplete="organization"
+            value={form.storeName}
+            onChange={(e) => setForm((f) => ({ ...f, storeName: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          />
+          {errors.storeName && (
+            <p className="mt-1 text-xs text-red-600">{errors.storeName}</p>
           )}
         </div>
 
