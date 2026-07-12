@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { StorageKeys } from '../storage/storage-keys';
+import { StorageService } from '../auth/storage-service';
 
 const API_TIMEOUT = 30000;
 
@@ -12,7 +13,7 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem(StorageKeys.TOKEN);
+  const token = StorageService.getTokenFromLocalStorage();
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
@@ -23,9 +24,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      localStorage.removeItem(StorageKeys.TOKEN);
+      StorageService.removeTokenFromLocalStorage();
       localStorage.removeItem(StorageKeys.AUTH_MODEL);
-      localStorage.removeItem(StorageKeys.CURRENT_USER);
+      StorageService.removeCurrentUser();
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
