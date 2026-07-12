@@ -220,10 +220,12 @@ interface LoginRequest {
 // Registration form payload
 interface RegisterRequest {
   fullName: string;
+  login: string;
   email: string;
   cellPhone: string;
   password: string;
-  passwordConfirmation: string;
+  storeName: string;
+  code?: string;
 }
 ```
 
@@ -244,7 +246,7 @@ interface AuthService {
   login(credentials: LoginRequest): Promise<UserModel>;
 
   // POST /v1/auth/register — requires online
-  register(payload: RegisterRequest): Promise<void>;
+  register(payload: RegisterRequest): Promise<boolean>;
 
   // Clear session data and redirect to /login
   logout(): void;
@@ -285,7 +287,7 @@ Thin wrapper around API calls. Returns typed responses. No business logic.
 ```ts
 interface AuthHttpService {
   login(credentials: LoginRequest): Promise<BaseResponseModel<AuthModel>>;
-  register(payload: RegisterRequest): Promise<BaseResponseModel<void>>;
+  register(payload: RegisterRequest): Promise<BaseResponseModel<boolean>>;
   getMe(): Promise<BaseResponseModel<UserModel>>;
 }
 ```
