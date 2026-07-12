@@ -41,8 +41,10 @@ export interface LoginRequest {
 
 export interface RegisterRequest {
   fullName: string;
+  login: string;
   email: string;
   cellPhone: string;
   password: string;
-  passwordConfirmation: string;
+  storeName: string;
+  code?: string;
 }

@@ -15,10 +15,22 @@ export const authHttpService = {
     return response.data;
   },
 
-  async register(payload: RegisterRequest): Promise<BaseResponseModel<void>> {
-    const response = await apiClient.post<BaseResponseModel<void>>(
+  async register(payload: RegisterRequest): Promise<BaseResponseModel<boolean>> {
+    const { fullName, login, password, cellPhone, email, storeName, code } = payload;
+    const body: Record<string, string> = {
+      fullName,
+      login,
+      password,
+      cellPhone,
+      email,
+      storeName,
+    };
+    if (code && code.trim() !== '') {
+      body.code = code;
+    }
+    const response = await apiClient.post<BaseResponseModel<boolean>>(
       '/v1/auth/register',
-      payload
+      body
     );
     return response.data;
   },
