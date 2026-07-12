@@ -43,7 +43,11 @@ describe('useAuthStore', () => {
   describe('AUTH-03: Valid token on startup', () => {
     it('restores session when a valid non-expired user is in localStorage', () => {
       const user = makeUser();
-      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(user));
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
 
       useAuthStore.getState().initialize();
 
@@ -56,7 +60,11 @@ describe('useAuthStore', () => {
   describe('AUTH-03: Expired token on startup', () => {
     it('clears session when expiresIn is in the past', () => {
       const user = makeUser({ expiresIn: Date.now() - 1000 });
-      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(user));
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
 
       useAuthStore.getState().initialize();
 
@@ -65,6 +73,7 @@ describe('useAuthStore', () => {
       expect(state.user).toBeNull();
       expect(localStorage.getItem(StorageKeys.TOKEN)).toBeNull();
       expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
+      expect(localStorage.getItem(StorageKeys.CURRENT_USER)).toBeNull();
     });
   });
 
@@ -117,7 +126,7 @@ describe('useAuthStore', () => {
   });
 
   describe('updateUser — STORE-1 through STORE-4, S-STORE-1', () => {
-    it('writes updated user to StorageKeys.AUTH_MODEL', () => {
+    it('writes minimal auth model (authToken, expiresIn only) to StorageKeys.AUTH_MODEL', () => {
       const user = makeUser({ fullName: 'Original Name' });
       useAuthStore.setState({ user, isAuthenticated: true });
 
@@ -125,7 +134,9 @@ describe('useAuthStore', () => {
       useAuthStore.getState().updateUser(updatedUser);
 
       const stored = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
-      expect(stored.fullName).toBe('María García');
+      expect(stored.fullName).toBeUndefined();
+      expect(stored.authToken).toBe(user.authToken);
+      expect(stored.expiresIn).toBeDefined();
     });
 
     it('writes updated user to StorageKeys.CURRENT_USER', () => {
@@ -149,14 +160,14 @@ describe('useAuthStore', () => {
       expect(useAuthStore.getState().user?.fullName).toBe('María García');
     });
 
-    it('forces password to empty string in stored user', () => {
+    it('forces password to empty string in stored currentUser profile', () => {
       const user = makeUser({ password: 'somepass' });
       useAuthStore.setState({ user, isAuthenticated: true });
 
       const updatedUser = makeUser({ password: 'ShouldBeCleared' });
       useAuthStore.getState().updateUser(updatedUser);
 
-      const stored = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
+      const stored = JSON.parse(localStorage.getItem(StorageKeys.CURRENT_USER)!);
       expect(stored.password).toBe('');
       expect(useAuthStore.getState().user?.password).toBe('');
     });
@@ -188,16 +199,22 @@ describe('useAuthStore', () => {
       const { expiresIn: _omit, ...fromMe } = makeUser({ fullName: 'Refreshed' });
       useAuthStore.getState().updateUser(fromMe as UserModel);
 
-      const stored = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
-      expect(stored.fullName).toBe('Refreshed');
-      expect(stored.expiresIn).toBe(sessionExpiry);
+      const storedProfile = JSON.parse(localStorage.getItem(StorageKeys.CURRENT_USER)!);
+      expect(storedProfile.fullName).toBe('Refreshed');
+
+      const storedAuthModel = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
+      expect(storedAuthModel.expiresIn).toBe(sessionExpiry);
     });
   });
 
   describe('AUTH-03: Background /me on startup', () => {
     it('fires background /me call when online and token exists — does not block render', async () => {
       const user = makeUser();
-      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(user));
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       localStorage.setItem(StorageKeys.TOKEN, 'token123');
 
       // Mock apiClient before initialize
@@ -217,7 +234,11 @@ describe('useAuthStore', () => {
 
     it('does not throw when /me fails (offline) — AUTH-03 background /me fail scenario', async () => {
       const user = makeUser();
-      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(user));
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       localStorage.setItem(StorageKeys.TOKEN, 'token123');
 
       // Mock navigator.onLine as false
@@ -231,7 +252,11 @@ describe('useAuthStore', () => {
 
     it('does not leak an unhandled rejection when the background /me wiring fails — AUTH-03', async () => {
       const user = makeUser();
-      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify(user));
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       localStorage.setItem(StorageKeys.TOKEN, 'token123');
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
