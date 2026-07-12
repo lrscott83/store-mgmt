@@ -142,7 +142,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    clearAuthStorage();
+    // Decision 1 (auth-service-parity, Slice 3): mirror Angular's logout() —
+    // remove ONLY the AUTH_MODEL key. `token` and `currentUser` intentionally
+    // stay stale (Angular 1:1 parity, not a bug).
+    localStorage.removeItem(StorageKeys.AUTH_MODEL);
     set({ user: null, isAuthenticated: false, error: null });
   },
 }));

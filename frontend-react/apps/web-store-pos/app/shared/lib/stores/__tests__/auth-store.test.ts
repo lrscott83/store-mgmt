@@ -111,7 +111,7 @@ describe('useAuthStore', () => {
   });
 
   describe('logout', () => {
-    it('clears user, token, and auth model from localStorage', () => {
+    it('clears the auth model and resets in-memory state', () => {
       const user = makeUser();
       useAuthStore.getState().setUser(user, 'tok');
       useAuthStore.getState().logout();
@@ -119,8 +119,25 @@ describe('useAuthStore', () => {
       const state = useAuthStore.getState();
       expect(state.isAuthenticated).toBe(false);
       expect(state.user).toBeNull();
-      expect(localStorage.getItem(StorageKeys.TOKEN)).toBeNull();
       expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
+    });
+  });
+
+  describe('logout — AUTH_MODEL-only clear (Decision 1)', () => {
+    it('removes only AUTH_MODEL; token and currentUser survive (Angular parity)', () => {
+      const user = makeUser();
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.TOKEN, user.authToken as string);
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
+
+      useAuthStore.getState().logout();
+
+      expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
+      expect(localStorage.getItem(StorageKeys.TOKEN)).toBe(user.authToken);
+      expect(localStorage.getItem(StorageKeys.CURRENT_USER)).toBe(JSON.stringify(user));
     });
   });
 
