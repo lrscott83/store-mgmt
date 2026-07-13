@@ -30,12 +30,12 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn().mockImplementation(() => ({
     getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-    getByDate: vi.fn().mockReturnValue(bm([])),
-    getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+    getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([])),
+    getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
     getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-    create: vi.fn(),
+    createInventoryEntry: vi.fn(),
     update: vi.fn(),
-    deactivate: vi.fn(),
+    deleteInventoryEntry: vi.fn(),
   })),
 }));
 
@@ -147,9 +147,10 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-// WU3 (service-return-shape-parity Slice 1, category B): getByDate/getAvailableByCategory
-// now return sync BaseResponseModel<T> (were bare arrays) — this test-only helper mirrors
-// the shape so existing mocks don't need to hand-roll the envelope everywhere.
+// WU3 (service-return-shape-parity Slice 1, category B): getInventoryEntriesInDay/
+// getInventoryCategoriesView (Fase 4: renamed from getByDate/getAvailableByCategory) return
+// sync BaseResponseModel<T> (were bare arrays) — this test-only helper mirrors the shape so
+// existing mocks don't need to hand-roll the envelope everywhere.
 function bm<T>(data: T): { data: T; succeeded: true; message: ''; actionCode: 200; errors: [] } {
   return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
 }
@@ -225,7 +226,7 @@ describe('InventoryAvailablePage — header total inventory value', () => {
     vi.mocked(InventoryOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAvailableByCategory: vi.fn().mockReturnValue(bm(categories)),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm(categories)),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -249,95 +250,51 @@ describe('InventoryAvailablePage — header total inventory value', () => {
   });
 });
 
-// ─── InventoryAvailablePage — isActive-only narrowing (regression lock, verify WARNING 1) ────
+// ─── InventoryAvailablePage — renders getInventoryCategoriesView() output directly (Fase 4) ──
 //
-// Regression lock for product-service-parity Slice 8 WU10 / verify WARNING 1 — Inventario
-// Disponible is isActive-only; inactive-but-in-stock products are intentionally excluded
-// (ratified 2026-07-09). Restoring all-products behavior belongs to the Inventory-parity SDD.
-//
-// This exercises the REAL seam available.tsx's loadData actually calls (categorySvc /
-// productSvc), NOT a canned InventoryOfflineService.getAvailableByCategory mock that ignores its
-// input — the module-level mock above (line ~34) returns a fixed `bm([])` regardless of
-// argument, which would bypass the very filtering behavior this test locks. The
-// getAvailableByCategory override below mirrors the real method's enriched→view mapping
-// (inventory-offline-service.ts:199-249) against a canned stock table, so its output is a
-// genuine function of the `enriched` array available.tsx builds from
-// ProductOfflineService.getAvailableProductsByCategoryId's (isActive-only) result.
-describe('InventoryAvailablePage — isActive-only narrowing (regression lock, verify WARNING 1)', () => {
-  beforeEach(() => {
-    mockEgressCategories = [makeCategory({ id: 'cat-1', name: 'Bebidas' })];
-    mockEgressProducts = [
-      makeEgressProduct({
-        id: 'p-active',
-        name: 'Ron Activo',
+// Fase 4 (inventory-offline-service-parity, GATE-B) SUPERSEDES the former "isActive-only
+// narrowing" regression lock (product-service-parity Slice 8 WU10 / verify WARNING 1, ratified
+// 2026-07-09 — that test's own comment named this exact SDD as the vehicle for the change:
+// "Restoring all-products behavior belongs to the Inventory-parity SDD"). available.tsx no
+// longer builds its own `enriched` product/category array via productSvc/categorySvc — it
+// renders getInventoryCategoriesView()'s own zero-arg output directly. Angular's own
+// getInventoryCategoriesView performs NO isActive check on products
+// (inventory-offline.service.ts:286-315) — matching that behavior is the SERVICE's
+// responsibility now (unit-tested in inventory-offline-service.test.ts), not this route. This
+// test only locks the passthrough: whatever the service returns is what renders, with no
+// client-side re-filtering.
+describe('InventoryAvailablePage — renders getInventoryCategoriesView() output directly (Fase 4, zero-arg passthrough)', () => {
+  it('renders every product the service returns, without any client-side re-filtering', async () => {
+    const categories: InventoryCategoryView[] = [
+      {
         categoryId: 'cat-1',
         categoryName: 'Bebidas',
-        isActive: true,
-      }),
-      makeEgressProduct({
-        id: 'p-inactive',
-        name: 'Ron Inactivo',
-        categoryId: 'cat-1',
-        categoryName: 'Bebidas',
-        isActive: false,
-      }),
+        totalQuantity: 15,
+        totalCostPrice: 35,
+        products: [
+          {
+            productId: 'p-active',
+            productName: 'Ron Activo',
+            categoryId: 'cat-1',
+            categoryName: 'Bebidas',
+            totalAvailable: 10,
+            avgCostPrice: 2,
+          },
+          {
+            productId: 'p-inactive',
+            productName: 'Ron Inactivo',
+            categoryId: 'cat-1',
+            categoryName: 'Bebidas',
+            totalAvailable: 5,
+            avgCostPrice: 3,
+          },
+        ],
+      },
     ];
-  });
-
-  afterEach(() => {
-    mockEgressCategories = [];
-    mockEgressProducts = [];
-  });
-
-  it('shows the active in-stock product and excludes the inactive in-stock product from the same category', async () => {
-    // Both products are "in stock" per this table — proves the exclusion of the inactive one
-    // comes from available.tsx's real product-loading seam (isActive-only), not from the stock
-    // table itself.
-    const stock: Record<string, { available: number; costPrice: number }> = {
-      'p-active': { available: 10, costPrice: 2 },
-      'p-inactive': { available: 5, costPrice: 3 },
-    };
     vi.mocked(InventoryOfflineService).mockImplementationOnce(
       () =>
         ({
-          getAvailableByCategory: vi.fn(
-            (
-              enriched: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
-            ) => {
-              const categoryMap = new Map<string, InventoryCategoryView>();
-              for (const p of enriched) {
-                const s = stock[p.id];
-                if (!s || s.available === 0) continue;
-                let cat = categoryMap.get(p.categoryId);
-                if (!cat) {
-                  cat = {
-                    categoryId: p.categoryId,
-                    categoryName: p.categoryName,
-                    totalQuantity: 0,
-                    totalCostPrice: 0,
-                    products: [],
-                  };
-                  categoryMap.set(p.categoryId, cat);
-                }
-                cat.products.push({
-                  productId: p.id,
-                  productName: p.name,
-                  categoryId: p.categoryId,
-                  categoryName: p.categoryName,
-                  totalAvailable: s.available,
-                  avgCostPrice: s.costPrice,
-                });
-              }
-              for (const cat of categoryMap.values()) {
-                cat.totalQuantity = cat.products.reduce((sum, pp) => sum + pp.totalAvailable, 0);
-                cat.totalCostPrice = cat.products.reduce(
-                  (sum, pp) => sum + pp.avgCostPrice * pp.totalAvailable,
-                  0,
-                );
-              }
-              return bm(Array.from(categoryMap.values()));
-            },
-          ),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm(categories)),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -351,7 +308,7 @@ describe('InventoryAvailablePage — isActive-only narrowing (regression lock, v
     fireEvent.click(toggle);
 
     expect(screen.getByText('Ron Activo')).toBeInTheDocument();
-    expect(screen.queryByText('Ron Inactivo')).not.toBeInTheDocument();
+    expect(screen.getByText('Ron Inactivo')).toBeInTheDocument();
   });
 });
 
@@ -400,7 +357,7 @@ describe('TodayEntriesPage — edit/deactivate actions stay reachable (regressio
     vi.mocked(InventoryOfflineService).mockImplementationOnce(
       () =>
         ({
-          getByDate: vi.fn().mockReturnValue(bm(todayEntries)),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -438,12 +395,12 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getByDate: vi.fn().mockReturnValue(bm(todayEntries)),
-          getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-          create: vi.fn(),
+          createInventoryEntry: vi.fn(),
           update: vi.fn(),
-          deactivate: deactivateMock,
+          deleteInventoryEntry: deactivateMock,
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -454,7 +411,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     );
     fireEvent.click(screen.getByText('Eliminar'));
 
-    expect(deactivateMock).toHaveBeenCalledWith('e1', 'p1');
+    expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1');
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
@@ -470,12 +427,12 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getByDate: getByDateMock,
-          getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+          getInventoryEntriesInDay: getByDateMock,
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-          create: vi.fn(),
+          createInventoryEntry: vi.fn(),
           update: vi.fn(),
-          deactivate: deactivateMock,
+          deleteInventoryEntry: deactivateMock,
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -487,7 +444,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     const callsBeforeClick = getByDateMock.mock.calls.length;
     fireEvent.click(screen.getByText('Eliminar'));
 
-    expect(deactivateMock).toHaveBeenCalledWith('e1', 'p1');
+    expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1');
     expect(getByDateMock.mock.calls.length).toBeGreaterThan(callsBeforeClick);
     expect(consoleErrorSpy).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
@@ -503,12 +460,12 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getByDate: vi.fn().mockReturnValue(bm([])),
-          getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-          create: createMock,
+          createInventoryEntry: createMock,
           update: vi.fn(),
-          deactivate: vi.fn(),
+          deleteInventoryEntry: vi.fn(),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -539,12 +496,12 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getByDate: getByDateMock,
-          getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+          getInventoryEntriesInDay: getByDateMock,
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-          create: createMock,
+          createInventoryEntry: createMock,
           update: vi.fn(),
-          deactivate: vi.fn(),
+          deleteInventoryEntry: vi.fn(),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -822,8 +779,8 @@ describe('InventoryTodayQuantitiesPage — Angular inicio/entradas/disponible/ve
     vi.mocked(InventoryOfflineService).mockImplementationOnce(
       () =>
         ({
-          getByDate: vi.fn().mockReturnValue(bm(entries)),
-          getAvailableByCategory: vi.fn().mockReturnValue(bm(categoryView)),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(entries)),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm(categoryView)),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -1088,12 +1045,12 @@ describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getByDate: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
-          getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-          create: vi.fn(),
+          createInventoryEntry: vi.fn(),
           update: vi.fn(),
-          deactivate: vi.fn(),
+          deleteInventoryEntry: vi.fn(),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -1114,12 +1071,12 @@ describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getByDate: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
-          getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([makeEntryView({ productId: 'p1' })])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-          create: vi.fn(),
+          createInventoryEntry: vi.fn(),
           update: vi.fn(),
-          deactivate: vi.fn(),
+          deleteInventoryEntry: vi.fn(),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -1134,7 +1091,7 @@ describe('InventoryTodaySalesProfitPage — Angular product-set filter (gap #3b)
 
   it('excludes an active & availableToSale product with neither sales nor today entries', () => {
     mockEgressProducts = [makeEgressProduct({ id: 'p1', name: 'SinActividad' })];
-    // Default top-level mocks already return [] for getByDate and getActiveOrdersInDay.
+    // Default top-level mocks already return [] for getInventoryEntriesInDay and getActiveOrdersInDay.
     render(
       <Wrapper>
         <InventoryTodaySalesProfitPage />
@@ -1173,15 +1130,15 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
       () =>
         ({
           getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
-          getByDate: vi.fn().mockReturnValue(bm([
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([
             makeEntryView({ id: 'e1', productId: 'p1', quantity: 10, costPrice: 2 }),
             makeEntryView({ id: 'e2', productId: 'p1', quantity: 10, costPrice: 4 }),
           ])),
-          getAvailableByCategory: vi.fn().mockReturnValue(bm([])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
           getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
-          create: vi.fn(),
+          createInventoryEntry: vi.fn(),
           update: vi.fn(),
-          deactivate: vi.fn(),
+          deleteInventoryEntry: vi.fn(),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
     vi.mocked(OrderOfflineService).mockImplementationOnce(

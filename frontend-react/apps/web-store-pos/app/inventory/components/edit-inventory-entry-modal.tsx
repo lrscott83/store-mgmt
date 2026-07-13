@@ -9,7 +9,6 @@ export interface EditInventoryEntryInput {
   productId: string;
   quantity: number;
   costPrice: number;
-  date: string;
 }
 
 interface EditInventoryEntryModalProps {
@@ -20,10 +19,6 @@ interface EditInventoryEntryModalProps {
   /** Pass an entry to edit; omit for create mode */
   entry?: InventoryEntry;
   error?: string;
-}
-
-function todayString(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export function EditInventoryEntryModal({
@@ -44,9 +39,6 @@ export function EditInventoryEntryModal({
   const [productId, setProductId] = useState(entry?.productId ?? '');
   const [quantity, setQuantity] = useState(entry?.quantity.toString() ?? '');
   const [costPrice, setCostPrice] = useState(entry?.costPrice.toString() ?? '');
-  const [date, setDate] = useState(
-    entry?.date ? new Date(entry.date).toISOString().slice(0, 10) : todayString(),
-  );
   const [validationError, setValidationError] = useState('');
 
   useEffect(() => {
@@ -102,7 +94,7 @@ export function EditInventoryEntryModal({
     }
 
     onSave(
-      { productId, quantity: qty, costPrice: cost, date },
+      { productId, quantity: qty, costPrice: cost },
       entry?.id,
     );
   }
@@ -192,19 +184,6 @@ export function EditInventoryEntryModal({
                 step="0.01"
                 value={costPrice}
                 onChange={(e) => setCostPrice(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-
-            {/* Date */}
-            <div>
-              <label className={labelClass}>
-                {intl.formatMessage({ id: 'INVENTORY.ENTRY.DATE' })}
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
                 className={inputClass}
               />
             </div>

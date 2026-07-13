@@ -25,7 +25,7 @@ import { OrderOfflineService } from '~/sales/lib/services/order-offline-service'
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { InventoryTodaySaleService } from './inventory-today-sale-service';
 
-// WU3 (service-return-shape-parity Slice 1, category B): getByDate now returns sync
+// WU3 (service-return-shape-parity Slice 1, category B): getInventoryEntriesInDay now returns sync
 // BaseResponseModel<InventoryEntryView[]> (was a bare array).
 function bm<T>(data: T): { data: T; succeeded: true; message: ''; actionCode: 200; errors: [] } {
   return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
@@ -119,7 +119,7 @@ describe('InventoryTodaySaleService', () => {
   let mockProductRepository: { getAvailableProducts: ReturnType<typeof vi.fn> };
   let mockOrderService: { getActiveOrdersInDay: ReturnType<typeof vi.fn> };
   let mockInventoryService: {
-    getByDate: ReturnType<typeof vi.fn>;
+    getInventoryEntriesInDay: ReturnType<typeof vi.fn>;
     getAvailableQuantity: ReturnType<typeof vi.fn>;
     getProductInventoriesByProductId: ReturnType<typeof vi.fn>;
     getAvailableInventoryCosts: ReturnType<typeof vi.fn>;
@@ -131,7 +131,7 @@ describe('InventoryTodaySaleService', () => {
     mockProductRepository = { getAvailableProducts: vi.fn().mockReturnValue([]) };
     mockOrderService = { getActiveOrdersInDay: vi.fn().mockReturnValue([]) };
     mockInventoryService = {
-      getByDate: vi.fn().mockReturnValue(bm([])),
+      getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([])),
       getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
       getProductInventoriesByProductId: vi.fn().mockReturnValue([]),
       getAvailableInventoryCosts: vi.fn().mockReturnValue([]),
@@ -182,7 +182,7 @@ describe('InventoryTodaySaleService', () => {
 
   it('IT-04: Entrada = sum of today\'s inventory entry quantities for the product', () => {
     mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
-    mockInventoryService.getByDate.mockReturnValue(bm([
+    mockInventoryService.getInventoryEntriesInDay.mockReturnValue(bm([
       makeEntryView({ productId: 'p1', quantity: 2 }),
       makeEntryView({ productId: 'p1', quantity: 3 }),
       makeEntryView({ productId: 'other', quantity: 100 }),
@@ -210,7 +210,7 @@ describe('InventoryTodaySaleService', () => {
   it('IT-06: Disponible = available + Vendido; Inicio = Disponible - Entrada (spec scenario: available=10, entry=5, sold=3 -> Disponible=13, Inicio=8)', () => {
     mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     mockInventoryService.getAvailableQuantity.mockReturnValue({ hasEntries: true, available: 10 });
-    mockInventoryService.getByDate.mockReturnValue(bm([makeEntryView({ productId: 'p1', quantity: 5 })]));
+    mockInventoryService.getInventoryEntriesInDay.mockReturnValue(bm([makeEntryView({ productId: 'p1', quantity: 5 })]));
     mockOrderService.getActiveOrdersInDay.mockReturnValue([
       makeOrder([makeOrderItem({ productId: 'p1', quantity: 3 })]),
     ]);
@@ -351,7 +351,7 @@ describe('InventoryTodaySaleService', () => {
     mockProductRepository.getAvailableProducts.mockReturnValue([makeProduct({ id: 'p1' })]);
     // Entry received 10 units @ cost 2, 8 already sold -> only 2 still available.
     // Quantity-weighted (Angular's live behavior, what col 9 MUST use): weight = quantity = 10.
-    // Available-weighted (getAvailableByCategory's avgCostPrice, must NOT be used): weight = available = 2.
+    // Available-weighted (getInventoryCategoriesView's avgCostPrice, must NOT be used): weight = available = 2.
     // A second entry received 10 @ cost 5, none sold (quantity == available == 10).
     mockInventoryService.getProductInventoriesByProductId.mockReturnValue([
       makeInventoryEntry({ id: 'e1', quantity: 10, available: 2, costPrice: 2 }),

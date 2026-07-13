@@ -50,7 +50,7 @@ export interface InventoryTodaySaleRow {
  *   the service — the field there is misleadingly named `productService` but typed
  *   `ProductRepository`. React mirrors this directly.]
  * - OrderOfflineService.getActiveOrdersInDay(date)
- * - InventoryOfflineService.getByDate(date) [today's entries]
+ * - InventoryOfflineService.getInventoryEntriesInDay(date) [today's entries]
  * - InventoryOfflineService.getAvailableQuantity(productId) [Σ active available]
  * - InventoryOfflineService.getProductInventoriesByProductId(productId) [col-9 weighting — ADR-2]
  *
@@ -71,11 +71,12 @@ export class InventoryTodaySaleService {
   getProductRows(date: Date = new Date()): InventoryTodaySaleRow[] {
     const products: Product[] = this.productRepository.getAvailableProducts();
     const todayOrders: Order[] = this.orderService.getActiveOrdersInDay(date);
-    // WU3 (service-return-shape-parity Slice 1, category B): getByDate now returns
-    // BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`. This
-    // service is scheduled for removal per ADR-6 (aggregation inlining), kept working here
-    // ahead of that later slice.
-    const todayEntries = this.inventoryService.getByDate(date).data;
+    // WU3 (service-return-shape-parity Slice 1, category B): getInventoryEntriesInDay now
+    // returns BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`.
+    // Fase 4: renamed from getByDate (date arg ignored — always returns today). This service
+    // is scheduled for removal per ADR-6 (aggregation inlining), kept working here ahead of
+    // that later slice.
+    const todayEntries = this.inventoryService.getInventoryEntriesInDay(date).data;
 
     return products.map((prod) => {
       const orderItems: OrderItem[] = todayOrders

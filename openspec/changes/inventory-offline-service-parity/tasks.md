@@ -114,12 +114,12 @@ Gates binding (do NOT re-decide): #1049 (3 gates, all strict Angular parity),
 
 ## WU2 — Call-site ripple + create-form date field + Stage 7 reports + route/component mocks
 
-- [ ] **T14** — `today-entries.tsx`: `handleSave` → `svc.createInventoryEntry(data.productId,
+- [x] **T14** — `today-entries.tsx`: `handleSave` → `svc.createInventoryEntry(data.productId,
   data.quantity, data.costPrice)` (drop the `''`/`new Date(data.date)` args, line ~105);
   `handleDeactivate` → `svc.deleteInventoryEntry(entry.productId, entry.id)` (swap arg
   order, line ~88); `loadEntries` → `svc.getInventoryEntriesInDay(new Date())` (line ~39).
 
-- [ ] **T15** — `edit-inventory-entry-modal.tsx`: REMOVE the date field entirely — delete
+- [x] **T15** — `edit-inventory-entry-modal.tsx`: REMOVE the date field entirely — delete
   the `date` state (`useState`), `todayString()` helper, the `date` field from
   `EditInventoryEntryInput`, the date `<input type="date">` block (lines ~199-210), and
   drop `date` from the `onSave(...)` payload (line ~104-107). Angular's
@@ -129,16 +129,16 @@ Gates binding (do NOT re-decide): #1049 (3 gates, all strict Angular parity),
   assertion depending on the date input (verified: none found) — re-run that file's tests
   after the removal to confirm no incidental breakage.
 
-- [ ] **T16** — `today-quantities.tsx`: `inventorySvc.getByDate(today).data` →
+- [x] **T16** — `today-quantities.tsx`: `inventorySvc.getByDate(today).data` →
   `inventorySvc.getInventoryEntriesInDay(today).data` (line ~85); replace the
   `enriched`-array `getAvailableByCategory(enriched)` call (lines ~90-101) with zero-arg
   `getInventoryCategoriesView()` — drop the now-unneeded `enriched` array construction.
 
-- [ ] **T17** — `today-sales-profit.tsx`: `inventorySvc.getByDate(today).data` →
+- [x] **T17** — `today-sales-profit.tsx`: `inventorySvc.getByDate(today).data` →
   `inventorySvc.getInventoryEntriesInDay(today).data` (line ~108). No
   `getAvailableByCategory`/`getInventoryCategoriesView` usage in this file — rename-only.
 
-- [ ] **T18** — `available.tsx`: `inventorySvc.getAvailableByCategory(enriched).data` →
+- [x] **T18** — `available.tsx`: `inventorySvc.getAvailableByCategory(enriched).data` →
   `inventorySvc.getInventoryCategoriesView().data` (line ~55) — zero-arg. Remove the now-dead
   `enriched` array construction (lines ~46-51). Evaluate whether `categorySvc.getProductCategories()`
   / `productSvc.getAvailableProductsByCategoryId(...)` (lines ~37-43) become fully unused
@@ -146,11 +146,11 @@ Gates binding (do NOT re-decide): #1049 (3 gates, all strict Angular parity),
   calls and the now-unused `productSvc`/`categorySvc` instantiations too (dead-code
   cleanup scoped strictly to this ripple, not a broader refactor).
 
-- [ ] **T19** — `reports/lib/services/inventory-today-sale-service.ts`:
+- [x] **T19** — `reports/lib/services/inventory-today-sale-service.ts`:
   `this.inventoryService.getByDate(date).data` → `this.inventoryService.getInventoryEntriesInDay(date).data`
   (line ~78). Rename-only — no `getAvailableByCategory` usage in this file.
 
-- [ ] **T20 (RED→GREEN together — mock/assertion ripple)** — `inventory-routes.test.tsx`:
+- [x] **T20 (RED→GREEN together — mock/assertion ripple)** — `inventory-routes.test.tsx`:
   across every `InventoryOfflineService` mock block (lines ~31-38, ~228, ~303, ~403,
   ~440-446, ~472-478, ~505-511, ~541-547, ~825-826, ~1090-1096, ~1116-1122, ~1175-1184),
   rename mock keys `create`→`createInventoryEntry`, `deactivate`→`deleteInventoryEntry`,
@@ -163,22 +163,22 @@ Gates binding (do NOT re-decide): #1049 (3 gates, all strict Angular parity),
   `categoryId`/`date`). Re-run the full file; fix any remaining failures from the rename
   ripple.
 
-- [ ] **T21** — `inventory-components.test.tsx`: re-run the `EditInventoryEntryModal`
+- [x] **T21** — `inventory-components.test.tsx`: re-run the `EditInventoryEntryModal`
   suites after T15's date-field removal; confirm no test references the date input (label
   `INVENTORY.ENTRY.DATE`, `type="date"`, or `todayString()`). No assertion changes
   expected per the grep audit, but this is the confirmation step.
 
-- [ ] **T22** — Grep-verify (spec "Report Callers Use Renamed Methods" scenario): `rg
+- [x] **T22** — Grep-verify (spec "Report Callers Use Renamed Methods" scenario): `rg
   "getByDate\(|getAvailableByCategory\(|\.deactivate\(" frontend-react/apps/web-store-pos/app/inventory
   frontend-react/apps/web-store-pos/app/reports` returns no matches outside historical
   comments/docs. Also confirm no method named `deactivate`, `getByDate`, or
   `getAvailableByCategory` remains on `InventoryOfflineService` itself (T12 already
   covered the service file; this is the call-site-wide sweep).
 
-- [ ] **T23** — Run full `npx turbo run test` across the affected workspace(s); fix any
+- [x] **T23** — Run full `npx turbo run test` across the affected workspace(s); fix any
   ripple failures (report tests, route tests, component tests).
 
-- [ ] **T24** — WU2 work-unit commit: `today-entries.tsx`, `edit-inventory-entry-modal.tsx`,
+- [x] **T24** — WU2 work-unit commit: `today-entries.tsx`, `edit-inventory-entry-modal.tsx`,
   `today-quantities.tsx`, `today-sales-profit.tsx`, `available.tsx`,
   `inventory-today-sale-service.ts`, `inventory-routes.test.tsx`,
   `inventory-components.test.tsx`. Conventional commit, e.g.

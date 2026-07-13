@@ -8,8 +8,6 @@ import { InventoryOfflineService } from '../lib/services/inventory-offline-servi
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
-import { createProductService } from '~/sales/lib/services/product-service.factory';
-import { ProductCategoryOfflineService } from '~/sales/lib/services/product-category-offline-service';
 import { InventoryProductList } from '../components/inventory-product-list';
 
 export const clientLoader = featureLoader([EFeatures.Available]);
@@ -24,38 +22,14 @@ export function InventoryAvailablePage() {
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
-    const productSvc = createProductService(storeId);
-    const categorySvc = new ProductCategoryOfflineService(storeId);
 
-    async function loadData() {
-      // WU10 (product-service-parity Flag #1, minimal in-scope fix): categorySvc.getAll() /
-      // productSvc.getAll() dropped (Exact-Surface Rule, no bare getAll on the async surface).
-      // getProductCategories() is offline-only, ALL categories, same unfiltered set as before —
-      // zero behavior change. Products are fetched per-category via
-      // getAvailableProductsByCategoryId (isActive-only) and flattened back into one array,
-      // preserving the pre-existing enrichment logic unchanged.
-      const catsResult = await categorySvc.getProductCategories();
-      const cats = catsResult.data ?? [];
-
-      const productLists = await Promise.all(
-        cats.map((c) => productSvc.getAvailableProductsByCategoryId(c.id)),
-      );
-      const products = productLists.flatMap((r) => r.data ?? []);
-
-      // Build enriched product list for getAvailableByCategory
-      const enriched = products.map((p) => ({
-        id: p.id,
-        name: p.name,
-        categoryId: p.categoryId,
-        categoryName: cats.find((c) => c.id === p.categoryId)?.name ?? '',
-      }));
-
-      // WU3 (category B): getAvailableByCategory now returns
-      // BaseResponseModel<InventoryCategoryView[]> (was a bare array) — unwrap `.data`.
-      setCategories(inventorySvc.getAvailableByCategory(enriched).data);
-    }
-
-    loadData();
+    // WU3 (category B): getInventoryCategoriesView now returns
+    // BaseResponseModel<InventoryCategoryView[]> (was a bare array) — unwrap `.data`.
+    // Fase 4 (GATE-B): renamed from getAvailableByCategory, now zero-arg — the service itself
+    // groups its own active entries and sources product/category names internally (via
+    // ProductRepository / ProductRepository.getCategoryRepository()), so the category/product
+    // fetching this page used to do purely to build the `enriched` array is no longer needed.
+    setCategories(inventorySvc.getInventoryCategoriesView().data);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 

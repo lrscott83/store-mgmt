@@ -34,11 +34,12 @@ export function TodayEntriesPage() {
     const svc = new InventoryOfflineService(storeId, productRepository);
     const products = [...productRepository.getStorageProductsMap().values()];
     const productMap = new Map(products.map((p) => [p.id, p.name]));
-    // WU3 (category B): getByDate now returns BaseResponseModel<InventoryEntryView[]>
-    // (was a bare array) — unwrap `.data`.
-    const raw = svc.getByDate(new Date()).data;
+    // WU3 (category B): getInventoryEntriesInDay now returns BaseResponseModel<InventoryEntryView[]>
+    // (was a bare array) — unwrap `.data`. Fase 4: renamed from getByDate (the date arg is
+    // ignored — always returns today, Angular parity).
+    const raw = svc.getInventoryEntriesInDay(new Date()).data;
     setEntries(
-      raw.map((e) => ({ ...e, productName: productMap.get(e.productId) ?? e.productName })),
+      raw.map((e: InventoryEntryView) => ({ ...e, productName: productMap.get(e.productId) ?? e.productName })),
     );
   }
 
@@ -79,13 +80,14 @@ export function TodayEntriesPage() {
   }
 
   // WU2 (service-return-shape-parity Slice 1): deactivate() now returns Result (never
-  // throws) — check `.succeeded` instead of try/catch.
+  // throws) — check `.succeeded` instead of try/catch. Fase 4: renamed to
+  // deleteInventoryEntry(productId, entryId) — Angular-exact param order.
   function handleDeactivate(entry: InventoryEntryView) {
     const svc = new InventoryOfflineService(
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
-    const result = svc.deactivate(entry.id, entry.productId);
+    const result = svc.deleteInventoryEntry(entry.productId, entry.id);
     if (!result.succeeded) {
       console.error(result.errors[0]?.description ?? 'InventoryEntry could not be deactivated');
       return;
@@ -95,6 +97,9 @@ export function TodayEntriesPage() {
 
   // WU2 (service-return-shape-parity Slice 1): create()/update() now return
   // DataResult<InventoryEntryView> (never throw) — check `.succeeded` instead of try/catch.
+  // Fase 4 (GATE-A): createInventoryEntry(productId, quantity, costPrice) derives categoryId/date
+  // internally — the create-form's date field is now vestigial for create (Angular parity: a
+  // new entry always stamps "now", no user-supplied backdating).
   function handleSave(data: EditInventoryEntryInput, entryId?: string) {
     const svc = new InventoryOfflineService(
       storeId,
@@ -102,7 +107,7 @@ export function TodayEntriesPage() {
     );
     const result = entryId
       ? svc.update(entryId, data.productId, data.quantity, data.costPrice)
-      : svc.create(data.productId, data.quantity, data.costPrice, '', new Date(data.date));
+      : svc.createInventoryEntry(data.productId, data.quantity, data.costPrice);
 
     // create() returns null (Angular parity) when the product does not exist; treat as a
     // generic failure since there is no DataResult envelope in that branch.
