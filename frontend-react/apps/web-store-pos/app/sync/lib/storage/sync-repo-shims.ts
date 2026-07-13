@@ -8,8 +8,8 @@ import type { GenericUpsertRepo } from '~/sync/lib/services/data-synchronizer-se
  * `BaseRepository` had no Angular correlate (playbook rule 12) and is gone; these shims are NOT
  * a reintroduction of that shared base class — each factory below is a standalone closure,
  * co-located in the sync module, that reads/writes the SAME on-disk key/wire-format as its
- * matching offline service (`OrderOfflineService`/`SaleCreditOfflineService` — plain array,
- * id-869), so a merge performed here stays readable by those consumers afterward.
+ * matching offline service (`OrderOfflineService` — plain array, id-869), so a merge performed
+ * here stays readable by that consumer afterward.
  *
  * SCOPE (product-sync-import-validation-parity, salecredit-sync-import-parity): Categories/
  * Products no longer go through a shim here — `import.tsx` constructs the real
@@ -39,10 +39,9 @@ function storageKey(entity: string, storeId: string): string {
 }
 
 /**
- * Orders/SaleCredits — PLAIN-ARRAY wire format on disk (SAME key as
- * `OrderOfflineService`/`SaleCreditOfflineService`, id-869), converted to/from a `Map`
- * internally so `DataSynchronizerService`'s Map-based merge loop (`mergeBreakOnly`) is
- * unaffected by the wire-format change.
+ * Orders — PLAIN-ARRAY wire format on disk (SAME key as `OrderOfflineService`, id-869),
+ * converted to/from a `Map` internally so `DataSynchronizerService`'s Map-based merge loop
+ * (`mergeBreakOnly`) is unaffected by the wire-format change.
  */
 function makeGenericUpsertRepoShim<T extends { id: string }>(
   entity: string,
