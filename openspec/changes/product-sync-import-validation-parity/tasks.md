@@ -20,7 +20,7 @@ Constructor signature of `DataSynchronizerService` changes
 `CategoryImportRepo`/`ProductImportRepo`) — product and category MUST land
 together, cannot be split across commits.
 
-- [ ] **T1.1 — RED: add `ProductImportRepo`/`CategoryImportRepo` interfaces + mock factories**
+- [x] **T1.1 — RED: add `ProductImportRepo`/`CategoryImportRepo` interfaces + mock factories**
       File: `sync/lib/services/data-synchronizer-service.ts` (interfaces, additive) and
       `sync/lib/services/__tests__/data-synchronizer-service.test.ts` (new
       `makeProductImportRepo`/`makeCategoryImportRepo` mock factories replacing
@@ -30,7 +30,7 @@ together, cannot be split across commits.
       seam shape so the next test can fail for the right reason.
       Requirement: "Sync Import Routes Through Domain Repositories".
 
-- [ ] **T1.2 — RED: write new parity test cases (must fail against current `mergeWithRevert`)**
+- [x] **T1.2 — RED: write new parity test cases (must fail against current `mergeWithRevert`)**
       File: `sync/lib/services/__tests__/data-synchronizer-service.test.ts`.
       Add test cases, run, confirm RED:
       - per-category name collision rejected (`Product.NameExists`) but identical name in a
@@ -51,7 +51,7 @@ together, cannot be split across commits.
       Enforces Name-Uniqueness and Order-Shift", "Revert Passes the Live Mutated Reference
       On Failure".
 
-- [ ] **T1.3 — GREEN: implement `mergeCategoriesViaRepository` + `mergeProductsViaRepository`**
+- [x] **T1.3 — GREEN: implement `mergeCategoriesViaRepository` + `mergeProductsViaRepository`**
       File: `sync/lib/services/data-synchronizer-service.ts`. Port 1:1 from Angular
       `synchronizeCategories`/`synchronizeProducts` per the design's step-mapping table:
       `getStorageProductsMap()` captured once pre-loop → sort incoming by `order` →
@@ -64,7 +64,7 @@ together, cannot be split across commits.
       references them after this). Update constructor param types to
       `CategoryImportRepo`/`ProductImportRepo`. Run T1.1+T1.2 → GREEN.
 
-- [ ] **T1.4 — GREEN: update T1/T2/T4/T5 mocks + assertions in the existing test file**
+- [x] **T1.4 — GREEN: update T1/T2/T4/T5 mocks + assertions in the existing test file**
       File: `sync/lib/services/__tests__/data-synchronizer-service.test.ts`. Swap every
       remaining `makeNameUniqueRepo<ProductCategory|Product>()` call-site to
       `makeCategoryImportRepo`/`makeProductImportRepo` (T1 write-order, T2 duplicate-name
@@ -75,7 +75,7 @@ together, cannot be split across commits.
       or weaken these — only the cat/prod mock plumbing changes.
       Run: `npx turbo run test -- data-synchronizer-service.test.ts` → full GREEN.
 
-- [ ] **T1.5 — shared-instance wiring in `import.tsx` (with its own test)**
+- [x] **T1.5 — shared-instance wiring in `import.tsx` (with its own test)**
       File: `sync/routes/import.tsx`. Replace `makeCategoryRepoShim()`/
       `makeProductRepoShim()` with ONE shared `new ProductCategoryRepository(storeId)`
       injected into `new ProductRepository(storeId, categoryRepo)`, so product
@@ -95,14 +95,14 @@ together, cannot be split across commits.
       scenario is implied by Gate A/data-flow — call this out explicitly in the PR/commit
       note per the instruction's Rule-12 flag).
 
-- [ ] **T1.6 — Regression ring 1: edited test file**
+- [x] **T1.6 — Regression ring 1: edited test file**
       `npx turbo run test -- data-synchronizer-service.test.ts` — GREEN before proceeding.
 
-- [ ] **T1.7 — Regression ring 2: `app/sync/**`**
+- [x] **T1.7 — Regression ring 2: `app/sync/**`**
       `npx turbo run test -- --dir app/sync` (or equivalent scoped invocation) — GREEN,
       including `import-no-write.test.ts` (must stay green per design's file-changes table).
 
-- [ ] **T1.8 — Commit WU1**
+- [x] **T1.8 — Commit WU1**
       One commit: interfaces, both merge methods, deleted `mergeWithRevert`/
       `NameUniqueRepo`, `import.tsx` shared-instance wiring, rewritten/extended
       synchronizer test file. Conventional commit, e.g.
@@ -112,7 +112,7 @@ together, cannot be split across commits.
 
 ## WU2 — Shim retirement (own commit)
 
-- [ ] **T2.1 — RED/prune: remove product/category cases from `sync-repo-shims.test.ts`**
+- [x] **T2.1 — RED/prune: remove product/category cases from `sync-repo-shims.test.ts`**
       File: `sync/lib/storage/__tests__/sync-repo-shims.test.ts`. Delete the
       `makeCategoryRepoShim`/`makeProductRepoShim` describe blocks (Map-entries wire-format
       cases) and the "a category import merge leaves ... readable by
@@ -123,7 +123,7 @@ together, cannot be split across commits.
       Order integration case (lines ~257-286). Run — should still be GREEN (this step only
       deletes now-obsolete assertions, doesn't change production code yet).
 
-- [ ] **T2.2 — GREEN: delete `makeProductRepoShim`/`makeCategoryRepoShim`/`makeNameUniqueRepoShim`**
+- [x] **T2.2 — GREEN: delete `makeProductRepoShim`/`makeCategoryRepoShim`/`makeNameUniqueRepoShim`**
       File: `sync/lib/storage/sync-repo-shims.ts`. Delete the three factories and the
       `makeNameUniqueRepoShim<T>` generic helper (dead after WU1 — nothing constructs
       `NameUniqueRepo` anymore). Keep `makeOrderRepoShim`/`makeSaleCreditRepoShim` and
@@ -134,22 +134,22 @@ together, cannot be split across commits.
       Requirement: "Sync-Local Storage Shim Replaces Shared Base Repository", "Sync Shim
       Wire-Format Parity Per Entity".
 
-- [ ] **T2.3 — Regression ring 1: edited test files**
+- [x] **T2.3 — Regression ring 1: edited test files**
       `npx turbo run test -- sync-repo-shims.test.ts data-synchronizer-service.test.ts` —
       GREEN.
 
-- [ ] **T2.4 — Regression ring 2: `app/sync/**` full**
+- [x] **T2.4 — Regression ring 2: `app/sync/**` full**
       Run the full sync module suite, confirm `import-no-write.test.ts` still GREEN with
       no shim imports left dangling.
 
-- [ ] **T2.5 — Commit WU2**
+- [x] **T2.5 — Commit WU2**
       One commit, e.g. `refactor(sync): retire product/category import shims (real repos own storage)`.
 
 ---
 
 ## WU3 — Spec supersession + regression close-out (own commit)
 
-- [ ] **T3.1 — Merge spec delta into `openspec/specs/sync/spec.md`**
+- [x] **T3.1 — Merge spec delta into `openspec/specs/sync/spec.md`**
       Apply the ADDED/MODIFIED/REMOVED requirements from
       `openspec/changes/product-sync-import-validation-parity/specs/sync/spec.md` into the
       canonical `openspec/specs/sync/spec.md`: remove "Sync Import Behavior Unchanged
@@ -160,16 +160,16 @@ together, cannot be split across commits.
       new test-writing — no RED/GREEN cycle for this task itself (covered by WU1/WU2 GREEN
       tests already).
 
-- [ ] **T3.2 — Regression ring 3: `app/sales/**` (repo consumers)**
+- [x] **T3.2 — Regression ring 3: `app/sales/**` (repo consumers)**
       `npx turbo run test -- --dir app/sales` — confirm `ProductRepository`/
       `ProductCategoryRepository` unit tests are unaffected (no repo contract changes —
       design explicitly states no repository changes, only new call-sites).
 
-- [ ] **T3.3 — Regression ring 4: full suite + typecheck + build**
+- [x] **T3.3 — Regression ring 4: full suite + typecheck + build**
       `npx turbo run test` (full), `npx turbo run typecheck` (or `tsc --noEmit` per repo
       convention), `npx turbo run build` — all GREEN before closing the change.
 
-- [ ] **T3.4 — Commit WU3**
+- [x] **T3.4 — Commit WU3**
       One commit, e.g. `docs(sync): supersede re-home-only spec with full validation parity requirement`.
 
 ---
