@@ -169,7 +169,7 @@ Estado: ⬜ pendiente · 🔎 en revisión · ⚠️ hallazgos · ✅ paridad co
 | L3 | product.repository | `application/products/product.repository.ts` | ✅ | Bypass de orquestación del sync RESUELTO (product-sync-import-validation-parity, verify PASS 2026-07-13): el import/sync rutea por el repo real recuperando validación por-categoría + barcode + category-exists + order-shift. Caché en memoria + auto-init ya restaurados en Fase 0 (eliminate-base-repository). |
 | L4 | product-category-offline.service | `application/categories/product-category-offline.service.ts` | ✅ | Paridad confirmada (product-service-parity Slice 5/8, verify PASS 2026-07-09); Fase 2 cierra con product-category-online-parity. |
 | L4 | product-offline.service | `application/products/product-offline.service.ts` | ✅ | Paridad confirmada (product-service-parity Slice 6, 2898d62/704b125). Superficie async 12+2 métodos. |
-| L4 | inventory-offline.service | `application/entries/inventory-offline.service.ts` | ⚠️ | React inventó `InventoryRepository` sin correlato Angular. Ver hallazgos de repos abajo. |
+| L4 | inventory-offline.service | `application/entries/inventory-offline.service.ts` | ✅ | InventoryRepository ELIMINADO/inlineado (eliminate-inventory-repository, 8dbc992). Verify bottom-up COMPLETO (inventory-offline-service-parity, verify PASS 2026-07-13): 4 gaps regla-3 arreglados a paridad Angular (create deriva categoryId+date interno; deleteInventoryEntry rename+param order; getInventoryEntriesInDay ignora date/siempre hoy; getInventoryCategoriesView zero-arg + sourcing vía ProductCategoryRepository, unguarded). Disponible ahora muestra inactivos-con-stock (paridad Angular, supersede el isActive-only de 2026-07-09). |
 | L5 | order-offline.service | `application/orders/order-offline.service.ts` | ⬜ | — |
 | L5 | shopping-cart.service | `_services/order/shopping-cart.service.ts` | ⬜ | — |
 | L6 | data-serializer.service | `application/synchronization/data-serializer.service.ts` | ⬜ | — |
@@ -190,8 +190,9 @@ Ninguno de los 3 repositorios React cumple al 100%. Detalle:
 - **Regla 2/4 (CONCERN) — RESUELTO** en Fase 0: `getStorageProductsMap` recuperó el caché en memoria (eliminate-base-repository).
 - **Regla 9 (CONCERN) — RESUELTO** en Fase 0: auto-init de localStorage al leer restaurado (eliminate-base-repository).
 
-### `inventory-repository.ts` — el más grave (estructural)
-- **Regla 6 (VIOLACIÓN):** Angular NO tiene repository de inventory. Su persistencia vive inline dentro de `inventory-offline.service.ts`. React inventó una capa `InventoryRepository` que no espeja nada.
+### `inventory-repository.ts` — el más grave (estructural) ✅ RESUELTO (2026-07-13)
+Los 5 hallazgos de abajo fueron resueltos: la capa `InventoryRepository` se ELIMINÓ/inlineó (eliminate-inventory-repository, 8dbc992) y la paridad del offline-service se verificó bottom-up (inventory-offline-service-parity, verify PASS). Detalle original preservado:
+- **Regla 6 (VIOLACIÓN) — RESUELTO:** Angular NO tiene repository de inventory. Su persistencia vive inline dentro de `inventory-offline.service.ts`. React inventó una capa `InventoryRepository` que no espeja nada.
 - **Regla 10 (VIOLACIÓN):** `remove` y `clear` sin correlato Angular Y sin call-site React — código muerto especulativo.
 - **Regla 3:** `getByProductId` fuerza `[]`, Angular puede devolver `undefined`.
 - **Regla 8 (CONCERN):** `reviveEntry` revive 3 fechas, Angular revive solo `date` — fix silencioso.
@@ -206,7 +207,7 @@ El `BaseRepository` compartido de React **no replica** dos comportamientos de An
 
 - [x] `BaseRepository`: ELIMINADO (regla 12) — SDD `eliminate-base-repository`, archive `c69019c`. Cada repo React reproduce inline los helpers de storage (caché + auto-init) como Angular.
 - [x] `BaseService` (interface React): ELIMINADA (regla 12) — SDD `baseservice-parity`, archive `a612fb5`. No espejaba a Angular; era invención. Los 4 offline exponen solo su `getStorageX()`.
-- [x] `InventoryRepository`: ELIMINADO/inlineado (reglas 6/12) — SDD `eliminate-inventory-repository`, archive `8dbc992`, verify PASS. Persistencia inline en InventoryOfflineService espejando Angular (cache + auto-init + reviveEntry date-only); export sync re-homed via `getInventoryEntriesJson`. Falta aún la VERIFICACIÓN de paridad del offline-service en sí (pasada bottom-up).
+- [x] `InventoryRepository`: ELIMINADO/inlineado (reglas 6/12) — SDD `eliminate-inventory-repository`, archive `8dbc992`, verify PASS. Persistencia inline en InventoryOfflineService espejando Angular (cache + auto-init + reviveEntry date-only); export sync re-homed via `getInventoryEntriesJson`. **Verificación bottom-up del offline-service COMPLETA** (inventory-offline-service-parity, verify PASS 2026-07-13, commits 54f7d6f/f693cc7): 4 gaps regla-3 arreglados a paridad Angular. **Fase 4 (inventory) CIERRA.**
 - [x] `activate/deactivateProductCategory`: RATIFICADO — drop del param `isActive` es correcto (código muerto en Angular, ambos lados; Fase 2 CIERRA con esta decisión ratificada).
 - [x] `product` sync bypass: RESUELTO (product-sync-import-validation-parity, verify PASS 2026-07-13). Se cableó el import/sync a través de `ProductRepository`/`ProductCategoryRepository` recuperando validación por-categoría + barcode + category-exists + order-shift (products Y categories). NOTA: el plan lo enmarcaba como bloqueado por Fase 7 — era incorrecto (Fase 7/sync ya estaba archivada en stage6-sync-parity). **Fase 3 (products) CIERRA con esta decisión.**
 
