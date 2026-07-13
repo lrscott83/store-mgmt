@@ -58,13 +58,14 @@ Mutated Reference On Failure"); no writes beyond that mutated state may persist.
 Product and category sync merges MUST route through the real `ProductRepository`/
 `ProductCategoryRepository` (Angular-parity DI, e.g. `ProductRepository(storeId, new
 ProductCategoryRepository(storeId))`), replacing the generic name-uniqueness-only shim. This
-intentionally CHANGES prior merge/revert behavior to recover Angular parity. Orders and inventory
-entries are unaffected — they keep break-only shim/service routing. Expenses and sale credits are
-also unaffected in kind (both already route through their offline services, break-only, no
-revert) — sale credits additionally carry a paid-guard partial-merge (see "Sale Credit Sync-Import
-Routes Through Offline Service With Paid-Guard Partial-Merge").
-(Previously: sale credits were grouped with orders as shim-routed; sale credits now route through
-`SaleCreditOfflineService`, not a shim.)
+intentionally CHANGES prior merge/revert behavior to recover Angular parity. Inventory entries are
+unaffected — they keep break-only service routing. Expenses, sale credits, and orders are also
+unaffected in kind (all three already route through their offline services, break-only, no
+revert) — sale credits additionally carry a paid-guard partial-merge, and orders additionally
+carry a narrow 4-field merge on update (see "Order Sync-Import Routes Through Offline Service With
+Narrow 4-Field Merge").
+(Previously: orders were grouped with the generic shim path; orders now route through
+`OrderOfflineService`, not a shim.)
 
 #### Scenario: Product import uses the real repository
 - GIVEN a `products.json` import file
@@ -75,6 +76,37 @@ Routes Through Offline Service With Paid-Guard Partial-Merge").
 - GIVEN a `categories.json` import file
 - WHEN categories merge
 - THEN each item calls `addImportedProductCategory`/`updateImportedProductCategory` on `ProductCategoryRepository`, never a generic shim
+
+### Requirement: Order Sync-Import Routes Through Offline Service With Narrow 4-Field Merge
+
+Order sync-import merges MUST route through `OrderOfflineService.addImportedOrder` (new id) /
+`updateImportedOrder` (existing id), replacing the generic `GenericUpsertRepo` shim full-overwrite.
+`addImportedOrder` MUST revive the imported order's `date` to a `Date` instance and append the
+order to storage. `updateImportedOrder` MUST overwrite ONLY `date`/`isActive`/`updatedDate`/
+`updatedByName` on the stored order — `total`/`orderItems`/`isCredit`/`paymentType`/`description`
+and every other field MUST be preserved from storage, never overwritten by the imported values.
+Merge stays break-only (no revert) across the incoming batch; an unexpected throw MUST surface
+`SynchronizerErrors.OrdersUnexpectedError` (existing code, unchanged).
+
+#### Scenario: New order is added via the service
+- GIVEN an imported order whose `id` does not exist in storage
+- WHEN the order merge runs
+- THEN `OrderOfflineService.addImportedOrder` is called and the order is appended to storage with `date` revived to a `Date` instance
+
+#### Scenario: Update to an existing order narrow-merges only 4 fields
+- GIVEN a stored order with `total: 500`, `orderItems: [...]`, `isCredit: true`, `paymentType: 'cash'`
+- WHEN an imported order with the same `id` carries different `date`/`isActive`/`updatedDate`/`updatedByName` AND different `total`/`orderItems`/`isCredit`/`paymentType`
+- THEN `updateImportedOrder` overwrites only `date`/`isActive`/`updatedDate`/`updatedByName`, while the stored `total`/`orderItems`/`isCredit`/`paymentType` remain unchanged
+
+#### Scenario: Order merge routes through the service, not the shim
+- GIVEN a reviewer inspects the production sync wiring for orders
+- WHEN checking which class performs the merge writes
+- THEN it MUST be `OrderOfflineService`, never `makeOrderRepoShim` or any `GenericUpsertRepo` shim
+
+#### Scenario: Unexpected failure surfaces the orders error code, break-only
+- GIVEN the order merge throws while processing an imported batch
+- WHEN the failure is caught
+- THEN the merge result carries `Synchronizer.OrdersUnexpectedError`, and any orders already written before the throw remain persisted (break-only, no revert)
 
 ### Requirement: Sale Credit Sync-Import Routes Through Offline Service With Paid-Guard Partial-Merge
 
@@ -236,46 +268,34 @@ While the app remains open, the registered service worker MUST poll `registratio
 
 ### Requirement: Sync-Local Storage Shim Replaces Shared Base Repository
 
-`sync/routes/import.tsx` MUST NOT construct raw `new BaseRepository<...>` instances. Orders MUST
-use a sync-local storage shim satisfying `GenericUpsertRepo`. Sale credits MUST NOT use a shim —
-`import.tsx` MUST construct `SaleCreditOfflineService` directly, and `DataSynchronizerService` MUST
-consume it through the `SaleCreditImportService` seam (mirroring `ExpenseImportService`). Categories
-and products MUST NOT use a `NameUniqueRepo` shim — `import.tsx` MUST construct the real
-`ProductCategoryRepository`/`ProductRepository` directly, and `DataSynchronizerService` MUST
-consume them through a dedicated repository-backed seam.
-(Previously: sale credits used a `GenericUpsertRepo` shim like orders; `makeSaleCreditRepoShim` is
-now retired.)
+`sync/routes/import.tsx` MUST NOT construct raw `new BaseRepository<...>` instances, and MUST NOT
+construct any sync-local `GenericUpsertRepo` shim — no entity remains shim-routed. Sale credits
+MUST NOT use a shim — `import.tsx` MUST construct `SaleCreditOfflineService` directly, and
+`DataSynchronizerService` MUST consume it through the `SaleCreditImportService` seam. Orders MUST
+NOT use a shim either — `import.tsx` MUST construct `OrderOfflineService` directly, and
+`DataSynchronizerService` MUST consume it through a new `OrderImportService` seam (mirroring
+`SaleCreditImportService`/`ExpenseImportService`). Categories and products MUST NOT use a
+`NameUniqueRepo` shim — `import.tsx` MUST construct the real `ProductCategoryRepository`/
+`ProductRepository` directly, and `DataSynchronizerService` MUST consume them through a dedicated
+repository-backed seam.
+(Previously: orders used a `GenericUpsertRepo` shim; `makeOrderRepoShim` and the whole
+`sync-repo-shims.ts` file are now retired — orders route through `OrderImportService` like sale
+credits and expenses.)
 
 #### Scenario: No BaseRepository import in the sync module
-- GIVEN a reviewer inspects `sync/routes/import.tsx` and any sync-local shim files
-- WHEN checking their imports
-- THEN none MUST import or instantiate `BaseRepository`
+- GIVEN a reviewer inspects `sync/routes/import.tsx`
+- WHEN checking its imports
+- THEN it MUST NOT import or instantiate `BaseRepository`
 
 #### Scenario: Products and categories bypass the generic shim
 - GIVEN a reviewer inspects the production sync wiring for products/categories
 - WHEN checking which class performs the merge writes
 - THEN it MUST be the real `ProductRepository`/`ProductCategoryRepository`, never `makeProductRepoShim`/the category shim or any `NameUniqueRepo` shim
 
-### Requirement: Sync Shim Wire-Format Parity Per Entity
-
-Sync-local shims (orders ONLY) MUST read/write the same on-disk keys/formats as their offline
-service — plain-array, converting array↔Map internally. Categories and products no longer go
-through a shim; they read/write Map-entries directly via `ProductRepository`/
-`ProductCategoryRepository`. Sale credits no longer go through a shim either; they read/write
-plain-array format directly via `SaleCreditOfflineService`, sharing the same on-disk key/format
-the shim previously mirrored.
-(Previously: shims covered "orders, sale credits ONLY"; sale credits are now service-routed, not
-shim-routed.)
-
-#### Scenario: Orders remain plain-array via the shim
-- GIVEN an order was created via `OrderOfflineService` before any sync import
-- WHEN a backup is imported and orders merge
-- THEN `lizoft.store-orders-{storeId}` MUST remain a plain JSON array readable by `OrderOfflineService` afterward
-
-#### Scenario: Category import writes through the real repository directly
-- GIVEN a category exists via `ProductCategoryRepository` before any sync import
-- WHEN a backup is imported and categories revert on a name clash
-- THEN `lizoft.store-product-categories-{storeId}` MUST remain Map-entries format, written by `ProductCategoryRepository` itself, not a shim copy
+#### Scenario: sync-repo-shims.ts no longer exists
+- GIVEN a reviewer inspects the `sync/lib/storage/` directory
+- WHEN checking for a `sync-repo-shims.ts` file
+- THEN it MUST NOT be present; `makeOrderRepoShim`, `makeGenericUpsertRepoShim`, `mergeBreakOnly`, and `GenericUpsertRepo<T>` MUST NOT exist anywhere in the sync module
 
 ### Requirement: getInventoryEntriesJson Raw Passthrough on InventoryOfflineService
 `InventoryOfflineService` MUST expose `getInventoryEntriesJson(storeId)`, a 1:1 port of Angular's
