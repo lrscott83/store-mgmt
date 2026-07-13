@@ -12,7 +12,7 @@ import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offl
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { createProductService } from '../lib/services/product-service.factory';
-import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
+import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { hasAvailableProductToSale } from '../lib/product-availability';
 import { SaleCategoryProducts } from '../components/sale-category-products';
 
@@ -37,7 +37,7 @@ export function SalePage() {
   // returns active-only categories sorted by order (ProductCategoryRepository.
   // getAvailableProductCategories) — no manual filter/sort needed.
   useEffect(() => {
-    const categoryService = new ProductCategoryOfflineService(storeId);
+    const categoryService = createProductCategoryService(storeId);
     categoryService.getAvailableProductCategories().then((result) => {
       const availableCategories = result.data ?? [];
       setCategories(availableCategories);

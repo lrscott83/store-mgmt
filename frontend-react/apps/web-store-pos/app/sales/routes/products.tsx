@@ -10,7 +10,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { createProductService } from '../lib/services/product-service.factory';
-import { ProductCategoryOfflineService } from '../lib/services/product-category-offline-service';
+import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { CategoryProductList } from '../components/category-product-list';
 import { CreateProductModal } from '../components/create-product-modal';
@@ -38,7 +38,7 @@ export function ProductsPage() {
   const [modal, setModal] = useState<Modal | null>(null);
 
   const productService = createProductService(storeId);
-  const categoryService = new ProductCategoryOfflineService(storeId);
+  const categoryService = createProductCategoryService(storeId);
 
   // Angular parity (products.component.ts:30-40): categories via getProductCategoriesView
   // (active-only, WITH productsCount); mirrors Angular's eager-mount-all
