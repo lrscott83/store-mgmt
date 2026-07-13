@@ -1,5 +1,5 @@
 import { Result } from '@store-mgmt/domain';
-import type { Expense, InventoryEntry, Product, ProductCategory, SaleCredit } from '@store-mgmt/domain';
+import type { Expense, InventoryEntry, Order, Product, ProductCategory, SaleCredit } from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
 
 // ---------------------------------------------------------------------------
@@ -100,15 +100,6 @@ export interface CategoryImportRepo {
 }
 
 /**
- * Repos backing entity types with break-only (no revert) semantics
- * (Orders, Expenses, SaleCredits).
- */
-export interface GenericUpsertRepo<T extends { id: string }> {
-  getAll(storeId: string): Map<string, T>;
-  upsert(storeId: string, item: T): void;
-}
-
-/**
  * Inventory import routes through the offline SERVICE, not the raw repo — Angular parity:
  * `data-synchronizer.service.ts` `synchronizeInventoryEntries` (:142-155) reads the raw
  * per-product map via `getStorageInventoriesMap`, then calls `addImportedEntries` for a new
@@ -152,6 +143,23 @@ export interface SaleCreditImportService {
   updateImportedSaleCredit(saleCredit: SaleCredit): Result;
 }
 
+/**
+ * Order import routes through the offline SERVICE, not a raw `GenericUpsertRepo` shim —
+ * Angular parity: `data-synchronizer.service.ts` `synchronizeOrders` (:167-200) calls
+ * `orderService.addImportedOrder` / `updateImportedOrder` (the domain-command layer), never a
+ * generic upsert shim. `updateImportedOrder` carries a NARROW 4-field merge
+ * (`order-offline.service.ts` :438-449): it overwrites ONLY `date`/`isActive`/`updatedDate`/
+ * `updatedByName` unconditionally, leaving `total`/`orderItems`/`isCredit`/`paymentType` and
+ * every other field untouched — a generic `GenericUpsertRepo` full-overwrite cannot express
+ * this, so Orders get their own narrow seam (mirrors `SaleCreditImportService`; order-sync-import-parity,
+ * the LAST entity migrated off `GenericUpsertRepo`/`mergeBreakOnly`).
+ */
+export interface OrderImportService {
+  getStorageOrders(): Order[];
+  addImportedOrder(order: Order): Result;
+  updateImportedOrder(order: Order): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -193,7 +201,7 @@ export class DataSynchronizerService {
     private readonly categoryRepo: CategoryImportRepo,
     private readonly productRepo: ProductImportRepo,
     private readonly inventoryService: InventoryImportService,
-    private readonly orderRepo: GenericUpsertRepo<import('@store-mgmt/domain').Order>,
+    private readonly orderService: OrderImportService,
     private readonly expenseService: ExpenseImportService,
     private readonly saleCreditService: SaleCreditImportService,
   ) {}
@@ -216,15 +224,10 @@ export class DataSynchronizerService {
     // 3. InventoryEntries — grouped by productId, break-only (no revert).
     push(this.mergeInventoryBreakOnly(data.inventoryEntries));
 
-    // 4. Orders — break-only (no revert).
-    push(
-      this.mergeBreakOnly(
-        'orders',
-        this.orderRepo,
-        data.orders,
-        SynchronizerErrors.OrdersUnexpectedError,
-      ),
-    );
+    // 4. Orders — routed through the offline SERVICE (Angular parity), break-only (no
+    // revert), with a narrow 4-field merge inside updateImportedOrder. Emits
+    // OrdersUnexpectedError (Angular's own code on this path — no copy-paste bug here).
+    push(this.mergeOrdersViaService(data.orders));
 
     // 5. Expenses — routed through the offline SERVICE (Angular parity), break-only (no
     // revert). Emits its own ExpensesUnexpectedError (Angular's copy-paste bug of reusing
@@ -339,35 +342,60 @@ export class DataSynchronizerService {
   }
 
   // ---------------------------------------------------------------------------
-  // Orders / Expenses / SaleCredits — break-only, no revert
+  // Orders — routed through the offline SERVICE (Angular parity, not a raw repo/shim)
   // ---------------------------------------------------------------------------
 
-  private mergeBreakOnly<T extends { id: string }>(
-    entity: string,
-    repo: GenericUpsertRepo<T>,
-    incoming: T[],
-    unexpectedError: { code: string; message: string },
-  ): MergeOutcome {
+  /**
+   * Mirrors Angular `data-synchronizer.service.ts` `synchronizeOrders` (:167-200): builds a map
+   * of stored orders, then routes each imported order through the SERVICE —
+   * `addImportedOrder` when new, `updateImportedOrder` when it already exists — breaking on
+   * the first non-succeeded Result. The narrow 4-field merge lives inside `updateImportedOrder`
+   * itself (not here) and does not affect insert/update counts. Break-only (no revert); an
+   * unexpected throw yields `OrdersUnexpectedError` (Angular's own code on this path — no
+   * copy-paste bug to fix here, unlike Expenses/SaleCredits).
+   */
+  private mergeOrdersViaService(incoming: Order[]): MergeOutcome {
     if (incoming.length === 0) {
-      return { merge: { entity, inserted: 0, updated: 0 } };
+      return { merge: { entity: 'orders', inserted: 0, updated: 0 } };
     }
 
     let inserted = 0;
     let updated = 0;
 
     try {
-      for (const item of incoming) {
-        const current = repo.getAll(this.storeId);
-        if (current.has(item.id)) updated++;
-        else inserted++;
-        repo.upsert(this.storeId, item);
+      const existing = new Map(this.orderService.getStorageOrders().map((o) => [o.id, o]));
+      for (const order of incoming) {
+        const isNew = !existing.has(order.id);
+        if (isNew) {
+          existing.set(order.id, order);
+          inserted++;
+        } else {
+          updated++;
+        }
+        const result = isNew
+          ? this.orderService.addImportedOrder(order)
+          : this.orderService.updateImportedOrder(order);
+        if (!result.succeeded) {
+          return {
+            merge: { entity: 'orders', inserted, updated },
+            error: {
+              entity: 'orders',
+              code: SynchronizerErrors.OrdersUnexpectedError.code,
+              message: SynchronizerErrors.OrdersUnexpectedError.message,
+            },
+          };
+        }
       }
-      return { merge: { entity, inserted, updated } };
+      return { merge: { entity: 'orders', inserted, updated } };
     } catch {
       // Break-only: no revert — writes already applied before the failure persist.
       return {
-        merge: { entity, inserted, updated },
-        error: { entity, code: unexpectedError.code, message: unexpectedError.message },
+        merge: { entity: 'orders', inserted, updated },
+        error: {
+          entity: 'orders',
+          code: SynchronizerErrors.OrdersUnexpectedError.code,
+          message: SynchronizerErrors.OrdersUnexpectedError.message,
+        },
       };
     }
   }

@@ -3,7 +3,7 @@ import { DataSynchronizerService } from '../data-synchronizer-service';
 import type {
   CategoryImportRepo,
   ProductImportRepo,
-  GenericUpsertRepo,
+  OrderImportService,
   InventoryImportService,
   ExpenseImportService,
   SaleCreditImportService,
@@ -178,17 +178,40 @@ function makeProductImportRepoMock(
   };
 }
 
-function makeGenericRepo<T extends { id: string }>(
-  initial: T[] = [],
-): GenericUpsertRepo<T> & { _upserted: T[] } {
+/**
+ * Mock of the offline OrderOfflineService's import surface. Orders sync through the SERVICE
+ * (Angular parity), so the synchronizer drives `addImportedOrder`/`updateImportedOrder` (never a
+ * raw repo `upsert`). The mock REPLICATES the real service's NARROW 4-field merge —
+ * `updateImportedOrder` overwrites ONLY `date`/`isActive`/`updatedDate`/`updatedByName`, keeping
+ * `total`/`orderItems`/`isCredit`/`paymentType` from the existing seeded record — otherwise the
+ * narrow-merge assertion below would be vacuous (design §6.1, tasks 2.1).
+ */
+function makeOrderImportServiceMock(
+  initial: Order[] = [],
+): OrderImportService & { _imported: Order[] } {
   const store = new Map(initial.map((v) => [v.id, v]));
-  const _upserted: T[] = [];
+  const _imported: Order[] = [];
   return {
-    _upserted,
-    getAll: (_storeId: string) => new Map(store),
-    upsert: (_storeId: string, item: T) => {
-      store.set(item.id, item);
-      _upserted.push(item);
+    _imported,
+    getStorageOrders: () => Array.from(store.values()),
+    addImportedOrder: (order: Order) => {
+      store.set(order.id, { ...order, date: new Date(order.date) });
+      _imported.push(order);
+      return Result.Success();
+    },
+    updateImportedOrder: (order: Order) => {
+      const existing = store.get(order.id);
+      if (existing) {
+        store.set(order.id, {
+          ...existing,
+          date: new Date(order.date),
+          isActive: order.isActive,
+          updatedDate: order.updatedDate,
+          updatedByName: order.updatedByName,
+        });
+      }
+      _imported.push(order);
+      return Result.Success();
     },
   };
 }
@@ -308,7 +331,7 @@ function makeService(opts?: {
   const catRepo = makeCategoryImportRepoMock(opts?.existingCategories ?? []);
   const prodRepo = makeProductImportRepoMock(opts?.existingProducts ?? []);
   const inventoryService = makeInventoryImportServiceMock(opts?.existingInventory ?? new Map());
-  const orderRepo = makeGenericRepo<Order>(opts?.existingOrders ?? []);
+  const orderService = makeOrderImportServiceMock(opts?.existingOrders ?? []);
   const expenseService = makeExpenseImportServiceMock(opts?.existingExpenses ?? []);
   const saleCreditService = makeSaleCreditImportServiceMock(opts?.existingSaleCredits ?? []);
 
@@ -317,11 +340,11 @@ function makeService(opts?: {
     catRepo,
     prodRepo,
     inventoryService,
-    orderRepo,
+    orderService,
     expenseService,
     saleCreditService,
   );
-  return { svc, catRepo, prodRepo, inventoryService, orderRepo, expenseService, saleCreditService };
+  return { svc, catRepo, prodRepo, inventoryService, orderService, expenseService, saleCreditService };
 }
 
 function emptyData(): ParsedData {
@@ -381,9 +404,16 @@ describe('DataSynchronizerService', () => {
           return Result.Success();
         },
       };
-      const orderRepo: GenericUpsertRepo<Order> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => writeOrder.push('order:' + item.id),
+      const orderService: OrderImportService = {
+        getStorageOrders: () => [],
+        addImportedOrder: (item) => {
+          writeOrder.push('order:' + item.id);
+          return Result.Success();
+        },
+        updateImportedOrder: (item) => {
+          writeOrder.push('order:' + item.id);
+          return Result.Success();
+        },
       };
       const expenseService: ExpenseImportService = {
         getStorageExpenses: () => [],
@@ -413,7 +443,7 @@ describe('DataSynchronizerService', () => {
         catRepo,
         prodRepo,
         inventoryService,
-        orderRepo,
+        orderService,
         expenseService,
         saleCreditService,
       );
@@ -465,7 +495,7 @@ describe('DataSynchronizerService', () => {
         categoryRepo,
         productRepo,
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         makeSaleCreditImportServiceMock(),
       );
@@ -510,7 +540,7 @@ describe('DataSynchronizerService', () => {
         categoryRepo,
         productRepo,
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         makeSaleCreditImportServiceMock(),
       );
@@ -552,14 +582,14 @@ describe('DataSynchronizerService', () => {
     it('does not revert other entity types when categories fail', async () => {
       const categoryRepo = new ProductCategoryRepository(REAL_STORE_ID);
       categoryRepo.addImportedProductCategory(makeCategory('cat-existing', 'Bebidas', 1));
-      const orderRepo = makeGenericRepo<Order>();
+      const orderService = makeOrderImportServiceMock();
 
       const svc = new DataSynchronizerService(
         REAL_STORE_ID,
         categoryRepo,
         new ProductRepository(REAL_STORE_ID, categoryRepo),
         makeInventoryImportServiceMock(),
-        orderRepo,
+        orderService,
         makeExpenseImportServiceMock(),
         makeSaleCreditImportServiceMock(),
       );
@@ -572,7 +602,7 @@ describe('DataSynchronizerService', () => {
       const result = await svc.sync(data);
       expect(result.succeeded).toBe(false);
       // Orders are unaffected by the categories failure — sync continues.
-      expect(orderRepo.getAll(REAL_STORE_ID).has('order-1')).toBe(true);
+      expect(orderService.getStorageOrders().some((o) => o.id === 'order-1')).toBe(true);
       const orderMerge = result.merges.find((m) => m.entity === 'orders');
       expect(orderMerge).toEqual({ entity: 'orders', inserted: 1, updated: 0 });
     });
@@ -605,7 +635,7 @@ describe('DataSynchronizerService', () => {
         categoryRepo,
         productRepo,
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         makeSaleCreditImportServiceMock(),
       );
@@ -764,17 +794,17 @@ describe('DataSynchronizerService', () => {
 
   describe('T3 — break-only (no revert) for orders/expenses/saleCredits/inventory', () => {
     it('breaks the orders loop on the first failing item but keeps prior successful writes', async () => {
-      const { svc, orderRepo } = makeService();
+      const { svc, orderService } = makeService();
       const failing = makeOrder('order-bad');
       const ok1 = makeOrder('order-ok-1');
       const ok2 = makeOrder('order-ok-2');
 
-      // upsert throws for the "bad" order id — simulates an unexpected
+      // addImportedOrder throws for the "bad" order id — simulates an unexpected
       // storage failure (Angular: caught, entity-level UnexpectedError).
-      const originalUpsert = orderRepo.upsert.bind(orderRepo);
-      orderRepo.upsert = (storeId: string, item: Order) => {
+      const originalAdd = orderService.addImportedOrder.bind(orderService);
+      orderService.addImportedOrder = (item: Order) => {
         if (item.id === 'order-bad') throw new Error('storage exploded');
-        originalUpsert(storeId, item);
+        return originalAdd(item);
       };
 
       const data: ParsedData = {
@@ -791,9 +821,9 @@ describe('DataSynchronizerService', () => {
 
       // Break-only: ok1 (written before the failure) persists, ok2 (after
       // the break) does NOT — no revert of ok1's already-applied write.
-      const remaining = orderRepo.getAll(STORE_ID);
-      expect(remaining.has('order-ok-1')).toBe(true);
-      expect(remaining.has('order-ok-2')).toBe(false);
+      const remaining = orderService.getStorageOrders();
+      expect(remaining.some((o) => o.id === 'order-ok-1')).toBe(true);
+      expect(remaining.some((o) => o.id === 'order-ok-2')).toBe(false);
     });
 
     it('breaks the inventory loop on first failure without reverting prior product groups', async () => {
@@ -820,8 +850,8 @@ describe('DataSynchronizerService', () => {
     });
 
     it('synchronizeFiles/sync aggregates errors across entity types and continues (not abort-on-first)', async () => {
-      const { svc, orderRepo, expenseService } = makeService();
-      orderRepo.upsert = () => {
+      const { svc, orderService, expenseService } = makeService();
+      orderService.addImportedOrder = () => {
         throw new Error('order storage exploded');
       };
       expenseService.addImportedExpense = () => {
@@ -1001,7 +1031,7 @@ describe('DataSynchronizerService', () => {
         catRepo,
         prodRepo,
         inventoryService,
-        orderRepo,
+        orderService,
         expenseService,
         saleCreditService,
       } = makeService();
@@ -1030,8 +1060,13 @@ describe('DataSynchronizerService', () => {
         writes++;
         return Result.Success();
       };
-      orderRepo.upsert = () => {
+      orderService.addImportedOrder = () => {
         writes++;
+        return Result.Success();
+      };
+      orderService.updateImportedOrder = () => {
+        writes++;
+        return Result.Success();
       };
       expenseService.addImportedExpense = () => {
         writes++;
@@ -1082,7 +1117,7 @@ describe('DataSynchronizerService', () => {
         makeCategoryImportRepoMock(),
         makeProductImportRepoMock(),
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         expenseService,
         makeSaleCreditImportServiceMock(),
       );
@@ -1129,7 +1164,7 @@ describe('DataSynchronizerService', () => {
         makeCategoryImportRepoMock(),
         makeProductImportRepoMock(),
         inventoryService,
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         makeSaleCreditImportServiceMock(),
       );
@@ -1172,7 +1207,7 @@ describe('DataSynchronizerService', () => {
         makeCategoryImportRepoMock(),
         makeProductImportRepoMock(),
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         saleCreditService,
       );
@@ -1216,7 +1251,7 @@ describe('DataSynchronizerService', () => {
         makeCategoryImportRepoMock(),
         makeProductImportRepoMock(),
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         saleCreditService,
       );
@@ -1249,7 +1284,7 @@ describe('DataSynchronizerService', () => {
         makeCategoryImportRepoMock(),
         makeProductImportRepoMock(),
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         saleCreditService,
       );
@@ -1274,7 +1309,7 @@ describe('DataSynchronizerService', () => {
         makeCategoryImportRepoMock(),
         makeProductImportRepoMock(),
         makeInventoryImportServiceMock(),
-        makeGenericRepo<Order>(),
+        makeOrderImportServiceMock(),
         makeExpenseImportServiceMock(),
         saleCreditService,
       );
@@ -1284,6 +1319,140 @@ describe('DataSynchronizerService', () => {
       expect(result.succeeded).toBe(false);
       const err = result.errors.find((e) => e.entity === 'saleCredits');
       expect(err?.code).toBe('Synchronizer.SaleCreditsUnexpectedError');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // T11 — order import routes through the offline service (Angular parity) +
+  // narrow 4-field merge (order-sync-import-parity)
+  // -------------------------------------------------------------------------
+
+  describe('T11 — order import routes through the offline service (Angular parity) + narrow 4-field merge', () => {
+    it('narrow merge preserves total/orderItems/isCredit/paymentType while overwriting date/isActive/updatedDate/updatedByName', async () => {
+      const existing: Order = {
+        ...makeOrder('o1'),
+        total: 500,
+        orderItems: [{
+          productId: 'p1',
+          productName: 'Coca Cola',
+          categoryId: 'cat-1',
+          categoryName: 'Bebidas',
+          name: 'Coca Cola',
+          quantity: 2,
+          price: 5,
+          productBusinessId: 'biz-1',
+          productCosts: [],
+          order: 0,
+        }],
+        isCredit: true,
+        paymentType: 0 as Order['paymentType'],
+      };
+      const orderService = makeOrderImportServiceMock([existing]);
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        orderService,
+        makeExpenseImportServiceMock(),
+        makeSaleCreditImportServiceMock(),
+      );
+
+      const updatedDate = new Date('2024-07-01T00:00:00.000Z');
+      const imported: Order = {
+        ...existing,
+        date: new Date('2024-07-02T00:00:00.000Z'),
+        isActive: false,
+        updatedDate,
+        updatedByName: 'jdoe',
+        // Different protected fields — MUST be ignored by the narrow merge.
+        total: 999,
+        orderItems: [],
+        isCredit: false,
+        paymentType: 1 as Order['paymentType'],
+      };
+
+      const result = await svc.sync({ ...emptyData(), orders: [imported] });
+
+      expect(result.succeeded).toBe(true);
+      const merge = result.merges.find((m) => m.entity === 'orders');
+      expect(merge).toEqual({ entity: 'orders', inserted: 0, updated: 1 });
+
+      const stored = orderService.getStorageOrders().find((o) => o.id === 'o1');
+      expect(stored?.isActive).toBe(false);
+      expect(stored?.updatedDate).toEqual(updatedDate);
+      expect(stored?.updatedByName).toBe('jdoe');
+      // Protected fields UNCHANGED from the original seed.
+      expect(stored?.total).toBe(500);
+      expect(stored?.orderItems).toEqual(existing.orderItems);
+      expect(stored?.isCredit).toBe(true);
+      expect(stored?.paymentType).toBe(0);
+    });
+
+    it('adds a new order whose id is absent from storage via addImportedOrder', async () => {
+      const orderService = makeOrderImportServiceMock([]);
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        orderService,
+        makeExpenseImportServiceMock(),
+        makeSaleCreditImportServiceMock(),
+      );
+
+      const incoming = makeOrder('order-new');
+      const result = await svc.sync({ ...emptyData(), orders: [incoming] });
+
+      expect(result.succeeded).toBe(true);
+      const merge = result.merges.find((m) => m.entity === 'orders');
+      expect(merge).toEqual({ entity: 'orders', inserted: 1, updated: 0 });
+      expect(orderService._imported.map((o) => o.id)).toEqual(['order-new']);
+    });
+
+    it('routes through OrderImportService, not a GenericUpsertRepo/mergeBreakOnly shim', () => {
+      const orderService = makeOrderImportServiceMock([]);
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        orderService,
+        makeExpenseImportServiceMock(),
+        makeSaleCreditImportServiceMock(),
+      );
+      // Compile-level assertion: ctor param 5 accepts `OrderImportService`
+      // (getStorageOrders/addImportedOrder/updateImportedOrder), not the retired
+      // GenericUpsertRepo<Order> (getAll/upsert) shape.
+      expect(svc).toBeInstanceOf(DataSynchronizerService);
+      expect(typeof orderService.getStorageOrders).toBe('function');
+      expect(typeof orderService.addImportedOrder).toBe('function');
+      expect(typeof orderService.updateImportedOrder).toBe('function');
+    });
+
+    it('emits OrdersUnexpectedError via the service when a write throws, break-only (orders already written before the throw remain persisted)', async () => {
+      const orderService = makeOrderImportServiceMock([]);
+      orderService.addImportedOrder = () => {
+        throw new Error('order storage exploded');
+      };
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        orderService,
+        makeExpenseImportServiceMock(),
+        makeSaleCreditImportServiceMock(),
+      );
+
+      const result = await svc.sync({ ...emptyData(), orders: [makeOrder('order-err')] });
+
+      expect(result.succeeded).toBe(false);
+      const err = result.errors.find((e) => e.entity === 'orders');
+      expect(err?.code).toBe('Synchronizer.OrdersUnexpectedError');
     });
   });
 });

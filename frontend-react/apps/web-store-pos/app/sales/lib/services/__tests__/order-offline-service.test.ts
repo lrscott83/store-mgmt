@@ -973,4 +973,77 @@ describe('OrderOfflineService', () => {
       expect(order.description).toBe('Merma note');
     });
   });
+
+  describe('ORD-19: addImportedOrder/updateImportedOrder (sync-import narrow merge, order-sync-import-parity)', () => {
+    it('addImportedOrder appends a new order and revives date to a Date instance', () => {
+      const imported = makeOrder({
+        id: 'imported-1',
+        date: '2024-06-01T00:00:00.000Z' as unknown as Date,
+      });
+
+      const result = service.addImportedOrder(imported);
+
+      expect(result.succeeded).toBe(true);
+      const stored = findOrder('imported-1');
+      expect(stored).toBeDefined();
+      expect(stored?.date).toBeInstanceOf(Date);
+    });
+
+    it('updateImportedOrder narrow-merges ONLY date/isActive/updatedDate/updatedByName, preserving total/orderItems/isCredit/paymentType', () => {
+      const seeded = makeOrder({
+        id: 'o1',
+        total: 500,
+        orderItems: [orderItemFor('p1', 'Coca Cola', { price: 5, qty: 2 })],
+        isCredit: true,
+        paymentType: PaymentType.Efectivo,
+        isActive: true,
+        description: 'original description',
+      });
+      seedOrders(storeId, [seeded]);
+      service = new OrderOfflineService(storeId);
+
+      const updatedDate = new Date('2024-07-01T00:00:00.000Z');
+      const imported = makeOrder({
+        id: 'o1',
+        date: '2024-07-02T00:00:00.000Z' as unknown as Date,
+        isActive: false,
+        updatedDate,
+        updatedByName: 'jdoe',
+        // Different protected fields — MUST be ignored by the narrow merge.
+        total: 999,
+        orderItems: [orderItemFor('p2', 'Fanta', { price: 3, qty: 5 })],
+        isCredit: false,
+        paymentType: PaymentType.Tarjeta,
+      });
+
+      const result = service.updateImportedOrder(imported);
+
+      expect(result.succeeded).toBe(true);
+      const stored = findOrder('o1');
+      expect(stored?.date).toBeInstanceOf(Date);
+      expect(stored?.date.toISOString()).toBe('2024-07-02T00:00:00.000Z');
+      expect(stored?.isActive).toBe(false);
+      expect(stored?.updatedDate).toEqual(updatedDate);
+      expect(stored?.updatedByName).toBe('jdoe');
+      // Protected fields UNCHANGED from the original seed.
+      expect(stored?.total).toBe(500);
+      expect(stored?.orderItems).toEqual(seeded.orderItems);
+      expect(stored?.isCredit).toBe(true);
+      expect(stored?.paymentType).toBe(PaymentType.Efectivo);
+      expect(stored?.description).toBe('original description');
+    });
+
+    it('updateImportedOrder is a no-op when the id is absent from storage (no throw, no insert)', () => {
+      seedOrders(storeId, [makeOrder({ id: 'o1' })]);
+      service = new OrderOfflineService(storeId);
+
+      const imported = makeOrder({ id: 'missing-id' });
+
+      const result = service.updateImportedOrder(imported);
+
+      expect(result.succeeded).toBe(true);
+      expect(service.getStorageOrders()).toHaveLength(1);
+      expect(findOrder('missing-id')).toBeUndefined();
+    });
+  });
 });

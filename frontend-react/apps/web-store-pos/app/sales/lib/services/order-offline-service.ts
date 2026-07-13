@@ -1,5 +1,5 @@
 import type { Order, OrderItem } from '@store-mgmt/domain';
-import { OrderType, PaymentType } from '@store-mgmt/domain';
+import { OrderType, PaymentType, Result } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
@@ -402,6 +402,37 @@ export class OrderOfflineService {
       })),
     }));
     this.inventoryService.increaseQuantitiesByOrderItems(normalizedItems);
+  }
+
+  /**
+   * order-sync-import-parity: 1:1 port of Angular's `addImportedOrder`
+   * (order-offline.service.ts:430-436) — appends the imported order, reviving `date` to a
+   * `Date` instance. Always returns `Result.Success()`.
+   */
+  addImportedOrder(order: Order): Result {
+    const imported: Order = { ...order, date: new Date(order.date) };
+    this.getStorageOrders().push(imported);
+    this.setOrdersLocalStorage(this.orders!);
+    return Result.Success();
+  }
+
+  /**
+   * order-sync-import-parity: 1:1 port of Angular's `updateImportedOrder`
+   * (order-offline.service.ts:438-449) — NARROW 4-field merge on the existing record by
+   * id: overwrites ONLY `date` (revived)/`isActive`/`updatedDate`/`updatedByName`; leaves
+   * `total`/`orderItems`/`isCredit`/`paymentType`/`description` and every other field
+   * untouched. No-op when the id is absent. Always returns `Result.Success()`.
+   */
+  updateImportedOrder(importedOrder: Order): Result {
+    const order = this.getStorageOrders().find((o) => o.id === importedOrder.id);
+    if (order) {
+      order.date = new Date(importedOrder.date);
+      order.isActive = importedOrder.isActive;
+      order.updatedDate = importedOrder.updatedDate;
+      order.updatedByName = importedOrder.updatedByName;
+      this.setOrdersLocalStorage(this.orders!);
+    }
+    return Result.Success();
   }
 
   /** Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) — plain-array write. */

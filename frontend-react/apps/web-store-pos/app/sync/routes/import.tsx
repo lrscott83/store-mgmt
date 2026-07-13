@@ -7,7 +7,6 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
-import { makeOrderRepoShim } from '~/sync/lib/storage/sync-repo-shims';
 import { DataSerializerService, WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -72,20 +71,21 @@ export function ImportPage() {
     // uniqueness + order-shift for categories).
     const categoryRepo = categoryRepoForSerializer;
     const productRepo = productRepoForSerializer;
-    const orderRepo = makeOrderRepoShim();
-    // Inventory + Expenses + SaleCredits route through their offline SERVICES (Angular parity:
-    // the synchronizer calls inventorySvc.addImportedEntries/updateImportedEntries,
+    // Inventory + Orders + Expenses + SaleCredits route through their offline SERVICES
+    // (Angular parity: the synchronizer calls inventorySvc.addImportedEntries/
+    // updateImportedEntries, orderSvc.addImportedOrder/updateImportedOrder,
     // expenseSvc.addImportedExpense/updateImportedExpense, and
-    // creditSvc.addImportedSaleCredit/updateImportedSaleCredit — never raw repos/shims).
-    // `inventorySvc`/`creditSvc` are the SAME instances constructed above for the
-    // serializer's read side (mirrors Angular's singleton DI; no second instance).
+    // creditSvc.addImportedSaleCredit/updateImportedSaleCredit — never raw repos/shims;
+    // order-sync-import-parity retires the last shim, `makeOrderRepoShim`). `inventorySvc`/
+    // `orderSvc`/`creditSvc` are the SAME instances constructed above for the serializer's
+    // read side (mirrors Angular's singleton DI; no second instance).
 
     const synchronizer = new DataSynchronizerService(
       storeId,
       categoryRepo,
       productRepo,
       inventorySvc,
-      orderRepo,
+      orderSvc,
       expenseSvc,
       creditSvc,
     );
