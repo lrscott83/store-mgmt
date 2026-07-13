@@ -149,7 +149,7 @@ Estado: ⬜ pendiente · 🔎 en revisión · ⚠️ hallazgos · ✅ paridad co
 | L0 | store-module-state.service | `_services/shared/store-module-state.service.ts` | ⬜ | — |
 | L1 | auth.service | `_services/auth/auth.service.ts` | ⬜ | — |
 | L1 | product.service [abstract] | `domain/interfaces/product.service.ts` | ⬜ | — |
-| L1 | product-category.service [abstract] | `application/categories/product-category.service.ts` | ⬜ | — |
+| L1 | product-category.service [abstract] | `application/categories/product-category.service.ts` | ✅ | Paridad confirmada (product-service-parity, verify PASS 2026-07-09). Async surface, `extends BaseService` dropeado (regla 12, commit 5a9d355). |
 | L1 | store.service | `_services/store/store.service.ts` | ⬜ | — |
 | L1 | store-user.service | `_services/storeuser/store-user.service.ts` | ⬜ | — |
 | L1 | user.service | `_services/user/user.service.ts` | ⬜ | — |
@@ -159,15 +159,15 @@ Estado: ⬜ pendiente · 🔎 en revisión · ⚠️ hallazgos · ✅ paridad co
 | L1 | module.service | `_services/module/module.service.ts` | ⬜ | — |
 | L1 | feature.service | `_services/features/feature.service.ts` | ⬜ | — |
 | L1 | message.service | `domain/interfaces/message.service.ts` | ⬜ | — |
-| L2 | product-category.repository | `application/categories/product-category.repository.ts` | ⚠️ | Regla 3: `activate/deactivateProductCategory` perdieron el param `isActive` (código muerto ambos lados, no ratificado). Resto OK. |
+| L2 | product-category.repository | `application/categories/product-category.repository.ts` | ✅ | Paridad confirmada (product-service-parity, verify PASS 2026-07-09). Regla 3: `activate/deactivateProductCategory` perdieron el param `isActive` (ratificado — código muerto Angular, drop intencional). |
 | L2 | authorization.service | `_services/authorization/authorization.service.ts` | ⬜ | — |
 | L2 | store-usage-tracker.service | `_services/usage-tracker/store-usage-tracker.service.ts` | ⬜ | — |
-| L2 | product-category-online.service | `application/categories/product-category-online.service.ts` | ⬜ | — |
+| L2 | product-category-online.service | `application/categories/product-category-online.service.ts` | ✅ | Paridad confirmada (product-category-online-parity, verify PASS 2026-07-13). DG-1 normaliza URLs dobles; factory DI patrones espejados. |
 | L2 | product-online.service | `application/products/product-online.service.ts` | ⬜ | — |
 | L2 | sale-credit-offline.service | `application/credits/sale-credit-offline.service.ts` | ⬜ | — |
 | L2 | expense-offline.service | `application/expenses/expense-offline.service.ts` | ⬜ | — |
 | L3 | product.repository | `application/products/product.repository.ts` | ⚠️ | Ver hallazgos de repos abajo. |
-| L4 | product-category-offline.service | `application/categories/product-category-offline.service.ts` | ⬜ | — |
+| L4 | product-category-offline.service | `application/categories/product-category-offline.service.ts` | ✅ | Paridad confirmada (product-service-parity Slice 5/8, verify PASS 2026-07-09); Fase 2 cierra con product-category-online-parity. |
 | L4 | product-offline.service | `application/products/product-offline.service.ts` | ⬜ | — |
 | L4 | inventory-offline.service | `application/entries/inventory-offline.service.ts` | ⚠️ | React inventó `InventoryRepository` sin correlato Angular. Ver hallazgos de repos abajo. |
 | L5 | order-offline.service | `application/orders/order-offline.service.ts` | ⬜ | — |
@@ -207,5 +207,7 @@ El `BaseRepository` compartido de React **no replica** dos comportamientos de An
 - [x] `BaseRepository`: ELIMINADO (regla 12) — SDD `eliminate-base-repository`, archive `c69019c`. Cada repo React reproduce inline los helpers de storage (caché + auto-init) como Angular.
 - [x] `BaseService` (interface React): ELIMINADA (regla 12) — SDD `baseservice-parity`, archive `a612fb5`. No espejaba a Angular; era invención. Los 4 offline exponen solo su `getStorageX()`.
 - [x] `InventoryRepository`: ELIMINADO/inlineado (reglas 6/12) — SDD `eliminate-inventory-repository`, archive `8dbc992`, verify PASS. Persistencia inline en InventoryOfflineService espejando Angular (cache + auto-init + reviveEntry date-only); export sync re-homed via `getInventoryEntriesJson`. Falta aún la VERIFICACIÓN de paridad del offline-service en sí (pasada bottom-up).
-- [ ] `product` sync bypass: ¿se cablea el import/sync a través de `ProductRepository` para recuperar la validación por-categoría + barcode?
-- [ ] `activate/deactivateProductCategory`: ¿se ratifica el drop del param `isActive` o se restaura?
+- [x] `activate/deactivateProductCategory`: RATIFICADO — drop del param `isActive` es correcto (código muerto en Angular, ambos lados; Fase 2 CIERRA con esta decisión ratificada).
+- [ ] `product` sync bypass: ¿se cablea el import/sync a través de `ProductRepository` para recuperar la validación por-categoría + barcode? (Fase 3 — ítems pendientes)
+
+**NOTA: FASE 2 (Categorías) — CERRADA.** Todos los nodos category están ✅. Los únicos ítems abiertos quedan para Fase 3 (`product` sync + import) y adelante. El 2 bugs cross-sibling (ProductOnlineService mirrors #5 double-slash; ProductCategoryOnlineService normaliza) queda registrado como follow-up.
