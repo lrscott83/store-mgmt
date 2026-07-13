@@ -6,7 +6,6 @@ import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
-import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { StoreForm } from '~/management/stores/components/store-form';
 import type { Store, Module, Owner } from '@store-mgmt/domain';
 
@@ -28,7 +27,7 @@ export function EditStorePage() {
   const intl = useIntl();
   const navigate = useNavigate();
   const { id: paramId } = useParams<{ id: string }>();
-  const { user, updateUser } = useAuthStore();
+  const { user, getUserByToken } = useAuthStore();
 
   const storeId = paramId ?? user?.selectedStoreId ?? '';
   const isEditMode = Boolean(storeId);
@@ -121,11 +120,10 @@ export function EditStorePage() {
           moduleIds: values.moduleIds,
           isActive: values.isActive,
         });
-        // Angular parity: after edit, refresh user session (getUserByToken equivalent).
-        // React-idiomatic: fetch /me and update auth store — no page reload.
+        // Angular parity: after edit, refresh user session via the consolidated
+        // getUserByToken() action (auth-store.ts) — no page reload.
         try {
-          const freshUser = await authHttpService.getMe();
-          updateUser(freshUser);
+          await getUserByToken();
         } catch {
           // Non-critical: session refresh failure should not block navigation
         }

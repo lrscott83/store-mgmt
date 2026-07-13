@@ -86,10 +86,11 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 
 let mockUser: UserModel | null = makeUser();
 let mockUpdateUser = vi.fn();
+let mockGetUserByToken = vi.fn();
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
-    const state = { user: mockUser, isAuthenticated: true, updateUser: mockUpdateUser };
+    const state = { user: mockUser, isAuthenticated: true, updateUser: mockUpdateUser, getUserByToken: mockGetUserByToken };
     if (typeof selector === 'function') return selector(state);
     return state;
   });
@@ -97,6 +98,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
     user: mockUser,
     isAuthenticated: true,
     updateUser: mockUpdateUser,
+    getUserByToken: mockGetUserByToken,
   });
   return { useAuthStore };
 });
@@ -518,17 +520,16 @@ describe('EditStorePage — edit mode: refreshes user after successful edit (no 
     mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
-    mockGetMe = vi.fn().mockResolvedValue({ data: makeUser() });
+    mockGetUserByToken = vi.fn().mockResolvedValue(makeUser());
   });
 
-  it('calls authHttpService.getMe and updateUser after successful edit instead of reload', async () => {
+  it('calls getUserByToken after successful edit instead of reload', async () => {
     const { EditStorePage } = await import('../edit-store');
     render(<Wrapper><EditStorePage /></Wrapper>);
     await waitFor(() => screen.getByDisplayValue('Existing Store'));
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => {
-      expect(mockGetMe).toHaveBeenCalled();
-      expect(mockUpdateUser).toHaveBeenCalled();
+      expect(mockGetUserByToken).toHaveBeenCalled();
     });
   });
 
