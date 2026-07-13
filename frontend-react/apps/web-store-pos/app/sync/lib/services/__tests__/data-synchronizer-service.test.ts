@@ -6,6 +6,7 @@ import type {
   GenericUpsertRepo,
   InventoryImportService,
   ExpenseImportService,
+  SaleCreditImportService,
 } from '../data-synchronizer-service';
 import type { ParsedData } from '../data-serializer-service';
 import { Result } from '@store-mgmt/domain';
@@ -219,6 +220,51 @@ function makeExpenseImportServiceMock(
 }
 
 /**
+ * Mock of the offline SaleCreditOfflineService's import surface. SaleCredits sync through the
+ * SERVICE (Angular parity), so the synchronizer drives `addImportedSaleCredit`/
+ * `updateImportedSaleCredit` (never a raw repo `upsert`). The mock REPLICATES the real
+ * service's paid-guard — `updateImportedSaleCredit` overwrites `paid`/`isPaid`/`paidDate` ONLY
+ * when the existing stored credit is unpaid (`!existing.paid`); otherwise the paid-guard tests
+ * below would be vacuous (design §6.1).
+ */
+function makeSaleCreditImportServiceMock(
+  initial: SaleCredit[] = [],
+): SaleCreditImportService & { _imported: SaleCredit[] } {
+  const store = new Map(initial.map((v) => [v.id, v]));
+  const _imported: SaleCredit[] = [];
+  return {
+    _imported,
+    getStorageSaleCredits: () => Array.from(store.values()),
+    addImportedSaleCredit: (saleCredit: SaleCredit) => {
+      store.set(saleCredit.id, saleCredit);
+      _imported.push(saleCredit);
+      return Result.Success();
+    },
+    updateImportedSaleCredit: (saleCredit: SaleCredit) => {
+      const existing = store.get(saleCredit.id);
+      if (existing) {
+        const updated: SaleCredit = {
+          ...existing,
+          isActive: saleCredit.isActive,
+          client: saleCredit.client,
+          note: saleCredit.note,
+          updatedDate: saleCredit.updatedDate,
+          updatedByName: saleCredit.updatedByName,
+        };
+        if (!existing.paid) {
+          updated.paid = saleCredit.paid;
+          updated.isPaid = saleCredit.isPaid;
+          updated.paidDate = saleCredit.paidDate;
+        }
+        store.set(saleCredit.id, updated);
+      }
+      _imported.push(saleCredit);
+      return Result.Success();
+    },
+  };
+}
+
+/**
  * Mock of the InventoryOfflineService import surface. Inventory syncs through the SERVICE
  * (Angular parity): the synchronizer reads via getStorageInventoriesMap and writes via
  * addImportedEntries (new productId bucket) / updateImportedEntries (existing bucket, field
@@ -264,7 +310,7 @@ function makeService(opts?: {
   const inventoryService = makeInventoryImportServiceMock(opts?.existingInventory ?? new Map());
   const orderRepo = makeGenericRepo<Order>(opts?.existingOrders ?? []);
   const expenseService = makeExpenseImportServiceMock(opts?.existingExpenses ?? []);
-  const saleCreditRepo = makeGenericRepo<SaleCredit>(opts?.existingSaleCredits ?? []);
+  const saleCreditService = makeSaleCreditImportServiceMock(opts?.existingSaleCredits ?? []);
 
   const svc = new DataSynchronizerService(
     STORE_ID,
@@ -273,9 +319,9 @@ function makeService(opts?: {
     inventoryService,
     orderRepo,
     expenseService,
-    saleCreditRepo,
+    saleCreditService,
   );
-  return { svc, catRepo, prodRepo, inventoryService, orderRepo, expenseService, saleCreditRepo };
+  return { svc, catRepo, prodRepo, inventoryService, orderRepo, expenseService, saleCreditService };
 }
 
 function emptyData(): ParsedData {
@@ -350,9 +396,16 @@ describe('DataSynchronizerService', () => {
           return Result.Success();
         },
       };
-      const saleCreditRepo: GenericUpsertRepo<SaleCredit> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => writeOrder.push('saleCredit:' + item.id),
+      const saleCreditService: SaleCreditImportService = {
+        getStorageSaleCredits: () => [],
+        addImportedSaleCredit: (item) => {
+          writeOrder.push('saleCredit:' + item.id);
+          return Result.Success();
+        },
+        updateImportedSaleCredit: (item) => {
+          writeOrder.push('saleCredit:' + item.id);
+          return Result.Success();
+        },
       };
 
       const svc = new DataSynchronizerService(
@@ -362,7 +415,7 @@ describe('DataSynchronizerService', () => {
         inventoryService,
         orderRepo,
         expenseService,
-        saleCreditRepo,
+        saleCreditService,
       );
 
       const data: ParsedData = {
@@ -414,7 +467,7 @@ describe('DataSynchronizerService', () => {
         makeInventoryImportServiceMock(),
         makeGenericRepo<Order>(),
         makeExpenseImportServiceMock(),
-        makeGenericRepo<SaleCredit>(),
+        makeSaleCreditImportServiceMock(),
       );
 
       const data: ParsedData = {
@@ -459,7 +512,7 @@ describe('DataSynchronizerService', () => {
         makeInventoryImportServiceMock(),
         makeGenericRepo<Order>(),
         makeExpenseImportServiceMock(),
-        makeGenericRepo<SaleCredit>(),
+        makeSaleCreditImportServiceMock(),
       );
 
       const data: ParsedData = {
@@ -508,7 +561,7 @@ describe('DataSynchronizerService', () => {
         makeInventoryImportServiceMock(),
         orderRepo,
         makeExpenseImportServiceMock(),
-        makeGenericRepo<SaleCredit>(),
+        makeSaleCreditImportServiceMock(),
       );
 
       const data: ParsedData = {
@@ -554,7 +607,7 @@ describe('DataSynchronizerService', () => {
         makeInventoryImportServiceMock(),
         makeGenericRepo<Order>(),
         makeExpenseImportServiceMock(),
-        makeGenericRepo<SaleCredit>(),
+        makeSaleCreditImportServiceMock(),
       );
     }
 
@@ -816,8 +869,8 @@ describe('DataSynchronizerService', () => {
     });
 
     it('emits SaleCreditsUnexpectedError (not OrdersUnexpectedError) when a sale-credit write fails', async () => {
-      const { svc, saleCreditRepo } = makeService();
-      saleCreditRepo.upsert = () => {
+      const { svc, saleCreditService } = makeService();
+      saleCreditService.addImportedSaleCredit = () => {
         throw new Error('sale-credit storage exploded');
       };
       const data: ParsedData = { ...emptyData(), saleCredits: [makeSaleCredit('sc-1')] };
@@ -943,8 +996,15 @@ describe('DataSynchronizerService', () => {
     });
 
     it('syncing empty data does NOT call any repo write methods', async () => {
-      const { svc, catRepo, prodRepo, inventoryService, orderRepo, expenseService, saleCreditRepo } =
-        makeService();
+      const {
+        svc,
+        catRepo,
+        prodRepo,
+        inventoryService,
+        orderRepo,
+        expenseService,
+        saleCreditService,
+      } = makeService();
       let writes = 0;
       catRepo.addImportedProductCategory = () => {
         writes++;
@@ -981,8 +1041,13 @@ describe('DataSynchronizerService', () => {
         writes++;
         return Result.Success();
       };
-      saleCreditRepo.upsert = () => {
+      saleCreditService.addImportedSaleCredit = () => {
         writes++;
+        return Result.Success();
+      };
+      saleCreditService.updateImportedSaleCredit = () => {
+        writes++;
+        return Result.Success();
       };
 
       await svc.sync(emptyData());
@@ -1019,7 +1084,7 @@ describe('DataSynchronizerService', () => {
         makeInventoryImportServiceMock(),
         makeGenericRepo<Order>(),
         expenseService,
-        makeGenericRepo<SaleCredit>(),
+        makeSaleCreditImportServiceMock(),
       );
 
       const result = await svc.sync({
@@ -1066,7 +1131,7 @@ describe('DataSynchronizerService', () => {
         inventoryService,
         makeGenericRepo<Order>(),
         makeExpenseImportServiceMock(),
-        makeGenericRepo<SaleCredit>(),
+        makeSaleCreditImportServiceMock(),
       );
 
       const result = await svc.sync({
@@ -1081,6 +1146,144 @@ describe('DataSynchronizerService', () => {
       expect(updatedProducts).toEqual(['prod-existing']);
       const merge = result.merges.find((m) => m.entity === 'inventoryEntries');
       expect(merge).toEqual({ entity: 'inventoryEntries', inserted: 1, updated: 1 });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // SaleCredit import goes through the SERVICE, not a raw repo (Angular parity),
+  // and carries a PAID-GUARD: `updateImportedSaleCredit` only overwrites
+  // paid/isPaid/paidDate when the existing stored credit is unpaid.
+  // -------------------------------------------------------------------------
+
+  describe('T10 — sale-credit import routes through the offline service (Angular parity) + paid-guard', () => {
+    it('paid-guard preserves paid fields when importing an unpaid version over a locally-paid credit', async () => {
+      const existing: SaleCredit = {
+        ...makeSaleCredit('sc-1'),
+        paid: 1500,
+        isPaid: true,
+        paidDate: new Date('2024-06-02T00:00:00.000Z'),
+        client: 'Old Client',
+        note: 'old note',
+      };
+      const saleCreditService = makeSaleCreditImportServiceMock([existing]);
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        saleCreditService,
+      );
+
+      const imported: SaleCredit = {
+        ...existing,
+        paid: 0,
+        isPaid: false,
+        paidDate: null as unknown as Date,
+        client: 'New Client',
+        note: 'new note',
+      };
+
+      const result = await svc.sync({ ...emptyData(), saleCredits: [imported] });
+
+      expect(result.succeeded).toBe(true);
+      const merge = result.merges.find((m) => m.entity === 'saleCredits');
+      expect(merge).toEqual({ entity: 'saleCredits', inserted: 0, updated: 1 });
+
+      const stored = saleCreditService.getStorageSaleCredits().find((c) => c.id === 'sc-1');
+      // Paid fields preserved from storage — NOT overwritten by the imported (unpaid) values.
+      expect(stored?.paid).toBe(1500);
+      expect(stored?.isPaid).toBe(true);
+      expect(stored?.paidDate).toEqual(new Date('2024-06-02T00:00:00.000Z'));
+      // Non-guarded fields ARE overwritten with the imported values.
+      expect(stored?.client).toBe('New Client');
+      expect(stored?.note).toBe('new note');
+    });
+
+    it('updates an unpaid existing credit fully (guard does not fire)', async () => {
+      const existing: SaleCredit = {
+        ...makeSaleCredit('sc-2'),
+        paid: 0,
+        isPaid: false,
+        paidDate: null as unknown as Date,
+      };
+      const saleCreditService = makeSaleCreditImportServiceMock([existing]);
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        saleCreditService,
+      );
+
+      const paidDate = new Date('2024-06-05T00:00:00.000Z');
+      const imported: SaleCredit = {
+        ...existing,
+        paid: 1500,
+        isPaid: true,
+        paidDate,
+      };
+
+      const result = await svc.sync({ ...emptyData(), saleCredits: [imported] });
+
+      expect(result.succeeded).toBe(true);
+      const merge = result.merges.find((m) => m.entity === 'saleCredits');
+      expect(merge).toEqual({ entity: 'saleCredits', inserted: 0, updated: 1 });
+
+      const stored = saleCreditService.getStorageSaleCredits().find((c) => c.id === 'sc-2');
+      expect(stored?.paid).toBe(1500);
+      expect(stored?.isPaid).toBe(true);
+      expect(stored?.paidDate).toEqual(paidDate);
+    });
+
+    it('adds a new sale credit whose id is absent from storage', async () => {
+      const saleCreditService = makeSaleCreditImportServiceMock([]);
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        saleCreditService,
+      );
+
+      const incoming = makeSaleCredit('sc-new');
+      const result = await svc.sync({ ...emptyData(), saleCredits: [incoming] });
+
+      expect(result.succeeded).toBe(true);
+      const merge = result.merges.find((m) => m.entity === 'saleCredits');
+      expect(merge).toEqual({ entity: 'saleCredits', inserted: 1, updated: 0 });
+      expect(saleCreditService._imported.map((c) => c.id)).toEqual(['sc-new']);
+    });
+
+    it('emits SaleCreditsUnexpectedError via the service when a write throws', async () => {
+      const saleCreditService = makeSaleCreditImportServiceMock([]);
+      saleCreditService.addImportedSaleCredit = () => {
+        throw new Error('sale-credit storage exploded');
+      };
+
+      const svc = new DataSynchronizerService(
+        STORE_ID,
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
+        makeInventoryImportServiceMock(),
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        saleCreditService,
+      );
+
+      const result = await svc.sync({ ...emptyData(), saleCredits: [makeSaleCredit('sc-err')] });
+
+      expect(result.succeeded).toBe(false);
+      const err = result.errors.find((e) => e.entity === 'saleCredits');
+      expect(err?.code).toBe('Synchronizer.SaleCreditsUnexpectedError');
     });
   });
 });

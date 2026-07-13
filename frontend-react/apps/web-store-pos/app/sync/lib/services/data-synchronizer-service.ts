@@ -1,5 +1,5 @@
 import { Result } from '@store-mgmt/domain';
-import type { Expense, InventoryEntry, Product, ProductCategory } from '@store-mgmt/domain';
+import type { Expense, InventoryEntry, Product, ProductCategory, SaleCredit } from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
 
 // ---------------------------------------------------------------------------
@@ -136,6 +136,22 @@ export interface ExpenseImportService {
   updateImportedExpense(expense: Expense): Result;
 }
 
+/**
+ * SaleCredit import routes through the offline SERVICE, not a raw repo — Angular parity:
+ * `data-synchronizer.service.ts` `synchronizeSaleCredits` (:234-264) calls
+ * `saleCreditService.addImportedSaleCredit` / `updateImportedSaleCredit` (the domain-command
+ * layer), never a generic upsert shim. `updateImportedSaleCredit` carries a PAID-GUARD
+ * (`sale-credit-offline.service.ts` :257-274): it overwrites `isActive`/`client`/`note`/
+ * `updatedDate`/`updatedByName` unconditionally, but only overwrites `paid`/`isPaid`/`paidDate`
+ * when the existing stored credit is unpaid — a generic `GenericUpsertRepo` full-overwrite
+ * cannot express this, so SaleCredits get their own narrow seam (mirrors `ExpenseImportService`).
+ */
+export interface SaleCreditImportService {
+  getStorageSaleCredits(): SaleCredit[];
+  addImportedSaleCredit(saleCredit: SaleCredit): Result;
+  updateImportedSaleCredit(saleCredit: SaleCredit): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -179,7 +195,7 @@ export class DataSynchronizerService {
     private readonly inventoryService: InventoryImportService,
     private readonly orderRepo: GenericUpsertRepo<import('@store-mgmt/domain').Order>,
     private readonly expenseService: ExpenseImportService,
-    private readonly saleCreditRepo: GenericUpsertRepo<import('@store-mgmt/domain').SaleCredit>,
+    private readonly saleCreditService: SaleCreditImportService,
   ) {}
 
   async sync(data: ParsedData): Promise<SyncResult> {
@@ -215,16 +231,10 @@ export class DataSynchronizerService {
     // OrdersUnexpectedError is fixed here).
     push(this.mergeExpensesViaService(data.expenses));
 
-    // 6. SaleCredits — break-only (no revert). Emits its own
+    // 6. SaleCredits — routed through the offline SERVICE (Angular parity), break-only (no
+    // revert), with a paid-guard partial-merge inside updateImportedSaleCredit. Emits its own
     // SaleCreditsUnexpectedError (Angular's copy-paste bug is fixed here).
-    push(
-      this.mergeBreakOnly(
-        'saleCredits',
-        this.saleCreditRepo,
-        data.saleCredits,
-        SynchronizerErrors.SaleCreditsUnexpectedError,
-      ),
-    );
+    push(this.mergeSaleCreditsViaService(data.saleCredits));
 
     return { succeeded: errors.length === 0, errors, merges };
   }
@@ -414,6 +424,67 @@ export class DataSynchronizerService {
           entity: 'expenses',
           code: SynchronizerErrors.ExpensesUnexpectedError.code,
           message: SynchronizerErrors.ExpensesUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SaleCredits — routed through the offline SERVICE (Angular parity, not raw repo)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Mirrors Angular `data-synchronizer.service.ts` `synchronizeSaleCredits` (:234-264): builds a
+   * map of stored sale credits, then routes each imported credit through the SERVICE —
+   * `addImportedSaleCredit` when new, `updateImportedSaleCredit` when it already exists —
+   * breaking on the first non-succeeded Result. The paid-guard partial-merge lives inside
+   * `updateImportedSaleCredit` itself (not here) and does not affect insert/update counts.
+   * Break-only (no revert); an unexpected throw yields `SaleCreditsUnexpectedError` (Angular's
+   * copy-paste OrdersUnexpectedError bug stays fixed here).
+   */
+  private mergeSaleCreditsViaService(incoming: SaleCredit[]): MergeOutcome {
+    if (incoming.length === 0) {
+      return { merge: { entity: 'saleCredits', inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    try {
+      const existing = new Map(
+        this.saleCreditService.getStorageSaleCredits().map((c) => [c.id, c]),
+      );
+      for (const saleCredit of incoming) {
+        const isNew = !existing.has(saleCredit.id);
+        if (isNew) {
+          existing.set(saleCredit.id, saleCredit);
+          inserted++;
+        } else {
+          updated++;
+        }
+        const result = isNew
+          ? this.saleCreditService.addImportedSaleCredit(saleCredit)
+          : this.saleCreditService.updateImportedSaleCredit(saleCredit);
+        if (!result.succeeded) {
+          return {
+            merge: { entity: 'saleCredits', inserted, updated },
+            error: {
+              entity: 'saleCredits',
+              code: SynchronizerErrors.SaleCreditsUnexpectedError.code,
+              message: SynchronizerErrors.SaleCreditsUnexpectedError.message,
+            },
+          };
+        }
+      }
+      return { merge: { entity: 'saleCredits', inserted, updated } };
+    } catch {
+      // Break-only: no revert — writes already applied before the failure persist.
+      return {
+        merge: { entity: 'saleCredits', inserted, updated },
+        error: {
+          entity: 'saleCredits',
+          code: SynchronizerErrors.SaleCreditsUnexpectedError.code,
+          message: SynchronizerErrors.SaleCreditsUnexpectedError.message,
         },
       };
     }

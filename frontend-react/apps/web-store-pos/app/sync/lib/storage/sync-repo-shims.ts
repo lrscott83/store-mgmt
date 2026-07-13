@@ -1,5 +1,5 @@
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
-import type { Order, SaleCredit } from '@store-mgmt/domain';
+import type { Order } from '@store-mgmt/domain';
 import type { GenericUpsertRepo } from '~/sync/lib/services/data-synchronizer-service';
 
 /**
@@ -11,12 +11,15 @@ import type { GenericUpsertRepo } from '~/sync/lib/services/data-synchronizer-se
  * matching offline service (`OrderOfflineService`/`SaleCreditOfflineService` — plain array,
  * id-869), so a merge performed here stays readable by those consumers afterward.
  *
- * SCOPE (product-sync-import-validation-parity): Categories/Products no longer go through a
- * shim here — `import.tsx` constructs the real `ProductCategoryRepository`/`ProductRepository`
- * directly and `DataSynchronizerService` consumes them through the `CategoryImportRepo`/
- * `ProductImportRepo` seams, which carry full Angular validation (category-exists, barcode-
- * uniqueness, per-category name-uniqueness, order-shift). This file is now scoped to
- * Orders/SaleCredits ONLY — entities with no Angular validation (break-only semantics).
+ * SCOPE (product-sync-import-validation-parity, salecredit-sync-import-parity): Categories/
+ * Products no longer go through a shim here — `import.tsx` constructs the real
+ * `ProductCategoryRepository`/`ProductRepository` directly and `DataSynchronizerService`
+ * consumes them through the `CategoryImportRepo`/`ProductImportRepo` seams, which carry full
+ * Angular validation (category-exists, barcode-uniqueness, per-category name-uniqueness,
+ * order-shift). SaleCredits also no longer go through a shim — they route through
+ * `SaleCreditOfflineService` directly (paid-guard partial-merge cannot be expressed by a
+ * generic full-overwrite shim). This file is now scoped to Orders ONLY — the one entity with
+ * no Angular validation and no special merge guard (break-only semantics).
  * `DataSynchronizerService`'s `GenericUpsertRepo` orchestration is consumed UNCHANGED — this
  * file only supplies storage.
  */
@@ -68,14 +71,4 @@ function makeGenericUpsertRepoShim<T extends { id: string }>(
 /** Same entity key + date-revival fields the removed `BaseRepository<Order>('orders', [...])` used; wire format is now plain-array (id-869), not Map-entries. */
 export function makeOrderRepoShim(): GenericUpsertRepo<Order> {
   return makeGenericUpsertRepoShim<Order>('orders', ['date', 'createdDate', 'updatedDate']);
-}
-
-/** Same entity key + date-revival fields the removed `BaseRepository<SaleCredit>('saleCredits', [...])` used; wire format is now plain-array (id-869), not Map-entries. */
-export function makeSaleCreditRepoShim(): GenericUpsertRepo<SaleCredit> {
-  return makeGenericUpsertRepoShim<SaleCredit>('saleCredits', [
-    'date',
-    'paidDate',
-    'createdDate',
-    'updatedDate',
-  ]);
 }

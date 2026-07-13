@@ -13,12 +13,13 @@ import type { ParsedData } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
-import type { Order, ProductCategory, SaleCredit } from '@store-mgmt/domain';
+import type { Order, ProductCategory } from '@store-mgmt/domain';
 import { Result } from '@store-mgmt/domain';
 import type {
   ExpenseImportService,
   GenericUpsertRepo,
   InventoryImportService,
+  SaleCreditImportService,
 } from '~/sync/lib/services/data-synchronizer-service';
 
 // Minimal mock implementations for the contract test
@@ -116,6 +117,14 @@ describe('T1.5 — shared category-repo instance (import.tsx wiring)', () => {
     return { getAll: () => new Map(), upsert: () => {} };
   }
 
+  function makeNoopSaleCreditService(): SaleCreditImportService {
+    return {
+      getStorageSaleCredits: () => [],
+      addImportedSaleCredit: () => Result.Success(),
+      updateImportedSaleCredit: () => Result.Success(),
+    };
+  }
+
   beforeEach(() => {
     localStorage.clear();
   });
@@ -133,7 +142,7 @@ describe('T1.5 — shared category-repo instance (import.tsx wiring)', () => {
       makeNoopInventoryService(),
       makeNoopGenericRepo<Order>(),
       makeNoopExpenseService(),
-      makeNoopGenericRepo<SaleCredit>(),
+      makeNoopSaleCreditService(),
     );
 
     const data: ParsedData = {
@@ -188,7 +197,7 @@ describe('T1.5 — shared category-repo instance (import.tsx wiring)', () => {
       makeNoopInventoryService(),
       makeNoopGenericRepo<Order>(),
       makeNoopExpenseService(),
-      makeNoopGenericRepo<SaleCredit>(),
+      makeNoopSaleCreditService(),
     );
 
     const data: ParsedData = {

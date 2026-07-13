@@ -7,7 +7,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
-import { makeOrderRepoShim, makeSaleCreditRepoShim } from '~/sync/lib/storage/sync-repo-shims';
+import { makeOrderRepoShim } from '~/sync/lib/storage/sync-repo-shims';
 import { DataSerializerService, WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -73,11 +73,12 @@ export function ImportPage() {
     const categoryRepo = categoryRepoForSerializer;
     const productRepo = productRepoForSerializer;
     const orderRepo = makeOrderRepoShim();
-    // Inventory + Expenses route through their offline SERVICES (Angular parity: the
-    // synchronizer calls inventorySvc.addImportedEntries/updateImportedEntries and
-    // expenseSvc.addImportedExpense/updateImportedExpense, not raw repos). `inventorySvc`
-    // is the same instance constructed above for the serializer's read side (WU2).
-    const saleCreditRepo = makeSaleCreditRepoShim();
+    // Inventory + Expenses + SaleCredits route through their offline SERVICES (Angular parity:
+    // the synchronizer calls inventorySvc.addImportedEntries/updateImportedEntries,
+    // expenseSvc.addImportedExpense/updateImportedExpense, and
+    // creditSvc.addImportedSaleCredit/updateImportedSaleCredit — never raw repos/shims).
+    // `inventorySvc`/`creditSvc` are the SAME instances constructed above for the
+    // serializer's read side (mirrors Angular's singleton DI; no second instance).
 
     const synchronizer = new DataSynchronizerService(
       storeId,
@@ -86,7 +87,7 @@ export function ImportPage() {
       inventorySvc,
       orderRepo,
       expenseSvc,
-      saleCreditRepo,
+      creditSvc,
     );
 
     return synchronizer.sync(parsedData);

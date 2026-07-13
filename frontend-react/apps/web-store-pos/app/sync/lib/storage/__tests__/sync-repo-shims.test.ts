@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Order, SaleCredit } from '@store-mgmt/domain';
+import type { Order } from '@store-mgmt/domain';
 import { Result } from '@store-mgmt/domain';
-import { makeOrderRepoShim, makeSaleCreditRepoShim } from '../sync-repo-shims';
+import { makeOrderRepoShim } from '../sync-repo-shims';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import type {
   CategoryImportRepo,
   ExpenseImportService,
   InventoryImportService,
   ProductImportRepo,
+  SaleCreditImportService,
 } from '~/sync/lib/services/data-synchronizer-service';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 
@@ -31,33 +32,14 @@ function makeOrder(id: string, overrides: Partial<Order> = {}): Order {
   };
 }
 
-function makeSaleCredit(id: string, overrides: Partial<SaleCredit> = {}): SaleCredit {
-  return {
-    id,
-    orderId: 'o1',
-    client: 'Client',
-    total: 500,
-    date: new Date('2024-06-01T00:00:00.000Z'),
-    paid: 0,
-    isPaid: false,
-    isActive: true,
-    paidDate: null as unknown as Date,
-    paidType: null as unknown as SaleCredit['paidType'],
-    note: '',
-    createdDate: new Date('2024-06-01T00:00:00.000Z'),
-    createdByName: 'admin',
-    ...overrides,
-  };
-}
-
 describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseRepository for import.tsx)', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
   describe('no BaseRepository import — sync-local shims replace it, not reintroduce it', () => {
-    it('makeOrderRepoShim/makeSaleCreditRepoShim source does not reference BaseRepository', () => {
-      for (const factory of [makeOrderRepoShim, makeSaleCreditRepoShim]) {
+    it('makeOrderRepoShim source does not reference BaseRepository', () => {
+      for (const factory of [makeOrderRepoShim]) {
         expect(factory.toString()).not.toContain('BaseRepository');
       }
     });
@@ -92,29 +74,6 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
 
       const shim = makeOrderRepoShim();
       expect(shim.getAll(storeId).size).toBe(2);
-    });
-
-    it('saleCredit shim upsert persists a PLAIN array at lizoft.store-saleCredits-{storeId}', () => {
-      const shim = makeSaleCreditRepoShim();
-      shim.upsert(storeId, makeSaleCredit('sc1'));
-
-      const raw = localStorage.getItem(`lizoft.store-saleCredits-${storeId}`);
-      const parsed = JSON.parse(raw!);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed[0]).toEqual(expect.objectContaining({ id: 'sc1' }));
-      expect(Array.isArray(parsed[0])).toBe(false);
-    });
-
-    it('saleCredit shim getAll exposes a Map keyed by id from plain-array on-disk storage', () => {
-      localStorage.setItem(
-        `lizoft.store-saleCredits-${storeId}`,
-        JSON.stringify([makeSaleCredit('sc1')]),
-      );
-
-      const shim = makeSaleCreditRepoShim();
-      const all = shim.getAll(storeId);
-      expect(all).toBeInstanceOf(Map);
-      expect(all.get('sc1')?.id).toBe('sc1');
     });
 
     it('order shim upsert on an existing id replaces it in place (array stays same length)', () => {
@@ -152,6 +111,11 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
       addImportedExpense: () => Result.Success(),
       updateImportedExpense: () => Result.Success(),
     };
+    const noopSaleCreditService: SaleCreditImportService = {
+      getStorageSaleCredits: () => [],
+      addImportedSaleCredit: () => Result.Success(),
+      updateImportedSaleCredit: () => Result.Success(),
+    };
     const noopCategoryRepo: CategoryImportRepo = {
       getStorageCategoriesMap: () => new Map(),
       addImportedProductCategory: () => Result.Success(),
@@ -173,7 +137,7 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
         noopInventoryService,
         makeOrderRepoShim(),
         noopExpenseService,
-        makeSaleCreditRepoShim(),
+        noopSaleCreditService,
       );
 
       const order = makeOrder('o1', { total: 777 });
