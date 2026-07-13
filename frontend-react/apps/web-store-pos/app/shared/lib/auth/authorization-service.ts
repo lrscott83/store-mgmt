@@ -1,5 +1,5 @@
 import type { UserModel } from '@store-mgmt/domain';
-import { EModules } from '@store-mgmt/domain';
+import { EModules, EFeatures } from '@store-mgmt/domain';
 
 export function isSuperAdmin(user: UserModel): boolean {
   return user.isSuperAdmin;
@@ -18,25 +18,31 @@ export function isUserAuthorized(
   featureIds: number[],
   storeId: string | undefined
 ): boolean {
-  if (featureIds.length === 0) return true;
+  // Gate #1 — per-call expiry guard (Angular authorization.service.ts:18).
+  // `<` EXCLUSIVE (NOT the `<=` inclusive session-load check at auth-store.ts:76 /
+  // Angular auth.service.ts:143). Deny-only: no logout() side-effect.
+  if (user.expiresIn < Date.now()) return false;
 
   if (user.isSuperAdmin) return true;
 
-  if (user.isReSeller || user.isOwnerAdmin) {
-    // Angular uses .some(): having ANY of the required features grants access.
-    return featureIds.some((id) => user.featureIds.includes(id));
-  }
+  // Gate #4 — independent fall-through ifs (Angular :23-26). A reseller/owner-admin
+  // that fails its featureIds check falls through to the unconditional store check.
+  if (user.isReSeller && featureIds.some((id) => user.featureIds.includes(id))) return true;
+  if (user.isOwnerAdmin && featureIds.some((id) => user.featureIds.includes(id))) return true;
 
-  // Store users are authorized against their selected store, matching
-  // Angular's isStoreUserAuthorize (r.storeId === currentUser.selectedStoreId).
-  // An explicit storeId (e.g. a store-scoped route param) takes precedence.
+  // Store-user check (Angular isStoreUserAuthorize :41-44). Preserves the existing React
+  // `storeId` param / effectiveStoreId behavior (out-of-scope pre-existing divergence, ADR-2).
   const effectiveStoreId = storeId ?? user.selectedStoreId;
   const matchingRoles = user.roles.filter((role) => role.storeId === effectiveStoreId);
-  if (matchingRoles.length === 0) return false;
-
   const combinedFeatureIds = matchingRoles.flatMap((role) => role.featureIds);
-  // Angular uses .some(): having ANY of the required features grants access.
-  return featureIds.some((id) => combinedFeatureIds.includes(id));
+  if (featureIds.some((id) => combinedFeatureIds.includes(id))) return true;
+
+  return false;
+}
+
+/** 1:1 port of Angular's `AuthorizationService.hasOwnersAvailableFeature` (authorization.service.ts:57-59). */
+export function hasOwnersAvailableFeature(user: UserModel): boolean {
+  return isUserAuthorized(user, [EFeatures.Owners], undefined);
 }
 
 /** 1:1 port of Angular's `AuthorizationService.hasModuleAvailable` (private helper there). */

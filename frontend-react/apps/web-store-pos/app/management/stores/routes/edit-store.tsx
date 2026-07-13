@@ -4,7 +4,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
+import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreForm } from '~/management/stores/components/store-form';
 import type { Store, Module, Owner } from '@store-mgmt/domain';
@@ -33,7 +33,7 @@ export function EditStorePage() {
   const isEditMode = Boolean(storeId);
   const isSuperAdmin = user?.isSuperAdmin ?? false;
   // Angular: isOwnerAdmin = isSuperAdmin || authorizationService.hasOwnersAvailableFeature()
-  const isOwnerAdmin = user ? (isSuperAdmin || isUserAuthorized(user, [EFeatures.Owners], undefined)) : false;
+  const isOwnerAdmin = user ? (isSuperAdmin || hasOwnersAvailableFeature(user)) : false;
 
   const [store, setStore] = useState<Store | undefined>(undefined);
   const [modules, setModules] = useState<Module[]>([]);

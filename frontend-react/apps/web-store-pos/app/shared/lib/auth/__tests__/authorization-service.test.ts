@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   isUserAuthorized,
   isSuperAdmin,
@@ -8,8 +8,9 @@ import {
   hasExpensesModuleAvailable,
   hasCreditsModuleAvailable,
   hasInventoryModuleAvailable,
+  hasOwnersAvailableFeature,
 } from '../authorization-service';
-import { EModules } from '@store-mgmt/domain';
+import { EModules, EFeatures } from '@store-mgmt/domain';
 import type { UserModel } from '@store-mgmt/domain';
 
 function makeUser(overrides: Partial<UserModel>): UserModel {
@@ -123,9 +124,51 @@ describe('AuthorizationService', () => {
       expect(isUserAuthorized(user, [21], 's1')).toBe(false);
     });
 
-    it('empty featureIds required returns true for any authenticated user', () => {
-      const user = makeUser({});
-      expect(isUserAuthorized(user, [], undefined)).toBe(true);
+    it('empty featureIds returns false for a non-superAdmin (no empty-array short-circuit, Angular parity)', () => {
+      expect(isUserAuthorized(makeUser({}), [], undefined)).toBe(false);
+    });
+
+    // companion (ordering): superAdmin still short-circuits before the (now-denying) store path
+    it('empty featureIds still returns true for superAdmin', () => {
+      expect(isUserAuthorized(makeUser({ isSuperAdmin: true }), [], undefined)).toBe(true);
+    });
+
+    it('denies when expired — expiry guard precedes even superAdmin (Angular :18 before :21)', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1000);
+      expect(
+        isUserAuthorized(makeUser({ isSuperAdmin: true, expiresIn: 999 }), [21], 's1')
+      ).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it('boundary: expiresIn === now is NOT expired (< exclusive, not <=)', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1000);
+      expect(
+        isUserAuthorized(makeUser({ isSuperAdmin: true, expiresIn: 1000 }), [21], 's1')
+      ).toBe(true);
+      vi.useRealTimers();
+    });
+
+    it('ReSeller falls through to store-user check when featureIds do not grant (Angular fall-through)', () => {
+      const user = makeUser({
+        isReSeller: true,
+        featureIds: [11],
+        selectedStoreId: 's1',
+        roles: [{ storeId: 's1', storeName: 'S1', moduleId: 2, featureIds: [21] }],
+      });
+      expect(isUserAuthorized(user, [21], 's1')).toBe(true); // old early-return => false
+    });
+
+    it('OwnerAdmin falls through to store-user check when featureIds do not grant', () => {
+      const user = makeUser({
+        isOwnerAdmin: true,
+        featureIds: [11],
+        selectedStoreId: 's1',
+        roles: [{ storeId: 's1', storeName: 'S1', moduleId: 2, featureIds: [21] }],
+      });
+      expect(isUserAuthorized(user, [21], 's1')).toBe(true);
     });
 
     it('StoreUser multiple role entries for same store — uses combined featureIds', () => {
@@ -137,6 +180,18 @@ describe('AuthorizationService', () => {
       });
       expect(isUserAuthorized(user, [21], 's1')).toBe(true);
       expect(isUserAuthorized(user, [31], 's1')).toBe(true);
+    });
+  });
+
+  describe('hasOwnersAvailableFeature (Angular AuthorizationService.hasOwnersAvailableFeature 1:1 port)', () => {
+    it('returns true when user has the Owners feature via featureIds', () => {
+      const user = makeUser({ isReSeller: true, featureIds: [EFeatures.Owners] });
+      expect(hasOwnersAvailableFeature(user)).toBe(true);
+    });
+
+    it('returns false when user lacks the Owners feature', () => {
+      const user = makeUser({ isReSeller: true, featureIds: [] });
+      expect(hasOwnersAvailableFeature(user)).toBe(false);
     });
   });
 
