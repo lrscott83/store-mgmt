@@ -49,6 +49,7 @@ function setAuthState(user: UserModel | null) {
     isLoading: false,
     error: null,
     initialize: vi.fn(),
+    getUserByToken: vi.fn(),
     setUser: vi.fn(),
     updateUser: vi.fn(),
     login: vi.fn(),

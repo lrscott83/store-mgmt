@@ -57,12 +57,13 @@ describe('useAuthStore', () => {
   });
 
   describe('AUTH-03: Expired token on startup', () => {
-    it('clears session when expiresIn is in the past', () => {
+    it('clears session via getUserByToken -> logout (AUTH_MODEL-only, Decision 1+3 parity)', () => {
       const user = makeUser({ expiresIn: Date.now() - 1000 });
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
         JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
       );
+      localStorage.setItem(StorageKeys.TOKEN, user.authToken as string);
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
 
       useAuthStore.getState().initialize();
@@ -70,9 +71,11 @@ describe('useAuthStore', () => {
       const state = useAuthStore.getState();
       expect(state.isAuthenticated).toBe(false);
       expect(state.user).toBeNull();
-      expect(localStorage.getItem(StorageKeys.TOKEN)).toBeNull();
       expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
-      expect(localStorage.getItem(StorageKeys.CURRENT_USER)).toBeNull();
+      // Decision 1 parity: the expired branch now routes through logout(), which
+      // clears ONLY AUTH_MODEL — TOKEN and CURRENT_USER intentionally survive.
+      expect(localStorage.getItem(StorageKeys.TOKEN)).toBe(user.authToken);
+      expect(localStorage.getItem(StorageKeys.CURRENT_USER)).toBe(JSON.stringify(user));
     });
   });
 
@@ -303,5 +306,144 @@ describe('useAuthStore', () => {
     // across full-suite run order (module caching). Its split-layout persistence uses the exact
     // same StorageService.setCurrentUser + minimal-AUTH_MODEL pattern that `setUser`/`updateUser`
     // already cover deterministically above.
+  });
+
+  describe('getUserByToken — consolidated (Decision 3+4)', () => {
+    it('(a) returns null and does NOT clear storage when AUTH_MODEL is missing token/expiry', async () => {
+      localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify({}));
+
+      const result = await useAuthStore.getState().getUserByToken();
+
+      expect(result).toBeNull();
+      expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).not.toBeNull();
+    });
+
+    it('(b) expiresIn <= now calls logout() and returns null (inclusive boundary)', async () => {
+      const user = makeUser({ expiresIn: Date.now() });
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
+
+      const result = await useAuthStore.getState().getUserByToken();
+
+      expect(result).toBeNull();
+      expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    });
+
+    it('(c) expiresIn > now returns the cached valid user', async () => {
+      const user = makeUser({ expiresIn: Date.now() + THIRTY_FIVE_DAYS_MS });
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
+
+      const result = await useAuthStore.getState().getUserByToken();
+
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe('u1');
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    });
+
+    it('(d) cached path sets user synchronously before any await (cold-boot)', () => {
+      const user = makeUser();
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+      // Deliberately NOT awaited — state must already be set before this line returns.
+      void useAuthStore.getState().getUserByToken();
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+      expect(useAuthStore.getState().user?.id).toBe('u1');
+    });
+
+    it('(e) background revalidation preserves stored expiresIn and does not rewrite AUTH_MODEL', async () => {
+      const storedExpiry = Date.now() + THIRTY_FIVE_DAYS_MS;
+      const user = makeUser({ expiresIn: storedExpiry });
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: storedExpiry })
+      );
+      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      const mockGetMe = vi.fn().mockResolvedValue({ ...user, fullName: 'Revalidated' });
+      vi.doMock('~/shared/lib/http/auth-http-service', () => ({
+        authHttpService: { getMe: mockGetMe },
+      }));
+
+      await useAuthStore.getState().getUserByToken();
+      // Flush microtasks/macrotasks so the fire-and-forget background call settles.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const storedAuthModel = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
+      expect(storedAuthModel.expiresIn).toBe(storedExpiry);
+      expect(storedAuthModel.authToken).toBe(user.authToken);
+    });
+
+    it('(g) no-cache branch sets user synchronously before any await (cold-boot, AUTH-03 REV2)', () => {
+      const user = makeUser();
+      // AUTH_MODEL present, but CURRENT_USER cache absent/mismatched — the
+      // "no usable cache" branch. Must still hydrate synchronously.
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+
+      // Deliberately NOT awaited — state must already be set before this line returns.
+      void useAuthStore.getState().getUserByToken();
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+      expect(useAuthStore.getState().user?.authToken).toBe(user.authToken);
+    });
+
+    it('(h) no-cache branch retains the synchronously-hydrated user when the foreground /me fetch fails', async () => {
+      const user = makeUser();
+      localStorage.setItem(
+        StorageKeys.AUTH_MODEL,
+        JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
+      );
+
+      vi.doMock('~/shared/lib/http/auth-http-service', () => ({
+        authHttpService: {
+          getMe: vi.fn().mockRejectedValue(new Error('offline')),
+        },
+      }));
+
+      await useAuthStore.getState().getUserByToken();
+
+      const state = useAuthStore.getState();
+      expect(state.isAuthenticated).toBe(true);
+      expect(state.user?.authToken).toBe(user.authToken);
+    });
+
+    it('(f) initialize() and login() both invoke the same getUserByToken action', async () => {
+      const fakeUser = makeUser();
+      const spy = vi.fn().mockResolvedValue(fakeUser);
+      useAuthStore.setState({ getUserByToken: spy });
+
+      useAuthStore.getState().initialize();
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      vi.doMock('~/shared/lib/http/auth-http-service', () => ({
+        authHttpService: {
+          login: vi.fn().mockResolvedValue({
+            data: { authToken: 'tok', refreshToken: 'r', expiresIn: Date.now() + THIRTY_FIVE_DAYS_MS },
+          }),
+        },
+      }));
+
+      const result = await useAuthStore.getState().login('a@b.com', 'pw');
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(result).toBe(fakeUser);
+    });
   });
 });

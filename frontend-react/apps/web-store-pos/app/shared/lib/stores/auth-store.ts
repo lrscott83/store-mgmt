@@ -11,79 +11,111 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   initialize: () => void;
+  getUserByToken: () => Promise<UserModel | null>;
   setUser: (user: UserModel, token: string) => void;
   updateUser: (user: UserModel) => void;
   login: (email: string, password: string) => Promise<UserModel>;
   logout: () => void;
 }
 
-function readStoredUser(): UserModel | null {
+// Decision 4 (auth-service-parity, Slice 3): background revalidation reuses the
+// STORED session expiry — it never recomputes a fresh 35-day stamp and never
+// rewrites AUTH_MODEL. Only the cached profile (CURRENT_USER) + in-memory state
+// are refreshed. Mirrors Angular auth.service.ts's validateToken (~line 200).
+async function validateTokenWithServer(authToken: string, expiresIn: number): Promise<void> {
   try {
-    const raw = localStorage.getItem(StorageKeys.AUTH_MODEL);
-    if (!raw) return null;
-    const authModel = JSON.parse(raw) as { authToken?: string; expiresIn?: number };
-    if (!authModel.expiresIn || authModel.expiresIn < Date.now()) return null;
-    const profile = StorageService.getCurrentUser();
-    return {
-      ...(profile ?? {}),
-      authToken: authModel.authToken,
-      expiresIn: authModel.expiresIn,
-    } as UserModel;
+    const { authHttpService } = await import('../http/auth-http-service');
+    const fresh = await authHttpService.getMe();
+    const userWithExpiry: UserModel = { ...fresh, authToken, expiresIn, password: '' };
+    StorageService.setCurrentUser(userWithExpiry);
+    useAuthStore.setState({ user: userWithExpiry });
   } catch {
-    localStorage.removeItem(StorageKeys.AUTH_MODEL);
-    return null;
+    // AUTH-03: background refresh must never surface errors.
   }
 }
 
-function clearAuthStorage(): void {
-  StorageService.removeTokenFromLocalStorage();
-  localStorage.removeItem(StorageKeys.AUTH_MODEL);
-  StorageService.removeCurrentUser();
-}
-
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
 
   initialize: () => {
-    const user = readStoredUser();
-    if (user) {
-      set({ user, isAuthenticated: true, error: null });
-      // AUTH-03: Fire background /me if online — must NOT block render or display errors on failure
+    void get().getUserByToken();
+  },
+
+  // Decision 3 (auth-service-parity, Slice 3): ONE reusable action mirroring
+  // Angular auth.service.ts's getUserByToken (~lines 129-186). Consumed by
+  // initialize() and login() so the /me-fetch logic is no longer duplicated.
+  getUserByToken: async (): Promise<UserModel | null> => {
+    const raw = localStorage.getItem(StorageKeys.AUTH_MODEL);
+    if (!raw) return null;
+
+    let auth: { authToken?: string; expiresIn?: number };
+    try {
+      auth = JSON.parse(raw) as { authToken?: string; expiresIn?: number };
+    } catch {
+      localStorage.removeItem(StorageKeys.AUTH_MODEL);
+      return null;
+    }
+
+    if (!auth.authToken || !auth.expiresIn) {
+      // Malformed-but-parseable AUTH_MODEL — nothing to clear (Decision 3).
+      return null;
+    }
+
+    if (auth.expiresIn <= Date.now()) {
+      // Decision 4: inclusive boundary (Angular:143). Expired session routes
+      // through logout() — AUTH_MODEL-only clear (Decision 1 parity).
+      get().logout();
+      return null;
+    }
+
+    // Cold-boot requirement: this branch must call set() BEFORE any await so
+    // initialize() hydrates synchronously on module evaluation.
+    const cachedProfile = StorageService.getCurrentUser();
+    if (cachedProfile && cachedProfile.authToken === auth.authToken) {
+      const userWithExpiry: UserModel = {
+        ...cachedProfile,
+        authToken: auth.authToken,
+        expiresIn: auth.expiresIn,
+      };
+      set({ user: userWithExpiry, isAuthenticated: true, error: null });
+
+      // AUTH-03: fire background revalidation if online — must NOT block
+      // render or surface errors on failure.
       if (typeof navigator !== 'undefined' && navigator.onLine) {
-        const token = StorageService.getTokenFromLocalStorage();
-        if (token) {
-          void import('../http/api-client').then(({ apiClient }) =>
-            apiClient
-              .get<{ data: UserModel }>('/v1/auth/me')
-              .then((res) => {
-                const updated = res.data?.data;
-                if (updated) {
-                  const expiresIn = Date.now() + THIRTY_FIVE_DAYS_MS;
-                  const userWithExpiry: UserModel = { ...updated, expiresIn, password: '' };
-                  // Split layout (Option A): profile → currentUser; AUTH_MODEL stays minimal.
-                  StorageService.setCurrentUser(userWithExpiry);
-                  localStorage.setItem(
-                    StorageKeys.AUTH_MODEL,
-                    JSON.stringify({ authToken: token, expiresIn })
-                  );
-                  set({ user: userWithExpiry });
-                }
-              })
-              .catch(() => {
-                // Silently ignore — spec AUTH-03: MUST NOT display any error on failure
-              })
-          ).catch(() => {
-            // AUTH-03: the background refresh must never surface errors — including
-            // module-import or wiring failures that reject the outer promise.
-          });
-        }
+        void validateTokenWithServer(auth.authToken, auth.expiresIn);
       }
-    } else {
-      clearAuthStorage();
-      set({ user: null, isAuthenticated: false, error: null });
+      return userWithExpiry;
+    }
+
+    // No usable cache — synchronously hydrate a best-effort user from the SAME
+    // localStorage read BEFORE any await (AUTH-03 REV2 cold-boot invariant),
+    // mirroring the merge-with-empty-profile the old readStoredUser did. Then
+    // enrich in the foreground (e.g. right after login()).
+    const bestEffortUser: UserModel = {
+      ...(cachedProfile ?? {}),
+      authToken: auth.authToken,
+      expiresIn: auth.expiresIn,
+    } as UserModel;
+    set({ user: bestEffortUser, isAuthenticated: true, error: null });
+
+    try {
+      const { authHttpService } = await import('../http/auth-http-service');
+      const fresh = await authHttpService.getMe();
+      const userWithExpiry: UserModel = {
+        ...fresh,
+        authToken: auth.authToken,
+        expiresIn: auth.expiresIn,
+        password: '',
+      };
+      StorageService.setCurrentUser(userWithExpiry);
+      set({ user: userWithExpiry, isAuthenticated: true, error: null });
+      return userWithExpiry;
+    } catch {
+      // Offline-resilient: retain the synchronously-hydrated user, never clear.
+      return bestEffortUser;
     }
   },
 
@@ -118,23 +150,22 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { authHttpService } = await import('../http/auth-http-service');
       const response = await authHttpService.login({ login: email, password });
       const authData = response.data;
-
-      const { apiClient } = await import('../http/api-client');
-      const meResponse = await apiClient.get<{ data: UserModel }>('/v1/auth/me', {
-        headers: { Authorization: `Bearer ${authData.authToken}` },
-      });
-      const user = meResponse.data.data;
       const expiresIn = Date.now() + THIRTY_FIVE_DAYS_MS;
-      const userWithExpiry: UserModel = { ...user, ...authData, expiresIn, password: '' };
 
       StorageService.setTokenToLocalStorage(authData.authToken);
-      StorageService.setCurrentUser(userWithExpiry);
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
         JSON.stringify({ authToken: authData.authToken, expiresIn })
       );
-      set({ user: userWithExpiry, isAuthenticated: true, isLoading: false, error: null });
-      return userWithExpiry;
+
+      // Decision 3: login() delegates the /me fetch + state hydration to the
+      // same consolidated getUserByToken() action used by initialize().
+      const user = await get().getUserByToken();
+      if (!user) {
+        throw new Error('AUTH: failed to load user after login');
+      }
+      set({ isLoading: false });
+      return user;
     } catch (err) {
       set({ isLoading: false });
       throw err;
