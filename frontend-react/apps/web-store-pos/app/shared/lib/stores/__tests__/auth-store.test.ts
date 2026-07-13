@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAuthStore } from '../auth-store';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAuthStore, registerAuthRedirect } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
 import type { UserModel } from '@store-mgmt/domain';
 
@@ -141,6 +141,43 @@ describe('useAuthStore', () => {
       expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
       expect(localStorage.getItem(StorageKeys.TOKEN)).toBe(user.authToken);
       expect(localStorage.getItem(StorageKeys.CURRENT_USER)).toBe(JSON.stringify(user));
+    });
+  });
+
+  describe('logout — conditional redirect (Decision 2)', () => {
+    afterEach(() => {
+      window.history.pushState({}, '', '/');
+      registerAuthRedirect(() => undefined);
+    });
+
+    it('redirects to /login when invoked from an authenticated route', () => {
+      window.history.pushState({}, '', '/sales');
+      const spy = vi.fn();
+      registerAuthRedirect(spy);
+
+      useAuthStore.getState().logout();
+
+      expect(spy).toHaveBeenCalledWith('/login');
+    });
+
+    it('does NOT redirect when already on /login', () => {
+      window.history.pushState({}, '', '/login');
+      const spy = vi.fn();
+      registerAuthRedirect(spy);
+
+      useAuthStore.getState().logout();
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('does NOT redirect when already on / (root)', () => {
+      window.history.pushState({}, '', '/');
+      const spy = vi.fn();
+      registerAuthRedirect(spy);
+
+      useAuthStore.getState().logout();
+
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 

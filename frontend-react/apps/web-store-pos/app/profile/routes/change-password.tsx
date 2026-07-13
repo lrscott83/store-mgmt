@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import { useNavigate } from 'react-router';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -15,7 +14,6 @@ export const clientLoader = featureLoader(
 
 export function ChangePasswordPage() {
   const intl = useIntl();
-  const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const isOnline = useOnlineStatus();
   const [isLoading, setIsLoading] = useState(false);
@@ -28,8 +26,9 @@ export function ChangePasswordPage() {
 
     try {
       await profileHttpService.changePassword(user.id, payload);
+      // Decision 2 (auth-service-parity, Slice 3): logout() now owns the
+      // conditional redirect itself (Angular parity) — no manual navigate here.
       logout();
-      navigate('/login');
     } catch {
       setError(intl.formatMessage({ id: 'PROFILE.UPDATE_ERROR' }));
     } finally {

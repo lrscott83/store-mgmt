@@ -5,6 +5,15 @@ import { StorageService } from '../auth/storage-service';
 
 const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
 
+// Decision 2 (auth-service-parity, Slice 3): the store is framework-agnostic
+// and never imports react-router directly (mirrors Angular DI-injecting
+// Router into AuthService). Instead the router pushes its `navigate` fn in
+// via this registration hook (see root.tsx App()).
+let authRedirect: ((path: string) => void) | undefined;
+export function registerAuthRedirect(fn: (path: string) => void): void {
+  authRedirect = fn;
+}
+
 interface AuthState {
   user: UserModel | null;
   isAuthenticated: boolean;
@@ -178,6 +187,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // stay stale (Angular 1:1 parity, not a bug).
     localStorage.removeItem(StorageKeys.AUTH_MODEL);
     set({ user: null, isAuthenticated: false, error: null });
+
+    // Decision 2: conditional redirect (Angular auth.service.ts:83-98) — skip
+    // when already on /login or / to avoid a redundant navigation loop.
+    const pathname = window.location.pathname;
+    if (pathname !== '/login' && pathname !== '/') {
+      authRedirect?.('/login');
+    }
   },
 }));
 

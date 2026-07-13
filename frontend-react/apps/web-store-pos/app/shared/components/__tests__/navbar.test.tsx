@@ -229,6 +229,24 @@ describe('Navbar — S-NAV-5: help icon has the Angular gray-pill background', (
   });
 });
 
+describe('Navbar — S-NAV-7: logout delegates the redirect to auth-store (Decision 2, parity)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does NOT call navigate("/login") directly when logout is clicked', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByText('Salir'));
+
+    expect(mockNavigate).not.toHaveBeenCalledWith('/login');
+  });
+});
+
 describe('Navbar — S-NAV-6: user menu dropdown closes on outside click', () => {
   it('closes the dropdown when clicking outside it', () => {
     render(

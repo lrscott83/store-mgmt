@@ -6,11 +6,13 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useNavigate,
 } from 'react-router';
 import type { Route } from './+types/root';
 import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
 import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
+import { registerAuthRedirect } from '~/shared/lib/stores/auth-store';
 
 import '@store-mgmt/web-common/styles.css';
 
@@ -33,9 +35,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const navigate = useNavigate();
+
   useEffect(() => {
     registerServiceWorker();
   }, []);
+
+  // Decision 2 (auth-service-parity, Slice 3): give the framework-agnostic
+  // auth-store a way to trigger a route change on logout, without the store
+  // ever importing react-router directly (mirrors Angular DI-injecting
+  // Router into AuthService).
+  useEffect(() => {
+    registerAuthRedirect(navigate);
+  }, [navigate]);
 
   // Stage 6 Slice C: client-side daily store-usage tracker, mirroring
   // Angular's `StoreUsageTrackerService` nav hook (see

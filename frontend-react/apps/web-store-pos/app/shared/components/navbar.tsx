@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { useNavigate, Link } from 'react-router';
+import { Link } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { CartShell } from './cart-shell';
@@ -12,7 +12,6 @@ interface NavbarProps {
 
 export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
   const intl = useIntl();
-  const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -20,8 +19,9 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
   useClickOutside(userMenuRef, () => setIsUserMenuOpen(false));
 
   function handleLogout() {
+    // Decision 2 (auth-service-parity, Slice 3): logout() now owns the
+    // conditional redirect itself (Angular parity) — no manual navigate here.
     logout();
-    navigate('/login');
   }
 
   return (

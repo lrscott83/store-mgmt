@@ -356,7 +356,7 @@ describe('ChangePasswordPage — S-PWD-1: success → logout + navigate /login',
     });
   });
 
-  it('navigates to /login on success', async () => {
+  it('does NOT call navigate("/login") directly — redirect is now colocated inside auth-store.logout() (Decision 2, parity)', async () => {
     const { ChangePasswordPage } = await import('../change-password');
     render(
       <Wrapper>
@@ -375,8 +375,9 @@ describe('ChangePasswordPage — S-PWD-1: success → logout + navigate /login',
     fireEvent.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/login');
+      expect(mockLogout).toHaveBeenCalled();
     });
+    expect(mockNavigate).not.toHaveBeenCalledWith('/login');
   });
 });
 
