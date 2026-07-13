@@ -163,84 +163,104 @@ export class InventoryOfflineService {
   }
 
   /**
-   * Returns active entries for a specific calendar day.
+   * Returns active entries for TODAY. Fase 4 (inventory-offline-service-parity, GATE-C —
+   * Angular-exact rename+ignore-date body): renamed from `getByDate`; the `date` param is
+   * ACCEPTED BUT IGNORED — the method ALWAYS computes today's window internally, mirroring
+   * Angular's `getInventoryEntriesInDay` literally (inventory-offline.service.ts:252-258),
+   * including its date-descending sort. React's prior date-honoring behavior is removed.
    *
    * WU3 (category B): returns SYNC BaseResponseModel<InventoryEntryView[]> (was a bare
    * array), matching Angular's getInventoryEntriesInDay (`this.Success(...)`, sync,
    * never async).
    */
-  getByDate(date: Date): BaseResponseModel<InventoryEntryView[]> {
-    const dayStart = startOfDay(date);
-    const dayEnd = startOfDay(addDays(date, 1));
-    const entries = this.getActiveInventoryEntriesStorage().filter(
-      (v) => v.date >= dayStart && v.date < dayEnd,
-    );
+  getInventoryEntriesInDay(_date: Date): BaseResponseModel<InventoryEntryView[]> {
+    const dayStart = startOfDay(new Date());
+    const dayEnd = addDays(dayStart, 1);
+    const entries = this.getActiveInventoryEntriesStorage()
+      .filter((v) => v.date >= dayStart && v.date < dayEnd)
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
     return success(entries);
   }
 
   /**
-   * Returns available stock grouped by category → product.
-   * Requires product records to be passed in so we can read categoryId/categoryName.
-   * When called without products (default), returns an empty array —
-   * containers should call the product service separately and use
-   * getActiveInventoryEntriesStorage().
+   * Returns available stock grouped by category → product. Fase 4
+   * (inventory-offline-service-parity, GATE-B — Angular-exact rename+zero-arg+category-repo
+   * sourcing): renamed from `getAvailableByCategory`, the `products` param is REMOVED entirely.
+   * Groups ACTIVE entries by `entry.categoryId` (stamped at creation time, GATE-A) — not a
+   * caller-supplied product map. Category NAME is sourced via `ProductCategoryRepository`
+   * (`productRepository.getCategoryRepository()`), mirroring Angular's
+   * `categoryRepository.getStorageCategoriesMap()` (inventory-offline.service.ts:288) —
+   * UNGUARDED (gate #1052: a categoryId with no matching category throws, exactly like Angular's
+   * own unguarded `storageCategory.name` read; no defensive `''` fallback is added).
    *
    * WU3 (category B): returns SYNC BaseResponseModel<InventoryCategoryView[]> (was a bare
    * array), matching Angular's getInventoryCategoriesView (`this.Success(...)`, sync,
    * never async).
    */
-  getAvailableByCategory(
-    products: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
-  ): BaseResponseModel<InventoryCategoryView[]> {
-    const map = this.getStorageInventoriesMap();
-    const productMap = new Map(products.map((p) => [p.id, p]));
-    const categoryMap = new Map<string, InventoryCategoryView>();
+  getInventoryCategoriesView(): BaseResponseModel<InventoryCategoryView[]> {
+    const productMap = this.productRepository.getStorageProductsMap();
+    const categoriesMap = this.productRepository.getCategoryRepository().getStorageCategoriesMap();
+    const activeEntries = this.getStorageActiveInventoryEntries();
 
-    for (const [productId, entries] of map) {
-      const product = productMap.get(productId);
-      if (!product) continue;
+    // Group by entry.categoryId (Angular 291), then by entry.productId within each category
+    // group (Angular 294) — mirrors Angular's structure literally.
+    const categoryGroups = new Map<string, InventoryEntry[]>();
+    for (const entry of activeEntries) {
+      const group = categoryGroups.get(entry.categoryId);
+      if (group) group.push(entry);
+      else categoryGroups.set(entry.categoryId, [entry]);
+    }
 
-      const activeEntries = entries.filter((e) => e.isActive);
-      const totalAvailable = activeEntries.reduce((sum, e) => sum + e.available, 0);
-      if (totalAvailable === 0) continue;
-
-      // Weighted-average unit cost across active entries — Angular's getAverageCostPrice.
-      // totalAvailable > 0 here (checked above), so this never divides by zero: Angular's own
-      // division-by-zero (NaN) bug for fully-depleted products is intentionally NOT replicated
-      // (diff-matrix #4 — fully-depleted products are excluded above instead).
-      const weightedCostSum = activeEntries.reduce((sum, e) => sum + e.available * e.costPrice, 0);
-      const avgCostPrice = weightedCostSum / totalAvailable;
-
-      let cat = categoryMap.get(product.categoryId);
-      if (!cat) {
-        cat = {
-          categoryId: product.categoryId,
-          categoryName: product.categoryName,
-          totalQuantity: 0,
-          totalCostPrice: 0,
-          products: [],
-        };
-        categoryMap.set(product.categoryId, cat);
+    const inventoryCategories: InventoryCategoryView[] = [];
+    categoryGroups.forEach((categoryEntries, categoryId) => {
+      const productGroups = new Map<string, InventoryEntry[]>();
+      for (const entry of categoryEntries) {
+        const group = productGroups.get(entry.productId);
+        if (group) group.push(entry);
+        else productGroups.set(entry.productId, [entry]);
       }
 
-      cat.products.push({
-        productId,
-        productName: product.name,
-        categoryId: product.categoryId,
-        categoryName: product.categoryName,
-        totalAvailable,
-        avgCostPrice,
+      const products: InventoryProductStock[] = [];
+      let categoryName: string | undefined;
+      productGroups.forEach((productEntries, productId) => {
+        // Pre-existing divergences (out of GATE-B scope, previously ratified): skip when the
+        // product no longer exists, and skip fully-depleted products (avoids Angular's own NaN
+        // bug for Σavailable === 0 — diff-matrix #4).
+        const product = productMap.get(productId);
+        if (!product) return;
+        const totalAvailable = productEntries.reduce((sum, e) => sum + e.available, 0);
+        if (totalAvailable === 0) return;
+
+        if (categoryName === undefined) {
+          // Angular parity (getInventoryCategoriesView:308) + gate #1052: UNGUARDED — throws
+          // here when categoryId has no matching category, mirroring Angular's own unguarded
+          // `storageCategoriesMap.get(item.categoryId).name` read literally.
+          categoryName = categoriesMap.get(categoryId)!.name;
+        }
+
+        const weightedCostSum = productEntries.reduce((sum, e) => sum + e.available * e.costPrice, 0);
+        products.push({
+          productId,
+          productName: product.name,
+          categoryId,
+          categoryName,
+          totalAvailable,
+          avgCostPrice: weightedCostSum / totalAvailable,
+        });
       });
-    }
 
-    // Category totals — Angular's getTotalQuantity/getTotalCostPrice, recomputed from the
-    // per-product views (Σ totalAvailable; Σ avgCostPrice·totalAvailable).
-    for (const cat of categoryMap.values()) {
-      cat.totalQuantity = cat.products.reduce((sum, p) => sum + p.totalAvailable, 0);
-      cat.totalCostPrice = cat.products.reduce((sum, p) => sum + p.avgCostPrice * p.totalAvailable, 0);
-    }
+      if (products.length === 0) return;
 
-    return success(Array.from(categoryMap.values()));
+      inventoryCategories.push({
+        categoryId,
+        categoryName: categoryName!,
+        totalQuantity: products.reduce((sum, p) => sum + p.totalAvailable, 0),
+        totalCostPrice: products.reduce((sum, p) => sum + p.avgCostPrice * p.totalAvailable, 0),
+        products,
+      });
+    });
+
+    return success(inventoryCategories);
   }
 
   /**
@@ -266,6 +286,23 @@ export class InventoryOfflineService {
   getInventoryCostTotalYesterday(): number {
     const start = startOfDay(new Date());
     return this.getInventoryCostTotalBefore(start);
+  }
+
+  /**
+   * Fase 4 (inventory-offline-service-parity, T11): private RAW-entry helper — 1:1 port of
+   * Angular's `getStorageInventoryEntries`/`getStorageActiveInventoryEntries`
+   * (inventory-offline.service.ts:46-52): flattens the per-product map into a single
+   * `InventoryEntry[]` list, then filters to `isActive` entries. Used internally by
+   * `getInventoryCategoriesView` in place of ad-hoc active-entry filtering — mirrors Angular's
+   * structure. Returns RAW entries (not the enriched `InventoryEntryView[]` that
+   * `getActiveInventoryEntriesStorage()` returns).
+   */
+  private getStorageInventoryEntries(): InventoryEntry[] {
+    return Array.from(this.getStorageInventoriesMap().values()).flat();
+  }
+
+  private getStorageActiveInventoryEntries(): InventoryEntry[] {
+    return this.getStorageInventoryEntries().filter((e) => e.isActive);
   }
 
   /**
@@ -325,27 +362,25 @@ export class InventoryOfflineService {
   /**
    * WU4 (category C): 1:1 port of Angular's `getInventoryEntriesInDayObservable`
    * (inventory-offline.service.ts:213 — `of(this.getInventoryEntriesInDay(date))`), the
-   * Observable sibling of the sync `getByDate`/`getInventoryEntriesInDay`. Named
-   * character-for-character after Angular (exact-surface rule); same-tick `Promise.resolve`
-   * mirrors `of(...)` over synchronous storage (design ADR-7). No existing call-site migration.
+   * Observable sibling of the sync `getInventoryEntriesInDay`. Named character-for-character
+   * after Angular (exact-surface rule); same-tick `Promise.resolve` mirrors `of(...)` over
+   * synchronous storage (design ADR-7). No existing call-site migration.
    */
   getInventoryEntriesInDayObservable(date: Date): Promise<BaseResponseModel<InventoryEntryView[]>> {
-    return Promise.resolve(this.getByDate(date));
+    return Promise.resolve(this.getInventoryEntriesInDay(date));
   }
 
   /**
-   * WU4 (category C): 1:1 port of Angular's `getInventoryCategoriesViewObservable`
-   * (inventory-offline.service.ts:260 — `of(this.getInventoryCategoriesView())`), the
-   * Observable sibling of the sync `getAvailableByCategory`/`getInventoryCategoriesView`.
-   * Named character-for-character after Angular (exact-surface rule); same-tick
-   * `Promise.resolve` mirrors `of(...)`. Keeps the `products` param of React's underlying
-   * sync `getAvailableByCategory` (a pre-existing DI-gap shape of that specific method) —
-   * only the method NAME was the parity defect. No existing call-site migration.
+   * WU4 (category C) + Fase 4 (GATE-B ripple): 1:1 port of Angular's
+   * `getInventoryCategoriesViewObservable` (inventory-offline.service.ts:260 —
+   * `of(this.getInventoryCategoriesView())`), the Observable sibling of the sync
+   * `getInventoryCategoriesView`. Now ZERO-ARG — the `products` param was only a DI-gap mirror
+   * of the old sync method's shape; GATE-B removed it from the underlying method, so it is
+   * dropped here too. Named character-for-character after Angular (exact-surface rule);
+   * same-tick `Promise.resolve` mirrors `of(...)`. No existing call-site migration.
    */
-  getInventoryCategoriesViewObservable(
-    products: Array<{ id: string; name: string; categoryId: string; categoryName: string }> = [],
-  ): Promise<BaseResponseModel<InventoryCategoryView[]>> {
-    return Promise.resolve(this.getAvailableByCategory(products));
+  getInventoryCategoriesViewObservable(): Promise<BaseResponseModel<InventoryCategoryView[]>> {
+    return Promise.resolve(this.getInventoryCategoriesView());
   }
 
   // ─── FIFO deduction ──────────────────────────────────────────────────────
@@ -488,14 +523,20 @@ export class InventoryOfflineService {
    * does not exist, Angular returns bare `null` (NOT a DataResult) before creating anything —
    * mirrored exactly here (ratified: preserve Angular's exact `null` shape).
    *
+   * Fase 4 (inventory-offline-service-parity, GATE-A — Angular-exact signature): renamed from
+   * `create`, drops the `categoryId`/`date` params entirely (3-arity, Angular parity). Both are
+   * derived INTERNALLY:
+   * - `categoryId` from `productRepository.getStorageProductsMap().get(productId).categoryId`
+   *   (Angular createInventoryEntry:76) — never caller-supplied.
+   * - `date`/`createdDate` are BOTH stamped from a SINGLE internal `new Date()` call made at
+   *   invocation time (Angular createInventoryEntry:70,80,83) — no caller-supplied backdating.
+   *
    * Spec §6.3 create contract; S-I1.
    */
-  create(
+  createInventoryEntry(
     productId: string,
     quantity: number,
     costPrice: number,
-    categoryId: string = '',
-    date: Date = new Date(),
   ): DataResult<InventoryEntryView> | null {
     const product = this.productRepository.getProductById(productId);
     if (!product) return null;
@@ -504,7 +545,8 @@ export class InventoryOfflineService {
     const maxOrder = existing.length > 0
       ? Math.max(...existing.map((e) => e.order))
       : -1;
-    const now = new Date();
+    const date = new Date();
+    const categoryId = this.productRepository.getStorageProductsMap().get(productId)!.categoryId;
 
     const entry: InventoryEntry = {
       id: generateId(),
@@ -516,7 +558,7 @@ export class InventoryOfflineService {
       date,
       order: maxOrder + 1,
       isActive: true,
-      createdDate: now,
+      createdDate: date,
       createdByName: getCurrentUserLogin(),
       updatedDate: undefined,
       updatedByName: undefined,
@@ -605,9 +647,13 @@ export class InventoryOfflineService {
    *
    * WU2 (category D): returns Result (was void, throwing) — NEVER throws.
    *
+   * Fase 4 (inventory-offline-service-parity): renamed from `deactivate(entryId, productId)` to
+   * `deleteInventoryEntry(productId, entryId)` — Angular-exact name + param order restored
+   * (Angular parity, inventory-offline.service.ts:179).
+   *
    * Spec §6.3 deactivate contract; S-I5.
    */
-  deactivate(entryId: string, productId: string): Result {
+  deleteInventoryEntry(productId: string, entryId: string): Result {
     const guard = this.isNotSoldEntry(productId, entryId);
     if (!guard.succeeded) return Result.Failure(guard.errors);
 
@@ -788,7 +834,7 @@ export class InventoryOfflineService {
    *
    * Stage 7 (Reports ledger, ADR-2): the only supported way to compute a
    * quantity-weighted average cost across a product's active (available > 0) entries.
-   * Do NOT reuse `getAvailableByCategory` (weights by `available`, diverges for
+   * Do NOT reuse `getInventoryCategoriesView` (weights by `available`, diverges for
    * partially-sold entries) or `getAvailableInventoryCosts` (mutates/deducts stock via FIFO).
    */
   getProductInventoriesByProductId(productId: string): InventoryEntry[] {

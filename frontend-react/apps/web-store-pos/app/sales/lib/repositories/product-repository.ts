@@ -38,6 +38,19 @@ export class ProductRepository {
     this.categoryRepository = categoryRepository;
   }
 
+  /**
+   * Fase 4 (inventory-offline-service-parity, GATE-B, rule-12 minimal accessor): surfaces the
+   * already-injected `ProductCategoryRepository` so `InventoryOfflineService` can source category
+   * names for `getInventoryCategoriesView()` the same way Angular does
+   * (`categoryRepository.getStorageCategoriesMap()`, inventory-offline.service.ts:288) — without
+   * adding a THIRD top-level DI param to `InventoryOfflineService` (which still only takes
+   * `storeId` + `productRepository`, mirroring Angular's constructor) or constructing a second,
+   * divergent `ProductCategoryRepository` instance. One-line passthrough, no new behavior.
+   */
+  getCategoryRepository(): ProductCategoryRepository {
+    return this.categoryRepository;
+  }
+
   /** 1:1 port of Angular `getStorageProductsMap` (product.repository.ts:36-40). */
   getStorageProductsMap(): Map<string, Product> {
     if (!this.products || this.products.size === 0 || this.getCurrentStorageKey() !== this.lastProductsKey) {

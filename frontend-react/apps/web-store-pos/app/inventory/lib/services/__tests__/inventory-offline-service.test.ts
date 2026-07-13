@@ -4,7 +4,7 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
-import type { InventoryEntry, OrderItem, Product, UserModel } from '@store-mgmt/domain';
+import type { InventoryEntry, OrderItem, Product, ProductCategory, UserModel } from '@store-mgmt/domain';
 
 const storeId = 's1';
 
@@ -29,6 +29,18 @@ function makeProduct(id: string, overrides: Partial<Product> = {}): Product {
 function seedProducts(storeId: string, products: Product[]): void {
   const entries = products.map((p) => [p.id, p] as [string, Product]);
   localStorage.setItem(`lizoft.store-products-${storeId}`, JSON.stringify(entries));
+}
+
+function makeCategory(id: string, overrides: Partial<ProductCategory> = {}): ProductCategory {
+  return { id, name: `Category ${id}`, order: 0, isActive: true, ...overrides };
+}
+
+// Fase 4 (inventory-offline-service-parity, GATE-B): seeds ProductCategoryRepository's storage
+// so getInventoryCategoriesView can source categoryName from it (mirrors Angular's
+// categoryRepository.getStorageCategoriesMap()), not the removed caller-supplied enrichment array.
+function seedCategories(storeId: string, categories: ProductCategory[]): void {
+  const entries = categories.map((c) => [c.id, c] as [string, ProductCategory]);
+  localStorage.setItem(`lizoft.store-product-categories-${storeId}`, JSON.stringify(entries));
 }
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
@@ -407,12 +419,13 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU2 (service-return-shape-parity Slice 1, category D): create() now returns
-  // DataResult<InventoryEntryView> (was plain InventoryEntry), matching Angular's
-  // createInventoryEntry sync DataResult return — never throws.
-  describe('INV-03: create — S-I1 (DataResult<InventoryEntryView>)', () => {
+  // WU2 (service-return-shape-parity Slice 1, category D) + Fase 4 (inventory-offline-service-parity
+  // GATE-A): createInventoryEntry(productId, quantity, costPrice) — renamed from create(), drops
+  // the categoryId/date params entirely; both are derived INTERNALLY (Angular parity,
+  // createInventoryEntry:60-90) — never caller-supplied.
+  describe('INV-03: createInventoryEntry — S-I1 (DataResult<InventoryEntryView>, Angular-exact signature)', () => {
     it('succeeds:true, data.available=data.quantity for a new entry', () => {
-      const result = service.create('p1', 50, 0.8);
+      const result = service.createInventoryEntry('p1', 50, 0.8);
       expect(result?.succeeded).toBe(true);
       expect(result?.errors).toEqual([]);
       expect(result?.data?.quantity).toBe(50);
@@ -420,44 +433,61 @@ describe('InventoryOfflineService', () => {
       expect(result?.data?.productName).toBe('Product p1');
     });
 
+    it('createInventoryEntry is 3-arity — no categoryId/date parameters accepted', () => {
+      expect(service.createInventoryEntry.length).toBe(3);
+    });
+
+    it('derives categoryId internally from productRepository.getStorageProductsMap() (Angular parity, createInventoryEntry:76) — not caller-supplied', () => {
+      seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-9' }), makeProduct('p2')]);
+      service.createInventoryEntry('p1', 50, 0.8);
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries[0].categoryId).toBe('cat-9');
+    });
+
+    it('stamps entry.date and entry.createdDate from a SINGLE internal `new Date()` call (Angular parity, createInventoryEntry:70,80,83) — both equal the same instant', () => {
+      service.createInventoryEntry('p1', 10, 1.5);
+      const entries = service.getProductInventoriesByProductId('p1');
+      expect(entries[0].date).toEqual(entries[0].createdDate);
+    });
+
     it('creates an entry with order=maxOrder+1 (verified via a subsequent read)', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { order: 2 })]);
       seedInventory(storeId, map);
 
-      service.create('p1', 10, 1.5);
+      service.createInventoryEntry('p1', 10, 1.5);
       const entries = service.getProductInventoriesByProductId('p1');
       const created = entries.find((e) => e.id !== 'e1');
       expect(created?.order).toBe(3); // maxOrder=2, so new entry gets 3
     });
 
     it('creates first entry with order=0 when no entries exist', () => {
-      service.create('p1', 10, 1.5);
+      service.createInventoryEntry('p1', 10, 1.5);
       const entries = service.getProductInventoriesByProductId('p1');
       expect(entries[0].order).toBe(0);
     });
 
     it('persists to localStorage', () => {
-      service.create('p1', 10, 1.5);
+      service.createInventoryEntry('p1', 10, 1.5);
       const raw = localStorage.getItem('lizoft.store-inventory-entries-s1');
       expect(raw).not.toBeNull();
     });
 
     it('sets isActive=true on new entry data', () => {
-      const result = service.create('p1', 10, 1.5);
+      const result = service.createInventoryEntry('p1', 10, 1.5);
       expect(result?.data?.isActive).toBe(true);
     });
 
     // Angular parity (audit-user-threading): create stamps createdByName from the
     // authenticated user's login and MUST NOT touch updatedByName/updatedDate.
     it('stamps createdByName with the authenticated user login (raw entry, not exposed on the view)', () => {
-      service.create('p1', 10, 1.5);
+      service.createInventoryEntry('p1', 10, 1.5);
       const entries = service.getProductInventoriesByProductId('p1');
       expect(entries[0].createdByName).toBe('jdoe');
     });
 
     it('leaves updatedByName/updatedDate undefined on create', () => {
-      service.create('p1', 10, 1.5);
+      service.createInventoryEntry('p1', 10, 1.5);
       const entries = service.getProductInventoriesByProductId('p1');
       expect(entries[0].updatedByName).toBeUndefined();
       expect(entries[0].updatedDate).toBeUndefined();
@@ -465,7 +495,7 @@ describe('InventoryOfflineService', () => {
 
     it('stamps createdByName with "" when no user is authenticated', () => {
       useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
-      service.create('p1', 10, 1.5);
+      service.createInventoryEntry('p1', 10, 1.5);
       const entries = service.getProductInventoriesByProductId('p1');
       expect(entries[0].createdByName).toBe('');
     });
@@ -516,14 +546,17 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU2 (category D): deactivate() now returns Result (guarded by isNotSoldEntry) — never throws.
-  describe('INV-05: deactivate — S-I5 (Result, never throws)', () => {
+  // WU2 (category D) + Fase 4 (GATE — Angular-exact rename+param order): deleteInventoryEntry
+  // (productId, entryId) — renamed from deactivate(entryId, productId), Angular param order
+  // restored (Angular parity, inventory-offline.service.ts:179). Guarded by isNotSoldEntry —
+  // never throws.
+  describe('INV-05: deleteInventoryEntry — S-I5 (Result, never throws, Angular-exact rename+param order)', () => {
     it('fails with InventoryErrors.SaleExistsWithThisEntry when entry has been partially sold', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 4 })]);
       seedInventory(storeId, map);
 
-      const result = service.deactivate('e1', 'p1');
+      const result = service.deleteInventoryEntry('p1', 'e1');
       expect(result).toEqual(Result.Failure([InventoryErrors.SaleExistsWithThisEntry]));
     });
 
@@ -532,12 +565,12 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      const result = service.deactivate('e1', 'p1');
+      const result = service.deleteInventoryEntry('p1', 'e1');
       expect(result).toEqual(Result.Success());
     });
 
     it('fails with InventoryErrors.EntryNotExists when entry not found', () => {
-      const result = service.deactivate('missing', 'p1');
+      const result = service.deleteInventoryEntry('p1', 'missing');
       expect(result).toEqual(Result.Failure([InventoryErrors.EntryNotExists]));
     });
 
@@ -546,7 +579,7 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      service.deactivate('e1', 'p1');
+      service.deleteInventoryEntry('p1', 'e1');
       const all = service.getActiveInventoryEntriesStorage();
       const found = all.find((v) => v.id === 'e1');
       // After deactivation, it should not appear in getActiveInventoryEntriesStorage
@@ -561,8 +594,23 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       seedInventory(storeId, map);
 
-      service.deactivate('e1', 'p1');
+      service.deleteInventoryEntry('p1', 'e1');
       expect(findRawEntry(storeId, 'e1')?.updatedByName).toBe('jdoe');
+    });
+
+    it('enforces the new (productId, entryId) order — the OLD swapped order does not resolve the entry', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
+      seedInventory(storeId, map);
+
+      // Old React arg order was (entryId, productId) — calling with 'e1' as productId and
+      // 'p1' as entryId must NOT deactivate the real entry (proves the rename enforces the
+      // new order, not just a bigger rename). 'e1' is not a product id -> guard fails first.
+      const result = service.deleteInventoryEntry('e1', 'p1');
+      expect(result).toEqual(Result.Failure([ProductErrors.NotExists]));
+
+      const all = service.getActiveInventoryEntriesStorage();
+      expect(all.find((v) => v.id === 'e1')).toBeDefined();
     });
   });
 
@@ -648,91 +696,104 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  describe('INV-09: getAvailableByCategory — weighted-average cost + category totals (Angular parity: getInventoryCategoriesView/getAverageCostPrice/getTotalCostPrice, inventory-offline.service.ts:286-349)', () => {
-    const enrichedProduct = (id: string, name: string, categoryId: string, categoryName: string) => ({
-      id,
-      name,
-      categoryId,
-      categoryName,
-    });
-
+  // WU3 (category B) + Fase 4 (GATE-B — Angular-exact rename+zero-arg+category-repo sourcing):
+  // getInventoryCategoriesView() — renamed from getAvailableByCategory, the `products` param is
+  // REMOVED entirely. Category names are sourced via ProductCategoryRepository
+  // (productRepository.getCategoryRepository().getStorageCategoriesMap()), mirroring Angular's
+  // categoryRepository.getStorageCategoriesMap() (inventory-offline.service.ts:286-349) — NOT
+  // the caller-supplied enrichment array.
+  describe('INV-09: getInventoryCategoriesView — weighted-average cost + category totals (Angular parity: getInventoryCategoriesView/getAverageCostPrice/getTotalCostPrice, inventory-offline.service.ts:286-349)', () => {
     it('returns a BaseResponseModel envelope: succeeded:true, message:"", actionCode:200, errors:[]', () => {
-      const result = service.getAvailableByCategory([]);
+      const result = service.getInventoryCategoriesView();
       expect(result.succeeded).toBe(true);
       expect(result.message).toBe('');
       expect(result.actionCode).toBe(200);
       expect(result.errors).toEqual([]);
     });
 
-    it('computes weighted-average cost price per product: Σ(available·costPrice)/Σavailable', () => {
+    it('computes weighted-average cost price per product: Σ(available·costPrice)/Σavailable, sourcing categoryName from ProductCategoryRepository (zero-arg, no products array)', () => {
+      seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
+      seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-1' }), makeProduct('p2')]);
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
-        makeEntry('e1', 'p1', { available: 10, costPrice: 2 }),
-        makeEntry('e2', 'p1', { available: 10, costPrice: 4 }),
+        makeEntry('e1', 'p1', { categoryId: 'cat-1', available: 10, costPrice: 2 }),
+        makeEntry('e2', 'p1', { categoryId: 'cat-1', available: 10, costPrice: 4 }),
       ]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]).data;
+      const categories = service.getInventoryCategoriesView().data;
 
+      expect(categories[0].categoryName).toBe('Bebidas');
       // (10*2 + 10*4) / 20 = 3
       expect(categories[0].products[0].avgCostPrice).toBe(3);
       expect(categories[0].products[0].totalAvailable).toBe(20);
     });
 
     it('weights by available quantity, not the original received quantity', () => {
+      seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
+      seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-1' }), makeProduct('p2')]);
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
         // received 10 @ $2 but 8 already sold -> only 2 left available
-        makeEntry('e1', 'p1', { quantity: 10, available: 2, costPrice: 2 }),
-        makeEntry('e2', 'p1', { quantity: 10, available: 8, costPrice: 5 }),
+        makeEntry('e1', 'p1', { categoryId: 'cat-1', quantity: 10, available: 2, costPrice: 2 }),
+        makeEntry('e2', 'p1', { categoryId: 'cat-1', quantity: 10, available: 8, costPrice: 5 }),
       ]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]).data;
+      const categories = service.getInventoryCategoriesView().data;
 
       // (2*2 + 8*5) / 10 = 4.4
       expect(categories[0].products[0].avgCostPrice).toBeCloseTo(4.4, 5);
     });
 
     it('computes category totalQuantity as the sum of each product totalAvailable', () => {
+      seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
+      seedProducts(storeId, [
+        makeProduct('p1', { categoryId: 'cat-1' }),
+        makeProduct('p2', { categoryId: 'cat-1' }),
+      ]);
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]);
-      map.set('p2', [makeEntry('e2', 'p2', { available: 5, costPrice: 3 })]);
+      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-1', available: 10, costPrice: 2 })]);
+      map.set('p2', [makeEntry('e2', 'p2', { categoryId: 'cat-1', available: 5, costPrice: 3 })]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([
-        enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
-        enrichedProduct('p2', 'Vodka', 'cat-1', 'Bebidas'),
-      ]).data;
+      const categories = service.getInventoryCategoriesView().data;
 
       expect(categories).toHaveLength(1);
       expect(categories[0].totalQuantity).toBe(15);
     });
 
     it('computes category totalCostPrice as Σ(product.avgCostPrice·product.totalAvailable) — matches Σ(entry.available·costPrice) for the category', () => {
+      seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
+      seedProducts(storeId, [
+        makeProduct('p1', { categoryId: 'cat-1' }),
+        makeProduct('p2', { categoryId: 'cat-1' }),
+      ]);
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]); // value = 20
-      map.set('p2', [makeEntry('e2', 'p2', { available: 5, costPrice: 3 })]); // value = 15
+      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-1', available: 10, costPrice: 2 })]); // value = 20
+      map.set('p2', [makeEntry('e2', 'p2', { categoryId: 'cat-1', available: 5, costPrice: 3 })]); // value = 15
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([
-        enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
-        enrichedProduct('p2', 'Vodka', 'cat-1', 'Bebidas'),
-      ]).data;
+      const categories = service.getInventoryCategoriesView().data;
 
       expect(categories[0].totalCostPrice).toBe(35);
     });
 
     it('keeps separate category totals for products in different categories', () => {
+      seedCategories(storeId, [
+        makeCategory('cat-1', { name: 'Bebidas' }),
+        makeCategory('cat-2', { name: 'Snacks' }),
+      ]);
+      seedProducts(storeId, [
+        makeProduct('p1', { categoryId: 'cat-1' }),
+        makeProduct('p2', { categoryId: 'cat-2' }),
+      ]);
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]);
-      map.set('p2', [makeEntry('e2', 'p2', { available: 5, costPrice: 10 })]);
+      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-1', available: 10, costPrice: 2 })]);
+      map.set('p2', [makeEntry('e2', 'p2', { categoryId: 'cat-2', available: 5, costPrice: 10 })]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([
-        enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas'),
-        enrichedProduct('p2', 'Papas', 'cat-2', 'Snacks'),
-      ]).data;
+      const categories = service.getInventoryCategoriesView().data;
 
       const bebidas = categories.find((c) => c.categoryId === 'cat-1');
       const snacks = categories.find((c) => c.categoryId === 'cat-2');
@@ -741,14 +802,45 @@ describe('InventoryOfflineService', () => {
     });
 
     it('does not divide by zero / produce NaN for fully-depleted products (documented divergence — Angular has a NaN bug here, not replicated)', () => {
+      seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 0, costPrice: 2 })]);
+      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-1', quantity: 10, available: 0, costPrice: 2 })]);
       seedInventory(storeId, map);
 
-      const categories = service.getAvailableByCategory([enrichedProduct('p1', 'Ron', 'cat-1', 'Bebidas')]).data;
+      const categories = service.getInventoryCategoriesView().data;
 
       // Fully-depleted product is excluded entirely — pre-existing divergence, not this gap's concern.
       expect(categories).toHaveLength(0);
+    });
+
+    // Gate #1052 (stale-data, user-ratified): mirror Angular's UNGUARDED category-name read —
+    // a categoryId with NO matching category in ProductCategoryRepository throws, matching
+    // Angular's `storageCategoriesMap.get(item.categoryId).name` (inventory-offline.service.ts:308)
+    // literally. No defensive `''` guard is added.
+    it('throws when an active entry has a categoryId with no matching category (Angular-exact unguarded read, gate #1052)', () => {
+      // No categories seeded — 'cat-missing' will not resolve in ProductCategoryRepository.
+      seedProducts(storeId, [makeProduct('p1', { categoryId: 'cat-missing' })]);
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-missing', available: 10, costPrice: 2 })]);
+      seedInventory(storeId, map);
+
+      expect(() => service.getInventoryCategoriesView()).toThrow();
+    });
+
+    it('no method named getAvailableByCategory remains on the service (Angular-exact rename)', () => {
+      expect((service as unknown as { getAvailableByCategory?: unknown }).getAvailableByCategory).toBeUndefined();
+    });
+  });
+
+  // T7/T8 (Fase 4, rule-12 minimal accessor): ProductRepository.getCategoryRepository() surfaces
+  // the ProductCategoryRepository it already wraps — used by getInventoryCategoriesView (GATE-B)
+  // to source category names, mirroring Angular's categoryRepository DI without adding a new
+  // top-level dependency to InventoryOfflineService.
+  describe('ProductRepository.getCategoryRepository() — accessor (Fase 4, minimal DI surfacing)', () => {
+    it('returns the SAME ProductCategoryRepository instance passed into the constructor (identity, not a new instance)', () => {
+      const catRepo = new ProductCategoryRepository(storeId);
+      const prodRepo = new ProductRepository(storeId, catRepo);
+      expect(prodRepo.getCategoryRepository()).toBe(catRepo);
     });
   });
 
@@ -796,37 +888,46 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU3 (category B): getByDate/getAvailableByCategory now return SYNC
-  // BaseResponseModel<T> (was a bare array) — never Promise, never Result/DataResult.
-  describe('INV-08: getByDate filters by date (BaseResponseModel<T>, WU3)', () => {
+  // WU3 (category B) + Fase 4 (GATE-C — Angular-exact rename+ignore-date body):
+  // getInventoryEntriesInDay(date) — renamed from getByDate; the `date` PARAM IS IGNORED — the
+  // method ALWAYS returns TODAY's active entries (Angular parity, inventory-offline.service.ts:
+  // 252-258). Returns SYNC BaseResponseModel<T> (never Promise, never Result/DataResult).
+  describe('INV-08: getInventoryEntriesInDay ignores its date param — always returns today (BaseResponseModel<T>)', () => {
     it('returns a BaseResponseModel envelope: succeeded:true, message:"", actionCode:200, errors:[]', () => {
-      const result = service.getByDate(new Date());
+      const result = service.getInventoryEntriesInDay(new Date());
       expect(result.succeeded).toBe(true);
       expect(result.message).toBe('');
       expect(result.actionCode).toBe(200);
       expect(result.errors).toEqual([]);
     });
 
-    it('returns entries matching the given date in .data', () => {
-      const date = new Date('2024-03-10T10:00:00.000Z');
+    it('IGNORES a NON-today date argument — always returns only today-dated active entries', () => {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const today = new Date();
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { date })]);
+      map.set('p1', [
+        makeEntry('e-yesterday', 'p1', { date: yesterday }),
+        makeEntry('e-today', 'p1', { date: today }),
+      ]);
       seedInventory(storeId, map);
 
-      const results = service.getByDate(date).data;
-      expect(results.length).toBeGreaterThanOrEqual(1);
-      expect(results[0].id).toBe('e1');
+      // Passing yesterday's date must NOT change the result — the date arg is ignored.
+      const results = service.getInventoryEntriesInDay(yesterday).data;
+      expect(results.map((e) => e.id)).toEqual(['e-today']);
     });
 
-    it('returns empty .data when no entries match the date', () => {
+    it('returns empty .data when no entries exist today, even when a non-today date argument is passed', () => {
       const date = new Date('2024-03-10T10:00:00.000Z');
-      const otherDate = new Date('2024-03-11T10:00:00.000Z');
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { date })]);
       seedInventory(storeId, map);
 
-      const results = service.getByDate(otherDate).data;
+      const results = service.getInventoryEntriesInDay(date).data;
       expect(results).toHaveLength(0);
+    });
+
+    it('no method named getByDate remains on the service (Angular-exact rename)', () => {
+      expect((service as unknown as { getByDate?: unknown }).getByDate).toBeUndefined();
     });
   });
 
@@ -1265,21 +1366,19 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  // WU4 (category C): Observable siblings restored under Angular's EXACT names —
-  // getInventoryEntriesInDayObservable (inventory-offline.service.ts:213) and
-  // getInventoryCategoriesViewObservable (:260), each `of(...)`-wrapping its sync-B
-  // counterpart. (The category sibling keeps React's `products` param — the pre-existing
-  // DI-gap shape of the underlying sync getAvailableByCategory — since only the NAME was the
-  // parity defect; no existing call-site migration needed.)
-  describe('getInventoryEntriesInDayObservable / getInventoryCategoriesViewObservable — Observable siblings (WU4)', () => {
-    it('getInventoryEntriesInDayObservable resolves the same BaseResponseModel envelope as the sync getByDate for the same date', async () => {
-      const date = new Date('2024-03-10T10:00:00.000Z');
+  // WU4 (category C) + Fase 4 (T11 — rename ripple): Observable siblings restored under
+  // Angular's EXACT names — getInventoryEntriesInDayObservable (inventory-offline.service.ts:213)
+  // and getInventoryCategoriesViewObservable (:260), each `of(...)`-wrapping its sync-B
+  // counterpart. getInventoryCategoriesViewObservable is now ZERO-ARG (drops the `products`
+  // param — it was only a DI-gap mirror of the old sync method's shape; GATE-B removed it).
+  describe('getInventoryEntriesInDayObservable / getInventoryCategoriesViewObservable — Observable siblings (WU4 + Fase 4 rename)', () => {
+    it('getInventoryEntriesInDayObservable resolves the same BaseResponseModel envelope as the sync getInventoryEntriesInDay for the same (ignored) date', async () => {
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { date })]);
+      map.set('p1', [makeEntry('e1', 'p1', { date: new Date() })]);
       seedInventory(storeId, map);
 
-      const asyncResult = await service.getInventoryEntriesInDayObservable(date);
-      const syncResult = service.getByDate(date);
+      const asyncResult = await service.getInventoryEntriesInDayObservable(new Date());
+      const syncResult = service.getInventoryEntriesInDay(new Date());
       expect(asyncResult).toEqual(syncResult);
     });
 
@@ -1289,14 +1388,14 @@ describe('InventoryOfflineService', () => {
       );
     });
 
-    it('getInventoryCategoriesViewObservable resolves the same BaseResponseModel envelope as the sync getAvailableByCategory for the same products', async () => {
+    it('getInventoryCategoriesViewObservable (zero-arg) resolves the same BaseResponseModel envelope as the sync getInventoryCategoriesView', async () => {
+      seedCategories(storeId, [makeCategory('cat-1', { name: 'Bebidas' })]);
       const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { available: 10, costPrice: 2 })]);
+      map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-1', available: 10, costPrice: 2 })]);
       seedInventory(storeId, map);
-      const products = [{ id: 'p1', name: 'Ron', categoryId: 'cat-1', categoryName: 'Bebidas' }];
 
-      const asyncResult = await service.getInventoryCategoriesViewObservable(products);
-      const syncResult = service.getAvailableByCategory(products);
+      const asyncResult = await service.getInventoryCategoriesViewObservable();
+      const syncResult = service.getInventoryCategoriesView();
       expect(asyncResult).toEqual(syncResult);
     });
 
@@ -1312,20 +1411,20 @@ describe('InventoryOfflineService', () => {
   // against missing/unavailable products. React now injects a real ProductRepository too,
   // restoring all three guards 1:1.
 
-  describe('create — product-existence guard (Angular parity: createInventoryEntry:60-64)', () => {
+  describe('createInventoryEntry — product-existence guard (Angular parity: createInventoryEntry:60-64)', () => {
     it('returns null when the product does not exist', () => {
       // 'ghost' is not among the seeded products (p1, p2).
-      const result = service.create('ghost', 10, 1.5);
+      const result = service.createInventoryEntry('ghost', 10, 1.5);
       expect(result).toBeNull();
     });
 
     it('does not persist any entry when the product does not exist', () => {
-      service.create('ghost', 10, 1.5);
+      service.createInventoryEntry('ghost', 10, 1.5);
       expect(service.getProductInventoriesByProductId('ghost')).toEqual([]);
     });
 
     it('still creates the entry (DataResult) when the product exists', () => {
-      const result = service.create('p1', 10, 1.5);
+      const result = service.createInventoryEntry('p1', 10, 1.5);
       expect(result?.succeeded).toBe(true);
     });
   });
@@ -1477,13 +1576,13 @@ describe('InventoryOfflineService', () => {
       expect(p2Entry.costPrice).toBe(9);
     });
 
-    it('product-scoped lookup: deactivate() only touches the entry under the given productId, even when another product has an entry sharing the same id', () => {
+    it('product-scoped lookup: deleteInventoryEntry() only touches the entry under the given productId, even when another product has an entry sharing the same id', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { quantity: 10, available: 10 })]);
       map.set('p2', [makeEntry('e1', 'p2', { quantity: 20, available: 20 })]);
       seedInventory(storeId, map);
 
-      const result = service.deactivate('e1', 'p1');
+      const result = service.deleteInventoryEntry('p1', 'e1');
 
       expect(result).toEqual(Result.Success());
       const p1Entry = service.getProductInventoriesByProductId('p1')[0];
