@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Order, Product, ProductCategory, SaleCredit } from '@store-mgmt/domain';
+import type { Order, SaleCredit } from '@store-mgmt/domain';
 import { Result } from '@store-mgmt/domain';
-import {
-  makeCategoryRepoShim,
-  makeOrderRepoShim,
-  makeProductRepoShim,
-  makeSaleCreditRepoShim,
-} from '../sync-repo-shims';
+import { makeOrderRepoShim, makeSaleCreditRepoShim } from '../sync-repo-shims';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import type {
   CategoryImportRepo,
@@ -17,28 +12,6 @@ import type {
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 
 const storeId = 's1';
-
-function makeCategory(id: string, overrides: Partial<ProductCategory> = {}): ProductCategory {
-  return { id, name: `Category ${id}`, order: 0, isActive: true, ...overrides };
-}
-
-function makeProduct(id: string, overrides: Partial<Product> = {}): Product {
-  return {
-    id,
-    name: `Product ${id}`,
-    categoryId: 'cat-1',
-    categoryName: 'Cat 1',
-    price: 10,
-    order: 0,
-    availableToSale: true,
-    discountFromInvantory: true,
-    businessId: '',
-    isActive: true,
-    createdDate: new Date('2024-01-01T00:00:00.000Z'),
-    createdByName: 'test',
-    ...overrides,
-  };
-}
 
 function makeOrder(id: string, overrides: Partial<Order> = {}): Order {
   return {
@@ -83,65 +56,10 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
   });
 
   describe('no BaseRepository import — sync-local shims replace it, not reintroduce it', () => {
-    it('makeCategoryRepoShim/makeProductRepoShim/makeOrderRepoShim/makeSaleCreditRepoShim source does not reference BaseRepository', () => {
-      for (const factory of [
-        makeCategoryRepoShim,
-        makeProductRepoShim,
-        makeOrderRepoShim,
-        makeSaleCreditRepoShim,
-      ]) {
+    it('makeOrderRepoShim/makeSaleCreditRepoShim source does not reference BaseRepository', () => {
+      for (const factory of [makeOrderRepoShim, makeSaleCreditRepoShim]) {
         expect(factory.toString()).not.toContain('BaseRepository');
       }
-    });
-  });
-
-  describe('Category/Product shims — Map-entries wire-format at the SAME key as ProductCategoryRepository/ProductRepository', () => {
-    it('category shim upsert persists Map-entries at lizoft.store-product-categories-{storeId}', () => {
-      const shim = makeCategoryRepoShim();
-      shim.upsert(storeId, makeCategory('c1'));
-
-      const raw = localStorage.getItem(`lizoft.store-product-categories-${storeId}`);
-      const parsed = JSON.parse(raw!);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed[0]).toEqual(['c1', expect.objectContaining({ id: 'c1' })]);
-    });
-
-    it('category shim getAll reads back what ProductCategoryRepository wrote (Map-entries)', () => {
-      const entries: [string, ProductCategory][] = [['c1', makeCategory('c1', { name: 'Bebidas' })]];
-      localStorage.setItem(`lizoft.store-product-categories-${storeId}`, JSON.stringify(entries));
-
-      const shim = makeCategoryRepoShim();
-      const all = shim.getAll(storeId);
-      expect(all.get('c1')?.name).toBe('Bebidas');
-    });
-
-    it('category shim save bulk-overwrites the whole Map (used for whole-type revert)', () => {
-      const shim = makeCategoryRepoShim();
-      shim.upsert(storeId, makeCategory('c1'));
-      shim.upsert(storeId, makeCategory('c2'));
-
-      shim.save(storeId, new Map([['c1', makeCategory('c1')]]));
-
-      expect(shim.getAll(storeId).size).toBe(1);
-      expect(shim.getAll(storeId).has('c2')).toBe(false);
-    });
-
-    it('product shim upsert persists Map-entries at lizoft.store-products-{storeId}', () => {
-      const shim = makeProductRepoShim();
-      shim.upsert(storeId, makeProduct('p1'));
-
-      const raw = localStorage.getItem(`lizoft.store-products-${storeId}`);
-      const parsed = JSON.parse(raw!);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed[0]).toEqual(['p1', expect.objectContaining({ id: 'p1' })]);
-    });
-
-    it('product shim getAll reads back what ProductRepository wrote (Map-entries)', () => {
-      const entries: [string, Product][] = [['p1', makeProduct('p1', { name: 'Ron' })]];
-      localStorage.setItem(`lizoft.store-products-${storeId}`, JSON.stringify(entries));
-
-      const shim = makeProductRepoShim();
-      expect(shim.getAll(storeId).get('p1')?.name).toBe('Ron');
     });
   });
 

@@ -1,6 +1,6 @@
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
-import type { Order, Product, ProductCategory, SaleCredit } from '@store-mgmt/domain';
-import type { GenericUpsertRepo, NameUniqueRepo } from '~/sync/lib/services/data-synchronizer-service';
+import type { Order, SaleCredit } from '@store-mgmt/domain';
+import type { GenericUpsertRepo } from '~/sync/lib/services/data-synchronizer-service';
 
 /**
  * Sync-local storage shims — re-home the raw persistence the (now-deleted) generic
@@ -8,12 +8,17 @@ import type { GenericUpsertRepo, NameUniqueRepo } from '~/sync/lib/services/data
  * `BaseRepository` had no Angular correlate (playbook rule 12) and is gone; these shims are NOT
  * a reintroduction of that shared base class — each factory below is a standalone closure,
  * co-located in the sync module, that reads/writes the SAME on-disk key/wire-format as its
- * matching offline repository/service (`ProductCategoryRepository`/`ProductRepository` —
- * Map-entries; `OrderOfflineService`/`SaleCreditOfflineService` — plain array, id-869), so a
- * merge performed here stays readable by those consumers afterward.
- * `DataSynchronizerService`'s existing merge/validation/revert orchestration
- * (`NameUniqueRepo`/`GenericUpsertRepo`) is consumed UNCHANGED — this file only supplies
- * storage (design.md "Sync Re-home").
+ * matching offline service (`OrderOfflineService`/`SaleCreditOfflineService` — plain array,
+ * id-869), so a merge performed here stays readable by those consumers afterward.
+ *
+ * SCOPE (product-sync-import-validation-parity): Categories/Products no longer go through a
+ * shim here — `import.tsx` constructs the real `ProductCategoryRepository`/`ProductRepository`
+ * directly and `DataSynchronizerService` consumes them through the `CategoryImportRepo`/
+ * `ProductImportRepo` seams, which carry full Angular validation (category-exists, barcode-
+ * uniqueness, per-category name-uniqueness, order-shift). This file is now scoped to
+ * Orders/SaleCredits ONLY — entities with no Angular validation (break-only semantics).
+ * `DataSynchronizerService`'s `GenericUpsertRepo` orchestration is consumed UNCHANGED — this
+ * file only supplies storage.
  */
 
 function reviveDates<T>(item: T, dateFields: string[]): T {
@@ -28,40 +33,6 @@ function reviveDates<T>(item: T, dateFields: string[]): T {
 
 function storageKey(entity: string, storeId: string): string {
   return StorageKeys.entityKey(entity, storeId);
-}
-
-/**
- * Categories/Products — Map-entries wire format, SAME key as
- * `ProductCategoryRepository`/`ProductRepository`. `save` is the bulk overwrite
- * `DataSynchronizerService.mergeWithRevert` uses to revert a whole-type snapshot on a name
- * clash.
- */
-function makeNameUniqueRepoShim<T extends { id: string; name: string }>(
-  entity: string,
-  dateFields: string[] = [],
-): NameUniqueRepo<T> {
-  function getAll(storeId: string): Map<string, T> {
-    const raw = localStorage.getItem(storageKey(entity, storeId));
-    if (!raw) return new Map<string, T>();
-    try {
-      const entries: [string, T][] = JSON.parse(raw);
-      return new Map(entries.map(([id, item]) => [id, reviveDates(item, dateFields)]));
-    } catch {
-      return new Map<string, T>();
-    }
-  }
-
-  function save(storeId: string, items: Map<string, T>): void {
-    localStorage.setItem(storageKey(entity, storeId), JSON.stringify(Array.from(items.entries())));
-  }
-
-  function upsert(storeId: string, item: T): void {
-    const all = getAll(storeId);
-    all.set(item.id, item);
-    save(storeId, all);
-  }
-
-  return { getAll, upsert, save };
 }
 
 /**
@@ -92,16 +63,6 @@ function makeGenericUpsertRepoShim<T extends { id: string }>(
   }
 
   return { getAll, upsert };
-}
-
-/** Same entity key + date-revival fields the removed `BaseRepository<ProductCategory>('product-categories')` used. */
-export function makeCategoryRepoShim(): NameUniqueRepo<ProductCategory> {
-  return makeNameUniqueRepoShim<ProductCategory>('product-categories');
-}
-
-/** Same entity key + date-revival fields the removed `BaseRepository<Product>('products', ['createdDate', 'updatedDate'])` used. */
-export function makeProductRepoShim(): NameUniqueRepo<Product> {
-  return makeNameUniqueRepoShim<Product>('products', ['createdDate', 'updatedDate']);
 }
 
 /** Same entity key + date-revival fields the removed `BaseRepository<Order>('orders', [...])` used; wire format is now plain-array (id-869), not Map-entries. */

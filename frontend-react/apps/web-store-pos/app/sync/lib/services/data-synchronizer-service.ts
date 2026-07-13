@@ -70,20 +70,6 @@ export const SynchronizerErrors = {
 // ---------------------------------------------------------------------------
 
 /**
- * @deprecated Superseded by `CategoryImportRepo`/`ProductImportRepo` (product-sync-import-
- * validation-parity). Kept ONLY because `sync/lib/storage/sync-repo-shims.ts` still
- * constructs it for its (now-dead) `makeCategoryRepoShim`/`makeProductRepoShim` factories —
- * scheduled for deletion together with those factories in the shim-retirement work unit.
- * `DataSynchronizerService` itself no longer references this type.
- */
-export interface NameUniqueRepo<T extends { id: string; name: string }> {
-  getAll(storeId: string): Map<string, T>;
-  upsert(storeId: string, item: T): void;
-  /** Bulk overwrite — used only to revert the whole map to a pre-import snapshot. */
-  save(storeId: string, items: Map<string, T>): void;
-}
-
-/**
  * Product import repo seam — satisfied structurally by the real `ProductRepository`
  * (Angular parity: `product.repository.ts` `getStorageProductsMap`/`addImportedProduct`/
  * `updateImportedProduct`/`updateProducts`). Narrow, 4-method, reuses the same
