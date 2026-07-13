@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { registerStoreActivity } from './store-usage-tracker';
+import { cleanOldStoreUsage, registerStoreActivity } from './store-usage-tracker';
 
 /**
  * Route-navigation trigger for the daily store-usage tracker. Mirrors
@@ -22,4 +22,13 @@ export function useStoreUsageTracker(): void {
     if (!userId || !selectedStoreId) return;
     registerStoreActivity(userId, selectedStoreId);
   }, [pathname, userId, selectedStoreId]);
+
+  // Mirrors Angular's unconditional `cleanOldData(30)` call at
+  // `app.component.ts:53` (first statement of `ngOnInit`) — fires exactly
+  // once on mount, never re-runs on login or store switch. The auth guard
+  // lives inside `cleanOldStoreUsage` itself, not at this call-site.
+  useEffect(() => {
+    const { user } = useAuthStore.getState();
+    cleanOldStoreUsage(user?.id ?? '', user?.selectedStoreId ?? '', 30);
+  }, []);
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── USAGE-1 through USAGE-3 (Stage 6 Slice C — Daily Store Activity Recording,
 // Buffered POST With Mutex) ──────────────────────────────────────────────────
@@ -197,5 +197,127 @@ describe('registerStoreActivity — USAGE-4: scoped by userId + selectedStoreId'
     const userB = JSON.parse(localStorage.getItem('lizoft.store-daily-usage-user-b')!);
     expect(userA.activeDays).toHaveLength(1);
     expect(userB.activeDays).toHaveLength(1);
+  });
+});
+
+// ── USAGE-5 (Slice 5 — Fase 1 auth cluster, port of Angular `cleanOldData`)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// Mirrors Angular `StoreUsageTrackerService.cleanOldData`
+// (store-usage-tracker.service.ts:119-136): guard-inside-method auth check,
+// inclusive cutoff-date prune of `activeDays`, conditional write-back only
+// when something was actually pruned.
+
+describe('cleanOldStoreUsage — USAGE-5: retention prune on mount (parity)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    // Pinned to UTC midnight: `new Date('YYYY-MM-DD')` parses as UTC midnight,
+    // and this sandbox's local timezone offset is 0 (UTC), so pinning system
+    // time to UTC midnight keeps `cutoff`'s time-of-day aligned with the
+    // parsed `day` values for a deterministic inclusive `>=` boundary.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-13T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('is a no-op when userId is missing (invalid tracking context)', async () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
+    const { cleanOldStoreUsage } = await import('../store-usage-tracker');
+    expect(() => cleanOldStoreUsage('', STORE_ID, 30)).not.toThrow();
+
+    expect(getItemSpy).not.toHaveBeenCalled();
+    expect(setItemSpy).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when selectedStoreId is missing or the empty guid', async () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
+    const { cleanOldStoreUsage } = await import('../store-usage-tracker');
+    expect(() => cleanOldStoreUsage(USER_ID, '', 30)).not.toThrow();
+    expect(() => cleanOldStoreUsage(USER_ID, EMPTY_GUID, 30)).not.toThrow();
+
+    expect(getItemSpy).not.toHaveBeenCalled();
+    expect(setItemSpy).not.toHaveBeenCalled();
+  });
+
+  it('prunes an entry strictly before the cutoff date', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ activeDays: [{ day: '2026-06-12', saved: true }] })
+    );
+
+    const { cleanOldStoreUsage } = await import('../store-usage-tracker');
+    cleanOldStoreUsage(USER_ID, STORE_ID, 30);
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(stored.activeDays).toEqual([]);
+  });
+
+  it('keeps an entry exactly at the cutoff date (inclusive >= boundary)', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ activeDays: [{ day: '2026-06-13', saved: true }] })
+    );
+
+    const { cleanOldStoreUsage } = await import('../store-usage-tracker');
+    cleanOldStoreUsage(USER_ID, STORE_ID, 30);
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(stored.activeDays).toEqual([{ day: '2026-06-13', saved: true }]);
+  });
+
+  it('keeps an entry after the cutoff date', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] })
+    );
+
+    const { cleanOldStoreUsage } = await import('../store-usage-tracker');
+    cleanOldStoreUsage(USER_ID, STORE_ID, 30);
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(stored.activeDays).toEqual([{ day: '2026-07-01', saved: true }]);
+  });
+
+  it('does not write to storage when nothing is pruned (no-op write)', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] })
+    );
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
+    const { cleanOldStoreUsage } = await import('../store-usage-tracker');
+    cleanOldStoreUsage(USER_ID, STORE_ID, 30);
+
+    expect(setItemSpy).not.toHaveBeenCalled();
+  });
+
+  it('writes the filtered activeDays back once, under the unchanged storage key, when pruning occurs', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        activeDays: [
+          { day: '2026-06-12', saved: true },
+          { day: '2026-07-01', saved: true },
+        ],
+      })
+    );
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
+    const { cleanOldStoreUsage } = await import('../store-usage-tracker');
+    cleanOldStoreUsage(USER_ID, STORE_ID, 30);
+
+    expect(setItemSpy).toHaveBeenCalledTimes(1);
+    expect(setItemSpy).toHaveBeenCalledWith(
+      STORAGE_KEY,
+      JSON.stringify({ activeDays: [{ day: '2026-07-01', saved: true }] })
+    );
   });
 });

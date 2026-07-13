@@ -111,3 +111,23 @@ export function registerStoreActivity(userId: string, selectedStoreId: string): 
   }
   flushUsage(userId);
 }
+
+/**
+ * Retention cleanup, called once on mount (see `use-store-usage-tracker.ts`).
+ * Mirrors Angular's `cleanOldData(daysToKeep)`
+ * (store-usage-tracker.service.ts:119-136): prunes `activeDays` entries older
+ * than `daysToKeep` days, keeping the entry exactly at the cutoff (inclusive
+ * `>=`), and writes back only when something was actually pruned.
+ */
+export function cleanOldStoreUsage(userId: string, selectedStoreId: string, daysToKeep: number): void {
+  if (!isTrackingContextValid(userId, selectedStoreId)) return;
+
+  const usage = readUsage(userId);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysToKeep);
+
+  const filtered = usage.activeDays.filter((day) => new Date(day.day) >= cutoff);
+  if (filtered.length !== usage.activeDays.length) {
+    writeUsage(userId, { activeDays: filtered });
+  }
+}
