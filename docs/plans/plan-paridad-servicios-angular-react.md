@@ -148,7 +148,7 @@ Estado: ⬜ pendiente · 🔎 en revisión · ⚠️ hallazgos · ✅ paridad co
 | L0 | csv-product.service | `_services/csv/csv-product.service.ts` | ⬜ | — |
 | L0 | store-module-state.service | `_services/shared/store-module-state.service.ts` | ⬜ | — |
 | L1 | auth.service | `_services/auth/auth.service.ts` | ⬜ | — |
-| L1 | product.service [abstract] | `domain/interfaces/product.service.ts` | ⬜ | — |
+| L1 | product.service [abstract] | `domain/interfaces/product.service.ts` | ✅ | Paridad confirmada (product-service-parity, verify PASS 2026-07-09). Superficie async 12 métodos, `extends BaseService` dropeado (regla 12, 40fa5aa). |
 | L1 | product-category.service [abstract] | `application/categories/product-category.service.ts` | ✅ | Paridad confirmada (product-service-parity, verify PASS 2026-07-09). Async surface, `extends BaseService` dropeado (regla 12, commit 5a9d355). |
 | L1 | store.service | `_services/store/store.service.ts` | ⬜ | — |
 | L1 | store-user.service | `_services/storeuser/store-user.service.ts` | ⬜ | — |
@@ -163,12 +163,12 @@ Estado: ⬜ pendiente · 🔎 en revisión · ⚠️ hallazgos · ✅ paridad co
 | L2 | authorization.service | `_services/authorization/authorization.service.ts` | ⬜ | — |
 | L2 | store-usage-tracker.service | `_services/usage-tracker/store-usage-tracker.service.ts` | ⬜ | — |
 | L2 | product-category-online.service | `application/categories/product-category-online.service.ts` | ✅ | Paridad confirmada (product-category-online-parity, verify PASS 2026-07-13). DG-1 normaliza URLs dobles; factory DI patrones espejados. |
-| L2 | product-online.service | `application/products/product-online.service.ts` | ⬜ | — |
+| L2 | product-online.service | `application/products/product-online.service.ts` | ✅ | Paridad confirmada (product-service-parity Slice 7, 07c0725). 5 URLs dobles de Angular espejadas verbatim (ANGULAR-BUG-SUSPECT #5). |
 | L2 | sale-credit-offline.service | `application/credits/sale-credit-offline.service.ts` | ⬜ | — |
 | L2 | expense-offline.service | `application/expenses/expense-offline.service.ts` | ⬜ | — |
-| L3 | product.repository | `application/products/product.repository.ts` | ⚠️ | Ver hallazgos de repos abajo. |
+| L3 | product.repository | `application/products/product.repository.ts` | ✅ | Bypass de orquestación del sync RESUELTO (product-sync-import-validation-parity, verify PASS 2026-07-13): el import/sync rutea por el repo real recuperando validación por-categoría + barcode + category-exists + order-shift. Caché en memoria + auto-init ya restaurados en Fase 0 (eliminate-base-repository). |
 | L4 | product-category-offline.service | `application/categories/product-category-offline.service.ts` | ✅ | Paridad confirmada (product-service-parity Slice 5/8, verify PASS 2026-07-09); Fase 2 cierra con product-category-online-parity. |
-| L4 | product-offline.service | `application/products/product-offline.service.ts` | ⬜ | — |
+| L4 | product-offline.service | `application/products/product-offline.service.ts` | ✅ | Paridad confirmada (product-service-parity Slice 6, 2898d62/704b125). Superficie async 12+2 métodos. |
 | L4 | inventory-offline.service | `application/entries/inventory-offline.service.ts` | ⚠️ | React inventó `InventoryRepository` sin correlato Angular. Ver hallazgos de repos abajo. |
 | L5 | order-offline.service | `application/orders/order-offline.service.ts` | ⬜ | — |
 | L5 | shopping-cart.service | `_services/order/shopping-cart.service.ts` | ⬜ | — |
@@ -185,10 +185,10 @@ Ninguno de los 3 repositorios React cumple al 100%. Detalle:
 - **Regla 3 (CONCERN):** `activateProductCategory`/`deactivateProductCategory` perdieron el segundo param `isActive` que Angular declara. Código muerto en ambos lados, pero cambio de firma no ratificado.
 - `addProductCategoryByName` (always-returns-id) espeja Angular correctamente — excepción ratificada (commits 42fcc7d, 2274ca8, engram #842). NO es hallazgo.
 
-### `product-repository.ts` — bypass de orquestación
-- **Regla 10 (VIOLACIÓN):** `updateImportedProduct`/`addImportedProduct`/`updateProducts` son ports 1:1 correctos pero SIN call-site real. El flujo sync/import esquiva `ProductRepository` y reimplementa un merge más débil contra `BaseRepository`: unicidad de nombre **global** (Angular la hace **por categoría**), sin chequeo de barcode ni de existencia de categoría.
-- **Regla 2/4 (CONCERN):** `getStorageProductsMap` perdió el caché en memoria (Angular devuelve la misma referencia entre llamadas; React re-parsea localStorage cada vez).
-- **Regla 9 (CONCERN):** `getProductsJson` en store vacío devuelve `null` en React vs `"[]"` en Angular (falta el auto-init de localStorage al leer).
+### `product-repository.ts` — bypass de orquestación ✅ RESUELTO (2026-07-13)
+- **Regla 10 (VIOLACIÓN) — RESUELTO** (product-sync-import-validation-parity, verify PASS): `updateImportedProduct`/`addImportedProduct`/`updateProducts` ahora tienen call-site real — el flujo sync/import rutea por `ProductRepository`/`ProductCategoryRepository` vía interfaces angostas (`ProductImportRepo`/`CategoryImportRepo`, 4 métodos c/u, patrón Inventory/Expense — sin abstracción nueva), recuperando unicidad de nombre **por categoría** + barcode + category-exists + order-shift (también para categorías). Revert espeja Angular (referencia mutada, Gate B). Barcode NO se forwarda en el add path — espeja Angular `addImportedProduct` literal. Supersede el requisito ratificado "Sync Import Behavior Unchanged (Re-Home Only)" del spec de sync.
+- **Regla 2/4 (CONCERN) — RESUELTO** en Fase 0: `getStorageProductsMap` recuperó el caché en memoria (eliminate-base-repository).
+- **Regla 9 (CONCERN) — RESUELTO** en Fase 0: auto-init de localStorage al leer restaurado (eliminate-base-repository).
 
 ### `inventory-repository.ts` — el más grave (estructural)
 - **Regla 6 (VIOLACIÓN):** Angular NO tiene repository de inventory. Su persistencia vive inline dentro de `inventory-offline.service.ts`. React inventó una capa `InventoryRepository` que no espeja nada.
@@ -208,6 +208,6 @@ El `BaseRepository` compartido de React **no replica** dos comportamientos de An
 - [x] `BaseService` (interface React): ELIMINADA (regla 12) — SDD `baseservice-parity`, archive `a612fb5`. No espejaba a Angular; era invención. Los 4 offline exponen solo su `getStorageX()`.
 - [x] `InventoryRepository`: ELIMINADO/inlineado (reglas 6/12) — SDD `eliminate-inventory-repository`, archive `8dbc992`, verify PASS. Persistencia inline en InventoryOfflineService espejando Angular (cache + auto-init + reviveEntry date-only); export sync re-homed via `getInventoryEntriesJson`. Falta aún la VERIFICACIÓN de paridad del offline-service en sí (pasada bottom-up).
 - [x] `activate/deactivateProductCategory`: RATIFICADO — drop del param `isActive` es correcto (código muerto en Angular, ambos lados; Fase 2 CIERRA con esta decisión ratificada).
-- [ ] `product` sync bypass: ¿se cablea el import/sync a través de `ProductRepository` para recuperar la validación por-categoría + barcode? (Fase 3 — ítems pendientes)
+- [x] `product` sync bypass: RESUELTO (product-sync-import-validation-parity, verify PASS 2026-07-13). Se cableó el import/sync a través de `ProductRepository`/`ProductCategoryRepository` recuperando validación por-categoría + barcode + category-exists + order-shift (products Y categories). NOTA: el plan lo enmarcaba como bloqueado por Fase 7 — era incorrecto (Fase 7/sync ya estaba archivada en stage6-sync-parity). **Fase 3 (products) CIERRA con esta decisión.**
 
 **NOTA: FASE 2 (Categorías) — CERRADA.** Todos los nodos category están ✅. Los únicos ítems abiertos quedan para Fase 3 (`product` sync + import) y adelante. El 2 bugs cross-sibling (ProductOnlineService mirrors #5 double-slash; ProductCategoryOnlineService normaliza) queda registrado como follow-up.
