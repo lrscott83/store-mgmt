@@ -1,4 +1,5 @@
-import type { Expense, InventoryEntry, Result } from '@store-mgmt/domain';
+import { Result } from '@store-mgmt/domain';
+import type { Expense, InventoryEntry, Product, ProductCategory } from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
 
 // ---------------------------------------------------------------------------
@@ -62,14 +63,6 @@ export const SynchronizerErrors = {
     code: 'Synchronizer.SaleCreditsUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar los créditos.',
   },
-  CategoryNameExists: {
-    code: 'ProductCategory.NameExists',
-    message: 'El nombre de la categoría ya existe.',
-  },
-  ProductNameExists: {
-    code: 'Product.NameExists',
-    message: 'El nombre del producto ya existe.',
-  },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -77,16 +70,47 @@ export const SynchronizerErrors = {
 // ---------------------------------------------------------------------------
 
 /**
- * Repos backing entity types that get a name-uniqueness guard AND a
- * whole-type revert-to-pre-import-snapshot on first failed item
- * (Categories, Products — see Angular `ProductCategoryRepository`/
- * `ProductRepository` `addProductCategoryData`/`addProductData`).
+ * @deprecated Superseded by `CategoryImportRepo`/`ProductImportRepo` (product-sync-import-
+ * validation-parity). Kept ONLY because `sync/lib/storage/sync-repo-shims.ts` still
+ * constructs it for its (now-dead) `makeCategoryRepoShim`/`makeProductRepoShim` factories —
+ * scheduled for deletion together with those factories in the shim-retirement work unit.
+ * `DataSynchronizerService` itself no longer references this type.
  */
 export interface NameUniqueRepo<T extends { id: string; name: string }> {
   getAll(storeId: string): Map<string, T>;
   upsert(storeId: string, item: T): void;
   /** Bulk overwrite — used only to revert the whole map to a pre-import snapshot. */
   save(storeId: string, items: Map<string, T>): void;
+}
+
+/**
+ * Product import repo seam — satisfied structurally by the real `ProductRepository`
+ * (Angular parity: `product.repository.ts` `getStorageProductsMap`/`addImportedProduct`/
+ * `updateImportedProduct`/`updateProducts`). Narrow, 4-method, reuses the same
+ * injected-interface pattern as `InventoryImportService`/`ExpenseImportService` — NO new
+ * shared abstraction (rule 12). No `storeId` per-call param: the real repo binds `storeId`
+ * at construction (mirrors Angular's root-DI singleton).
+ */
+export interface ProductImportRepo {
+  getStorageProductsMap(): Map<string, Product>;
+  addImportedProduct(product: Product): Result;
+  updateImportedProduct(product: Product): Result;
+  /** Bulk overwrite — revert call, receives the SAME mutated map reference (Gate B). */
+  updateProducts(products: Map<string, Product>): void;
+}
+
+/**
+ * Category import repo seam — satisfied structurally by the real `ProductCategoryRepository`
+ * (Angular parity: `product-category.repository.ts` `getStorageCategoriesMap`/
+ * `addImportedProductCategory`/`updateImportedProductCategory`/`updateCategories`). Narrow,
+ * 4-method, same pattern as `ProductImportRepo` above.
+ */
+export interface CategoryImportRepo {
+  getStorageCategoriesMap(): Map<string, ProductCategory>;
+  addImportedProductCategory(category: ProductCategory): Result;
+  updateImportedProductCategory(category: ProductCategory): Result;
+  /** Bulk overwrite — revert call, receives the SAME mutated map reference (Gate B). */
+  updateCategories(categories: Map<string, ProductCategory>): void;
 }
 
 /**
@@ -143,13 +167,17 @@ interface MergeOutcome {
  * Angular-compatible import synchronizer.
  *
  * Matches `frontend/src/app/application/synchronization/data-synchronizer.service.ts`
- * logic 1:1 (per binding design, engram #642):
+ * logic 1:1 (per binding design, product-sync-import-validation-parity):
  * - Categories are always merged FIRST (Angular unshifts categories.json to
  *   the front of the files list for referential integrity).
- * - Categories/Products: name-uniqueness guard (rejects when another entity
- *   of the same type already has the same `name`, scoped by comparing ids),
- *   items iterated sorted by `order`; on the FIRST failed item, the whole
- *   entity type's map is reverted to its pre-import snapshot.
+ * - Categories/Products route through the REAL `ProductCategoryRepository`/
+ *   `ProductRepository` (injected as `CategoryImportRepo`/`ProductImportRepo`), which own
+ *   ALL validation — category-exists, barcode-uniqueness, per-category name-uniqueness,
+ *   and order-shift for products; name-uniqueness and order-shift for categories. Items
+ *   are iterated sorted by `order`; on the FIRST failed item, the whole entity type's map
+ *   is reverted via `updateProducts`/`updateCategories`, receiving the SAME in-loop-mutated
+ *   map reference obtained from `getStorageProductsMap`/`getStorageCategoriesMap` at the
+ *   start of the loop — NOT a defensive clone (mirrors Angular's literal mutated-ref revert).
  * - InventoryEntries/Orders/Expenses/SaleCredits: break-only semantics — the
  *   first failed item stops that entity type's loop, but prior successful
  *   writes for that type are NOT reverted.
@@ -160,8 +188,8 @@ interface MergeOutcome {
 export class DataSynchronizerService {
   constructor(
     private readonly storeId: string,
-    private readonly categoryRepo: NameUniqueRepo<import('@store-mgmt/domain').ProductCategory>,
-    private readonly productRepo: NameUniqueRepo<import('@store-mgmt/domain').Product>,
+    private readonly categoryRepo: CategoryImportRepo,
+    private readonly productRepo: ProductImportRepo,
     private readonly inventoryService: InventoryImportService,
     private readonly orderRepo: GenericUpsertRepo<import('@store-mgmt/domain').Order>,
     private readonly expenseService: ExpenseImportService,
@@ -178,26 +206,10 @@ export class DataSynchronizerService {
     };
 
     // 1. Categories — first, whole-type revert on first failed item.
-    push(
-      this.mergeWithRevert(
-        'categories',
-        this.categoryRepo,
-        data.categories,
-        SynchronizerErrors.CategoryNameExists,
-        SynchronizerErrors.CategoriesUnexpectedError,
-      ),
-    );
+    push(this.mergeCategoriesViaRepository(data.categories));
 
     // 2. Products — whole-type revert on first failed item.
-    push(
-      this.mergeWithRevert(
-        'products',
-        this.productRepo,
-        data.products,
-        SynchronizerErrors.ProductNameExists,
-        SynchronizerErrors.ProductsUnexpectedError,
-      ),
-    );
+    push(this.mergeProductsViaRepository(data.products));
 
     // 3. InventoryEntries — grouped by productId, break-only (no revert).
     push(this.mergeInventoryBreakOnly(data.inventoryEntries));
@@ -232,48 +244,100 @@ export class DataSynchronizerService {
   }
 
   // ---------------------------------------------------------------------------
-  // Categories / Products — name-uniqueness guard + whole-type revert
+  // Categories / Products — routed through the real domain repositories, which own
+  // ALL validation (category-exists, barcode-uniqueness, per-category name-uniqueness,
+  // order-shift for products; name-uniqueness + order-shift for categories). The
+  // synchronizer only ORCHESTRATES: capture the storage map once, sort incoming by
+  // `order`, add-vs-update by id, break on first failure, revert with the SAME
+  // in-loop-mutated map reference (Gate B — do NOT clone; matches Angular
+  // `synchronizeCategories`/`synchronizeProducts` 1:1, `data-synchronizer.service.ts`
+  // :68-131).
   // ---------------------------------------------------------------------------
 
-  private mergeWithRevert<T extends { id: string; name: string; order: number }>(
-    entity: string,
-    repo: NameUniqueRepo<T>,
-    incoming: T[],
-    nameExistsError: { code: string; message: string },
-    unexpectedError: { code: string; message: string },
-  ): MergeOutcome {
+  /** 1:1 port of Angular `synchronizeCategories` (data-synchronizer.service.ts:100-131). */
+  private mergeCategoriesViaRepository(incoming: ProductCategory[]): MergeOutcome {
+    const entity = 'categories';
     if (incoming.length === 0) {
       return { merge: { entity, inserted: 0, updated: 0 } };
     }
 
-    const snapshot = new Map(repo.getAll(this.storeId));
+    const categories = this.categoryRepo.getStorageCategoriesMap();
     let inserted = 0;
     let updated = 0;
 
     try {
+      let result: Result = Result.Success();
       const sorted = [...incoming].sort((a, b) => a.order - b.order);
-      for (const item of sorted) {
-        const current = repo.getAll(this.storeId);
-        const clash = Array.from(current.values()).find(
-          (existing) => existing.name === item.name && existing.id !== item.id,
-        );
-        if (clash) {
-          repo.save(this.storeId, snapshot);
-          return {
-            merge: { entity, inserted: 0, updated: 0 },
-            error: { entity, code: nameExistsError.code, message: nameExistsError.message },
-          };
-        }
-        if (current.has(item.id)) updated++;
+      for (const category of sorted) {
+        const isUpdate = categories.has(category.id);
+        result = isUpdate
+          ? this.categoryRepo.updateImportedProductCategory(category)
+          : this.categoryRepo.addImportedProductCategory(category);
+        if (!result.succeeded) break;
+        if (isUpdate) updated++;
         else inserted++;
-        repo.upsert(this.storeId, item);
+      }
+      if (!result.succeeded) {
+        this.categoryRepo.updateCategories(categories);
+        const failure = result.errors[0];
+        return {
+          merge: { entity, inserted: 0, updated: 0 },
+          error: { entity, code: failure.code, message: failure.description },
+        };
       }
       return { merge: { entity, inserted, updated } };
     } catch {
-      repo.save(this.storeId, snapshot);
       return {
         merge: { entity, inserted: 0, updated: 0 },
-        error: { entity, code: unexpectedError.code, message: unexpectedError.message },
+        error: {
+          entity,
+          code: SynchronizerErrors.CategoriesUnexpectedError.code,
+          message: SynchronizerErrors.CategoriesUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  /** 1:1 port of Angular `synchronizeProducts` (data-synchronizer.service.ts:68-98). */
+  private mergeProductsViaRepository(incoming: Product[]): MergeOutcome {
+    const entity = 'products';
+    if (incoming.length === 0) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    const products = this.productRepo.getStorageProductsMap();
+    let inserted = 0;
+    let updated = 0;
+
+    try {
+      let result: Result = Result.Success();
+      const sorted = [...incoming].sort((a, b) => a.order - b.order);
+      for (const product of sorted) {
+        const isUpdate = products.has(product.id);
+        result = isUpdate
+          ? this.productRepo.updateImportedProduct(product)
+          : this.productRepo.addImportedProduct(product);
+        if (!result.succeeded) break;
+        if (isUpdate) updated++;
+        else inserted++;
+      }
+      if (!result.succeeded) {
+        this.productRepo.updateProducts(products);
+        const failure = result.errors[0];
+        return {
+          merge: { entity, inserted: 0, updated: 0 },
+          error: { entity, code: failure.code, message: failure.description },
+        };
+      }
+      return { merge: { entity, inserted, updated } };
+    } catch {
+      return {
+        merge: { entity, inserted: 0, updated: 0 },
+        error: {
+          entity,
+          code: SynchronizerErrors.ProductsUnexpectedError.code,
+          message: SynchronizerErrors.ProductsUnexpectedError.message,
+        },
       };
     }
   }

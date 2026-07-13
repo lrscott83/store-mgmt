@@ -9,10 +9,11 @@ import {
 } from '../sync-repo-shims';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import type {
+  CategoryImportRepo,
   ExpenseImportService,
   InventoryImportService,
+  ProductImportRepo,
 } from '~/sync/lib/services/data-synchronizer-service';
-import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 
 const storeId = 's1';
@@ -212,6 +213,16 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
 
   // 6.3 — integration: DataSynchronizerService (orchestration UNCHANGED) driven by the
   // sync-local shims, then read back through the REAL repository/offline-service classes.
+  //
+  // NOTE (product-sync-import-validation-parity, WU1): categories/products no longer route
+  // through `makeCategoryRepoShim`/`makeProductRepoShim` — they route through the REAL
+  // `ProductCategoryRepository`/`ProductRepository` (see
+  // `data-synchronizer-service.test.ts` T2/T9 for that coverage). The category-shim
+  // integration case that lived here is superseded and removed; only noop cat/prod stand-
+  // ins remain, required solely to satisfy `DataSynchronizerService`'s constructor for the
+  // ORDER-focused assertion below. Full shim-factory retirement (WU2) prunes the
+  // remaining Category/Product shim-behavior tests above and deletes the factories
+  // themselves from `sync-repo-shims.ts`.
   describe('Integration — DataSynchronizerService orchestration unchanged, storage now re-homed via shims', () => {
     const noopInventoryService: InventoryImportService = {
       getStorageInventoriesMap: () => new Map(),
@@ -223,42 +234,24 @@ describe('sync-repo-shims (sync-local storage, re-homes the deleted BaseReposito
       addImportedExpense: () => Result.Success(),
       updateImportedExpense: () => Result.Success(),
     };
-
-    it('a category import merge leaves lizoft.store-product-categories-{storeId} in Map-entries form readable by ProductCategoryRepository', async () => {
-      const synchronizer = new DataSynchronizerService(
-        storeId,
-        makeCategoryRepoShim(),
-        makeProductRepoShim(),
-        noopInventoryService,
-        makeOrderRepoShim(),
-        noopExpenseService,
-        makeSaleCreditRepoShim(),
-      );
-
-      const category = makeCategory('c1', { name: 'Bebidas' });
-      const result = await synchronizer.sync({
-        categories: [category],
-        products: [],
-        inventoryEntries: [],
-        orders: [],
-        expenses: [],
-        saleCredits: [],
-      });
-
-      expect(result.succeeded).toBe(true);
-      const raw = localStorage.getItem(`lizoft.store-product-categories-${storeId}`);
-      const parsed = JSON.parse(raw!);
-      expect(Array.isArray(parsed[0]) && parsed[0][0] === 'c1').toBe(true);
-
-      const realRepo = new ProductCategoryRepository(storeId);
-      expect(realRepo.getProductCategoryById('c1')?.name).toBe('Bebidas');
-    });
+    const noopCategoryRepo: CategoryImportRepo = {
+      getStorageCategoriesMap: () => new Map(),
+      addImportedProductCategory: () => Result.Success(),
+      updateImportedProductCategory: () => Result.Success(),
+      updateCategories: () => {},
+    };
+    const noopProductRepo: ProductImportRepo = {
+      getStorageProductsMap: () => new Map(),
+      addImportedProduct: () => Result.Success(),
+      updateImportedProduct: () => Result.Success(),
+      updateProducts: () => {},
+    };
 
     it('an order import merge leaves lizoft.store-orders-{storeId} in plain-array form readable by OrderOfflineService', async () => {
       const synchronizer = new DataSynchronizerService(
         storeId,
-        makeCategoryRepoShim(),
-        makeProductRepoShim(),
+        noopCategoryRepo,
+        noopProductRepo,
         noopInventoryService,
         makeOrderRepoShim(),
         noopExpenseService,

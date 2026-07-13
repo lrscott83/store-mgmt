@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { DataSynchronizerService } from '../data-synchronizer-service';
 import type {
-  NameUniqueRepo,
+  CategoryImportRepo,
+  ProductImportRepo,
   GenericUpsertRepo,
   InventoryImportService,
   ExpenseImportService,
@@ -16,6 +17,8 @@ import type {
   Expense,
   SaleCredit,
 } from '@store-mgmt/domain';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -118,17 +121,57 @@ function makeSaleCredit(id: string): SaleCredit {
 // Mock repo factories
 // ---------------------------------------------------------------------------
 
-function makeNameUniqueRepo<T extends { id: string; name: string }>(
-  initial: T[] = [],
-): NameUniqueRepo<T> & { snapshot(): T[] } {
+/**
+ * Dumb, always-succeeding mocks of the narrow `CategoryImportRepo`/`ProductImportRepo`
+ * seams — used ONLY for orchestration-focused tests (write order, upsert counts,
+ * empty-noop, "other entity types unaffected"). They do NOT reimplement Angular's
+ * validation rules (category-exists/barcode/per-category-name/order-shift) — that
+ * would re-derive repository business logic inside a test double (the exact anti-
+ * pattern the shim used to commit). Tests that exercise VALIDATION or the mutated-
+ * reference revert use the REAL `ProductRepository`/`ProductCategoryRepository`
+ * (see the "T2" and "T9" describe blocks below), backed by jsdom `localStorage`.
+ *
+ * `getStorageCategoriesMap`/`getStorageProductsMap` intentionally return the SAME
+ * `store` reference every call (never a defensive copy) — mirrors the real repos'
+ * own cached-Map semantics, which is what makes the mutated-reference revert work.
+ */
+function makeCategoryImportRepoMock(
+  initial: ProductCategory[] = [],
+): CategoryImportRepo & { snapshot(): ProductCategory[] } {
   let store = new Map(initial.map((v) => [v.id, v]));
   return {
-    getAll: (_storeId: string) => new Map(store),
-    upsert: (_storeId: string, item: T) => {
-      store.set(item.id, item);
+    getStorageCategoriesMap: () => store,
+    addImportedProductCategory: (category: ProductCategory) => {
+      store.set(category.id, category);
+      return Result.Success();
     },
-    save: (_storeId: string, items: Map<string, T>) => {
-      store = new Map(items);
+    updateImportedProductCategory: (category: ProductCategory) => {
+      store.set(category.id, category);
+      return Result.Success();
+    },
+    updateCategories: (categories: Map<string, ProductCategory>) => {
+      store = new Map(categories);
+    },
+    snapshot: () => Array.from(store.values()),
+  };
+}
+
+function makeProductImportRepoMock(
+  initial: Product[] = [],
+): ProductImportRepo & { snapshot(): Product[] } {
+  let store = new Map(initial.map((v) => [v.id, v]));
+  return {
+    getStorageProductsMap: () => store,
+    addImportedProduct: (product: Product) => {
+      store.set(product.id, product);
+      return Result.Success();
+    },
+    updateImportedProduct: (product: Product) => {
+      store.set(product.id, product);
+      return Result.Success();
+    },
+    updateProducts: (products: Map<string, Product>) => {
+      store = new Map(products);
     },
     snapshot: () => Array.from(store.values()),
   };
@@ -216,8 +259,8 @@ function makeService(opts?: {
   existingExpenses?: Expense[];
   existingSaleCredits?: SaleCredit[];
 }) {
-  const catRepo = makeNameUniqueRepo<ProductCategory>(opts?.existingCategories ?? []);
-  const prodRepo = makeNameUniqueRepo<Product>(opts?.existingProducts ?? []);
+  const catRepo = makeCategoryImportRepoMock(opts?.existingCategories ?? []);
+  const prodRepo = makeProductImportRepoMock(opts?.existingProducts ?? []);
   const inventoryService = makeInventoryImportServiceMock(opts?.existingInventory ?? new Map());
   const orderRepo = makeGenericRepo<Order>(opts?.existingOrders ?? []);
   const expenseService = makeExpenseImportServiceMock(opts?.existingExpenses ?? []);
@@ -257,15 +300,29 @@ describe('DataSynchronizerService', () => {
     it('writes categories before products, inventory, orders, expenses, saleCredits', async () => {
       const writeOrder: string[] = [];
 
-      const catRepo: NameUniqueRepo<ProductCategory> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => writeOrder.push('category:' + item.id),
-        save: () => {},
+      const catRepo: CategoryImportRepo = {
+        getStorageCategoriesMap: () => new Map(),
+        addImportedProductCategory: (item) => {
+          writeOrder.push('category:' + item.id);
+          return Result.Success();
+        },
+        updateImportedProductCategory: (item) => {
+          writeOrder.push('category:' + item.id);
+          return Result.Success();
+        },
+        updateCategories: () => {},
       };
-      const prodRepo: NameUniqueRepo<Product> = {
-        getAll: () => new Map(),
-        upsert: (_s, item) => writeOrder.push('product:' + item.id),
-        save: () => {},
+      const prodRepo: ProductImportRepo = {
+        getStorageProductsMap: () => new Map(),
+        addImportedProduct: (item) => {
+          writeOrder.push('product:' + item.id);
+          return Result.Success();
+        },
+        updateImportedProduct: (item) => {
+          writeOrder.push('product:' + item.id);
+          return Result.Success();
+        },
+        updateProducts: () => {},
       };
       const inventoryService: InventoryImportService = {
         getStorageInventoriesMap: () => new Map(),
@@ -331,19 +388,43 @@ describe('DataSynchronizerService', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 3.2: duplicate category/product name → whole-type revert + typed error
+  // 3.2: duplicate category/product name → whole-type revert with the LIVE
+  // mutated map reference (Gate B — NOT a clean pre-import snapshot). Uses the
+  // REAL ProductRepository/ProductCategoryRepository (jsdom localStorage) so the
+  // revert-with-mutated-ref quirk is reproduced automatically, exactly as Angular
+  // does — driving a mock here would only prove the mock, not the repo.
   // -------------------------------------------------------------------------
 
-  describe('T2 — duplicate name rejected + whole-type revert', () => {
-    it('rejects a duplicate category name and reverts categories to their pre-import snapshot', async () => {
-      const existing = makeCategory('cat-existing', 'Bebidas', 1);
-      const { svc, catRepo } = makeService({ existingCategories: [existing] });
+  describe('T2 — duplicate name rejected + revert with the mutated reference (not a clean snapshot)', () => {
+    const REAL_STORE_ID = 'store-t2-real';
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it('rejects a duplicate category name; revert persists the mutated map (order-shift already applied), not the pre-import snapshot', async () => {
+      const categoryRepo = new ProductCategoryRepository(REAL_STORE_ID);
+      categoryRepo.addImportedProductCategory(makeCategory('cat-existing', 'Bebidas', 1));
+
+      const productRepo = new ProductRepository(REAL_STORE_ID, categoryRepo);
+      const svc = new DataSynchronizerService(
+        REAL_STORE_ID,
+        categoryRepo,
+        productRepo,
+        makeInventoryImportServiceMock(),
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        makeGenericRepo<SaleCredit>(),
+      );
 
       const data: ParsedData = {
         ...emptyData(),
         categories: [
+          // Succeeds first (sorted by order) — its order-shift bumps cat-existing
+          // from order 1 to order 2, mutating the SAME cached map in place.
           makeCategory('cat-ok', 'Snacks', 1),
-          makeCategory('cat-dup', 'Bebidas', 2), // name clashes with cat-existing
+          // Then fails: name now clashes with cat-existing (still named 'Bebidas').
+          makeCategory('cat-dup', 'Bebidas', 2),
         ],
       };
 
@@ -351,28 +432,44 @@ describe('DataSynchronizerService', () => {
 
       expect(result.succeeded).toBe(false);
       const catError = result.errors.find((e) => e.entity === 'categories');
-      expect(catError).toBeDefined();
       expect(catError?.code).toBe('ProductCategory.NameExists');
-
-      // Whole-type revert: categories map is back to its pre-import state —
-      // NOT even cat-ok (which came before the clash, sorted by order) persists.
-      const remaining = catRepo.getAll(STORE_ID);
-      expect(remaining.size).toBe(1);
-      expect(remaining.has('cat-existing')).toBe(true);
-      expect(remaining.has('cat-ok')).toBe(false);
-      expect(remaining.has('cat-dup')).toBe(false);
-
       const catMerge = result.merges.find((m) => m.entity === 'categories');
       expect(catMerge).toEqual({ entity: 'categories', inserted: 0, updated: 0 });
+
+      // Mutated-reference revert (Gate B): cat-ok's successful insert AND the
+      // order-shift it triggered on cat-existing both persist — this is NOT the
+      // clean pre-import snapshot (which would have only cat-existing at order 1).
+      const persisted = new ProductCategoryRepository(REAL_STORE_ID);
+      expect(persisted.getProductCategoryById('cat-ok')).toBeDefined();
+      expect(persisted.getProductCategoryById('cat-existing')?.order).toBe(2);
+      expect(persisted.getProductCategoryById('cat-dup')).toBeUndefined();
     });
 
-    it('rejects a duplicate product name and reverts products to their pre-import snapshot', async () => {
-      const existing = makeProduct('prod-existing', 'Coca Cola', 1);
-      const { svc, prodRepo } = makeService({ existingProducts: [existing] });
+    it('rejects a duplicate product name; revert persists the mutated map (order-shift already applied), not the pre-import snapshot', async () => {
+      const categoryRepo = new ProductCategoryRepository(REAL_STORE_ID);
+      categoryRepo.addImportedProductCategory(makeCategory('cat-1', 'Bebidas', 1));
+
+      const productRepo = new ProductRepository(REAL_STORE_ID, categoryRepo);
+      productRepo.addImportedProduct(makeProduct('prod-existing', 'Coca Cola', 1));
+
+      const svc = new DataSynchronizerService(
+        REAL_STORE_ID,
+        categoryRepo,
+        productRepo,
+        makeInventoryImportServiceMock(),
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        makeGenericRepo<SaleCredit>(),
+      );
 
       const data: ParsedData = {
         ...emptyData(),
-        products: [makeProduct('prod-dup', 'Coca Cola', 1)],
+        products: [
+          // Succeeds first — its order-shift bumps prod-existing from order 1 to 2.
+          makeProduct('prod-ok', 'Sprite', 1),
+          // Then fails: name clashes with prod-existing (same category, still 'Coca Cola').
+          makeProduct('prod-dup', 'Coca Cola', 2),
+        ],
       };
 
       const result = await svc.sync(data);
@@ -381,10 +478,10 @@ describe('DataSynchronizerService', () => {
       const prodError = result.errors.find((e) => e.entity === 'products');
       expect(prodError?.code).toBe('Product.NameExists');
 
-      const remaining = prodRepo.getAll(STORE_ID);
-      expect(remaining.size).toBe(1);
-      expect(remaining.has('prod-existing')).toBe(true);
-      expect(remaining.has('prod-dup')).toBe(false);
+      const persisted = new ProductRepository(REAL_STORE_ID, categoryRepo);
+      expect(persisted.getProductById('prod-ok')).toBeDefined();
+      expect(persisted.getProductById('prod-existing')?.order).toBe(2);
+      expect(persisted.getProductById('prod-dup')).toBeUndefined();
     });
 
     it('processes categories sorted by order before checking for name clashes', async () => {
@@ -396,14 +493,24 @@ describe('DataSynchronizerService', () => {
       };
       const result = await svc.sync(data);
       expect(result.succeeded).toBe(true);
-      const remaining = catRepo.getAll(STORE_ID);
-      expect(remaining.size).toBe(2);
+      expect(catRepo.snapshot()).toHaveLength(2);
     });
 
     it('does not revert other entity types when categories fail', async () => {
-      const { svc, orderRepo } = makeService({
-        existingCategories: [makeCategory('cat-existing', 'Bebidas', 1)],
-      });
+      const categoryRepo = new ProductCategoryRepository(REAL_STORE_ID);
+      categoryRepo.addImportedProductCategory(makeCategory('cat-existing', 'Bebidas', 1));
+      const orderRepo = makeGenericRepo<Order>();
+
+      const svc = new DataSynchronizerService(
+        REAL_STORE_ID,
+        categoryRepo,
+        new ProductRepository(REAL_STORE_ID, categoryRepo),
+        makeInventoryImportServiceMock(),
+        orderRepo,
+        makeExpenseImportServiceMock(),
+        makeGenericRepo<SaleCredit>(),
+      );
+
       const data: ParsedData = {
         ...emptyData(),
         categories: [makeCategory('cat-dup', 'Bebidas', 1)],
@@ -412,9 +519,188 @@ describe('DataSynchronizerService', () => {
       const result = await svc.sync(data);
       expect(result.succeeded).toBe(false);
       // Orders are unaffected by the categories failure — sync continues.
-      expect(orderRepo.getAll(STORE_ID).has('order-1')).toBe(true);
+      expect(orderRepo.getAll(REAL_STORE_ID).has('order-1')).toBe(true);
       const orderMerge = result.merges.find((m) => m.entity === 'orders');
       expect(orderMerge).toEqual({ entity: 'orders', inserted: 1, updated: 0 });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Full Angular validation parity (product-sync-import-validation-parity):
+  // category-exists, barcode-uniqueness, per-category name-uniqueness, and
+  // order-shift for products; name-uniqueness + order-shift for categories.
+  // Uses the REAL repositories — these rules live in ProductRepository/
+  // ProductCategoryRepository, not reimplementable in a test mock.
+  // -------------------------------------------------------------------------
+
+  describe('T9 — full Angular validation parity via real repositories', () => {
+    const REAL_STORE_ID = 'store-t9-real';
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    function makeRealPair(): { categoryRepo: ProductCategoryRepository; productRepo: ProductRepository } {
+      const categoryRepo = new ProductCategoryRepository(REAL_STORE_ID);
+      const productRepo = new ProductRepository(REAL_STORE_ID, categoryRepo);
+      return { categoryRepo, productRepo };
+    }
+
+    function makeSvc(categoryRepo: ProductCategoryRepository, productRepo: ProductRepository) {
+      return new DataSynchronizerService(
+        REAL_STORE_ID,
+        categoryRepo,
+        productRepo,
+        makeInventoryImportServiceMock(),
+        makeGenericRepo<Order>(),
+        makeExpenseImportServiceMock(),
+        makeGenericRepo<SaleCredit>(),
+      );
+    }
+
+    it('rejects an imported product whose categoryId does not exist (ProductCategory.NotExists)', async () => {
+      const { categoryRepo, productRepo } = makeRealPair();
+      const svc = makeSvc(categoryRepo, productRepo);
+
+      const data: ParsedData = {
+        ...emptyData(),
+        products: [
+          { ...makeProduct('prod-1', 'Cola', 1), categoryId: 'cat-missing' },
+        ],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      const err = result.errors.find((e) => e.entity === 'products');
+      expect(err?.code).toBe('ProductCategory.NotExists');
+      expect(productRepo.getProductById('prod-1')).toBeUndefined();
+    });
+
+    it('rejects an imported product with a barcode already used by a stored product (Product.BarcodeExists)', async () => {
+      // NOTE: Angular's (and this repo's already-ported) `addImportedProduct` never
+      // forwards `barcode` to `addProductData` — only `updateImportedProduct` does
+      // (product.repository.ts:173-185 vs :244-259). Barcode-uniqueness on import is
+      // therefore only reachable via the UPDATE path (an existing id re-imported with a
+      // new/changed barcode), never via the ADD path (a brand-new id). This is pre-
+      // existing `ProductRepository` behavior, unrelated to and out of scope for this
+      // change (no repository contract changes) — the fixture below exercises the
+      // REACHABLE path, not a new/altered one.
+      const { categoryRepo, productRepo } = makeRealPair();
+      categoryRepo.addImportedProductCategory(makeCategory('cat-1', 'Bebidas', 1));
+      // prod-a is created via the normal (non-import) path, which DOES persist barcode.
+      productRepo.addProductData('prod-a', 'cat-1', 'Coca Cola', 1000, 'biz-1', 1, true, true, false, '7501234');
+      productRepo.addProductData('prod-b', 'cat-1', 'Sprite', 1000, 'biz-1', 2, true, true, false, '999999');
+      const svc = makeSvc(categoryRepo, productRepo);
+
+      const data: ParsedData = {
+        ...emptyData(),
+        // Re-imports the EXISTING prod-b (update path) with a barcode clashing with prod-a.
+        products: [{ ...makeProduct('prod-b', 'Sprite', 2), barcode: '7501234' }],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      const err = result.errors.find((e) => e.entity === 'products');
+      expect(err?.code).toBe('Product.BarcodeExists');
+      expect(productRepo.getProductById('prod-b')?.barcode).toBe('999999');
+    });
+
+    it('rejects a duplicate product name within the SAME category (Product.NameExists)', async () => {
+      const { categoryRepo, productRepo } = makeRealPair();
+      categoryRepo.addImportedProductCategory(makeCategory('cat-1', 'Bebidas', 1));
+      productRepo.addImportedProduct(makeProduct('prod-existing', 'Cola', 1));
+      const svc = makeSvc(categoryRepo, productRepo);
+
+      const data: ParsedData = {
+        ...emptyData(),
+        products: [makeProduct('prod-new', 'Cola', 2)],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      const err = result.errors.find((e) => e.entity === 'products');
+      expect(err?.code).toBe('Product.NameExists');
+    });
+
+    it('allows the same product name across DIFFERENT categories (name-uniqueness is per-category, not global)', async () => {
+      const { categoryRepo, productRepo } = makeRealPair();
+      categoryRepo.addImportedProductCategory(makeCategory('cat-1', 'Bebidas', 1));
+      categoryRepo.addImportedProductCategory(makeCategory('cat-2', 'Snacks', 2));
+      productRepo.addImportedProduct(makeProduct('prod-existing', 'Cola', 1));
+      const svc = makeSvc(categoryRepo, productRepo);
+
+      const data: ParsedData = {
+        ...emptyData(),
+        products: [{ ...makeProduct('prod-new', 'Cola', 1), categoryId: 'cat-2', categoryName: 'Snacks' }],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(true);
+      expect(productRepo.getProductById('prod-new')).toBeDefined();
+    });
+
+    it('shifts order for existing products in the same category when an imported product lands at their order', async () => {
+      const { categoryRepo, productRepo } = makeRealPair();
+      categoryRepo.addImportedProductCategory(makeCategory('cat-1', 'Bebidas', 1));
+      productRepo.addImportedProduct(makeProduct('p1', 'Cola', 1));
+      productRepo.addImportedProduct(makeProduct('p2', 'Sprite', 2));
+      productRepo.addImportedProduct(makeProduct('p3', 'Fanta', 3));
+      const svc = makeSvc(categoryRepo, productRepo);
+
+      const data: ParsedData = {
+        ...emptyData(),
+        products: [makeProduct('p-new', 'Pepsi', 2)],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(true);
+      const byOrder = productRepo
+        .getProductsByCategoryId('cat-1')
+        .reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.id]: p.order }), {});
+      expect(byOrder).toEqual({ p1: 1, 'p-new': 2, p2: 3, p3: 4 });
+    });
+
+    it('rejects a duplicate category name (ProductCategory.NameExists)', async () => {
+      const { categoryRepo, productRepo } = makeRealPair();
+      categoryRepo.addImportedProductCategory(makeCategory('cat-existing', 'Bebidas', 1));
+      const svc = makeSvc(categoryRepo, productRepo);
+
+      const data: ParsedData = {
+        ...emptyData(),
+        categories: [makeCategory('cat-new', 'Bebidas', 2)],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(false);
+      const err = result.errors.find((e) => e.entity === 'categories');
+      expect(err?.code).toBe('ProductCategory.NameExists');
+    });
+
+    it('shifts order for existing categories when an imported category lands at their order', async () => {
+      const { categoryRepo, productRepo } = makeRealPair();
+      categoryRepo.addImportedProductCategory(makeCategory('c1', 'Bebidas', 1));
+      categoryRepo.addImportedProductCategory(makeCategory('c2', 'Snacks', 2));
+      categoryRepo.addImportedProductCategory(makeCategory('c3', 'Limpieza', 3));
+      const svc = makeSvc(categoryRepo, productRepo);
+
+      const data: ParsedData = {
+        ...emptyData(),
+        categories: [makeCategory('c-new', 'Lacteos', 2)],
+      };
+
+      const result = await svc.sync(data);
+
+      expect(result.succeeded).toBe(true);
+      const byOrder = categoryRepo
+        .getProductCategories()
+        .reduce<Record<string, number>>((acc, c) => ({ ...acc, [c.id]: c.order }), {});
+      expect(byOrder).toEqual({ c1: 1, 'c-new': 2, c2: 3, c3: 4 });
     });
   });
 
@@ -581,8 +867,8 @@ describe('DataSynchronizerService', () => {
         categories: [makeCategory('cat-new', 'From File')],
       };
       await svc.sync(data);
-      const remaining = catRepo.getAll(STORE_ID);
-      expect(remaining.has('cat-local')).toBe(true);
+      const remaining = catRepo.snapshot();
+      expect(remaining.some((c) => c.id === 'cat-local')).toBe(true);
     });
 
     it('returns a merge entry for all 6 entities', async () => {
@@ -660,11 +946,21 @@ describe('DataSynchronizerService', () => {
       const { svc, catRepo, prodRepo, inventoryService, orderRepo, expenseService, saleCreditRepo } =
         makeService();
       let writes = 0;
-      catRepo.upsert = () => {
+      catRepo.addImportedProductCategory = () => {
         writes++;
+        return Result.Success();
       };
-      prodRepo.upsert = () => {
+      catRepo.updateImportedProductCategory = () => {
         writes++;
+        return Result.Success();
+      };
+      prodRepo.addImportedProduct = () => {
+        writes++;
+        return Result.Success();
+      };
+      prodRepo.updateImportedProduct = () => {
+        writes++;
+        return Result.Success();
       };
       inventoryService.addImportedEntries = () => {
         writes++;
@@ -718,8 +1014,8 @@ describe('DataSynchronizerService', () => {
 
       const svc = new DataSynchronizerService(
         STORE_ID,
-        makeNameUniqueRepo<ProductCategory>(),
-        makeNameUniqueRepo<Product>(),
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
         makeInventoryImportServiceMock(),
         makeGenericRepo<Order>(),
         expenseService,
@@ -765,8 +1061,8 @@ describe('DataSynchronizerService', () => {
 
       const svc = new DataSynchronizerService(
         STORE_ID,
-        makeNameUniqueRepo<ProductCategory>(),
-        makeNameUniqueRepo<Product>(),
+        makeCategoryImportRepoMock(),
+        makeProductImportRepoMock(),
         inventoryService,
         makeGenericRepo<Order>(),
         makeExpenseImportServiceMock(),
