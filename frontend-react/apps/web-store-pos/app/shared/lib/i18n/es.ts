@@ -159,6 +159,9 @@ const messages: Record<string, string> = {
     'Usted no puede realizar la venta porque el pago es menor que el total.',
   'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT':
     'Usted no puede realizar la venta por cobrar sin especificar el cliente.',
+  // Angular vocabs/es.ts:388 (SHOPPING_CART.EDIT_DETAILS) — used by the ported-but-unwired
+  // EditOrderDetailsModal (edit-order-details-parity, Fase 6 slice 3/3).
+  'SHOPPING_CART.EDIT_DETAILS': 'Editar Detalles',
   // Cart line-item quantity/remove controls — Angular's nav-right template has NO
   // aria-labels on these buttons at all (icon-only, no accessibility text); these are a
   // React-added a11y improvement with previously-hardcoded English text, now Spanish per
