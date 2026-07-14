@@ -215,18 +215,19 @@ export class OrderOfflineService {
   }
 
   /**
-   * Sync replacement of Angular's `filterOrdersObservable`. `isCredit` is a tri-state:
-   * -1 = any, 1 = credit only, 0 = non-credit only. `paymentType`/`start`/`end` are
-   * optional and unbounded when falsy — 1:1 port, operates over active orders only,
-   * RAW date comparisons (no internal day-snapping).
+   * 1:1 port of Angular `filterOrdersObservable` (order-offline.service.ts:290-297),
+   * C-shape (async, `Promise<BaseResponseModel<Order[]>>`, never rejects). Renamed from
+   * `filterOrders`. `isCredit` is a tri-state: -1 = any, 1 = credit only, 0 = non-credit
+   * only. `paymentType`/`start`/`end` are optional and unbounded when falsy — operates
+   * over active orders only, RAW date comparisons (no internal day-snapping).
    */
-  filterOrders(
+  filterOrdersObservable(
     isCredit: number,
     paymentType?: PaymentType,
     start?: Date,
     end?: Date,
-  ): Order[] {
-    return this.getStorageOrders()
+  ): Promise<BaseResponseModel<Order[]>> {
+    const filtered = this.getStorageOrders()
       .filter(
         (o) =>
           o.isActive &&
@@ -236,20 +237,22 @@ export class OrderOfflineService {
           (!end || o.date < end),
       )
       .sort((a, b) => a.date.getTime() - b.date.getTime());
+    return Promise.resolve(success(filtered));
   }
 
   /**
-   * 1:1 port of Angular's `OrderOfflineService.getCategoryCartItemsView` — aggregates
-   * today's active order items by category, then by product, for the "Cuadre del día"
-   * (Today Stats) view. Category `order` is resolved from `ProductCategoryRepository`
-   * (Angular parity — `OrderOfflineService` injects `ProductCategoryRepository` directly,
-   * `order-offline.service.ts:38,79`, never the offline service), falling back to
-   * `Number.MAX_VALUE` when not found (Angular's exact fallback, so ghost/deleted categories
-   * sort last if ever rendered in `order`).
+   * 1:1 port of Angular `getCategoryCartItemsView` (order-offline.service.ts:76-109),
+   * B-shape (sync, `BaseResponseModel<CategoryCartItemsView[]>` envelope, no Promise) —
+   * aggregates today's active order items by category, then by product, for the "Cuadre
+   * del día" (Today Stats) view. Category `order` is resolved from
+   * `ProductCategoryRepository` (Angular parity — `OrderOfflineService` injects
+   * `ProductCategoryRepository` directly, `order-offline.service.ts:38,79`, never the
+   * offline service), falling back to `Number.MAX_VALUE` when not found (Angular's exact
+   * fallback, so ghost/deleted categories sort last if ever rendered in `order`).
    * NOTE: matches Angular's quirk of NOT explicitly sorting the returned array by `order`
    * — iteration order follows Map insertion order (first-seen category in orderItems).
    */
-  getCategoryCartItemsView(date: Date): CategoryCartItemsView[] {
+  getCategoryCartItemsView(date: Date): BaseResponseModel<CategoryCartItemsView[]> {
     const categoryRepository = new ProductCategoryRepository(this.storeId);
     const storageCategories = categoryRepository.getProductCategories();
     const orderItems: OrderItem[] = this.getActiveOrdersInDay(date).flatMap(
@@ -283,17 +286,17 @@ export class OrderOfflineService {
       });
     });
 
-    return categoryItemsView;
+    return success(categoryItemsView);
   }
 
   /**
    * 1:1 port of Angular `getCategoryCartItemsViewObservable` (order-offline.service.ts:71-74).
-   * No live tsx caller yet (additive). NOTE: wraps the current bare-array return of
-   * `getCategoryCartItemsView` — WU4 changes that method's own return type to the B-shape
-   * envelope, at which point this wrapper must unwrap `.data` instead (tracked in WU4).
+   * No live tsx caller yet (additive). Unwraps `.data` off the now-enveloped sync call —
+   * the sync call already returns a `BaseResponseModel`, so the Observable variant reuses
+   * its `.data` as the payload rather than double-wrapping the whole envelope.
    */
   getCategoryCartItemsViewObservable(date: Date): Promise<BaseResponseModel<CategoryCartItemsView[]>> {
-    return Promise.resolve(success(this.getCategoryCartItemsView(date)));
+    return Promise.resolve(success(this.getCategoryCartItemsView(date).data));
   }
 
   /**

@@ -566,14 +566,14 @@ describe('OrderOfflineService', () => {
   });
 
   // Angular parity (order-offline.service.ts:71-74): additive. WU4: getCategoryCartItemsView
-  // wraps the current bare-array return of getCategoryCartItemsView (B-shape envelope
-  // lands in WU4).
+  // now returns its own B-shape envelope, so this Observable wrapper unwraps `.data` off it
+  // rather than double-wrapping the whole envelope.
   describe('ORD-2x: getCategoryCartItemsViewObservable', () => {
     beforeEach(() => {
       mockCategoryGetAll.mockReturnValue([]);
     });
 
-    it('resolves succeeded:true with .data equal to the sync getCategoryCartItemsView result', async () => {
+    it('resolves succeeded:true with .data equal to the sync getCategoryCartItemsView().data', async () => {
       const items = makeCartItems([
         { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },
       ]);
@@ -584,7 +584,7 @@ describe('OrderOfflineService', () => {
       const result = await service.getCategoryCartItemsViewObservable(date);
 
       expect(result.succeeded).toBe(true);
-      expect(result.data).toEqual(syncResult);
+      expect(result.data).toEqual(syncResult.data);
     });
   });
 
@@ -717,7 +717,7 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  describe('ORD-08: getCategoryCartItemsView (Angular getCategoryCartItemsView 1:1 port)', () => {
+  describe('ORD-08: getCategoryCartItemsView (Angular getCategoryCartItemsView 1:1 port, B-shape envelope)', () => {
     beforeEach(() => {
       mockCategoryGetAll.mockReturnValue([
         { id: 'cat1', name: 'Bebidas', order: 2, isActive: true },
@@ -725,8 +725,12 @@ describe('OrderOfflineService', () => {
       ]);
     });
 
+    it('returns succeeded:true synchronously (no Promise)', () => {
+      expect(service.getCategoryCartItemsView(new Date()).succeeded).toBe(true);
+    });
+
     it('returns empty array when there are no active orders today', () => {
-      expect(service.getCategoryCartItemsView(new Date())).toEqual([]);
+      expect(service.getCategoryCartItemsView(new Date()).data).toEqual([]);
     });
 
     it('groups order items by categoryId, aggregating total/itemsCount across orders', async () => {
@@ -739,7 +743,7 @@ describe('OrderOfflineService', () => {
       await createTestOrder(service, items1, PaymentType.Efectivo, false, '');
       await createTestOrder(service, items2, PaymentType.Efectivo, false, '');
 
-      const result = service.getCategoryCartItemsView(new Date());
+      const result = service.getCategoryCartItemsView(new Date()).data;
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('cat1');
       expect(result[0].name).toBe('Bebidas');
@@ -754,7 +758,7 @@ describe('OrderOfflineService', () => {
       ]);
       await createTestOrder(service, items, PaymentType.Efectivo, false, '');
 
-      const result = service.getCategoryCartItemsView(new Date());
+      const result = service.getCategoryCartItemsView(new Date()).data;
       expect(result[0].productItems).toHaveLength(2);
       const cola = result[0].productItems.find((p) => p.name === 'Cola');
       const fanta = result[0].productItems.find((p) => p.name === 'Fanta');
@@ -769,7 +773,7 @@ describe('OrderOfflineService', () => {
         { product: makeProduct({ id: 'p1', categoryId: 'cat2', categoryName: 'Snacks', price: 2 }), quantity: 1 },
       ]);
       await createTestOrder(service, items, PaymentType.Efectivo, false, '');
-      const result = service.getCategoryCartItemsView(new Date());
+      const result = service.getCategoryCartItemsView(new Date()).data;
       expect(result[0].order).toBe(1); // cat2's order from the mocked category list
     });
 
@@ -778,7 +782,7 @@ describe('OrderOfflineService', () => {
         { product: makeProduct({ id: 'p1', categoryId: 'unknown-cat', categoryName: 'Ghost', price: 2 }), quantity: 1 },
       ]);
       await createTestOrder(service, items, PaymentType.Efectivo, false, '');
-      const result = service.getCategoryCartItemsView(new Date());
+      const result = service.getCategoryCartItemsView(new Date()).data;
       expect(result[0].order).toBe(Number.MAX_VALUE);
     });
 
@@ -788,7 +792,7 @@ describe('OrderOfflineService', () => {
       ]);
       const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       service.deactivateOrder(order.id);
-      expect(service.getCategoryCartItemsView(new Date())).toEqual([]);
+      expect(service.getCategoryCartItemsView(new Date()).data).toEqual([]);
     });
   });
 
@@ -1126,76 +1130,81 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  describe('ORD-17: filterOrders — sync replacement of filterOrdersObservable', () => {
-    it('isCredit=-1 returns all active orders regardless of credit status', () => {
+  describe('ORD-17: filterOrdersObservable — async C-shape (renamed from filterOrders)', () => {
+    it('isCredit=-1 returns all active orders regardless of credit status', async () => {
       seedOrders(storeId, [
         makeOrder({ id: 'credit', isCredit: true, isActive: true }),
         makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
       ]);
-      expect(service.filterOrders(-1).map((o) => o.id).sort()).toEqual(['credit', 'non-credit']);
+      const result = await service.filterOrdersObservable(-1);
+      expect(result.succeeded).toBe(true);
+      expect(result.data.map((o) => o.id).sort()).toEqual(['credit', 'non-credit']);
     });
 
-    it('isCredit=1 returns only credit orders', () => {
+    it('isCredit=1 returns only credit orders', async () => {
       seedOrders(storeId, [
         makeOrder({ id: 'credit', isCredit: true, isActive: true }),
         makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
       ]);
-      expect(service.filterOrders(1).map((o) => o.id)).toEqual(['credit']);
+      const result = await service.filterOrdersObservable(1);
+      expect(result.data.map((o) => o.id)).toEqual(['credit']);
     });
 
-    it('isCredit=0 returns only non-credit orders', () => {
+    it('isCredit=0 returns only non-credit orders', async () => {
       seedOrders(storeId, [
         makeOrder({ id: 'credit', isCredit: true, isActive: true }),
         makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
       ]);
-      expect(service.filterOrders(0).map((o) => o.id)).toEqual(['non-credit']);
+      const result = await service.filterOrdersObservable(0);
+      expect(result.data.map((o) => o.id)).toEqual(['non-credit']);
     });
 
-    it('excludes inactive orders regardless of isCredit filter', () => {
+    it('excludes inactive orders regardless of isCredit filter', async () => {
       seedOrders(storeId, [makeOrder({ id: 'inactive', isCredit: false, isActive: false })]);
-      expect(service.filterOrders(-1)).toHaveLength(0);
+      const result = await service.filterOrdersObservable(-1);
+      expect(result.data).toHaveLength(0);
     });
 
-    it('filters by paymentType when provided', () => {
+    it('filters by paymentType when provided', async () => {
       seedOrders(storeId, [
         makeOrder({ id: 'efectivo', paymentType: PaymentType.Efectivo, isActive: true }),
         makeOrder({ id: 'tarjeta', paymentType: PaymentType.Tarjeta, isActive: true }),
       ]);
-      expect(service.filterOrders(-1, PaymentType.Tarjeta).map((o) => o.id)).toEqual(['tarjeta']);
+      const result = await service.filterOrdersObservable(-1, PaymentType.Tarjeta);
+      expect(result.data.map((o) => o.id)).toEqual(['tarjeta']);
     });
 
-    it('filters by start date (inclusive) when provided', () => {
+    it('filters by start date (inclusive) when provided', async () => {
       const now = new Date();
       seedOrders(storeId, [
         makeOrder({ id: 'before', date: addDays(now, -5), isActive: true }),
         makeOrder({ id: 'after', date: now, isActive: true }),
       ]);
-      expect(
-        service.filterOrders(-1, undefined, addDays(now, -1)).map((o) => o.id),
-      ).toEqual(['after']);
+      const result = await service.filterOrdersObservable(-1, undefined, addDays(now, -1));
+      expect(result.data.map((o) => o.id)).toEqual(['after']);
     });
 
-    it('filters by end date (exclusive) when provided', () => {
+    it('filters by end date (exclusive) when provided', async () => {
       const now = new Date();
       seedOrders(storeId, [
         makeOrder({ id: 'before', date: addDays(now, -5), isActive: true }),
         makeOrder({ id: 'after', date: now, isActive: true }),
       ]);
-      expect(
-        service.filterOrders(-1, undefined, undefined, addDays(now, -1)).map((o) => o.id),
-      ).toEqual(['before']);
+      const result = await service.filterOrdersObservable(-1, undefined, undefined, addDays(now, -1));
+      expect(result.data.map((o) => o.id)).toEqual(['before']);
     });
 
     // Angular parity (order-offline.service.ts:246-250, getActiveOrders): the private
-    // helper backing filterOrders/filterOrdersObservable sorts by `date` ascending.
-    it('returns active orders sorted by date ascending, regardless of insertion order', () => {
+    // helper backing filterOrdersObservable sorts by `date` ascending.
+    it('returns active orders sorted by date ascending, regardless of insertion order', async () => {
       const now = new Date();
       seedOrders(storeId, [
         makeOrder({ id: 'newest', date: now, isActive: true }),
         makeOrder({ id: 'oldest', date: addDays(now, -2), isActive: true }),
         makeOrder({ id: 'middle', date: addDays(now, -1), isActive: true }),
       ]);
-      expect(service.filterOrders(-1).map((o) => o.id)).toEqual(['oldest', 'middle', 'newest']);
+      const result = await service.filterOrdersObservable(-1);
+      expect(result.data.map((o) => o.id)).toEqual(['oldest', 'middle', 'newest']);
     });
   });
 

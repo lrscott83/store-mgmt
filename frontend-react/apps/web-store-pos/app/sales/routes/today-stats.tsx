@@ -90,7 +90,7 @@ export function TodayStatsPage() {
 
   useEffect(() => {
     const orderService = new OrderOfflineService(storeId);
-    setCategories(orderService.getCategoryCartItemsView(new Date()));
+    setCategories(orderService.getCategoryCartItemsView(new Date()).data);
 
     const activeOrders: Order[] = orderService.getActiveOrdersInDay(new Date());
     setSalesCashTotal(

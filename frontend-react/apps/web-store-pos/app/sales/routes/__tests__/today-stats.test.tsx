@@ -18,8 +18,13 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
   }),
 }));
 
+// Category-B envelope helper: getCategoryCartItemsView returns a sync BaseResponseModel<CategoryCartItemsView[]>.
+function categoryEnvelope(data: unknown[] = []) {
+  return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
+}
+
 const mockGetActiveOrdersInDay = vi.fn().mockReturnValue([] as Order[]);
-const mockGetCategoryCartItemsView = vi.fn().mockReturnValue([]);
+const mockGetCategoryCartItemsView = vi.fn().mockReturnValue(categoryEnvelope([]));
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
     getActiveOrdersInDay: mockGetActiveOrdersInDay,
@@ -125,7 +130,7 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
     vi.clearAllMocks();
     mockAuthState.user.storeModuleIds = [];
     mockGetActiveOrdersInDay.mockReturnValue([]);
-    mockGetCategoryCartItemsView.mockReturnValue([]);
+    mockGetCategoryCartItemsView.mockReturnValue(categoryEnvelope([]));
     mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([]));
     mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(creditsEnvelope([]));
     mockGetPaidSaleCreditsInDayObservable.mockResolvedValue(creditsEnvelope([]));
@@ -171,9 +176,11 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
   });
 
   it('renders a Ventas ({itemsCount} productos) panel using getCategoryCartItemsView totals', () => {
-    mockGetCategoryCartItemsView.mockReturnValue([
-      { id: 'cat1', name: 'Bebidas', order: 1, total: 30, itemsCount: 4, productItems: [] },
-    ]);
+    mockGetCategoryCartItemsView.mockReturnValue(
+      categoryEnvelope([
+        { id: 'cat1', name: 'Bebidas', order: 1, total: 30, itemsCount: 4, productItems: [] },
+      ]),
+    );
     render(
       <Wrapper>
         <TodayStatsPage />
@@ -199,7 +206,7 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     vi.clearAllMocks();
     mockAuthState.user.storeModuleIds = [EModules.Expenses, EModules.Credits];
     mockGetActiveOrdersInDay.mockReturnValue([]);
-    mockGetCategoryCartItemsView.mockReturnValue([]);
+    mockGetCategoryCartItemsView.mockReturnValue(categoryEnvelope([]));
   });
 
   it('renders Gastos and Créditos panels when the user has those modules', async () => {
