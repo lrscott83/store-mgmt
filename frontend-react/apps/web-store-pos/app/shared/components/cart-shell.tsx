@@ -75,6 +75,7 @@ export function CartShell() {
   const {
     items,
     orderType,
+    orderDescription,
     paymentType,
     isCredit,
     clientName,
@@ -184,7 +185,7 @@ export function CartShell() {
         orderType,
         isCredit,
         paymentType,
-        undefined,
+        orderDescription,
         clientName.trim(),
       );
       if (!result.succeeded) {

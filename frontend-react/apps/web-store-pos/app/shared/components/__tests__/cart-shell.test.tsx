@@ -8,16 +8,20 @@ vi.mock('~/shared/lib/stores/cart-store', () => ({
   useCartStore: vi.fn(),
 }));
 
-// Mock OrderOfflineService
+// Mock OrderOfflineService — hoisted createOrder mock so tests can assert on the
+// positional args CartShell threads into it (esp. the `details` arg, WU3).
+const createOrderMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    data: { id: 'order-1' },
+    succeeded: true,
+    message: '',
+    actionCode: 200,
+    errors: [],
+  }),
+);
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
-    createOrder: vi.fn().mockResolvedValue({
-      data: { id: 'order-1' },
-      succeeded: true,
-      message: '',
-      actionCode: 200,
-      errors: [],
-    }),
+    createOrder: createOrderMock,
   })),
 }));
 
@@ -94,6 +98,7 @@ function mockCartState(overrides = {}) {
   const defaultState = {
     items: [],
     orderType: OrderType.Normal,
+    orderDescription: '',
     paymentType: PaymentType.Efectivo,
     isCredit: false,
     clientName: '',
@@ -558,6 +563,41 @@ describe('CartShell — createOrder validations (Registrar)', () => {
       expect(screen.getByText('La venta fue creada satisfactoriamente.')).toBeInTheDocument();
     });
     expect(clear).toHaveBeenCalledTimes(1);
+  });
+
+  // WU3 — createOrder must thread the cart store's orderDescription into the `details`
+  // arg (5th positional), mirroring Angular nav-right.component.ts:208 passing
+  // shoppingCartService.getOrderDescription() to orderService.createOrder().
+  it('CART-DESC-01: threads store.orderDescription into createOrder details arg', async () => {
+    const product = makeProduct();
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      orderDescription: 'entrega tarde',
+    });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    expect(createOrderMock.mock.calls[0][4]).toBe('entrega tarde');
+  });
+
+  it("CART-DESC-02: passes '' (not undefined) as details when orderDescription is default", async () => {
+    const product = makeProduct();
+    mockCartState({
+      items: [{ product, quantity: 1 }],
+      total: vi.fn().mockReturnValue(5),
+      orderDescription: '',
+    });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => expect(createOrderMock).toHaveBeenCalledTimes(1));
+    expect(createOrderMock.mock.calls[0][4]).toBe('');
   });
 });
 
