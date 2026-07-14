@@ -260,6 +260,24 @@ describe('OrderOfflineService', () => {
       expect(oi.price).toBe(4);
     });
 
+    // Post-verify parity fix (order-offline-service-parity): Angular's createOrderItems
+    // stamps OrderItem.order from the Product's own `order` attribute
+    // (order-offline.service.ts:377: `order: product.order`), NOT the cart array index.
+    // getCategoryCartItemsView reads this field to build the "Cuadre del día" view, so
+    // stamping the index instead corrupts persisted order data vs Angular.
+    it('stamps orderItems[].order from product.order, not the cart index', async () => {
+      const productA = makeProduct({ id: 'pA', name: 'Product A', order: 5 });
+      const productB = makeProduct({ id: 'pB', name: 'Product B', order: 2 });
+      const items = makeCartItems([
+        { product: productA, quantity: 1 }, // cart index 0
+        { product: productB, quantity: 1 }, // cart index 1
+      ]);
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      const orderItems = result.data!.orderItems;
+      expect(orderItems[0].order).toBe(5); // productA.order, NOT cart index 0
+      expect(orderItems[1].order).toBe(2); // productB.order, NOT cart index 1
+    });
+
     // WU2 (order-offline-service-parity): the inventory-module gate is now sourced
     // internally from useAuthStore (no caller-supplied hasInventoryModule flag) — the
     // default test user (beforeEach) has storeModuleIds:[] (no Inventory module), so

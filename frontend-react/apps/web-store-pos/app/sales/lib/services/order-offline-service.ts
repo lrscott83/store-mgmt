@@ -327,7 +327,7 @@ export class OrderOfflineService {
     const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
 
     // Build orderItems with FIFO inventory deduction if needed
-    const orderItems: OrderItem[] = cartItems.map((cartItem, index) => {
+    const orderItems: OrderItem[] = cartItems.map((cartItem) => {
       const { product, quantity } = cartItem;
       let productCosts: import('@store-mgmt/domain').InventoryEntryCost[] = [];
 
@@ -354,7 +354,9 @@ export class OrderOfflineService {
         price: cartItem.price ?? product.price,
         productBusinessId: product.businessId ?? '',
         productCosts,
-        order: index,
+        // Angular parity (order-offline.service.ts:377): stamps OrderItem.order from the
+        // Product's own catalog display-order attribute, NOT the cart array index.
+        order: product.order,
       };
     });
 
