@@ -54,8 +54,15 @@ and auto-init:
       `paymentDate` field. NOT replicated or fixed in WU4 — untouched.
 - [ ] Order/expense: Angular normalizes `isCredit ??= false` / `paymentType ??= Efectivo` on read;
       React lacks this. NOT added in WU3/WU5.
-- [ ] Sync orchestration divergence (generic `upsert`/`save` + inline name-guard vs Angular's
+- [x] Sync orchestration divergence (generic `upsert`/`save` + inline name-guard vs Angular's
       `addImported*`/`updateImported*`): preserved as-is in WU6 — separate change, not this one.
+      RESOLVED (2026-07-14) in the dedicated sync-import-parity changes, not here: `sync/routes/import.tsx`
+      now constructs the real domain repos/services (`ProductRepository`/`ProductCategoryRepository`/
+      `OrderOfflineService`/`ExpenseOfflineService`/`SaleCreditOfflineService`) and
+      `data-synchronizer-service.ts` routes every import through `addImported*`/`updateImported*`
+      (category repo L273-274, product repo L317-318; order/credit carry their narrow merge + paid-guard),
+      never a generic upsert/save shim. Closed via `product-sync-import-validation-parity`,
+      `order-sync-import-parity`, `salecredit-sync-import-parity`.
 
 Do not silently resolve any of the above while implementing WU1-WU7. If a task below appears to
 require touching one of these, STOP and re-open with the user instead of assuming.
