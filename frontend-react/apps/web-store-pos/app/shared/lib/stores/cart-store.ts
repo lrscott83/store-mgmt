@@ -18,6 +18,10 @@ interface CartState {
    * (shopping-cart.service.ts:23) — overwritten only on the NEW-item branch of addItem,
    * reset to Normal by clear(). No per-orderType cart isolation (matches Angular). */
   orderType: OrderType;
+  /** 1:1 port of Angular's ShoppingCartService's `orderDescription` field
+   * (shopping-cart.service.ts:24) — declared with NO initializer (undefined until
+   * `updateOrderDetails` runs), reset to `''` by `clear()` (mirrors clearCart line 163). */
+  orderDescription: string | undefined;
   paymentType: PaymentType;
   isCredit: boolean;
   clientName: string;
@@ -27,6 +31,10 @@ interface CartState {
   setPaymentType: (type: PaymentType) => void;
   setClientName: (name: string) => void;
   toggleCredit: () => void;
+  /** 1:1 port of Angular's ShoppingCartService.updateOrderDetails (shopping-cart.service.ts:38-41). */
+  updateOrderDetails: (orderType: OrderType, orderDescription: string) => void;
+  /** 1:1 port of Angular's ShoppingCartService.getOrderDescription (shopping-cart.service.ts:55-56). */
+  getOrderDescription: () => string | undefined;
   clear: () => void;
   total: () => number;
   /** 1:1 port of Angular's ShoppingCartService.getCartItemQuantity(productId). */
@@ -38,6 +46,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       orderType: OrderType.Normal,
+      orderDescription: undefined,
       paymentType: PaymentType.Efectivo,
       isCredit: false,
       clientName: '',
@@ -91,10 +100,19 @@ export const useCartStore = create<CartState>()(
         set((state) => ({ isCredit: !state.isCredit }));
       },
 
+      updateOrderDetails: (orderType: OrderType, orderDescription: string) => {
+        set({ orderType, orderDescription });
+      },
+
+      getOrderDescription: () => {
+        return get().orderDescription;
+      },
+
       clear: () => {
         set({
           items: [],
           orderType: OrderType.Normal,
+          orderDescription: '',
           paymentType: PaymentType.Efectivo,
           isCredit: false,
           clientName: '',

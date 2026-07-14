@@ -111,3 +111,39 @@ describe('useCartStore — orderType + price threading (Egress/Mayorista realign
     expect(useCartStore.getState().total()).toBe(13); // 5*2 + 3*1, identical to pre-change behavior
   });
 });
+
+// 1:1 port of Angular's ShoppingCartService.orderDescription field + updateOrderDetails/
+// getOrderDescription (shopping-cart.service.ts:24,38-41,55-56). Angular's field is declared
+// `private orderDescription: string;` with NO initializer (undefined at construction time),
+// only ever set by updateOrderDetails() or reset to "" by clearCart() (line 163). React mirrors
+// that: the store's initial `orderDescription` is `undefined`, not `""`.
+describe('useCartStore — orderDescription (edit-order-details parity)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('updateOrderDetails writes both orderType and orderDescription', () => {
+    useCartStore.getState().updateOrderDetails(OrderType.Mayorista, 'nota de entrega');
+    expect(useCartStore.getState().orderType).toBe(OrderType.Mayorista);
+    expect(useCartStore.getState().orderDescription).toBe('nota de entrega');
+  });
+
+  it('getOrderDescription returns the current orderDescription', () => {
+    useCartStore.getState().updateOrderDetails(OrderType.Normal, 'entrega tarde');
+    expect(useCartStore.getState().getOrderDescription()).toBe('entrega tarde');
+  });
+
+  it('clear() resets orderDescription to ""', () => {
+    useCartStore.getState().updateOrderDetails(OrderType.Mayorista, 'nota de entrega');
+    useCartStore.getState().clear();
+    expect(useCartStore.getState().orderDescription).toBe('');
+  });
+
+  it('addItem still overwrites orderType unchanged (no field-name collision with orderDescription)', () => {
+    useCartStore.getState().updateOrderDetails(OrderType.Otro, 'nota previa');
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 1, OrderType.Mayorista);
+    expect(useCartStore.getState().orderType).toBe(OrderType.Mayorista);
+    expect(useCartStore.getState().orderDescription).toBe('nota previa');
+  });
+});
