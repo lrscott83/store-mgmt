@@ -424,12 +424,90 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  describe('ORD-06: getActiveOrdersInDay', () => {
-    it('getActiveOrdersInDay returns today orders', () => {
+  // Angular parity (order-offline.service.ts:299-303): getActiveOrdersInDay IGNORES its
+  // `date` param and always uses today's day boundaries — the param is kept in the
+  // signature for call-site compatibility, mirroring Angular's own unused param.
+  describe('ORD-06: getActiveOrdersInDay ignores its date parameter', () => {
+    it('returns today orders when called with today', () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
       service.create(items, PaymentType.Efectivo, false, '');
       const todayOrders = service.getActiveOrdersInDay(new Date());
       expect(todayOrders.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('still returns only TODAY active orders when called with a PAST date (date has zero effect)', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({ id: 'yesterday-order', date: addDays(now, -1), isActive: true }),
+        makeOrder({ id: 'today-order', date: now, isActive: true }),
+      ]);
+      const yesterday = addDays(now, -1);
+      const result = service.getActiveOrdersInDay(yesterday);
+      expect(result.map((o) => o.id)).toEqual(['today-order']);
+    });
+  });
+
+  describe('ORD-2x: getOrderById', () => {
+    it('returns the matching order', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      expect(service.getOrderById(order.id)).toEqual(order);
+    });
+
+    it('returns undefined for an unknown id', () => {
+      expect(service.getOrderById('missing')).toBeUndefined();
+    });
+  });
+
+  // Angular parity (order-offline.service.ts:286-288): additive, no live tsx caller yet.
+  describe('ORD-2x: getActiveTodayOrdersObservable', () => {
+    it('resolves succeeded:true with .data = today active orders', async () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = service.create(items, PaymentType.Efectivo, false, '');
+      const result = await service.getActiveTodayOrdersObservable();
+      expect(result.succeeded).toBe(true);
+      expect(result.data.map((o) => o.id)).toEqual([order.id]);
+    });
+
+    it('resolves succeeded:true with empty data when there are no active orders today', async () => {
+      const result = await service.getActiveTodayOrdersObservable();
+      expect(result.succeeded).toBe(true);
+      expect(result.data).toEqual([]);
+    });
+  });
+
+  // Angular parity (order-offline.service.ts:71-74): additive, wraps the WU1-current bare
+  // return of getCategoryCartItemsView (B-shape envelope lands in WU4).
+  describe('ORD-2x: getCategoryCartItemsViewObservable', () => {
+    beforeEach(() => {
+      mockCategoryGetAll.mockReturnValue([]);
+    });
+
+    it('resolves succeeded:true with .data equal to the sync getCategoryCartItemsView result', async () => {
+      const items = makeCartItems([
+        { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },
+      ]);
+      service.create(items, PaymentType.Efectivo, false, '');
+
+      const date = new Date();
+      const syncResult = service.getCategoryCartItemsView(date);
+      const result = await service.getCategoryCartItemsViewObservable(date);
+
+      expect(result.succeeded).toBe(true);
+      expect(result.data).toEqual(syncResult);
+    });
+  });
+
+  describe('ORD-2x: getOrdersJson', () => {
+    it('returns the exact stored JSON string for the current store', () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      service.create(items, PaymentType.Efectivo, false, '');
+      const raw = localStorage.getItem('lizoft.store-orders-s1');
+      expect(service.getOrdersJson()).toBe(raw);
+    });
+
+    it('returns "[]" when nothing is stored for that store key', () => {
+      expect(service.getOrdersJson()).toBe('[]');
     });
   });
 
@@ -443,9 +521,7 @@ describe('OrderOfflineService', () => {
   });
 
   // WU3 (eliminate-base-repository): inlined persistence — plain-array wire-format, cache,
-  // auto-init, 1:1 port of Angular's order-offline.service.ts:400-451. Revival fields
-  // (date/createdDate/updatedDate) are UNCHANGED from current React behavior (Decision Gate —
-  // Angular itself only revives `date`, but that gap is explicitly OUT OF SCOPE for this WU).
+  // auto-init, 1:1 port of Angular's order-offline.service.ts:400-451.
   describe('Persistence — plain-array wire-format, cache, auto-init (order-offline.service.ts:400-451)', () => {
     // NOTE: does NOT use `vi.restoreAllMocks()` in an afterEach — this test file's
     // module-level `vi.mock()` factories (InventoryOfflineService/SaleCreditOfflineService)
@@ -484,7 +560,9 @@ describe('OrderOfflineService', () => {
       expect(callsForKey).toHaveLength(1);
     });
 
-    it('STILL revives date/createdDate/updatedDate to Date instances on a fresh instance re-read (unchanged React behavior — Decision Gate)', () => {
+    // Angular parity (order-offline.service.ts:456-463): revives ONLY `date` on read;
+    // `createdDate`/`updatedDate` remain the raw (unconverted) stored values.
+    it('revives ONLY date to a Date instance on a fresh instance re-read; createdDate/updatedDate remain unconverted', () => {
       seedOrders(storeId, [
         makeOrder({
           id: 'o1',
@@ -496,8 +574,47 @@ describe('OrderOfflineService', () => {
       const freshService = new OrderOfflineService(storeId);
       const found = freshService.getStorageOrders().find((o) => o.id === 'o1');
       expect(found?.date).toBeInstanceOf(Date);
-      expect(found?.createdDate).toBeInstanceOf(Date);
-      expect(found?.updatedDate).toBeInstanceOf(Date);
+      expect(found?.createdDate).toBe('2024-01-01T00:00:00.000Z');
+      expect(found?.updatedDate).toBe('2024-01-02T00:00:00.000Z');
+    });
+
+    // Angular parity (order-offline.service.ts:456-463): getOrdersFromLocalStorage backfills
+    // isCredit/paymentType defaults for legacy orders written before those fields existed.
+    // Falsy-check semantics (mirrors Angular's `!order.isCredit`/`!order.paymentType`), NOT a
+    // stricter "is undefined" check — a legitimately-set order is left untouched.
+    it('backfills isCredit=false and paymentType=Efectivo for legacy orders missing those fields', () => {
+      const legacyOrderJson = {
+        id: 'legacy-1',
+        orderItems: [],
+        total: 0,
+        itemsCount: 0,
+        date: new Date('2024-01-01T00:00:00.000Z'),
+        type: OrderType.Normal,
+        description: '',
+        isActive: true,
+        createdDate: new Date('2024-01-01T00:00:00.000Z'),
+        createdByName: 'test',
+        updatedDate: undefined,
+        updatedByName: undefined,
+        // isCredit/paymentType intentionally OMITTED (legacy pre-existing data).
+      };
+      localStorage.setItem(
+        `lizoft.store-orders-${storeId}`,
+        JSON.stringify([
+          legacyOrderJson,
+          makeOrder({ id: 'current-1', isCredit: true, paymentType: PaymentType.Tarjeta }),
+        ]),
+      );
+      const freshService = new OrderOfflineService(storeId);
+      const orders = freshService.getStorageOrders();
+
+      const legacy = orders.find((o) => o.id === 'legacy-1');
+      expect(legacy?.isCredit).toBe(false);
+      expect(legacy?.paymentType).toBe(PaymentType.Efectivo);
+
+      const current = orders.find((o) => o.id === 'current-1');
+      expect(current?.isCredit).toBe(true);
+      expect(current?.paymentType).toBe(PaymentType.Tarjeta);
     });
   });
 
@@ -937,6 +1054,18 @@ describe('OrderOfflineService', () => {
       expect(
         service.filterOrders(-1, undefined, undefined, addDays(now, -1)).map((o) => o.id),
       ).toEqual(['before']);
+    });
+
+    // Angular parity (order-offline.service.ts:246-250, getActiveOrders): the private
+    // helper backing filterOrders/filterOrdersObservable sorts by `date` ascending.
+    it('returns active orders sorted by date ascending, regardless of insertion order', () => {
+      const now = new Date();
+      seedOrders(storeId, [
+        makeOrder({ id: 'newest', date: now, isActive: true }),
+        makeOrder({ id: 'oldest', date: addDays(now, -2), isActive: true }),
+        makeOrder({ id: 'middle', date: addDays(now, -1), isActive: true }),
+      ]);
+      expect(service.filterOrders(-1).map((o) => o.id)).toEqual(['oldest', 'middle', 'newest']);
     });
   });
 

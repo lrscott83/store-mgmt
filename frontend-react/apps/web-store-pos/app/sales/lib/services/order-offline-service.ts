@@ -1,5 +1,5 @@
-import type { Order, OrderItem } from '@store-mgmt/domain';
-import { OrderType, PaymentType, Result } from '@store-mgmt/domain';
+import type { BaseResponseModel, Order, OrderItem } from '@store-mgmt/domain';
+import { OrderType, PaymentType, Result, success } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
@@ -75,6 +75,11 @@ export class OrderOfflineService {
     return this.orders;
   }
 
+  /** 1:1 port of Angular `getOrderById` (order-offline.service.ts:67-69). */
+  getOrderById(id: string): Order | undefined {
+    return this.getStorageOrders().find((o) => o.id === id);
+  }
+
   getByDateRange(from: Date, to: Date): Order[] {
     const start = startOfDay(from);
     const end = startOfDay(addDays(to, 1));
@@ -83,12 +88,25 @@ export class OrderOfflineService {
     );
   }
 
-  getActiveOrdersInDay(date: Date): Order[] {
-    const dayStart = startOfDay(date);
-    const dayEnd = startOfDay(addDays(date, 1));
+  /**
+   * 1:1 port of Angular `getActiveOrdersInDay` (order-offline.service.ts:299-303) — IGNORES
+   * the passed `date` param and always uses today's day boundaries. The param is kept in
+   * the signature for call-site compatibility, mirroring Angular's own unused param.
+   */
+  getActiveOrdersInDay(_date: Date): Order[] {
+    const dayStart = startOfDay(new Date());
+    const dayEnd = addDays(dayStart, 1);
     return this.getStorageOrders().filter(
       (o) => o.isActive && o.date >= dayStart && o.date < dayEnd,
     );
+  }
+
+  /**
+   * 1:1 port of Angular `getActiveTodayOrdersObservable` (order-offline.service.ts:286-288).
+   * No live tsx caller yet (additive).
+   */
+  getActiveTodayOrdersObservable(): Promise<BaseResponseModel<Order[]>> {
+    return Promise.resolve(success(this.getActiveOrdersInDay(new Date())));
   }
 
   /**
@@ -110,7 +128,9 @@ export class OrderOfflineService {
    * private `getActiveOrdersBetweenDates`.
    */
   private activeOrdersBetween(start: Date, end: Date): Order[] {
-    return this.getStorageOrders().filter((o) => o.isActive && o.date >= start && o.date < end);
+    return this.getStorageOrders()
+      .filter((o) => o.isActive && o.date >= start && o.date < end)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 
   getActiveOrdersPriceBetweenDates(start: Date, end: Date): number {
@@ -202,14 +222,16 @@ export class OrderOfflineService {
     start?: Date,
     end?: Date,
   ): Order[] {
-    return this.getStorageOrders().filter(
-      (o) =>
-        o.isActive &&
-        (isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit)) &&
-        (!paymentType || paymentType === o.paymentType) &&
-        (!start || o.date >= start) &&
-        (!end || o.date < end),
-    );
+    return this.getStorageOrders()
+      .filter(
+        (o) =>
+          o.isActive &&
+          (isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit)) &&
+          (!paymentType || paymentType === o.paymentType) &&
+          (!start || o.date >= start) &&
+          (!end || o.date < end),
+      )
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 
   /**
@@ -258,6 +280,16 @@ export class OrderOfflineService {
     });
 
     return categoryItemsView;
+  }
+
+  /**
+   * 1:1 port of Angular `getCategoryCartItemsViewObservable` (order-offline.service.ts:71-74).
+   * No live tsx caller yet (additive). NOTE: wraps the WU1-current bare-array return of
+   * `getCategoryCartItemsView` — WU4 changes that method's own return type to the B-shape
+   * envelope, at which point this wrapper must unwrap `.data` instead (tracked in WU4).
+   */
+  getCategoryCartItemsViewObservable(date: Date): Promise<BaseResponseModel<CategoryCartItemsView[]>> {
+    return Promise.resolve(success(this.getCategoryCartItemsView(date)));
   }
 
   create(
@@ -350,7 +382,7 @@ export class OrderOfflineService {
   }
 
   update(id: string, paymentType: PaymentType): Order {
-    const order = this.getStorageOrders().find((o) => o.id === id);
+    const order = this.getOrderById(id);
     if (!order) throw new Error(`Order not found: ${id}`);
     order.paymentType = paymentType;
     order.updatedDate = new Date();
@@ -365,7 +397,7 @@ export class OrderOfflineService {
    * on not-found (Angular's Result-command collapses to this per design ADR-1).
    */
   activateOrder(id: string): void {
-    const order = this.getStorageOrders().find((o) => o.id === id);
+    const order = this.getOrderById(id);
     if (!order) throw new Error(`Order not found: ${id}`);
     order.isActive = true;
     order.updatedDate = new Date();
@@ -374,7 +406,7 @@ export class OrderOfflineService {
   }
 
   deactivate(id: string): void {
-    const order = this.getStorageOrders().find((o) => o.id === id);
+    const order = this.getOrderById(id);
     if (!order) throw new Error(`Order not found: ${id}`);
 
     // Step 1: Mark order inactive
@@ -435,6 +467,11 @@ export class OrderOfflineService {
     return Result.Success();
   }
 
+  /** 1:1 port of Angular `getOrdersJson` (order-offline.service.ts:416-418). */
+  getOrdersJson(): string {
+    return localStorage.getItem(this.getStorageKey()) ?? '[]';
+  }
+
   /** Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) — plain-array write. */
   private setOrdersLocalStorage(orders: Order[]): void {
     localStorage.setItem(this.getStorageKey(), JSON.stringify(orders));
@@ -454,17 +491,17 @@ export class OrderOfflineService {
   /**
    * Private port of Angular `getOrdersFromLocalStorage` (order-offline.service.ts:451-470) —
    * on empty/missing/unparsable storage, auto-initializes by writing an empty array before
-   * returning it. Revives `date`/`createdDate`/`updatedDate` to `Date` instances — SAME
-   * fields the pre-existing `BaseRepository<Order>` revived (Decision Gate: unchanged;
-   * Angular itself only revives `date` here, but closing that gap is a separate,
-   * out-of-scope fix-vs-replicate call).
+   * returning it. In the same per-order mapping pass: revives ONLY `date` to a `Date`
+   * instance (Angular revives no other field here) AND backfills `isCredit=false`/
+   * `paymentType=Efectivo` for legacy orders missing those fields (falsy-check semantics,
+   * mirroring Angular's `!order.isCredit`/`!order.paymentType`, not an is-undefined check).
    */
   private getOrdersFromLocalStorage(): Order[] {
     try {
       const ordersJson = localStorage.getItem(this.getStorageKey());
       if (ordersJson) {
         const orders = JSON.parse(ordersJson) as Order[];
-        return orders.map((order) => this.reviveOrderDates(order));
+        return orders.map((order) => this.reviveAndBackfillOrder(order));
       }
     } catch {
       // ignore — fall through to auto-init
@@ -473,12 +510,11 @@ export class OrderOfflineService {
     return [];
   }
 
-  private reviveOrderDates(order: Order): Order {
+  private reviveAndBackfillOrder(order: Order): Order {
     const revived = { ...order } as Record<string, unknown>;
-    for (const field of ['date', 'createdDate', 'updatedDate']) {
-      const value = revived[field];
-      if (typeof value === 'string') revived[field] = new Date(value);
-    }
+    if (typeof revived.date === 'string') revived.date = new Date(revived.date);
+    if (!revived.isCredit) revived.isCredit = false;
+    if (!revived.paymentType) revived.paymentType = PaymentType.Efectivo;
     return revived as unknown as Order;
   }
 }
