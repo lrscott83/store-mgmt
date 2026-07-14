@@ -26,7 +26,11 @@ visual/token change, spot-check instead of new test.
   React domain [TDD]. RESULT: zero gaps found, no fix needed — full matrix in apply-progress.
 - [x] 0.2 L2 Services: 0.2.1 enumerate Angular application/* methods + _services/* cross-cutting
   (connection, download-manager, update, usage-tracker, shopping-cart) - list only, full audit
-  deferred to Stage 6; 0.2.2 confirm service-factory.ts offline routing when USE_ONLINE_SERVICE=false;
+  deferred to Stage 6; 0.2.2 confirm offline routing when USE_ONLINE_SERVICE=false — the LIVE
+  routing is the per-entity factories createProductService/createProductCategoryService
+  (product-service.factory.ts / product-category-service.factory.ts), mirroring Angular's per-entity
+  factories. NOTE (2026-07-14): the generic service-factory.ts originally cited here was a dead R12
+  invention (no Angular correlate, zero call-sites) and was DELETED during Judgment Day;
   0.2.3 map each Angular method -> React *-offline-service.ts, build method-gap matrix per module.
   RESULT: offline-service counterparts confirmed present for all core entities; PWA cross-cutting
   method-level mapping deferred to Stage 6 as designed.
