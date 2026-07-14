@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PaymentType, OrderType } from '@store-mgmt/domain';
+import { EModules, OrderErrors, PaymentType, OrderType } from '@store-mgmt/domain';
 import type { Order, Product, InventoryEntryCost, OrderItem, UserModel } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -151,6 +151,26 @@ function seedOrders(storeId: string, orders: Order[]): void {
   localStorage.setItem(`lizoft.store-orders-${storeId}`, JSON.stringify(orders));
 }
 
+// WU2 (order-offline-service-parity): createOrder is now async (C-shape) and its
+// inventory-module gate is sourced internally from useAuthStore — no caller-supplied
+// override. This helper preserves the pre-WU2 positional test-call shape (cartItems,
+// paymentType, isCredit, clientName, orderType?, details?) for the many call-sites that
+// only use createOrder() as setup scaffolding, not to test its own signature/shape
+// (those live in ORD-01/ORD-02/ORD-09/ORD-18, which call `service.createOrder(...)`
+// directly in Angular's own param order and assert on the returned envelope).
+async function createTestOrder(
+  svc: OrderOfflineService,
+  cartItems: CartItem[],
+  paymentType: PaymentType,
+  isCredit: boolean,
+  clientName: string,
+  orderType: OrderType = OrderType.Normal,
+  details?: string,
+): Promise<Order> {
+  const result = await svc.createOrder(cartItems, orderType, isCredit, paymentType, details, clientName);
+  return result.data as Order;
+}
+
 describe('OrderOfflineService', () => {
   let service: OrderOfflineService;
   const storeId = 's1';
@@ -168,229 +188,298 @@ describe('OrderOfflineService', () => {
     return service.getStorageOrders().find((o) => o.id === id);
   }
 
-  describe('ORD-01: create builds correct orderItems (FIFO mock)', () => {
-    it('creates an order with correct total', () => {
+  describe('ORD-01: createOrder builds correct orderItems (FIFO mock)', () => {
+    it('creates an order with correct total', async () => {
       const items = makeCartItems([
         { product: makeProduct({ price: 5 }), quantity: 2 },
         { product: makeProduct({ id: 'p2', name: 'Fanta', price: 3 }), quantity: 1 },
       ]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.total).toBe(13); // 5*2 + 3*1
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.succeeded).toBe(true);
+      expect(result.data?.total).toBe(13); // 5*2 + 3*1
     });
 
-    it('creates an order with correct itemsCount', () => {
+    it('creates an order with correct itemsCount', async () => {
       const items = makeCartItems([
         { product: makeProduct({ price: 5 }), quantity: 2 },
         { product: makeProduct({ id: 'p2', name: 'Fanta', price: 3 }), quantity: 3 },
       ]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.itemsCount).toBe(5); // 2 + 3
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.itemsCount).toBe(5); // 2 + 3
     });
 
-    it('creates an order with type=Normal', () => {
+    it('creates an order with type=Normal', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.type).toBe(OrderType.Normal);
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.type).toBe(OrderType.Normal);
     });
 
-    it('creates an order with a unique id', () => {
+    it('creates an order with a unique id', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const o1 = service.create(items, PaymentType.Efectivo, false, '');
-      const o2 = service.create(items, PaymentType.Efectivo, false, '');
-      expect(o1.id).not.toBe(o2.id);
+      const r1 = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      const r2 = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(r1.data?.id).not.toBe(r2.data?.id);
     });
 
-    it('persists the order to localStorage', () => {
+    it('persists the order to localStorage', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
       const raw = localStorage.getItem('lizoft.store-orders-s1');
       expect(raw).not.toBeNull();
     });
 
-    it('sets isActive=true on the new order', () => {
+    it('sets isActive=true on the new order', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.isActive).toBe(true);
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.isActive).toBe(true);
     });
 
-    // Angular parity (audit-user-threading): create stamps createdByName from the
+    // Angular parity (audit-user-threading): createOrder stamps createdByName from the
     // authenticated user's login and MUST NOT touch updatedByName/updatedDate.
-    it('stamps createdByName with the authenticated user login', () => {
+    it('stamps createdByName with the authenticated user login', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.createdByName).toBe('jdoe');
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.createdByName).toBe('jdoe');
     });
 
-    it('leaves updatedByName/updatedDate undefined on create', () => {
+    it('leaves updatedByName/updatedDate undefined on create', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.updatedByName).toBeUndefined();
-      expect(order.updatedDate).toBeUndefined();
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.updatedByName).toBeUndefined();
+      expect(result.data?.updatedDate).toBeUndefined();
     });
 
-    it('builds orderItems with correct product info', () => {
+    it('builds orderItems with correct product info', async () => {
       const product = makeProduct({ id: 'p1', name: 'Cola', categoryId: 'cat1', categoryName: 'Drinks', price: 4 });
       const items = makeCartItems([{ product, quantity: 2 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      const oi = order.orderItems[0];
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      const oi = result.data!.orderItems[0];
       expect(oi.productId).toBe('p1');
       expect(oi.productName).toBe('Cola');
       expect(oi.quantity).toBe(2);
       expect(oi.price).toBe(4);
     });
 
-    it('calls getAvailableInventoryCosts when discountFromInvantory=true', () => {
+    // WU2 (order-offline-service-parity): the inventory-module gate is now sourced
+    // internally from useAuthStore (no caller-supplied hasInventoryModule flag) — the
+    // default test user (beforeEach) has storeModuleIds:[] (no Inventory module), so
+    // tests that need deduction to fire must opt IN by setting EModules.Inventory.
+    it('calls getAvailableInventoryCosts when discountFromInvantory=true and the user has the inventory module', async () => {
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe', storeModuleIds: [EModules.Inventory] }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const product = makeProduct({ discountFromInvantory: true });
       const items = makeCartItems([{ product, quantity: 2 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
-      // hasInventoryModule defaults to true when create()'s 6th param is omitted.
+      await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
       expect(inventoryMock.getAvailableInventoryCosts).toHaveBeenCalledWith('p1', 2, {
         product,
         hasInventoryModule: true,
       });
     });
 
-    it('does NOT call getAvailableInventoryCosts when discountFromInvantory=false', () => {
+    it('does NOT call getAvailableInventoryCosts when discountFromInvantory=false', async () => {
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const product = makeProduct({ discountFromInvantory: false });
       const items = makeCartItems([{ product, quantity: 2 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
       expect(inventoryMock.getAvailableInventoryCosts).not.toHaveBeenCalled();
     });
 
     // Real behavior fix (L4 map diff-matrix #6 / prioritized-list item #7): Angular's
     // createOrderItems gates FIFO deduction on `product.discountFromInvantory &&
-    // hasInventoryModuleAvailable()` (order-offline.service.ts:360). Previously create() only
-    // checked discountFromInvantory, so a product left with discountFromInvantory=true after
-    // the store's inventory module was disabled would still silently deduct inventory.
-    it('does NOT call getAvailableInventoryCosts when discountFromInvantory=true but the inventory module is disabled', () => {
+    // hasInventoryModuleAvailable()` (order-offline.service.ts:360). The default test user
+    // (beforeEach) has no inventory module, so deduction must NOT fire.
+    it('does NOT call getAvailableInventoryCosts when discountFromInvantory=true but the inventory module is disabled', async () => {
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const product = makeProduct({ discountFromInvantory: true });
       const items = makeCartItems([{ product, quantity: 2 }]);
-      service.create(items, PaymentType.Efectivo, false, '', OrderType.Normal, false);
+      await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
       expect(inventoryMock.getAvailableInventoryCosts).not.toHaveBeenCalled();
     });
 
-    it('leaves productCosts empty when discountFromInvantory=true but the inventory module is disabled', () => {
+    // WU2 module-gate test (design Testing Strategy): no authenticated user at all ->
+    // the internal gate must also resolve to false (mirrors `user ? hasInventoryModuleAvailable(user) : false`).
+    it('does NOT call getAvailableInventoryCosts when there is no authenticated user at all', async () => {
+      useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const product = makeProduct({ discountFromInvantory: true });
       const items = makeCartItems([{ product, quantity: 2 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Normal, false);
-      expect(order.orderItems[0].productCosts).toEqual([]);
+      await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(inventoryMock.getAvailableInventoryCosts).not.toHaveBeenCalled();
     });
 
-    it('sets productCosts from getAvailableInventoryCosts when discountFromInvantory=true', () => {
+    it('leaves productCosts empty when discountFromInvantory=true but the inventory module is disabled', async () => {
+      const product = makeProduct({ discountFromInvantory: true });
+      const items = makeCartItems([{ product, quantity: 2 }]);
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.orderItems[0].productCosts).toEqual([]);
+    });
+
+    it('sets productCosts from getAvailableInventoryCosts when discountFromInvantory=true', async () => {
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe', storeModuleIds: [EModules.Inventory] }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       const fakeCosts: InventoryEntryCost[] = [{ id: 'e1', costPrice: 2.5, quantity: 2 }];
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       inventoryMock.getAvailableInventoryCosts.mockReturnValue(fakeCosts);
 
       const product = makeProduct({ discountFromInvantory: true });
       const items = makeCartItems([{ product, quantity: 2 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.orderItems[0].productCosts).toEqual(fakeCosts);
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.orderItems[0].productCosts).toEqual(fakeCosts);
     });
   });
 
-  describe('ORD-02: create with isCredit=true calls SaleCreditOfflineService.createSaleCredit', () => {
-    it('calls createSaleCredit when isCredit=true', () => {
+  describe('ORD-02: createOrder with isCredit=true calls SaleCreditOfflineService.createSaleCredit', () => {
+    it('calls createSaleCredit when isCredit=true', async () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct({ price: 10 }), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, true, 'Juan Perez');
+      await service.createOrder(items, OrderType.Normal, true, PaymentType.Efectivo, undefined, 'Juan Perez');
       expect(creditMock.createSaleCredit).toHaveBeenCalledOnce();
     });
 
-    it('passes the clientName to createSaleCredit', () => {
+    it('passes the clientName to createSaleCredit', async () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct({ price: 10 }), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, true, 'Maria Lopez');
+      await service.createOrder(items, OrderType.Normal, true, PaymentType.Efectivo, undefined, 'Maria Lopez');
       const callArgs = creditMock.createSaleCredit.mock.calls[0];
       expect(callArgs[1]).toBe('Maria Lopez');
     });
 
-    it('passes the order total to createSaleCredit', () => {
+    it('passes the order total to createSaleCredit', async () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct({ price: 15 }), quantity: 2 }]);
-      service.create(items, PaymentType.Efectivo, true, 'Carlos');
+      await service.createOrder(items, OrderType.Normal, true, PaymentType.Efectivo, undefined, 'Carlos');
       const callArgs = creditMock.createSaleCredit.mock.calls[0];
       expect(callArgs[2]).toBe(30); // 15 * 2
     });
 
-    it('sets isCredit=true and description on the order', () => {
+    it('sets isCredit=true and description on the order', async () => {
       const items = makeCartItems([{ product: makeProduct({ price: 10 }), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, true, 'Pedro');
-      expect(order.isCredit).toBe(true);
-      expect(order.description).toBe('Pedro');
+      const result = await service.createOrder(items, OrderType.Normal, true, PaymentType.Efectivo, undefined, 'Pedro');
+      expect(result.data?.isCredit).toBe(true);
+      expect(result.data?.description).toBe('Pedro');
     });
 
-    it('does NOT call createSaleCredit when isCredit=false', () => {
+    it('does NOT call createSaleCredit when isCredit=false', async () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
       expect(creditMock.createSaleCredit).not.toHaveBeenCalled();
     });
   });
 
-  describe('ORD-03: deactivate restores inventory', () => {
-    it('calls increaseQuantitiesByOrderItems on deactivation', () => {
+  describe('ORD-03: deactivateOrder restores inventory (D-shape Result)', () => {
+    it('calls increaseQuantitiesByOrderItems on deactivation', async () => {
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.deactivate(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
       expect(inventoryMock.increaseQuantitiesByOrderItems).toHaveBeenCalledOnce();
     });
 
-    it('passes the order items to increaseQuantitiesByOrderItems', () => {
+    it('passes the order items to increaseQuantitiesByOrderItems', async () => {
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.deactivate(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
       const passedItems = inventoryMock.increaseQuantitiesByOrderItems.mock.calls[0][0];
       expect(passedItems).toEqual(order.orderItems);
     });
+
+    // Cascade-guard (gate c): failure BEFORE restock.
+    it('returns Result.Failure and does NOT restock when deactivateSaleCreditByOrderId fails', async () => {
+      const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
+      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, true, 'Ana');
+      creditMock.deactivateSaleCreditByOrderId.mockReturnValueOnce({ succeeded: false, errors: [] });
+      const result = service.deactivateOrder(order.id);
+      expect(result.succeeded).toBe(false);
+      expect(inventoryMock.increaseQuantitiesByOrderItems).not.toHaveBeenCalled();
+    });
+
+    it('returns the restock call Result (not a blanket Success()) when the cascade succeeds', async () => {
+      const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
+      inventoryMock.increaseQuantitiesByOrderItems.mockReturnValueOnce({ succeeded: true, errors: [] });
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      const result = service.deactivateOrder(order.id);
+      expect(result.succeeded).toBe(true);
+      expect(inventoryMock.increaseQuantitiesByOrderItems).toHaveBeenCalledOnce();
+    });
   });
 
-  describe('ORD-04: deactivate voids associated credit', () => {
-    it('calls deactivateSaleCreditByOrderId when order is a credit order', () => {
+  describe('ORD-04: deactivateOrder voids associated credit (unconditional cascade, Angular parity)', () => {
+    it('calls deactivateSaleCreditByOrderId when order is a credit order', async () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
-      service.deactivate(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, true, 'Ana');
+      service.deactivateOrder(order.id);
       expect(creditMock.deactivateSaleCreditByOrderId).toHaveBeenCalledWith(order.id);
     });
 
-    it('sets order.isActive=false after deactivation', () => {
+    // Angular parity (order-offline.service.ts:322-324): NO `if (order.isCredit)` guard —
+    // the credit-void call happens for every order, credit or not (no-op success when the
+    // order has no credit, per deactivateSaleCreditByOrderId's own contract).
+    it('calls deactivateSaleCreditByOrderId UNCONDITIONALLY, even for a non-credit order', async () => {
+      const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.deactivate(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
+      expect(creditMock.deactivateSaleCreditByOrderId).toHaveBeenCalledWith(order.id);
+    });
+
+    it('sets order.isActive=false after deactivation', async () => {
+      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
       const found = findOrder(order.id);
       expect(found?.isActive).toBe(false);
     });
 
-    // Angular parity (audit-user-threading): deactivate stamps updatedByName from the
+    // Angular parity (audit-user-threading): deactivateOrder stamps updatedByName from the
     // authenticated user's login — the nested creditService.deactivateSaleCreditByOrderId call stamps
     // ITS OWN SaleCredit entity separately (mocked here, verified in the SaleCredit suite).
-    it('stamps updatedByName with the authenticated user login', () => {
+    it('stamps updatedByName with the authenticated user login', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.deactivate(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
       const found = findOrder(order.id);
       expect(found?.updatedByName).toBe('jdoe');
     });
   });
 
-  describe('ORD-10: update stamps updatedByName', () => {
-    it('stamps updatedByName with the authenticated user login', () => {
+  describe('ORD-10: updateTodayOrder stamps updatedByName (D-shape DataResult, never throws)', () => {
+    it('stamps updatedByName with the authenticated user login', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      const updated = service.update(order.id, PaymentType.Tarjeta);
-      expect(updated.updatedByName).toBe('jdoe');
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      const result = service.updateTodayOrder(order.id, PaymentType.Tarjeta);
+      expect(result.succeeded).toBe(true);
+      expect(result.data?.paymentType).toBe(PaymentType.Tarjeta);
+      expect(result.data?.updatedByName).toBe('jdoe');
+    });
+
+    it('returns DataResult failure with OrderErrors.NotExists for an unknown id, does not throw', () => {
+      expect(() => service.updateTodayOrder('missing', PaymentType.Tarjeta)).not.toThrow();
+      const result = service.updateTodayOrder('missing', PaymentType.Tarjeta);
+      expect(result.succeeded).toBe(false);
+      expect(result.data).toBeUndefined();
+      expect(result.errors).toEqual([OrderErrors.NotExists]);
     });
   });
 
   describe('ORD-05: getByDateRange filters correctly', () => {
-    it('returns orders within the date range', () => {
+    it('returns orders within the date range', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const from = new Date();
       from.setHours(0, 0, 0, 0);
       const to = new Date();
@@ -399,9 +488,9 @@ describe('OrderOfflineService', () => {
       expect(results.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('excludes orders outside the date range', () => {
+    it('excludes orders outside the date range', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       yesterday.setHours(0, 0, 0, 0);
@@ -411,10 +500,10 @@ describe('OrderOfflineService', () => {
       expect(results).toHaveLength(0);
     });
 
-    it('only returns active orders', () => {
+    it('only returns active orders', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.deactivate(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
       const from = new Date();
       from.setHours(0, 0, 0, 0);
       const to = new Date();
@@ -428,9 +517,9 @@ describe('OrderOfflineService', () => {
   // `date` param and always uses today's day boundaries — the param is kept in the
   // signature for call-site compatibility, mirroring Angular's own unused param.
   describe('ORD-06: getActiveOrdersInDay ignores its date parameter', () => {
-    it('returns today orders when called with today', () => {
+    it('returns today orders when called with today', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const todayOrders = service.getActiveOrdersInDay(new Date());
       expect(todayOrders.length).toBeGreaterThanOrEqual(1);
     });
@@ -448,9 +537,9 @@ describe('OrderOfflineService', () => {
   });
 
   describe('ORD-2x: getOrderById', () => {
-    it('returns the matching order', () => {
+    it('returns the matching order', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       expect(service.getOrderById(order.id)).toEqual(order);
     });
 
@@ -463,7 +552,7 @@ describe('OrderOfflineService', () => {
   describe('ORD-2x: getActiveTodayOrdersObservable', () => {
     it('resolves succeeded:true with .data = today active orders', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const result = await service.getActiveTodayOrdersObservable();
       expect(result.succeeded).toBe(true);
       expect(result.data.map((o) => o.id)).toEqual([order.id]);
@@ -476,8 +565,9 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  // Angular parity (order-offline.service.ts:71-74): additive, wraps the WU1-current bare
-  // return of getCategoryCartItemsView (B-shape envelope lands in WU4).
+  // Angular parity (order-offline.service.ts:71-74): additive. WU4: getCategoryCartItemsView
+  // wraps the current bare-array return of getCategoryCartItemsView (B-shape envelope
+  // lands in WU4).
   describe('ORD-2x: getCategoryCartItemsViewObservable', () => {
     beforeEach(() => {
       mockCategoryGetAll.mockReturnValue([]);
@@ -487,7 +577,7 @@ describe('OrderOfflineService', () => {
       const items = makeCartItems([
         { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },
       ]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
 
       const date = new Date();
       const syncResult = service.getCategoryCartItemsView(date);
@@ -499,9 +589,9 @@ describe('OrderOfflineService', () => {
   });
 
   describe('ORD-2x: getOrdersJson', () => {
-    it('returns the exact stored JSON string for the current store', () => {
+    it('returns the exact stored JSON string for the current store', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const raw = localStorage.getItem('lizoft.store-orders-s1');
       expect(service.getOrdersJson()).toBe(raw);
     });
@@ -521,9 +611,9 @@ describe('OrderOfflineService', () => {
   });
 
   describe('ORD-07: storage key format', () => {
-    it('uses lizoft.store-orders-{storeId} as key', () => {
+    it('uses lizoft.store-orders-{storeId} as key', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const raw = localStorage.getItem('lizoft.store-orders-s1');
       expect(raw).not.toBeNull();
     });
@@ -539,9 +629,9 @@ describe('OrderOfflineService', () => {
     // call history; the `getItem` spy below is left as a pass-through spy (calls the real
     // implementation), so no explicit restore is needed.
 
-    it('persists orders on-disk as a PLAIN array of order objects, never [id, order] Map-entries pairs', () => {
+    it('persists orders on-disk as a PLAIN array of order objects, never [id, order] Map-entries pairs', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
 
       const raw = localStorage.getItem('lizoft.store-orders-s1');
       const parsed = JSON.parse(raw!);
@@ -639,15 +729,15 @@ describe('OrderOfflineService', () => {
       expect(service.getCategoryCartItemsView(new Date())).toEqual([]);
     });
 
-    it('groups order items by categoryId, aggregating total/itemsCount across orders', () => {
+    it('groups order items by categoryId, aggregating total/itemsCount across orders', async () => {
       const items1 = makeCartItems([
         { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },
       ]);
       const items2 = makeCartItems([
         { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 3 },
       ]);
-      service.create(items1, PaymentType.Efectivo, false, '');
-      service.create(items2, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items1, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items2, PaymentType.Efectivo, false, '');
 
       const result = service.getCategoryCartItemsView(new Date());
       expect(result).toHaveLength(1);
@@ -657,12 +747,12 @@ describe('OrderOfflineService', () => {
       expect(result[0].itemsCount).toBe(5); // 2 + 3
     });
 
-    it('further groups by productId within each category, with per-product total/itemsCount', () => {
+    it('further groups by productId within each category, with per-product total/itemsCount', async () => {
       const items = makeCartItems([
         { product: makeProduct({ id: 'p1', name: 'Cola', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },
         { product: makeProduct({ id: 'p2', name: 'Fanta', categoryId: 'cat1', categoryName: 'Bebidas', price: 3 }), quantity: 1 },
       ]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
 
       const result = service.getCategoryCartItemsView(new Date());
       expect(result[0].productItems).toHaveLength(2);
@@ -674,79 +764,87 @@ describe('OrderOfflineService', () => {
       expect(fanta?.itemsCount).toBe(1);
     });
 
-    it("resolves each category's order field from ProductCategoryOfflineService", () => {
+    it("resolves each category's order field from ProductCategoryOfflineService", async () => {
       const items = makeCartItems([
         { product: makeProduct({ id: 'p1', categoryId: 'cat2', categoryName: 'Snacks', price: 2 }), quantity: 1 },
       ]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const result = service.getCategoryCartItemsView(new Date());
       expect(result[0].order).toBe(1); // cat2's order from the mocked category list
     });
 
-    it('falls back to Number.MAX_VALUE when the category is not found in storage', () => {
+    it('falls back to Number.MAX_VALUE when the category is not found in storage', async () => {
       const items = makeCartItems([
         { product: makeProduct({ id: 'p1', categoryId: 'unknown-cat', categoryName: 'Ghost', price: 2 }), quantity: 1 },
       ]);
-      service.create(items, PaymentType.Efectivo, false, '');
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const result = service.getCategoryCartItemsView(new Date());
       expect(result[0].order).toBe(Number.MAX_VALUE);
     });
 
-    it('excludes inactive (deactivated) orders', () => {
+    it('excludes inactive (deactivated) orders', async () => {
       const items = makeCartItems([
         { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 1 },
       ]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.deactivate(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
       expect(service.getCategoryCartItemsView(new Date())).toEqual([]);
     });
   });
 
-  // Egress/Mayorista realignment: create() gains a 5th orderType param, Normal-preserving by
-  // default. Per-item custom price (CartItem.price) flows into orderItem.price/order.total,
-  // and FIFO inventory deduction (getAvailableInventoryCosts) still runs identically for a
+  // Egress/Mayorista realignment: createOrder's `type` param is now REQUIRED (Angular
+  // parity — no default), so the old "defaults to Normal when omitted" scenario is
+  // inherently obsolete; rewritten to assert explicit Normal passthrough instead.
+  // Per-item custom price (CartItem.price) flows into orderItem.price/order.total, and
+  // FIFO inventory deduction (getAvailableInventoryCosts) still runs identically for a
   // Mayorista sale, since the discountFromInvantory branch is unrelated to orderType.
-  describe('ORD-09: create with orderType=Mayorista + custom per-item price', () => {
-    it('defaults order.type to Normal when orderType is not passed (Normal-preserving)', () => {
+  describe('ORD-09: createOrder with type=Mayorista + custom per-item price', () => {
+    it('persists order.type=Normal when passed explicitly', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.type).toBe(OrderType.Normal);
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.type).toBe(OrderType.Normal);
     });
 
-    it('persists order.type=Mayorista when passed', () => {
+    it('persists order.type=Mayorista when passed', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
-      expect(order.type).toBe(OrderType.Mayorista);
+      const result = await service.createOrder(items, OrderType.Mayorista, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.type).toBe(OrderType.Mayorista);
     });
 
-    it('uses the cart item custom price (not product.price) for orderItem.price when set', () => {
+    it('uses the cart item custom price (not product.price) for orderItem.price when set', async () => {
       const items = makeCartItems([
         { product: makeProduct({ price: 5 }), quantity: 2, price: 8 },
       ]);
-      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
-      expect(order.orderItems[0].price).toBe(8);
+      const result = await service.createOrder(items, OrderType.Mayorista, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.orderItems[0].price).toBe(8);
     });
 
-    it('uses the custom price (not product.price) for order.total when set', () => {
+    it('uses the custom price (not product.price) for order.total when set', async () => {
       const items = makeCartItems([
         { product: makeProduct({ price: 5 }), quantity: 2, price: 8 },
       ]);
-      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
-      expect(order.total).toBe(16); // 8 * 2, NOT 5 * 2
+      const result = await service.createOrder(items, OrderType.Mayorista, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.total).toBe(16); // 8 * 2, NOT 5 * 2
     });
 
-    it('falls back to product.price when the cart item has no custom price, even for Mayorista', () => {
+    it('falls back to product.price when the cart item has no custom price, even for Mayorista', async () => {
       const items = makeCartItems([{ product: makeProduct({ price: 5 }), quantity: 2 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
-      expect(order.orderItems[0].price).toBe(5);
-      expect(order.total).toBe(10);
+      const result = await service.createOrder(items, OrderType.Mayorista, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.orderItems[0].price).toBe(5);
+      expect(result.data?.total).toBe(10);
     });
 
-    it('still runs FIFO inventory deduction (getAvailableInventoryCosts) for a Mayorista sale', () => {
+    it('still runs FIFO inventory deduction (getAvailableInventoryCosts) for a Mayorista sale', async () => {
+      useAuthStore.setState({
+        user: makeUser({ login: 'jdoe', storeModuleIds: [EModules.Inventory] }),
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const product = makeProduct({ discountFromInvantory: true });
       const items = makeCartItems([{ product, quantity: 2, price: 9 }]);
-      service.create(items, PaymentType.Efectivo, false, '', OrderType.Mayorista);
+      await service.createOrder(items, OrderType.Mayorista, false, PaymentType.Efectivo, undefined, '');
       expect(inventoryMock.getAvailableInventoryCosts).toHaveBeenCalledWith('p1', 2, {
         product,
         hasInventoryModule: true,
@@ -760,33 +858,37 @@ describe('OrderOfflineService', () => {
   // restore) rather than inventing new partial-delete semantics.
   // WU2 (offline-online-service-parity, Slice 1): activateOrder is flag-only
   // (Angular's updateOrderActive(id, true)) — no credit/inventory cascade, unlike deactivate.
-  describe('ORD-12: activateOrder — flag-only, no cascade', () => {
-    it('sets isActive=true', () => {
+  describe('ORD-12: activateOrder — flag-only, no cascade (D-shape Result, never throws)', () => {
+    it('sets isActive=true', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      service.deactivate(order.id);
-      service.activateOrder(order.id);
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+      service.deactivateOrder(order.id);
+      const result = service.activateOrder(order.id);
+      expect(result.succeeded).toBe(true);
       expect(findOrder(order.id)?.isActive).toBe(true);
     });
 
-    it('throws for a missing id', () => {
-      expect(() => service.activateOrder('missing')).toThrow();
+    it('returns Result.Failure([OrderErrors.NotExists]) for a missing id, does not throw', () => {
+      expect(() => service.activateOrder('missing')).not.toThrow();
+      const result = service.activateOrder('missing');
+      expect(result.succeeded).toBe(false);
+      expect(result.errors).toEqual([OrderErrors.NotExists]);
     });
 
-    it('does NOT cascade to credit/inventory (unlike deactivate)', () => {
+    it('does NOT cascade to credit/inventory (unlike deactivateOrder)', async () => {
       const creditMock = vi.mocked(SaleCreditOfflineService).mock.results[0]?.value;
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, true, 'Ana');
       vi.clearAllMocks();
       service.activateOrder(order.id);
       expect(creditMock.deactivateSaleCreditByOrderId).not.toHaveBeenCalled();
       expect(inventoryMock.increaseQuantitiesByOrderItems).not.toHaveBeenCalled();
     });
 
-    it('stamps updatedByName with the authenticated user login', () => {
+    it('stamps updatedByName with the authenticated user login', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
+      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       service.activateOrder(order.id);
       expect(findOrder(order.id)?.updatedByName).toBe('jdoe');
     });
@@ -1097,37 +1199,36 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  describe('ORD-18: create optional details param (description = details || (isCredit ? clientName : \'\'))', () => {
-    it('uses details as description when provided (credit order)', () => {
+  describe('ORD-18: createOrder optional details param (description = details || (isCredit ? client : \'\'))', () => {
+    it('uses details as description when provided (credit order)', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, true, 'Ana', OrderType.Normal, true, 'Special note');
-      expect(order.description).toBe('Special note');
+      const result = await service.createOrder(items, OrderType.Normal, true, PaymentType.Efectivo, 'Special note', 'Ana');
+      expect(result.data?.description).toBe('Special note');
     });
 
-    it('falls back to clientName when details is not provided and isCredit=true', () => {
+    it('falls back to clientName when details is not provided and isCredit=true', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, true, 'Ana');
-      expect(order.description).toBe('Ana');
+      const result = await service.createOrder(items, OrderType.Normal, true, PaymentType.Efectivo, undefined, 'Ana');
+      expect(result.data?.description).toBe('Ana');
     });
 
-    it('falls back to empty string when details is not provided and isCredit=false', () => {
+    it('falls back to empty string when details is not provided and isCredit=false', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(items, PaymentType.Efectivo, false, '');
-      expect(order.description).toBe('');
+      const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
+      expect(result.data?.description).toBe('');
     });
 
-    it('uses details even when isCredit=false', () => {
+    it('uses details even when isCredit=false', async () => {
       const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = service.create(
+      const result = await service.createOrder(
         items,
-        PaymentType.Efectivo,
-        false,
-        '',
         OrderType.Normal,
-        true,
+        false,
+        PaymentType.Efectivo,
         'Merma note',
+        '',
       );
-      expect(order.description).toBe('Merma note');
+      expect(result.data?.description).toBe('Merma note');
     });
   });
 

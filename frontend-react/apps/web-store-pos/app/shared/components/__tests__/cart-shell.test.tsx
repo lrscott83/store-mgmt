@@ -11,7 +11,13 @@ vi.mock('~/shared/lib/stores/cart-store', () => ({
 // Mock OrderOfflineService
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
-    create: vi.fn().mockReturnValue({ id: 'order-1' }),
+    createOrder: vi.fn().mockResolvedValue({
+      data: { id: 'order-1' },
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    }),
   })),
 }));
 

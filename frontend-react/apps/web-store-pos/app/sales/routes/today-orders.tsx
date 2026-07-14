@@ -48,30 +48,22 @@ export function TodayOrdersPage() {
   }, [storeId, paymentType, isCredit]);
 
   // Angular's OrderOfflineService.updateTodayOrder/deactivateOrder return a Result/DataResult
-  // that can report `succeeded: false`; React's offline-service ports only fail via a
-  // not-found exception (see order-offline-service.ts). try/catch here is the faithful
-  // translation of that failure signal for the Swal error dialogs in EditOrderModal/
-  // OrderItemList.
+  // that reports `succeeded: false` on not-found rather than throwing — mirrored here via a
+  // `.succeeded` check for the Swal error dialogs in EditOrderModal/OrderItemList.
   function handleUpdate(orderId: string, newPaymentType: PaymentType): boolean {
-    try {
-      const service = new OrderOfflineService(storeId);
-      service.update(orderId, newPaymentType);
-      loadTodayOrders();
-      return true;
-    } catch {
-      return false;
-    }
+    const service = new OrderOfflineService(storeId);
+    const result = service.updateTodayOrder(orderId, newPaymentType);
+    if (!result.succeeded) return false;
+    loadTodayOrders();
+    return true;
   }
 
   function handleDeactivate(order: Order): boolean {
-    try {
-      const service = new OrderOfflineService(storeId);
-      service.deactivate(order.id);
-      loadTodayOrders();
-      return true;
-    } catch {
-      return false;
-    }
+    const service = new OrderOfflineService(storeId);
+    const result = service.deactivateOrder(order.id);
+    if (!result.succeeded) return false;
+    loadTodayOrders();
+    return true;
   }
 
   const ordersItemsCount = orders.reduce((count, o) => count + o.itemsCount, 0);

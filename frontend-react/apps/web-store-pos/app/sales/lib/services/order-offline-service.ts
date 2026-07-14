@@ -1,5 +1,5 @@
 import type { BaseResponseModel, Order, OrderItem } from '@store-mgmt/domain';
-import { OrderType, PaymentType, Result, success } from '@store-mgmt/domain';
+import { DataResult, OrderErrors, OrderType, PaymentType, Result, success } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
@@ -9,6 +9,8 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import type { CategoryCartItemsView, ProductCartItemsView } from '../category-cart-items-view';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 
 /**
@@ -49,8 +51,8 @@ function generateId(): string {
  * class has no Angular correlate, playbook rule 12). Per-instance cache
  * (`orders`/`lastOrdersKey`), reloaded only when empty or the store key changes, auto-init
  * on empty read, PLAIN-ARRAY wire format — 1:1 port of `order-offline.service.ts:400-451`.
- * Revival fields (`date`/`createdDate`/`updatedDate`) are UNCHANGED from current React
- * behavior (Decision Gate — pending fix-vs-replicate call, NOT resolved here).
+ * Revival on read is `date`-only (`reviveAndBackfillOrder`); `createdDate`/`updatedDate`
+ * are left as raw strings, matching Angular exactly.
  */
 export class OrderOfflineService {
   private readonly creditService: SaleCreditOfflineService;
@@ -286,7 +288,7 @@ export class OrderOfflineService {
 
   /**
    * 1:1 port of Angular `getCategoryCartItemsViewObservable` (order-offline.service.ts:71-74).
-   * No live tsx caller yet (additive). NOTE: wraps the WU1-current bare-array return of
+   * No live tsx caller yet (additive). NOTE: wraps the current bare-array return of
    * `getCategoryCartItemsView` — WU4 changes that method's own return type to the B-shape
    * envelope, at which point this wrapper must unwrap `.data` instead (tracked in WU4).
    */
@@ -294,22 +296,32 @@ export class OrderOfflineService {
     return Promise.resolve(success(this.getCategoryCartItemsView(date)));
   }
 
-  create(
+  /**
+   * 1:1 port of Angular `createOrder` (order-offline.service.ts:42-65), C-shape (async,
+   * envelope, never rejects). Param order matches Angular exactly: `(cartItems, type,
+   * isCredit, paymentType, details, client)`. The invented `hasInventoryModule` param is
+   * REMOVED — the inventory-deduction gate is now sourced internally via
+   * `useAuthStore.getState().user` + `hasInventoryModuleAvailable(user)`, mirroring
+   * Angular's injected `AuthorizationService.hasInventoryModuleAvailable()`
+   * (order-offline.service.ts:360). `details`/`client` keep a light TS-only optionality
+   * (`details?`, `client = ''`) so the pre-existing details-fallback description logic
+   * (`details || (isCredit ? client : '')`) — itself unchanged by this rename — still
+   * compiles positionally; every value ever supplied at these positions is identical to
+   * what Angular's own callers always pass.
+   */
+  createOrder(
     cartItems: CartItem[],
-    paymentType: PaymentType,
+    type: OrderType,
     isCredit: boolean,
-    clientName: string,
-    orderType: OrderType = OrderType.Normal,
-    // Defaults to true so the many pre-existing tests that don't exercise the
-    // module-disabled path are unaffected; the one real caller (CartShell.handleCreateOrder)
-    // always passes the actual authorizationService.hasInventoryModuleAvailable() value.
-    hasInventoryModule: boolean = true,
-    // Angular parity: createOrder's `details` param. Takes priority over the isCredit/
-    // clientName fallback when provided; existing callers that omit it are unaffected.
+    paymentType: PaymentType,
     details?: string,
-  ): Order {
+    client: string = '',
+  ): Promise<BaseResponseModel<Order>> {
     const now = new Date();
     const orderId = generateId();
+
+    const user = useAuthStore.getState().user;
+    const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
 
     // Build orderItems with FIFO inventory deduction if needed
     const orderItems: OrderItem[] = cartItems.map((cartItem, index) => {
@@ -318,12 +330,9 @@ export class OrderOfflineService {
 
       // 1:1 port of Angular's OrderOfflineService.createOrderItems gate
       // (order-offline.service.ts:360): `product.discountFromInvantory &&
-      // authorizationService.hasInventoryModuleAvailable()`. Previously this only checked
-      // discountFromInvantory, so a product left with discountFromInvantory=true after the
-      // store's inventory module was disabled would still silently deduct inventory — fixed
-      // here to match Angular exactly (L4 map diff-matrix #6 / prioritized-list item #7).
-      // getAvailableInventoryCosts also receives the eligibility context so it self-defends
-      // against isActive/availableToSale changes since add-to-cart time, mirroring Angular's
+      // authorizationService.hasInventoryModuleAvailable()`. getAvailableInventoryCosts
+      // also receives the eligibility context so it self-defends against
+      // isActive/availableToSale changes since add-to-cart time, mirroring Angular's
       // internal hasAvailableProductToSale chain.
       if (product.discountFromInvantory && hasInventoryModule) {
         productCosts = this.inventoryService.getAvailableInventoryCosts(product.id, quantity, {
@@ -358,10 +367,10 @@ export class OrderOfflineService {
       total,
       itemsCount,
       date: now,
-      type: orderType,
+      type,
       paymentType,
       isCredit,
-      description: details || (isCredit ? clientName : ''),
+      description: details || (isCredit ? client : ''),
       isActive: true,
       createdDate: now,
       createdByName: getCurrentUserLogin(),
@@ -377,56 +386,69 @@ export class OrderOfflineService {
     if (isCredit) {
       // Angular always passes '' for note (order-offline.service.ts:63); the returned
       // DataResult is ignored, mirroring Angular's own fire-and-forget call.
-      this.creditService.createSaleCredit(orderId, clientName, total, '');
+      this.creditService.createSaleCredit(orderId, client, total, '');
     }
 
-    return order;
+    return Promise.resolve(success(order));
   }
 
-  update(id: string, paymentType: PaymentType): Order {
+  /**
+   * 1:1 port of Angular `updateTodayOrder` (order-offline.service.ts:342-352), D-shape
+   * (sync, `DataResult<Order>`, never throws). Renamed from `update`.
+   */
+  updateTodayOrder(id: string, paymentType: PaymentType): DataResult<Order> {
     const order = this.getOrderById(id);
-    if (!order) throw new Error(`Order not found: ${id}`);
+    if (!order) return new DataResult<Order>(undefined, false, [OrderErrors.NotExists]);
     order.paymentType = paymentType;
     order.updatedDate = new Date();
     order.updatedByName = getCurrentUserLogin();
     this.setOrdersLocalStorage(this.orders!);
-    return order;
+    return new DataResult<Order>(order, true, []);
+  }
+
+  /**
+   * Private port of Angular's `updateOrderActive` (order-offline.service.ts:330-340) —
+   * shared flag-flip helper backing both `activateOrder` and the first step of
+   * `deactivateOrder`, mirroring Angular's own factoring (neither method duplicates the
+   * not-found/stamp logic).
+   */
+  private updateOrderActive(id: string, isActive: boolean): Result {
+    const order = this.getOrderById(id);
+    if (!order) return Result.Failure([OrderErrors.NotExists]);
+    order.isActive = isActive;
+    order.updatedDate = new Date();
+    order.updatedByName = getCurrentUserLogin();
+    this.setOrdersLocalStorage(this.orders!);
+    return Result.Success();
   }
 
   /**
    * 1:1 port of Angular's `activateOrder` (`updateOrderActive(id, true)`) — flag-only,
-   * no credit/inventory cascade (unlike deactivate). Return-type contract: void, throws
-   * on not-found (Angular's Result-command collapses to this per design ADR-1).
+   * no credit/inventory cascade (unlike deactivateOrder). D-shape: `Result`, never throws.
    */
-  activateOrder(id: string): void {
-    const order = this.getOrderById(id);
-    if (!order) throw new Error(`Order not found: ${id}`);
-    order.isActive = true;
-    order.updatedDate = new Date();
-    order.updatedByName = getCurrentUserLogin();
-    this.setOrdersLocalStorage(this.orders!);
+  activateOrder(id: string): Result {
+    return this.updateOrderActive(id, true);
   }
 
-  deactivate(id: string): void {
-    const order = this.getOrderById(id);
-    if (!order) throw new Error(`Order not found: ${id}`);
+  /**
+   * 1:1 port of Angular `deactivateOrder` (order-offline.service.ts:317-328), D-shape
+   * (sync, `Result`, never throws). Cascade-guard restored: `updateOrderActive` failure
+   * short-circuits to `Result.Failure([])`; `creditService.deactivateSaleCreditByOrderId`
+   * is called UNCONDITIONALLY (Angular does NOT gate this on `order.isCredit` — read
+   * :322-324 — no-op-succeeds when the order has no credit, per
+   * `SaleCreditOfflineService.deactivateSaleCreditByOrderId`'s own contract) and its
+   * failure ALSO short-circuits to `Result.Failure([])` BEFORE any inventory restock;
+   * only on cascade success does restock run, returning THAT call's `Result` directly
+   * (not a blanket `Success()`).
+   */
+  deactivateOrder(id: string): Result {
+    const flagResult = this.updateOrderActive(id, false);
+    if (!flagResult.succeeded) return Result.Failure([]);
 
-    // Step 1: Mark order inactive
-    order.isActive = false;
-    order.updatedDate = new Date();
-    order.updatedByName = getCurrentUserLogin();
-    this.setOrdersLocalStorage(this.orders!);
+    const creditResult = this.creditService.deactivateSaleCreditByOrderId(id);
+    if (!creditResult.succeeded) return Result.Failure([]);
 
-    // Step 2: Void associated credit if credit order. Angular's own deactivateOrder DOES
-    // check this Result (order-offline.service.ts:317-324), but wiring that check into
-    // Order's own deactivate() belongs to the Order slice (design ADR-4 dependency
-    // order) — this slice only renames the SaleCredit-side method, keeping Order's
-    // current fire-and-forget call pattern (flagged mismatch #6).
-    if (order.isCredit) {
-      this.creditService.deactivateSaleCreditByOrderId(id);
-    }
-
-    // Step 3: Restore inventory entries
+    const order = this.getOrderById(id)!;
     // Normalizes cost.id ?? cost.inventoryId for Angular-origin data (Decision 2)
     const normalizedItems = order.orderItems.map((oi) => ({
       ...oi,
@@ -435,7 +457,7 @@ export class OrderOfflineService {
         id: cost.id ?? (cost as unknown as { inventoryId: string }).inventoryId,
       })),
     }));
-    this.inventoryService.increaseQuantitiesByOrderItems(normalizedItems);
+    return this.inventoryService.increaseQuantitiesByOrderItems(normalizedItems);
   }
 
   /**
