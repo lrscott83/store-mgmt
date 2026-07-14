@@ -509,6 +509,15 @@ describe('OrderOfflineService', () => {
     it('returns "[]" when nothing is stored for that store key', () => {
       expect(service.getOrdersJson()).toBe('[]');
     });
+
+    // Angular parity (order-offline.service.ts:416-418): `localStorage.getItem(...) || "[]"`
+    // — a falsy-check (`||`), NOT a nullish-check (`??`). They diverge when getItem returns
+    // the empty string "" (falsy but not nullish): Angular/`||` falls back to "[]", a `??`
+    // port would incorrectly return "" verbatim.
+    it('returns "[]" when the stored value is an empty string (falsy-check parity, not nullish)', () => {
+      localStorage.setItem('lizoft.store-orders-s1', '');
+      expect(service.getOrdersJson()).toBe('[]');
+    });
   });
 
   describe('ORD-07: storage key format', () => {
@@ -908,6 +917,25 @@ describe('OrderOfflineService', () => {
       const now = new Date();
       seedOrders(storeId, [makeOrder({ id: 'yesterday', date: addDays(now, -1), isActive: true })]);
       expect(service.getOrdersInDay(now)).toHaveLength(0);
+    });
+
+    // Angular parity (order-offline.service.ts:305-311): getOrdersInDay sorts its result by
+    // `date` ascending — React's port was missing this sort entirely.
+    it('returns orders sorted by date ascending, regardless of insertion/seed order', () => {
+      const dayStart = startOfDay(new Date());
+      const morning = new Date(dayStart.getTime() + 8 * 60 * 60 * 1000);
+      const noon = new Date(dayStart.getTime() + 12 * 60 * 60 * 1000);
+      const evening = new Date(dayStart.getTime() + 18 * 60 * 60 * 1000);
+      seedOrders(storeId, [
+        makeOrder({ id: 'evening', date: evening, isActive: true }),
+        makeOrder({ id: 'morning', date: morning, isActive: true }),
+        makeOrder({ id: 'noon', date: noon, isActive: true }),
+      ]);
+      expect(service.getOrdersInDay(dayStart).map((o) => o.id)).toEqual([
+        'morning',
+        'noon',
+        'evening',
+      ]);
     });
   });
 

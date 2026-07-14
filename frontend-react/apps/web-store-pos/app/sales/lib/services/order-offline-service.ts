@@ -119,7 +119,9 @@ export class OrderOfflineService {
   getOrdersInDay(date: Date): Order[] {
     const dayStart = startOfDay(date);
     const dayEnd = startOfDay(addDays(date, 1));
-    return this.getStorageOrders().filter((o) => o.date >= dayStart && o.date < dayEnd);
+    return this.getStorageOrders()
+      .filter((o) => o.date >= dayStart && o.date < dayEnd)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 
   /**
@@ -467,9 +469,13 @@ export class OrderOfflineService {
     return Result.Success();
   }
 
-  /** 1:1 port of Angular `getOrdersJson` (order-offline.service.ts:416-418). */
+  /**
+   * 1:1 port of Angular `getOrdersJson` (order-offline.service.ts:416-418) — falsy-check
+   * fallback (`||`), NOT nullish (`??`): an empty-string stored value also falls back to
+   * `"[]"`, matching Angular exactly.
+   */
   getOrdersJson(): string {
-    return localStorage.getItem(this.getStorageKey()) ?? '[]';
+    return localStorage.getItem(this.getStorageKey()) || '[]';
   }
 
   /** Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) — plain-array write. */
