@@ -140,7 +140,7 @@ function orderItemFor(
     productBusinessId: 'biz1',
     productCosts:
       opts.costPrice !== undefined
-        ? [{ id: 'cost-1', costPrice: opts.costPrice, quantity: opts.qty }]
+        ? [{ inventoryId: 'cost-1', costPrice: opts.costPrice, quantity: opts.qty }]
         : [],
     order: 0,
   };
@@ -345,7 +345,7 @@ describe('OrderOfflineService', () => {
         isLoading: false,
         error: null,
       });
-      const fakeCosts: InventoryEntryCost[] = [{ id: 'e1', costPrice: 2.5, quantity: 2 }];
+      const fakeCosts: InventoryEntryCost[] = [{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }];
       const inventoryMock = vi.mocked(InventoryOfflineService).mock.results[0]?.value;
       inventoryMock.getAvailableInventoryCosts.mockReturnValue(fakeCosts);
 

@@ -5,6 +5,7 @@ import {
   DataSerializerService,
   WrongPasswordError,
   CorruptFileError,
+  EDataFileName,
 } from '../data-serializer-service';
 import type {
   InventoryReader,
@@ -335,6 +336,19 @@ describe('DataSerializerService', () => {
       const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
       const names = entries.map((e) => e.filename).sort();
       expect(names).toEqual([...ANGULAR_ENTRY_NAMES].sort());
+    });
+
+    // parity-audit-remediation Slice 2: naming-only alignment with Angular's
+    // EDataFileName enum (data.file.model.ts:6-13) — PascalCase members, same string values.
+    it('EDataFileName mirrors Angular\'s PascalCase member names with unchanged string values', () => {
+      expect(EDataFileName).toEqual({
+        Categories: 'categories.json',
+        Products: 'products.json',
+        InventoryEntries: 'inventory-entries.json',
+        Orders: 'orders.json',
+        Expenses: 'expenses.json',
+        SaleCredits: 'sale-credits.json',
+      });
     });
 
     it('each entry is reported as encrypted (password-AES)', async () => {

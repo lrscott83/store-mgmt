@@ -1203,8 +1203,8 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
       productBusinessId: 'biz-1',
       // FIFO breakdown recorded at sale time: 2 units @ $2 + 1 unit @ $3 = totalCost 7.
       productCosts: [
-        { id: 'e1', costPrice: 2, quantity: 2 },
-        { id: 'e2', costPrice: 3, quantity: 1 },
+        { inventoryId: 'e1', costPrice: 2, quantity: 2 },
+        { inventoryId: 'e2', costPrice: 3, quantity: 1 },
       ],
       order: 1,
     };

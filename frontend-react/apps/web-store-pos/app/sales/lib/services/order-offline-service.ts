@@ -521,15 +521,7 @@ export class OrderOfflineService {
     if (!creditResult.succeeded) return Result.Failure([]);
 
     const order = this.getOrderById(id)!;
-    // Normalizes cost.id ?? cost.inventoryId for Angular-origin data (Decision 2)
-    const normalizedItems = order.orderItems.map((oi) => ({
-      ...oi,
-      productCosts: oi.productCosts.map((cost) => ({
-        ...cost,
-        id: cost.id ?? (cost as unknown as { inventoryId: string }).inventoryId,
-      })),
-    }));
-    return this.inventoryService.increaseQuantitiesByOrderItems(normalizedItems);
+    return this.inventoryService.increaseQuantitiesByOrderItems(order.orderItems);
   }
 
   /**

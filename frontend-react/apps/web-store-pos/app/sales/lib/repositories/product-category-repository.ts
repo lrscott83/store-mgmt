@@ -11,10 +11,11 @@ function generateId(): string {
  * `frontend/src/app/application/categories/product-category.repository.ts` — EXACT public
  * surface (no `upsert`/`remove`; those are forbidden bridges per the Exact-Surface Rule).
  *
- * One deliberate deviation (Angular-bugs-policy: FIX, don't mirror): Angular's
- * `activateProductCategory(id, isActive)`/`deactivateProductCategory(id, isActive)` declare a
- * SECOND `isActive` parameter that the body never reads (always hardcodes `true`/`false`) — a
- * dead param. React drops it: 1-param `activateProductCategory(id)`/`deactivateProductCategory(id)`.
+ * `activateProductCategory(id, isActive)`/`deactivateProductCategory(id, isActive)` mirror
+ * Angular's literal 2-param signature (repo.ts:150,154) — the SECOND `isActive` parameter is
+ * NEVER read by the body (always hardcodes `true`/`false`); this is a DELIBERATE literal mirror
+ * of Angular's dead parameter (parity-audit-remediation Slice 2, MAXIMAL-parity decision),
+ * overriding the angular-bugs-policy "fix, don't replicate" default for this specific dead param.
  *
  * `addProductCategoryData` (Angular repo.ts:71-88) is PUBLIC, matching Angular's default
  * visibility and spec.md's authoritative surface table (spec.md:77); shared by
@@ -173,15 +174,16 @@ export class ProductCategoryRepository {
   }
 
   /**
-   * 1-param (dead-param fix per angular-bugs-policy — see class doc). 1:1 port of Angular
-   * `activateProductCategory` behavior (repo.ts:150-152), minus the unread `isActive` param.
+   * 2-param, Angular-exact (repo.ts:150-152) — the `isActive` argument is inert (see class doc).
    */
-  activateProductCategory(id: string): Result {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  activateProductCategory(id: string, isActive: boolean): Result {
     return this.updateProductCategoryActive(id, true);
   }
 
-  /** 1-param (dead-param fix). 1:1 port of Angular `deactivateProductCategory` behavior (repo.ts:154-156). */
-  deactivateProductCategory(id: string): Result {
+  /** 2-param, Angular-exact (repo.ts:154-156) — the `isActive` argument is inert (see class doc). */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  deactivateProductCategory(id: string, isActive: boolean): Result {
     return this.updateProductCategoryActive(id, false);
   }
 

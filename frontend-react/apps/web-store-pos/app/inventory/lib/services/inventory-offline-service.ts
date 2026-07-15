@@ -76,7 +76,7 @@ export interface InventoryCategoryView {
 /**
  * Per-product FIFO breakdown — sync equivalent of Angular's InventoryEntriesView
  * (inventory-entries.view.ts). `availableEntries` reuses domain's InventoryEntryCost
- * (`id`, not Angular's `inventoryId` — Batch 1 rename already applies here).
+ * (`inventoryId`, mirroring Angular's field name — parity-audit-remediation Slice 2).
  */
 export interface InventoryEntriesView {
   productId: string;
@@ -328,8 +328,8 @@ export class InventoryOfflineService {
 
   /**
    * 1:1 port of Angular's `getInventoryEntriesView` — per-product FIFO breakdown of
-   * ACTIVE entries with `available > 0`, sorted by `order` ascending. Emits `id` (not
-   * Angular's `inventoryId`) via domain's InventoryEntryCost. Zero-arg per spec
+   * ACTIVE entries with `available > 0`, sorted by `order` ascending. Emits `inventoryId`
+   * (Angular parity) via domain's InventoryEntryCost. Zero-arg per spec
    * (offline-online-service-parity, spec-slice1); `productName` defaults to `''`
    * (matches `getActiveInventoryEntriesStorage()`'s convention — this service has no ProductRepository
    * dependency; containers that need names enrich separately).
@@ -344,7 +344,7 @@ export class InventoryOfflineService {
       const availableEntries: InventoryEntryCost[] = entries
         .filter((e) => e.available > 0 && e.isActive)
         .sort((a, b) => a.order - b.order)
-        .map((e) => ({ id: e.id, costPrice: e.costPrice, quantity: e.available }));
+        .map((e) => ({ inventoryId: e.id, costPrice: e.costPrice, quantity: e.available }));
 
       let productAvailable = 0;
       for (const e of availableEntries) productAvailable += e.quantity;
@@ -423,7 +423,7 @@ export class InventoryOfflineService {
       const taken = Math.min(remaining, entry.available);
       entry.available -= taken;
       remaining -= taken;
-      costs.push({ id: entry.id, costPrice: entry.costPrice, quantity: taken });
+      costs.push({ inventoryId: entry.id, costPrice: entry.costPrice, quantity: taken });
     }
 
     // Persist the mutated map (entries are mutated in-place above)
@@ -468,8 +468,9 @@ export class InventoryOfflineService {
 
   /**
    * Restores available quantities for each inventory entry referenced in orderItems.
-   * Matches by cost.id (React canonical) with fallback to cost.inventoryId (Angular data).
-   * Persists after all increments.
+   * Matches each cost by its `inventoryId` (Angular parity — parity-audit-remediation
+   * Slice 2 reverted the field from a React-only `id` rename). Persists after all
+   * increments.
    *
    * Spec §6.3 increaseQuantitiesByOrderItems contract; S-I3.
    */
@@ -483,10 +484,7 @@ export class InventoryOfflineService {
 
     for (const orderItem of orderItems) {
       for (const cost of orderItem.productCosts) {
-        // Design Decision 2: normalize cost.id ?? cost.inventoryId for Angular-origin data
-        const entryId =
-          cost.id ??
-          (cost as unknown as { inventoryId?: string }).inventoryId;
+        const entryId = cost.inventoryId;
         if (!entryId) continue;
 
         // Find the entry by id across all products

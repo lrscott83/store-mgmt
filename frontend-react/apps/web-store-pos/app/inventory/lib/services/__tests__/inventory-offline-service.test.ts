@@ -130,8 +130,8 @@ describe('InventoryOfflineService', () => {
       const costs = service.getAvailableInventoryCosts('p1', 7);
 
       expect(costs).toHaveLength(2);
-      expect(costs[0]).toEqual({ id: 'e1', costPrice: 2.5, quantity: 6 });
-      expect(costs[1]).toEqual({ id: 'e2', costPrice: 3.0, quantity: 1 });
+      expect(costs[0]).toEqual({ inventoryId: 'e1', costPrice: 2.5, quantity: 6 });
+      expect(costs[1]).toEqual({ inventoryId: 'e2', costPrice: 3.0, quantity: 1 });
     });
 
     it('persists deducted available counts to localStorage', () => {
@@ -150,7 +150,7 @@ describe('InventoryOfflineService', () => {
         new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
       );
       const allCosts = service2.getAvailableInventoryCosts('p1', 3); // only 3 left in e2
-      expect(allCosts[0].id).toBe('e2');
+      expect(allCosts[0].inventoryId).toBe('e2');
       expect(allCosts[0].quantity).toBe(3);
     });
 
@@ -190,7 +190,7 @@ describe('InventoryOfflineService', () => {
       const costs = service.getAvailableInventoryCosts('p1', 3);
 
       // Should take from e1 (order=0) first
-      expect(costs[0].id).toBe('e1');
+      expect(costs[0].inventoryId).toBe('e1');
       expect(costs[0].quantity).toBe(3);
     });
   });
@@ -216,7 +216,7 @@ describe('InventoryOfflineService', () => {
         new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
       );
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
-      expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
+      expect(fullCosts).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 6 }]);
     });
 
     it('returns [] and does not deduct when eligibility.product.availableToSale is false', () => {
@@ -235,7 +235,7 @@ describe('InventoryOfflineService', () => {
         new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
       );
       const fullCosts = service2.getAvailableInventoryCosts('p1', 6);
-      expect(fullCosts).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 6 }]);
+      expect(fullCosts).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 6 }]);
     });
 
     it('returns [] when isActive/availableToSale are eligible but active stock is insufficient (module enabled + discountFromInvantory)', () => {
@@ -262,7 +262,7 @@ describe('InventoryOfflineService', () => {
         product: { isActive: true, availableToSale: true, discountFromInvantory: true },
         hasInventoryModule: false,
       });
-      expect(costs).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 2 }]);
+      expect(costs).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }]);
     });
 
     it('bypasses the stock-sufficiency check when product.discountFromInvantory is false, even with module enabled', () => {
@@ -274,7 +274,7 @@ describe('InventoryOfflineService', () => {
         product: { isActive: true, availableToSale: true, discountFromInvantory: false },
         hasInventoryModule: true,
       });
-      expect(costs).toEqual([{ id: 'e1', costPrice: 2.5, quantity: 2 }]);
+      expect(costs).toEqual([{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }]);
     });
 
     it('computes costs normally (unchanged from the no-eligibility-arg path) for a fully eligible product with sufficient stock', () => {
@@ -290,8 +290,8 @@ describe('InventoryOfflineService', () => {
         hasInventoryModule: true,
       });
       expect(costs).toEqual([
-        { id: 'e1', costPrice: 2.5, quantity: 6 },
-        { id: 'e2', costPrice: 3.0, quantity: 1 },
+        { inventoryId: 'e1', costPrice: 2.5, quantity: 6 },
+        { inventoryId: 'e2', costPrice: 3.0, quantity: 1 },
       ]);
     });
   });
@@ -317,8 +317,8 @@ describe('InventoryOfflineService', () => {
           productBusinessId: 'biz1',
           order: 0,
           productCosts: [
-            { id: 'e1', costPrice: 2.5, quantity: 6 },
-            { id: 'e2', costPrice: 3.0, quantity: 1 },
+            { inventoryId: 'e1', costPrice: 2.5, quantity: 6 },
+            { inventoryId: 'e2', costPrice: 3.0, quantity: 1 },
           ],
         },
       ];
@@ -333,8 +333,8 @@ describe('InventoryOfflineService', () => {
       );
       const costs = service2.getAvailableInventoryCosts('p1', 10);
       expect(costs).toHaveLength(2);
-      expect(costs[0]).toMatchObject({ id: 'e1', quantity: 6 });
-      expect(costs[1]).toMatchObject({ id: 'e2', quantity: 4 });
+      expect(costs[0]).toMatchObject({ inventoryId: 'e1', quantity: 6 });
+      expect(costs[1]).toMatchObject({ inventoryId: 'e2', quantity: 4 });
     });
 
     it('persists restored quantities to localStorage', () => {
@@ -353,7 +353,7 @@ describe('InventoryOfflineService', () => {
           price: 5,
           productBusinessId: 'biz1',
           order: 0,
-          productCosts: [{ id: 'e1', costPrice: 2.5, quantity: 5 }],
+          productCosts: [{ inventoryId: 'e1', costPrice: 2.5, quantity: 5 }],
         },
       ];
 
@@ -361,17 +361,16 @@ describe('InventoryOfflineService', () => {
 
       // After restore, should be able to deduct 5 again
       const costs = service.getAvailableInventoryCosts('p1', 5);
-      expect(costs[0].id).toBe('e1');
+      expect(costs[0].inventoryId).toBe('e1');
       expect(costs[0].quantity).toBe(5);
     });
 
-    it('handles cost.inventoryId fallback for Angular-origin data', () => {
+    it('does not throw and is a no-op when inventoryId does not match any stored entry', () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [makeEntry('e1', 'p1', { available: 0 })]);
       seedInventory(storeId, map);
 
-      // Simulate Angular-origin data where inventoryId is used instead of id
-      const orderItems = [
+      const orderItems: OrderItem[] = [
         {
           productId: 'p1',
           productName: 'Product',
@@ -382,13 +381,10 @@ describe('InventoryOfflineService', () => {
           price: 5,
           productBusinessId: 'biz1',
           order: 0,
-          productCosts: [
-            { id: undefined as unknown as string, inventoryId: 'e1', costPrice: 2.5, quantity: 5 } as unknown as import('@store-mgmt/domain').InventoryEntryCost,
-          ],
+          productCosts: [{ inventoryId: 'unknown-entry', costPrice: 2.5, quantity: 5 }],
         },
-      ] as OrderItem[];
+      ];
 
-      // Should not throw — should handle undefined id with inventoryId fallback
       expect(() => service.increaseQuantitiesByOrderItems(orderItems)).not.toThrow();
     });
 
@@ -1020,7 +1016,7 @@ describe('InventoryOfflineService', () => {
       );
     });
 
-    it('returns per-product FIFO breakdown sorted by order asc, emitting `id` not `inventoryId`', async () => {
+    it('returns per-product FIFO breakdown sorted by order asc, emitting `inventoryId` (Angular parity)', async () => {
       const map = new Map<string, InventoryEntry[]>();
       map.set('p1', [
         makeEntry('e2', 'p1', { order: 1, available: 4, costPrice: 3.0 }),
@@ -1034,8 +1030,8 @@ describe('InventoryOfflineService', () => {
       expect(views[0].productId).toBe('p1');
       expect(views[0].productAvailable).toBe(10);
       expect(views[0].availableEntries).toEqual([
-        { id: 'e1', costPrice: 2.5, quantity: 6 },
-        { id: 'e2', costPrice: 3.0, quantity: 4 },
+        { inventoryId: 'e1', costPrice: 2.5, quantity: 6 },
+        { inventoryId: 'e2', costPrice: 3.0, quantity: 4 },
       ]);
     });
 
@@ -1050,7 +1046,7 @@ describe('InventoryOfflineService', () => {
 
       const result = await service.getInventoryEntriesView();
       const views = result.data;
-      expect(views[0].availableEntries).toEqual([{ id: 'e3', costPrice: 2.5, quantity: 3 }]);
+      expect(views[0].availableEntries).toEqual([{ inventoryId: 'e3', costPrice: 2.5, quantity: 3 }]);
       expect(views[0].productAvailable).toBe(3);
     });
 

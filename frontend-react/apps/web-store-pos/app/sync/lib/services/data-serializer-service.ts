@@ -53,13 +53,13 @@ export class CorruptFileError extends Error {
 // Angular-compatible entry names (data.file.model.ts EDataFileName parity)
 // ---------------------------------------------------------------------------
 
-const ENTRY_NAMES = {
-  categories: 'categories.json',
-  products: 'products.json',
-  inventoryEntries: 'inventory-entries.json',
-  orders: 'orders.json',
-  expenses: 'expenses.json',
-  saleCredits: 'sale-credits.json',
+export const EDataFileName = {
+  Categories: 'categories.json',
+  Products: 'products.json',
+  InventoryEntries: 'inventory-entries.json',
+  Orders: 'orders.json',
+  Expenses: 'expenses.json',
+  SaleCredits: 'sale-credits.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -184,12 +184,12 @@ export class DataSerializerService {
       password: this.derivePassword(password),
     });
 
-    await zipWriter.add(ENTRY_NAMES.categories, new TextReader(categoriesJson));
-    await zipWriter.add(ENTRY_NAMES.products, new TextReader(productsJson));
-    await zipWriter.add(ENTRY_NAMES.inventoryEntries, new TextReader(inventoryJson));
-    await zipWriter.add(ENTRY_NAMES.orders, new TextReader(ordersJson));
-    await zipWriter.add(ENTRY_NAMES.expenses, new TextReader(expensesJson));
-    await zipWriter.add(ENTRY_NAMES.saleCredits, new TextReader(saleCreditsJson));
+    await zipWriter.add(EDataFileName.Categories, new TextReader(categoriesJson));
+    await zipWriter.add(EDataFileName.Products, new TextReader(productsJson));
+    await zipWriter.add(EDataFileName.InventoryEntries, new TextReader(inventoryJson));
+    await zipWriter.add(EDataFileName.Orders, new TextReader(ordersJson));
+    await zipWriter.add(EDataFileName.Expenses, new TextReader(expensesJson));
+    await zipWriter.add(EDataFileName.SaleCredits, new TextReader(saleCreditsJson));
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
@@ -231,13 +231,13 @@ export class DataSerializerService {
 
     const categoryEntries = parseJson<[string, ProductCategory][]>(
       contents,
-      ENTRY_NAMES.categories,
+      EDataFileName.Categories,
       [],
     );
-    const productEntries = parseJson<[string, Product][]>(contents, ENTRY_NAMES.products, []);
+    const productEntries = parseJson<[string, Product][]>(contents, EDataFileName.Products, []);
     const inventoryEntryTuples = parseJson<[string, InventoryEntry[]][]>(
       contents,
-      ENTRY_NAMES.inventoryEntries,
+      EDataFileName.InventoryEntries,
       [],
     );
 
@@ -245,9 +245,9 @@ export class DataSerializerService {
       categories: categoryEntries.map(([, category]) => category),
       products: productEntries.map(([, product]) => product),
       inventoryEntries: inventoryEntryTuples.flatMap(([, entriesForProduct]) => entriesForProduct),
-      orders: parseJson<Order[]>(contents, ENTRY_NAMES.orders, []),
-      expenses: parseJson<Expense[]>(contents, ENTRY_NAMES.expenses, []),
-      saleCredits: parseJson<SaleCredit[]>(contents, ENTRY_NAMES.saleCredits, []),
+      orders: parseJson<Order[]>(contents, EDataFileName.Orders, []),
+      expenses: parseJson<Expense[]>(contents, EDataFileName.Expenses, []),
+      saleCredits: parseJson<SaleCredit[]>(contents, EDataFileName.SaleCredits, []),
     };
   }
 }

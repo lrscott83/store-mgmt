@@ -269,10 +269,13 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
   });
 
   // ─── 1.9 activateProductCategory / deactivateProductCategory ────────────
-  describe('activateProductCategory / deactivateProductCategory (repo.ts:139-148) — 1-param, dead-param fix', () => {
-    it('activateProductCategory(id) toggles ONLY isActive to true', () => {
+  // parity-audit-remediation Slice 2: restored to Angular's literal 2-param signature
+  // (repo.ts:150,154) — the 2nd `isActive` argument is inert (method body hardcodes true/false
+  // regardless of the passed value), a deliberate literal mirror per MAXIMAL-parity decision.
+  describe('activateProductCategory / deactivateProductCategory (repo.ts:150,154) — 2-param, Angular-exact (inert isActive)', () => {
+    it('activateProductCategory(id, isActive) toggles ONLY isActive to true', () => {
       seedCategories([makeCategory('c1', { isActive: false, name: 'X', order: 5 })]);
-      const result = repo.activateProductCategory('c1');
+      const result = repo.activateProductCategory('c1', true);
       expect(result.succeeded).toBe(true);
       const updated = repo.getProductCategoryById('c1');
       expect(updated?.isActive).toBe(true);
@@ -280,17 +283,29 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
       expect(updated?.order).toBe(5);
     });
 
-    it('deactivateProductCategory(id) toggles ONLY isActive to false', () => {
+    it('deactivateProductCategory(id, isActive) toggles ONLY isActive to false', () => {
       seedCategories([makeCategory('c1', { isActive: true })]);
-      const result = repo.deactivateProductCategory('c1');
+      const result = repo.deactivateProductCategory('c1', false);
       expect(result.succeeded).toBe(true);
       expect(repo.getProductCategoryById('c1')?.isActive).toBe(false);
     });
 
     it('activateProductCategory fails with NotExists when the id does not exist', () => {
-      const result = repo.activateProductCategory('missing');
+      const result = repo.activateProductCategory('missing', true);
       expect(result.succeeded).toBe(false);
       expect(result.errors).toEqual([{ code: 'ProductCategory.NotExists', description: 'La categoría no existe.' }]);
+    });
+
+    it('the 2nd isActive argument is inert — passing false to activateProductCategory still sets isActive=true (Angular hardcodes it)', () => {
+      seedCategories([makeCategory('c1', { isActive: false })]);
+      repo.activateProductCategory('c1', false);
+      expect(repo.getProductCategoryById('c1')?.isActive).toBe(true);
+    });
+
+    it('the 2nd isActive argument is inert — passing true to deactivateProductCategory still sets isActive=false (Angular hardcodes it)', () => {
+      seedCategories([makeCategory('c1', { isActive: true })]);
+      repo.deactivateProductCategory('c1', true);
+      expect(repo.getProductCategoryById('c1')?.isActive).toBe(false);
     });
   });
 

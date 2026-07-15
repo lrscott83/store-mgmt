@@ -32,7 +32,7 @@ describe('calculateOrderProfit', () => {
       const item = makeOrderItem({
         price: 5,
         quantity: 2,
-        productCosts: [{ id: 'e1', costPrice: 2.5, quantity: 2 }],
+        productCosts: [{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }],
       });
       const result = calculateOrderProfit(item);
       expect(result.cost).toBe(5);
@@ -42,7 +42,7 @@ describe('calculateOrderProfit', () => {
       const item = makeOrderItem({
         price: 5,
         quantity: 2,
-        productCosts: [{ id: 'e1', costPrice: 2.5, quantity: 2 }],
+        productCosts: [{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }],
       });
       const result = calculateOrderProfit(item);
       expect(result.profit).toBe(5);
@@ -52,7 +52,7 @@ describe('calculateOrderProfit', () => {
       const item = makeOrderItem({
         price: 5,
         quantity: 2,
-        productCosts: [{ id: 'e1', costPrice: 2.5, quantity: 2 }],
+        productCosts: [{ inventoryId: 'e1', costPrice: 2.5, quantity: 2 }],
       });
       const result = calculateOrderProfit(item);
       expect(result.margin).toBe(50);
@@ -65,8 +65,8 @@ describe('calculateOrderProfit', () => {
         price: 10,
         quantity: 3,
         productCosts: [
-          { id: 'e1', costPrice: 2.0, quantity: 2 },
-          { id: 'e2', costPrice: 3.0, quantity: 1 },
+          { inventoryId: 'e1', costPrice: 2.0, quantity: 2 },
+          { inventoryId: 'e2', costPrice: 3.0, quantity: 1 },
         ],
       });
       // revenue=30, cost=4+3=7, profit=23

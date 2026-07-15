@@ -1,7 +1,7 @@
 import type { AuditableBaseModel } from './base';
 
 export interface InventoryEntryCost {
-  id: string;
+  inventoryId: string;
   quantity: number;
   costPrice: number;
 }
