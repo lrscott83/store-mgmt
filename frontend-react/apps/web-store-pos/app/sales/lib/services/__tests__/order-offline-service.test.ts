@@ -495,43 +495,6 @@ describe('OrderOfflineService', () => {
     });
   });
 
-  describe('ORD-05: getByDateRange filters correctly', () => {
-    it('returns orders within the date range', async () => {
-      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
-      const from = new Date();
-      from.setHours(0, 0, 0, 0);
-      const to = new Date();
-      to.setHours(23, 59, 59, 999);
-      const results = service.getByDateRange(from, to);
-      expect(results.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('excludes orders outside the date range', async () => {
-      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-      const yesterdayEnd = new Date(yesterday);
-      yesterdayEnd.setHours(23, 59, 59, 999);
-      const results = service.getByDateRange(yesterday, yesterdayEnd);
-      expect(results).toHaveLength(0);
-    });
-
-    it('only returns active orders', async () => {
-      const items = makeCartItems([{ product: makeProduct(), quantity: 1 }]);
-      const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
-      service.deactivateOrder(order.id);
-      const from = new Date();
-      from.setHours(0, 0, 0, 0);
-      const to = new Date();
-      to.setHours(23, 59, 59, 999);
-      const results = service.getByDateRange(from, to);
-      expect(results.every((o) => o.isActive)).toBe(true);
-    });
-  });
-
   // Angular parity (order-offline.service.ts:299-303): getActiveOrdersInDay IGNORES its
   // `date` param and always uses today's day boundaries — the param is kept in the
   // signature for call-site compatibility, mirroring Angular's own unused param.
@@ -918,7 +881,7 @@ describe('OrderOfflineService', () => {
   });
 
   // ADR-5: financial helpers use RAW date boundaries (pre-snapped by the Today/Yesterday
-  // wrappers), via a private active*Between helper — NOT the day-snapping getByDateRange.
+  // wrappers), via a private active*Between helper, not a day-snapping range filter.
   describe('ORD-13: getActiveOrdersPriceToday/Yesterday/BetweenDates', () => {
     it('Today sums active orders total for today only', () => {
       const now = new Date();

@@ -191,21 +191,6 @@ describe('storeHttpService.disapproveStore — HTTP-8: POST /v1/stores/disapprov
   });
 });
 
-describe('storeHttpService.deactivateStore — HTTP-9: DELETE /v1/stores/:id', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    const { apiClient } = await import('~/shared/lib/http/api-client');
-    (apiClient.delete as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
-  });
-
-  it('calls DELETE /v1/stores/:id', async () => {
-    const { storeHttpService } = await import('../store-http-service');
-    const { apiClient } = await import('~/shared/lib/http/api-client');
-    await storeHttpService.deactivateStore('s1');
-    expect(apiClient.delete).toHaveBeenCalledWith('/v1/stores/s1');
-  });
-});
-
 describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStore', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

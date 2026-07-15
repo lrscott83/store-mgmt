@@ -76,13 +76,6 @@ export const storeHttpService = {
     return response.data;
   },
 
-  async deactivateStore(id: string): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.delete<BaseResponseModel<boolean>>(
-      `/v1/stores/${id}`
-    );
-    return response.data;
-  },
-
   async getModulesToStore(): Promise<BaseResponseModel<Module[]>> {
     const response = await apiClient.get<BaseResponseModel<Module[]>>(
       '/v1/modules/ToStore'

@@ -614,28 +614,6 @@ describe('InventoryOfflineService', () => {
     });
   });
 
-  describe('INV-06: hasAvailableStock', () => {
-    it('returns true when enough stock exists', () => {
-      const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { available: 10 })]);
-      seedInventory(storeId, map);
-
-      expect(service.hasAvailableStock('p1', 5)).toBe(true);
-    });
-
-    it('returns false when not enough stock', () => {
-      const map = new Map<string, InventoryEntry[]>();
-      map.set('p1', [makeEntry('e1', 'p1', { available: 3 })]);
-      seedInventory(storeId, map);
-
-      expect(service.hasAvailableStock('p1', 5)).toBe(false);
-    });
-
-    it('returns false when no stock exists', () => {
-      expect(service.hasAvailableStock('p1', 1)).toBe(false);
-    });
-  });
-
   describe('INV-08: getAvailableQuantity — distinguishes "no active entries" from "insufficient quantity" (Angular InventoryOfflineService.hasAvailableProductToSale branches 5 vs 6)', () => {
     it('returns hasEntries=false and available=0 when no entries exist for the product', () => {
       expect(service.getAvailableQuantity('p1')).toEqual({ hasEntries: false, available: 0 });

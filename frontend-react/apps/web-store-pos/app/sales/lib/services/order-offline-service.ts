@@ -98,14 +98,6 @@ export class OrderOfflineService {
     return this.getStorageOrders().find((o) => o.id === id);
   }
 
-  getByDateRange(from: Date, to: Date): Order[] {
-    const start = startOfDay(from);
-    const end = startOfDay(addDays(to, 1));
-    return this.getStorageOrders().filter(
-      (o) => o.isActive && o.date >= start && o.date < end,
-    );
-  }
-
   /**
    * 1:1 port of Angular `getActiveOrdersInDay` (order-offline.service.ts:299-303) — IGNORES
    * the passed `date` param and always uses today's day boundaries. The param is kept in
@@ -143,9 +135,9 @@ export class OrderOfflineService {
   }
 
   /**
-   * ADR-5: financial helpers use RAW date boundaries (pre-snapped by the caller), NOT
-   * the day-snapping `getByDateRange` (which would double-snap). 1:1 port of Angular's
-   * private `getActiveOrdersBetweenDates`.
+   * ADR-5: financial helpers use RAW date boundaries (pre-snapped by the caller) rather
+   * than re-snapping to day boundaries internally (which would double-snap). 1:1 port of
+   * Angular's private `getActiveOrdersBetweenDates`.
    */
   private activeOrdersBetween(start: Date, end: Date): Order[] {
     return this.getStorageOrders()

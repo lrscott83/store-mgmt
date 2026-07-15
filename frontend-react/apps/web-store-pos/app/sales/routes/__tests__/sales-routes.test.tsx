@@ -52,7 +52,6 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
     getStorageOrders: vi.fn().mockReturnValue([]),
     getActiveOrdersInDay: vi.fn().mockReturnValue([]),
-    getByDateRange: vi.fn().mockReturnValue([]),
     getCategoryCartItemsView: vi.fn().mockReturnValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
     deactivateOrder: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
     updateTodayOrder: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),

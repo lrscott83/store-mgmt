@@ -817,17 +817,6 @@ export class InventoryOfflineService {
   // ─── Query helpers ───────────────────────────────────────────────────────
 
   /**
-   * Returns true if the sum of available quantities for a product >= requested quantity.
-   */
-  hasAvailableStock(productId: string, quantity: number): boolean {
-    const entries = this.getProductInventoriesByProductId(productId);
-    const total = entries
-      .filter((e) => e.isActive)
-      .reduce((sum, e) => sum + e.available, 0);
-    return total >= quantity;
-  }
-
-  /**
    * Returns the RAW inventory entries for a product — no isActive filter, no mutation.
    * 1:1 port of Angular's `getProductInventoriesByProductId`
    * (inventory-offline.service.ts:54-56).
