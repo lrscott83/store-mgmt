@@ -1,6 +1,46 @@
 import type { jsPDF } from 'jspdf';
 import type { HookData, UserOptions } from 'jspdf-autotable';
-import type { InventoryTodaySaleRow } from '../services/inventory-today-sale-service';
+
+/**
+ * One row of the 13-column per-product inventory-at-sale-price ledger.
+ * Typed numbers (NOT `toFixed` strings) — formatting happens at the display/PDF edge.
+ *
+ * Previously defined on the now-deleted `InventoryTodaySaleService` (an invented
+ * aggregation class with no Angular correlate — rule 12). Angular computes these
+ * rows inline in `InventoryTodaySaleComponent.generateProductRows()`
+ * (frontend/src/app/presentation/reports/inventory-today-sale/inventory-today-sale.component.ts:176-226).
+ * That route is not yet wired in React (Stage 7 remains pending on today-report.tsx);
+ * this interface is kept here — the sole remaining consumer — for the PDF export shape.
+ */
+export interface InventoryTodaySaleRow {
+  productId: string;
+  /** Col 1 — Producto */
+  productName: string;
+  /** Col 2 — U (hardcoded literal, NOT a product unit-of-measure field — Angular parity) */
+  unit: string;
+  /** Col 3 — Inicio = available + vendido - entrada */
+  inicio: number;
+  /** Col 4 — Entrada = sum of today's inventory entry quantities */
+  entrada: number;
+  /** Col 5 — Disponible = available + vendido */
+  disponible: number;
+  /** Col 6 — Vendido = sum of today's order-item quantities */
+  vendido: number;
+  /** Col 7 — Precio Venta = avg(today's order-item prices), 0 if none */
+  precioVenta: number;
+  /** Col 8 — Importe Venta = vendido x precioVenta */
+  importeVenta: number;
+  /** Col 9 — Costo Unitario = quantity-weighted avg costPrice across active (available>0) entries */
+  costoUnitario: number;
+  /** Col 10 — Costo Total = vendido x costoUnitario */
+  costoTotal: number;
+  /** Col 11 — C.P Venta = costoTotal / importeVenta when importeVenta>0, else 0 */
+  cpVenta: number;
+  /** Col 12 — Final = disponible - vendido */
+  final: number;
+  /** Col 13 — Importe Final = final x costoUnitario */
+  importeFinal: number;
+}
 
 /**
  * `exportInventoryTodaySalePdf` — 1:1 port of Angular's commented-out

@@ -3,19 +3,104 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { ReportAggregationService } from '../lib/services/report-aggregation-service';
-import type { ReportSummary } from '../lib/services/report-aggregation-service';
+import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ProductRepository } from '~/sales/lib/repositories/product-repository';
+import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 
 export const clientLoader = featureLoader([EFeatures.TodayReports]);
+
+// Local view-model types — Angular keeps this shape inline in the presentation
+// components (today-orders.component.ts, inventory-today-sales-profit.component.ts,
+// inventory-available.component.ts); no shared aggregation service/model exists on
+// the Angular side, so React does not invent one either (rule 12).
+interface TodayReportProductAvailable {
+  productId: string;
+  productName: string;
+  available: number;
+}
+
+interface TodayReportSummary {
+  date: Date;
+  orderCount: number;
+  totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
+  available: TodayReportProductAvailable[];
+}
+
+/**
+ * Computes today's report summary from the offline services' existing public
+ * methods. Mirrors the computations Angular keeps inline in
+ * today-orders.component.ts (order count), inventory-today-sales-profit.component.ts
+ * (revenue/cost/profit totals) and inventory-available.component.ts +
+ * inventory-product-list.component.ts (per-product available table) — moved here
+ * (not a data-layer service) since Angular has no shared aggregation service for
+ * this route either.
+ */
+function computeTodayReport(storeId: string, date: Date = new Date()): TodayReportSummary {
+  const orderService = new OrderOfflineService(storeId);
+  const inventoryService = new InventoryOfflineService(
+    storeId,
+    new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+  );
+
+  const orders = orderService.getActiveOrdersInDay(date);
+
+  let totalRevenue = 0;
+  let totalCost = 0;
+
+  for (const order of orders) {
+    for (const item of order.orderItems) {
+      const result = calculateOrderProfit(item);
+      totalRevenue += result.revenue;
+      totalCost += result.cost;
+    }
+  }
+
+  const totalProfit = totalRevenue - totalCost;
+
+  // available = per-product totalAvailable, sourced from
+  // InventoryOfflineService.getInventoryCategoriesView() — the 1:1 port of Angular's
+  // getInventoryCategoriesView/getInventoryCategoriesViewObservable, which
+  // inventory-available.component.ts feeds (as `categories$`) into
+  // inventory-product-list.component.ts to render the available-stock table.
+  // Mirrors Angular's `if (response && response.succeeded) { categories$.next(response.data) }`
+  // guard: on failure the available list simply stays empty.
+  const available: TodayReportProductAvailable[] = [];
+  const categoriesResponse = inventoryService.getInventoryCategoriesView();
+  if (categoriesResponse.succeeded) {
+    for (const category of categoriesResponse.data) {
+      for (const product of category.products) {
+        if (product.totalAvailable > 0) {
+          available.push({
+            productId: product.productId,
+            productName: product.productName,
+            available: product.totalAvailable,
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    date,
+    orderCount: orders.length,
+    totalRevenue,
+    totalCost,
+    totalProfit,
+    available,
+  };
+}
 
 export function TodayReportPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const [report, setReport] = useState<ReportSummary | null>(null);
+  const [report, setReport] = useState<TodayReportSummary | null>(null);
 
   const loadReport = useCallback(() => {
-    const svc = new ReportAggregationService(storeId);
-    setReport(svc.getTodayReport());
+    setReport(computeTodayReport(storeId));
   }, [storeId]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { InventoryTodaySaleRow } from '../services/inventory-today-sale-service';
+import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
 
 // ─── Mock jspdf + jspdf-autotable (Lazy Code-Split Export — Requirement) ─────
 // The production module MUST `await import(...)` these INSIDE the exported
