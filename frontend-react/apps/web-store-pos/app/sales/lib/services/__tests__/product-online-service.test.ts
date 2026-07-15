@@ -46,23 +46,24 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
     expect(svc).toBeTruthy();
   });
 
-  // ANGULAR-BUG-SUSPECT #5: 8/12 URLs carry a literal double-slash (API_URL ends with '/',
-  // method prepends '/'). Mirrored verbatim, asserted exactly.
+  // Consistency fix (parity-audit-remediation Slice 1): 8/12 URLs previously carried a literal
+  // double-slash (API_URL ends with '/', method prepended another '/'). Normalized to a single
+  // slash to match the sibling ProductCategoryOnlineService (already normalized, DG-1).
 
-  it('ONLINE-02: hasAnyAvailableToSaleProduct → GET /v1/Products//hasAnyAvailableToSaleProduct', async () => {
+  it('ONLINE-02: hasAnyAvailableToSaleProduct → GET /v1/Products/hasAnyAvailableToSaleProduct', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     api.get.mockResolvedValue(envelope(true));
     const result = await svc.hasAnyAvailableToSaleProduct();
-    expect(api.get).toHaveBeenCalledWith('/v1/Products//hasAnyAvailableToSaleProduct');
+    expect(api.get).toHaveBeenCalledWith('/v1/Products/hasAnyAvailableToSaleProduct');
     expect(result.data).toBe(true);
   });
 
-  it('ONLINE-03: getProductById → GET /v1/Products//:id (double slash)', async () => {
+  it('ONLINE-03: getProductById → GET /v1/Products/:id (single slash)', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     await svc.getProductById('p1');
-    expect(api.get).toHaveBeenCalledWith('/v1/Products//p1');
+    expect(api.get).toHaveBeenCalledWith('/v1/Products/p1');
   });
 
   it('ONLINE-04: getProductByBarcode → GET /v1/Products/byBarcode/:barcode (SINGLE slash — asymmetry)', async () => {
@@ -72,32 +73,32 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
     expect(api.get).toHaveBeenCalledWith('/v1/Products/byBarcode/ABC123');
   });
 
-  it('ONLINE-05: getProductsToSelect → GET /v1/Products//toEntry (double slash)', async () => {
+  it('ONLINE-05: getProductsToSelect → GET /v1/Products/toEntry (single slash)', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     await svc.getProductsToSelect();
-    expect(api.get).toHaveBeenCalledWith('/v1/Products//toEntry');
+    expect(api.get).toHaveBeenCalledWith('/v1/Products/toEntry');
   });
 
-  it('ONLINE-06: getAvailableProductsByCategoryId → GET /v1/Products//availableByCategoryId/:id', async () => {
+  it('ONLINE-06: getAvailableProductsByCategoryId → GET /v1/Products/availableByCategoryId/:id', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     await svc.getAvailableProductsByCategoryId('cat-1');
-    expect(api.get).toHaveBeenCalledWith('/v1/Products//availableByCategoryId/cat-1');
+    expect(api.get).toHaveBeenCalledWith('/v1/Products/availableByCategoryId/cat-1');
   });
 
-  it('ONLINE-07: getProductsToSaleByCategoryId → GET /v1/Products//toSaleByCategoryId/:id', async () => {
+  it('ONLINE-07: getProductsToSaleByCategoryId → GET /v1/Products/toSaleByCategoryId/:id', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     await svc.getProductsToSaleByCategoryId('cat-1');
-    expect(api.get).toHaveBeenCalledWith('/v1/Products//toSaleByCategoryId/cat-1');
+    expect(api.get).toHaveBeenCalledWith('/v1/Products/toSaleByCategoryId/cat-1');
   });
 
-  it('ONLINE-08: deleteProduct → DELETE /v1/Products//:id (double slash)', async () => {
+  it('ONLINE-08: deleteProduct → DELETE /v1/Products/:id (single slash)', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     await svc.deleteProduct('p1');
-    expect(api.delete).toHaveBeenCalledWith('/v1/Products//p1');
+    expect(api.delete).toHaveBeenCalledWith('/v1/Products/p1');
   });
 
   it('ONLINE-09: createCsvProducts → POST /v1/Products/import with { csvProducts }', async () => {
@@ -108,12 +109,12 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
     expect(api.post).toHaveBeenCalledWith('/v1/Products/import', { csvProducts });
   });
 
-  it('ONLINE-10: getMaxOrder → GET /v1/Products//maxOrderByCategoryId/:id', async () => {
+  it('ONLINE-10: getMaxOrder → GET /v1/Products/maxOrderByCategoryId/:id', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     api.get.mockResolvedValue(envelope(5));
     const result = await svc.getMaxOrder('cat-1');
-    expect(api.get).toHaveBeenCalledWith('/v1/Products//maxOrderByCategoryId/cat-1');
+    expect(api.get).toHaveBeenCalledWith('/v1/Products/maxOrderByCategoryId/cat-1');
     expect(result.data).toBe(5);
   });
 
@@ -140,13 +141,13 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
   });
 
   // The asymmetry only affects createProduct — updateProduct DOES send barcode.
-  it('ONLINE-12: updateProduct → PUT /v1/Products//:id including barcode in the payload', async () => {
+  it('ONLINE-12: updateProduct → PUT /v1/Products/:id including barcode in the payload', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     await svc.updateProduct('p1', 'cat-1', 'Coca Cola', 1.5, 'biz-1', 2, true, true, false, 'BARCODE123');
     expect(api.put).toHaveBeenCalledTimes(1);
     const [url, body] = api.put.mock.calls[0];
-    expect(url).toBe('/v1/Products//p1');
+    expect(url).toBe('/v1/Products/p1');
     expect(body).toEqual({
       id: 'p1',
       categoryId: 'cat-1',

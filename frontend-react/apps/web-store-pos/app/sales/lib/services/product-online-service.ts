@@ -15,11 +15,14 @@ import { apiClient } from '~/shared/lib/http/api-client';
  * mapping — the backend already shapes `BaseResponseModel`).
  *
  * Mirrors Angular's `API_URL = ${apiUrl}/${apiVersion}/Products/` (trailing slash) with the React
- * apiClient base + `/v1/Products/` prefix. ANGULAR-BUG-SUSPECT #5: 8 of 12 methods build their URL
- * as `API_URL + '/' + suffix`, an extra leading slash on top of the trailing one, yielding literal
- * double slashes (e.g. `/v1/Products//toEntry`). Mirrored verbatim, NOT normalized —
- * `getProductByBarcode`/`createCsvProducts`/`createProducts`/`createProduct` are the only clean
- * ones, matching Angular's own inconsistency.
+ * apiClient base + `/v1/Products/` prefix. ANGULAR-BUG-SUSPECT #5: Angular builds 8 of 12 URLs as
+ * `API_URL + '/' + suffix`, an extra leading slash on top of the trailing one, yielding literal
+ * double slashes (e.g. `/v1/Products//toEntry`). React NORMALIZES these 8 to a single slash
+ * (`getProductById`, `hasAnyAvailableToSaleProduct`, `getProductsToSelect`,
+ * `getAvailableProductsByCategoryId`, `getProductsToSaleByCategoryId`, `deleteProduct`,
+ * `getMaxOrder`, `updateProduct`) for consistency with the sibling
+ * `ProductCategoryOnlineService` (already normalized, DG-1) — parity-audit-remediation Slice 1.
+ * `getProductByBarcode`/`createCsvProducts`/`createProducts`/`createProduct` were already clean.
  *
  * `createProduct` accepts `barcode?` for type conformance with `ProductService` but OMITS it
  * from the POST body (ANGULAR-BUG-SUSPECT #4); `updateProduct` DOES send it. No `setDiscountFrom-
@@ -33,13 +36,13 @@ export class ProductOnlineService implements ProductService {
   private readonly API_URL = '/v1/Products/';
 
   async hasAnyAvailableToSaleProduct(): Promise<BaseResponseModel<boolean>> {
-    const url = this.API_URL + '/hasAnyAvailableToSaleProduct';
+    const url = this.API_URL + 'hasAnyAvailableToSaleProduct';
     const response = await apiClient.get<BaseResponseModel<boolean>>(url);
     return response.data;
   }
 
   async getProductById(id: string): Promise<BaseResponseModel<Product>> {
-    const url = this.API_URL + '/' + id;
+    const url = this.API_URL + id;
     const response = await apiClient.get<BaseResponseModel<Product>>(url);
     return response.data;
   }
@@ -51,25 +54,25 @@ export class ProductOnlineService implements ProductService {
   }
 
   async getProductsToSelect(): Promise<BaseResponseModel<ProductSelectView[]>> {
-    const url = this.API_URL + '/toEntry';
+    const url = this.API_URL + 'toEntry';
     const response = await apiClient.get<BaseResponseModel<ProductSelectView[]>>(url);
     return response.data;
   }
 
   async getAvailableProductsByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>> {
-    const url = this.API_URL + '/availableByCategoryId/' + categoryId;
+    const url = this.API_URL + 'availableByCategoryId/' + categoryId;
     const response = await apiClient.get<BaseResponseModel<Product[]>>(url);
     return response.data;
   }
 
   async getProductsToSaleByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>> {
-    const url = this.API_URL + '/toSaleByCategoryId/' + categoryId;
+    const url = this.API_URL + 'toSaleByCategoryId/' + categoryId;
     const response = await apiClient.get<BaseResponseModel<Product[]>>(url);
     return response.data;
   }
 
   async deleteProduct(id: string): Promise<BaseResponseModel<boolean>> {
-    const url = this.API_URL + '/' + id;
+    const url = this.API_URL + id;
     const response = await apiClient.delete<BaseResponseModel<boolean>>(url);
     return response.data;
   }
@@ -81,7 +84,7 @@ export class ProductOnlineService implements ProductService {
   }
 
   async getMaxOrder(categoryId: string): Promise<BaseResponseModel<number>> {
-    const url = this.API_URL + '/maxOrderByCategoryId/' + categoryId;
+    const url = this.API_URL + 'maxOrderByCategoryId/' + categoryId;
     const response = await apiClient.get<BaseResponseModel<number>>(url);
     return response.data;
   }
@@ -139,7 +142,7 @@ export class ProductOnlineService implements ProductService {
       isActive,
       businessId,
     };
-    const url = this.API_URL + '/' + id;
+    const url = this.API_URL + id;
     const response = await apiClient.put<BaseResponseModel<boolean>>(url, editRequest);
     return response.data;
   }
