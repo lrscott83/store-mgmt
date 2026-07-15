@@ -20,7 +20,7 @@ export function UserListPage() {
 
   function loadUsers() {
     userHttpService
-      .listUsers()
+      .getUsers()
       .then((res) => {
         setUsers(res.data);
         setError('');
@@ -63,8 +63,8 @@ export function UserListPage() {
         users={users}
         onCreate={() => navigate('/management/users/create')}
         onEdit={(id) => navigate(`/management/users/edit/${id}`)}
-        onActivate={(id) => handleLifecycleAction(userHttpService.activateUser, id)}
-        onDeactivate={(id) => handleLifecycleAction(userHttpService.deactivateUser, id)}
+        onActivate={(id) => handleLifecycleAction((userId) => userHttpService.activateUser(userId, true), id)}
+        onDeactivate={(id) => handleLifecycleAction(userHttpService.deleteUser, id)}
       />
     </div>
   );

@@ -109,7 +109,7 @@ let mockListStores = vi.fn();
 let mockGetStore = vi.fn();
 let mockCreateStore = vi.fn();
 let mockUpdateStore = vi.fn();
-let mockListModulesToStore = vi.fn();
+let mockGetModulesToStore = vi.fn();
 let mockListOwners = vi.fn();
 
 vi.mock('~/management/stores/lib/services/store-http-service', () => ({
@@ -118,7 +118,7 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     get getStore() { return mockGetStore; },
     get createStore() { return mockCreateStore; },
     get updateStore() { return mockUpdateStore; },
-    get listModulesToStore() { return mockListModulesToStore; },
+    get getModulesToStore() { return mockGetModulesToStore; },
     get listOwners() { return mockListOwners; },
   },
 }));
@@ -177,7 +177,7 @@ describe('EditStorePage — mode resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
@@ -240,7 +240,7 @@ describe('EditStorePage — create mode: success navigates to user create', () =
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
     mockCreateStore = vi.fn().mockResolvedValue({ data: makeStore() });
   });
@@ -266,7 +266,7 @@ describe('EditStorePage — create mode: HTTP error shown inline', () => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
     mockCreateStore = vi.fn().mockRejectedValue(new Error('Server error'));
   });
@@ -293,7 +293,7 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule({ name: 'Catalog Module' })] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule({ name: 'Catalog Module' })] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
@@ -303,7 +303,7 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
     await waitFor(() => {
       expect(screen.getByLabelText('Catalog Module')).toBeInTheDocument();
     });
-    expect(mockListModulesToStore).toHaveBeenCalledTimes(1);
+    expect(mockGetModulesToStore).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -312,7 +312,7 @@ describe('EditStorePage — create mode: module catalog error blocks submit', ()
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockListModulesToStore = vi.fn().mockRejectedValue(new Error('Catalog error'));
+    mockGetModulesToStore = vi.fn().mockRejectedValue(new Error('Catalog error'));
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
@@ -329,7 +329,7 @@ describe('EditStorePage — create mode: isOwnerAdmin computed from feature', ()
   beforeEach(() => {
     vi.clearAllMocks();
     mockParams = {};
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
   });
 
@@ -365,7 +365,7 @@ describe('EditStorePage — create mode: HTTP-only, no offline notice (Req: HTTP
     vi.clearAllMocks();
     mockUser = makeUser({ selectedStoreId: '' });
     mockParams = {};
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
@@ -388,7 +388,7 @@ describe('EditStorePage — edit mode: success navigates to store list', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
     mockGetMe = vi.fn().mockResolvedValue({ data: makeUser() });
@@ -411,7 +411,7 @@ describe('EditStorePage — edit mode: pre-fills form from fetched store', () =>
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Pre-filled Name' }) });
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
   });
 
@@ -430,7 +430,7 @@ describe('EditStorePage — edit mode: HTTP-only, no offline notice (Req: HTTP-O
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore() });
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
@@ -449,7 +449,7 @@ describe('EditStorePage — no BaseRepository cache read/write on load or save (
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
     mockGetMe = vi.fn().mockResolvedValue({ data: makeUser() });
@@ -475,7 +475,7 @@ describe('EditStorePage — edit mode: HTTP error shown inline without redirect'
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Edit Me' }) });
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
     mockUpdateStore = vi.fn().mockRejectedValue(new Error('Update failed'));
   });
@@ -498,7 +498,7 @@ describe('EditStorePage — edit mode: store not found shows error state', () =>
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 'nonexistent' };
     mockGetStore = vi.fn().mockRejectedValue(new Error('Not found'));
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
   });
 
@@ -517,7 +517,7 @@ describe('EditStorePage — edit mode: refreshes user after successful edit (no 
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
     mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
-    mockListModulesToStore = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
     mockListOwners = vi.fn().mockResolvedValue({ data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
     mockGetUserByToken = vi.fn().mockResolvedValue(makeUser());

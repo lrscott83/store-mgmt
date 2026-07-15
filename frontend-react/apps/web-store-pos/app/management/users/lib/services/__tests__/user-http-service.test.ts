@@ -19,7 +19,7 @@ describe('userHttpService — HTTP-1: module exists as singleton', () => {
   });
 });
 
-describe('userHttpService.listUsers — HTTP-2: GET /v1/users/all/true', () => {
+describe('userHttpService.getUsers — HTTP-2: GET /v1/users/all/true', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
@@ -31,19 +31,19 @@ describe('userHttpService.listUsers — HTTP-2: GET /v1/users/all/true', () => {
   it('calls GET /v1/users/all/true (not /storeusers/list/true)', async () => {
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    await userHttpService.listUsers();
+    await userHttpService.getUsers();
     expect(apiClient.get).toHaveBeenCalledWith('/v1/users/all/true');
   });
 
   it('returns the data array from the response', async () => {
     const { userHttpService } = await import('../user-http-service');
-    const result = await userHttpService.listUsers();
+    const result = await userHttpService.getUsers();
     expect(result.data).toHaveLength(1);
     expect(result.data[0].fullName).toBe('User One');
   });
 });
 
-describe('userHttpService.getUser — HTTP-3: GET /v1/users/:id', () => {
+describe('userHttpService.getUserById — HTTP-3: GET /v1/users/:id', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
@@ -55,13 +55,13 @@ describe('userHttpService.getUser — HTTP-3: GET /v1/users/:id', () => {
   it('calls GET /v1/users/:id with correct id', async () => {
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    await userHttpService.getUser('u1');
+    await userHttpService.getUserById('u1');
     expect(apiClient.get).toHaveBeenCalledWith('/v1/users/u1');
   });
 
   it('returns the user from the response', async () => {
     const { userHttpService } = await import('../user-http-service');
-    const result = await userHttpService.getUser('u1');
+    const result = await userHttpService.getUserById('u1');
     expect(result.data.fullName).toBe('User One');
   });
 });
@@ -106,7 +106,7 @@ describe('userHttpService.createUser — HTTP-4: POST /v1/storeusers', () => {
   });
 });
 
-describe('userHttpService.updateUserDetails — HTTP-5: PUT /v1/users/:id', () => {
+describe('userHttpService.editUser — HTTP-5: PUT /v1/users/:id', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
@@ -119,13 +119,13 @@ describe('userHttpService.updateUserDetails — HTTP-5: PUT /v1/users/:id', () =
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     const payload = { fullName: 'Updated User', cellPhone: '+456', email: 'u@test.com', isActive: true };
-    await userHttpService.updateUserDetails('u1', payload);
+    await userHttpService.editUser('u1', payload);
     expect(apiClient.put).toHaveBeenCalledWith('/v1/users/u1', payload);
   });
 
   it('returns the boolean response data', async () => {
     const { userHttpService } = await import('../user-http-service');
-    const result = await userHttpService.updateUserDetails('u1', {
+    const result = await userHttpService.editUser('u1', {
       fullName: 'X', cellPhone: '', email: '', isActive: false,
     });
     expect(result.data).toBe(true);
@@ -139,15 +139,22 @@ describe('userHttpService.activateUser — HTTP-6: POST /v1/users/activate', () 
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
   });
 
-  it('calls POST /v1/users/activate with {id, isActive:true}', async () => {
+  it('calls POST /v1/users/activate with {id, isActive} passed through', async () => {
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    await userHttpService.activateUser('u1');
+    await userHttpService.activateUser('u1', true);
     expect(apiClient.post).toHaveBeenCalledWith('/v1/users/activate', { id: 'u1', isActive: true });
+  });
+
+  it('passes isActive:false through when called with false', async () => {
+    const { userHttpService } = await import('../user-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await userHttpService.activateUser('u1', false);
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/users/activate', { id: 'u1', isActive: false });
   });
 });
 
-describe('userHttpService.deactivateUser — HTTP-7: DELETE /v1/users/:id', () => {
+describe('userHttpService.deleteUser — HTTP-7: DELETE /v1/users/:id', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
@@ -157,7 +164,7 @@ describe('userHttpService.deactivateUser — HTTP-7: DELETE /v1/users/:id', () =
   it('calls DELETE /v1/users/:id', async () => {
     const { userHttpService } = await import('../user-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    await userHttpService.deactivateUser('u1');
+    await userHttpService.deleteUser('u1');
     expect(apiClient.delete).toHaveBeenCalledWith('/v1/users/u1');
   });
 });

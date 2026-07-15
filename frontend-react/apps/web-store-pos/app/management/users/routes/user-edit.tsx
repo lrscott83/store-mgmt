@@ -32,7 +32,7 @@ export function UserEditPage() {
   useEffect(() => {
     if (!userId) return;
     userHttpService
-      .getUser(userId)
+      .getUserById(userId)
       .then((res) => {
         setStoreUser(res.data);
         setLoadError('');
@@ -52,7 +52,7 @@ export function UserEditPage() {
     setDetailsError('');
     setDetailsLoading(true);
     try {
-      await userHttpService.updateUserDetails(userId, values);
+      await userHttpService.editUser(userId, values);
       navigate('/management/users');
     } catch {
       setDetailsError(intl.formatMessage({ id: 'USERS.ERROR' }));

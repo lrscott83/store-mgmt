@@ -47,7 +47,7 @@ export function EditStorePage() {
     if (isEditMode) {
       Promise.all([
         storeHttpService.getStore(storeId),
-        storeHttpService.listModulesToStore(),
+        storeHttpService.getModulesToStore(),
         (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve({ data: [] as Owner[] }),
       ])
         .then(([storeRes, modulesRes, ownersRes]) => {
@@ -77,7 +77,7 @@ export function EditStorePage() {
         });
     } else {
       Promise.all([
-        storeHttpService.listModulesToStore(),
+        storeHttpService.getModulesToStore(),
         (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve({ data: [] as Owner[] }),
       ])
         .then(([modulesRes, ownersRes]) => {

@@ -19,14 +19,14 @@ interface UpdateUserDetailsPayload {
 }
 
 export const userHttpService = {
-  async listUsers(): Promise<BaseResponseModel<User[]>> {
+  async getUsers(): Promise<BaseResponseModel<User[]>> {
     const response = await apiClient.get<BaseResponseModel<User[]>>(
       '/v1/users/all/true'
     );
     return response.data;
   },
 
-  async getUser(id: string): Promise<BaseResponseModel<User>> {
+  async getUserById(id: string): Promise<BaseResponseModel<User>> {
     const response = await apiClient.get<BaseResponseModel<User>>(
       `/v1/users/${id}`
     );
@@ -41,7 +41,7 @@ export const userHttpService = {
     return response.data;
   },
 
-  async updateUserDetails(id: string, payload: UpdateUserDetailsPayload): Promise<BaseResponseModel<boolean>> {
+  async editUser(id: string, payload: UpdateUserDetailsPayload): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.put<BaseResponseModel<boolean>>(
       `/v1/users/${id}`,
       payload
@@ -49,15 +49,15 @@ export const userHttpService = {
     return response.data;
   },
 
-  async activateUser(id: string): Promise<BaseResponseModel<boolean>> {
+  async activateUser(id: string, isActive: boolean): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.post<BaseResponseModel<boolean>>(
       '/v1/users/activate',
-      { id, isActive: true }
+      { id, isActive }
     );
     return response.data;
   },
 
-  async deactivateUser(id: string): Promise<BaseResponseModel<boolean>> {
+  async deleteUser(id: string): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.delete<BaseResponseModel<boolean>>(
       `/v1/users/${id}`
     );

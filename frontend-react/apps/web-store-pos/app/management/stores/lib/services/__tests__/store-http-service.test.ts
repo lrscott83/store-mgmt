@@ -206,7 +206,7 @@ describe('storeHttpService.deactivateStore — HTTP-9: DELETE /v1/stores/:id', (
   });
 });
 
-describe('storeHttpService.listModulesToStore — HTTP-11: GET /v1/modules/ToStore', () => {
+describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStore', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
@@ -218,13 +218,13 @@ describe('storeHttpService.listModulesToStore — HTTP-11: GET /v1/modules/ToSto
   it('calls GET /v1/modules/ToStore', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
-    await storeHttpService.listModulesToStore();
+    await storeHttpService.getModulesToStore();
     expect(apiClient.get).toHaveBeenCalledWith('/v1/modules/ToStore');
   });
 
   it('returns module array from response', async () => {
     const { storeHttpService } = await import('../store-http-service');
-    const result = await storeHttpService.listModulesToStore();
+    const result = await storeHttpService.getModulesToStore();
     expect(result.data).toHaveLength(1);
     expect(result.data[0].name).toBe('Module A');
   });

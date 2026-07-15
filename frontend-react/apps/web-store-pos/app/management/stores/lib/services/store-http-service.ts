@@ -83,7 +83,7 @@ export const storeHttpService = {
     return response.data;
   },
 
-  async listModulesToStore(): Promise<BaseResponseModel<Module[]>> {
+  async getModulesToStore(): Promise<BaseResponseModel<Module[]>> {
     const response = await apiClient.get<BaseResponseModel<Module[]>>(
       '/v1/modules/ToStore'
     );
