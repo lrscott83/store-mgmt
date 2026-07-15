@@ -18,7 +18,7 @@ Se ejecutó un SDD sobre estos gaps con el **código como única fuente de verda
 
 - ✅ **Resuelto:** interceptor de errores (WU3, commit `20fbbc8`), CSV robusto (WU4, commit `b82bbbf`), 3 inventos rule-12 eliminados (WU-R, commit `621d411`).
 - ↩️ **No era gap (reclasificado leyendo el código):** `base.service`, `owner-details`/`getOwnerDetailsById`, `deleteReSeller`, `MessageService`, `store-module-state`, `data.service`, auth `forgotPassword`/`signInGoogle`/`createUser`/`registration`, `AddressModel`/`SocialNetworksModel`/`Message`, i18n `setLanguage`. Todos **dead-code de Angular** (call-site comentado, cuerpo vacío o componente nunca renderizado) → regla 10/12: NO se portan.
-- ⏳ **Sigue abierto (fuera de scope — mecánica de framework/PWA, NO contrato de datos):** `download-manager`, `preloading`, `splash-screen`, `LoadingOverlay` sin cablear. Requieren decisión de UX.
+- ✅ **PWA cerrado (SDD `pwa-framework-parity`, 2026-07-15):** `preloading` portado (WU-1, commit `b0847cf`) y spinner global HTTP cableado con el `LoadingOverlay` existente (WU-2, commit `1424f07`). `download-manager` y `splash-screen` verificados como **dead-code de Angular** (output nunca renderizado / componente nunca importado) → no se portan. Verify PASS, suite 1656/1656.
 
 Detalle por ítem en §6 (actualizada) y §7.
 
@@ -191,10 +191,11 @@ Los 12 ítems que el reporte marcó como 🔴, re-verificados contra call-sites 
 | 8 | auth `forgotPassword`/`signInGoogle`/`createUser`/`registration`/server-`logout` | ↩️ No era gap | Sin call-sites vivos (solo `registerOwner`, ya portado como `register`). Dead code. |
 | 9 | Interceptor de errores | ✅ **Resuelto (WU3)** | 401→`authStore.logout()`, 500→dialog, network tag. Commit `20fbbc8`. Salvedad: envelope network-error no byte-idéntico (sin consumidor vivo). |
 | 10 | `AddressModel`/`SocialNetworksModel`/`Message` | ↩️ No era gap | Cero usos en Angular. Dead code. |
-| 11 | PWA: `download-manager`, `preloading`, `splash-screen`, `LoadingOverlay` sin cablear | ⏳ **Abierto** | Mecánica de framework/UX, **fuera de scope** del SDD. No es contrato de datos. Decisión pendiente. |
+| 11 | PWA: `preloading`, `LoadingService`/spinner | ✅ **Resuelto (SDD pwa-framework-parity)** | `preloading` portado (WU-1, `b0847cf`); spinner global HTTP cableado al `LoadingOverlay` existente (WU-2, `1424f07`). Verify PASS. |
+| 11b | PWA: `download-manager`, `splash-screen` | ↩️ No era gap | Verificado en código: `download-manager` output nunca renderizado (`app.component.html` no bindea sus observables); `splash-screen` módulo/componente nunca importado. Dead code. |
 | 12 | i18n `setLanguage`/`loadTranslations` | ↩️ No era gap | Solo `loadTranslations` vivo (cubierto por `es.ts` estático); `setLanguage` sin caller, locale único `es`. Dead code. |
 
-**Balance:** 2 resueltos con código (WU3, WU4), 9 reclasificados como dead-code de Angular (regla 10/12 → no se portan), 1 abierto fuera de scope (PWA framework).
+**Balance:** todo cerrado. Resueltos con código: interceptor (WU3), CSV (WU4), `preloading` + spinner global (SDD `pwa-framework-parity`). El resto reclasificado como dead-code de Angular (regla 10/12 → no se portan). **Nada abierto.**
 
 ## 7. Extras React sin origen Angular (rule 12) — decididos por grep de consumidores
 
