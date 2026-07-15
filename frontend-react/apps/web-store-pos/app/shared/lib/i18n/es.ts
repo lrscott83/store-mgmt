@@ -195,6 +195,7 @@ const messages: Record<string, string> = {
   'PRODUCTS.CSV.ERROR.MISSING_NAME': 'El nombre es requerido',
   'PRODUCTS.CSV.ERROR.MISSING_PRICE': 'El precio es requerido',
   'PRODUCTS.CSV.ERROR.INVALID_PRICE': 'El precio debe ser un número válido',
+  'PRODUCTS.CSV.ERROR.MISSING_CATEGORY': 'La categoría es requerida',
   'PRODUCTS.CSV.ERROR.DUPLICATE_BARCODE': 'El código de barras ya existe',
   // PRODUCTS.CSV preview-table column headers/status badges — this client-side CSV preview
   // (parse + per-row validation table) has NO Angular counterpart at all (Angular's

@@ -9,6 +9,7 @@ const CSV_ROW_ERROR_MESSAGE_KEYS: Record<CsvRowError['errorCode'], string> = {
   MISSING_NAME: 'PRODUCTS.CSV.ERROR.MISSING_NAME',
   MISSING_PRICE: 'PRODUCTS.CSV.ERROR.MISSING_PRICE',
   INVALID_PRICE: 'PRODUCTS.CSV.ERROR.INVALID_PRICE',
+  MISSING_CATEGORY: 'PRODUCTS.CSV.ERROR.MISSING_CATEGORY',
 };
 
 interface CsvProductImporterModalProps {
@@ -124,7 +125,7 @@ export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporte
                     <td className="px-3 py-1.5 text-gray-500">{i + 1}</td>
                     <td className="px-3 py-1.5 text-gray-800">{product.name}</td>
                     <td className="px-3 py-1.5 text-gray-800">${product.price.toFixed(2)}</td>
-                    <td className="px-3 py-1.5 text-gray-500">{product.category ?? '-'}</td>
+                    <td className="px-3 py-1.5 text-gray-500">{product.category}</td>
                     <td className="px-3 py-1.5">
                       <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
                         {intl.formatMessage({ id: 'PRODUCTS.CSV.STATUS_VALID' })}
