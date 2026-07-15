@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { useLoadingStore } from '~/shared/lib/stores/loading-store';
 
 const mockNavigate = vi.fn();
 const mockRegisterAuthRedirect = vi.fn();
@@ -34,6 +35,7 @@ import App from '../root';
 describe('App (root) — registers the auth-store redirect handler on mount (Decision 2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useLoadingStore.setState({ count: 0, isLoading: false });
   });
 
   it('calls registerAuthRedirect with the router navigate function on mount', () => {
@@ -44,5 +46,40 @@ describe('App (root) — registers the auth-store redirect handler on mount (Dec
     );
 
     expect(mockRegisterAuthRedirect).toHaveBeenCalledWith(mockNavigate);
+  });
+});
+
+// Angular parity: app.component.ts:33 (`loading$ = loadingService.loading$`) +
+// app.component.html:2-6 (`@if (loading$ | async) { <div class="http-loading-overlay">... }`)
+// — a full-screen overlay renders above the router outlet whenever an HTTP
+// request is in flight, and disappears the instant it isn't.
+describe('App (root) — global HTTP-loading overlay (Angular app.component.html:2-6 parity)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useLoadingStore.setState({ count: 0, isLoading: false });
+  });
+
+  it('does not render the loading overlay when no request is in flight', () => {
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('renders the loading overlay when useLoadingStore.isLoading is true', () => {
+    useLoadingStore.setState({ count: 1, isLoading: true });
+
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
+
+    // LoadingOverlay nests a Spinner, and both carry role="status" (overlay
+    // container + inner spinner icon), so assert at least one is present.
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
   });
 });

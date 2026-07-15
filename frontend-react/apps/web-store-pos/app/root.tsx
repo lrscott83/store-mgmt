@@ -13,6 +13,8 @@ import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
 import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
 import { registerAuthRedirect } from '~/shared/lib/stores/auth-store';
+import { useLoadingStore } from '~/shared/lib/stores/loading-store';
+import { LoadingOverlay } from '@store-mgmt/web-common/client';
 
 import '@store-mgmt/web-common/styles.css';
 
@@ -36,6 +38,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const navigate = useNavigate();
+  const isLoading = useLoadingStore((state) => state.isLoading);
 
   useEffect(() => {
     registerServiceWorker();
@@ -54,7 +57,14 @@ export default function App() {
   // `~/shared/lib/usage/store-usage-tracker.ts`).
   useStoreUsageTracker();
 
-  return <Outlet />;
+  return (
+    <>
+      {/* Angular app.component.html:2-6 — global overlay renders above the
+          router outlet whenever loadingService's request count > 0. */}
+      {isLoading && <LoadingOverlay />}
+      <Outlet />
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

@@ -3,6 +3,7 @@ import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosError } from 'axios';
 import { StorageKeys } from '../../storage/storage-keys';
 import esMessages from '../../i18n/es';
+import { useLoadingStore } from '../../stores/loading-store';
 
 // StorageKeys.TOKEN = 'token' (hard-coded to avoid circular config import in tests)
 const TOKEN_KEY = 'token';
@@ -21,6 +22,7 @@ beforeEach(() => {
   localStorage.clear();
   vi.resetModules();
   fireMock.mockClear();
+  useLoadingStore.setState({ count: 0, isLoading: false });
 });
 
 afterEach(() => {
@@ -43,6 +45,14 @@ function getResponseInterceptor(instance: ReturnType<typeof axios.create>) {
   const handler = handlers.find((h) => h !== null && typeof h?.rejected === 'function');
   if (!handler?.rejected) throw new Error('Response interceptor not found');
   return handler.rejected as (error: AxiosError) => Promise<never>;
+}
+
+function getResponseSuccessInterceptor(instance: ReturnType<typeof axios.create>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handlers: Array<{ fulfilled?: unknown } | null> = (instance.interceptors.response as any).handlers;
+  const handler = handlers.find((h) => h !== null && typeof h?.fulfilled === 'function');
+  if (!handler?.fulfilled) throw new Error('Response success interceptor not found');
+  return handler.fulfilled as (response: unknown) => unknown;
 }
 
 describe('api-client (AUTH-06)', () => {
@@ -323,6 +333,131 @@ describe('api-client (AUTH-06)', () => {
       }
 
       expect(fireMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Global loading spinner (Angular loading-interceptor.service.ts:13-22 parity)', () => {
+    it('calls loadingStore.start() from the request interceptor (Angular loading-interceptor.service.ts:15)', async () => {
+      const { apiClient } = await import('../api-client');
+      // Same-module-registry-cycle import (no vi.resetModules() between these
+      // two imports) so the spy attaches to the exact store instance the
+      // interceptor calls into — mirrors the useAuthStore pattern above.
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const startSpy = vi.spyOn(useLoadingStore.getState(), 'start');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+      const config = {
+        headers: { ...axios.defaults.headers.common },
+        url: '/test',
+        method: 'get',
+      } as unknown as InternalAxiosRequestConfig;
+
+      fulfilled(config);
+
+      expect(startSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls loadingStore.stop() on a successful response (Angular finalize() success path)', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const stopSpy = vi.spyOn(useLoadingStore.getState(), 'stop');
+
+      const fulfilled = getResponseSuccessInterceptor(apiClient);
+      fulfilled({ data: {} });
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls loadingStore.stop() on a network error (no response) — never sticks the overlay', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const stopSpy = vi.spyOn(useLoadingStore.getState(), 'stop');
+
+      const rejected = getResponseInterceptor(apiClient);
+      const networkError = new axios.AxiosError(
+        'Network Error',
+        'ERR_NETWORK',
+        undefined,
+        undefined,
+        undefined
+      );
+
+      try {
+        await rejected(networkError);
+      } catch {
+        // Expected: interceptor always rejects
+      }
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls loadingStore.stop() on a 401 error — never sticks the overlay', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const stopSpy = vi.spyOn(useLoadingStore.getState(), 'stop');
+
+      const rejected = getResponseInterceptor(apiClient);
+      const mockError = new axios.AxiosError('Unauthorized', '401', undefined, undefined, {
+        status: 401,
+        data: {},
+        headers: {},
+        config: {} as InternalAxiosRequestConfig,
+        statusText: 'Unauthorized',
+      });
+
+      try {
+        await rejected(mockError);
+      } catch {
+        // Expected: interceptor always rejects
+      }
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls loadingStore.stop() on a 500 error — never sticks the overlay', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const stopSpy = vi.spyOn(useLoadingStore.getState(), 'stop');
+
+      const rejected = getResponseInterceptor(apiClient);
+      const mockError = new axios.AxiosError('Internal Server Error', '500', undefined, undefined, {
+        status: 500,
+        data: {},
+        headers: {},
+        config: {} as InternalAxiosRequestConfig,
+        statusText: 'Internal Server Error',
+      });
+
+      try {
+        await rejected(mockError);
+      } catch {
+        // Expected: interceptor always rejects
+      }
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls loadingStore.stop() on a generic (non-401/500) HTTP error — e.g. 404', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const stopSpy = vi.spyOn(useLoadingStore.getState(), 'stop');
+
+      const rejected = getResponseInterceptor(apiClient);
+      const mockError = new axios.AxiosError('Not Found', '404', undefined, undefined, {
+        status: 404,
+        data: {},
+        headers: {},
+        config: {} as InternalAxiosRequestConfig,
+        statusText: 'Not Found',
+      });
+
+      try {
+        await rejected(mockError);
+      } catch {
+        // Expected: interceptor always rejects
+      }
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

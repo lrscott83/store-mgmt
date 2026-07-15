@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { StorageService } from '../auth/storage-service';
 import { useAuthStore } from '../stores/auth-store';
+import { useLoadingStore } from '../stores/loading-store';
 import { showBlockingError } from '../blocking-alert';
 import esMessages from '../i18n/es';
 
@@ -14,7 +15,12 @@ export const apiClient = axios.create({
   },
 });
 
+// Mirrors Angular's loading-interceptor.service.ts:13-22 (LoadingInterceptor):
+// start() fires before every request; stop() fires in finalize() so it runs
+// on BOTH the success and error response paths below. This axios request
+// interceptor is the React port of `intercept()`'s `this.loadingService.start()`.
 apiClient.interceptors.request.use((config) => {
+  useLoadingStore.getState().start();
   const token = StorageService.getTokenFromLocalStorage();
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
@@ -28,8 +34,18 @@ apiClient.interceptors.request.use((config) => {
 // network-error tagging, 401 -> AuthService.logout() delegation, 500 -> Swal
 // blocking dialog.
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Angular finalize() success path (loading-interceptor.service.ts:18-20).
+    useLoadingStore.getState().stop();
+    return response;
+  },
   (error) => {
+    // Angular finalize() error path — runs on EVERY error branch below
+    // (network, 401, 500, generic), exactly like RxJS finalize() firing on
+    // both next and error notifications. Called once, unconditionally, so no
+    // branch can accidentally forget it and leave the overlay stuck.
+    useLoadingStore.getState().stop();
+
     if (axios.isAxiosError(error)) {
       // Angular error-interceptor.service.ts:52-59: `err.status === 0 ||
       // err.name === 'TimeoutError' || err.message?.includes('Network')` never
