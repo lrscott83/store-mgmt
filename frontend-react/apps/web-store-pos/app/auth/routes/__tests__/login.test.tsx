@@ -14,8 +14,13 @@ vi.mock('~/shared/lib/auth/connectivity-service', () => ({
   },
 }));
 
+vi.mock('~/shared/lib/pwa/preload-heavy-chunks', () => ({
+  preloadHeavyChunks: vi.fn(),
+}));
+
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
+import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 import LoginPage from '../login';
 import type { UserModel } from '@store-mgmt/domain';
 
@@ -103,6 +108,25 @@ describe('LoginPage (AUTH-01)', () => {
 
     await waitFor(() => {
       expect(loginFn).toHaveBeenCalledWith('user@test.com', 'password123');
+    });
+  });
+
+  // PWA-PRELOAD-1: mirrors Angular's login.component.ts:171 submit() success
+  // path, which calls navigateToUserHome() -> preloadHeavyChunks().
+  it('preloads the heavy route chunks on successful login (AUTH-01 + PWA-PRELOAD-1)', async () => {
+    const loginFn = vi.fn().mockResolvedValue(makeUser());
+    renderLogin(loginFn);
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'user@test.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+      target: { value: 'password123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+
+    await waitFor(() => {
+      expect(preloadHeavyChunks).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -6,7 +6,12 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
   },
 }));
 
+vi.mock('~/shared/lib/pwa/preload-heavy-chunks', () => ({
+  preloadHeavyChunks: vi.fn(),
+}));
+
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 import {
   authLoader,
   guestOnlyLoader,
@@ -108,6 +113,21 @@ describe('Route Loaders (AUTH-04)', () => {
       setAuthState(makeUser({ isReSeller: true }));
       const res = (await guestOnlyLoader()) as Response;
       expect(res.headers.get('Location')).toBe('/admin/owners');
+    });
+
+    // PWA-PRELOAD-1: mirrors Angular's login.component.ts:50 constructor
+    // already-authenticated path, which calls navigateToUserHome() ->
+    // preloadHeavyChunks().
+    it('preloads the heavy route chunks before redirecting an authenticated user', async () => {
+      setAuthState(makeUser());
+      await guestOnlyLoader();
+      expect(preloadHeavyChunks).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not preload when not authenticated', async () => {
+      setAuthState(null);
+      await guestOnlyLoader();
+      expect(preloadHeavyChunks).not.toHaveBeenCalled();
     });
   });
 

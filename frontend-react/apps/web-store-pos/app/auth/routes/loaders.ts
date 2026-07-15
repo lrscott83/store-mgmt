@@ -3,6 +3,7 @@ import type { LoaderFunctionArgs } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
+import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 
 function getAuthState() {
   return useAuthStore.getState();
@@ -27,8 +28,11 @@ export async function authLoader(): Promise<Response | null> {
 export async function guestOnlyLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   // An already-authenticated user hitting /login is sent to their real home view
-  // (Angular's navigateToUserHome()), NOT to a bare '/' landing.
+  // (Angular's navigateToUserHome()), NOT to a bare '/' landing. Also warm the
+  // heavy route chunks here, mirroring Angular's second navigateToUserHome()
+  // call-site (login.component.ts:50, the constructor's already-authenticated redirect).
   if (isAuthenticated && user) {
+    preloadHeavyChunks();
     return redirect(await resolveUserHomePath(user));
   }
   return null;

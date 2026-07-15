@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
+import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -57,7 +58,9 @@ export default function LoginPage() {
 
     try {
       const user = await login(form.email, form.password);
-      // Mirror Angular's navigateToUserHome() (shared with guestOnlyLoader).
+      // Mirror Angular's navigateToUserHome() (shared with guestOnlyLoader):
+      // warm the heavy route chunks, then resolve where to land.
+      preloadHeavyChunks();
       navigate(await resolveUserHomePath(user));
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
