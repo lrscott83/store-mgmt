@@ -14,10 +14,10 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
   return { useAuthStore };
 });
 
-vi.mock('~/statistics/lib/services/statistics-aggregation-service', () => ({
-  StatisticsAggregationService: vi.fn().mockImplementation(() => ({
-    getDailySales: vi.fn().mockReturnValue([]),
-    getDailyProfit: vi.fn().mockReturnValue([]),
+vi.mock('~/sales/lib/services/order-offline-service', () => ({
+  OrderOfflineService: vi.fn().mockImplementation(() => ({
+    getLastMonthSales: vi.fn().mockReturnValue([]),
+    getLastMonthSaleProfits: vi.fn().mockReturnValue([]),
   })),
 }));
 

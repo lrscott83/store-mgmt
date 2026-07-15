@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EModules, OrderErrors, PaymentType, OrderType } from '@store-mgmt/domain';
 import type { Order, Product, InventoryEntryCost, OrderItem, UserModel } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
@@ -54,6 +54,7 @@ vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
 import { OrderOfflineService } from '../order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { SaleCreditOfflineService } from '../sale-credit-offline-service';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
@@ -1329,6 +1330,370 @@ describe('OrderOfflineService', () => {
       expect(result.succeeded).toBe(true);
       expect(service.getStorageOrders()).toHaveLength(1);
       expect(findOrder('missing-id')).toBeUndefined();
+    });
+  });
+
+  // Rule 12 relocation: this logic used to live in a standalone (invented)
+  // `StatisticsAggregationService` class. Angular keeps it ON `OrderOfflineService`
+  // (`getLastMonthSales`/`getLastMonthSaleProfits`, order-offline.service.ts:211-244), so
+  // these tests were moved here (adapted from mocked collaborators to the real,
+  // localStorage-backed service, since `getLastMonthSales`/`getLastMonthSaleProfits` now run
+  // for real). Angular takes NO date parameter (rule 3, strict signature parity) — `new
+  // Date()` is pinned via `vi.useFakeTimers()`/`vi.setSystemTime()` for determinism.
+  describe('getLastMonthSales (statistics aggregation, rule 12 relocation)', () => {
+    const TODAY = new Date('2026-05-28T12:00:00.000Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(TODAY);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function dayAgo(daysAgo: number): Date {
+      const d = new Date(TODAY);
+      d.setDate(d.getDate() - daysAgo);
+      d.setHours(10, 0, 0, 0);
+      return d;
+    }
+
+    function dayStr(date: Date): string {
+      return date.toISOString().slice(0, 10);
+    }
+
+    it('returns exactly 30 entries even with no orders', () => {
+      expect(service.getLastMonthSales()).toHaveLength(30);
+    });
+
+    it('all entries are zero when no orders exist', () => {
+      for (const point of service.getLastMonthSales()) {
+        expect(point.value).toBe(0);
+      }
+    });
+
+    it('each entry has a Date label', () => {
+      for (const point of service.getLastMonthSales()) {
+        expect(point.label).toBeInstanceOf(Date);
+      }
+    });
+
+    it('labels span 30 days ending on today (last entry = today)', () => {
+      const result = service.getLastMonthSales();
+      expect(dayStr(result[result.length - 1].label)).toBe(dayStr(TODAY));
+    });
+
+    it('aggregates value correctly for a day with orders', () => {
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: dayAgo(0),
+          isActive: true,
+          // getLastMonthSales -> getActiveOrdersPriceBetweenDates sums Order.total (Angular
+          // parity, order-offline.service.ts:167-170), NOT a per-item recomputation.
+          total: 50,
+          orderItems: [
+            orderItemFor('p1', 'Product 1', { price: 10, qty: 3 }),
+            orderItemFor('p2', 'Product 2', { price: 5, qty: 4 }),
+          ],
+        }),
+      ]);
+
+      const result = service.getLastMonthSales();
+      const todayPoint = result.find((p) => dayStr(p.label) === dayStr(TODAY));
+      expect(todayPoint).toBeDefined();
+      // revenue = 10*3 + 5*4 = 50
+      expect(todayPoint!.value).toBe(50);
+    });
+
+    it('groups multiple orders on the same day', () => {
+      const orderDate = dayAgo(1);
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: orderDate,
+          isActive: true,
+          total: 20,
+          orderItems: [orderItemFor('p1', 'Product 1', { price: 10, qty: 2 })],
+        }),
+        makeOrder({
+          id: 'o2',
+          date: orderDate,
+          isActive: true,
+          total: 20,
+          orderItems: [orderItemFor('p2', 'Product 2', { price: 5, qty: 4 })],
+        }),
+      ]);
+
+      const result = service.getLastMonthSales();
+      const point = result.find((p) => dayStr(p.label) === dayStr(orderDate));
+      expect(point!.value).toBe(40); // 20 + 20
+    });
+
+    it('zero-fills days with no orders (STAT-6)', () => {
+      const orderDate = dayAgo(5);
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: orderDate,
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Product 1', { price: 20, qty: 1 })],
+        }),
+      ]);
+
+      const zeroPoints = service
+        .getLastMonthSales()
+        .filter((p) => dayStr(p.label) !== dayStr(orderDate));
+      for (const point of zeroPoints) {
+        expect(point.value).toBe(0);
+      }
+    });
+
+    it('excludes inactive orders (getActiveOrdersPriceBetweenDates filters isActive)', () => {
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'inactive',
+          date: dayAgo(0),
+          isActive: false,
+          orderItems: [orderItemFor('p1', 'Product 1', { price: 100, qty: 1 })],
+        }),
+      ]);
+      for (const point of service.getLastMonthSales()) {
+        expect(point.value).toBe(0);
+      }
+    });
+
+    it('queries each bucket with its OWN [dayStart, dayStart+1) window — NOT Angular\'s buggy always-today window', () => {
+      const spy = vi.spyOn(service, 'getActiveOrdersPriceBetweenDates');
+
+      service.getLastMonthSales();
+
+      // 30 calls, one per bucket, each with a DIFFERENT start date (proves per-day windows,
+      // not a single repeated "today" window like Angular's getLastMonthSales bug).
+      expect(spy).toHaveBeenCalledTimes(30);
+      const callStarts = spy.mock.calls.map((args) => (args[0] as Date).getTime());
+      const uniqueStarts = new Set(callStarts);
+      expect(uniqueStarts.size).toBe(30);
+
+      // Each call's end = start + 1 day.
+      for (const [start, end] of spy.mock.calls as [Date, Date][]) {
+        const diffMs = end.getTime() - start.getTime();
+        expect(diffMs).toBe(24 * 60 * 60 * 1000);
+      }
+
+      spy.mockRestore();
+    });
+  });
+
+  describe('getLastMonthSaleProfits (statistics aggregation, rule 12 relocation)', () => {
+    const TODAY = new Date('2026-05-28T12:00:00.000Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(TODAY);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function dayAgo(daysAgo: number): Date {
+      const d = new Date(TODAY);
+      d.setDate(d.getDate() - daysAgo);
+      d.setHours(10, 0, 0, 0);
+      return d;
+    }
+
+    function dayStr(date: Date): string {
+      return date.toISOString().slice(0, 10);
+    }
+
+    function seedExpense(date: Date, total: number): void {
+      const existingRaw = localStorage.getItem(`lizoft.store-expenses-${storeId}`);
+      const existing = existingRaw ? JSON.parse(existingRaw) : [];
+      existing.push({
+        id: crypto.randomUUID(),
+        type: 1,
+        total,
+        date,
+        paymentType: PaymentType.Efectivo,
+        note: '',
+        isActive: true,
+        createdDate: date,
+        createdByName: 'test',
+        updatedDate: undefined,
+        updatedByName: undefined,
+      });
+      localStorage.setItem(`lizoft.store-expenses-${storeId}`, JSON.stringify(existing));
+    }
+
+    it('returns exactly 30 entries', () => {
+      expect(service.getLastMonthSaleProfits()).toHaveLength(30);
+    });
+
+    it('all entries are zero when no orders or expenses exist', () => {
+      for (const point of service.getLastMonthSaleProfits()) {
+        expect(point.value).toBe(0);
+      }
+    });
+
+    it('each entry has a Date label', () => {
+      for (const point of service.getLastMonthSaleProfits()) {
+        expect(point.label).toBeInstanceOf(Date);
+      }
+    });
+
+    it('calculates profit via calculateOrderProfit (uses productCosts, not inventory)', () => {
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: dayAgo(0),
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Product 1', { price: 20, qty: 3, costPrice: 12 })],
+        }),
+      ]);
+
+      const result = service.getLastMonthSaleProfits();
+      const todayPoint = result.find((p) => dayStr(p.label) === dayStr(TODAY));
+      // profit = (20*3) - (12*3) = 60 - 36 = 24
+      expect(todayPoint!.value).toBe(24);
+    });
+
+    it('profit sums across multiple items in one order', () => {
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: dayAgo(0),
+          isActive: true,
+          orderItems: [
+            orderItemFor('p1', 'Product 1', { price: 10, qty: 2, costPrice: 6 }),
+            orderItemFor('p2', 'Product 2', { price: 5, qty: 4, costPrice: 3 }),
+          ],
+        }),
+      ]);
+
+      const result = service.getLastMonthSaleProfits();
+      const todayPoint = result.find((p) => dayStr(p.label) === dayStr(TODAY));
+      // item1: 10*2 - 6*2 = 8; item2: 5*4 - 3*4 = 8; total = 16
+      expect(todayPoint!.value).toBe(16);
+    });
+
+    it('zero-fills days with no orders', () => {
+      const orderDate = dayAgo(3);
+      seedOrders(storeId, [
+        makeOrder({
+          id: 'o1',
+          date: orderDate,
+          isActive: true,
+          orderItems: [orderItemFor('p1', 'Product 1', { price: 10, qty: 1, costPrice: 4 })],
+        }),
+      ]);
+
+      const zeroPoints = service
+        .getLastMonthSaleProfits()
+        .filter((p) => dayStr(p.label) !== dayStr(orderDate));
+      for (const point of zeroPoints) {
+        expect(point.value).toBe(0);
+      }
+    });
+
+    // WU6: Daily Profit Nets Out Expenses (Angular parity — getLastMonthSaleProfits
+    // subtracts expenseService.getActiveExpensesPriceBetweenDates, order-offline.service.ts:223).
+    describe('expense netting', () => {
+      it('nets orders and expenses for the day: value = orderProfit(day) - expenses(day)', () => {
+        const orderDate = dayAgo(0);
+        seedOrders(storeId, [
+          makeOrder({
+            id: 'o1',
+            date: orderDate,
+            isActive: true,
+            orderItems: [orderItemFor('p1', 'Product 1', { price: 20, qty: 3, costPrice: 12 })],
+          }),
+        ]);
+        // orderProfit = (20*3) - (12*3) = 24
+        seedExpense(orderDate, 10);
+
+        const result = service.getLastMonthSaleProfits();
+        const todayPoint = result.find((p) => dayStr(p.label) === dayStr(TODAY));
+        // 24 - 10 = 14
+        expect(todayPoint!.value).toBe(14);
+      });
+
+      it('a day with only expenses (no orders) yields a negative value', () => {
+        // Seed a 30-total expense on EVERY one of the 30 bucket days.
+        for (let i = 0; i <= 29; i++) {
+          seedExpense(dayAgo(i), 30);
+        }
+
+        const result = service.getLastMonthSaleProfits();
+        // Every bucket has 0 order profit and 30 in expenses -> -30 everywhere.
+        for (const point of result) {
+          expect(point.value).toBe(-30);
+        }
+      });
+
+      it('a day with 0 expenses is unaffected (matches Angular no-expense baseline)', () => {
+        const orderDate = dayAgo(0);
+        seedOrders(storeId, [
+          makeOrder({
+            id: 'o1',
+            date: orderDate,
+            isActive: true,
+            orderItems: [orderItemFor('p1', 'Product 1', { price: 20, qty: 3, costPrice: 12 })],
+          }),
+        ]);
+
+        const result = service.getLastMonthSaleProfits();
+        const todayPoint = result.find((p) => dayStr(p.label) === dayStr(TODAY));
+        expect(todayPoint!.value).toBe(24);
+      });
+
+      it("queries expenses per-bucket with each day's OWN [dayStart, dayStart+1) window — NOT Angular's buggy always-today window", () => {
+        const spy = vi.spyOn(ExpenseOfflineService.prototype, 'getActiveExpensesPriceBetweenDates');
+
+        service.getLastMonthSaleProfits();
+
+        // 30 calls, one per bucket, each with a DIFFERENT start date (proves per-day windows,
+        // not a single repeated "today" window like Angular's getLastMonthSaleProfits bug).
+        expect(spy).toHaveBeenCalledTimes(30);
+        const callStarts = spy.mock.calls.map((args) => (args[0] as Date).getTime());
+        const uniqueStarts = new Set(callStarts);
+        expect(uniqueStarts.size).toBe(30);
+
+        // Each call's end = start + 1 day.
+        for (const [start, end] of spy.mock.calls as [Date, Date][]) {
+          const diffMs = end.getTime() - start.getTime();
+          expect(diffMs).toBe(24 * 60 * 60 * 1000);
+        }
+
+        spy.mockRestore();
+      });
+
+      it('nets expenses independently per bucket (per-bucket isolation)', () => {
+        const day0 = dayAgo(0);
+        const day5 = dayAgo(5);
+        seedOrders(storeId, [
+          makeOrder({
+            id: 'o1',
+            date: day0,
+            isActive: true,
+            orderItems: [orderItemFor('p1', 'Product 1', { price: 10, qty: 1 })], // profit 10
+          }),
+          makeOrder({
+            id: 'o2',
+            date: day5,
+            isActive: true,
+            orderItems: [orderItemFor('p2', 'Product 2', { price: 50, qty: 1 })], // profit 50
+          }),
+        ]);
+        // Only the day-5 bucket has an expense of 20; every other bucket has 0.
+        seedExpense(day5, 20);
+
+        const result = service.getLastMonthSaleProfits();
+        expect(result.find((p) => dayStr(p.label) === dayStr(TODAY))!.value).toBe(10); // unaffected
+        expect(result.find((p) => dayStr(p.label) === dayStr(day5))!.value).toBe(30); // 50 - 20
+      });
     });
   });
 });

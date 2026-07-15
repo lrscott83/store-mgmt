@@ -4,6 +4,7 @@ import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
@@ -20,6 +21,17 @@ import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 export interface TopProduct {
   id: string;
   name: string;
+  value: number;
+}
+
+/**
+ * ChartData — mirrors Angular's presentation view model
+ * (`presentation/_models/chart-data,model.ts:1-4`) returned by `getLastMonthSales`/
+ * `getLastMonthSaleProfits`. Angular types both fields as `any`; React types them
+ * concretely as the actual runtime shape those methods always produce.
+ */
+export interface ChartData {
+  label: Date;
   value: number;
 }
 
@@ -57,6 +69,7 @@ function generateId(): string {
 export class OrderOfflineService {
   private readonly creditService: SaleCreditOfflineService;
   private readonly inventoryService: InventoryOfflineService;
+  private readonly expenseService: ExpenseOfflineService;
 
   private orders: Order[] | null = null;
   private lastOrdersKey: string | undefined;
@@ -67,6 +80,9 @@ export class OrderOfflineService {
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
+    // Angular parity: OrderOfflineService injects ExpenseOfflineService directly
+    // (order-offline.service.ts:24,38) — used by getLastMonthSaleProfits' expense-netting.
+    this.expenseService = new ExpenseOfflineService(storeId);
   }
 
   /** 1:1 port of Angular `getStorageOrders` (order-offline.service.ts:400-405). */
@@ -173,6 +189,65 @@ export class OrderOfflineService {
     const start = startOfDay(addDays(new Date(), -1));
     const end = startOfDay(new Date());
     return this.getActiveOrdersProfitBetweenDates(start, end);
+  }
+
+  /**
+   * 1:1 port of Angular `getLastMonthSales` (order-offline.service.ts:229-244) — rule 12
+   * relocation (this logic used to live in an invented standalone
+   * `StatisticsAggregationService`; Angular keeps it ON `OrderOfflineService`, so it lives
+   * here too). NO parameters — always keyed off `new Date()` at call time, matching Angular
+   * exactly. Returns 30 `ChartData` entries (oldest → newest, last entry = today).
+   *
+   * Date-window divergence (angular-bugs-policy, rule 8 — CONSCIOUS, approved, NOT
+   * replicated): Angular recomputes `startDate = startOfDay(today)` INSIDE the loop on
+   * every iteration instead of per-bucket, so `startDate` never actually varies — every
+   * bucket but the last ends up querying an empty/inverted [today, earlierDay) range, and
+   * only the i=0 ("today") bucket ever resolves real data. That is a real Angular bug; it
+   * is confirmed and intentionally NOT replicated here. React keeps the already-correct
+   * per-bucket window: each of the 30 buckets queries its OWN [dayStart, dayStart+1) range.
+   */
+  getLastMonthSales(): ChartData[] {
+    const today = new Date();
+    const data: ChartData[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const label = addDays(today, -i);
+      const dayStart = startOfDay(label);
+      const dayEnd = addDays(dayStart, 1);
+      data.push({
+        label,
+        value: this.getActiveOrdersPriceBetweenDates(dayStart, dayEnd),
+      });
+    }
+    return data;
+  }
+
+  /**
+   * 1:1 port of Angular `getLastMonthSaleProfits` (order-offline.service.ts:211-227) — same
+   * rule-12 relocation as `getLastMonthSales`. NO parameters. Nets out each bucket's active
+   * expenses: `value = orderProfit(day) - expenseService.getActiveExpensesPriceBetweenDates
+   * (dayStart, dayStart+1)`.
+   *
+   * Same date-window divergence as `getLastMonthSales` above (angular-bugs-policy, rule 8 —
+   * CONSCIOUS, approved, NOT replicated): Angular's own `getLastMonthSaleProfits` has the
+   * identical `startDate = startOfDay(today)` recomputed-every-iteration bug, so React keeps
+   * the fixed per-bucket [dayStart, dayStart+1) window and only adds the expense
+   * subtraction on top.
+   */
+  getLastMonthSaleProfits(): ChartData[] {
+    const today = new Date();
+    const data: ChartData[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const label = addDays(today, -i);
+      const dayStart = startOfDay(label);
+      const dayEnd = addDays(dayStart, 1);
+      const orderProfit = this.getActiveOrdersProfitBetweenDates(dayStart, dayEnd);
+      const dayExpenses = this.expenseService.getActiveExpensesPriceBetweenDates(dayStart, dayEnd);
+      data.push({
+        label,
+        value: orderProfit - dayExpenses,
+      });
+    }
+    return data;
   }
 
   /**

@@ -12,17 +12,24 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import type { DailySalesPoint, DailyProfitPoint } from '../lib/services/statistics-aggregation-service';
+import type { ChartData } from '~/sales/lib/services/order-offline-service';
+
+/** Formats a chart-point `label` Date as MM-DD for axis ticks / tooltip labels. */
+function formatLabel(label: Date): string {
+  const month = String(label.getMonth() + 1).padStart(2, '0');
+  const day = String(label.getDate()).padStart(2, '0');
+  return `${month}-${day}`;
+}
 
 // ─── Sales Chart (LastMonthSalesComponent — STAT-9) ───────────────────────────
 
 interface SalesChartCoreProps {
-  data: DailySalesPoint[];
+  data: ChartData[];
   emptyMessage: string;
 }
 
 export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
-  const allZero = data.every((p) => p.totalRevenue === 0);
+  const allZero = data.every((p) => p.value === 0);
 
   if (allZero) {
     return (
@@ -36,37 +43,13 @@ export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis
-          dataKey="date"
-          tick={{ fontSize: 10 }}
-          tickFormatter={(v: string) => v.slice(5)} // MM-DD
-        />
+        <XAxis dataKey="label" tick={{ fontSize: 10 }} tickFormatter={formatLabel} />
         <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `$${v}`} />
         <Tooltip
-          formatter={(value: number, name: string) => {
-            if (name === 'totalRevenue') return [`$${value.toFixed(2)}`, 'Ingresos'];
-            if (name === 'orderCount') return [value, 'Pedidos'];
-            return [value, name];
-          }}
-          labelFormatter={(label: string) => label}
+          formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ingresos']}
+          labelFormatter={(label: Date) => formatLabel(label)}
         />
-        <Line
-          type="monotone"
-          dataKey="totalRevenue"
-          stroke="#2563eb"
-          strokeWidth={2}
-          dot={false}
-          name="totalRevenue"
-        />
-        <Line
-          type="monotone"
-          dataKey="orderCount"
-          stroke="#9ca3af"
-          strokeWidth={1}
-          dot={false}
-          name="orderCount"
-          yAxisId={0}
-        />
+        <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} dot={false} name="value" />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -75,12 +58,12 @@ export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
 // ─── Profit Chart (LastMonthSaleProfitsComponent — STAT-10/11) ────────────────
 
 interface ProfitChartCoreProps {
-  data: DailyProfitPoint[];
+  data: ChartData[];
   emptyMessage: string;
 }
 
 export function ProfitChartCore({ data, emptyMessage }: ProfitChartCoreProps) {
-  const allZero = data.every((p) => p.profit === 0);
+  const allZero = data.every((p) => p.value === 0);
 
   if (allZero) {
     return (
@@ -94,17 +77,13 @@ export function ProfitChartCore({ data, emptyMessage }: ProfitChartCoreProps) {
     <ResponsiveContainer width="100%" height={260}>
       <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis
-          dataKey="date"
-          tick={{ fontSize: 10 }}
-          tickFormatter={(v: string) => v.slice(5)} // MM-DD
-        />
+        <XAxis dataKey="label" tick={{ fontSize: 10 }} tickFormatter={formatLabel} />
         <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `$${v}`} />
         <Tooltip
           formatter={(value: number) => [`$${(value as number).toFixed(2)}`, 'Ganancia bruta']}
-          labelFormatter={(label: string) => label}
+          labelFormatter={(label: Date) => formatLabel(label)}
         />
-        <Bar dataKey="profit" fill="#16a34a" name="profit" radius={[2, 2, 0, 0]} />
+        <Bar dataKey="value" fill="#16a34a" name="value" radius={[2, 2, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
