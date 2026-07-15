@@ -12,6 +12,18 @@
 
 ---
 
+## 0. Estado de resolución — SDD `angular-react-parity-fixes` (2026-07-15)
+
+Se ejecutó un SDD sobre estos gaps con el **código como única fuente de verdad** y el **playbook como veredicto**. Verificación **PASS** (suite 1635/1635, `tsc` limpio). Archivado en `openspec/changes/archive/2026-07-15-angular-react-parity-fixes/`.
+
+- ✅ **Resuelto:** interceptor de errores (WU3, commit `20fbbc8`), CSV robusto (WU4, commit `b82bbbf`), 3 inventos rule-12 eliminados (WU-R, commit `621d411`).
+- ↩️ **No era gap (reclasificado leyendo el código):** `base.service`, `owner-details`/`getOwnerDetailsById`, `deleteReSeller`, `MessageService`, `store-module-state`, `data.service`, auth `forgotPassword`/`signInGoogle`/`createUser`/`registration`, `AddressModel`/`SocialNetworksModel`/`Message`, i18n `setLanguage`. Todos **dead-code de Angular** (call-site comentado, cuerpo vacío o componente nunca renderizado) → regla 10/12: NO se portan.
+- ⏳ **Sigue abierto (fuera de scope — mecánica de framework/PWA, NO contrato de datos):** `download-manager`, `preloading`, `splash-screen`, `LoadingOverlay` sin cablear. Requieren decisión de UX.
+
+Detalle por ítem en §6 (actualizada) y §7.
+
+---
+
 ## 1. Models
 
 Angular dispersa los modelos en `domain/entities/**`, `_services/**/_models` y `presentation/_models`. React los **consolida** en `packages/domain/src/models/*.ts` (+ `enums/index.ts`, `commons/`). La consolidación en sí es aceptable (mismo tipo, otra ubicación); lo que se marca abajo son las divergencias de forma o los faltantes.
@@ -140,7 +152,7 @@ Angular tiene online-service solo para **products** y **product-categories**.
 | `application/synchronization/data-serializer.service.ts` | `sync/lib/services/data-serializer-service.ts` | 🟡 | Renames + cambio de forma: `serializeEncryptedZip(pwd): void` (descarga DOM) → `export(pwd): Uint8Array` (bytes; descarga movida al caller). `deserializeEncryptedZip(...): DataFile[]` → `import(...): ParsedData` (objeto tipado por entidad). Helpers `getDataFiles`/`generateFileName`/`pad` sin correlato. Deriv. de password + nombres de entry 1:1. |
 | `application/synchronization/data-synchronizer.service.ts` | `sync/lib/services/data-synchronizer-service.ts` | 🟡 | `synchronizeFiles(DataFile[]): Result` → `sync(ParsedData): SyncResult` (retorno con `merges`/counters que Angular no produce). Métodos privados renombrados (`synchronize*`→`merge*`). Fix: cada entidad emite su código de error propio (Angular tenía copy-paste `OrdersUnexpectedError`). |
 | `application/synchronization/data.file.model.ts` (`DataFile`, `EDataFileName`) | — (disperso en `data-serializer-service.ts`) | 🟡 | El modelo de intercambio compartido/exportado no tiene archivo standalone; React usa `ParsedData` tipado + const privada `ENTRY_NAMES`. |
-| `_services/csv/csv-product.service.ts` (`@Injectable`, papaparse, `Observable<CsvProduct[]>`) | `sales/lib/csv-product-parser.ts` (función `parseCsvProducts(text): CsvParseResult`) | 🔴 | **No mapea limpio.** Angular es service con papaparse (maneja comillas, `dynamicTyping`, valida category+name+price). React NO es service ni usa papaparse: función sync que parte por comas a mano (rompe con comas entre comillas), `category` opcional, retorna diagnósticos por-fila. Divergencia de capa + motor de parsing + validación. |
+| `_services/csv/csv-product.service.ts` (`@Injectable`, papaparse, `Observable<CsvProduct[]>`) | `sales/lib/csv-product-parser.ts` (función `parseCsvProducts(text): CsvParseResult`) | ✅ **Resuelto (WU4)** | Antes 🔴. Ahora tokenizer RFC4180 (maneja comillas con comas internas), `category` requerido (`MISSING_CATEGORY`) y coerción de `price` espejando `validateProducts`. Sigue siendo función (no service) a propósito: se espeja el comportamiento, no la capa. Sin nueva dependencia (papaparse no agregado). Commit `b82bbbf`. |
 
 ### 5.5 Mecánicas de framework (⚙️ — sin correlato de service, esperado)
 
@@ -158,38 +170,45 @@ Estos services Angular resuelven infraestructura que React implementa de forma i
 | `presentation/splash-screen/splash-screen.service.ts` (fade `AnimationBuilder`) | — | 🔴 Sin lógica de splash en TS (posible CSS/HTML, no localizado). |
 | `_modules/i18n/translation.service.ts` (`ngx-translate`) | `shared/lib/i18n/i18n-provider.tsx` (`react-intl`) + `es.ts` | 🔴 Sin `setLanguage`/`loadTranslations` (solo lectura, locale único `es`). |
 | `_interceptors/interceptor.service.ts` (Bearer token) | `api-client.ts` request interceptor | ✅ Port 1:1 funcional. |
-| `_interceptors/error-interceptor.service.ts` (timeout 30s, 401→logout, 500→Swal) | `api-client.ts` response interceptor (401→clear+redirect) | 🔴 Falta 500→dialog y tagging de network error. 401 diverge: React limpia y `window.location.href` directo, sin pasar por `auth-store.logout()` ni su guardia anti-loop. Timeout 30s sí presente. |
+| `_interceptors/error-interceptor.service.ts` (timeout 30s, 401→logout, 500→Swal) | `api-client.ts` response interceptor | ✅ **Resuelto (WU3)** — antes 🔴. 401→`useAuthStore.getState().logout()` (respeta guardia anti-loop + token stale), 500→dialog `blocking-alert`, network taggeado `isNetworkError`. Timeout 30s ya estaba. Salvedad menor (regla 9): envelope network-error no byte-idéntico, sin consumidor vivo. Commit `20fbbc8`. |
 | `_interceptors/connection-interceptor.service.ts` | — (hook `useOnlineStatus` en call-sites) | Idioma React; sin gate global de request. |
 
 ---
 
-## 6. Resumen de gaps reales (🔴 — para priorizar)
+## 6. Estado de los "gaps" tras el SDD
 
-**Faltantes de contrato/negocio que deberían existir según el playbook:**
+Los 12 ítems que el reporte marcó como 🔴, re-verificados contra call-sites vivos de Angular:
 
-1. **`base.service.ts`** — Angular tiene una clase base CRUD + estado reactivo compartida por casi todos los services; React no la espeja (lógica duplicada por-feature). Regla 12: como Angular SÍ la tiene, React debería tenerla.
-2. **`owner.service.ts::getOwnerDetailsById`** — sin ruta/vista owner-details en React.
-3. **`reseller.service.ts::deleteReSeller`** — falta método HTTP y acción de UI (Angular la usa).
-4. **`MessageService`** (`domain/interfaces/message.service.ts`) — sin correlato (posible dead code en Angular; confirmar).
-5. **`store-module-state.service.ts`** — señal "modules updated" ausente.
-6. **`data.service.ts`** (`loadProducts`/`loadCategories`) — sin correlato.
-7. **`CsvProductService`** — degradado de service+papaparse a función manual (parsing más débil, validación distinta).
-8. **`auth.service`/`auth-http.service`** — sin `forgotPassword`, `signInGoogle`/`getSocialToken`, `logout` server-side, `createUser`, `registration`.
-9. **Interceptor de errores** — sin 500→dialog ni tagging network; 401 no pasa por `auth-store.logout()`.
-10. **Models sin port:** `AddressModel`, `SocialNetworksModel`, `Message`/`EMessageStatus`.
-11. **PWA:** `download-manager`, `preloading`, `splash-screen` sin port; `LoadingOverlay` sin cablear.
-12. **i18n:** `setLanguage`/`loadTranslations` sin port (locale único).
+| # | Ítem | Estado | Detalle (código) |
+|---|---|---|---|
+| 1 | `base.service.ts` estado reactivo | ↩️ No era gap | Grep de consumidores vivos de `items$`/`fetch()`: solo poblado de dropdowns; React ya lo cubre con `useEffect`+`listX()`+`useState`. Un base/store nuevo sería invención (regla 12) + mejora (regla 2). |
+| 2 | `owner.service.ts::getOwnerDetailsById` | ↩️ No era gap | `OwnerDetailsComponent` importado (`owners.component.ts:32`) pero **nunca renderizado** (0 `<app-owner-details>` en HTML, sin ruta). `ngOnInit` no corre → método muerto. |
+| 3 | `reseller.service.ts::deleteReSeller` | ↩️ No era gap | `resellers.component.ts:47` tiene **cuerpo VACÍO**; el botón engancha a un no-op, nunca llama al service. Dead code. |
+| 4 | `MessageService` | ↩️ No era gap | Único call-site comentado (`sale-product-row.component.ts:96`). Dead code. |
+| 5 | `store-module-state.service.ts` | ↩️ No era gap | Emisión viva pero suscriptor comentado (`nav-content.component.ts:126`) → efecto nulo. Dead code. |
+| 6 | `data.service.ts` loaders | ↩️ No era gap | Llamadas comentadas (`register.component.ts:87-88`). Dead code. |
+| 7 | `CsvProductService` | ✅ **Resuelto (WU4)** | Tokenizer con comillas + `category` requerido, espeja `validateProducts`. Commit `b82bbbf`. |
+| 8 | auth `forgotPassword`/`signInGoogle`/`createUser`/`registration`/server-`logout` | ↩️ No era gap | Sin call-sites vivos (solo `registerOwner`, ya portado como `register`). Dead code. |
+| 9 | Interceptor de errores | ✅ **Resuelto (WU3)** | 401→`authStore.logout()`, 500→dialog, network tag. Commit `20fbbc8`. Salvedad: envelope network-error no byte-idéntico (sin consumidor vivo). |
+| 10 | `AddressModel`/`SocialNetworksModel`/`Message` | ↩️ No era gap | Cero usos en Angular. Dead code. |
+| 11 | PWA: `download-manager`, `preloading`, `splash-screen`, `LoadingOverlay` sin cablear | ⏳ **Abierto** | Mecánica de framework/UX, **fuera de scope** del SDD. No es contrato de datos. Decisión pendiente. |
+| 12 | i18n `setLanguage`/`loadTranslations` | ↩️ No era gap | Solo `loadTranslations` vivo (cubierto por `es.ts` estático); `setLanguage` sin caller, locale único `es`. Dead code. |
 
-## 7. Extras React sin origen Angular (candidatos a revisar por regla 12)
+**Balance:** 2 resueltos con código (WU3, WU4), 9 reclasificados como dead-code de Angular (regla 10/12 → no se portan), 1 abierto fuera de scope (PWA framework).
 
-- `ProductRepository.getCategoryRepository()` (accessor)
-- `InventoryOfflineService.hasAvailableStock` / `getAvailableQuantity` / `update`
-- `OrderOfflineService.getByDateRange`
-- `sales/lib/product-availability.ts` (función `hasAvailableProductToSale` extraída)
-- Tipos `SyncResult`/`EntityMergeResult`/`SyncEntityError`, `ParsedData`/`CsvParseResult`
-- `store-http-service.deactivateStore`
-- `shared/lib/auth/user-home.ts` (`resolveUserHomePath`), `current-user.ts` (`getCurrentUserLogin`) — extracciones de lógica inline Angular
-- `shared/lib/config/menu-config.ts` / `global-config.ts` — config declarativa React-específica
-- `ReSeller.login?` (campo extra)
+## 7. Extras React sin origen Angular (rule 12) — decididos por grep de consumidores
 
-> **Nota metodológica:** varias divergencias marcadas están documentadas en el código React como "fixes" de bugs Angular. El playbook (regla 8) exige que todo fix se consulte antes; este reporte solo constata la diferencia contra el source, no valida si cada fix fue aprobado.
+| Extra | Decisión | Motivo |
+|---|---|---|
+| `InventoryOfflineService.hasAvailableStock` | ✅ **Eliminado (WU-R)** | Solo call-sites de test, sin origen Angular. Commit `621d411`. |
+| `OrderOfflineService.getByDateRange` | ✅ **Eliminado (WU-R)** | Solo tests; el propio comentario admitía "sin correlato Angular". |
+| `store-http-service.deactivateStore` | ✅ **Eliminado (WU-R)** | Solo tests; Angular `store.service` no tiene deactivate/delete. |
+| `ReSeller.login?` (campo) | ⏹️ **Conservado** | Consumidor vivo `reseller-edit.tsx:80` que espeja el control disabled de Angular (`edit-reseller-details.component.ts:129`). El modelo Angular lo omite pero el payload lo trae. |
+| `ProductRepository.getCategoryRepository()` | ⏹️ Conservado | Consumidor vivo `inventory-offline-service.ts:202`; puente DI mecánico (regla 5). |
+| `InventoryOfflineService.getAvailableQuantity` / `update` | ⏹️ Conservado | Consumidores vivos; descomposición mecánica / rename a auditar vs `updateInventoryEntry`. |
+| `sales/lib/product-availability.ts` | ⏹️ Conservado | Extracción de la lógica inline `hasAvailableProductToSale` (regla 10 mecánica). |
+| Tipos `SyncResult`/`EntityMergeResult`/`ParsedData`/`CsvParseResult` | ⏹️ Conservado | Formas necesarias de la capa de sync/CSV React. |
+| `user-home.ts` / `current-user.ts` | ⏹️ Conservado | Extracciones de lógica inline Angular (mecánicas). |
+| `menu-config.ts` / `global-config.ts` | ⏹️ Conservado | Config declarativa idiomática React. |
+
+> **Nota metodológica:** varias divergencias 🟡 están documentadas en el código React como "fixes" de bugs Angular. El playbook (regla 8) exige consultar todo fix; en este ciclo se ratificó **KEEP** para todos (paridad = contratos, no bugs). El reporte constata la diferencia contra el source, no re-abre esos fixes.
