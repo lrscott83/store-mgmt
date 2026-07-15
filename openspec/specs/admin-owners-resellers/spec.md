@@ -95,6 +95,32 @@ Reseller copy MUST match Angular literally for all 6 known mismatches.
 - WHEN the form renders
 - THEN the submit button reads "Actualizar" (GENERAL.UPDATE); on create it reads "Adicionar" (GENERAL.ADD)
 
+### Requirement: ReSeller Model Retains login Field (Angular's Own Model Is Stale)
+
+The `ReSeller` TypeScript model (`packages/domain/src/models/store.ts`) MUST keep its `login?:
+string` field, even though Angular's `domain/resellers/reseller.model.ts` interface omits it.
+This is a ratified deviation from the original design/spec draft (which called for removal as a
+rule-12 invention): source-grep proved a live consumer — `reseller-edit.tsx:80`
+(`setLogin(r.login ?? '')`) mirrors Angular's own `edit-reseller-details.component.ts:129`, which
+declares a disabled `login` `FormGroup` control populated via `patchValue(reSeller)` from the
+real API response. Angular's declared model is stale relative to its own runtime contract; parity
+is measured against Angular's actual behavior, not its (incomplete) TypeScript interface.
+
+**Rules**: 3 (behavior/runtime-contract parity over stale declared-type parity), 12 (not an
+invention — mirrors a real, if undeclared, Angular consumer).
+
+#### Scenario: ReSeller model keeps the login field
+- GIVEN the React `ReSeller` interface
+- WHEN inspected against Angular's runtime `edit-reseller-details.component.ts:129` disabled
+  `login` form control (not just Angular's declared `reseller.model.ts` interface)
+- THEN React's `ReSeller.login?: string` field remains present
+
+#### Scenario: reseller-edit surfaces the field as disabled, mirroring Angular
+- GIVEN a reseller record fetched from the API includes a `login` value
+- WHEN `reseller-edit.tsx` renders
+- THEN it calls `setLogin(r.login ?? '')`, mirroring Angular's disabled `login` control populated
+  via `patchValue(reSeller)`
+
 ## Non-Requirements (Explicit Exclusions)
 
 - MUST NOT implement Angular's no-op stub actions: owner Approve/Activate/Deactivate; reseller Activate/Deactivate/Delete. These stay absent from gear menus.
