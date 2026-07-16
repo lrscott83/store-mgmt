@@ -56,5 +56,6 @@ export function usePwaInstall(): PwaInstall {
     };
   }, []);
 
+  console.info('[PWA] usePwaInstall render — canInstall=%s canPrompt=%s', canInstall, deferredPrompt !== null);
   return { canInstall, canPrompt: deferredPrompt !== null, promptInstall: firePwaInstallPrompt };
 }

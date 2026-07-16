@@ -10,6 +10,7 @@ import { initPwaInstallCapture } from '~/shared/lib/pwa/pwa-install-prompt';
 // disabled even though the browser considers the app installable. See
 // `~/shared/lib/pwa/pwa-install-prompt.ts` for the capture store that
 // `usePwaInstall` reads from.
+console.info('[PWA] entry.client executing — installing early capture BEFORE hydrate');
 initPwaInstallCapture();
 
 startTransition(() => {

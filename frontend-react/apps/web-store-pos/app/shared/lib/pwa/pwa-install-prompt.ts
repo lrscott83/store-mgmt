@@ -29,11 +29,13 @@ function onBeforeInstallPrompt(e: Event): void {
   // Prevent Chrome's mini-infobar so we control when to prompt.
   e.preventDefault();
   deferredPrompt = e as BeforeInstallPromptEvent;
+  console.info('[PWA] ✅ beforeinstallprompt FIRED — captured & stored, notifying', subscribers.size, 'subscriber(s)');
   notify();
 }
 
 function onAppInstalled(): void {
   deferredPrompt = null;
+  console.info('[PWA] appinstalled — cleared');
   notify();
 }
 
@@ -44,10 +46,20 @@ function onAppInstalled(): void {
  * early-capture entry point didn't run first, e.g. in isolated unit tests).
  */
 export function initPwaInstallCapture(): void {
-  if (initialized || typeof window === 'undefined') return;
+  if (typeof window === 'undefined') {
+    console.info('[PWA] initPwaInstallCapture skipped — no window (SSR)');
+    return;
+  }
+  if (initialized) {
+    console.info('[PWA] initPwaInstallCapture skipped — already initialized');
+    return;
+  }
   initialized = true;
   window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
   window.addEventListener('appinstalled', onAppInstalled);
+  const standalone =
+    typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches;
+  console.info('[PWA] capture listeners attached — swSupported=%s standalone=%s', 'serviceWorker' in navigator, standalone);
 }
 
 /** Returns the currently captured prompt event, or `null` if none was captured. */
