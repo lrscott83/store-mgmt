@@ -15,6 +15,7 @@ import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker
 import { registerAuthRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
+import { InstallAppButton } from '~/shared/components/install-app-button';
 
 import '@store-mgmt/web-common/styles.css';
 
@@ -63,6 +64,12 @@ export default function App() {
           router outlet whenever loadingService's request count > 0. */}
       {isLoading && <LoadingOverlay />}
       <Outlet />
+      {/* Angular app.component.html — the "Instalar App" pwa-install-btn is
+          hosted by AppComponent, which renders <router-outlet> for the WHOLE
+          app (landing, login, register, and every authenticated route). This
+          root is RR7's true equivalent of AppComponent, so it must mount here
+          — not in app-layout.tsx, which only wraps authenticated routes. */}
+      <InstallAppButton />
     </>
   );
 }

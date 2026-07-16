@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { IntlProvider } from 'react-intl';
@@ -110,5 +110,41 @@ describe('AppLayout — sidebar overlays content instead of pushing it', () => {
     fireEvent.click(screen.getByRole('button', { name: /collapse sidebar/i }));
 
     expect(screen.getByRole('navigation', { name: /main navigation/i }).className).toContain('w-0');
+  });
+});
+
+// The PWA "Instalar App" button moved to app/root.tsx (Angular app.component
+// parity: it must render on every route, not just authenticated ones). Guard
+// against a regression that would double-mount it here too.
+describe('AppLayout — does not render its own PWA install button (moved to root, avoids double-mount)', () => {
+  function setServiceWorkerSupported(supported: boolean) {
+    if (supported) {
+      Object.defineProperty(navigator, 'serviceWorker', { value: {}, configurable: true });
+    } else if ('serviceWorker' in navigator) {
+      delete (navigator as unknown as Record<string, unknown>).serviceWorker;
+    }
+  }
+
+  function setStandalone(matches: boolean) {
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }) as unknown as typeof window.matchMedia;
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+    setServiceWorkerSupported(true);
+    setStandalone(false);
+  });
+
+  afterEach(() => {
+    setServiceWorkerSupported(false);
+  });
+
+  it('does not render the "Instalar App" button even when installable', () => {
+    renderLayout();
+    expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument();
   });
 });

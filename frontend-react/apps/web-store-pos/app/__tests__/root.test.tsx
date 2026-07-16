@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
@@ -81,5 +81,49 @@ describe('App (root) — global HTTP-loading overlay (Angular app.component.html
     // LoadingOverlay nests a Spinner, and both carry role="status" (overlay
     // container + inner spinner icon), so assert at least one is present.
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
+  });
+});
+
+// Angular parity: app.component.html hosts <router-outlet> for the WHOLE app
+// (landing, login, register, and every authenticated route), so the
+// "Instalar App" pwa-install-btn renders globally, not just on authenticated
+// pages. RR7's true equivalent of AppComponent is this root, not
+// app-layout.tsx (which only wraps the authenticated route subtree).
+describe('App (root) — global PWA install button (Angular app.component parity)', () => {
+  function setServiceWorkerSupported(supported: boolean) {
+    if (supported) {
+      Object.defineProperty(navigator, 'serviceWorker', { value: {}, configurable: true });
+    } else if ('serviceWorker' in navigator) {
+      delete (navigator as unknown as Record<string, unknown>).serviceWorker;
+    }
+  }
+
+  function setStandalone(matches: boolean) {
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }) as unknown as typeof window.matchMedia;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useLoadingStore.setState({ count: 0, isLoading: false });
+    setServiceWorkerSupported(true);
+    setStandalone(false);
+  });
+
+  afterEach(() => {
+    setServiceWorkerSupported(false);
+  });
+
+  it('renders the "Instalar App" button at the global root, reachable on every route', () => {
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: /instalar app/i })).toBeInTheDocument();
   });
 });
