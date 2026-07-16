@@ -25,6 +25,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* PWA manifest — mirrors Angular index.html's `<link rel="manifest">`.
+            Required for the browser to consider the app installable and fire
+            `beforeinstallprompt`; the file lives at public/manifest.webmanifest. */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#22d3ee" />
         <Meta />
         <Links />
       </head>

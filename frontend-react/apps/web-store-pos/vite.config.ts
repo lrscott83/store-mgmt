@@ -26,7 +26,13 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       devOptions: {
-        enabled: false,
+        // Serve the service worker in `pnpm dev` too, so the PWA install flow
+        // (beforeinstallprompt → InstallAppButton) can be exercised locally.
+        // service-worker.ts is a classic worker (no ES imports), so the default
+        // type applies. Production behaviour is unchanged. Caveat: a live SW in
+        // dev can serve cached responses — unregister it in DevTools > Application
+        // if HMR ever misbehaves.
+        enabled: true,
       },
     }),
   ],
