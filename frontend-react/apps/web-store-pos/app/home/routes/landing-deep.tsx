@@ -1,6 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import { Button } from '~/shared/components/ui/button';
+import { CloseIcon } from '~/shared/components/ui/icons';
 import './landing-deep.css';
+
+// Mirrors Button's primary variant (ui/button.tsx VARIANT_CLASSES.primary) for
+// anchor/Link CTAs: a real <button> can't be nested inside <a>/<Link>, so route
+// and in-page-anchor CTAs apply the same token utilities inline instead.
+const ctaPrimary =
+  'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 shadow-card ' +
+  'bg-primary text-white text-sm font-medium transition-colors hover:bg-primary-hover';
+
+// Mirrors Button's outline variant, retinted for use over the hero's brand
+// gradient (border-primary/text-primary would be invisible against a
+// primary-colored background — the hero already uses white/N opacity steps
+// for its glass stats card, so this follows the same pattern).
+const ctaOutlineOnGradient =
+  'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 border ' +
+  'border-white/30 text-white text-sm font-medium transition-colors hover:bg-white/10';
 
 const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = [
   {
@@ -220,26 +237,30 @@ export default function LandingDeep() {
   return (
     <div className="landing-wrapper">
       {/* NAVBAR */}
-      <nav className={`landing-nav${isScrolled ? ' scrolled' : ''}`}>
-        <div className="container">
-          <div className="d-flex align-items-center justify-content-between">
-            <a className="nav-brand" href="#hero">
+      <nav
+        className={`fixed inset-x-0 top-0 z-50 py-5 transition-colors${
+          isScrolled ? ' bg-surface/85 backdrop-blur border-b border-border' : ''
+        }`}
+      >
+        <div className="mx-auto w-full max-w-6xl px-4">
+          <div className="flex items-center justify-between">
+            <a className="text-2xl font-bold text-accent" href="#hero">
               VendeDTo
             </a>
 
-            <div className="d-none d-lg-flex align-items-center gap-4">
-              <a className="nav-auth-link" href="#caracteristicas">
+            <div className="hidden items-center gap-6 lg:flex">
+              <a className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent" href="#caracteristicas">
                 Características
               </a>
-              <a className="nav-auth-link" href="#como-funciona">
+              <a className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent" href="#como-funciona">
                 Cómo funciona
               </a>
               {showLoginButton && (
-                <Link className="nav-auth-link" to="/login">
+                <Link className="text-sm font-medium uppercase tracking-wide text-text-muted hover:text-accent" to="/login">
                   Entrar
                 </Link>
               )}
-              <a className="btn-primary-amber" href="#registro">
+              <a className={ctaPrimary} href="#registro">
                 Comenzar
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -247,38 +268,53 @@ export default function LandingDeep() {
               </a>
             </div>
 
-            <button
-              className={`d-lg-none nav-toggler${menuOpen ? ' open' : ''}`}
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Menu"
-            >
-              <span></span>
-              <span></span>
-              <span></span>
-            </button>
-          </div>
+            <div className="relative lg:hidden">
+              <Button variant="outline" className="px-2 py-2" onClick={() => setMenuOpen((v) => !v)} aria-label="Menu">
+                {menuOpen ? (
+                  <CloseIcon className="h-5 w-5" />
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                )}
+              </Button>
 
-          <div className={`nav-dropdown${menuOpen ? ' show' : ''}`}>
-            <a className="nav-dropdown-item" href="#hero" onClick={closeMenu}>
-              Inicio
-            </a>
-            <a className="nav-dropdown-item" href="#caracteristicas" onClick={closeMenu}>
-              Características
-            </a>
-            <a className="nav-dropdown-item" href="#como-funciona" onClick={closeMenu}>
-              Cómo funciona
-            </a>
-            <Link className="nav-dropdown-item" to="/login" onClick={closeMenu}>
-              Iniciar sesión
-            </Link>
-            <a
-              className="nav-dropdown-item"
-              href="#registro"
-              onClick={closeMenu}
-              style={{ color: '#f5b026', fontWeight: 600 }}
-            >
-              Comenzar
-            </a>
+              {menuOpen && (
+                <div className="absolute right-0 top-full min-w-[200px] rounded-md border border-border border-t-2 border-t-accent bg-surface py-4 shadow-card">
+                  <a className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent" href="#hero" onClick={closeMenu}>
+                    Inicio
+                  </a>
+                  <a
+                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                    href="#caracteristicas"
+                    onClick={closeMenu}
+                  >
+                    Características
+                  </a>
+                  <a
+                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                    href="#como-funciona"
+                    onClick={closeMenu}
+                  >
+                    Cómo funciona
+                  </a>
+                  <Link
+                    className="block px-6 py-2 text-sm text-text hover:bg-accent/5 hover:text-accent"
+                    to="/login"
+                    onClick={closeMenu}
+                  >
+                    Iniciar sesión
+                  </Link>
+                  <a
+                    className="block px-6 py-2 text-sm font-semibold text-accent hover:bg-accent/5"
+                    href="#registro"
+                    onClick={closeMenu}
+                  >
+                    Comenzar
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>

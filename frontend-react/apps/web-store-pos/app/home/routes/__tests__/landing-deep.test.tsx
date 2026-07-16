@@ -97,4 +97,37 @@ describe('LandingDeep — public landing route', () => {
       expect(indexRoute?.file).toBe('home/routes/landing-deep.tsx');
     });
   });
+
+  describe('Nav section', () => {
+    it('shows desktop nav links at baseline render', () => {
+      renderLanding();
+      expect(screen.getByRole('link', { name: /^características$/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /^cómo funciona$/i })).toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: /comenzar/i }).length).toBeGreaterThan(0);
+    });
+
+    it('toggles the mobile dropdown open and closed', () => {
+      renderLanding();
+      expect(screen.queryByText(/iniciar sesión/i)).not.toBeInTheDocument();
+
+      const toggler = screen.getByRole('button', { name: /menu/i });
+      fireEvent.click(toggler);
+      expect(screen.getByText(/iniciar sesión/i)).toBeInTheDocument();
+
+      fireEvent.click(toggler);
+      expect(screen.queryByText(/iniciar sesión/i)).not.toBeInTheDocument();
+    });
+
+    it('hides the desktop "Entrar" link when the PWA is installable (showLoginButton=false)', () => {
+      // Installable: swSupported && !isStandalone (default mocks already satisfy this).
+      renderLanding();
+      expect(screen.queryByRole('link', { name: /^entrar$/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the desktop "Entrar" link when the PWA is NOT installable', () => {
+      setServiceWorkerSupported(false);
+      renderLanding();
+      expect(screen.getByRole('link', { name: /^entrar$/i })).toBeInTheDocument();
+    });
+  });
 });
