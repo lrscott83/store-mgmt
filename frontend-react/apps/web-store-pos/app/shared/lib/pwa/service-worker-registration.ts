@@ -52,18 +52,18 @@ export function setupServiceWorker(registerSW: RegisterSWFn): void {
  * additionally keeps this inert in environments (and tests) without SW
  * support.
  */
-// Built at runtime (not a string literal) so Vite's static import-analysis
-// never attempts to eagerly resolve this virtual module during transform —
-// this virtual module only exists once vite-plugin-pwa runs (dev/build).
-// Keeps the dynamic import resolvable at actual runtime while allowing
-// Vitest (which has no PWA plugin registered) to mock the specifier at test
-// time instead of failing transform-time resolution.
-const PWA_REGISTER_MODULE = ['virtual', 'pwa-register'].join(':');
-
 export function registerServiceWorker(): void {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
-  void import(/* @vite-ignore */ PWA_REGISTER_MODULE).then(({ registerSW }) => {
+  // Static specifier (NOT `@vite-ignore` + a runtime-built string): that older
+  // form hid the import from vite-plugin-pwa, so `virtual:pwa-register` was
+  // never rewritten and the browser fetched it as a literal URL
+  // (`GET virtual:pwa-register` → CORS/ERR_FAILED), leaving the SW unregistered.
+  // A plain literal lets the plugin resolve it — to the real `registerSW` in a
+  // build, to a no-op stub in dev (`devOptions.enabled: false`). It stays a
+  // dynamic import so it's off the SSR path, and Vitest (no PWA plugin) still
+  // intercepts it via `vi.doMock('virtual:pwa-register', …)` at runtime.
+  void import('virtual:pwa-register').then(({ registerSW }) => {
     setupServiceWorker(registerSW);
   });
 }
