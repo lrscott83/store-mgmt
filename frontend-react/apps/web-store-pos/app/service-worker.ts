@@ -5,7 +5,12 @@ declare let self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
 };
 
-const PRECACHE_NAME = 'app-shell-v1';
+// Bump this version whenever precached shell assets (icons, favicon, etc.)
+// change. The `activate` handler deletes every cache NOT in `currentCaches`,
+// so bumping the suffix purges the previous `app-shell-*` cache — otherwise the
+// cache-first `/icons/` handler below serves stale (e.g. old blank) icons
+// forever, since it never revalidates and the old cache is never evicted.
+const PRECACHE_NAME = 'app-shell-v2';
 const APP_CHUNKS_CACHE = 'app-chunks-v1';
 const FONTS_CACHE = 'fonts-v1';
 
