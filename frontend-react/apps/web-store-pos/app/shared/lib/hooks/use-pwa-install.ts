@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
-
-/** The non-standard `beforeinstallprompt` event (Chromium PWA install flow). */
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import {
+  firePwaInstallPrompt,
+  getDeferredPrompt,
+  subscribeDeferredPrompt,
+} from '~/shared/lib/pwa/pwa-install-prompt';
 
 export interface PwaInstall {
   /** Whether the install affordance should be shown (SW supported, not already installed). */
@@ -27,45 +26,35 @@ function isRunningStandalone(): boolean {
   return Boolean(displayStandalone) || iosStandalone;
 }
 
+function getServerSnapshot(): null {
+  return null;
+}
+
 /**
  * Mirrors Angular's `AppComponent` PWA install logic: the button is offered when
  * service workers are supported and the app is not already installed, and it stays
  * disabled until a `beforeinstallprompt` event is captured. Resets on `appinstalled`.
+ *
+ * The captured prompt itself lives in the framework-agnostic
+ * `pwa-install-prompt` store (populated as early as possible, from
+ * `entry.client.tsx`, before hydration) — `useSyncExternalStore` here just
+ * projects that already-captured state into React, so a prompt fired before
+ * this hook ever mounted is still reflected immediately.
  */
 export function usePwaInstall(): PwaInstall {
   const swSupported = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
   const [canInstall, setCanInstall] = useState<boolean>(() => swSupported && !isRunningStandalone());
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const deferredPrompt = useSyncExternalStore(subscribeDeferredPrompt, getDeferredPrompt, getServerSnapshot);
 
   useEffect(() => {
-    function onBeforeInstallPrompt(e: Event) {
-      // Prevent Chrome's mini-infobar so we control when to prompt.
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setCanInstall(true);
-    }
     function onAppInstalled() {
-      setDeferredPrompt(null);
       setCanInstall(false);
     }
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
     window.addEventListener('appinstalled', onAppInstalled);
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
       window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
 
-  async function promptInstall(): Promise<void> {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    try {
-      await deferredPrompt.userChoice;
-    } finally {
-      // A prompt can only be used once.
-      setDeferredPrompt(null);
-    }
-  }
-
-  return { canInstall, canPrompt: deferredPrompt !== null, promptInstall };
+  return { canInstall, canPrompt: deferredPrompt !== null, promptInstall: firePwaInstallPrompt };
 }
