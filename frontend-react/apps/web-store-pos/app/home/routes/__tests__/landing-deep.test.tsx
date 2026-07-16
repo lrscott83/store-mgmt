@@ -215,4 +215,21 @@ describe('LandingDeep — public landing route', () => {
       expect(cta).toHaveClass('bg-primary');
     });
   });
+
+  describe('Footer + hex-color regression guard', () => {
+    it('renders the footer copyright text', () => {
+      renderLanding();
+      expect(screen.getByText(/© 2026 vendedto/i)).toBeInTheDocument();
+    });
+
+    it('has no raw hex color in any inline `style` attribute, anywhere in the rendered tree', () => {
+      const { container } = renderLanding();
+      const hexPattern = /#[0-9a-f]{3,8}\b/i;
+      const elementsWithStyle = container.querySelectorAll('[style]');
+      for (const el of Array.from(elementsWithStyle)) {
+        const styleAttr = el.getAttribute('style') ?? '';
+        expect(hexPattern.test(styleAttr)).toBe(false);
+      }
+    });
+  });
 });

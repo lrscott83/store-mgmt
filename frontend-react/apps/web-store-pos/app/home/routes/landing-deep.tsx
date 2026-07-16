@@ -247,7 +247,7 @@ export default function LandingDeep() {
   }, []);
 
   return (
-    <div className="landing-wrapper">
+    <div className="min-h-screen overflow-x-hidden bg-background text-text">
       {/* NAVBAR */}
       <nav
         className={`fixed inset-x-0 top-0 z-50 py-5 transition-colors${
@@ -505,9 +505,9 @@ export default function LandingDeep() {
       </section>
 
       {/* FOOTER */}
-      <footer className="footer">
-        <div className="container">
-          <p className="footer-text mb-0">&copy; 2026 VendeDTo · Desarrollado para emprendedores con éxito</p>
+      <footer className="border-t border-border py-8 text-center">
+        <div className="mx-auto w-full max-w-6xl px-4">
+          <p className="text-xs tracking-wide text-text-muted">&copy; 2026 VendeDTo · Desarrollado para emprendedores con éxito</p>
         </div>
       </footer>
     </div>
