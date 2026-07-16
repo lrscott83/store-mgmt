@@ -6,6 +6,13 @@
   "background_color": "#ecf2f7",
   "theme_color": "#22d3ee",
   "orientation": "any",
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest.webmanifest"
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",

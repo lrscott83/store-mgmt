@@ -31,9 +31,21 @@ function getServerSnapshot(): null {
 }
 
 /**
- * Mirrors Angular's `AppComponent` PWA install logic: the button is offered when
- * service workers are supported and the app is not already installed, and it stays
- * disabled until a `beforeinstallprompt` event is captured. Resets on `appinstalled`.
+ * PWA install logic based on Angular's `AppComponent`: the button is offered
+ * when service workers are supported and the app is not already installed, and
+ * it stays disabled until a `beforeinstallprompt` event is captured. Resets on
+ * `appinstalled`.
+ *
+ * DIVERGENCE FROM ANGULAR (deliberate product decision): Angular keeps showing
+ * the button (disabled) in a browser tab even when the PWA is already
+ * installed — it only hides in standalone display mode. React additionally
+ * hides it once the app is known to be installed. `beforeinstallprompt` never
+ * fires for an installed app and `appinstalled` only fires at install time
+ * (not on later loads), so an app installed in a PREVIOUS session and now
+ * opened in a non-standalone tab is only detectable via
+ * `navigator.getInstalledRelatedApps()` (Chromium; requires `related_applications`
+ * self-reference in the manifest). Detection is best-effort: if the API is
+ * absent or rejects, we fall back to the Angular behaviour (button shown).
  *
  * The captured prompt itself lives in the framework-agnostic
  * `pwa-install-prompt` store (populated as early as possible, from
@@ -43,18 +55,41 @@ function getServerSnapshot(): null {
  */
 export function usePwaInstall(): PwaInstall {
   const swSupported = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
-  const [canInstall, setCanInstall] = useState<boolean>(() => swSupported && !isRunningStandalone());
+  const [installed, setInstalled] = useState<boolean>(false);
   const deferredPrompt = useSyncExternalStore(subscribeDeferredPrompt, getDeferredPrompt, getServerSnapshot);
 
   useEffect(() => {
     function onAppInstalled() {
-      setCanInstall(false);
+      setInstalled(true);
     }
     window.addEventListener('appinstalled', onAppInstalled);
     return () => {
       window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
+
+  useEffect(() => {
+    const nav = navigator as Navigator & {
+      getInstalledRelatedApps?: () => Promise<Array<{ platform: string }>>;
+    };
+    if (typeof nav.getInstalledRelatedApps !== 'function') return;
+    let cancelled = false;
+    void nav
+      .getInstalledRelatedApps()
+      .then((apps) => {
+        if (!cancelled && apps.some((app) => app.platform === 'webapp')) {
+          setInstalled(true);
+        }
+      })
+      .catch(() => {
+        // Best-effort — on failure fall back to showing the button (parity).
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const canInstall = swSupported && !isRunningStandalone() && !installed;
 
   return { canInstall, canPrompt: deferredPrompt !== null, promptInstall: firePwaInstallPrompt };
 }

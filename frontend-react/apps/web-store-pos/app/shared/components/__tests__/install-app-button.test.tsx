@@ -30,6 +30,17 @@ function setServiceWorkerSupported(supported: boolean) {
   }
 }
 
+function setInstalledRelatedApps(apps: Array<{ platform: string }> | null) {
+  if (apps === null) {
+    delete (navigator as unknown as Record<string, unknown>).getInstalledRelatedApps;
+    return;
+  }
+  Object.defineProperty(navigator, 'getInstalledRelatedApps', {
+    value: vi.fn().mockResolvedValue(apps),
+    configurable: true,
+  });
+}
+
 describe('InstallAppButton — Angular app.component pwa-install-btn parity', () => {
   beforeEach(() => {
     setServiceWorkerSupported(true);
@@ -39,6 +50,7 @@ describe('InstallAppButton — Angular app.component pwa-install-btn parity', ()
 
   afterEach(() => {
     setServiceWorkerSupported(false);
+    setInstalledRelatedApps(null);
     vi.restoreAllMocks();
     resetPwaInstallPromptForTests();
   });
@@ -54,6 +66,28 @@ describe('InstallAppButton — Angular app.component pwa-install-btn parity', ()
     setStandalone(true);
     render(<InstallAppButton />);
     expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument();
+  });
+
+  // DIVERGENCE FROM ANGULAR (product decision): Angular keeps showing the
+  // install button (disabled) in a browser tab even when the PWA is already
+  // installed. React hides it. An app installed in a PREVIOUS session and now
+  // viewed in a NON-standalone tab is only detectable via
+  // `navigator.getInstalledRelatedApps()` (beforeinstallprompt never fires for
+  // an installed app; appinstalled only fires at install time).
+  it('does NOT render once getInstalledRelatedApps reports the PWA is already installed', async () => {
+    setInstalledRelatedApps([{ platform: 'webapp' }]);
+    render(<InstallAppButton />);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('KEEPS rendering when getInstalledRelatedApps reports no installed webapp', async () => {
+    setInstalledRelatedApps([]);
+    render(<InstallAppButton />);
+    const btn = await screen.findByRole('button', { name: /instalar app/i });
+    // Give the async detection a chance to (wrongly) hide it.
+    await waitFor(() => expect(btn).toBeInTheDocument());
   });
 
   it('does NOT render when service workers are unsupported', () => {
