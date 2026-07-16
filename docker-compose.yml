@@ -95,6 +95,19 @@ services:
       - api
     networks:
       - postgres_network
+
+  web-store-pos:
+    build:
+      context: ./frontend-react
+      dockerfile: Dockerfile
+    container_name: smca_web_pos
+    restart: always
+    ports:
+      - "8085:80"
+    depends_on:
+      - api
+    networks:
+      - postgres_network
 volumes:
   postgres_data:
   pgadmin-data:
