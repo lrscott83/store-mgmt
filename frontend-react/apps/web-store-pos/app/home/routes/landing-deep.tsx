@@ -320,26 +320,34 @@ export default function LandingDeep() {
       </nav>
 
       {/* HERO */}
-      <section id="hero" className="hero-section">
-        <div className="hero-bg-grid"></div>
-        <div className="hero-bg-glow"></div>
+      <section
+        id="hero"
+        className="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-accent pt-32 pb-20 text-white"
+      >
+        <div className="landing-hero-grid" aria-hidden="true"></div>
+        <div
+          className="landing-animate-glow absolute top-1/2 left-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/30 blur-3xl"
+          aria-hidden="true"
+        ></div>
 
-        <div className="container position-relative">
-          <div className="row align-items-center g-5">
+        <div className="relative mx-auto w-full max-w-6xl px-4">
+          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">
             {/* Left: Copy */}
-            <div className="col-lg-6">
-              <p className="hero-eyebrow">Punto de venta offline</p>
-              <h1 className="hero-title">
+            <div>
+              <p className="landing-animate-in mb-6 text-xs font-medium tracking-[0.2em] text-accent uppercase [animation-delay:100ms]">
+                Punto de venta offline
+              </p>
+              <h1 className="landing-animate-in mb-6 text-5xl leading-[0.95] font-bold tracking-tight sm:text-6xl lg:text-7xl [animation-delay:250ms]">
                 Vende más.
                 <br />
-                Controla <span className="accent">todo.</span>
+                Controla <span className="text-accent italic">todo.</span>
               </h1>
-              <p className="hero-sub">
+              <p className="landing-animate-in mb-10 max-w-[500px] text-lg text-white/60 sm:text-xl [animation-delay:400ms]">
                 Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y reportes — siempre disponibles en tu
                 dispositivo.
               </p>
-              <div className="hero-actions">
-                <a href="#registro" className="btn-primary-amber">
+              <div className="landing-animate-in flex flex-col gap-4 sm:flex-row [animation-delay:550ms]">
+                <a href="#registro" className={ctaPrimary}>
                   Comenzar
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path
@@ -351,7 +359,7 @@ export default function LandingDeep() {
                     />
                   </svg>
                 </a>
-                <a href="#caracteristicas" className="btn-ghost">
+                <a href="#caracteristicas" className={ctaOutlineOnGradient}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M6.5 5.5l4 2.5-4 2.5v-5z" fill="currentColor" />
@@ -362,19 +370,19 @@ export default function LandingDeep() {
             </div>
 
             {/* Right: Stats card */}
-            <div className="col-lg-5 offset-lg-1">
-              <div className="hero-card">
-                <div className="hero-card-stat">
-                  <span className="hero-card-number">24</span>
-                  <span className="hero-card-label">hrs, sin conexión</span>
+            <div>
+              <div className="landing-animate-in rounded-lg border border-white/20 bg-white/10 p-10 backdrop-blur [animation-delay:700ms]">
+                <div className="mb-3 flex items-baseline gap-2">
+                  <span className="text-4xl leading-none font-bold text-accent">24</span>
+                  <span className="text-xs font-medium tracking-wide text-white/40 uppercase">hrs, sin conexión</span>
                 </div>
-                <div className="hero-card-stat">
-                  <span className="hero-card-number">100%</span>
-                  <span className="hero-card-label">seguridad de tus datos</span>
+                <div className="mb-3 flex items-baseline gap-2">
+                  <span className="text-4xl leading-none font-bold text-accent">100%</span>
+                  <span className="text-xs font-medium tracking-wide text-white/40 uppercase">seguridad de tus datos</span>
                 </div>
-                <div className="hero-card-stat">
-                  <span className="hero-card-number">0</span>
-                  <span className="hero-card-label">descontrol</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl leading-none font-bold text-accent">0</span>
+                  <span className="text-xs font-medium tracking-wide text-white/40 uppercase">descontrol</span>
                 </div>
               </div>
             </div>

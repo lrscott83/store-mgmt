@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import LandingDeep from '../landing-deep';
 
@@ -128,6 +128,25 @@ describe('LandingDeep — public landing route', () => {
       setServiceWorkerSupported(false);
       renderLanding();
       expect(screen.getByRole('link', { name: /^entrar$/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Hero section', () => {
+    it('renders the hero heading, brand and "Ver características" anchor', () => {
+      renderLanding();
+      expect(screen.getByRole('heading', { name: /vende más/i })).toBeInTheDocument();
+      expect(screen.getByText('VendeDTo')).toBeInTheDocument();
+      const seeFeatures = screen.getByRole('link', { name: /ver características/i });
+      expect(seeFeatures).toHaveAttribute('href', '#caracteristicas');
+    });
+
+    it('uses the token-derived brand gradient on the hero container and the primary CTA', () => {
+      renderLanding();
+      const hero = document.querySelector('#hero');
+      expect(hero).toHaveClass('bg-gradient-to-br', 'from-primary');
+
+      const heroCta = within(hero as HTMLElement).getByRole('link', { name: /^comenzar$/i });
+      expect(heroCta).toHaveClass('bg-primary');
     });
   });
 });
