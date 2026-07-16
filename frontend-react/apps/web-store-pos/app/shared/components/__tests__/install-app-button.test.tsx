@@ -45,12 +45,14 @@ describe('InstallAppButton — Angular app.component pwa-install-btn parity', ()
   beforeEach(() => {
     setServiceWorkerSupported(true);
     setStandalone(false);
+    localStorage.clear();
     resetPwaInstallPromptForTests();
   });
 
   afterEach(() => {
     setServiceWorkerSupported(false);
     setInstalledRelatedApps(null);
+    localStorage.clear();
     vi.restoreAllMocks();
     resetPwaInstallPromptForTests();
   });
@@ -88,6 +90,39 @@ describe('InstallAppButton — Angular app.component pwa-install-btn parity', ()
     const btn = await screen.findByRole('button', { name: /instalar app/i });
     // Give the async detection a chance to (wrongly) hide it.
     await waitFor(() => expect(btn).toBeInTheDocument());
+  });
+
+  it('does NOT render when a prior install left the pwa-installed flag in localStorage (cross-tab/session)', () => {
+    // Simulates: installed in a previous session, now opened in a NEW browser
+    // tab. beforeinstallprompt does not fire for an installed app, so the
+    // persisted flag is the signal that hides the button.
+    localStorage.setItem('pwa-installed', 'true');
+    render(<InstallAppButton />);
+    expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument();
+  });
+
+  it('clears the stale installed flag and shows the button when beforeinstallprompt fires (uninstall self-heal)', async () => {
+    localStorage.setItem('pwa-installed', 'true');
+    render(<InstallAppButton />);
+    expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument();
+
+    // The app is installable again (was uninstalled) → Chrome fires the event.
+    act(() => {
+      window.dispatchEvent(makeInstallPromptEvent());
+    });
+
+    const btn = await screen.findByRole('button', { name: /instalar app/i });
+    expect(btn).toBeEnabled();
+    expect(localStorage.getItem('pwa-installed')).toBeNull();
+  });
+
+  it('persists the installed flag on appinstalled so other tabs hide the button', () => {
+    render(<InstallAppButton />);
+    act(() => {
+      window.dispatchEvent(new Event('appinstalled'));
+    });
+    expect(localStorage.getItem('pwa-installed')).toBe('true');
+    expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument();
   });
 
   it('does NOT render when service workers are unsupported', () => {

@@ -31,6 +31,32 @@ function getServerSnapshot(): null {
 }
 
 /**
+ * localStorage key remembering that this origin's PWA has been installed.
+ * Set on `appinstalled`, cleared as soon as a `beforeinstallprompt` fires
+ * (which only happens when the app is NOT installed) so it self-heals after an
+ * uninstall. Shared across all tabs of the origin.
+ */
+const INSTALLED_FLAG_KEY = 'pwa-installed';
+
+function readInstalledFlag(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(INSTALLED_FLAG_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeInstalledFlag(value: boolean): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (value) localStorage.setItem(INSTALLED_FLAG_KEY, 'true');
+    else localStorage.removeItem(INSTALLED_FLAG_KEY);
+  } catch {
+    // Best-effort — a blocked/unavailable localStorage just disables persistence.
+  }
+}
+
+/**
  * PWA install logic based on Angular's `AppComponent`: the button is offered
  * when service workers are supported and the app is not already installed, and
  * it stays disabled until a `beforeinstallprompt` event is captured. Resets on
@@ -42,10 +68,16 @@ function getServerSnapshot(): null {
  * hides it once the app is known to be installed. `beforeinstallprompt` never
  * fires for an installed app and `appinstalled` only fires at install time
  * (not on later loads), so an app installed in a PREVIOUS session and now
- * opened in a non-standalone tab is only detectable via
- * `navigator.getInstalledRelatedApps()` (Chromium; requires `related_applications`
- * self-reference in the manifest). Detection is best-effort: if the API is
- * absent or rejects, we fall back to the Angular behaviour (button shown).
+ * opened in a non-standalone tab is otherwise invisible to JS. Two signals
+ * cover it, both best-effort (on failure we fall back to Angular's behaviour,
+ * showing the button):
+ *   1. A persisted `localStorage` flag ({@link INSTALLED_FLAG_KEY}) written on
+ *      `appinstalled` and read on load — works in every browser and across
+ *      tabs, and self-heals on uninstall (cleared when `beforeinstallprompt`
+ *      fires again). This is the primary, reliable signal.
+ *   2. `navigator.getInstalledRelatedApps()` (Chromium only; needs the
+ *      `related_applications` self-reference in the manifest) — authoritative
+ *      when it resolves, but not universally supported.
  *
  * The captured prompt itself lives in the framework-agnostic
  * `pwa-install-prompt` store (populated as early as possible, from
@@ -55,11 +87,12 @@ function getServerSnapshot(): null {
  */
 export function usePwaInstall(): PwaInstall {
   const swSupported = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
-  const [installed, setInstalled] = useState<boolean>(false);
+  const [installed, setInstalled] = useState<boolean>(() => readInstalledFlag());
   const deferredPrompt = useSyncExternalStore(subscribeDeferredPrompt, getDeferredPrompt, getServerSnapshot);
 
   useEffect(() => {
     function onAppInstalled() {
+      writeInstalledFlag(true);
       setInstalled(true);
     }
     window.addEventListener('appinstalled', onAppInstalled);
@@ -67,6 +100,16 @@ export function usePwaInstall(): PwaInstall {
       window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
+
+  // A captured `beforeinstallprompt` means the browser considers the app
+  // installable — i.e. it is NOT installed — so clear any stale flag left over
+  // from a previous install that has since been uninstalled.
+  useEffect(() => {
+    if (deferredPrompt) {
+      writeInstalledFlag(false);
+      setInstalled(false);
+    }
+  }, [deferredPrompt]);
 
   useEffect(() => {
     const nav = navigator as Navigator & {
@@ -78,6 +121,7 @@ export function usePwaInstall(): PwaInstall {
       .getInstalledRelatedApps()
       .then((apps) => {
         if (!cancelled && apps.some((app) => app.platform === 'webapp')) {
+          writeInstalledFlag(true);
           setInstalled(true);
         }
       })
