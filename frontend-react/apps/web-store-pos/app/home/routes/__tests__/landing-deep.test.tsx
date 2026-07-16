@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import LandingDeep from '../landing-deep';
 
@@ -147,6 +147,50 @@ describe('LandingDeep — public landing route', () => {
 
       const heroCta = within(hero as HTMLElement).getByRole('link', { name: /^comenzar$/i });
       expect(heroCta).toHaveClass('bg-primary');
+    });
+  });
+
+  describe('Features grid + scroll-reveal', () => {
+    it('renders all 9 FEATURES titles, each inside a shared Card', () => {
+      renderLanding();
+      const titles = [
+        'Seguridad total',
+        'Funciona sin Internet',
+        'Registro instantáneo',
+        'Cuadre de caja rápido',
+        'Inventario en tiempo real',
+        'Reportes claros',
+        'Facturación integrada',
+        'Panel de decisiones',
+        'Sincronización flexible',
+      ];
+      for (const title of titles) {
+        const heading = screen.getByText(title);
+        expect(heading).toBeInTheDocument();
+        expect(heading.closest('[data-slot="card"]')).not.toBeNull();
+      }
+    });
+
+    it('renders the features grid with responsive grid classes', () => {
+      renderLanding();
+      const grids = Array.from(document.querySelectorAll('#caracteristicas .grid'));
+      const featuresGrid = grids.find((el) => el.className.includes('lg:grid-cols-3'));
+      expect(featuresGrid).toHaveClass('grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-3');
+    });
+
+    it('reveals a feature wrapper (opacity-0 → opacity-100) when the observer fires isIntersecting', () => {
+      renderLanding();
+      const firstWrapper = screen.getByText('Seguridad total').closest('[data-slot="card"]')?.parentElement;
+      expect(firstWrapper).toHaveClass('opacity-0');
+
+      const observer = observerInstances[0];
+      const target = observer.observedElements[0];
+      const entry = { target, isIntersecting: true } as IntersectionObserverEntry;
+      act(() => {
+        observer.callback([entry], observer);
+      });
+
+      expect(firstWrapper).toHaveClass('opacity-100');
     });
   });
 });
