@@ -232,4 +232,21 @@ describe('LandingDeep — public landing route', () => {
       }
     });
   });
+
+  describe('Full regression — all sections present', () => {
+    it('renders the hero, features, how-it-works, CTA and footer sections', () => {
+      const { container } = renderLanding();
+      expect(container.querySelector('#hero')).toBeInTheDocument();
+      expect(container.querySelector('#caracteristicas')).toBeInTheDocument();
+      expect(container.querySelector('#como-funciona')).toBeInTheDocument();
+      expect(container.querySelector('#registro')).toBeInTheDocument();
+      expect(container.querySelector('footer')).toBeInTheDocument();
+    });
+
+    it('carries a token-derived accent class on at least one non-CTA element (guardrail)', () => {
+      renderLanding();
+      const brand = screen.getByText('VendeDTo');
+      expect(brand).toHaveClass('text-accent');
+    });
+  });
 });
