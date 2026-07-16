@@ -193,4 +193,26 @@ describe('LandingDeep — public landing route', () => {
       expect(firstWrapper).toHaveClass('opacity-100');
     });
   });
+
+  describe('How-it-works + CTA', () => {
+    it('renders all 3 STEPS titles inside a shared Card, laid out in a 3-col grid', () => {
+      renderLanding();
+      const titles = ['Regístrate', 'Configura tu punto', 'Empieza a vender'];
+      for (const title of titles) {
+        const heading = screen.getByText(title);
+        expect(heading).toBeInTheDocument();
+        expect(heading.closest('[data-slot="card"]')).not.toBeNull();
+      }
+
+      const grid = document.querySelector('#como-funciona .grid');
+      expect(grid).toHaveClass('md:grid-cols-3');
+    });
+
+    it('renders the "Crear cuenta gratis" CTA as a Link to /register styled with ctaPrimary tokens', () => {
+      renderLanding();
+      const cta = screen.getByRole('link', { name: /crear cuenta gratis/i });
+      expect(cta).toHaveAttribute('href', '/register');
+      expect(cta).toHaveClass('bg-primary');
+    });
+  });
 });

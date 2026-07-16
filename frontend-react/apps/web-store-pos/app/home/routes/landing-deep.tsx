@@ -449,76 +449,57 @@ export default function LandingDeep() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section id="como-funciona" className="features-section" style={{ borderTop: '1px solid rgba(245, 176, 66, 0.06)' }}>
-        <div className="container">
-          <div className="text-center mb-5 pb-3">
-            <p className="section-eyebrow" style={{ justifyContent: 'center' }}>
-              <span style={{ display: 'block', width: 24, height: 1, background: '#f5b026' }}></span>
+      <section id="como-funciona" className="border-t border-border px-4 py-24">
+        <div className="mx-auto w-full max-w-6xl">
+          <div className="mb-12 pb-3 text-center">
+            <p className="mb-4 flex items-center justify-center gap-3 text-xs font-medium tracking-[0.25em] text-accent uppercase">
+              <span className="block h-px w-6 bg-accent" aria-hidden="true"></span>
               En tres pasos
             </p>
-            <h2 className="section-title" style={{ marginLeft: 'auto', marginRight: 'auto' }}>
+            <h2 className="mx-auto text-3xl leading-tight font-bold tracking-tight text-text sm:text-4xl lg:text-5xl">
               Así de simple
             </h2>
           </div>
 
-          <div className="row g-5">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {STEPS.map((step) => (
-              <div className="col-md-4" key={step.number}>
-                <div className="feature-card">
-                  <div className="feature-icon-wrap" style={{ marginBottom: '1.5rem' }}>
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-body)',
-                        fontSize: '1.6rem',
-                        fontWeight: 700,
-                        color: '#f5b026',
-                        lineHeight: 1,
-                      }}
-                    >
-                      {step.number}
-                    </span>
-                  </div>
-                  <h3 className="feature-title">{step.title}</h3>
-                  <p className="feature-desc">{step.desc}</p>
-                </div>
-              </div>
+              <Card key={step.number}>
+                <span className="mb-6 block text-2xl leading-none font-bold text-accent">{step.number}</span>
+                <h3 className="mb-2 text-lg font-semibold text-text">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-text-muted">{step.desc}</p>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section id="registro" className="cta-section">
-        <div className="cta-bg-element"></div>
-        <div className="container">
-          <div className="cta-inner">
-            <p className="section-eyebrow" style={{ justifyContent: 'center', marginBottom: '1.5rem' }}>
-              <span style={{ display: 'block', width: 24, height: 1, background: '#f5b026' }}></span>
+      <section id="registro" className="relative overflow-hidden px-4 py-24">
+        <div
+          className="landing-animate-glow absolute right-[-100px] bottom-[-200px] h-[500px] w-[500px] rounded-full bg-accent/20 blur-3xl"
+          aria-hidden="true"
+        ></div>
+        <div className="relative mx-auto w-full max-w-6xl">
+          <div className="rounded-lg bg-surface p-16 text-center shadow-card">
+            <p className="mb-6 flex items-center justify-center gap-3 text-xs font-medium tracking-[0.25em] text-accent uppercase">
+              <span className="block h-px w-6 bg-accent" aria-hidden="true"></span>
               Empieza hoy
             </p>
-            <h2 className="cta-title">
+            <h2 className="mb-4 text-3xl leading-tight font-bold text-text sm:text-4xl lg:text-[2.8rem]">
               Tu negocio merece
               <br />
               las mejores herramientas
             </h2>
-            <p className="cta-sub">Únete a cientos de emprendedores que ya gestionan sus ventas con control y seguridad.</p>
-            <Link to="/register" className="btn-primary-amber" style={{ fontSize: '1rem', padding: '1rem 2.5rem' }}>
+            <p className="mb-10 text-lg text-text-muted">
+              Únete a cientos de emprendedores que ya gestionan sus ventas con control y seguridad.
+            </p>
+            <Link to="/register" className={`${ctaPrimary} px-10 py-4 text-base`}>
               Crear cuenta gratis
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>
-            <p
-              style={{
-                marginTop: '1.25rem',
-                fontFamily: 'var(--font-body)',
-                fontSize: '1rem',
-                color: 'rgba(245, 240, 235, 0.3)',
-                letterSpacing: '0.04em',
-              }}
-            >
-              2 meses de prueba gratis · Pago mensual post-uso
-            </p>
+            <p className="mt-5 text-sm tracking-wide text-text-muted/60">2 meses de prueba gratis · Pago mensual post-uso</p>
           </div>
         </div>
       </section>
