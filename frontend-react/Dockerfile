@@ -8,8 +8,12 @@ FROM node:22-alpine AS build
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 COPY . .
+# Build web-store-pos AND its workspace deps (domain, web-common) in
+# dependency order — the `...` suffix selects the package plus its deps.
+# @store-mgmt/domain resolves via exports -> dist/, so it must be compiled first
+# or the app build fails with "Failed to resolve entry for @store-mgmt/domain".
 RUN pnpm install --frozen-lockfile \
- && pnpm --filter @store-mgmt/web-store-pos build
+ && pnpm --filter "@store-mgmt/web-store-pos..." build
 
 # --- Serve stage --------------------------------------------------------------
 FROM nginx:alpine
