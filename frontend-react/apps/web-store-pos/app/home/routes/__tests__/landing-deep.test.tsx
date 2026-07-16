@@ -140,10 +140,13 @@ describe('LandingDeep — public landing route', () => {
       expect(seeFeatures).toHaveAttribute('href', '#caracteristicas');
     });
 
-    it('uses the token-derived brand gradient on the hero container and the primary CTA', () => {
+    it('renders the hero on the app background (no full-bleed gradient) and keeps the primary CTA', () => {
       renderLanding();
       const hero = document.querySelector('#hero');
-      expect(hero).toHaveClass('bg-gradient-to-br', 'from-primary');
+      // Hero inherits the app's standard light background from the page root,
+      // matching every other view — no bespoke brand-gradient background.
+      expect(hero).not.toHaveClass('bg-gradient-to-br');
+      expect(hero).not.toHaveClass('from-primary');
 
       const heroCta = within(hero as HTMLElement).getByRole('link', { name: /^comenzar$/i });
       expect(heroCta).toHaveClass('bg-primary');

@@ -12,13 +12,11 @@ const ctaPrimary =
   'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 shadow-card ' +
   'bg-primary text-white text-sm font-medium transition-colors hover:bg-primary-hover';
 
-// Mirrors Button's outline variant, retinted for use over the hero's brand
-// gradient (border-primary/text-primary would be invisible against a
-// primary-colored background — the hero already uses white/N opacity steps
-// for its glass stats card, so this follows the same pattern).
-const ctaOutlineOnGradient =
+// Mirrors Button's outline variant for anchor/Link CTAs on the app's light
+// background: border and text use the standard tokens, matching the other views.
+const ctaOutline =
   'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 border ' +
-  'border-white/30 text-white text-sm font-medium transition-colors hover:bg-white/10';
+  'border-border text-text text-sm font-medium transition-colors hover:border-primary hover:text-primary';
 
 const FEATURES: Array<{ title: string; desc: string; icon: React.ReactNode }> = [
   {
@@ -332,16 +330,7 @@ export default function LandingDeep() {
       </nav>
 
       {/* HERO */}
-      <section
-        id="hero"
-        className="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-accent pt-32 pb-20 text-white"
-      >
-        <div className="landing-hero-grid" aria-hidden="true"></div>
-        <div
-          className="landing-animate-glow absolute top-1/2 left-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/30 blur-3xl"
-          aria-hidden="true"
-        ></div>
-
+      <section id="hero" className="relative pt-32 pb-20">
         <div className="relative mx-auto w-full max-w-6xl px-4">
           <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">
             {/* Left: Copy */}
@@ -354,7 +343,7 @@ export default function LandingDeep() {
                 <br />
                 Controla <span className="text-accent italic">todo.</span>
               </h1>
-              <p className="landing-animate-in mb-10 max-w-[500px] text-lg text-white/60 sm:text-xl [animation-delay:400ms]">
+              <p className="landing-animate-in mb-10 max-w-[500px] text-lg text-text-muted sm:text-xl [animation-delay:400ms]">
                 Gestiona tu negocio sin depender de Internet. Ventas, inventario, cuadre de caja y reportes — siempre disponibles en tu
                 dispositivo.
               </p>
@@ -371,7 +360,7 @@ export default function LandingDeep() {
                     />
                   </svg>
                 </a>
-                <a href="#caracteristicas" className={ctaOutlineOnGradient}>
+                <a href="#caracteristicas" className={ctaOutline}>
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
                     <path d="M6.5 5.5l4 2.5-4 2.5v-5z" fill="currentColor" />
@@ -383,18 +372,18 @@ export default function LandingDeep() {
 
             {/* Right: Stats card */}
             <div>
-              <div className="landing-animate-in rounded-lg border border-white/20 bg-white/10 p-10 backdrop-blur [animation-delay:700ms]">
+              <div className="landing-animate-in rounded-lg border border-border bg-surface p-10 shadow-card [animation-delay:700ms]">
                 <div className="mb-3 flex items-baseline gap-2">
                   <span className="text-4xl leading-none font-bold text-accent">24</span>
-                  <span className="text-xs font-medium tracking-wide text-white/40 uppercase">hrs, sin conexión</span>
+                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">hrs, sin conexión</span>
                 </div>
                 <div className="mb-3 flex items-baseline gap-2">
                   <span className="text-4xl leading-none font-bold text-accent">100%</span>
-                  <span className="text-xs font-medium tracking-wide text-white/40 uppercase">seguridad de tus datos</span>
+                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">seguridad de tus datos</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl leading-none font-bold text-accent">0</span>
-                  <span className="text-xs font-medium tracking-wide text-white/40 uppercase">descontrol</span>
+                  <span className="text-xs font-medium tracking-wide text-text-muted uppercase">descontrol</span>
                 </div>
               </div>
             </div>
@@ -474,12 +463,8 @@ export default function LandingDeep() {
       </section>
 
       {/* CTA */}
-      <section id="registro" className="relative overflow-hidden px-4 py-24">
-        <div
-          className="landing-animate-glow absolute right-[-100px] bottom-[-200px] h-[500px] w-[500px] rounded-full bg-accent/20 blur-3xl"
-          aria-hidden="true"
-        ></div>
-        <div className="relative mx-auto w-full max-w-6xl">
+      <section id="registro" className="px-4 py-24">
+        <div className="mx-auto w-full max-w-6xl">
           <div className="rounded-lg bg-surface p-16 text-center shadow-card">
             <p className="mb-6 flex items-center justify-center gap-3 text-xs font-medium tracking-[0.25em] text-accent uppercase">
               <span className="block h-px w-6 bg-accent" aria-hidden="true"></span>
