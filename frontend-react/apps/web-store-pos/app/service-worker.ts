@@ -86,8 +86,13 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         return fetch(request).then((response) => {
           if (response.ok) {
+            // Clone synchronously here, BEFORE `return response` below. A Response
+            // body can be read only once; cloning inside the async
+            // caches.open().then() ran after the returned response had already
+            // started being consumed ("Response body is already used").
+            const responseToCache = response.clone();
             caches.open(PRECACHE_NAME).then((cache) => {
-              cache.put(request, response.clone());
+              cache.put(request, responseToCache);
             });
           }
           return response;
