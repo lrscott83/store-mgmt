@@ -38,6 +38,21 @@ describe('pwa-install-prompt store — captures beforeinstallprompt outside Reac
     expect(getDeferredPrompt()).toBe(evt);
   });
 
+  it('adopts an event already captured by the early inline <head> script (window.__pwaInstallPrompt)', () => {
+    // Chrome fires beforeinstallprompt once, often BEFORE the deferred module
+    // bundle runs initPwaInstallCapture(). The inline <head> script catches it
+    // into window.__pwaInstallPrompt; init must adopt that so the button is not
+    // stuck disabled after the event was already missed by the module listener.
+    const evt = makeInstallPromptEvent();
+    (window as unknown as { __pwaInstallPrompt?: unknown }).__pwaInstallPrompt = evt;
+
+    // `subscribeDeferredPrompt` is the lazy init path used by `usePwaInstall`'s
+    // `useSyncExternalStore`, which reads the snapshot right after subscribing.
+    subscribeDeferredPrompt(vi.fn());
+
+    expect(getDeferredPrompt()).toBe(evt);
+  });
+
   it('is idempotent — calling initPwaInstallCapture multiple times attaches the listener once', () => {
     const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 

@@ -17,6 +17,11 @@ export interface BeforeInstallPromptEvent extends Event {
  * (`useSyncExternalStore` in `usePwaInstall`).
  */
 
+/** Window augmented with the global the early inline <head> script parks the event on. */
+type WindowWithInstallPrompt = Window & {
+  __pwaInstallPrompt?: BeforeInstallPromptEvent | null;
+};
+
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let initialized = false;
 const subscribers = new Set<() => void>();
@@ -48,6 +53,16 @@ export function initPwaInstallCapture(): void {
   initialized = true;
   window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
   window.addEventListener('appinstalled', onAppInstalled);
+  // Adopt an event captured by the early inline <head> script before this
+  // (deferred, module-bundled) code ran. Chrome fires `beforeinstallprompt`
+  // once and does not re-dispatch it, so once the SW/manifest are warm it
+  // often fires before the bundle executes — the inline listener parks it on
+  // `window.__pwaInstallPrompt`, and we take ownership here.
+  const early = (window as WindowWithInstallPrompt).__pwaInstallPrompt;
+  if (early) {
+    deferredPrompt = early;
+    notify();
+  }
 }
 
 /** Returns the currently captured prompt event, or `null` if none was captured. */
@@ -88,6 +103,9 @@ export function resetPwaInstallPromptForTests(): void {
   if (initialized && typeof window !== 'undefined') {
     window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
     window.removeEventListener('appinstalled', onAppInstalled);
+  }
+  if (typeof window !== 'undefined') {
+    (window as WindowWithInstallPrompt).__pwaInstallPrompt = null;
   }
   deferredPrompt = null;
   initialized = false;

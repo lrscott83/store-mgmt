@@ -25,6 +25,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Capture `beforeinstallprompt` from an inline classic script that
+            runs DURING head parse — before the deferred `type=module` app
+            bundle (entry.client.tsx) executes. Chrome fires this event once,
+            does not re-dispatch it, and once the service worker + manifest are
+            warm it fires before the bundle runs, so the module-scope listener
+            in pwa-install-prompt.ts misses it and the "Instalar App" button
+            stays disabled. Parking the event on `window.__pwaInstallPrompt`
+            lets `initPwaInstallCapture()` adopt it once the bundle loads. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaInstallPrompt=e;});window.addEventListener('appinstalled',function(){window.__pwaInstallPrompt=null;});",
+          }}
+        />
         {/* Browser tab / bookmark favicon — mirrors Angular index.html's
             `<link rel="icon" type="image/png" href="assets/favicon.png" />`.
             Lives at public/favicon.png. */}
