@@ -28,11 +28,16 @@ export default defineConfig({
       devOptions: {
         // Serve the service worker in `pnpm dev` too, so the PWA install flow
         // (beforeinstallprompt → InstallAppButton) can be exercised locally.
-        // service-worker.ts is a classic worker (no ES imports), so the default
-        // type applies. Production behaviour is unchanged. Caveat: a live SW in
-        // dev can serve cached responses — unregister it in DevTools > Application
-        // if HMR ever misbehaves.
         enabled: true,
+        // REQUIRED: without an explicit type, vite-plugin-pwa's dev register
+        // template interpolates the string "undefined" into
+        // `new Workbox(url, { type: "undefined" })`, an invalid WorkerType that
+        // makes the browser reject registration (empty SW panel → no
+        // beforeinstallprompt → install button stuck disabled). service-worker.ts
+        // is a classic worker (no ES imports), so 'classic' is correct.
+        type: 'classic',
+        // Caveat: a live SW in dev can serve cached responses — unregister it in
+        // DevTools > Application if HMR ever misbehaves.
       },
     }),
   ],
