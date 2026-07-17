@@ -146,10 +146,39 @@ attributes) — these are NEW, spec-fixed strings, not sourced from `es.ts`.
 - WHEN inspecting the 4 elements above
 - THEN each `aria-label` equals its Required (Spanish) value exactly
 
+### Requirement: Register terms-acceptance toggle
+
+`app/auth/routes/register.tsx` MUST render a terms-acceptance toggle that gates
+submission, mirroring Angular's `accept` control (`register.component.html:191-210`,
+`Validators.required`). Added as a follow-on to the text-parity pass (commit `d6217e3`),
+verified against Angular source (engram `sdd/view-text-parity/terms-toggle-verify`).
+
+- Toggle is a boolean `accepted`, initially false.
+- Label = `REGISTRATION.ACCEPT_CONDITIONS` immediately followed by a link with text
+  `REGISTRATION.TERMS_CONDITIONS`.
+- Link targets React route `/terms-conditions` (React's real terms route, per
+  `footer.tsx`), opens `target="_blank"` `rel="noreferrer"`. Angular's
+  `/terminos-condiciones` slug is intentionally NOT copied (no such React route).
+- Info line = `REGISTRATION.INFO_TERMS_CONDITIONS`.
+- Submit button disabled when `!accepted`, preserving React's pre-existing `isLoading`
+  gate: `disabled={isLoading || !accepted}`. Mirrors Angular `[disabled]="!accept.value"`.
+
+| Key | Required text (verbatim, Angular vocabs/es.ts) |
+|---|---|
+| `REGISTRATION.ACCEPT_CONDITIONS` | `Estoy de acuerdo con los ` (135 — trailing space) |
+| `REGISTRATION.TERMS_CONDITIONS` | `términos y condiciones` (136) |
+| `REGISTRATION.INFO_TERMS_CONDITIONS` | `Usted debe aceptar los términos y condiciones para registrarse en el sistema.` (137) |
+
+#### Scenario: Submit gated by acceptance
+- GIVEN the register form renders
+- WHEN the accept toggle is off
+- THEN the submit button is disabled
+- AND WHEN the toggle is turned on (not loading)
+- THEN the submit button is enabled
+
 ## Out of Scope
 
-- Terms-acceptance toggle missing from `register.tsx` (structural gap, not text).
-- Any color, font, layout, or structural change.
+- Any color, font, layout, or structural change beyond the authorized terms toggle above.
 - `login.tsx` input `type`/`autoComplete` (stays `email`).
 - Dynamic/backend-sourced error banner text (API response messages) — only static
   fallback/UI copy is specified here.
