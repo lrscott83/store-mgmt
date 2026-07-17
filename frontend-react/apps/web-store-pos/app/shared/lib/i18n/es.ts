@@ -40,6 +40,11 @@ const messages: Record<string, string> = {
   // dialogs, e.g. order-item-list.component.ts:35-38 deactivateOrder)
   'GENERAL.DELETE_CONFIRM_TITLE': 'Confirmación para eliminar',
   'GENERAL.DELETE_CONFIRM_MESSAGE_A': '¿Está seguro que desea eliminar esta {name}?',
+  // GENERAL.CONFIRM_TITLE / GENERAL.WIZARD_DIRTY_MESSAGE (Angular vocabs/es.ts:175,190) —
+  // the unsaved-changes SweetAlert shown by can-deactivate.guard.ts (view-text-parity).
+  'GENERAL.CONFIRM_TITLE': 'Confirmación',
+  'GENERAL.WIZARD_DIRTY_MESSAGE':
+    'Usted tiene cambios pendientes. ¿Desea salvar los cambios antes de pasar a la otra página?',
 
   // Auth
   'AUTH.SIGN_IN': 'Iniciar sesión',
@@ -66,6 +71,19 @@ const messages: Record<string, string> = {
   'AUTH.OFFLINE_LOGIN': 'Estás offline. Se requiere conexión para iniciar sesión.',
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
   'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',
+
+  // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
+  // AUTH/GENERAL, not nested. view-text-parity.)
+  'REGISTRATION.WELCOME': 'Creación de cuenta',
+  'REGISTRATION.ALREADY_ACCOUNT': '¿Ya tienes una cuenta?',
+  'REGISTRATION.SIGNIN_LINK': 'Entra',
+  'REGISTRATION.SIGNUP_BUTTON': 'Registrar',
+  // NEW — Angular register.component.ts has no connectivity check/banner at all;
+  // wording follows AUTH.OFFLINE_LOGIN pattern (view-text-parity spec).
+  'REGISTRATION.OFFLINE_BANNER': 'Estás offline. Se requiere conexión para registrarte.',
+  // NEW — Angular has no visible post-submit success copy in this component
+  // (view-text-parity spec).
+  'REGISTRATION.SUCCESS_REDIRECT': 'Cuenta creada. Redirigiendo al inicio de sesión…',
 
   // Tutorial
   'TUTORIAL.TITLE': 'Tutorial',
@@ -248,6 +266,10 @@ const messages: Record<string, string> = {
   // GENERAL.RESPONSE.ERROR500_MESSAGE — Angular's generic technical-support fallback.
   'GENERAL.RESPONSE.ERROR500_MESSAGE':
     'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
+  // GENERAL.RESPONSE.ERROR404_MESSAGE (Angular vocabs/es.ts:254-255) — root ErrorBoundary
+  // 404 details copy (view-text-parity).
+  'GENERAL.RESPONSE.ERROR404_MESSAGE':
+    'Puede que necesite estar conectado a Internet para hacer esta operación. Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
 
   // SaleCreditErrors / OrderErrors (Angular frontend/src/app/domain/entities/sale-credits/
   // sale-credit.errors.ts and .../orders/order.errors.ts — hardcoded Spanish literals there,
@@ -269,6 +291,11 @@ const messages: Record<string, string> = {
   // GENERAL.VALIDATION.* (Angular GENERAL.VALIDATION — used by sale-product-row quantity/price form)
   'GENERAL.VALIDATION.REQUIRED': '{name} es requerido',
   'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO': '{name} mínimo valor es 0',
+  // GENERAL.VALIDATION.PASSWORD_POLICY / INVALID_PASSWORD (Angular vocabs/es.ts:242,241) —
+  // register.tsx password field validation (view-text-parity).
+  'GENERAL.VALIDATION.PASSWORD_POLICY':
+    'La contraseña debe tener al menos 8 caracteres, un número y una letra en mayúscula',
+  'GENERAL.VALIDATION.INVALID_PASSWORD': 'Las contraseñas no son iguales',
   // Angular GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE/INVALID_INTEGER/INVALID_FLOAT
   // (vocabs/es.ts:244,246-247) — edit-inventory-entry-modal quantity/costPrice validation.
   'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ONE': '{name} mínimo valor es 1',
@@ -640,6 +667,14 @@ const messages: Record<string, string> = {
   'GENERAL.EMAIL': 'Correo',
   'GENERAL.PASSWORD': 'Contraseña',
   'GENERAL.DESCRIPTION': 'Descripción',
+  // GENERAL.LOGIN / GENERAL.CONFIRM_PASSWORD (Angular vocabs/es.ts:151,153) — register.tsx
+  // + login.tsx field labels (view-text-parity).
+  'GENERAL.LOGIN': 'Usuario',
+  'GENERAL.CONFIRM_PASSWORD': 'Confirmar Contraseña',
+
+  // Store (Angular STORE.* — vocabs/es.ts:347)
+  // STORE.STORE_NAME — register.tsx store-name field label (view-text-parity).
+  'STORE.STORE_NAME': 'Nombre de la tienda',
 
   // Sync — Export / Import
   'SYNC.EXPORT_TITLE': 'Exportar datos',
