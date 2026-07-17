@@ -95,7 +95,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} noValidate>
         <div className="mb-4">
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            {intl.formatMessage({ id: 'AUTH.EMAIL' })}
+            {intl.formatMessage({ id: 'GENERAL.LOGIN' })}
           </label>
           <input
             id="email"

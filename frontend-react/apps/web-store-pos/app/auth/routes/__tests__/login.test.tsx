@@ -75,8 +75,8 @@ describe('LoginPage (AUTH-01)', () => {
 
   it('renders login form with email and password fields', () => {
     renderLogin();
-    // "Email" label is the same in Spanish
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    // GENERAL.LOGIN = "Usuario" (view-text-parity: forced literal parity, not AUTH.EMAIL)
+    expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
     // "Contraseña" is the Spanish label for password
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument();
     // "Iniciar sesión" is the Spanish text for the submit button
@@ -98,7 +98,7 @@ describe('LoginPage (AUTH-01)', () => {
     const loginFn = vi.fn().mockResolvedValue(makeUser());
     renderLogin(loginFn);
 
-    fireEvent.change(screen.getByLabelText(/email/i), {
+    fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
     fireEvent.change(screen.getByLabelText(/contraseña/i), {
@@ -117,7 +117,7 @@ describe('LoginPage (AUTH-01)', () => {
     const loginFn = vi.fn().mockResolvedValue(makeUser());
     renderLogin(loginFn);
 
-    fireEvent.change(screen.getByLabelText(/email/i), {
+    fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
     fireEvent.change(screen.getByLabelText(/contraseña/i), {
@@ -134,7 +134,7 @@ describe('LoginPage (AUTH-01)', () => {
     vi.mocked(ConnectivityService.isOnline).mockReturnValue(false);
     renderLogin();
 
-    fireEvent.change(screen.getByLabelText(/email/i), {
+    fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
     fireEvent.change(screen.getByLabelText(/contraseña/i), {
@@ -152,7 +152,7 @@ describe('LoginPage (AUTH-01)', () => {
     const loginFn = vi.fn().mockRejectedValue({ status: 401 });
     renderLogin(loginFn);
 
-    fireEvent.change(screen.getByLabelText(/email/i), {
+    fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
     fireEvent.change(screen.getByLabelText(/contraseña/i), {
@@ -170,5 +170,25 @@ describe('LoginPage (AUTH-01)', () => {
     renderLogin();
     // AUTH.REGISTER = "Crear cuenta"
     expect(screen.getByRole('link', { name: /crear cuenta/i })).toBeInTheDocument();
+  });
+});
+
+describe('LoginPage — view-text-parity: identifier label forced literal parity (GENERAL.LOGIN)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('renders the identifier label as exactly "Usuario", not "Email"', () => {
+    renderLogin();
+    expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
+    expect(screen.queryByText('Email')).not.toBeInTheDocument();
+  });
+
+  it('keeps input type="email" and autoComplete="email" unchanged', () => {
+    renderLogin();
+    const input = screen.getByLabelText('Usuario');
+    expect(input).toHaveAttribute('type', 'email');
+    expect(input).toHaveAttribute('autoComplete', 'email');
   });
 });
