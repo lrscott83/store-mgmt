@@ -30,7 +30,11 @@ vi.mock('~/shared/lib/i18n/i18n-provider', () => ({
   I18nProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-import App from '../root';
+import App, { ErrorBoundary } from '../root';
+
+function mockRouteError(status: number, statusText = '') {
+  return { status, statusText, internal: false, data: null };
+}
 
 describe('App (root) — registers the auth-store redirect handler on mount (Decision 2)', () => {
   beforeEach(() => {
@@ -125,5 +129,29 @@ describe('App (root) — global PWA install button (Angular app.component parity
     );
 
     expect(screen.getByRole('button', { name: /instalar app/i })).toBeInTheDocument();
+  });
+});
+
+describe('ErrorBoundary — view-text-parity: Spanish copy (Angular parity, no i18n context available)', () => {
+  it('renders heading "404" and GENERAL.RESPONSE.ERROR404_MESSAGE details for a 404 route error', () => {
+    render(<ErrorBoundary error={mockRouteError(404)} params={{}} />);
+
+    expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Puede que necesite estar conectado a Internet para hacer esta operación. Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('renders heading "Error" and GENERAL.RESPONSE.ERROR500_MESSAGE details for a non-404 route error', () => {
+    render(<ErrorBoundary error={mockRouteError(500, 'Internal Server Error')} params={{}} />);
+
+    expect(screen.getByRole('heading', { name: 'Error' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.'
+      )
+    ).toBeInTheDocument();
   });
 });

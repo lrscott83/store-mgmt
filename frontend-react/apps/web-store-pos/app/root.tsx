@@ -10,6 +10,7 @@ import {
 } from 'react-router';
 import type { Route } from './+types/root';
 import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
+import messages from '~/shared/lib/i18n/es';
 import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
 import { registerAuthRedirect } from '~/shared/lib/stores/auth-store';
@@ -98,17 +99,20 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = 'Oops!';
-  let details = 'An unexpected error occurred.';
+  // ErrorBoundary can render on paths that never reach I18nProvider (e.g. a
+  // root-level render error), so it reads the Spanish catalog directly
+  // instead of useIntl (view-text-parity).
+  let message: string = messages['GENERAL.ERROR'];
+  let details: string = messages['GENERAL.RESPONSE.ERROR500_MESSAGE'];
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? '404' : 'Error';
-    details =
-      error.status === 404
-        ? 'The requested page could not be found.'
-        : error.statusText || details;
+    if (error.status === 404) {
+      message = '404';
+      details = messages['GENERAL.RESPONSE.ERROR404_MESSAGE'];
+    }
   } else if (import.meta.env.DEV && error && error instanceof Error) {
+    // DEV-only stack trace/error.message — technical, not user copy, stays unchanged.
     details = error.message;
     stack = error.stack;
   }
