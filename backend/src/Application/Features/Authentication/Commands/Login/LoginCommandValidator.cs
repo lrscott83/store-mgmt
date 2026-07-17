@@ -14,8 +14,7 @@ namespace Application.Features.Authentication.Commands.Login
             RuleFor(x => x.Password)
                 .NotNull().WithMessage("'{PropertyName}' is required.")
                 .NotEmpty().WithMessage("'{PropertyName}' is required.")
-                .MinimumLength(8).WithMessage("'{PropertyName}' must be at least 8 characters.")
-                .Must(password => !string.IsNullOrEmpty(password) && password.Any(char.IsUpper)).WithMessage("'{PropertyName}' must contain at least one uppercase letter.");
+                .MinimumLength(8).WithMessage("'{PropertyName}' must be at least 8 characters.");
         }
     }
 }
