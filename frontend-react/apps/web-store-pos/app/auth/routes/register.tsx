@@ -47,6 +47,7 @@ export default function RegisterPage() {
   const [isOffline, setIsOffline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [accepted, setAccepted] = useState(false);
 
   const PASSWORD_POLICY_REGEX = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
 
@@ -284,9 +285,35 @@ export default function RegisterPage() {
           )}
         </div>
 
+        <div className="mb-4">
+          <label htmlFor="acceptTerms" className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              id="acceptTerms"
+              type="checkbox"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+            <span>
+              {intl.formatMessage({ id: 'REGISTRATION.ACCEPT_CONDITIONS' })}
+              <Link
+                to="/terms-conditions"
+                target="_blank"
+                rel="noreferrer"
+                className="text-cyan-600 hover:text-cyan-700 font-medium"
+              >
+                {intl.formatMessage({ id: 'REGISTRATION.TERMS_CONDITIONS' })}
+              </Link>
+            </span>
+          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            {intl.formatMessage({ id: 'REGISTRATION.INFO_TERMS_CONDITIONS' })}
+          </p>
+        </div>
+
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || !accepted}
           className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading

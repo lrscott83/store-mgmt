@@ -47,6 +47,12 @@ function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
     target: { value: 'Passw0rd!' },
   });
+  acceptTerms();
+}
+
+/** Toggles the terms-acceptance checkbox on — required before submit is enabled. */
+function acceptTerms() {
+  fireEvent.click(screen.getByRole('checkbox'));
 }
 
 function renderRegister(initialEntries: string[] = ['/register']) {
@@ -241,6 +247,7 @@ describe('RegisterPage — view-text-parity: validate() error strings', () => {
 
   it('shows all 6 required-field errors byte-identical to GENERAL.VALIDATION.REQUIRED interpolation', async () => {
     renderRegister();
+    acceptTerms();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
@@ -265,6 +272,7 @@ describe('RegisterPage — view-text-parity: validate() error strings', () => {
     fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
       target: { value: 'weak' },
     });
+    acceptTerms();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
@@ -371,5 +379,42 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
         screen.getByText('Cuenta creada. Redirigiendo al inicio de sesión…')
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe('RegisterPage — terms-acceptance toggle (Angular parity: register.component.html:191-210, accept control)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('renders the accept-conditions label and the terms-and-conditions link (REGISTRATION.ACCEPT_CONDITIONS / REGISTRATION.TERMS_CONDITIONS)', () => {
+    renderRegister();
+    expect(screen.getByText(/Estoy de acuerdo con los/)).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'términos y condiciones' });
+    expect(link).toHaveAttribute('href', '/terms-conditions');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
+  });
+
+  it('renders the info-terms-conditions text (REGISTRATION.INFO_TERMS_CONDITIONS)', () => {
+    renderRegister();
+    expect(
+      screen.getByText(
+        'Usted debe aceptar los términos y condiciones para registrarse en el sistema.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('disables the submit button on initial render (accept off)', () => {
+    renderRegister();
+    expect(screen.getByRole('button', { name: 'Registrar' })).toBeDisabled();
+  });
+
+  it('enables the submit button after the user toggles accept on', () => {
+    renderRegister();
+    expect(screen.getByRole('button', { name: 'Registrar' })).toBeDisabled();
+    acceptTerms();
+    expect(screen.getByRole('button', { name: 'Registrar' })).not.toBeDisabled();
   });
 });

@@ -94,6 +94,11 @@ const messages: Record<string, string> = {
   // text-parity rule (view-text-parity DoD).
   'REGISTRATION.EMAIL_TAKEN': 'Este correo ya está registrado.',
   'REGISTRATION.VALIDATION_ERROR': 'Error de validación. Por favor, revise sus datos.',
+  // Terms-acceptance toggle (Angular register.component.html:191-210, vocabs/es.ts:135-137)
+  'REGISTRATION.ACCEPT_CONDITIONS': 'Estoy de acuerdo con los ',
+  'REGISTRATION.TERMS_CONDITIONS': 'términos y condiciones',
+  'REGISTRATION.INFO_TERMS_CONDITIONS':
+    'Usted debe aceptar los términos y condiciones para registrarse en el sistema.',
 
   // Tutorial
   'TUTORIAL.TITLE': 'Tutorial',
