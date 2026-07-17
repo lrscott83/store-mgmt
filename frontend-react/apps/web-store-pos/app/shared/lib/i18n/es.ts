@@ -68,6 +68,7 @@ const messages: Record<string, string> = {
   'AUTH.INVALID_CREDENTIALS': 'Email o contraseña inválidos',
   'AUTH.ACCOUNT_INACTIVE': 'Tu cuenta está inactiva. Contactá soporte.',
   'AUTH.SERVER_ERROR': 'Algo salió mal. Intentá de nuevo.',
+  'AUTH.INVALID_ERROR': 'La autenticación no es válida por el siguiente error: {error}',
   'AUTH.OFFLINE_LOGIN': 'Estás offline. Se requiere conexión para iniciar sesión.',
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
   'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',

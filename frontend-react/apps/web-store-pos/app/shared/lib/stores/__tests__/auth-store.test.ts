@@ -113,6 +113,42 @@ describe('useAuthStore', () => {
     });
   });
 
+  // AUTH-ERR-PARITY: mirror Angular auth.service.ts:60-70. The login endpoint
+  // always returns HTTP 200 (AuthController wraps in Ok()), so a failed login is
+  // a `succeeded:false` body — login() must surface errors[0].description, not
+  // blindly read response.data.
+  describe('login — succeeded:false envelope (Angular INVALID_ERROR parity)', () => {
+    it('throws an error tagged with errors[0].description when the envelope has succeeded:false', async () => {
+      vi.resetModules();
+      const mockPost = vi.fn().mockResolvedValue({
+        data: {
+          data: null,
+          succeeded: false,
+          message: '',
+          actionCode: 400,
+          errors: [{ code: 'Auth', description: 'usuario o contraseña incorrecta' }],
+        },
+      });
+      vi.doMock('~/shared/lib/http/api-client', () => ({
+        apiClient: {
+          post: mockPost,
+          get: vi.fn(),
+          interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+        },
+      }));
+
+      const { useAuthStore: freshStore } = await import('../auth-store');
+
+      await expect(
+        freshStore.getState().login('a@b.com', 'password123')
+      ).rejects.toMatchObject({
+        loginRejectionDescription: 'usuario o contraseña incorrecta',
+      });
+
+      vi.doUnmock('~/shared/lib/http/api-client');
+    });
+  });
+
   describe('logout', () => {
     it('clears the auth model and resets in-memory state', () => {
       const user = makeUser();
@@ -473,6 +509,10 @@ describe('useAuthStore', () => {
         authHttpService: {
           login: vi.fn().mockResolvedValue({
             data: { authToken: 'tok', refreshToken: 'r', expiresIn: Date.now() + THIRTY_FIVE_DAYS_MS },
+            succeeded: true,
+            message: '',
+            actionCode: 200,
+            errors: [],
           }),
         },
       }));

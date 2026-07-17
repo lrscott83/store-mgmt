@@ -166,6 +166,36 @@ describe('LoginPage (AUTH-01)', () => {
     });
   });
 
+  // AUTH-ERR-PARITY: mirrors Angular login.component.ts:162-167 INVALID_ERROR path
+  // (auth.service.ts:60-70). A HTTP-200 body-level failure (succeeded:false, e.g.
+  // wrong credentials returned by LoginCommandHandler's ResponseResult.Failure)
+  // carries the backend message in errors[0].description. auth-store rethrows it
+  // tagged as `loginRejectionDescription`; login must surface the EXACT text, not
+  // the generic AUTH.SERVER_ERROR.
+  it('surfaces the exact backend error message on a body-level login rejection (INVALID_ERROR parity)', async () => {
+    const rejection = Object.assign(new Error('rejected'), {
+      loginRejectionDescription: 'El usuario o la contraseña no es correcta',
+    });
+    const loginFn = vi.fn().mockRejectedValue(rejection);
+    renderLogin(loginFn);
+
+    fireEvent.change(screen.getByLabelText('Usuario'), {
+      target: { value: 'user@test.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+      target: { value: 'password123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'La autenticación no es válida por el siguiente error: El usuario o la contraseña no es correcta'
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
   it('links to register page', () => {
     renderLogin();
     // AUTH.REGISTER = "Crear cuenta"

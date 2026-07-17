@@ -158,6 +158,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { authHttpService } = await import('../http/auth-http-service');
       const response = await authHttpService.login({ login: email, password });
+
+      // Mirror Angular auth.service.ts:60-70: the login endpoint always returns
+      // HTTP 200 (AuthController wraps every result in Ok()), so a failed login —
+      // e.g. wrong credentials, where LoginCommandHandler returns
+      // ResponseResult.Failure — arrives as a `succeeded:false` body carrying the
+      // backend message in errors[0].description. Angular surfaces that exact text
+      // via its INVALID_ERROR path; we rethrow it tagged so login.tsx can too,
+      // instead of blindly reading response.data (null here) and falling through
+      // to a generic error.
+      if (!response.succeeded) {
+        const description =
+          response.errors && response.errors.length > 0
+            ? response.errors[0].description
+            : 'El usuario no pudo entrar porque el nombre de usuario o la contraseña no es correcta';
+        const rejection = new Error(description) as Error & {
+          loginRejectionDescription?: string;
+        };
+        rejection.loginRejectionDescription = description;
+        throw rejection;
+      }
+
       const authData = response.data;
       const expiresIn = Date.now() + THIRTY_FIVE_DAYS_MS;
 

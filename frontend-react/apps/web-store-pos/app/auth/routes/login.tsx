@@ -63,6 +63,22 @@ export default function LoginPage() {
       preloadHeavyChunks();
       navigate(await resolveUserHomePath(user));
     } catch (err: unknown) {
+      // Angular login.component.ts:162-167 INVALID_ERROR path: a body-level
+      // failure (HTTP 200 + succeeded:false) carries the backend's own message
+      // (auth-store tags it as loginRejectionDescription). Surface it verbatim,
+      // interpolated into AUTH.INVALID_ERROR, instead of a generic fallback.
+      const rejectionDescription = (err as { loginRejectionDescription?: string })
+        ?.loginRejectionDescription;
+      if (rejectionDescription) {
+        setErrors({
+          form: intl.formatMessage(
+            { id: 'AUTH.INVALID_ERROR' },
+            { error: rejectionDescription }
+          ),
+        });
+        return;
+      }
+
       const status = (err as { status?: number })?.status;
       if (status === 401) {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.INVALID_CREDENTIALS' }) });
