@@ -53,12 +53,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigate fallback: serve cached shell for auth-required routes
+  // App-shell navigation (cache-first). This app is SPA mode (`ssr:false`), so
+  // the build emits ONE shell — `build/client/index.html` — and every route is
+  // resolved client-side by React Router. Serve that precached shell for every
+  // navigation, online OR offline, then let the client router + auth-store pick
+  // the view. A valid 35-day session in localStorage hydrates with no network,
+  // so an authenticated user offline lands in the app normally instead of a
+  // dead "Offline" page. Matching the OLD `/login` here was a bug: no `/login`
+  // HTML file exists in an SPA build, so `caches.match('/login')` always missed
+  // and fell through to the bare `Response('Offline', 503)` white screen.
+  // New shell HTML ships via the SW update-prompt flow, not a per-nav network hit.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() =>
-        caches.match('/login').then((cached) => cached ?? new Response('Offline', { status: 503 }))
-      )
+      caches.match('/index.html').then((cached) => cached ?? fetch(request))
     );
     return;
   }
