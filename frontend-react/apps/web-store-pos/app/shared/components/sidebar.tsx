@@ -34,7 +34,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       )}
       <nav
         className={`fixed inset-y-0 left-0 z-40 flex flex-col h-full bg-white border-r border-gray-200 transition-all duration-200 overflow-hidden ${isOpen ? 'w-64' : 'w-0'}`}
-        aria-label="Main navigation"
+        aria-label="Navegación principal"
       >
         {isOpen && (
           <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
@@ -43,7 +43,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               type="button"
               onClick={onClose}
               className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 transition-colors"
-              aria-label="Collapse sidebar"
+              aria-label="Contraer barra lateral"
             >
               <svg data-icon="menu-fold" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />

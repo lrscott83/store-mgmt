@@ -35,7 +35,7 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
           type="button"
           onClick={onSidebarToggle}
           className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 transition-colors"
-          aria-label="Toggle sidebar"
+          aria-label="Alternar barra lateral"
         >
           <svg data-icon="menu-unfold" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -65,7 +65,7 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
             type="button"
             onClick={() => setIsUserMenuOpen((v) => !v)}
             className="flex items-center justify-center rounded-lg p-2 text-gray-500 hover:bg-gray-100 transition-colors"
-            aria-label="User menu"
+            aria-label="Menú de usuario"
             aria-expanded={isUserMenuOpen}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -58,7 +58,7 @@ describe('AppLayout — sidebar default state (user preference: collapsed by def
 
   it('sidebar is collapsed by default even at desktop width', () => {
     renderLayout();
-    const sidebar = screen.getByRole('navigation', { name: /main navigation/i });
+    const sidebar = screen.getByRole('navigation', { name: 'Navegación principal' });
     expect(sidebar.className).toContain('w-0');
   });
 
@@ -66,7 +66,7 @@ describe('AppLayout — sidebar default state (user preference: collapsed by def
     renderLayout();
     Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1920 });
     window.dispatchEvent(new Event('resize'));
-    const sidebar = screen.getByRole('navigation', { name: /main navigation/i });
+    const sidebar = screen.getByRole('navigation', { name: 'Navegación principal' });
     expect(sidebar.className).toContain('w-0');
   });
 });
@@ -82,7 +82,7 @@ describe('AppLayout — sidebar overlays content instead of pushing it', () => {
     const mainBefore = screen.getByRole('main');
     const widthClassesBefore = mainBefore.className;
 
-    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
 
     const mainAfter = screen.getByRole('main');
     expect(mainAfter.className).toBe(widthClassesBefore);
@@ -91,25 +91,25 @@ describe('AppLayout — sidebar overlays content instead of pushing it', () => {
   it('clicking the sidebar backdrop closes the sidebar (in-app-layout wiring)', () => {
     renderLayout();
 
-    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }));
-    const sidebar = screen.getByRole('navigation', { name: /main navigation/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
+    const sidebar = screen.getByRole('navigation', { name: 'Navegación principal' });
     expect(sidebar.className).toContain('w-64');
 
     fireEvent.click(screen.getByTestId('sidebar-backdrop'));
 
-    const sidebarAfterClose = screen.getByRole('navigation', { name: /main navigation/i });
+    const sidebarAfterClose = screen.getByRole('navigation', { name: 'Navegación principal' });
     expect(sidebarAfterClose.className).toContain('w-0');
   });
 
   it('clicking the in-sidebar collapse button closes the sidebar (in-app-layout wiring)', () => {
     renderLayout();
 
-    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }));
-    expect(screen.getByRole('navigation', { name: /main navigation/i }).className).toContain('w-64');
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' }).className).toContain('w-64');
 
-    fireEvent.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Contraer barra lateral' }));
 
-    expect(screen.getByRole('navigation', { name: /main navigation/i }).className).toContain('w-0');
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' }).className).toContain('w-0');
   });
 });
 

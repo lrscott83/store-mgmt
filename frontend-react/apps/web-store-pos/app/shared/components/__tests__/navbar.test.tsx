@@ -97,7 +97,7 @@ describe('Navbar — S-NAV-1: both profile links render in user dropdown', () =>
         <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     expect(screen.getByText('Editar Perfil')).toBeInTheDocument();
   });
 
@@ -107,7 +107,7 @@ describe('Navbar — S-NAV-1: both profile links render in user dropdown', () =>
         <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     expect(screen.getByText('Cambiar Contraseña')).toBeInTheDocument();
   });
 
@@ -117,7 +117,7 @@ describe('Navbar — S-NAV-1: both profile links render in user dropdown', () =>
         <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     expect(screen.getByText('Salir')).toBeInTheDocument();
   });
 });
@@ -134,7 +134,7 @@ describe('Navbar — S-NAV-2: clicking profile links closes the dropdown', () =>
       </Wrapper>,
     );
     // Open dropdown
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     expect(screen.getByText('Editar Perfil')).toBeInTheDocument();
 
     // Click the link
@@ -150,7 +150,7 @@ describe('Navbar — S-NAV-2: clicking profile links closes the dropdown', () =>
         <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     expect(screen.getByText('Cambiar Contraseña')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Cambiar Contraseña'));
@@ -171,7 +171,7 @@ describe('Navbar — S-NAV-3: header keeps only the EXPAND toggle; collapse now 
         <Navbar isSidebarOpen={false} onSidebarToggle={onSidebarToggle} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
     expect(onSidebarToggle).toHaveBeenCalledTimes(1);
   });
 
@@ -181,7 +181,7 @@ describe('Navbar — S-NAV-3: header keeps only the EXPAND toggle; collapse now 
         <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    const toggle = screen.getByRole('button', { name: /toggle sidebar/i });
+    const toggle = screen.getByRole('button', { name: 'Alternar barra lateral' });
     expect(toggle.querySelector('[data-icon="menu-unfold"]')).toBeInTheDocument();
   });
 
@@ -191,7 +191,7 @@ describe('Navbar — S-NAV-3: header keeps only the EXPAND toggle; collapse now 
         <Navbar isSidebarOpen={true} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.queryByRole('button', { name: /toggle sidebar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Alternar barra lateral' })).not.toBeInTheDocument();
   });
 });
 
@@ -211,7 +211,7 @@ describe('Navbar — S-NAV-4: user menu trigger is a plain person icon (Angular 
         <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     expect(screen.getByText('jperez')).toBeInTheDocument();
     expect(screen.queryByText('juan@test.com')).not.toBeInTheDocument();
   });
@@ -240,10 +240,30 @@ describe('Navbar — S-NAV-7: logout delegates the redirect to auth-store (Decis
         <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     fireEvent.click(screen.getByText('Salir'));
 
     expect(mockNavigate).not.toHaveBeenCalledWith('/login');
+  });
+});
+
+describe('Navbar — view-text-parity: aria-labels in Spanish (React-only, no Angular correlate)', () => {
+  it('renders the sidebar-toggle button with aria-label "Alternar barra lateral"', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Alternar barra lateral' })).toBeInTheDocument();
+  });
+
+  it('renders the user-menu trigger button with aria-label "Menú de usuario"', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Menú de usuario' })).toBeInTheDocument();
   });
 });
 
@@ -258,7 +278,7 @@ describe('Navbar — S-NAV-6: user menu dropdown closes on outside click', () =>
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     expect(screen.getByText('Editar Perfil')).toBeInTheDocument();
 
     fireEvent.mouseDown(screen.getByTestId('outside-area'));
@@ -273,7 +293,7 @@ describe('Navbar — S-NAV-6: user menu dropdown closes on outside click', () =>
       </Wrapper>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /user menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
     const editProfileLink = screen.getByText('Editar Perfil');
     expect(editProfileLink).toBeInTheDocument();
 

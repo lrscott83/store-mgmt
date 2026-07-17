@@ -211,22 +211,34 @@ describe('Sidebar — SHELL-05: in-sidebar collapse toggle (top-right of sidebar
   it('renders a collapse button in the sidebar header when open', () => {
     renderSidebar(makeSuperAdmin(), true);
 
-    expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Contraer barra lateral' })).toBeInTheDocument();
   });
 
   it('does not render the collapse button when closed', () => {
     renderSidebar(makeSuperAdmin(), false);
 
-    expect(screen.queryByRole('button', { name: /collapse sidebar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Contraer barra lateral' })).not.toBeInTheDocument();
   });
 
   it('calls onClose when the in-sidebar collapse button is clicked', () => {
     const onClose = vi.fn();
     renderSidebar(makeSuperAdmin(), true, onClose);
 
-    fireEvent.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Contraer barra lateral' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Sidebar — view-text-parity: aria-labels in Spanish (React-only, no Angular correlate)', () => {
+  it('renders the nav landmark with aria-label "Navegación principal"', () => {
+    renderSidebar(makeSuperAdmin(), true);
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' })).toBeInTheDocument();
+  });
+
+  it('renders the in-sidebar collapse button with aria-label "Contraer barra lateral"', () => {
+    renderSidebar(makeSuperAdmin(), true);
+    expect(screen.getByRole('button', { name: 'Contraer barra lateral' })).toBeInTheDocument();
   });
 });
 
