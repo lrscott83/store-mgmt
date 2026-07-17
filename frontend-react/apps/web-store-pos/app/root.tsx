@@ -65,8 +65,12 @@ export default function App() {
   const navigate = useNavigate();
   const isLoading = useLoadingStore((state) => state.isLoading);
 
+  // Mirrors Angular's `app.component.ts:57` — `setTimeout(() => updateService.init(), 5000)`:
+  // the service-worker update flow (new-version prompt + 15-min poll) starts 5s after boot,
+  // not immediately, so it doesn't compete with initial app startup.
   useEffect(() => {
-    registerServiceWorker();
+    const timer = setTimeout(() => registerServiceWorker(), 5000);
+    return () => clearTimeout(timer);
   }, []);
 
   // Decision 2 (auth-service-parity, Slice 3): give the framework-agnostic
