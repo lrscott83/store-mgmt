@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
+import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
@@ -28,6 +29,12 @@ export default function LoginPage() {
   const [form, setForm] = useState<FormState>({ email: '', password: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isOffline, setIsOffline] = useState(false);
+  // AUTH-FLICKER: covers the WHOLE login flow (login -> getUserByToken ->
+  // resolveUserHomePath -> navigate) with one loading state, so the form never
+  // flashes back between the individual API calls (whose per-request overlay
+  // toggles off in the gaps). Stays true through navigation (the route unmounts
+  // on success); only reset on error so the form + message reappear.
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function validate(): FormErrors {
     const errs: FormErrors = {};
@@ -57,12 +64,15 @@ export default function LoginPage() {
     }
 
     try {
+      setIsSubmitting(true);
       const user = await login(form.email, form.password);
       // Mirror Angular's navigateToUserHome() (shared with guestOnlyLoader):
       // warm the heavy route chunks, then resolve where to land.
       preloadHeavyChunks();
       navigate(await resolveUserHomePath(user));
     } catch (err: unknown) {
+      // Reveal the form again so the user can see the error and retry.
+      setIsSubmitting(false);
       // Angular login.component.ts:162-167 INVALID_ERROR path: a body-level
       // failure (HTTP 200 + succeeded:false) carries the backend's own message
       // (auth-store tags it as loginRejectionDescription). Surface it verbatim,
@@ -88,6 +98,12 @@ export default function LoginPage() {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.SERVER_ERROR' }) });
       }
     }
+  }
+
+  // While the login flow runs, show ONLY the loading overlay — never the form —
+  // so it can't flash back between the login/me/home-resolve calls.
+  if (isSubmitting) {
+    return <LoadingOverlay />;
   }
 
   return (

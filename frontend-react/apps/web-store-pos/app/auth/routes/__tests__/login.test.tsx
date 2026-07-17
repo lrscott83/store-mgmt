@@ -161,8 +161,10 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
 
     await waitFor(() => {
-      // AUTH.INVALID_CREDENTIALS = "Email o contraseña inválidos"
-      expect(screen.getByText(/inválidos|contraseña/i)).toBeInTheDocument();
+      // AUTH.INVALID_CREDENTIALS = "Email o contraseña inválidos". Assert the
+      // exact error text — a loose /contraseña/i regex also matches the
+      // "Contraseña" password label, which is ambiguous (multiple elements).
+      expect(screen.getByText('Email o contraseña inválidos')).toBeInTheDocument();
     });
   });
 
@@ -194,6 +196,38 @@ describe('LoginPage (AUTH-01)', () => {
         )
       ).toBeInTheDocument();
     });
+  });
+
+  // AUTH-FLICKER: while the login flow is in-flight (login() -> getUserByToken()
+  // -> resolveUserHomePath() -> navigate()), the login form must NOT reappear
+  // between the individual API calls. The route holds a full-cover loading state
+  // from submit until navigation unmounts it, so the user never sees the form
+  // flash back after entering credentials.
+  it('replaces the form with a loading state while the login flow is in-flight (no form flash)', async () => {
+    let resolveLogin!: (u: UserModel) => void;
+    const loginFn = vi.fn(
+      () => new Promise<UserModel>((res) => { resolveLogin = res; })
+    );
+    renderLogin(loginFn);
+
+    fireEvent.change(screen.getByLabelText('Usuario'), {
+      target: { value: 'user@test.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+      target: { value: 'password123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+
+    // Login promise still pending -> the form (submit button) is gone, replaced
+    // by the loading indicator. Previously the button stayed mounted, so the
+    // form was visible during the gaps between API calls.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: /iniciar sesión/i })
+      ).not.toBeInTheDocument();
+    });
+
+    resolveLogin(makeUser());
   });
 
   it('links to register page', () => {
