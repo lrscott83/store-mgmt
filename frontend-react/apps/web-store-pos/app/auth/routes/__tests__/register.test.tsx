@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { IntlProvider } from 'react-intl';
+import messages from '~/shared/lib/i18n/es';
 
 // ─── react-router mock (keep real useSearchParams, mock only useNavigate) ────
 
@@ -34,22 +36,26 @@ import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import RegisterPage from '../register';
 
 function fillRequiredFields() {
-  fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Jane Doe' } });
-  fireEvent.change(screen.getByLabelText(/^login$/i), { target: { value: 'janedoe' } });
-  fireEvent.change(screen.getByLabelText(/^store name$/i), { target: { value: 'Jane Store' } });
-  fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@test.com' } });
-  fireEvent.change(screen.getByLabelText(/phone number/i), { target: { value: '+5491100000' } });
-  fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'Passw0rd!' } });
-  fireEvent.change(screen.getByLabelText(/confirm password/i), {
+  fireEvent.change(screen.getByLabelText('Nombre Completo'), { target: { value: 'Jane Doe' } });
+  fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'janedoe' } });
+  fireEvent.change(screen.getByLabelText('Nombre de la tienda'), {
+    target: { value: 'Jane Store' },
+  });
+  fireEvent.change(screen.getByLabelText('Correo'), { target: { value: 'jane@test.com' } });
+  fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+5491100000' } });
+  fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'Passw0rd!' } });
+  fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
     target: { value: 'Passw0rd!' },
   });
 }
 
 function renderRegister(initialEntries: string[] = ['/register']) {
   return render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <RegisterPage />
-    </MemoryRouter>
+    <IntlProvider locale="es" messages={messages}>
+      <MemoryRouter initialEntries={initialEntries}>
+        <RegisterPage />
+      </MemoryRouter>
+    </IntlProvider>
   );
 }
 
@@ -61,8 +67,8 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
 
   it('renders login and storeName inputs', () => {
     renderRegister();
-    expect(screen.getByLabelText(/^login$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^store name$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre de la tienda')).toBeInTheDocument();
   });
 
   it('does not render a visible input for code', () => {
@@ -80,7 +86,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     });
     renderRegister();
     fillRequiredFields();
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
       expect(screen.getByText('Login already exists')).toBeInTheDocument();
@@ -98,7 +104,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     });
     renderRegister();
     fillRequiredFields();
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/login');
@@ -108,13 +114,13 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('blocks submit on password/passwordConfirmation mismatch — register() never called', async () => {
     renderRegister();
     fillRequiredFields();
-    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+    fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
       target: { value: 'Different1!' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/do not match|don't match/i)).toBeInTheDocument();
+      expect(screen.getByText('Las contraseñas no son iguales')).toBeInTheDocument();
     });
     expect(authHttpService.register).not.toHaveBeenCalled();
   });
@@ -129,7 +135,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     });
     renderRegister(['/register?code=ABC123']);
     fillRequiredFields();
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
       expect(authHttpService.register).toHaveBeenCalledWith(
@@ -148,12 +154,222 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     });
     renderRegister();
     fillRequiredFields();
-    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
 
     await waitFor(() => {
       expect(authHttpService.register).toHaveBeenCalled();
     });
     const payload = vi.mocked(authHttpService.register).mock.calls[0][0];
     expect(payload).not.toHaveProperty('passwordConfirmation');
+  });
+});
+
+describe('RegisterPage — view-text-parity: heading/already-account/signin-link/submit button', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('renders heading "Creación de cuenta" (REGISTRATION.WELCOME)', () => {
+    renderRegister();
+    expect(screen.getByRole('heading', { name: 'Creación de cuenta' })).toBeInTheDocument();
+  });
+
+  it('renders already-account text "¿Ya tienes una cuenta?" (REGISTRATION.ALREADY_ACCOUNT)', () => {
+    renderRegister();
+    expect(screen.getByText('¿Ya tienes una cuenta?')).toBeInTheDocument();
+  });
+
+  it('renders sign-in link "Entra" (REGISTRATION.SIGNIN_LINK)', () => {
+    renderRegister();
+    expect(screen.getByRole('link', { name: 'Entra' })).toBeInTheDocument();
+  });
+
+  it('renders submit button "Registrar" (REGISTRATION.SIGNUP_BUTTON) when idle', () => {
+    renderRegister();
+    expect(screen.getByRole('button', { name: 'Registrar' })).toBeInTheDocument();
+  });
+});
+
+describe('RegisterPage — view-text-parity: field labels', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('renders "Nombre Completo" label (GENERAL.FULL_NAME)', () => {
+    renderRegister();
+    expect(screen.getByLabelText('Nombre Completo')).toBeInTheDocument();
+  });
+
+  it('renders "Usuario" label (GENERAL.LOGIN)', () => {
+    renderRegister();
+    expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
+  });
+
+  it('renders "Contraseña" label (GENERAL.PASSWORD)', () => {
+    renderRegister();
+    expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
+  });
+
+  it('renders "Confirmar Contraseña" label (GENERAL.CONFIRM_PASSWORD)', () => {
+    renderRegister();
+    expect(screen.getByLabelText('Confirmar Contraseña')).toBeInTheDocument();
+  });
+
+  it('renders "Teléfono" label (GENERAL.CELL_PHONE)', () => {
+    renderRegister();
+    expect(screen.getByLabelText('Teléfono')).toBeInTheDocument();
+  });
+
+  it('renders "Correo" label (GENERAL.EMAIL)', () => {
+    renderRegister();
+    expect(screen.getByLabelText('Correo')).toBeInTheDocument();
+  });
+
+  it('renders "Nombre de la tienda" label (STORE.STORE_NAME)', () => {
+    renderRegister();
+    expect(screen.getByLabelText('Nombre de la tienda')).toBeInTheDocument();
+  });
+});
+
+describe('RegisterPage — view-text-parity: validate() error strings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('shows all 6 required-field errors byte-identical to GENERAL.VALIDATION.REQUIRED interpolation', async () => {
+    renderRegister();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Nombre Completo es requerido')).toBeInTheDocument();
+      expect(screen.getByText('Usuario es requerido')).toBeInTheDocument();
+      expect(screen.getByText('Teléfono es requerido')).toBeInTheDocument();
+      expect(screen.getByText('Nombre de la tienda es requerido')).toBeInTheDocument();
+      expect(screen.getByText('Contraseña es requerido')).toBeInTheDocument();
+      expect(screen.getByText('Confirmar Contraseña es requerido')).toBeInTheDocument();
+    });
+  });
+
+  it('shows password-policy error text (GENERAL.VALIDATION.PASSWORD_POLICY)', async () => {
+    renderRegister();
+    fireEvent.change(screen.getByLabelText('Nombre Completo'), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'janedoe' } });
+    fireEvent.change(screen.getByLabelText('Nombre de la tienda'), {
+      target: { value: 'Jane Store' },
+    });
+    fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+5491100000' } });
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'weak' } });
+    fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
+      target: { value: 'weak' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'La contraseña debe tener al menos 8 caracteres, un número y una letra en mayúscula'
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows password-mismatch error text (GENERAL.VALIDATION.INVALID_PASSWORD)', async () => {
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText('Confirmar Contraseña'), {
+      target: { value: 'Different1!' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Las contraseñas no son iguales')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('RegisterPage — view-text-parity: loading/offline/success copy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('shows "Registrando..." on the submit button while loading (AUTH.REGISTERING)', async () => {
+    let resolveRegister: (value: {
+      succeeded: boolean;
+      data: boolean;
+      message: string;
+      actionCode: number;
+      errors: { code: string; description: string }[];
+    }) => void;
+    vi.mocked(authHttpService.register).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRegister = resolve;
+      })
+    );
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Registrando...' })).toBeInTheDocument();
+    });
+
+    resolveRegister!({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
+  });
+
+  it('shows the offline banner text exactly (REGISTRATION.OFFLINE_BANNER)', async () => {
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(false);
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Estás offline. Se requiere conexión para registrarte.')
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows "Algo salió mal" fallback in Spanish on generic network error (REGISTRATION.UNEXPECTED_ERROR)', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue(new Error('network down'));
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.'
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows the success-redirect text exactly (REGISTRATION.SUCCESS_REDIRECT)', async () => {
+    let resolveRegister: (value: {
+      succeeded: boolean;
+      data: boolean;
+      message: string;
+      actionCode: number;
+      errors: { code: string; description: string }[];
+    }) => void;
+    vi.mocked(authHttpService.register).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRegister = resolve;
+      })
+    );
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    resolveRegister!({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Cuenta creada. Redirigiendo al inicio de sesión…')
+      ).toBeInTheDocument();
+    });
   });
 });

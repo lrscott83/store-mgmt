@@ -84,6 +84,16 @@ const messages: Record<string, string> = {
   // NEW — Angular has no visible post-submit success copy in this component
   // (view-text-parity spec).
   'REGISTRATION.SUCCESS_REDIRECT': 'Cuenta creada. Redirigiendo al inicio de sesión…',
+  // REGISTRATION.UNEXPECTED_ERROR (Angular vocabs/es.ts:135-136) — generic network/unknown
+  // error fallback for register's catch block (view-text-parity DoD: no leftover English
+  // literals in touched files).
+  'REGISTRATION.UNEXPECTED_ERROR':
+    'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.',
+  // NEW — React-invented client-side email-uniqueness/validation sub-cases (Angular's
+  // onSubmit has no equivalent branching), spec-fixed Spanish text per the blanket
+  // text-parity rule (view-text-parity DoD).
+  'REGISTRATION.EMAIL_TAKEN': 'Este correo ya está registrado.',
+  'REGISTRATION.VALIDATION_ERROR': 'Error de validación. Por favor, revise sus datos.',
 
   // Tutorial
   'TUTORIAL.TITLE': 'Tutorial',

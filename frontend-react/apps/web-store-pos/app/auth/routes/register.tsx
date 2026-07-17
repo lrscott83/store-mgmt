@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useIntl } from 'react-intl';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { guestOnlyLoader } from './loaders';
@@ -29,6 +30,7 @@ interface FormErrors {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const intl = useIntl();
   const [searchParams] = useSearchParams();
   const code = searchParams.get('code') ?? undefined;
 
@@ -46,18 +48,37 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const PASSWORD_POLICY_REGEX = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+  function requiredError(fieldName: string): string {
+    return intl.formatMessage({ id: 'GENERAL.VALIDATION.REQUIRED' }, { name: fieldName });
+  }
+
   function validate(): FormErrors {
     const errs: FormErrors = {};
-    if (!form.fullName.trim()) errs.fullName = 'Full name is required';
-    if (!form.login.trim()) errs.login = 'Login is required';
-    if (!form.email.trim()) errs.email = 'Email is required';
-    if (!form.cellPhone.trim()) errs.cellPhone = 'Phone number is required';
-    if (!form.storeName.trim()) errs.storeName = 'Store name is required';
-    if (!form.password) errs.password = 'Password is required';
+    if (!form.fullName.trim()) {
+      errs.fullName = requiredError(intl.formatMessage({ id: 'GENERAL.FULL_NAME' }));
+    }
+    if (!form.login.trim()) {
+      errs.login = requiredError(intl.formatMessage({ id: 'GENERAL.LOGIN' }));
+    }
+    if (!form.cellPhone.trim()) {
+      errs.cellPhone = requiredError(intl.formatMessage({ id: 'GENERAL.CELL_PHONE' }));
+    }
+    if (!form.storeName.trim()) {
+      errs.storeName = requiredError(intl.formatMessage({ id: 'STORE.STORE_NAME' }));
+    }
+    if (!form.password) {
+      errs.password = requiredError(intl.formatMessage({ id: 'GENERAL.PASSWORD' }));
+    } else if (!PASSWORD_POLICY_REGEX.test(form.password)) {
+      errs.password = intl.formatMessage({ id: 'GENERAL.VALIDATION.PASSWORD_POLICY' });
+    }
     if (!form.passwordConfirmation) {
-      errs.passwordConfirmation = 'Please confirm your password';
+      errs.passwordConfirmation = requiredError(
+        intl.formatMessage({ id: 'GENERAL.CONFIRM_PASSWORD' })
+      );
     } else if (form.password !== form.passwordConfirmation) {
-      errs.passwordConfirmation = 'Passwords do not match';
+      errs.passwordConfirmation = intl.formatMessage({ id: 'GENERAL.VALIDATION.INVALID_PASSWORD' });
     }
     return errs;
   }
@@ -101,12 +122,14 @@ export default function RegisterPage() {
       const message = axiosErr.response?.data?.message;
       if (status === 400) {
         if (message?.toLowerCase().includes('email')) {
-          setErrors({ email: 'This email is already registered' });
+          setErrors({ email: intl.formatMessage({ id: 'REGISTRATION.EMAIL_TAKEN' }) });
         } else {
-          setErrors({ form: message ?? 'Validation error. Please check your data.' });
+          setErrors({
+            form: message ?? intl.formatMessage({ id: 'REGISTRATION.VALIDATION_ERROR' }),
+          });
         }
       } else {
-        setErrors({ form: 'Something went wrong. Please try again.' });
+        setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.UNEXPECTED_ERROR' }) });
       }
     } finally {
       setIsLoading(false);
@@ -116,18 +139,22 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="text-center py-4">
-        <p className="text-green-600 font-medium">Account created! Redirecting to login…</p>
+        <p className="text-green-600 font-medium">
+          {intl.formatMessage({ id: 'REGISTRATION.SUCCESS_REDIRECT' })}
+        </p>
       </div>
     );
   }
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">Create your account</h2>
+      <h2 className="text-xl font-semibold text-gray-800 mb-6">
+        {intl.formatMessage({ id: 'REGISTRATION.WELCOME' })}
+      </h2>
 
       {isOffline && (
         <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-          You are offline. An internet connection is required to register.
+          {intl.formatMessage({ id: 'REGISTRATION.OFFLINE_BANNER' })}
         </div>
       )}
 
@@ -140,7 +167,7 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit} noValidate>
         <div className="mb-4">
           <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
-            Full name
+            {intl.formatMessage({ id: 'GENERAL.FULL_NAME' })}
           </label>
           <input
             id="fullName"
@@ -157,7 +184,7 @@ export default function RegisterPage() {
 
         <div className="mb-4">
           <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-1">
-            Login
+            {intl.formatMessage({ id: 'GENERAL.LOGIN' })}
           </label>
           <input
             id="login"
@@ -174,7 +201,7 @@ export default function RegisterPage() {
 
         <div className="mb-4">
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email
+            {intl.formatMessage({ id: 'GENERAL.EMAIL' })}
           </label>
           <input
             id="email"
@@ -191,7 +218,7 @@ export default function RegisterPage() {
 
         <div className="mb-4">
           <label htmlFor="cellPhone" className="block text-sm font-medium text-gray-700 mb-1">
-            Phone number
+            {intl.formatMessage({ id: 'GENERAL.CELL_PHONE' })}
           </label>
           <input
             id="cellPhone"
@@ -208,7 +235,7 @@ export default function RegisterPage() {
 
         <div className="mb-4">
           <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-1">
-            Store name
+            {intl.formatMessage({ id: 'STORE.STORE_NAME' })}
           </label>
           <input
             id="storeName"
@@ -225,7 +252,7 @@ export default function RegisterPage() {
 
         <div className="mb-4">
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            Password
+            {intl.formatMessage({ id: 'GENERAL.PASSWORD' })}
           </label>
           <input
             id="password"
@@ -242,7 +269,7 @@ export default function RegisterPage() {
 
         <div className="mb-6">
           <label htmlFor="passwordConfirmation" className="block text-sm font-medium text-gray-700 mb-1">
-            Confirm password
+            {intl.formatMessage({ id: 'GENERAL.CONFIRM_PASSWORD' })}
           </label>
           <input
             id="passwordConfirmation"
@@ -262,14 +289,16 @@ export default function RegisterPage() {
           disabled={isLoading}
           className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isLoading ? 'Creating account…' : 'Create account'}
+          {isLoading
+            ? intl.formatMessage({ id: 'AUTH.REGISTERING' })
+            : intl.formatMessage({ id: 'REGISTRATION.SIGNUP_BUTTON' })}
         </button>
       </form>
 
       <div className="mt-6 text-center text-sm text-gray-600">
-        Already have an account?{' '}
+        {intl.formatMessage({ id: 'REGISTRATION.ALREADY_ACCOUNT' })}{' '}
         <Link to="/login" className="text-cyan-600 hover:text-cyan-700 font-medium">
-          Sign in
+          {intl.formatMessage({ id: 'REGISTRATION.SIGNIN_LINK' })}
         </Link>
       </div>
     </div>
