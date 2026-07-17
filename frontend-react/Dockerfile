@@ -8,6 +8,13 @@ FROM node:22-alpine AS build
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 COPY . .
+# Bake the API base URL into the client bundle. web-store-pos is a static SPA
+# (react-router.config.ts -> ssr:false), so Vite reads API_URL at BUILD time
+# via envDir (vite.config.ts -> '../..', i.e. /app here). Default '/api' is
+# same-origin — deploy/nginx.conf proxies `location /api` to api:8000. Override
+# per-environment with `docker build --build-arg API_URL=...`.
+ARG API_URL=/api
+RUN echo "API_URL=${API_URL}" > .env
 # Build web-store-pos AND its workspace deps (domain, web-common) in
 # dependency order — the `...` suffix selects the package plus its deps.
 # @store-mgmt/domain resolves via exports -> dist/, so it must be compiled first
