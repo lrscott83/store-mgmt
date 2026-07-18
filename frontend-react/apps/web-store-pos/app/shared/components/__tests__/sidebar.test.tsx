@@ -230,6 +230,21 @@ describe('Sidebar — SHELL-05: in-sidebar collapse toggle (top-right of sidebar
   });
 });
 
+describe('Sidebar — nav-item click closes the sidebar (Angular closeOtherMenu parity)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls onClose when a menu item is clicked', () => {
+    const onClose = vi.fn();
+    renderSidebar(makeSuperAdmin(), true, onClose);
+
+    fireEvent.click(screen.getByText('Vender'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('Sidebar — view-text-parity: aria-labels in Spanish (React-only, no Angular correlate)', () => {
   it('renders the nav landmark with aria-label "Navegación principal"', () => {
     renderSidebar(makeSuperAdmin(), true);
