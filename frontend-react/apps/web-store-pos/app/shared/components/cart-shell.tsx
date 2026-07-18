@@ -209,7 +209,10 @@ export function CartShell() {
 
   return (
     <>
-    <div className="relative" ref={cartRef}>
+    {/* Below the sm breakpoint the wrapper goes `static` so the panel below can
+        span the full header width, mirroring Angular's `.pc-h-item { position: static }`
+        rule (navbar.scss). On sm+ it stays `relative` for the narrow anchored dropdown. */}
+    <div className="static sm:relative" ref={cartRef}>
       {/* Cart button with badge */}
       <button
         type="button"
@@ -230,9 +233,12 @@ export function CartShell() {
         </span>
       </button>
 
-      {/* Cart dropdown panel */}
+      {/* Cart dropdown panel.
+          Mobile: full-width (left-0 right-0, anchored to the `relative` header),
+          mirroring Angular's `.pc-h-dropdown { left:0; right:0 }` under the sm breakpoint.
+          sm+: narrow 20rem dropdown anchored to the right. */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-surface shadow-card z-50">
+        <div className="absolute left-0 right-0 top-full mt-2 w-auto rounded-xl border border-border bg-surface shadow-card z-50 sm:left-auto sm:right-0 sm:w-80">
           {/* Header: "Venta actual" (hardcoded, matches Angular) + LIVE order type subtitle.
               Angular's NavRightComponent binds this to shoppingCartService.getOrderType()
               (nav-right.component.ts:427-429, nav-right.component.html:96) — NOT a fixed
@@ -288,6 +294,7 @@ export function CartShell() {
               value={payment ?? ''}
               onChange={(e) => setPayment(e.target.value === '' ? undefined : Number(e.target.value))}
               aria-label={intl.formatMessage({ id: 'GENERAL.PAY' })}
+              placeholder={intl.formatMessage({ id: 'GENERAL.PAY' })}
               className="w-24 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
             />
           </div>

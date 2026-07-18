@@ -47,7 +47,7 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+    <header className="relative flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
       {/* Left: sidebar EXPAND toggle — only shown while the sidebar is closed.
           The COLLAPSE (<<) action now lives in the sidebar's own header row. */}
       {isSidebarOpen ? (
