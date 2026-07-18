@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { useIntl } from 'react-intl';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
-import { WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { InfoBox } from '~/shared/components/ui/info-box';
@@ -28,18 +27,18 @@ export function ImportForm({ onImport }: ImportFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<SyncResult | null>(null);
+  const [success, setSuccess] = useState(false);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setSelectedFile(e.target.files?.[0] ?? null);
     setError('');
-    setResult(null);
+    setSuccess(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    setResult(null);
+    setSuccess(false);
 
     if (!selectedFile) {
       setError(intl.formatMessage({ id: 'SYNC.ERROR_NO_FILE' }));
@@ -53,22 +52,21 @@ export function ImportForm({ onImport }: ImportFormProps) {
 
     setBusy(true);
     try {
-      const syncResult = await onImport(selectedFile, password);
+      const syncResult: SyncResult = await onImport(selectedFile, password);
       if (syncResult.succeeded) {
-        setResult(syncResult);
+        // Angular shows only a single success toast — no per-entity counts.
+        setSuccess(true);
       } else {
-        setError(syncResult.errors.map((e) => e.message).join(' '));
+        // Angular surfaces the first domain error, else the generic message.
+        setError(
+          syncResult.errors[0]?.message ??
+            intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }),
+        );
       }
-    } catch (err) {
-      if (err instanceof WrongPasswordError) {
-        setError(intl.formatMessage({ id: 'SYNC.ERROR_WRONG_PASSWORD' }));
-      } else if (err instanceof CorruptFileError) {
-        setError(intl.formatMessage({ id: 'SYNC.ERROR_CORRUPT_FILE' }));
-      } else {
-        // Non-typed/unexpected error: never surface a raw err.message, always
-        // a translated catch-all (Stage 6 Slice B — Translated Error Fallback).
-        setError(intl.formatMessage({ id: 'SYNC.ERROR_UNEXPECTED' }));
-      }
+    } catch {
+      // Angular collapses every failure (wrong password, corrupt file,
+      // unexpected) into one generic message; never leak a raw err.message.
+      setError(intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }));
     } finally {
       setBusy(false);
     }
@@ -121,25 +119,12 @@ export function ImportForm({ onImport }: ImportFormProps) {
         {error && <InfoBox variant="danger">{error}</InfoBox>}
 
         <Button type="submit" variant="fab" disabled={busy}>
-          {busy
-            ? intl.formatMessage({ id: 'SYNC.IMPORTING' })
-            : intl.formatMessage({ id: 'SYNC.IMPORT_BUTTON' })}
+          {intl.formatMessage({ id: 'SYNC.IMPORT_BUTTON' })}
         </Button>
 
-        {result && (
+        {success && (
           <InfoBox variant="primary">
-            <h2 className="mb-2 text-sm font-semibold">
-              {intl.formatMessage({ id: 'SYNC.SUCCESS_TITLE' })}
-            </h2>
-            <ul className="space-y-1 text-sm">
-              {result.merges.map((r) => (
-                <li key={r.entity}>
-                  <span className="font-medium">{r.entity}</span>:{' '}
-                  {intl.formatMessage({ id: 'SYNC.RESULT_INSERTED' }, { count: r.inserted })},{' '}
-                  {intl.formatMessage({ id: 'SYNC.RESULT_UPDATED' }, { count: r.updated })}
-                </li>
-              ))}
-            </ul>
+            {intl.formatMessage({ id: 'SYNC.IMPORT_SUCCESS' })}
           </InfoBox>
         )}
       </form>

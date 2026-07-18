@@ -147,8 +147,8 @@ describe('ExportForm — S-EXPORT-6: password show/hide toggle', () => {
   });
 });
 
-describe('ExportForm — S-EXPORT-7: unexpected error shows translated catch-all', () => {
-  it('shows SYNC.ERROR_UNEXPECTED, never a raw err.message, on an unexpected error', async () => {
+describe('ExportForm — S-EXPORT-7: export failure shows no error UI (Angular parity)', () => {
+  it('shows no error banner and never leaks a raw err.message on export failure', async () => {
     const onExport = vi.fn().mockRejectedValue(new Error('raw boom, do not leak me'));
     render(
       <Wrapper>
@@ -160,15 +160,21 @@ describe('ExportForm — S-EXPORT-7: unexpected error shows translated catch-all
     });
     fireEvent.click(screen.getByRole('button', { name: /exportar/i }));
 
+    // Wait for the export attempt to complete (button re-enabled by finally)
+    await waitFor(() => expect(onExport).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.getByText(/Ocurrió un error inesperado/i)).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: /exportar/i })).not.toBeDisabled(),
     );
+
+    // Angular's file-export path shows no success/error text at all
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByText(/raw boom/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ocurrió un error inesperado/i)).not.toBeInTheDocument();
   });
 });
 
-describe('ExportForm — S-EXPORT-4: loading state', () => {
-  it('disables the button and shows loading text while exporting', async () => {
+describe('ExportForm — S-EXPORT-4: loading state (button disabled, label unchanged — Angular parity)', () => {
+  it('disables the button while exporting and keeps the "Exportar" label', async () => {
     let resolveExport!: (v: Uint8Array) => void;
     const onExport = vi.fn(
       () =>
@@ -188,7 +194,7 @@ describe('ExportForm — S-EXPORT-4: loading state', () => {
     fireEvent.click(screen.getByRole('button', { name: /exportar/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /exportando/i })).toBeDisabled(),
+      expect(screen.getByRole('button', { name: /exportar/i })).toBeDisabled(),
     );
 
     await act(async () => {

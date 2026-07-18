@@ -29,10 +29,10 @@ export function ExportForm({ onExport }: ExportFormProps) {
     setBusy(true);
     try {
       await onExport(password);
-    } catch {
-      // Non-typed/unexpected error: never surface a raw err.message, always
-      // a translated catch-all (Stage 6 Slice B — Translated Error Fallback).
-      setError(intl.formatMessage({ id: 'SYNC.ERROR_UNEXPECTED' }));
+    } catch (err) {
+      // Angular's file-export path shows no error UI; match that (no inline
+      // error). Log for debugging only — never surface a raw err.message.
+      console.error('Export failed:', err);
     } finally {
       setBusy(false);
     }
@@ -70,9 +70,7 @@ export function ExportForm({ onExport }: ExportFormProps) {
         {error && <InfoBox variant="danger">{error}</InfoBox>}
 
         <Button type="submit" variant="fab" disabled={busy}>
-          {busy
-            ? intl.formatMessage({ id: 'SYNC.EXPORTING' })
-            : intl.formatMessage({ id: 'SYNC.EXPORT_BUTTON' })}
+          {intl.formatMessage({ id: 'SYNC.EXPORT_BUTTON' })}
         </Button>
       </form>
     </Card>

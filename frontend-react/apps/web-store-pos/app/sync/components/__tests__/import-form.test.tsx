@@ -68,8 +68,8 @@ describe('ImportForm — S-IMPORT-2: missing password blocked', () => {
   });
 });
 
-describe('ImportForm — S-IMPORT-3: success shows per-entity counts', () => {
-  it('shows inserted and updated counts for all 6 entities after success', async () => {
+describe('ImportForm — S-IMPORT-3: success shows Angular single-line message (no per-entity counts)', () => {
+  it('shows the Angular success line and NO counts panel after success', async () => {
     const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
     render(
       <Wrapper>
@@ -89,16 +89,20 @@ describe('ImportForm — S-IMPORT-3: success shows per-entity counts', () => {
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Importación completada/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText('Los datos se importaron correctamente.'),
+      ).toBeInTheDocument(),
     );
 
-    // At least one entity result visible
-    expect(screen.getByText(/categories/i)).toBeInTheDocument();
+    // Angular shows no summary panel, no per-entity breakdown, no counts
+    expect(screen.queryByText(/Importación completada/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/insertado/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/categories/i)).not.toBeInTheDocument();
   });
 });
 
-describe('ImportForm — S-IMPORT-4: wrong-password error + no writes', () => {
-  it('shows SYNC.ERROR_WRONG_PASSWORD and onImport throws WrongPasswordError', async () => {
+describe('ImportForm — S-IMPORT-4: wrong-password collapses into Angular generic error + no writes', () => {
+  it('shows the generic Angular import error (no distinct wrong-password text)', async () => {
     const onImport = vi.fn().mockRejectedValue(new WrongPasswordError());
     render(
       <Wrapper>
@@ -119,16 +123,20 @@ describe('ImportForm — S-IMPORT-4: wrong-password error + no writes', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Contraseña incorrecta/i),
+        screen.getByText(/Ha ocurrido un error al importar los datos/i),
       ).toBeInTheDocument(),
     );
-    // Success title must NOT appear (no writes)
-    expect(screen.queryByText(/Importación completada/i)).not.toBeInTheDocument();
+    // Angular has no distinct "wrong password" text
+    expect(screen.queryByText(/Contraseña incorrecta/i)).not.toBeInTheDocument();
+    // Success message must NOT appear (no writes)
+    expect(
+      screen.queryByText(/Los datos se importaron correctamente/i),
+    ).not.toBeInTheDocument();
   });
 });
 
-describe('ImportForm — S-IMPORT-5: corrupt-file error + no writes', () => {
-  it('shows SYNC.ERROR_CORRUPT_FILE and success title is absent', async () => {
+describe('ImportForm — S-IMPORT-5: corrupt-file collapses into Angular generic error + no writes', () => {
+  it('shows the generic Angular import error (no distinct corrupt-file text)', async () => {
     const onImport = vi.fn().mockRejectedValue(new CorruptFileError());
     render(
       <Wrapper>
@@ -149,10 +157,13 @@ describe('ImportForm — S-IMPORT-5: corrupt-file error + no writes', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/El archivo está dañado/i),
+        screen.getByText(/Ha ocurrido un error al importar los datos/i),
       ).toBeInTheDocument(),
     );
-    expect(screen.queryByText(/Importación completada/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/El archivo está dañado/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Los datos se importaron correctamente/i),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -178,7 +189,7 @@ describe('ImportForm — S-IMPORT-7: shared UI kit (Card/Button fab/InfoBox)', (
     expect(screen.getByRole('button', { name: /importar/i }).className).toContain('rounded-full');
   });
 
-  it('renders the success result inside an InfoBox banner', async () => {
+  it('renders the success message inside an InfoBox banner', async () => {
     const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
     render(
       <Wrapper>
@@ -195,7 +206,7 @@ describe('ImportForm — S-IMPORT-7: shared UI kit (Card/Button fab/InfoBox)', (
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() => {
-      const banner = screen.getByText(/Importación completada/i);
+      const banner = screen.getByText('Los datos se importaron correctamente.');
       expect(banner.closest('[role="status"]')).not.toBeNull();
     });
   });
@@ -220,8 +231,8 @@ describe('ImportForm — S-IMPORT-8: password show/hide toggle', () => {
   });
 });
 
-describe('ImportForm — S-IMPORT-9: unexpected error shows translated catch-all', () => {
-  it('shows SYNC.ERROR_UNEXPECTED, never a raw err.message, on an unexpected error', async () => {
+describe('ImportForm — S-IMPORT-9: unexpected error collapses into Angular generic message', () => {
+  it('shows the generic Angular import error, never a raw err.message', async () => {
     const onImport = vi.fn().mockRejectedValue(new Error('raw boom, do not leak me'));
     render(
       <Wrapper>
@@ -238,14 +249,16 @@ describe('ImportForm — S-IMPORT-9: unexpected error shows translated catch-all
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Ocurrió un error inesperado/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/Ha ocurrido un error al importar los datos/i),
+      ).toBeInTheDocument(),
     );
     expect(screen.queryByText(/raw boom/i)).not.toBeInTheDocument();
   });
 });
 
-describe('ImportForm — S-IMPORT-6: loading state', () => {
-  it('disables the button and shows loading text while importing', async () => {
+describe('ImportForm — S-IMPORT-6: loading state (button disabled, label unchanged — Angular parity)', () => {
+  it('disables the button while importing and keeps the "Importar" label', async () => {
     let resolveImport!: (v: SyncResult) => void;
     const onImport = vi.fn(
       () =>
@@ -272,7 +285,7 @@ describe('ImportForm — S-IMPORT-6: loading state', () => {
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /importando/i })).toBeDisabled(),
+      expect(screen.getByRole('button', { name: /importar/i })).toBeDisabled(),
     );
 
     await act(async () => {
