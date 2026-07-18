@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { cleanOldStoreUsage, registerStoreActivity } from './store-usage-tracker';
+import { cleanOldStoreUsage, isTrackingArmed, registerStoreActivity } from './store-usage-tracker';
 
 /**
  * Route-navigation trigger for the daily store-usage tracker. Mirrors
@@ -20,6 +20,11 @@ export function useStoreUsageTracker(): void {
 
   useEffect(() => {
     if (!userId || !selectedStoreId) return;
+    // Angular parity: the NavigationEnd subscription only exists when tracking
+    // was armed by an explicit login (see `armTracking`). After a page reload it
+    // is never re-armed, so the tracker stays dormant — no request on navigation,
+    // matching Angular's empty network tab post-reload.
+    if (!isTrackingArmed()) return;
     registerStoreActivity(userId, selectedStoreId);
   }, [pathname, userId, selectedStoreId]);
 

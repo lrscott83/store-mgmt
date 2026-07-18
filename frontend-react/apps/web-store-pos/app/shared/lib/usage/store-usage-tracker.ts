@@ -33,6 +33,34 @@ export interface Usage {
 // Angular service is a root-provided singleton too).
 let sending = false;
 
+// React port of Angular's NavigationEnd-subscription lifecycle
+// (`startTracking()`/`stopTracking()`, store-usage-tracker.service.ts). Angular
+// only subscribes to navigation when `isUserAuthenticated()` is true AT THE
+// MOMENT `startTracking()` runs — and since AuthService seeds
+// `currentUserValue = undefined` at construction (getUserByToken() commented
+// out), the ONLY place tracking actually arms is an explicit login
+// (login.component.ts:169-170). On a page reload the subscription is never
+// re-armed, so Angular's tracker stays dormant for the whole session.
+//
+// `armed` is module state, so it resets to false on every page reload — exactly
+// reproducing Angular's dormant-after-reload behavior. The navigation hook
+// (use-store-usage-tracker.ts) checks `isTrackingArmed()` before firing.
+let armed = false;
+
+/** Mirror of Angular `startTracking()` — called on explicit login only. */
+export function armTracking(): void {
+  armed = true;
+}
+
+/** Mirror of Angular `stopTracking()`. */
+export function disarmTracking(): void {
+  armed = false;
+}
+
+export function isTrackingArmed(): boolean {
+  return armed;
+}
+
 function getToday(): string {
   return new Date().toISOString().split('T')[0]!;
 }
@@ -74,9 +102,14 @@ function flushUsage(userId: string): void {
 
   sending = true;
   void apiClient
-    .post<BaseResponseModel<DailyUsage[]>>('/v1/usages/store-daily-usage', {
-      activeDays: unsavedDays,
-    })
+    .post<BaseResponseModel<DailyUsage[]>>(
+      '/v1/usages/store-daily-usage',
+      { activeDays: unsavedDays },
+      // Background telemetry: never drive the global loading overlay (see
+      // api-client.ts skipLoading). Deliberate divergence from Angular's
+      // always-loading LoadingInterceptor.
+      { skipLoading: true },
+    )
     .then((response) => {
       if (response.data?.succeeded && response.data.data) {
         const current = readUsage(userId);

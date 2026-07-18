@@ -7,6 +7,18 @@ import esMessages from '../i18n/es';
 
 const API_TIMEOUT = 30000;
 
+// Opt-out flag for background requests (e.g. the store-usage tracker's telemetry
+// POST): when `skipLoading: true` is passed in the request config, the loading
+// interceptor never drives the global overlay for that request. This is a
+// deliberate divergence from Angular (whose LoadingInterceptor wraps ALL
+// requests) — background sync must stay invisible to the user.
+declare module 'axios' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  export interface AxiosRequestConfig {
+    skipLoading?: boolean;
+  }
+}
+
 export const apiClient = axios.create({
   baseURL: (import.meta.env['API_URL'] as string | undefined) ?? '',
   timeout: API_TIMEOUT,
@@ -20,7 +32,10 @@ export const apiClient = axios.create({
 // on BOTH the success and error response paths below. This axios request
 // interceptor is the React port of `intercept()`'s `this.loadingService.start()`.
 apiClient.interceptors.request.use((config) => {
-  useLoadingStore.getState().start();
+  // skipLoading opt-out: background telemetry requests never drive the overlay.
+  if (!config.skipLoading) {
+    useLoadingStore.getState().start();
+  }
   const token = StorageService.getTokenFromLocalStorage();
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
@@ -36,15 +51,21 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => {
     // Angular finalize() success path (loading-interceptor.service.ts:18-20).
-    useLoadingStore.getState().stop();
+    // Mirror the request-side skipLoading opt-out so start()/stop() stay balanced.
+    if (!response.config?.skipLoading) {
+      useLoadingStore.getState().stop();
+    }
     return response;
   },
   (error) => {
     // Angular finalize() error path — runs on EVERY error branch below
     // (network, 401, 500, generic), exactly like RxJS finalize() firing on
     // both next and error notifications. Called once, unconditionally, so no
-    // branch can accidentally forget it and leave the overlay stuck.
-    useLoadingStore.getState().stop();
+    // branch can accidentally forget it and leave the overlay stuck — except
+    // for skipLoading requests, which never called start() to begin with.
+    if (!error.config?.skipLoading) {
+      useLoadingStore.getState().stop();
+    }
 
     if (axios.isAxiosError(error)) {
       // Angular error-interceptor.service.ts:52-59: `err.status === 0 ||

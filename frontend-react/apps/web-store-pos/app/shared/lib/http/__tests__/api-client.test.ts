@@ -460,4 +460,57 @@ describe('api-client (AUTH-06)', () => {
       expect(stopSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  // Background telemetry (e.g. the store-usage tracker) tags its request config
+  // with `skipLoading: true` so it never drives the global overlay — start() and
+  // stop() are both skipped on the request AND its response/error paths.
+  describe('Global loading spinner — skipLoading opt-out (background requests)', () => {
+    it('does NOT call loadingStore.start() when config.skipLoading is true', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const startSpy = vi.spyOn(useLoadingStore.getState(), 'start');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+      const config = {
+        headers: { ...axios.defaults.headers.common },
+        url: '/v1/usages/store-daily-usage',
+        method: 'post',
+        skipLoading: true,
+      } as unknown as InternalAxiosRequestConfig;
+
+      fulfilled(config);
+
+      expect(startSpy).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call loadingStore.stop() on a successful response when config.skipLoading is true', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const stopSpy = vi.spyOn(useLoadingStore.getState(), 'stop');
+
+      const fulfilled = getResponseSuccessInterceptor(apiClient);
+      fulfilled({ data: {}, config: { skipLoading: true } });
+
+      expect(stopSpy).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call loadingStore.stop() on an error response when config.skipLoading is true', async () => {
+      const { apiClient } = await import('../api-client');
+      const { useLoadingStore } = await import('../../stores/loading-store');
+      const stopSpy = vi.spyOn(useLoadingStore.getState(), 'stop');
+
+      const rejected = getResponseInterceptor(apiClient);
+      const networkError = new axios.AxiosError('Network Error', 'ERR_NETWORK', {
+        skipLoading: true,
+      } as unknown as InternalAxiosRequestConfig);
+
+      try {
+        await rejected(networkError);
+      } catch {
+        // Expected: interceptor always rejects
+      }
+
+      expect(stopSpy).not.toHaveBeenCalled();
+    });
+  });
 });

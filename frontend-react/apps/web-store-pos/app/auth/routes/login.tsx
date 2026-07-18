@@ -6,6 +6,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
+import { armTracking } from '~/shared/lib/usage/store-usage-tracker';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -66,6 +67,11 @@ export default function LoginPage() {
     try {
       setIsSubmitting(true);
       const user = await login(form.email, form.password);
+      // Arm the store-usage tracker on explicit login, mirroring Angular's
+      // login.component.ts:169-170 (stopTracking() + startTracking()). This is
+      // the ONLY place tracking arms — after a page reload it stays dormant,
+      // exactly like Angular (no usage POST on navigation post-reload).
+      armTracking();
       // Mirror Angular's navigateToUserHome() (shared with guestOnlyLoader):
       // warm the heavy route chunks, then resolve where to land.
       preloadHeavyChunks();

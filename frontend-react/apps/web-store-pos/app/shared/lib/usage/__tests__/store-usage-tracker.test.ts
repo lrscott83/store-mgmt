@@ -97,9 +97,13 @@ describe('registerStoreActivity — USAGE-2: POSTs only unsaved days', () => {
     const { registerStoreActivity } = await import('../store-usage-tracker');
     registerStoreActivity(USER_ID, STORE_ID);
 
-    expect(apiClient.post).toHaveBeenCalledWith('/v1/usages/store-daily-usage', {
-      activeDays: [{ day: today(), saved: false }],
-    });
+    // Background telemetry: the POST must carry `skipLoading: true` so the axios
+    // loading interceptor never drives the global overlay for it (silent sync).
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/usages/store-daily-usage',
+      { activeDays: [{ day: today(), saved: false }] },
+      { skipLoading: true }
+    );
   });
 
   it('excludes already-saved days from the POST payload', async () => {
@@ -115,9 +119,11 @@ describe('registerStoreActivity — USAGE-2: POSTs only unsaved days', () => {
     const { registerStoreActivity } = await import('../store-usage-tracker');
     registerStoreActivity(USER_ID, STORE_ID);
 
-    expect(apiClient.post).toHaveBeenCalledWith('/v1/usages/store-daily-usage', {
-      activeDays: [{ day: today(), saved: false }],
-    });
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/usages/store-daily-usage',
+      { activeDays: [{ day: today(), saved: false }] },
+      { skipLoading: true }
+    );
   });
 
   it('marks the buffered days saved on a successful response', async () => {
@@ -174,6 +180,33 @@ describe('registerStoreActivity — USAGE-3: sending mutex blocks concurrent POS
     // Resolve the in-flight POST — mutex releases, a following flush can post again.
     resolvePost({ data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] } });
     await vi.waitFor(() => expect(apiClient.post).toHaveBeenCalledTimes(1));
+  });
+});
+
+// ── USAGE-4 (arm/disarm lifecycle — Angular parity) ─────────────────────────
+// Mirrors Angular's `startTracking()`/`stopTracking()` (store-usage-tracker.service.ts):
+// the NavigationEnd subscription is armed ONLY by an explicit login
+// (login.component.ts:169-170), never at construction (AuthService seeds
+// `currentUserValue = undefined` and leaves `getUserByToken()` commented). Since
+// `armed` is module state, a page RELOAD resets it to false — so after a reload
+// the tracker stays dormant exactly like Angular (no request on navigation).
+describe('tracking arm lifecycle — USAGE-4', () => {
+  beforeEach(async () => {
+    const { disarmTracking } = await import('../store-usage-tracker');
+    disarmTracking();
+  });
+
+  it('is disarmed by default (module load / page reload parity)', async () => {
+    const { isTrackingArmed } = await import('../store-usage-tracker');
+    expect(isTrackingArmed()).toBe(false);
+  });
+
+  it('arms on explicit login and disarms on request', async () => {
+    const { armTracking, disarmTracking, isTrackingArmed } = await import('../store-usage-tracker');
+    armTracking();
+    expect(isTrackingArmed()).toBe(true);
+    disarmTracking();
+    expect(isTrackingArmed()).toBe(false);
   });
 });
 
