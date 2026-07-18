@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { Link } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 import { CartShell } from './cart-shell';
@@ -10,13 +10,35 @@ interface NavbarProps {
   onSidebarToggle: () => void;
 }
 
+const HELP_PATH = '/help/tutorial';
+
 export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
   const intl = useIntl();
   const { user, logout } = useAuthStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Remembers the last non-help view so the help icon can toggle back to it.
+  const lastNonHelpPathRef = useRef('/');
 
   useClickOutside(userMenuRef, () => setIsUserMenuOpen(false));
+
+  useEffect(() => {
+    if (location.pathname !== HELP_PATH) {
+      lastNonHelpPathRef.current = location.pathname + location.search;
+    }
+  }, [location.pathname, location.search]);
+
+  // Toggle: show the tutorial, or if already on it, return to the previous view.
+  function handleHelpToggle(event: React.MouseEvent) {
+    event.preventDefault();
+    if (location.pathname === HELP_PATH) {
+      navigate(lastNonHelpPathRef.current);
+    } else {
+      navigate(HELP_PATH);
+    }
+  }
 
   function handleLogout() {
     // Decision 2 (auth-service-parity, Slice 3): logout() now owns the
@@ -47,7 +69,8 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
       <div className="flex items-center gap-2">
         {/* Tutorial — header link, matches Angular's nav-right question-circle (bg-gray-200 pill) */}
         <Link
-          to="/help/tutorial"
+          to={HELP_PATH}
+          onClick={handleHelpToggle}
           className="rounded-full p-2 bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
           aria-label={intl.formatMessage({ id: 'MENU.TUTORIAL' })}
           title={intl.formatMessage({ id: 'MENU.TUTORIAL' })}
