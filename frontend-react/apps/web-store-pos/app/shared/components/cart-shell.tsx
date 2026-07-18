@@ -295,7 +295,7 @@ export function CartShell() {
               onChange={(e) => setPayment(e.target.value === '' ? undefined : Number(e.target.value))}
               aria-label={intl.formatMessage({ id: 'GENERAL.PAY' })}
               placeholder={intl.formatMessage({ id: 'GENERAL.PAY' })}
-              className="w-24 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              className="w-36 rounded-md border border-border px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
             />
           </div>
 
