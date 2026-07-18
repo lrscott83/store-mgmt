@@ -13,6 +13,7 @@ import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { CategoryProductList } from '../components/category-product-list';
+import { CategoryActionsMenu } from '../components/category-actions-menu';
 import { CreateProductModal } from '../components/create-product-modal';
 import { EditProductModal } from '../components/edit-product-modal';
 import { EditProductsModal } from '../components/edit-products-modal';
@@ -236,38 +237,54 @@ export function ProductsPage() {
             const isExpanded = expandedCategoryIds.has(category.id);
             return (
               <div key={category.id} className="rounded-lg border border-border bg-surface">
-                <button
-                  type="button"
-                  onClick={() => togglePanel(category.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                  data-testid={`category-panel-toggle-${category.id}`}
-                  aria-expanded={isExpanded}
-                >
-                  <span className="flex-1 text-base font-medium text-text">{category.name}</span>
-                  {/* Angular parity (products.component.ts:30-40): badge uses
-                      getProductCategoriesView's productsCount (isActive && availableToSale) —
-                      a DIFFERENT filter than the panel's own product list below (isActive-only),
-                      a deliberate Angular quirk (spec.md "three separate filters"). */}
-                  <span className="text-sm text-text-muted">{category.productsCount}</span>
-                  {/* Angular's mat-expansion-panel toggle indicator (rotates when open). */}
-                  <svg
-                    className={`h-5 w-5 shrink-0 text-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    aria-hidden="true"
+                {/* Header row: name+count toggle the panel; a gear menu sits to the LEFT of
+                    the chevron and exposes the category actions WITHOUT expanding — clicking
+                    the gear must not toggle. The chevron is its own toggle button so the gear
+                    can be a sibling (nested <button>s are invalid HTML). */}
+                <div className="flex w-full items-center gap-3 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => togglePanel(category.id)}
+                    className="flex flex-1 items-center gap-3 text-left"
+                    data-testid={`category-panel-toggle-${category.id}`}
+                    aria-expanded={isExpanded}
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                  </svg>
-                </button>
+                    <span className="flex-1 text-base font-medium text-text">{category.name}</span>
+                    {/* Angular parity (products.component.ts:30-40): badge uses
+                        getProductCategoriesView's productsCount (isActive && availableToSale) —
+                        a DIFFERENT filter than the panel's own product list below (isActive-only),
+                        a deliberate Angular quirk (spec.md "three separate filters"). */}
+                    <span className="text-sm text-text-muted">{category.productsCount}</span>
+                  </button>
+                  <CategoryActionsMenu
+                    category={category}
+                    onEditCategory={() => setModal({ type: 'category', category })}
+                    onAddProduct={() => setModal({ type: 'create', category })}
+                    onAddProducts={() => setModal({ type: 'bulk', category })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePanel(category.id)}
+                    className="shrink-0 rounded p-0.5 text-text-muted hover:text-text"
+                    aria-label="Expandir o contraer categoría"
+                    aria-expanded={isExpanded}
+                  >
+                    {/* Angular's mat-expansion-panel toggle indicator (rotates when open). */}
+                    <svg
+                      className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </button>
+                </div>
                 {isExpanded && (
                   <div className="border-t border-border px-4 py-3">
                     <CategoryProductList
-                      category={category}
                       products={categoryProducts}
-                      onEditCategory={() => setModal({ type: 'category', category })}
-                      onAddProduct={() => setModal({ type: 'create', category })}
-                      onAddProducts={() => setModal({ type: 'bulk', category })}
                       onEditProduct={(product) => setModal({ type: 'edit', product })}
                       onDeleteProduct={handleDeleteProduct}
                     />

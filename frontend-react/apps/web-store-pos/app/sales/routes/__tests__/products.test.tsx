@@ -294,7 +294,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
 
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
@@ -367,7 +367,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-products-button'));
     fireEvent.change(await screen.findByTestId('price-input-prod-1'), { target: { value: '9.99' } });
     fireEvent.click(screen.getByTestId('bulk-save-button'));
@@ -396,7 +396,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       </Wrapper>,
     );
 
-    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
     fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
@@ -437,7 +437,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
         </Wrapper>,
       );
 
-      fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+      fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
       fireEvent.click(screen.getByTestId('edit-category-button'));
       fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas Frías' } });
       fireEvent.click(screen.getByTestId('category-save-button'));
@@ -522,6 +522,39 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
         { category: 'Snacks', name: 'Chips', price: 10 },
       ]);
+    });
+  });
+
+  describe('category header gear menu (React-only enhancement)', () => {
+    it('exposes category actions via the gear WITHOUT expanding the panel', async () => {
+      mockCategories = [makeCategory()];
+      mockProducts = [makeProduct()]; // "Coca Cola" only shows when the panel is expanded
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      // Opening the gear reveals the actions but must NOT expand the panel
+      fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+      expect(screen.getByTestId('edit-category-button')).toBeInTheDocument();
+      expect(screen.getByTestId('category-panel-toggle-cat-1')).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
+    });
+
+    it('expands the panel when the header (not the gear) is clicked', async () => {
+      mockCategories = [makeCategory()];
+      mockProducts = [makeProduct()];
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+      expect(screen.getByText('Coca Cola')).toBeInTheDocument();
     });
   });
 });

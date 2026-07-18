@@ -1,17 +1,11 @@
 import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Product, ProductCategory } from '@store-mgmt/domain';
+import type { Product } from '@store-mgmt/domain';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { Button } from '~/shared/components/ui/button';
-import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
 
 interface CategoryProductListProps {
-  category: ProductCategory;
   products: Product[];
-  onEditCategory: () => void;
-  onAddProduct: () => void;
-  onAddProducts: () => void;
   onEditProduct: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
 }
@@ -19,16 +13,14 @@ interface CategoryProductListProps {
 /**
  * Per-category product panel — matches Angular's
  * `category-product-list.component.html`. Rendered inside one accordion panel per
- * category by `ProductsPage`. Shows: per-category empty state, product list (name +
- * price) with a per-product edit/delete actions menu, and the category's own action row
- * (Editar Categoría / Nuevo Productos [bulk] / Nuevo Producto [single]).
+ * category by `ProductsPage`. Shows the per-category empty state and the product list
+ * (name + price) with a per-product edit/delete actions menu.
+ *
+ * The category-level actions (Editar Categoría / Nuevo Producto / Nuevo Productos)
+ * now live in the header's CategoryActionsMenu (gear), not here.
  */
 export function CategoryProductList({
-  category,
   products,
-  onEditCategory,
-  onAddProduct,
-  onAddProducts,
   onEditProduct,
   onDeleteProduct,
 }: CategoryProductListProps) {
@@ -44,29 +36,6 @@ export function CategoryProductList({
           {intl.formatMessage({ id: 'PRODUCT_CATEGORY.NO_PRODUCT_FOUND' })}
         </InfoBox>
       )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="fab" onClick={onEditCategory} data-testid="edit-category-button">
-          {/* Angular: <mat-icon>edit</mat-icon> */}
-          <EditIcon />
-          {/* PRODUCT_CATEGORY.EDIT_CATEGORY */}
-          {intl.formatMessage({ id: 'PRODUCT_CATEGORY.EDIT_CATEGORY' })}
-        </Button>
-        <div className="ml-auto flex flex-wrap justify-end gap-2">
-          <Button variant="fab" onClick={onAddProducts} data-testid="add-products-button">
-            {/* Angular: <mat-icon>add</mat-icon> */}
-            <PlusIcon />
-            {/* PRODUCT.NEW_PRODUCTS (bulk add) */}
-            {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCTS' })}
-          </Button>
-          <Button variant="fab" onClick={onAddProduct} data-testid="add-product-button">
-            {/* Angular: <mat-icon>add</mat-icon> */}
-            <PlusIcon />
-            {/* PRODUCT.NEW_PRODUCT (single add) */}
-            {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCT' })}
-          </Button>
-        </div>
-      </div>
 
       {products.length > 0 && (
         <ul className="divide-y divide-border">
