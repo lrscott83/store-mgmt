@@ -157,6 +157,48 @@ export function EyeOffIcon({ className = '' }: IconProps) {
   );
 }
 
+/** Material `payments` (cash glyph — action-menu `pay` intent, same path as `PaymentMethodIcon` kind='cash', promoted to `BASE` size). */
+export function PayIcon({ className = '' }: IconProps) {
+  return (
+    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 6h18M3 6v12a1 1 0 001 1h16a1 1 0 001-1V6M3 6l2-3h14l2 3M12 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"
+      />
+    </svg>
+  );
+}
+
+/** Material `check_circle` (action-menu `activate`/`approve` intents). */
+export function CheckCircleIcon({ className = '' }: IconProps) {
+  return (
+    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  );
+}
+
+/** Material `block` (action-menu `deactivate`/`disapprove` intents). */
+export function BanIcon({ className = '' }: IconProps) {
+  return (
+    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+      />
+    </svg>
+  );
+}
+
 /**
  * Empty-state "boxes" icon — Angular's byte-identical inline SVG path
  * (inventory-today-quantities.component.html empty-state, 64×64, stroke-width 1.5).
