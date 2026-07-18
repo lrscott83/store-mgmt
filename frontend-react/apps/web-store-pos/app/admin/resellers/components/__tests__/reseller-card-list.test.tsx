@@ -148,6 +148,19 @@ describe('ResellerCardList — gear action menu (Req: Resellers Gear Menu — Ed
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.EDIT'] }));
     expect(onEdit).toHaveBeenCalledWith('r-edit');
   });
+
+  it('S-GM-RESELLER-1: Editar is text-primary (no separator, single item)', async () => {
+    const { ResellerCardList } = await import('../reseller-card-list');
+    render(
+      <Wrapper>
+        <ResellerCardList {...baseProps} resellers={[makeReseller({ id: 'r-color' })]} />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    const editItem = screen.getByRole('menuitem', { name: esMessages['GENERAL.EDIT'] });
+    expect(editItem).toHaveClass('text-primary');
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
 });
 
 describe('ResellerCardList — state indicator class (Req: Resellers State CSS Class)', () => {

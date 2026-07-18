@@ -70,6 +70,15 @@ describe('CategoryActionsMenu — gear menu for category actions', () => {
     expect(addProductButton.querySelector('svg')).toBeTruthy();
   });
 
+  it('S-GM-CAT-ACTIONS-1: all three items are text-primary and no separator is present', () => {
+    renderMenu();
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    expect(screen.getByTestId('edit-category-button')).toHaveClass('text-primary');
+    expect(screen.getByTestId('add-products-button')).toHaveClass('text-primary');
+    expect(screen.getByTestId('add-product-button')).toHaveClass('text-primary');
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
   it('calls onEditCategory and closes the menu', () => {
     const onEditCategory = vi.fn();
     renderMenu({ onEditCategory });

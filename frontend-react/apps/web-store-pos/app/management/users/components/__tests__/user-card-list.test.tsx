@@ -153,6 +153,32 @@ describe('UserCardList — gear action menu (Req: Users List Uses Shared Chrome 
     fireEvent.click(activateItem);
     expect(onActivate).toHaveBeenCalledWith('u-inactive');
   });
+
+  it('S-GM-USER-1: inactive user shows Editar (text-primary) and Activar (text-success), no separator', async () => {
+    const { UserCardList } = await import('../user-card-list');
+    render(
+      <Wrapper>
+        <UserCardList {...baseProps} users={[makeUser({ id: 'u-inactive', isActive: false })]} />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.EDIT'] })).toHaveClass('text-primary');
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.ACTIVATE'] })).toHaveClass('text-success');
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
+  it('S-GM-USER-2: active user shows Editar (text-primary) and Desactivar (text-warning), no separator', async () => {
+    const { UserCardList } = await import('../user-card-list');
+    render(
+      <Wrapper>
+        <UserCardList {...baseProps} users={[makeUser({ id: 'u-active', isActive: true })]} />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.EDIT'] })).toHaveClass('text-primary');
+    expect(screen.getByRole('menuitem', { name: esMessages['USERS.DEACTIVATE'] })).toHaveClass('text-warning');
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
 });
 
 // Deactivated indicator is a pure Tailwind visual state (no Angular-side semantic marker

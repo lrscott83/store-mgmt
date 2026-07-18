@@ -132,6 +132,44 @@ describe('SaleCreditList', () => {
     fireEvent.click(screen.getByText('Pagar'));
     expect(screen.getAllByText('Venta por Cobrar').length).toBeGreaterThan(0);
   });
+
+  it('S-GM-SALE-CREDIT-1: unpaid credit shows Editar (text-primary) and Pagar por (text-success)', () => {
+    const credits = [makeCredit({ id: 'c1', paid: 0 })];
+    render(
+      <Wrapper>
+        <SaleCreditList saleCredits={credits} readOnly={false} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('sale-credit-actions-toggle-c1'));
+    expect(screen.getByRole('menuitem', { name: 'Editar' })).toHaveClass('text-primary');
+    expect(screen.getByRole('menuitem', { name: 'Pagar' })).toHaveClass('text-success');
+  });
+
+  it('S-GM-SALE-CREDIT-2: paid credit hides Pagar por', () => {
+    const credits = [makeCredit({ id: 'c1', paid: 200, total: 200 })];
+    render(
+      <Wrapper>
+        <SaleCreditList saleCredits={credits} readOnly={false} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('sale-credit-actions-toggle-c1'));
+    expect(screen.getByRole('menuitem', { name: 'Editar' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Pagar' })).not.toBeInTheDocument();
+  });
+
+  it('S-GM-SALE-CREDIT-3: opening row A does not open row B', () => {
+    const credits = [
+      makeCredit({ id: 'c1', client: 'Row A' }),
+      makeCredit({ id: 'c2', client: 'Row B' }),
+    ];
+    render(
+      <Wrapper>
+        <SaleCreditList saleCredits={credits} readOnly={false} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('sale-credit-actions-toggle-c1'));
+    expect(screen.getAllByRole('menu')).toHaveLength(1);
+  });
 });
 
 // --- EditSaleCreditModal (matches Angular's edit-sale-credit-modal.component: client + note only) ---

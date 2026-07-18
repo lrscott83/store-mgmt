@@ -1,9 +1,7 @@
-import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
-import { EditIcon, TrashIcon } from '~/shared/components/ui/icons';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 
 interface CategoryProductListProps {
   products: Product[];
@@ -62,11 +60,7 @@ interface ProductRowProps {
 
 function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
   const intl = useIntl();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const formattedPrice = `$${product.price.toFixed(2)}`;
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useClickOutside(menuRef, () => setIsMenuOpen(false));
 
   return (
     <li className="flex items-center justify-between py-3">
@@ -75,54 +69,16 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
         {/* Angular formats with `currency:'USD':'symbol':'1.2-2'` -> literal $X.XX,
             not locale-formatted (es locale would render "2,00 US$"). */}
         <span className="text-sm font-medium text-primary">{formattedPrice}</span>
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen((v) => !v)}
-            className="rounded-full p-1.5 text-primary hover:bg-primary-light transition-colors"
-            aria-label="Acciones"
-            aria-expanded={isMenuOpen}
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-
-          {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-border bg-surface shadow-lg z-10 py-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onEdit();
-                }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-primary hover:bg-primary-light transition-colors"
-              >
-                <EditIcon />
-                {/* PRODUCT.EDIT_PRODUCT */}
-                {intl.formatMessage({ id: 'PRODUCT.EDIT_PRODUCT' })}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onDelete();
-                }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"
-              >
-                <TrashIcon />
-                {/* PRODUCT.DELETE_PRODUCT */}
-                {intl.formatMessage({ id: 'PRODUCT.DELETE_PRODUCT' })}
-              </button>
-            </div>
-          )}
-        </div>
+        <ActionMenu>
+          <ActionMenuItem intent="edit" onClick={onEdit}>
+            {/* PRODUCT.EDIT_PRODUCT */}
+            {intl.formatMessage({ id: 'PRODUCT.EDIT_PRODUCT' })}
+          </ActionMenuItem>
+          <ActionMenuItem intent="delete" separatorBefore onClick={onDelete}>
+            {/* PRODUCT.DELETE_PRODUCT */}
+            {intl.formatMessage({ id: 'PRODUCT.DELETE_PRODUCT' })}
+          </ActionMenuItem>
+        </ActionMenu>
       </div>
     </li>
   );

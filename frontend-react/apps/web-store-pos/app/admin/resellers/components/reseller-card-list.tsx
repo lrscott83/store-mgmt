@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { ReSeller } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
-import { PlusIcon, SettingsIcon } from '~/shared/components/ui/icons';
+import { PlusIcon } from '~/shared/components/ui/icons';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 
 interface ResellerCardListProps {
   resellers: ReSeller[];
@@ -29,16 +29,6 @@ function getCardClass(reseller: ReSeller): string {
 
 export function ResellerCardList({ resellers, onCreate, onEdit }: ResellerCardListProps) {
   const intl = useIntl();
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
-  function toggleMenu(id: string) {
-    setOpenMenuId((current) => (current === id ? null : id));
-  }
-
-  function handleEdit(id: string) {
-    onEdit(id);
-    setOpenMenuId(null);
-  }
 
   return (
     <div className="space-y-4">
@@ -68,30 +58,12 @@ export function ResellerCardList({ resellers, onCreate, onEdit }: ResellerCardLi
               {reseller.description && (
                 <p className="text-sm text-text-muted">{reseller.description}</p>
               )}
-              <div className="relative flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => toggleMenu(reseller.id)}
-                  aria-label="Acciones"
-                  className="rounded-full p-2 text-primary hover:bg-primary-light"
-                >
-                  <SettingsIcon />
-                </button>
-                {openMenuId === reseller.id && (
-                  <div
-                    role="menu"
-                    className="absolute right-0 top-full z-10 mt-1 w-40 rounded-md border border-border bg-surface shadow-card"
-                  >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleEdit(reseller.id)}
-                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-text hover:bg-primary-light"
-                    >
-                      {intl.formatMessage({ id: 'GENERAL.EDIT' })}
-                    </button>
-                  </div>
-                )}
+              <div className="flex justify-end pt-2">
+                <ActionMenu widthClass="w-40">
+                  <ActionMenuItem intent="edit" onClick={() => onEdit(reseller.id)}>
+                    {intl.formatMessage({ id: 'GENERAL.EDIT' })}
+                  </ActionMenuItem>
+                </ActionMenu>
               </div>
             </div>
           </Card>

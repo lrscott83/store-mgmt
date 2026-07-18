@@ -108,6 +108,21 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
     expect(deleteButton?.querySelector('svg')).toBeTruthy();
   });
 
+  it('S-GM-PRODUCT-ROW-1: a separator precedes "Eliminar Producto"', () => {
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[makeProduct()]}
+          onEditProduct={vi.fn()}
+          onDeleteProduct={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByLabelText('Acciones'));
+    const deleteButton = screen.getByText('Eliminar Producto').closest('button');
+    expect(deleteButton?.previousElementSibling).toHaveAttribute('role', 'separator');
+  });
+
   it('calls onEditProduct with the product when "Editar Producto" is clicked', () => {
     const onEditProduct = vi.fn();
     const product = makeProduct();

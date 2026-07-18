@@ -149,6 +149,21 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] }));
     expect(onDelete).toHaveBeenCalledWith('o-del');
   });
+
+  it('S-GM-OWNER-1: Editar is text-primary and Eliminar is text-danger preceded by a separator', async () => {
+    const { OwnerCardList } = await import('../owner-card-list');
+    render(
+      <Wrapper>
+        <OwnerCardList {...baseProps} owners={[makeOwner({ id: 'o-color' })]} />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    const editItem = screen.getByRole('menuitem', { name: esMessages['OWNER.EDIT_OWNER'] });
+    const deleteItem = screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] });
+    expect(editItem).toHaveClass('text-primary');
+    expect(deleteItem).toHaveClass('text-danger');
+    expect(deleteItem.previousElementSibling).toHaveAttribute('role', 'separator');
+  });
 });
 
 describe('OwnerCardList — state indicator classes (Req: Owners State CSS Classes)', () => {
