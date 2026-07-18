@@ -17,6 +17,8 @@ import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/p
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { Switch } from '~/shared/components/ui/switch';
+import { InfoBox } from '~/shared/components/ui/info-box';
 
 const PAYMENT_TYPE_OPTIONS: { type: PaymentType; labelKey: string }[] = [
   { type: PaymentType.Efectivo, labelKey: 'CART.EFECTIVO' },
@@ -236,21 +238,33 @@ export function CartShell() {
               (nav-right.component.ts:427-429, nav-right.component.html:96) — NOT a fixed
               value; the cart's orderType changes per session (Normal/Mayorista/etc, see
               Egress/Mayorista realignment). */}
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          {/* Header: "Venta actual" + order type on the left; Limpiar / Registrar on the
+              right — matching Angular's nav-right header row (both mat-fab buttons live at
+              the top, disabled when the cart is empty). React closes the panel via
+              click-outside (useClickOutside), so no explicit close button is needed. */}
+          <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <div>
               <h3 className="text-sm font-semibold text-text">Venta actual</h3>
               <span className="text-xs text-text-muted">{getOrderTypeText(orderType)}</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="rounded-md p-1 text-text-muted hover:text-text"
-              aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={itemCount === 0}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-muted hover:bg-primary-light transition-colors disabled:opacity-50"
+              >
+                {intl.formatMessage({ id: 'SHOPPING_CART.CLEAR' })}
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateOrder}
+                disabled={itemCount === 0 || isSubmitting}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+              >
+                {intl.formatMessage({ id: 'SHOPPING_CART.REGISTER' })}
+              </button>
+            </div>
           </div>
 
           {/* Payment / Vuelto row */}
@@ -278,26 +292,28 @@ export function CartShell() {
             />
           </div>
 
-          {/* Payment-type selector with icons */}
+          {/* Payment-type selector — radio group (Angular mat-radio-group parity), each
+              option with its icon + label */}
           <div className="border-b border-border px-4 py-3">
-            <div className="flex gap-1">
+            <div className="flex gap-4" role="radiogroup">
               {PAYMENT_TYPE_OPTIONS.map(({ type, labelKey }) => {
                 const kind = getPaymentTypeIconKind(type);
                 const label = intl.formatMessage({ id: labelKey });
                 return (
-                  <button
+                  <label
                     key={type}
-                    type="button"
-                    onClick={() => setPaymentType(type)}
-                    className={`flex flex-1 items-center justify-center gap-1 rounded-md py-1 text-xs font-medium transition-colors ${
-                      paymentType === type
-                        ? 'bg-primary text-white'
-                        : 'border border-border text-text-muted hover:bg-primary-light'
-                    }`}
+                    className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-text"
                   >
+                    <input
+                      type="radio"
+                      name="payment-type"
+                      checked={paymentType === type}
+                      onChange={() => setPaymentType(type)}
+                      className="text-primary focus:ring-primary"
+                    />
                     <PaymentTypeIcon kind={kind} />
                     {label}
-                  </button>
+                  </label>
                 );
               })}
             </div>
@@ -307,17 +323,11 @@ export function CartShell() {
               Angular's @if (hasCreditsModuleAvailable) block */}
           {creditsModuleAvailable && (
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isCredit}
-                  onChange={toggleCredit}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <span className="text-xs font-medium text-text">
-                  {intl.formatMessage({ id: 'CART.CREDIT_SALE' })}
-                </span>
-              </label>
+              <Switch
+                checked={isCredit}
+                onChange={() => toggleCredit()}
+                label={intl.formatMessage({ id: 'GENERAL.CREDIT' })}
+              />
               <input
                 type="text"
                 value={clientName}
@@ -333,26 +343,23 @@ export function CartShell() {
           {/* Print-invoice toggle — UI-only, no print behavior (Angular's
               generateTicket/generateFacture are disabled no-ops) */}
           <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={mustGenerateFacture}
-                onChange={() => setMustGenerateFacture((v) => !v)}
-                aria-label={intl.formatMessage({ id: 'SHOPPING_CART.PRINT_INVOICE' })}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <span className="text-xs font-medium text-text">
-                {intl.formatMessage({ id: 'SHOPPING_CART.PRINT_INVOICE' })}
-              </span>
-            </label>
+            <Switch
+              checked={mustGenerateFacture}
+              onChange={(v) => setMustGenerateFacture(v)}
+              label={intl.formatMessage({ id: 'SHOPPING_CART.PRINT_INVOICE' })}
+            />
           </div>
 
           {/* Items */}
           <div className="max-h-64 overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-text-muted">
-                {intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_PAY_EMPTY_CART' })}
-              </p>
+              // Angular shows the empty-cart notice inside an alert-light-primary box;
+              // InfoBox is React's design-system equivalent of that info banner.
+              <div className="px-4 py-4">
+                <InfoBox variant="primary">
+                  {intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_PAY_EMPTY_CART' })}
+                </InfoBox>
+              </div>
             ) : (
               <ul className="divide-y divide-border">
                 {items.map((item) => (
@@ -418,29 +425,6 @@ export function CartShell() {
               {submitSuccess}
             </p>
           )}
-
-          {/* Action buttons: Limpiar / Registrar, both disabled when cart is empty,
-              matching Angular's [disabled]="getItemsCount() === 0" on both mat-fab buttons */}
-          <div className="flex items-center gap-2 px-4 py-3">
-            <button
-              type="button"
-              onClick={handleClear}
-              disabled={itemCount === 0}
-              className="flex-1 rounded-lg border border-border py-1.5 text-xs font-medium text-text-muted hover:bg-primary-light transition-colors disabled:opacity-50"
-            >
-              {intl.formatMessage({ id: 'SHOPPING_CART.CLEAR' })}
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateOrder}
-              disabled={itemCount === 0 || isSubmitting}
-              className="flex-1 rounded-lg bg-primary py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
-            >
-              {isSubmitting
-                ? intl.formatMessage({ id: 'GENERAL.LOADING' })
-                : intl.formatMessage({ id: 'SHOPPING_CART.REGISTER' })}
-            </button>
-          </div>
         </div>
       )}
     </div>

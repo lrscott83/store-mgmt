@@ -201,12 +201,14 @@ describe('CartShell — payment-type selector with icons', () => {
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
   });
 
-  it('renders the three payment type options: Efectivo, Tarjeta, Zelle', () => {
+  it('renders the three payment type options as radio buttons: Efectivo, Tarjeta, Zelle', () => {
     renderCartShell();
     openCart();
     expect(screen.getByText('Efectivo')).toBeInTheDocument();
     expect(screen.getByText('Tarjeta')).toBeInTheDocument();
     expect(screen.getByText('Zelle')).toBeInTheDocument();
+    // Angular uses mat-radio-group — parity means true radio controls, not a button group
+    expect(screen.getAllByRole('radio')).toHaveLength(3);
   });
 
   it('renders a distinct inline SVG icon per payment type option', () => {
@@ -223,12 +225,14 @@ describe('CartShell — credit toggle + client input gated by credits module', (
     vi.clearAllMocks();
   });
 
-  it('shows the credit toggle when the user has the credits module available', () => {
+  it('shows the credit toggle as a switch labeled "Crédito" (Angular GENERAL.CREDIT parity)', () => {
     mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
     renderCartShell();
     openCart();
-    expect(screen.getByText('Venta a crédito')).toBeInTheDocument();
+    // Angular uses mat-slide-toggle + label "Crédito" (not a checkbox / "Venta a crédito")
+    expect(screen.getByRole('switch', { name: 'Crédito' })).toBeInTheDocument();
+    expect(screen.queryByText('Venta a crédito')).not.toBeInTheDocument();
   });
 
   it('hides the credit toggle and client input when the user lacks the credits module', () => {
@@ -236,7 +240,7 @@ describe('CartShell — credit toggle + client input gated by credits module', (
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
     renderCartShell();
     openCart();
-    expect(screen.queryByText('Venta a crédito')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Crédito' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Cliente')).not.toBeInTheDocument();
   });
 });
@@ -248,10 +252,14 @@ describe('CartShell — print-invoice toggle (UI-only, no print behavior)', () =
     mockCartState({ items: [], total: vi.fn().mockReturnValue(0) });
   });
 
-  it('renders the print-invoice toggle labeled "Imprimir Factura (prueba)"', () => {
+  it('renders the print-invoice toggle as a switch labeled "Imprimir Factura (prueba)"', () => {
     renderCartShell();
     openCart();
     expect(screen.getByText('Imprimir Factura (prueba)')).toBeInTheDocument();
+    // Angular uses mat-slide-toggle — parity means a switch, not a checkbox
+    expect(
+      screen.getByRole('switch', { name: 'Imprimir Factura (prueba)' }),
+    ).toBeInTheDocument();
   });
 
   it('toggling it does not throw or trigger any print/window.open call', () => {
