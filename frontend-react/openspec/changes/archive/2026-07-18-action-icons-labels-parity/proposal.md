@@ -66,8 +66,8 @@ None. Strict TDD active — test_command `pnpm test`; typecheck `pnpm -C apps/we
 
 ## Success Criteria
 
-- [ ] All 5 component files render Angular-matching icons on the specified buttons/menu items.
-- [ ] Category gear menu order = Categoría, Productos, Producto.
-- [ ] Modal footers use `GENERAL.CLOSE` + `CloseIcon`; Save/Update branches correct with `SaveIcon`.
-- [ ] `GENERAL.SAVE` resolves to `'Salvar'` everywhere.
-- [ ] Typecheck clean; full test suite green.
+- [x] All 5 component files render Angular-matching icons on the specified buttons/menu items.
+- [x] Category gear menu order = Categoría, Productos, Producto.
+- [x] Modal footers use `GENERAL.CLOSE` + `CloseIcon`; Save/Update branches correct with `SaveIcon`.
+- [x] `GENERAL.SAVE` resolves to `'Salvar'` everywhere.
+- [x] Typecheck clean; full test suite green.
