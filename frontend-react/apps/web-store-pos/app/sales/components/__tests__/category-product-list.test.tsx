@@ -89,6 +89,25 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
     expect(screen.getByText('Eliminar Producto')).toBeInTheDocument();
   });
 
+  it('renders "Editar Producto" with a primary-colored edit icon and "Eliminar Producto" with a danger-colored delete icon', () => {
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[makeProduct()]}
+          onEditProduct={vi.fn()}
+          onDeleteProduct={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByLabelText('Acciones'));
+    const editButton = screen.getByText('Editar Producto').closest('button');
+    const deleteButton = screen.getByText('Eliminar Producto').closest('button');
+    expect(editButton).toHaveClass('text-primary');
+    expect(editButton?.querySelector('svg')).toBeTruthy();
+    expect(deleteButton).toHaveClass('text-danger');
+    expect(deleteButton?.querySelector('svg')).toBeTruthy();
+  });
+
   it('calls onEditProduct with the product when "Editar Producto" is clicked', () => {
     const onEditProduct = vi.fn();
     const product = makeProduct();

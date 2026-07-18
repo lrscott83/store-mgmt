@@ -73,3 +73,61 @@ describe('EditProductModal — validation text parity (GENERAL.VALIDATION.REQUIR
     expect(screen.getByText('Precio es requerido')).toBeInTheDocument();
   });
 });
+
+describe('EditProductModal — footer icons/labels parity', () => {
+  it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct()}
+          categories={[makeCategory()]}
+          onSave={vi.fn()}
+          onDelete={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    // The orphan delete-confirm footer block also uses GENERAL.CANCEL; scope to the
+    // main footer "Cerrar" button by data-testid sibling (edit-product-submit).
+    const saveButton = screen.getByTestId('edit-product-submit');
+    const closeButton = saveButton.parentElement?.querySelector('button:first-child');
+    expect(closeButton).toHaveTextContent('Cerrar');
+    expect(closeButton?.querySelector('svg')).toBeTruthy();
+  });
+
+  it('confirm button reads "Actualizar" (GENERAL.UPDATE) and renders a save icon', () => {
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct()}
+          categories={[makeCategory()]}
+          onSave={vi.fn()}
+          onDelete={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const saveButton = screen.getByTestId('edit-product-submit');
+    expect(saveButton).toHaveTextContent('Actualizar');
+    expect(saveButton.querySelector('svg')).toBeTruthy();
+  });
+
+  it('does not alter the orphan delete-confirm footer block', () => {
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct()}
+          categories={[makeCategory()]}
+          onSave={vi.fn()}
+          onDelete={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const deleteButton = screen.getByTestId('delete-product-button');
+    expect(deleteButton).toHaveTextContent('Descartar');
+    fireEvent.click(deleteButton);
+    const confirmButton = screen.getByTestId('confirm-delete-button');
+    expect(confirmButton).toBeInTheDocument();
+  });
+});

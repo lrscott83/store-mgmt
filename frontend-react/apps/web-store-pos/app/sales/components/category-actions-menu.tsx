@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { ProductCategory } from '@store-mgmt/domain';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
+import { EditIcon, PlusIcon } from '~/shared/components/ui/icons';
 
 interface CategoryActionsMenuProps {
   category: ProductCategory;
@@ -66,15 +67,8 @@ export function CategoryActionsMenu({
             data-testid="edit-category-button"
             className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text hover:bg-primary-light transition-colors"
           >
+            <EditIcon />
             {intl.formatMessage({ id: 'PRODUCT_CATEGORY.EDIT_CATEGORY' })}
-          </button>
-          <button
-            type="button"
-            onClick={() => runAction(onAddProduct)}
-            data-testid="add-product-button"
-            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text hover:bg-primary-light transition-colors"
-          >
-            {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCT' })}
           </button>
           <button
             type="button"
@@ -82,7 +76,17 @@ export function CategoryActionsMenu({
             data-testid="add-products-button"
             className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text hover:bg-primary-light transition-colors"
           >
+            <PlusIcon />
             {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCTS' })}
+          </button>
+          <button
+            type="button"
+            onClick={() => runAction(onAddProduct)}
+            data-testid="add-product-button"
+            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text hover:bg-primary-light transition-colors"
+          >
+            <PlusIcon />
+            {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCT' })}
           </button>
         </div>
       )}

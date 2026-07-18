@@ -52,6 +52,24 @@ describe('CategoryActionsMenu — gear menu for category actions', () => {
     expect(screen.getByTestId('add-products-button')).toBeInTheDocument();
   });
 
+  it('renders items in Angular order (Categoría, Productos bulk, Producto single) each with an icon', () => {
+    renderMenu();
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    const editButton = screen.getByTestId('edit-category-button');
+    const addProductsButton = screen.getByTestId('add-products-button');
+    const addProductButton = screen.getByTestId('add-product-button');
+
+    // DOM order: edit-category-button -> add-products-button (bulk) -> add-product-button (single)
+    const position = editButton.compareDocumentPosition(addProductsButton);
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const position2 = addProductsButton.compareDocumentPosition(addProductButton);
+    expect(position2 & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    expect(editButton.querySelector('svg')).toBeTruthy();
+    expect(addProductsButton.querySelector('svg')).toBeTruthy();
+    expect(addProductButton.querySelector('svg')).toBeTruthy();
+  });
+
   it('calls onEditCategory and closes the menu', () => {
     const onEditCategory = vi.fn();
     renderMenu({ onEditCategory });

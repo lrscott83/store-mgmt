@@ -3,7 +3,7 @@ const messages: Record<string, string> = {
   'GENERAL.APP_NAME': 'VendeDTo',
   'GENERAL.APP_SUBTITLE': 'Automatiza tu Negocio',
   'GENERAL.LOADING': 'Cargando...',
-  'GENERAL.SAVE': 'Guardar',
+  'GENERAL.SAVE': 'Salvar',
   'GENERAL.CANCEL': 'Cancelar',
   'GENERAL.DISCARD': 'Descartar',
   'GENERAL.CONFIRM': 'Confirmar',

@@ -55,3 +55,28 @@ describe('CreateProductModal — validation text parity (GENERAL.VALIDATION.REQU
     expect(screen.getByText('Categoría es requerido')).toBeInTheDocument();
   });
 });
+
+describe('CreateProductModal — footer icons/labels parity', () => {
+  it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
+    render(
+      <Wrapper>
+        <CreateProductModal categories={[makeCategory()]} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    const closeButton = screen.getByRole('button', { name: 'Cerrar' });
+    expect(closeButton).toBeInTheDocument();
+    expect(closeButton.querySelector('svg')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
+  });
+
+  it('confirm button reads "Salvar" and renders a save icon', () => {
+    render(
+      <Wrapper>
+        <CreateProductModal categories={[makeCategory()]} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    const saveButton = screen.getByTestId('create-product-submit');
+    expect(saveButton).toHaveTextContent('Salvar');
+    expect(saveButton.querySelector('svg')).toBeTruthy();
+  });
+});

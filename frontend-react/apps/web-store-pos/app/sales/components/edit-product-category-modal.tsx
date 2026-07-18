@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { ProductCategory } from '@store-mgmt/domain';
+import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 
 interface EditProductCategoryModalProps {
   category?: ProductCategory;
@@ -104,16 +105,20 @@ export function EditProductCategoryModal({ category, onSave, onClose }: EditProd
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
             >
-              {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
+              <CloseIcon />
+              {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
+              className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
               data-testid="category-save-button"
             >
-              {intl.formatMessage({ id: 'GENERAL.SAVE' })}
+              <SaveIcon />
+              {isEditing
+                ? intl.formatMessage({ id: 'GENERAL.UPDATE' })
+                : intl.formatMessage({ id: 'GENERAL.SAVE' })}
             </button>
           </div>
         </form>

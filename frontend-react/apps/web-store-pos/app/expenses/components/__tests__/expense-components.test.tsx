@@ -26,7 +26,7 @@ describe('ExpenseFormModal — total validation (Angular parity: required + min(
       </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText('Total'), { target: { value: '0' } });
-    fireEvent.click(screen.getByText('Guardar'));
+    fireEvent.click(screen.getByText('Salvar'));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave.mock.calls[0][0].total).toBe(0);
   });
@@ -40,7 +40,7 @@ describe('ExpenseFormModal — total validation (Angular parity: required + min(
     );
     fireEvent.change(screen.getByLabelText('Total'), { target: { value: '-5' } });
     expect(screen.getByText('El total debe ser mayor a 0')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Guardar'));
+    fireEvent.click(screen.getByText('Salvar'));
     expect(onSave).not.toHaveBeenCalled();
   });
 

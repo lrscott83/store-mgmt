@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
+import { EditIcon, TrashIcon } from '~/shared/components/ui/icons';
 
 interface CategoryProductListProps {
   products: Product[];
@@ -101,8 +102,9 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
                   setIsMenuOpen(false);
                   onEdit();
                 }}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text hover:bg-primary-light transition-colors"
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-primary hover:bg-primary-light transition-colors"
               >
+                <EditIcon />
                 {/* PRODUCT.EDIT_PRODUCT */}
                 {intl.formatMessage({ id: 'PRODUCT.EDIT_PRODUCT' })}
               </button>
@@ -114,6 +116,7 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
                 }}
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"
               >
+                <TrashIcon />
                 {/* PRODUCT.DELETE_PRODUCT */}
                 {intl.formatMessage({ id: 'PRODUCT.DELETE_PRODUCT' })}
               </button>

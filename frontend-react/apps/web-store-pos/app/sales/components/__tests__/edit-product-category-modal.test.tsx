@@ -77,3 +77,43 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
     expect(screen.queryByText('Active')).not.toBeInTheDocument();
   });
 });
+
+describe('EditProductCategoryModal — footer icons/labels parity', () => {
+  it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    const closeButton = screen.getByRole('button', { name: 'Cerrar' });
+    expect(closeButton).toBeInTheDocument();
+    expect(closeButton.querySelector('svg')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
+  });
+
+  it('confirm button reads "Salvar" in create-mode and renders a save icon', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    const saveButton = screen.getByTestId('category-save-button');
+    expect(saveButton).toHaveTextContent('Salvar');
+    expect(saveButton.querySelector('svg')).toBeTruthy();
+  });
+
+  it('confirm button reads "Actualizar" in edit-mode and renders a save icon', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal
+          category={{ id: 'cat-1', name: 'Bebidas', order: 1, isActive: true }}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const saveButton = screen.getByTestId('category-save-button');
+    expect(saveButton).toHaveTextContent('Actualizar');
+    expect(saveButton.querySelector('svg')).toBeTruthy();
+  });
+});
