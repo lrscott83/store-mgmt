@@ -70,8 +70,8 @@ describe('StoreCardList — empty state', () => {
   });
 });
 
-describe('StoreCardList — Button-based actions wired', () => {
-  it('calls onEdit with the store id when the Edit button is clicked', async () => {
+describe('StoreCardList — gear menu actions wired', () => {
+  it('calls onEdit with the store id when Editar is clicked', async () => {
     const onEdit = vi.fn();
     const { StoreCardList } = await import('../store-card-list');
     render(
@@ -84,11 +84,12 @@ describe('StoreCardList — Button-based actions wired', () => {
         />
       </Wrapper>
     );
-    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.EDIT'] }));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-x'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.EDIT'] }));
     expect(onEdit).toHaveBeenCalledWith('store-x');
   });
 
-  it('calls onApprove with the store id when the Approve button is clicked', async () => {
+  it('calls onApprove with the store id when Aprobar is clicked', async () => {
     const onApprove = vi.fn();
     const { StoreCardList } = await import('../store-card-list');
     render(
@@ -101,11 +102,12 @@ describe('StoreCardList — Button-based actions wired', () => {
         />
       </Wrapper>
     );
-    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.APPROVE'] }));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-y'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.APPROVE'] }));
     expect(onApprove).toHaveBeenCalledWith('store-y');
   });
 
-  it('calls onDisapprove with the store id when the Disapprove button is clicked', async () => {
+  it('calls onDisapprove with the store id when Desaprobar is clicked', async () => {
     const onDisapprove = vi.fn();
     const { StoreCardList } = await import('../store-card-list');
     render(
@@ -118,13 +120,14 @@ describe('StoreCardList — Button-based actions wired', () => {
         />
       </Wrapper>
     );
-    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] }));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-z'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] }));
     expect(onDisapprove).toHaveBeenCalledWith('store-z');
   });
 });
 
 describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Shared Chrome)', () => {
-  it('approved store renders ONLY Disapprove, not Approve', async () => {
+  it('approved store renders ONLY Desaprobar, not Aprobar (S-GM-STORE-1)', async () => {
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
@@ -136,13 +139,18 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
         />
       </Wrapper>
     );
-    expect(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-a'));
+    const editItem = screen.getByRole('menuitem', { name: esMessages['STORES.EDIT'] });
+    const disapproveItem = screen.getByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] });
+    expect(editItem).toHaveClass('text-primary');
+    expect(disapproveItem).toHaveClass('text-warning');
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.APPROVE'] })
+      screen.queryByRole('menuitem', { name: esMessages['STORES.APPROVE'] })
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
 
-  it('unapproved store renders ONLY Approve, not Disapprove', async () => {
+  it('unapproved store renders ONLY Aprobar, not Desaprobar (S-GM-STORE-2)', async () => {
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
@@ -154,10 +162,13 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
         />
       </Wrapper>
     );
-    expect(screen.getByRole('button', { name: esMessages['STORES.APPROVE'] })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-b'));
+    const approveItem = screen.getByRole('menuitem', { name: esMessages['STORES.APPROVE'] });
+    expect(approveItem).toHaveClass('text-success');
     expect(
-      screen.queryByRole('button', { name: esMessages['STORES.DISAPPROVE'] })
+      screen.queryByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] })
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
 });
 

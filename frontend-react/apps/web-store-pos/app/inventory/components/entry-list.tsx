@@ -1,5 +1,6 @@
 import { useIntl } from 'react-intl';
 import type { InventoryEntryView } from '@store-mgmt/domain';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 
 interface EntryListProps {
   entries: InventoryEntryView[];
@@ -79,24 +80,18 @@ export function EntryList({
                 {new Date(entry.date).toLocaleDateString('es')}
               </td>
               {showActions && (
-                <td className="px-4 py-3">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => onEdit?.(entry)}
-                      className="rounded bg-primary-light px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
-                    >
+                <td className="px-4 py-3 text-right">
+                  <ActionMenu testId={`entry-actions-toggle-${entry.id}`}>
+                    <ActionMenuItem intent="edit" onClick={() => onEdit?.(entry)}>
                       {intl.formatMessage({ id: 'GENERAL.EDIT' })}
-                    </button>
-                    <button
-                      onClick={() => onDeactivate?.(entry)}
-                      className="rounded bg-danger/10 px-2 py-1 text-xs font-medium text-danger hover:bg-danger/20"
-                    >
+                    </ActionMenuItem>
+                    <ActionMenuItem intent="delete" separatorBefore onClick={() => onDeactivate?.(entry)}>
                       {/* CRITICAL bug fix (Angular parity: entry-list.component.html:36
                           GENERAL.DELETE) — was wrongly wired to ORDERS.DEACTIVATE
                           ("Anular pedido"), the cancel-order label, not delete-entry. */}
                       {intl.formatMessage({ id: 'GENERAL.DELETE' })}
-                    </button>
-                  </div>
+                    </ActionMenuItem>
+                  </ActionMenu>
                 </td>
               )}
             </tr>

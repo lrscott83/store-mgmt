@@ -111,23 +111,78 @@ const MOCK_EXPENSE: Expense = {
 };
 
 describe('ExpenseList — readOnly gating (Angular parity: entry-list.component.html:22 @if (!readOnly))', () => {
-  it('hides edit/delete actions when readOnly', () => {
+  it('hides the actions gear entirely when readOnly', () => {
     render(
       <Wrapper>
         <ExpenseList expenses={[MOCK_EXPENSE]} readOnly onEdit={() => {}} onDelete={() => {}} />
       </Wrapper>,
     );
+    expect(screen.queryByTestId('expense-actions-toggle-e1')).not.toBeInTheDocument();
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
     expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
   });
 
-  it('shows edit/delete actions when not readOnly', () => {
+  it('shows edit/delete actions (via the gear menu) when not readOnly', () => {
     render(
       <Wrapper>
         <ExpenseList expenses={[MOCK_EXPENSE]} readOnly={false} onEdit={() => {}} onDelete={() => {}} />
       </Wrapper>,
     );
+    fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));
     expect(screen.getByText('Editar')).toBeInTheDocument();
     expect(screen.getByText('Eliminar')).toBeInTheDocument();
+  });
+});
+
+describe('ExpenseList — gear action menu (S-GM-EXPENSE)', () => {
+  it('S-GM-EXPENSE-1: not read-only with onDelete shows Editar (text-primary) and Eliminar (text-danger, separator)', () => {
+    render(
+      <Wrapper>
+        <ExpenseList expenses={[MOCK_EXPENSE]} readOnly={false} onEdit={() => {}} onDelete={() => {}} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));
+    const editItem = screen.getByRole('menuitem', { name: 'Editar' });
+    const deleteItem = screen.getByRole('menuitem', { name: 'Eliminar' });
+    expect(editItem).toHaveClass('text-primary');
+    expect(deleteItem).toHaveClass('text-danger');
+    expect(deleteItem.previousElementSibling).toHaveAttribute('role', 'separator');
+  });
+
+  it('S-GM-EXPENSE-2: no onDelete handler hides Eliminar only', () => {
+    render(
+      <Wrapper>
+        <ExpenseList expenses={[MOCK_EXPENSE]} readOnly={false} onEdit={() => {}} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));
+    expect(screen.getByRole('menuitem', { name: 'Editar' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Eliminar' })).not.toBeInTheDocument();
+  });
+
+  it('S-GM-EXPENSE-3: read-only hides the actions gear entirely', () => {
+    render(
+      <Wrapper>
+        <ExpenseList expenses={[MOCK_EXPENSE]} readOnly onEdit={() => {}} onDelete={() => {}} />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('expense-actions-toggle-e1')).not.toBeInTheDocument();
+  });
+
+  it('Editar/Eliminar invoke the existing onEdit/onDelete handlers with the expense', () => {
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    render(
+      <Wrapper>
+        <ExpenseList expenses={[MOCK_EXPENSE]} readOnly={false} onEdit={onEdit} onDelete={onDelete} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar' }));
+    expect(onEdit).toHaveBeenCalledWith(MOCK_EXPENSE);
+
+    fireEvent.click(screen.getByTestId('expense-actions-toggle-e1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Eliminar' }));
+    expect(onDelete).toHaveBeenCalledWith(MOCK_EXPENSE);
   });
 });

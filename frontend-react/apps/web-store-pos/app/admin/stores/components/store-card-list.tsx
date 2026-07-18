@@ -1,8 +1,7 @@
 import { useIntl } from 'react-intl';
 import type { Store } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
-import { Button } from '~/shared/components/ui/button';
-import { EditIcon } from '~/shared/components/ui/icons';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 
 interface StoreCardListProps {
   stores: Store[];
@@ -12,13 +11,14 @@ interface StoreCardListProps {
 }
 
 /**
- * Super-admin store lifecycle grid at /admin/stores. L5 parity: shared Card/Button chrome +
- * icons replace the old raw-table markup (`shared/components/ui/{card,button,icons}.tsx`,
- * same precedent as Expenses). Angular's `store-list.component.html:40-50` dead-codes
- * Activate/Deactivate out of the DOM entirely for every role — neither control exists here
- * (Req: Activate/Deactivate Controls Removed). State CSS and Approve/Disapprove XOR mirror
- * `admin/owners/components/owner-card-list.tsx getCardClass` (Req: Store Card Visual
- * Lifecycle State, Req: Card-Grid List Uses Shared Chrome).
+ * Super-admin store lifecycle grid at /admin/stores. Gear/action menu (shared `ActionMenu`
+ * primitive) replaces the old flat Editar/Aprobar/Desaprobar buttons, matching Angular
+ * `store-list.component.html:17-51` (gear-menu-action-styling change). Angular
+ * `store-list.component.html:40-50` dead-codes Activate/Deactivate out of the DOM entirely
+ * for every role — neither control exists here (Req: Activate/Deactivate Controls Removed).
+ * State CSS and Approve/Disapprove XOR mirror `admin/owners/components/owner-card-list.tsx
+ * getCardClass` (Req: Store Card Visual Lifecycle State, Req: Card-Grid List Uses Shared
+ * Chrome).
  */
 function getStoreCardClass(store: Store): string {
   if (!store.isActive) return 'bg-danger/10 border border-danger';
@@ -44,20 +44,21 @@ export function StoreCardList({ stores, onEdit, onApprove, onDisapprove }: Store
           <div className="space-y-2">
             <p className="text-sm text-text-muted">{store.address}</p>
             {store.description && <p className="text-sm text-text-muted">{store.description}</p>}
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button variant="outline" onClick={() => onEdit(store.id)}>
-                <EditIcon className="h-4 w-4" />
-                {intl.formatMessage({ id: 'STORES.EDIT' })}
-              </Button>
-              {store.approved ? (
-                <Button variant="danger" onClick={() => onDisapprove(store.id)}>
-                  {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
-                </Button>
-              ) : (
-                <Button variant="primary" onClick={() => onApprove(store.id)}>
-                  {intl.formatMessage({ id: 'STORES.APPROVE' })}
-                </Button>
-              )}
+            <div className="flex justify-end pt-2">
+              <ActionMenu testId={`store-actions-toggle-${store.id}`} widthClass="w-40">
+                <ActionMenuItem intent="edit" onClick={() => onEdit(store.id)}>
+                  {intl.formatMessage({ id: 'STORES.EDIT' })}
+                </ActionMenuItem>
+                {store.approved ? (
+                  <ActionMenuItem intent="disapprove" onClick={() => onDisapprove(store.id)}>
+                    {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
+                  </ActionMenuItem>
+                ) : (
+                  <ActionMenuItem intent="approve" onClick={() => onApprove(store.id)}>
+                    {intl.formatMessage({ id: 'STORES.APPROVE' })}
+                  </ActionMenuItem>
+                )}
+              </ActionMenu>
             </div>
           </div>
         </Card>

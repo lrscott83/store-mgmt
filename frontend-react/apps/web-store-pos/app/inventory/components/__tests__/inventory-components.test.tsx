@@ -397,16 +397,17 @@ describe('EntryList — smoke render', () => {
 // `@Input() readOnly: boolean = true` — gates the edit/delete menu) ─────────
 
 describe('EntryList — readOnly prop (Angular parity)', () => {
-  it('shows edit/delete actions when isOwnerAdmin and readOnly is not passed', () => {
+  it('shows edit/delete actions (via the gear menu) when isOwnerAdmin and readOnly is not passed', () => {
     render(
       <Wrapper>
         <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} isOwnerAdmin />
       </Wrapper>,
     );
-    expect(screen.getAllByText('Editar').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+    expect(screen.getByText('Editar')).toBeInTheDocument();
     // CRITICAL bug fix (Angular parity: entry-list.component.html:36 GENERAL.DELETE) — was
     // wrongly wired to ORDERS.DEACTIVATE ("Anular pedido"), the cancel-order label.
-    expect(screen.getAllByText('Eliminar').length).toBeGreaterThan(0);
+    expect(screen.getByText('Eliminar')).toBeInTheDocument();
     expect(screen.queryByText('Anular pedido')).not.toBeInTheDocument();
   });
 
@@ -416,10 +417,60 @@ describe('EntryList — readOnly prop (Angular parity)', () => {
         <EntryList entries={MOCK_ENTRIES} isOwnerAdmin readOnly />
       </Wrapper>,
     );
+    expect(screen.queryByTestId('entry-actions-toggle-e1')).not.toBeInTheDocument();
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
     expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
     // Data still renders — only the actions column is gated.
     expect(screen.getAllByText('Coca Cola').length).toBeGreaterThan(0);
+  });
+});
+
+describe('EntryList — gear action menu (S-GM-ENTRY)', () => {
+  it('S-GM-ENTRY-1: owner-admin, not read-only sees the gear with Editar (text-primary) and Eliminar (text-danger, separator)', () => {
+    render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} isOwnerAdmin readOnly={false} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+    const editItem = screen.getByRole('menuitem', { name: 'Editar' });
+    const deleteItem = screen.getByRole('menuitem', { name: 'Eliminar' });
+    expect(editItem).toHaveClass('text-primary');
+    expect(deleteItem).toHaveClass('text-danger');
+    expect(deleteItem.previousElementSibling).toHaveAttribute('role', 'separator');
+  });
+
+  it('S-GM-ENTRY-2: read-only or non-owner-admin hides the actions gear', () => {
+    const { rerender } = render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} isOwnerAdmin={false} readOnly={false} />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('entry-actions-toggle-e1')).not.toBeInTheDocument();
+
+    rerender(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} isOwnerAdmin readOnly />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('entry-actions-toggle-e1')).not.toBeInTheDocument();
+  });
+
+  it('S-GM-ENTRY-3: Editar and Eliminar invoke the existing onEdit/onDeactivate handlers with the entry', () => {
+    const onEdit = vi.fn();
+    const onDeactivate = vi.fn();
+    render(
+      <Wrapper>
+        <EntryList entries={MOCK_ENTRIES} onEdit={onEdit} onDeactivate={onDeactivate} isOwnerAdmin readOnly={false} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar' }));
+    expect(onEdit).toHaveBeenCalledWith(MOCK_ENTRIES[0]);
+
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Eliminar' }));
+    expect(onDeactivate).toHaveBeenCalledWith(MOCK_ENTRIES[0]);
   });
 });
 
@@ -460,8 +511,10 @@ describe('EntryList — isOwnerAdmin gating (Angular parity)', () => {
         <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} isOwnerAdmin />
       </Wrapper>,
     );
-    expect(screen.getAllByText('Editar').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Eliminar').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('entry-actions-toggle-e1')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
+    expect(screen.getByText('Editar')).toBeInTheDocument();
+    expect(screen.getByText('Eliminar')).toBeInTheDocument();
   });
 });
 

@@ -187,7 +187,8 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.APPROVE'] }));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.APPROVE'] }));
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
@@ -219,7 +220,8 @@ describe('AdminStoreListPage — approve requires confirmation', () => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.APPROVE'] }));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.APPROVE'] }));
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
@@ -277,7 +279,8 @@ describe('AdminStoreListPage — disapprove requires confirmation', () => {
       expect(screen.getByText('Store Beta')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] }));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s2'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] }));
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
@@ -309,7 +312,8 @@ describe('AdminStoreListPage — disapprove requires confirmation', () => {
       expect(screen.getByText('Store Beta')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: esMessages['STORES.DISAPPROVE'] }));
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s2'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] }));
 
     await waitFor(() => {
       expect(mockConfirmDialog).toHaveBeenCalledTimes(1);

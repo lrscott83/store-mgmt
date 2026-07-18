@@ -3,7 +3,8 @@ import type { Expense } from '@store-mgmt/domain';
 import { ExpenseType, PaymentType } from '@store-mgmt/domain';
 import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { PaymentMethodIcon, TrashIcon } from '~/shared/components/ui/icons';
+import { PaymentMethodIcon } from '~/shared/components/ui/icons';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 
 const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
@@ -74,22 +75,17 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
           </div>
 
           {!readOnly && (
-            <div className="ml-4 flex shrink-0 gap-2">
-              <button
-                onClick={() => onEdit?.(expense)}
-                className="rounded bg-primary-light px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
-              >
-                {intl.formatMessage({ id: 'EXPENSES.EDIT' })}
-              </button>
-              {onDelete && (
-                <button
-                  onClick={() => onDelete(expense)}
-                  className="flex items-center gap-1 rounded bg-danger/10 px-2 py-1 text-xs font-medium text-danger hover:bg-danger/20"
-                >
-                  <TrashIcon className="h-3.5 w-3.5" />
-                  {intl.formatMessage({ id: 'EXPENSES.DELETE' })}
-                </button>
-              )}
+            <div className="ml-4 flex shrink-0">
+              <ActionMenu testId={`expense-actions-toggle-${expense.id}`}>
+                <ActionMenuItem intent="edit" onClick={() => onEdit?.(expense)}>
+                  {intl.formatMessage({ id: 'EXPENSES.EDIT' })}
+                </ActionMenuItem>
+                {onDelete && (
+                  <ActionMenuItem intent="delete" separatorBefore onClick={() => onDelete(expense)}>
+                    {intl.formatMessage({ id: 'EXPENSES.DELETE' })}
+                  </ActionMenuItem>
+                )}
+              </ActionMenu>
             </div>
           )}
         </div>
