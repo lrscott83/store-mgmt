@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
+import { Button } from '~/shared/components/ui/button';
 
 interface EditProductsModalProps {
   products: Product[];
@@ -72,23 +73,14 @@ export function EditProductsModal({ products, onSave, onClose }: EditProductsMod
         </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-          >
+          <Button variant="fab" type="button" onClick={onClose}>
             <CloseIcon />
             {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
-            data-testid="bulk-save-button"
-          >
+          </Button>
+          <Button variant="fab" type="button" onClick={handleSave} data-testid="bulk-save-button">
             <SaveIcon />
             {intl.formatMessage({ id: 'GENERAL.SAVE' })}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

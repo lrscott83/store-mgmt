@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { ProductCategory } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
+import { Button } from '~/shared/components/ui/button';
 
 interface CreateProductForm {
   name: string;
@@ -177,22 +178,14 @@ export function CreateProductModal({ categories, onSave, onClose }: CreateProduc
 
           {/* Buttons */}
           <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
+            <Button variant="fab" type="button" onClick={onClose}>
               <CloseIcon />
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
-            </button>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
-              data-testid="create-product-submit"
-            >
+            </Button>
+            <Button variant="fab" type="submit" data-testid="create-product-submit">
               <SaveIcon />
               {intl.formatMessage({ id: 'GENERAL.SAVE' })}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

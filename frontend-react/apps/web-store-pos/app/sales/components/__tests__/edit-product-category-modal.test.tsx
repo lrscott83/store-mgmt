@@ -116,4 +116,14 @@ describe('EditProductCategoryModal — footer icons/labels parity', () => {
     expect(saveButton).toHaveTextContent('Actualizar');
     expect(saveButton.querySelector('svg')).toBeTruthy();
   });
+
+  it('footer buttons use the purple fab pill style (Angular mat-fab parity)', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Cerrar' }).className).toContain('rounded-full');
+    expect(screen.getByTestId('category-save-button').className).toContain('rounded-full');
+  });
 });

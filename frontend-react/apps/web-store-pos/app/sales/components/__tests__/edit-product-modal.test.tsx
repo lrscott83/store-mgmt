@@ -130,4 +130,22 @@ describe('EditProductModal — footer icons/labels parity', () => {
     const confirmButton = screen.getByTestId('confirm-delete-button');
     expect(confirmButton).toBeInTheDocument();
   });
+
+  it('main footer buttons use the purple fab pill style (Angular mat-fab parity)', () => {
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct()}
+          categories={[makeCategory()]}
+          onSave={vi.fn()}
+          onDelete={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const saveButton = screen.getByTestId('edit-product-submit');
+    const closeButton = saveButton.parentElement?.querySelector('button:first-child') as HTMLElement;
+    expect(saveButton.className).toContain('rounded-full');
+    expect(closeButton.className).toContain('rounded-full');
+  });
 });
