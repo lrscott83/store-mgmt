@@ -95,13 +95,13 @@ export function SalePage() {
 
   return (
     <Card title={intl.formatMessage({ id: 'SALES.HEADER' })}>
-      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1">
+      <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto pb-1">
         {categories.map((category) => (
           <button
             key={category.id}
             type="button"
             onClick={() => selectCategory(category)}
-            className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            className={`whitespace-nowrap rounded-md px-1 py-2 text-sm font-medium transition-colors ${
               category.id === selectedCategoryId
                 ? 'bg-primary text-white'
                 : 'bg-primary-light text-primary hover:bg-primary/20'
