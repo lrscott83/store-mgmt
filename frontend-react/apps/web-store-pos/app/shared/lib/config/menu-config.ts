@@ -33,7 +33,10 @@ export const MENU_GROUPS: MenuGroup[] = [
       { label: 'MENU.PRODUCTS', path: '/sales/products', featureIds: [EFeatures.Products], moduleId: EModules.Sales },
       { label: 'MENU.SALE', path: '/sales/new', featureIds: [EFeatures.Sale], moduleId: EModules.Sales },
       { label: 'MENU.TODAY_ORDERS', path: '/sales/today-orders', featureIds: [EFeatures.TodayOrders], moduleId: EModules.Sales },
+      { label: 'MENU.TODAY_CREDITS', path: '/sales/today-credits', featureIds: [EFeatures.CreditSale], moduleId: EModules.Sales },
       { label: 'MENU.TODAY_STATS', path: '/sales/today-stats', featureIds: [EFeatures.TodayStats], moduleId: EModules.Sales },
+      { label: 'MENU.CREDITS_HISTORY', path: '/sales/credits', featureIds: [EFeatures.CreditSale], moduleId: EModules.Sales },
+      { label: 'MENU.ORDERS_HISTORY', path: '/sales/orders', featureIds: [EFeatures.SalesHistory], moduleId: EModules.Sales },
     ],
   },
   {
@@ -45,6 +48,7 @@ export const MENU_GROUPS: MenuGroup[] = [
       { label: 'MENU.TODAY_QUANTITIES', path: '/inventory/today-quantities', featureIds: [EFeatures.InventoryTodayQuantities], moduleId: EModules.Inventory },
       { label: 'MENU.TODAY_SALES_PROFIT', path: '/inventory/today-sales-profit', featureIds: [EFeatures.InventoryTodaySaleProfit], moduleId: EModules.Inventory },
       { label: 'MENU.EGRESS', path: '/inventory/egress', featureIds: [EFeatures.Egress], moduleId: EModules.Inventory },
+      { label: 'MENU.ENTRIES_HISTORY', path: '/inventory/entries', featureIds: [EFeatures.EntriesHistory], moduleId: EModules.Inventory },
     ],
   },
   {
@@ -84,13 +88,6 @@ export const MENU_GROUPS: MenuGroup[] = [
       { label: 'MENU.STORES', path: '/management/stores', featureIds: [EFeatures.Stores], moduleId: EModules.Management },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management },
       { label: 'MENU.CONFIGURATIONS', path: '/management/configurations', featureIds: [EFeatures.Configurations], moduleId: EModules.Management },
-    ],
-  },
-  {
-    groupLabel: 'MENU.PROFILE',
-    items: [
-      { label: 'MENU.EDIT_PROFILE', path: '/profile/edit', featureIds: [EFeatures.Profile] },
-      { label: 'MENU.CHANGE_PASSWORD', path: '/profile/change-password', featureIds: [EFeatures.Profile] },
     ],
   },
 ];

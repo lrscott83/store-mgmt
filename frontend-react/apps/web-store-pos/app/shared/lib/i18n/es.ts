@@ -116,7 +116,6 @@ const messages: Record<string, string> = {
   'MENU.REPORTS': 'REPORTES',
   'MENU.STATISTICS': 'ESTADÍSTICAS',
   'MENU.MANAGEMENT': 'GESTIÓN',
-  'MENU.PROFILE': 'Perfil',
 
   // Menu items — Admin (Angular MENU.ADMIN.*)
   'MENU.ADMIN_DASHBOARD': 'Dashboard',

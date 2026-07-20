@@ -257,6 +257,121 @@ describe('Sidebar — view-text-parity: aria-labels in Spanish (React-only, no A
   });
 });
 
+describe('Sidebar — sidebar-menu-parity: SALES group item set and order', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('SuperAdmin sees SALES group items in exact order: Products, Vender, Ventas del día, Créditos del día, Cuadre del día, Créditos, Ventas', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const links = screen.getAllByRole('link');
+    const linkTexts = links.map((l) => l.textContent ?? '');
+    const salesOrder = [
+      'Catálogo Productos',
+      'Vender',
+      'Ventas del día',
+      'Créditos del día',
+      'Cuadre del día',
+      'Créditos',
+      'Ventas',
+    ];
+    const indices = salesOrder.map((text) => linkTexts.indexOf(text));
+    expect(indices.every((i) => i !== -1)).toBe(true);
+    for (let i = 1; i < indices.length; i++) {
+      expect(indices[i]).toBeGreaterThan(indices[i - 1]);
+    }
+  });
+
+  it('StoreUser with CreditSale sees "Créditos del día" and "Créditos"', () => {
+    const user = makeStoreUser([EFeatures.CreditSale], 's1');
+    renderSidebar(user);
+
+    expect(screen.getByText('Créditos del día')).toBeInTheDocument();
+    expect(screen.getByText('Créditos')).toBeInTheDocument();
+  });
+
+  it('StoreUser without CreditSale does NOT see "Créditos del día" or "Créditos"', () => {
+    const user = makeStoreUser([EFeatures.Products], 's1');
+    renderSidebar(user);
+
+    expect(screen.queryByText('Créditos del día')).not.toBeInTheDocument();
+    expect(screen.queryByText('Créditos')).not.toBeInTheDocument();
+  });
+
+  it('StoreUser with SalesHistory sees "Ventas"', () => {
+    const user = makeStoreUser([EFeatures.SalesHistory], 's1');
+    renderSidebar(user);
+
+    expect(screen.getByText('Ventas')).toBeInTheDocument();
+  });
+
+  it('StoreUser without SalesHistory does NOT see "Ventas"', () => {
+    const user = makeStoreUser([EFeatures.Products], 's1');
+    renderSidebar(user);
+
+    expect(screen.queryByText('Ventas')).not.toBeInTheDocument();
+  });
+});
+
+describe('Sidebar — sidebar-menu-parity: INVENTORY group item set and order', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('SuperAdmin sees INVENTORY group with "Entradas" (history) after "Salida", full 6-item order intact', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const links = screen.getAllByRole('link');
+    const linkTexts = links.map((l) => l.textContent ?? '');
+    const inventoryOrder = [
+      'Disponible',
+      'Entradas del día',
+      'Cantidades del día',
+      'Ganancias del día',
+      'Salida',
+      'Entradas',
+    ];
+    const indices = inventoryOrder.map((text) => linkTexts.indexOf(text));
+    expect(indices.every((i) => i !== -1)).toBe(true);
+    for (let i = 1; i < indices.length; i++) {
+      expect(indices[i]).toBeGreaterThan(indices[i - 1]);
+    }
+  });
+
+  it('StoreUser without EntriesHistory does not see "Entradas" (history) item; other 5 INVENTORY items unaffected', () => {
+    const user = makeStoreUser(
+      [EFeatures.Available, EFeatures.Entries, EFeatures.InventoryTodayQuantities, EFeatures.InventoryTodaySaleProfit, EFeatures.Egress],
+      's1'
+    );
+    renderSidebar(user);
+
+    expect(screen.getByText('Disponible')).toBeInTheDocument();
+    expect(screen.getByText('Entradas del día')).toBeInTheDocument();
+    expect(screen.getByText('Cantidades del día')).toBeInTheDocument();
+    expect(screen.getByText('Ganancias del día')).toBeInTheDocument();
+    expect(screen.getByText('Salida')).toBeInTheDocument();
+    expect(screen.queryByText('Entradas')).not.toBeInTheDocument();
+  });
+});
+
+describe('Sidebar — sidebar-menu-parity: no Profile group', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not render the Profile group or its items for SuperAdmin', () => {
+    renderSidebar(makeSuperAdmin());
+
+    expect(screen.queryByText('Editar Perfil')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cambiar Contraseña')).not.toBeInTheDocument();
+    const links = screen.getAllByRole('link');
+    const hrefs = links.map((l) => l.getAttribute('href'));
+    expect(hrefs).not.toContain('/profile/edit');
+    expect(hrefs).not.toContain('/profile/change-password');
+  });
+});
+
 describe('Sidebar — SHELL-06: brand logo at the top of the sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
