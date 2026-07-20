@@ -52,7 +52,7 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
               {owner.email && <p className="text-sm text-text-muted">{owner.email}</p>}
               {owner.description && <p className="text-sm text-text-muted">{owner.description}</p>}
               <div className="flex justify-end pt-2">
-                <ActionMenu widthClass="w-40">
+                <ActionMenu widthClass="min-w-40">
                   <ActionMenuItem intent="edit" onClick={() => onEdit(owner.id)}>
                     {intl.formatMessage({ id: 'OWNER.EDIT_OWNER' })}
                   </ActionMenuItem>

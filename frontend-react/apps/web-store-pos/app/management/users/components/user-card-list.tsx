@@ -50,7 +50,7 @@ export function UserCardList({ users, onCreate, onEdit, onActivate, onDeactivate
                 <p className="text-sm text-text-muted">{user.cellPhone}</p>
                 {user.email && <p className="text-sm text-text-muted">{user.email}</p>}
                 <div className="flex justify-end pt-2">
-                  <ActionMenu widthClass="w-40">
+                  <ActionMenu widthClass="min-w-40">
                     <ActionMenuItem intent="edit" onClick={() => onEdit(user.id)}>
                       {intl.formatMessage({ id: 'USERS.EDIT' })}
                     </ActionMenuItem>

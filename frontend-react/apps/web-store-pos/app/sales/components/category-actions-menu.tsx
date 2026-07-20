@@ -31,7 +31,7 @@ export function CategoryActionsMenu({
     <ActionMenu
       testId={`category-actions-toggle-${category.id}`}
       label="Opciones de categoría"
-      widthClass="w-52"
+      widthClass="min-w-52"
     >
       <ActionMenuItem intent="edit" onClick={onEditCategory} data-testid="edit-category-button">
         {intl.formatMessage({ id: 'PRODUCT_CATEGORY.EDIT_CATEGORY' })}

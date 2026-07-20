@@ -45,7 +45,7 @@ export function StoreCardList({ stores, onEdit, onApprove, onDisapprove }: Store
             <p className="text-sm text-text-muted">{store.address}</p>
             {store.description && <p className="text-sm text-text-muted">{store.description}</p>}
             <div className="flex justify-end pt-2">
-              <ActionMenu testId={`store-actions-toggle-${store.id}`} widthClass="w-40">
+              <ActionMenu testId={`store-actions-toggle-${store.id}`} widthClass="min-w-40">
                 <ActionMenuItem intent="edit" onClick={() => onEdit(store.id)}>
                   {intl.formatMessage({ id: 'STORES.EDIT' })}
                 </ActionMenuItem>

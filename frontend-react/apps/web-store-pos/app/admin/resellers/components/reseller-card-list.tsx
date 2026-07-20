@@ -59,7 +59,7 @@ export function ResellerCardList({ resellers, onCreate, onEdit }: ResellerCardLi
                 <p className="text-sm text-text-muted">{reseller.description}</p>
               )}
               <div className="flex justify-end pt-2">
-                <ActionMenu widthClass="w-40">
+                <ActionMenu widthClass="min-w-40">
                   <ActionMenuItem intent="edit" onClick={() => onEdit(reseller.id)}>
                     {intl.formatMessage({ id: 'GENERAL.EDIT' })}
                   </ActionMenuItem>

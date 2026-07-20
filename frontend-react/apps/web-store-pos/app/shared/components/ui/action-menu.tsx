@@ -44,7 +44,8 @@ interface ActionMenuProps {
   label?: string;
   /** data-testid forwarded to the trigger button. */
   testId?: string;
-  /** Tailwind width utility for the dropdown. Default 'w-44'. */
+  /** Tailwind MIN-width utility for the dropdown. The menu hugs its content
+   * (`w-max`) and never wraps item labels; this sets the floor. Default 'min-w-44'. */
   widthClass?: string;
   /** ActionMenuItem children. */
   children: ReactNode;
@@ -55,7 +56,7 @@ interface ActionMenuProps {
  * dropdown container, `useClickOutside` close behavior, and (via `ActionMenuItem`) the
  * `intent -> color` map. See openspec/changes/gear-menu-action-styling/design.md.
  */
-export function ActionMenu({ label = 'Acciones', testId, widthClass = 'w-44', children }: ActionMenuProps) {
+export function ActionMenu({ label = 'Acciones', testId, widthClass = 'min-w-44', children }: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +77,7 @@ export function ActionMenu({ label = 'Acciones', testId, widthClass = 'w-44', ch
       {isOpen && (
         <div
           role="menu"
-          className={`absolute right-0 top-full z-10 mt-1 ${widthClass} rounded-xl border border-border bg-surface shadow-lg py-1`}
+          className={`absolute right-0 top-full z-10 mt-1 w-max ${widthClass} rounded-xl border border-border bg-surface shadow-lg py-1`}
         >
           <ActionMenuContext.Provider value={{ close: () => setIsOpen(false) }}>
             {children}
@@ -123,7 +124,7 @@ export function ActionMenuItem({
           ctx?.close();
           onClick();
         }}
-        className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm ${s.fg} ${s.hover} transition-colors`}
+        className={`flex w-full items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm ${s.fg} ${s.hover} transition-colors`}
       >
         {resolvedIcon}
         {children}
