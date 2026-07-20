@@ -150,6 +150,63 @@ describe('EditProductModal — Angular field set/order parity', () => {
   });
 });
 
+describe('EditProductModal — price min(0) and order pattern parity (Angular formGroup validators)', () => {
+  it('blocks submit and shows NUMBER_GREADER_THAN_ZERO when price is negative', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('edit-product-price-input'), { target: { value: '-5' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText('Precio mínimo valor es 0')).toBeInTheDocument();
+  });
+
+  it('blocks submit with no message when order is a decimal (fails pattern /^[0-9]\\d*$/)', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('edit-product-order-input'), { target: { value: '3.5' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByText('Orden es requerido')).not.toBeInTheDocument();
+  });
+
+  it('blocks submit with no message when order is negative', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('edit-product-order-input'), { target: { value: '-1' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByText('Orden es requerido')).not.toBeInTheDocument();
+  });
+
+  it('submits normally when order is a valid non-negative integer', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('edit-product-order-input'), { target: { value: '9' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ order: 9 }));
+  });
+});
+
 describe('EditProductModal — footer icons/labels parity', () => {
   it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
     render(

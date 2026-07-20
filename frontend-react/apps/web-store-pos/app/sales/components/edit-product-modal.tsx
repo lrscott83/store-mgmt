@@ -40,15 +40,28 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
         { id: 'GENERAL.VALIDATION.REQUIRED' },
         { name: intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' }) },
       );
+    } else if (parseFloat(form.price) < 0) {
+      // Angular parity: Validators.min(0) on price (edit-product-modal.component.ts:147)
+      newErrors.price = intl.formatMessage(
+        { id: 'GENERAL.VALIDATION.NUMBER_GREADER_THAN_ZERO' },
+        { name: intl.formatMessage({ id: 'GENERAL.PRICE' }) },
+      );
     }
+    // Angular parity: Validators.pattern(RegExExtensions.numeric = /^[0-9]\d*$/) on order
+    // (edit-product-modal.component.ts:148-150). Angular has NO mat-error for the pattern
+    // failure (html:61-64 only renders the required error) — a pattern mismatch must block
+    // submit silently, with no visible message.
+    let orderPatternValid = true;
     if (!form.order.trim() || isNaN(parseFloat(form.order))) {
       newErrors.order = intl.formatMessage(
         { id: 'GENERAL.VALIDATION.REQUIRED' },
         { name: intl.formatMessage({ id: 'GENERAL.ORDER' }) },
       );
+    } else if (!/^[0-9]\d*$/.test(form.order.trim())) {
+      orderPatternValid = false;
     }
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 && orderPatternValid;
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -72,7 +85,7 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
         <h2 className="text-base font-semibold text-gray-900 mb-4">
           {intl.formatMessage({ id: 'PRODUCT.EDIT_PRODUCT' })}
         </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               {intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' })}
@@ -102,6 +115,7 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
                 className="w-full rounded-md border border-gray-300 pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
