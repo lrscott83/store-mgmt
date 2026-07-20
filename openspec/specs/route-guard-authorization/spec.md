@@ -1,4 +1,4 @@
-# route-guard-authorization Capability Specification
+# Route Guard Authorization Specification
 
 ## Purpose
 
@@ -96,6 +96,6 @@ auth-gated as before.
 
 - storeId-param sourcing (ADR-2) — ratified deferred, untouched.
 - Offline/no-cache `authLoader` asymmetry — ratified deferred, untouched.
-- Stale-closure `selectedStoreId` bug in profile loaders — real React bug, not parity; out of scope.
+- Stale-closure `selectedStoreId` bug in profile loaders — real React bug, not
+  parity; out of scope.
 - Dead Angular `_services/auth/auth.guard.ts` — never imported; ignored.
-</content>

@@ -92,5 +92,3 @@ schema changes; pure client routing logic.
 - [ ] REGRESSION: `adminFeatureLoader`, `resellerFeatureLoader`,
       `superAdminLoader` untouched and still deny owner-admin without featureId.
 - [ ] `pnpm test`, `tsc --noEmit`, and build all pass.
-</content>
-</invoke>
