@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { FileInput } from '~/shared/components/ui/file-input';
 import type { ParsedProductRow, CsvRowError } from '../lib/csv-product-parser';
 import { parseCsvProducts } from '../lib/csv-product-parser';
 
@@ -19,14 +20,12 @@ interface CsvProductImporterModalProps {
 
 export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporterModalProps) {
   const intl = useIntl();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [products, setProducts] = useState<ParsedProductRow[]>([]);
   const [errors, setErrors] = useState<CsvRowError[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [hasFile, setHasFile] = useState(false);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function handleFileChange(file: File | null) {
     if (!file) return;
 
     const reader = new FileReader();
@@ -68,12 +67,9 @@ export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporte
 
         {/* File input */}
         <div className="mb-4">
-          <input
-            ref={fileInputRef}
-            type="file"
+          <FileInput
             accept=".csv,text/csv"
-            onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-3 file:rounded-md file:border file:border-gray-300 file:bg-gray-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-gray-600 hover:file:bg-gray-100"
+            onFileChange={handleFileChange}
             data-testid="csv-file-input"
           />
         </div>

@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { FileInput } from '~/shared/components/ui/file-input';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 
@@ -21,7 +22,6 @@ export interface ImportFormProps {
 
 export function ImportForm({ onImport }: ImportFormProps) {
   const intl = useIntl();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,8 +29,8 @@ export function ImportForm({ onImport }: ImportFormProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setSelectedFile(e.target.files?.[0] ?? null);
+  function handleFileChange(file: File | null) {
+    setSelectedFile(file);
     setError('');
     setSuccess(false);
   }
@@ -79,15 +79,14 @@ export function ImportForm({ onImport }: ImportFormProps) {
           <label htmlFor="import-file" className="block text-sm font-medium text-text">
             {intl.formatMessage({ id: 'SYNC.FILE_LABEL' })}
           </label>
-          <input
-            id="import-file"
-            ref={fileInputRef}
-            type="file"
-            accept=".zip"
-            onChange={handleFileChange}
-            disabled={busy}
-            className="mt-1 block w-full text-sm text-text disabled:opacity-60"
-          />
+          <div className="mt-1">
+            <FileInput
+              id="import-file"
+              accept=".zip"
+              onFileChange={handleFileChange}
+              disabled={busy}
+            />
+          </div>
         </div>
 
         <div>

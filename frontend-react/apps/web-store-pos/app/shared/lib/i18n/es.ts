@@ -8,6 +8,8 @@ const messages: Record<string, string> = {
   'GENERAL.DISCARD': 'Descartar',
   'GENERAL.CONFIRM': 'Confirmar',
   'GENERAL.CLOSE': 'Cerrar',
+  'GENERAL.SELECT_FILE': 'Seleccionar archivo',
+  'GENERAL.NO_FILE_SELECTED': 'Ningún archivo seleccionado',
   'GENERAL.CREDIT': 'Crédito',
   'GENERAL.SEARCH': 'Buscar',
   'GENERAL.TOTAL': 'Total',
