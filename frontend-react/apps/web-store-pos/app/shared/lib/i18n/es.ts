@@ -219,7 +219,7 @@ const messages: Record<string, string> = {
   'PRODUCTS.FORM.CATEGORY': 'Categoría',
   'PRODUCTS.FORM.BARCODE': 'Código de barras',
   'PRODUCTS.FORM.AVAILABLE_TO_SALE': 'Disponible para Vender',
-  'PRODUCTS.FORM.DISCOUNT_FROM_INVENTORY': 'Descontar del inventario',
+  'PRODUCTS.FORM.DISCOUNT_FROM_INVENTORY': 'Descuenta del Inventario',
   'PRODUCTS.EMPTY_STATE': 'No hay productos registrados',
   'PRODUCTS.CSV.TITLE': 'Importar productos desde CSV',
   'PRODUCTS.CSV.PREVIEW': 'Vista previa',

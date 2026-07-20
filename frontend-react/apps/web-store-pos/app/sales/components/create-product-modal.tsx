@@ -7,34 +7,41 @@ import { Button } from '~/shared/components/ui/button';
 interface CreateProductForm {
   name: string;
   price: string;
-  barcode: string;
-  categoryId: string;
+  order: string;
+  isActive: boolean;
   availableToSale: boolean;
   discountFromInvantory: boolean;
 }
 
 interface CreateProductModalProps {
-  categories: ProductCategory[];
+  category: ProductCategory;
+  defaultOrder: number;
   onSave: (data: {
     name: string;
     price: number;
     barcode?: string;
     categoryId: string;
+    order: number;
+    isActive: boolean;
     availableToSale: boolean;
     discountFromInvantory: boolean;
   }) => void;
   onClose: () => void;
 }
 
-export function CreateProductModal({ categories, onSave, onClose }: CreateProductModalProps) {
+// Angular parity source: edit-product-modal.component.html — the ONE real modal, reused for
+// both create+edit. Field order: Nombre, Precio ($ prefix), Orden, Activo, Disponible para
+// Vender, Descuenta del Inventario. Barcode + category dropdown stay commented out in Angular
+// (never rendered) — category is pinned to the click-context `category` prop instead.
+export function CreateProductModal({ category, defaultOrder, onSave, onClose }: CreateProductModalProps) {
   const intl = useIntl();
   const [form, setForm] = useState<CreateProductForm>({
     name: '',
     price: '',
-    barcode: '',
-    categoryId: categories[0]?.id ?? '',
+    order: defaultOrder.toString(),
+    isActive: true,
     availableToSale: true,
-    discountFromInvantory: false,
+    discountFromInvantory: true,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateProductForm, string>>>({});
 
@@ -52,10 +59,10 @@ export function CreateProductModal({ categories, onSave, onClose }: CreateProduc
         { name: intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' }) },
       );
     }
-    if (!form.categoryId) {
-      newErrors.categoryId = intl.formatMessage(
+    if (!form.order.trim() || isNaN(parseFloat(form.order))) {
+      newErrors.order = intl.formatMessage(
         { id: 'GENERAL.VALIDATION.REQUIRED' },
-        { name: intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' }) },
+        { name: intl.formatMessage({ id: 'GENERAL.ORDER' }) },
       );
     }
     setErrors(newErrors);
@@ -68,8 +75,10 @@ export function CreateProductModal({ categories, onSave, onClose }: CreateProduc
     onSave({
       name: form.name.trim(),
       price: parseFloat(form.price),
-      barcode: form.barcode.trim() || undefined,
-      categoryId: form.categoryId,
+      barcode: undefined,
+      categoryId: category.id,
+      order: parseInt(form.order, 10),
+      isActive: form.isActive,
       availableToSale: form.availableToSale,
       discountFromInvantory: form.discountFromInvantory,
     });
@@ -79,7 +88,7 @@ export function CreateProductModal({ categories, onSave, onClose }: CreateProduc
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-md rounded-xl bg-white shadow-lg p-6">
         <h2 className="text-base font-semibold text-gray-900 mb-4">
-          {intl.formatMessage({ id: 'PRODUCTS.CREATE' })}
+          {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCT' })}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
@@ -98,56 +107,58 @@ export function CreateProductModal({ categories, onSave, onClose }: CreateProduc
             {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
           </div>
 
-          {/* Price */}
+          {/* Price ($ prefix) */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               {intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' })}
             </label>
-            <input
-              type="number"
-              step="0.01"
-              value={form.price}
-              onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
-              data-testid="product-price-input"
-            />
+            <div className="relative">
+              <span
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                data-testid="product-price-prefix"
+              >
+                $
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                value={form.price}
+                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                className="w-full rounded-md border border-gray-300 pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                data-testid="product-price-input"
+              />
+            </div>
             {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
           </div>
 
-          {/* Barcode */}
+          {/* Order */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              {intl.formatMessage({ id: 'PRODUCTS.FORM.BARCODE' })}
+              {intl.formatMessage({ id: 'GENERAL.ORDER' })}
             </label>
             <input
-              type="text"
-              value={form.barcode}
-              onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value }))}
+              type="number"
+              value={form.order}
+              onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
-              data-testid="product-barcode-input"
+              data-testid="product-order-input"
             />
+            {errors.order && <p className="mt-1 text-xs text-red-500">{errors.order}</p>}
           </div>
 
-          {/* Category */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              {intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' })}
-            </label>
-            <select
-              value={form.categoryId}
-              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
-              data-testid="product-category-select"
-            >
-              <option value="">-- {intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' })} --</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {errors.categoryId && <p className="mt-1 text-xs text-red-500">{errors.categoryId}</p>}
-          </div>
+          {/* Active */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+              className="h-4 w-4 rounded border-gray-300 text-cyan-600"
+              data-testid="product-active-checkbox"
+            />
+            <span className="text-xs font-medium text-gray-600">
+              {intl.formatMessage({ id: 'GENERAL.ACTIVE' })}
+            </span>
+          </label>
 
           {/* Available to sale */}
           <label className="flex items-center gap-2 cursor-pointer">
