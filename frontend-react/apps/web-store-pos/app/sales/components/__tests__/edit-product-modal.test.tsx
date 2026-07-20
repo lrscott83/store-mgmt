@@ -2,22 +2,19 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Product, ProductCategory } from '@store-mgmt/domain';
+import type { Product } from '@store-mgmt/domain';
 import { EditProductModal } from '../edit-product-modal';
 
-// Text parity with Angular's edit-product-modal.component.html:24-31,42-49 — the "name"/
-// "price" required-field errors use GENERAL.VALIDATION.REQUIRED with GENERAL.NAME/
-// GENERAL.PRICE, resolving to "Nombre es requerido" / "Precio es requerido".
+// Angular parity source: edit-product-modal.component.html — same field set/order as create:
+// Nombre, Precio ($ prefix), Orden, Activo, Disponible para Vender, Descuenta del Inventario.
+// NO barcode input, NO category dropdown, NO in-modal delete (delete lives at list-row level).
+// categoryId stays pinned to product.categoryId — never user-editable.
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
       {children}
     </IntlProvider>
   );
-}
-
-function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory {
-  return { id: 'cat-1', name: 'Bebidas', order: 1, isActive: true, ...overrides };
 }
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
@@ -42,13 +39,7 @@ describe('EditProductModal — name field autofocus', () => {
   it('focuses the name input on mount', () => {
     render(
       <Wrapper>
-        <EditProductModal
-          product={makeProduct()}
-          categories={[makeCategory()]}
-          onSave={vi.fn()}
-          onDelete={vi.fn()}
-          onClose={vi.fn()}
-        />
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     expect(screen.getByTestId('edit-product-name-input')).toHaveFocus();
@@ -59,13 +50,7 @@ describe('EditProductModal — validation text parity (GENERAL.VALIDATION.REQUIR
   it('shows "Nombre es requerido" when name is cleared', () => {
     render(
       <Wrapper>
-        <EditProductModal
-          product={makeProduct()}
-          categories={[makeCategory()]}
-          onSave={vi.fn()}
-          onDelete={vi.fn()}
-          onClose={vi.fn()}
-        />
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: '' } });
@@ -76,18 +61,92 @@ describe('EditProductModal — validation text parity (GENERAL.VALIDATION.REQUIR
   it('shows "Precio es requerido" when price is cleared', () => {
     render(
       <Wrapper>
-        <EditProductModal
-          product={makeProduct()}
-          categories={[makeCategory()]}
-          onSave={vi.fn()}
-          onDelete={vi.fn()}
-          onClose={vi.fn()}
-        />
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('edit-product-price-input'), { target: { value: '' } });
     fireEvent.click(screen.getByTestId('edit-product-submit'));
     expect(screen.getByText('Precio es requerido')).toBeInTheDocument();
+  });
+
+  it('shows "Orden es requerido" when order is cleared', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('edit-product-order-input'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+    expect(screen.getByText('Orden es requerido')).toBeInTheDocument();
+  });
+});
+
+describe('EditProductModal — Angular field set/order parity', () => {
+  it('prefills Orden=product.order and Activo=product.isActive', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct({ order: 7, isActive: false })} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('edit-product-order-input')).toHaveValue(7);
+    expect(screen.getByTestId('edit-product-active-checkbox')).not.toBeChecked();
+  });
+
+  it('renders a "$" prefix on the Precio field', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('edit-product-price-prefix')).toHaveTextContent('$');
+  });
+
+  it('does not render a barcode input', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('edit-product-barcode-input')).not.toBeInTheDocument();
+  });
+
+  it('does not render a category dropdown', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('title resolves PRODUCT.EDIT_PRODUCT ("Editar Producto")', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('heading', { name: 'Editar Producto' })).toBeInTheDocument();
+  });
+
+  it('does not render delete UI (delete-product-button/confirm-delete-button)', () => {
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('delete-product-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('confirm-delete-button')).not.toBeInTheDocument();
+  });
+
+  it('submit keeps categoryId pinned to product.categoryId', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductModal product={makeProduct({ categoryId: 'cat-9' })} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ categoryId: 'cat-9' }));
   });
 });
 
@@ -95,17 +154,9 @@ describe('EditProductModal — footer icons/labels parity', () => {
   it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
     render(
       <Wrapper>
-        <EditProductModal
-          product={makeProduct()}
-          categories={[makeCategory()]}
-          onSave={vi.fn()}
-          onDelete={vi.fn()}
-          onClose={vi.fn()}
-        />
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
-    // The orphan delete-confirm footer block also uses GENERAL.CANCEL; scope to the
-    // main footer "Cerrar" button by data-testid sibling (edit-product-submit).
     const saveButton = screen.getByTestId('edit-product-submit');
     const closeButton = saveButton.parentElement?.querySelector('button:first-child');
     expect(closeButton).toHaveTextContent('Cerrar');
@@ -115,13 +166,7 @@ describe('EditProductModal — footer icons/labels parity', () => {
   it('confirm button reads "Actualizar" (GENERAL.UPDATE) and renders a save icon', () => {
     render(
       <Wrapper>
-        <EditProductModal
-          product={makeProduct()}
-          categories={[makeCategory()]}
-          onSave={vi.fn()}
-          onDelete={vi.fn()}
-          onClose={vi.fn()}
-        />
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     const saveButton = screen.getByTestId('edit-product-submit');
@@ -129,35 +174,10 @@ describe('EditProductModal — footer icons/labels parity', () => {
     expect(saveButton.querySelector('svg')).toBeTruthy();
   });
 
-  it('does not alter the orphan delete-confirm footer block', () => {
-    render(
-      <Wrapper>
-        <EditProductModal
-          product={makeProduct()}
-          categories={[makeCategory()]}
-          onSave={vi.fn()}
-          onDelete={vi.fn()}
-          onClose={vi.fn()}
-        />
-      </Wrapper>,
-    );
-    const deleteButton = screen.getByTestId('delete-product-button');
-    expect(deleteButton).toHaveTextContent('Descartar');
-    fireEvent.click(deleteButton);
-    const confirmButton = screen.getByTestId('confirm-delete-button');
-    expect(confirmButton).toBeInTheDocument();
-  });
-
   it('main footer buttons use the purple fab pill style (Angular mat-fab parity)', () => {
     render(
       <Wrapper>
-        <EditProductModal
-          product={makeProduct()}
-          categories={[makeCategory()]}
-          onSave={vi.fn()}
-          onDelete={vi.fn()}
-          onClose={vi.fn()}
-        />
+        <EditProductModal product={makeProduct()} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     const saveButton = screen.getByTestId('edit-product-submit');
