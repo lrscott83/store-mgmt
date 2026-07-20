@@ -100,8 +100,13 @@ export default [
     // Profile — User profile management
     route('profile/edit', 'profile/routes/edit-profile.tsx'),
     route('profile/change-password', 'profile/routes/change-password.tsx'),
+  ]),
 
-    // Help — Tutorial
+  // Help — Tutorial (PUBLIC — mirrors Angular's app-routing.module.ts:89-97,
+  // which nests help/tutorial inside ClientLayoutComponent with NO canActivate
+  // guard). Same chrome as app-layout, but reached via a layout module that
+  // does NOT re-export authLoader as its clientLoader.
+  layout('shared/components/public-app-layout.tsx', { id: 'public-app-layout' }, [
     route('help/tutorial', 'help/routes/tutorial.tsx'),
   ]),
 

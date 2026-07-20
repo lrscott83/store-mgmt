@@ -38,7 +38,11 @@ export async function guestOnlyLoader(): Promise<Response | null> {
   return null;
 }
 
-export function featureLoader(requiredFeatureIds: number[], storeIdParam?: string) {
+// Non-bypass core: identical to the pre-change `featureLoader` body. Used
+// directly by `adminFeatureLoader`/`resellerFeatureLoader` so the owner/super-admin
+// bypass added to the plain `featureLoader` below does NOT leak into the admin/
+// reseller guard chains (they must keep requiring a featureId match).
+function featureGate(requiredFeatureIds: number[], storeIdParam?: string) {
   return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
     const { user, isAuthenticated } = getAuthState();
     if (!user || !isAuthenticated) {
@@ -49,6 +53,23 @@ export function featureLoader(requiredFeatureIds: number[], storeIdParam?: strin
       return denyAccess();
     }
     return null;
+  };
+}
+
+// Mirrors Angular's live AuthGuard (auth-guard.ts:44): SuperAdmin/OwnerAdmin
+// bypass the feature check entirely on plain feature-gated routes, BEFORE any
+// featureId/storeId/expiry evaluation. Reseller and store-user behavior is
+// unchanged (delegates to featureGate).
+export function featureLoader(requiredFeatureIds: number[], storeIdParam?: string) {
+  return async (args: LoaderFunctionArgs): Promise<Response | null> => {
+    const { user, isAuthenticated } = getAuthState();
+    if (!user || !isAuthenticated) {
+      return denyAccess();
+    }
+    if (user.isSuperAdmin || user.isOwnerAdmin) {
+      return null;
+    }
+    return featureGate(requiredFeatureIds, storeIdParam)(args);
   };
 }
 
@@ -67,7 +88,7 @@ export function adminFeatureLoader(featureIds: number[]) {
   return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
     const adminResult = await adminLoader();
     if (adminResult) return adminResult;
-    return featureLoader(featureIds)({ params } as LoaderFunctionArgs);
+    return featureGate(featureIds)({ params } as LoaderFunctionArgs);
   };
 }
 
@@ -86,7 +107,7 @@ export function resellerFeatureLoader(featureIds: number[]) {
   return async ({ params }: LoaderFunctionArgs): Promise<Response | null> => {
     const resellerResult = await resellerLoader();
     if (resellerResult) return resellerResult;
-    return featureLoader(featureIds)({ params } as LoaderFunctionArgs);
+    return featureGate(featureIds)({ params } as LoaderFunctionArgs);
   };
 }
 

@@ -133,22 +133,30 @@ describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths',
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-HELP-TEST-2 / S-HELP-ACCESS-2 — authLoader redirects unauthenticated user
+// S-HELP-TEST-2 — help/tutorial is a PUBLIC route (route-guard-parity)
+// Angular's app-routing.module.ts nests help/tutorial inside ClientLayoutComponent
+// with NO canActivate guard — it is reachable without authentication. The route
+// is moved out of the authLoader-gated app-layout branch (routes.ts) into a
+// public no-auth chrome layout, so TutorialPage must render with NO session.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('authLoader — S-HELP-TEST-2: unauthenticated redirect to /login', () => {
-  it('redirects to /login when no session exists', async () => {
-    // authLoader calls useAuthStore.getState() — override the mock to return no session
+describe('TutorialPage — S-HELP-TEST-2: public access, no auth required', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders content with no user/session — no redirect, no thrown error', async () => {
     const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
     const getState = (useAuthStore as unknown as { getState: ReturnType<typeof vi.fn> }).getState;
     getState.mockReturnValueOnce({ user: null, isAuthenticated: false, logout: vi.fn() });
 
-    const { authLoader } = await import('~/auth/routes/loaders');
-    const result = await authLoader();
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
 
-    expect(result).toBeInstanceOf(Response);
-    const res = result as Response;
-    expect(res.status).toBe(302);
-    expect(res.headers.get('Location')).toBe('/login');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tutorial');
   });
 });

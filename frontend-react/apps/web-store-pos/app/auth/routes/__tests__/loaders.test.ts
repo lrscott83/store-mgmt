@@ -171,6 +171,27 @@ describe('Route Loaders (AUTH-04)', () => {
       const result = await loader({ params: {} } as never);
       expect(result).toBeNull();
     });
+
+    // route-guard-parity: mirrors Angular auth-guard.ts:44 — OwnerAdmin bypasses
+    // the feature check entirely on plain feature-gated routes (no featureId match
+    // required). This is a CHANGED behavior vs. the previous React implementation.
+    it('allows OwnerAdmin without matching featureId — owner-admin bypass', async () => {
+      setAuthState(makeUser({ isOwnerAdmin: true, featureIds: [] }));
+      const loader = featureLoader([21, 22]);
+      const result = await loader({ params: { storeId: 's1' } } as never);
+      expect(result).toBeNull();
+    });
+
+    // route-guard-parity: the SuperAdmin/OwnerAdmin bypass MUST precede
+    // isUserAuthorized's expiry gate (Angular auth-guard.ts:44 returns before any
+    // expiry check). An expired-but-still-`isAuthenticated` SuperAdmin is still
+    // allowed through the plain featureLoader.
+    it('allows SuperAdmin with an expired session — bypass precedes expiry check', async () => {
+      setAuthState(makeUser({ isSuperAdmin: true, expiresIn: Date.now() - 1000, featureIds: [] }));
+      const loader = featureLoader([21, 22]);
+      const result = await loader({ params: { storeId: 's1' } } as never);
+      expect(result).toBeNull();
+    });
   });
 
   describe('adminLoader', () => {
