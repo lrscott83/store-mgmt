@@ -95,3 +95,16 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* Hide the scrollbar while keeping horizontal scroll/swipe. Mirrors Angular's
+   `.no-scrollbar` on the sale-screen category strip (`scrollmenu no-scrollbar`
+   in sale.component.html/.scss): the strip stays swipeable left/right but the
+   visible track is removed across WebKit, Firefox, and legacy Edge. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    width: 0;
+    display: none;
+  }
+}

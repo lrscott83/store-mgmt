@@ -95,7 +95,7 @@ export function SalePage() {
 
   return (
     <Card title={intl.formatMessage({ id: 'SALES.HEADER' })}>
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1">
         {categories.map((category) => (
           <button
             key={category.id}
