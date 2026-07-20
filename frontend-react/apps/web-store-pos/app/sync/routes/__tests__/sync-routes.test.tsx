@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 
@@ -184,6 +184,67 @@ describe('ExportPage — smoke render', () => {
   it('renders default export', async () => {
     const mod = await import('../export');
     expect(typeof mod.default).toBe('function');
+  });
+});
+
+// ─── ExportPage delivery — Angular parity (always download, never share) ─────
+//
+// Angular's `serializeEncryptedZip` (data-serializer.service.ts:68-73) delivers
+// the encrypted zip with a PLAIN download anchor, unconditionally. It never
+// calls `navigator.share` — that lives only in the separate `shareData()` path
+// (send-data.component.ts:37) which shares products.json, not the backup zip.
+// React's export must mirror this: always download, never share. Calling
+// `navigator.share({ files })` on desktop (where `navigator.share` exists but
+// file-sharing is unsupported) throws and breaks the export.
+
+describe('ExportPage — delivery (Angular parity: always download, never share)', () => {
+  const createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
+  const revokeObjectURLMock = vi.fn();
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click');
+  const hadShare = 'share' in navigator;
+  const shareMock = vi.fn().mockRejectedValue(new Error('file share not supported'));
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    createObjectURLMock.mockReturnValue('blob:mock-url');
+    URL.createObjectURL = createObjectURLMock;
+    URL.revokeObjectURL = revokeObjectURLMock;
+    // Simulate a desktop browser: `navigator.share` EXISTS as a function but
+    // rejects when handed files (the real desktop failure mode).
+    Object.defineProperty(navigator, 'share', {
+      value: shareMock,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    if (!hadShare) {
+      delete (navigator as unknown as { share?: unknown }).share;
+    }
+  });
+
+  it('downloads via an anchor and never calls navigator.share', async () => {
+    const { default: ExportPage } = await import('../export');
+    render(
+      <Wrapper>
+        <ExportPage />
+      </Wrapper>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Contraseña de cifrado/i), {
+      target: { value: 'my-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar' }));
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+    expect(shareMock).not.toHaveBeenCalled();
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -42,7 +42,13 @@ export function ExportPage() {
 
     const payload = await serializer.export(password);
 
-    // Delivery: navigator.share when available, plain download fallback
+    // Delivery: plain download anchor, matching Angular's `serializeEncryptedZip`
+    // (data-serializer.service.ts:68-73) 1:1. Angular's export path NEVER uses
+    // `navigator.share` — that lives only in the separate `shareData()` action
+    // (send-data.component.ts:37), which shares products.json, not the backup zip.
+    // A `navigator.share`-first delivery breaks the export on desktop, where
+    // `navigator.share` exists as a function but file-sharing is unsupported and
+    // the call throws.
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const yy = String(now.getFullYear()).slice(2);
@@ -53,18 +59,12 @@ export function ExportPage() {
     const filename = `datos${yy}${mm}${dd}-${hh}${min}.zip`;
 
     const blob = new Blob([payload], { type: 'application/zip' });
-
-    if (typeof navigator.share === 'function') {
-      const file = new File([blob], filename, { type: 'application/zip' });
-      await navigator.share({ files: [file], title: filename });
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
 
     return payload;
   }
