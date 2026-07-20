@@ -385,7 +385,7 @@ export function CartShell() {
                       <button
                         type="button"
                         onClick={() => handleQuantityChange(item.product.id, item.quantity, -1)}
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs"
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none"
                         aria-label={intl.formatMessage(
                           { id: 'CART.DECREASE_QUANTITY' },
                           { name: item.product.name },
@@ -396,7 +396,7 @@ export function CartShell() {
                       <button
                         type="button"
                         onClick={() => handleQuantityChange(item.product.id, item.quantity, 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-xs"
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none"
                         aria-label={intl.formatMessage(
                           { id: 'CART.INCREASE_QUANTITY' },
                           { name: item.product.name },
