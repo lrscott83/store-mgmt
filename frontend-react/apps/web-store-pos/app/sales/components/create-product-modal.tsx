@@ -89,6 +89,7 @@ export function CreateProductModal({ categories, onSave, onClose }: CreateProduc
             </label>
             <input
               type="text"
+              autoFocus
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"

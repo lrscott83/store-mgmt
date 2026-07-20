@@ -21,6 +21,17 @@ function makeCategory(overrides: Partial<ProductCategory> = {}): ProductCategory
   return { id: 'cat-1', name: 'Bebidas', order: 1, isActive: true, ...overrides };
 }
 
+describe('CreateProductModal — name field autofocus', () => {
+  it('focuses the name input on mount', () => {
+    render(
+      <Wrapper>
+        <CreateProductModal categories={[makeCategory()]} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('product-name-input')).toHaveFocus();
+  });
+});
+
 describe('CreateProductModal — validation text parity (GENERAL.VALIDATION.REQUIRED)', () => {
   it('shows "Nombre es requerido" when name is empty', () => {
     render(

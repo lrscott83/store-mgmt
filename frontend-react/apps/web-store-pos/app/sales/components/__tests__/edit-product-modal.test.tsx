@@ -38,6 +38,23 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   };
 }
 
+describe('EditProductModal — name field autofocus', () => {
+  it('focuses the name input on mount', () => {
+    render(
+      <Wrapper>
+        <EditProductModal
+          product={makeProduct()}
+          categories={[makeCategory()]}
+          onSave={vi.fn()}
+          onDelete={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('edit-product-name-input')).toHaveFocus();
+  });
+});
+
 describe('EditProductModal — validation text parity (GENERAL.VALIDATION.REQUIRED)', () => {
   it('shows "Nombre es requerido" when name is cleared', () => {
     render(

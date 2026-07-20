@@ -78,6 +78,30 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
   });
 });
 
+describe('EditProductCategoryModal — name field autofocus', () => {
+  it('focuses the name input on mount in create-mode', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('category-name-input')).toHaveFocus();
+  });
+
+  it('focuses the name input on mount in edit-mode', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal
+          category={{ id: 'cat-1', name: 'Bebidas', order: 1, isActive: true }}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('category-name-input')).toHaveFocus();
+  });
+});
+
 describe('EditProductCategoryModal — footer icons/labels parity', () => {
   it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
     render(
