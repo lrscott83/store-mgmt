@@ -130,7 +130,10 @@ export function ProductsPage() {
       product.isActive,
       product.availableToSale,
       product.discountFromInvantory,
-      product.barcode,
+      // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
+      // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
+      // that already has a stored barcode.
+      undefined,
     );
     if (!result.succeeded) {
       showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');

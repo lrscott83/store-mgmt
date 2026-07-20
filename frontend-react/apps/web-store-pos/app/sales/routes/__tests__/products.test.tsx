@@ -372,6 +372,30 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[2]).toBe('Coca Cola Zero'); // name
   });
 
+  // Angular parity (edit-product-modal.component.ts:86,125): the barcode FormControl is
+  // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product that
+  // already has a stored barcode. React mirrors this by forwarding undefined regardless of
+  // product.barcode.
+  it('threads barcode=undefined into updateProduct even for a product with a stored barcode (parity fix)', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct({ barcode: '7501234567890' })];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Editar Producto'));
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    await waitFor(() => expect(productServiceSpies.updateProduct).toHaveBeenCalledTimes(1));
+    const args = productServiceSpies.updateProduct.mock.calls[0];
+    expect(args[9]).toBeUndefined(); // barcode positional arg — always undefined, mirrors Angular
+  });
+
   // Angular parity (product-modal-parity): EditProductModal no longer accepts onDelete/categories
   // — deletion stays at list-row level, category stays pinned to product.categoryId.
   it('renders EditProductModal without an in-modal delete affordance (WU4.2)', async () => {
