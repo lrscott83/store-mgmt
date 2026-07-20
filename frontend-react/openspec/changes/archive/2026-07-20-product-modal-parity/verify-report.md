@@ -68,3 +68,9 @@ None — implementation is a clean, spec-faithful port with no loose ends found.
 **PASS**
 
 All 12 tasks complete, all 15 spec requirements/scenarios have passing covering tests (re-executed by this verify pass, not just copied from apply-progress), full suite green (125 files / 1815 tests), typecheck clean, and grep audits confirm no stale references to removed props/fields (`categories=`, `onDelete`, barcode UI, delete-confirmation UI) remain in the product-modal surface.
+
+---
+
+## Addendum (post-Phase-6, recorded at archive time)
+
+This report predates Phase 6 (tasks.md, appended after this verify pass). Phase 6 added 3 more spec requirements (price min(0), order pattern, barcode-always-undefined-on-update) discovered by a second, focused parity review against Angular's `edit-product-modal.component.ts`/`.html`. All 3 were fixed (commits d645d32, 2eb4735, b331634) and covered by 9 new tests (suite grew 1815 → 1824, still green; typecheck clean). The orchestrator's archive instructions confirm this final state was validated via a focused parity re-review returning 1:1 PARITY, not a full re-run of `sdd-verify`. See `sdd/product-modal-parity/tasks.md` (id 1273) and `sdd/product-modal-parity/archive-report` for the reconciled final state.

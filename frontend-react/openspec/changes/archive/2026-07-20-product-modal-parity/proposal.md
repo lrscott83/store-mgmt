@@ -50,8 +50,8 @@ Single-scope commit set; `git revert` the modal + products.tsx + es.ts commits. 
 - `productService.getMaxOrder(categoryId): Promise<BaseResponseModel<number>>` (exists).
 
 ## Success Criteria
-- [ ] Both modals: no barcode input, no category dropdown; show Orden, Activo, `$` prefix.
-- [ ] Create pinned to context category; order defaults to max+1.
-- [ ] EditProductModal has no delete UI/prop; row-level delete still works.
-- [ ] Titles use `PRODUCT.NEW_PRODUCT`/`PRODUCT.EDIT_PRODUCT`; discount copy = `Descuenta del Inventario`.
-- [ ] 3 test files pass under strict TDD.
+- [x] Both modals: no barcode input, no category dropdown; show Orden, Activo, `$` prefix.
+- [x] Create pinned to context category; order defaults to max+1.
+- [x] EditProductModal has no delete UI/prop; row-level delete still works.
+- [x] Titles use `PRODUCT.NEW_PRODUCT`/`PRODUCT.EDIT_PRODUCT`; discount copy = `Descuenta del Inventario`.
+- [x] 3 test files pass under strict TDD.
