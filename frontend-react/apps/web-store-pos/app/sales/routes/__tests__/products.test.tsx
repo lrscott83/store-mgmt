@@ -26,6 +26,7 @@ const productServiceSpies = vi.hoisted(() => ({
   updateProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   deleteProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   createCsvProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  getMaxOrder: vi.fn((..._args: unknown[]) => Promise.resolve({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] })),
 }));
 
 const { bm } = vi.hoisted(() => ({
@@ -41,6 +42,7 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
     updateProduct: productServiceSpies.updateProduct,
     deleteProduct: productServiceSpies.deleteProduct,
     createCsvProducts: productServiceSpies.createCsvProducts,
+    getMaxOrder: productServiceSpies.getMaxOrder,
   })),
 }));
 
@@ -128,6 +130,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     productServiceSpies.updateProduct.mockClear();
     productServiceSpies.updateProduct.mockResolvedValue(okEnvelope);
     productServiceSpies.deleteProduct.mockClear();
+    productServiceSpies.getMaxOrder.mockClear();
+    productServiceSpies.getMaxOrder.mockResolvedValue({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
     categoryServiceSpies.createProductCategory.mockClear();
     categoryServiceSpies.createProductCategory.mockResolvedValue({
       data: true,
@@ -281,12 +285,20 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.queryByTestId('products-search-input')).not.toBeInTheDocument();
   });
 
-  // Angular parity (edit-product-modal.component.ts:88-100): create routes through the async
-  // createProduct(categoryId, name, price, businessId, order, isActive, availableToSale,
-  // discountFromInvantory, barcode?) positional surface — no audit fields (the service owns
-  // createdByName/createdDate stamping).
-  it('calls createProduct with positional args (service owns audit stamping)', async () => {
+  // Angular parity (edit-product-modal.component.ts:42-49,88-100): opening the create modal
+  // awaits productService.getMaxOrder(category.id) and prefills Orden with data+1; submit routes
+  // through the async createProduct(categoryId, name, price, businessId, order, isActive,
+  // availableToSale, discountFromInvantory, barcode?) positional surface — no audit fields (the
+  // service owns createdByName/createdDate stamping).
+  it('awaits getMaxOrder(category.id) and prefills Orden with max+1 before opening the create modal', async () => {
     mockCategories = [makeCategory()];
+    productServiceSpies.getMaxOrder.mockResolvedValueOnce({
+      data: 4,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
 
     render(
       <Wrapper>
@@ -297,7 +309,30 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
 
-    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    await waitFor(() => expect(productServiceSpies.getMaxOrder).toHaveBeenCalledWith('cat-1'));
+    expect(await screen.findByTestId('product-order-input')).toHaveValue(5);
+  });
+
+  it('calls createProduct with positional args carrying the modal order/isActive (service owns audit stamping)', async () => {
+    mockCategories = [makeCategory()];
+    productServiceSpies.getMaxOrder.mockResolvedValueOnce({
+      data: 0,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-product-button'));
+
+    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
@@ -307,7 +342,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[1]).toBe('Sprite'); // name
     expect(args[2]).toBe(2.5); // price
     expect(args[3]).toBe(''); // businessId
-    expect(args[4]).toBe(1); // order
+    expect(args[4]).toBe(1); // order (getMaxOrder data=0 -> 0+1)
     expect(args[5]).toBe(true); // isActive
   });
 
@@ -335,6 +370,27 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[0]).toBe('prod-1'); // id
     expect(args[1]).toBe('cat-1'); // categoryId
     expect(args[2]).toBe('Coca Cola Zero'); // name
+  });
+
+  // Angular parity (product-modal-parity): EditProductModal no longer accepts onDelete/categories
+  // — deletion stays at list-row level, category stays pinned to product.categoryId.
+  it('renders EditProductModal without an in-modal delete affordance (WU4.2)', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Editar Producto'));
+
+    expect(await screen.findByTestId('edit-product-name-input')).toBeInTheDocument();
+    expect(screen.queryByTestId('delete-product-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('confirm-delete-button')).not.toBeInTheDocument();
   });
 
   // Angular parity: handleDeleteProduct routes through the async deleteProduct(id) surface.
@@ -398,7 +454,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
-    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 

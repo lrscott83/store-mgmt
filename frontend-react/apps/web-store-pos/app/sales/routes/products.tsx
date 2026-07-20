@@ -23,7 +23,7 @@ import { CsvProductImporterModal } from '../components/csv-product-importer-moda
 export const clientLoader = featureLoader([EFeatures.Products]);
 
 type Modal =
-  | { type: 'create'; category: ProductCategory }
+  | { type: 'create'; category: ProductCategory; defaultOrder: number }
   | { type: 'edit'; product: Product }
   | { type: 'bulk'; category: ProductCategory }
   | { type: 'category'; category?: ProductCategory }
@@ -74,16 +74,26 @@ export function ProductsPage() {
     });
   }
 
+  // --- Add product (opens the create modal) ---
+  // Angular parity (edit-product-modal.component.ts:42-49): opening the modal for create awaits
+  // productService.getMaxOrder(category.id) and prefills Orden with data+1.
+  async function handleAddProduct(category: ProductCategory) {
+    const maxOrderResult = await productService.getMaxOrder(category.id);
+    setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+  }
+
   // --- Create product ---
   // Angular parity (edit-product-modal.component.ts:88-112): createProduct(...) positional
   // async surface; on failure surface errors[0].description via the same blocking-error path as
-  // handleCategorySave (Angular's Swal error). Order stays 1 (pre-existing React value, not part
-  // of this slice's service reconciliation).
+  // handleCategorySave (Angular's Swal error). order/isActive now come from the modal's own
+  // Orden/Activo fields (Angular form controls), not hardcoded.
   async function handleCreateProduct(data: {
     name: string;
     price: number;
     barcode?: string;
     categoryId: string;
+    order: number;
+    isActive: boolean;
     availableToSale: boolean;
     discountFromInvantory: boolean;
   }) {
@@ -92,8 +102,8 @@ export function ProductsPage() {
       data.name,
       data.price,
       '',
-      1,
-      true,
+      data.order,
+      data.isActive,
       data.availableToSale,
       data.discountFromInvantory,
       data.barcode,
@@ -259,7 +269,7 @@ export function ProductsPage() {
                   <CategoryActionsMenu
                     category={category}
                     onEditCategory={() => setModal({ type: 'category', category })}
-                    onAddProduct={() => setModal({ type: 'create', category })}
+                    onAddProduct={() => handleAddProduct(category)}
                     onAddProducts={() => setModal({ type: 'bulk', category })}
                   />
                   <button
@@ -299,7 +309,8 @@ export function ProductsPage() {
       {/* Modals */}
       {modal?.type === 'create' && (
         <CreateProductModal
-          categories={categories}
+          category={modal.category}
+          defaultOrder={modal.defaultOrder}
           onSave={handleCreateProduct}
           onClose={() => setModal(null)}
         />
@@ -308,9 +319,7 @@ export function ProductsPage() {
       {modal?.type === 'edit' && (
         <EditProductModal
           product={modal.product}
-          categories={categories}
           onSave={handleEditProduct}
-          onDelete={handleDeleteProduct}
           onClose={() => setModal(null)}
         />
       )}
