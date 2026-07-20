@@ -81,13 +81,13 @@ describe('CreateProductModal — Angular field set/order parity', () => {
     expect(screen.getByTestId('product-discount-checkbox')).toBeChecked();
   });
 
-  it('renders a "$" prefix on the Precio field', () => {
+  it('renders the Precio field without a currency prefix', () => {
     render(
       <Wrapper>
         <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.getByTestId('product-price-prefix')).toHaveTextContent('$');
+    expect(screen.queryByTestId('product-price-prefix')).not.toBeInTheDocument();
   });
 
   it('does not render a barcode input', () => {

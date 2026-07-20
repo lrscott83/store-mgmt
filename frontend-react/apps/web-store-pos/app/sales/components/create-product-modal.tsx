@@ -30,7 +30,7 @@ interface CreateProductModalProps {
 }
 
 // Angular parity source: edit-product-modal.component.html — the ONE real modal, reused for
-// both create+edit. Field order: Nombre, Precio ($ prefix), Orden, Activo, Disponible para
+// both create+edit. Field order: Nombre, Precio, Orden, Activo, Disponible para
 // Vender, Descuenta del Inventario. Barcode + category dropdown stay commented out in Angular
 // (never rendered) — category is pinned to the click-context `category` prop instead.
 export function CreateProductModal({ category, defaultOrder, onSave, onClose }: CreateProductModalProps) {
@@ -120,28 +120,20 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
             {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
           </div>
 
-          {/* Price ($ prefix) */}
+          {/* Price */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               {intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' })}
             </label>
-            <div className="relative">
-              <span
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
-                data-testid="product-price-prefix"
-              >
-                $
-              </span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                className="w-full rounded-md border border-gray-300 pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
-                data-testid="product-price-input"
-              />
-            </div>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.price}
+              onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              data-testid="product-price-input"
+            />
             {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
           </div>
 
