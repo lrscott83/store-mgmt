@@ -14,7 +14,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 const defaultInitialValues = {
   fullName: 'Juan Pérez',
-  cellPhone: '+54911',
+  cellPhone: '51234567',
   email: 'juan@test.com',
 };
 
@@ -34,7 +34,7 @@ describe('EditProfileForm — renders with initialValues (EDIT-3)', () => {
     expect(nameInput).toBeInTheDocument();
   });
 
-  it('pre-fills cellPhone field from initialValues', () => {
+  it('pre-fills cellPhone field masked as +53 0 000-0000 (Angular ngx-mask parity)', () => {
     render(
       <Wrapper>
         <EditProfileForm
@@ -45,7 +45,58 @@ describe('EditProfileForm — renders with initialValues (EDIT-3)', () => {
         />
       </Wrapper>,
     );
-    expect(screen.getByDisplayValue('+54911')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('+53 5 123-4567')).toBeInTheDocument();
+  });
+});
+
+describe('EditProfileForm — cellPhone mask (Req: cellPhone parity with UserDetailsForm)', () => {
+  it('strips non-digit characters as the user types, before storing/displaying', () => {
+    render(
+      <Wrapper>
+        <EditProfileForm
+          initialValues={{ fullName: 'Juan', cellPhone: '', email: '' }}
+          isOnline
+          isLoading={false}
+          onSubmit={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    const input = screen.getByLabelText(/teléfono celular/i);
+    fireEvent.change(input, { target: { value: 'abc51234567xyz' } });
+    expect(input).toHaveValue('+53 5 123-4567');
+  });
+});
+
+describe('EditProfileForm — cellPhone is required (new check, Angular parity)', () => {
+  it('does not call onSubmit when cellPhone is empty', () => {
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <EditProfileForm
+          initialValues={{ fullName: 'Juan Pérez', cellPhone: '', email: 'juan@test.com' }}
+          isOnline
+          isLoading={false}
+          onSubmit={onSubmit}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows a validation message when cellPhone is empty and submit attempted', () => {
+    render(
+      <Wrapper>
+        <EditProfileForm
+          initialValues={{ fullName: 'Juan Pérez', cellPhone: '', email: 'juan@test.com' }}
+          isOnline
+          isLoading={false}
+          onSubmit={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 });
 
@@ -88,7 +139,7 @@ describe('EditProfileForm — EDIT-9: blocks submit for invalid email format', (
     render(
       <Wrapper>
         <EditProfileForm
-          initialValues={{ fullName: 'Juan', cellPhone: '', email: 'not-an-email' }}
+          initialValues={{ fullName: 'Juan', cellPhone: '51234567', email: 'not-an-email' }}
           isOnline
           isLoading={false}
           onSubmit={onSubmit}
@@ -103,7 +154,7 @@ describe('EditProfileForm — EDIT-9: blocks submit for invalid email format', (
     render(
       <Wrapper>
         <EditProfileForm
-          initialValues={{ fullName: 'Juan', cellPhone: '', email: 'bad-email' }}
+          initialValues={{ fullName: 'Juan', cellPhone: '51234567', email: 'bad-email' }}
           isOnline
           isLoading={false}
           onSubmit={vi.fn()}
@@ -161,7 +212,7 @@ describe('EditProfileForm — onSubmit called with correct payload when valid', 
     fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
     expect(onSubmit).toHaveBeenCalledWith({
       fullName: 'Juan Pérez',
-      cellPhone: '+54911',
+      cellPhone: '51234567',
       email: 'juan@test.com',
     });
   });
