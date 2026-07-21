@@ -577,6 +577,31 @@ describe('EditInventoryEntryModal — title/save button toggle by mode (Angular 
   });
 });
 
+// ─── EditInventoryEntryModal — product select always disabled (Angular parity) ──
+//
+// Angular reference: edit-inventory-entry-modal.component.html:17 `[disabled]="true"` on the
+// product mat-select — unconditional, in BOTH create and edit mode (not gated on `entry`).
+
+describe('EditInventoryEntryModal — product select disabled (Angular parity: [disabled]="true")', () => {
+  it('disables the product select in create mode (no entry passed)', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('combobox')).toBeDisabled();
+  });
+
+  it('disables the product select in edit mode (entry passed)', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" entry={makeEntry()} />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('combobox')).toBeDisabled();
+  });
+});
+
 // ─── EditInventoryEntryModal — validation messages (Angular parity) ─────────
 //
 // Angular reference: edit-inventory-entry-modal.component.html:26,42,64 (GENERAL.VALIDATION.

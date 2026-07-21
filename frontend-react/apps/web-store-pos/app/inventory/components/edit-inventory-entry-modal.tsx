@@ -144,6 +144,9 @@ export function EditInventoryEntryModal({
                 value={productId}
                 onChange={(e) => setProductId(e.target.value)}
                 className={inputClass}
+                // Angular parity (edit-inventory-entry-modal.component.html:17):
+                // [disabled]="true" unconditionally, in BOTH create and edit mode.
+                disabled
               >
                 <option value="">
                   {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}...
