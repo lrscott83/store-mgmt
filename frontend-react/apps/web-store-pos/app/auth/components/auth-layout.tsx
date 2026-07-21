@@ -1,6 +1,14 @@
 import { Outlet } from 'react-router';
 import { useIntl } from 'react-intl';
+import { Footer } from '~/shared/components/footer';
 
+/**
+ * Guest layout for /login, /register, etc. Ports Angular's
+ * `guest-footer.component.html` (legal links + Contact + copyright) below the
+ * form card, reusing the shared `Footer` component (near-identical markup to
+ * Angular's `client-footer.component.html`, already ported for the client
+ * layout — see `shared/components/footer.tsx`).
+ */
 export default function AuthLayout() {
   const intl = useIntl();
 
@@ -19,6 +27,7 @@ export default function AuthLayout() {
           <Outlet />
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

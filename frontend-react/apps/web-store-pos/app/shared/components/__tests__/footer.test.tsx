@@ -37,4 +37,11 @@ describe('Footer — parity with Angular client-footer.component.html', () => {
     expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute('href', '/private-police');
     expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute('href', '/terms-conditions');
   });
+
+  it('legal links open in a new tab, matching Angular target="_blank"', () => {
+    renderFooter();
+    expect(screen.getByText('Políticas de Cookies').closest('a')).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute('target', '_blank');
+  });
 });

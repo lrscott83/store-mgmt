@@ -356,29 +356,24 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     });
   });
 
-  it('shows the success-redirect text exactly (REGISTRATION.SUCCESS_REDIRECT)', async () => {
-    let resolveRegister: (value: {
-      succeeded: boolean;
-      data: boolean;
-      message: string;
-      actionCode: number;
-      errors: { code: string; description: string }[];
-    }) => void;
-    vi.mocked(authHttpService.register).mockReturnValue(
-      new Promise((resolve) => {
-        resolveRegister = resolve;
-      })
-    );
+  it('navigates straight to /login on success and never renders the interim REGISTRATION.SUCCESS_REDIRECT screen (Angular has no such screen)', async () => {
+    vi.mocked(authHttpService.register).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
     renderRegister();
     fillRequiredFields();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
-    resolveRegister!({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Cuenta creada. Redirigiendo al inicio de sesión…')
-      ).toBeInTheDocument();
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
+    expect(
+      screen.queryByText('Cuenta creada. Redirigiendo al inicio de sesión…')
+    ).not.toBeInTheDocument();
   });
 });
 

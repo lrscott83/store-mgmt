@@ -46,7 +46,6 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isOffline, setIsOffline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [accepted, setAccepted] = useState(false);
 
   const PASSWORD_POLICY_REGEX = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -112,7 +111,6 @@ export default function RegisterPage() {
         code,
       });
       if (response.succeeded) {
-        setSuccess(true);
         navigate('/login');
       } else {
         setErrors({ form: response.errors[0].description });
@@ -135,16 +133,6 @@ export default function RegisterPage() {
     } finally {
       setIsLoading(false);
     }
-  }
-
-  if (success) {
-    return (
-      <div className="text-center py-4">
-        <p className="text-green-600 font-medium">
-          {intl.formatMessage({ id: 'REGISTRATION.SUCCESS_REDIRECT' })}
-        </p>
-      </div>
-    );
   }
 
   return (

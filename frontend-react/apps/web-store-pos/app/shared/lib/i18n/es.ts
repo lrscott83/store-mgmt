@@ -94,9 +94,6 @@ const messages: Record<string, string> = {
   // NEW — Angular register.component.ts has no connectivity check/banner at all;
   // wording follows AUTH.OFFLINE_LOGIN pattern (view-text-parity spec).
   'REGISTRATION.OFFLINE_BANNER': 'Estás offline. Se requiere conexión para registrarte.',
-  // NEW — Angular has no visible post-submit success copy in this component
-  // (view-text-parity spec).
-  'REGISTRATION.SUCCESS_REDIRECT': 'Cuenta creada. Redirigiendo al inicio de sesión…',
   // REGISTRATION.UNEXPECTED_ERROR (Angular vocabs/es.ts:135-136) — generic network/unknown
   // error fallback for register's catch block (view-text-parity DoD: no leftover English
   // literals in touched files).
