@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
 import type { Expense } from '@store-mgmt/domain';
@@ -30,6 +30,13 @@ vi.mock('~/expenses/lib/services/expense-offline-service', () => ({
     update: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
     deleteExpense: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
   })),
+}));
+
+// T5 (Angular parity, expense-list.component.ts:52-68 onDeleteExpense): a confirmDialog Swal
+// gates the delete — mock the shared wrapper rather than asserting on inline DOM text/buttons.
+const confirmDialogMock = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -130,6 +137,97 @@ describe('TodayExpensesPage — smoke render', () => {
     fireEvent.click(screen.getByText('Editar'));
     fireEvent.click(screen.getByText('Salvar'));
     expect(screen.getByText('El gasto no existe.')).toBeInTheDocument();
+  });
+});
+
+// T5 (Angular parity, expense-list.component.ts:52-68 onDeleteExpense): confirmDialog Swal
+// (question icon, GENERAL.DELETE_CONFIRM_TITLE/MESSAGE with {name: GENERAL.EXPENSE},
+// GENERAL.YES/NO) gates the delete — replaces the previous React-only div-modal confirmation.
+describe('TodayExpensesPage — delete gated by confirmDialog (T5)', () => {
+  function makeExpense(): Expense {
+    return {
+      id: 'e1',
+      type: ExpenseType.Comida,
+      total: 20,
+      date: new Date(),
+      paymentType: PaymentType.Efectivo,
+      note: '',
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: '',
+    } as Expense;
+  }
+
+  beforeEach(() => {
+    confirmDialogMock.mockClear();
+    confirmDialogMock.mockResolvedValue(true);
+  });
+
+  it('T5: confirms via confirmDialog with the exact Angular keys, then calls deleteExpense(id)', async () => {
+    const expense = makeExpense();
+    const deleteExpenseMock = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockImpl = () =>
+      ({
+        getStorageExpenses: vi.fn().mockReturnValue([expense]),
+        getExpensesInDayObservable: vi.fn().mockReturnValue(expensesResponse([expense])),
+        create: vi.fn(),
+        update: vi.fn(),
+        deleteExpense: deleteExpenseMock,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any;
+    // 3 constructor calls: mount load, the delete handler's own instance, and the reload
+    // triggered after a successful delete.
+    vi.mocked(ExpenseOfflineService)
+      .mockImplementationOnce(mockImpl)
+      .mockImplementationOnce(mockImpl)
+      .mockImplementationOnce(mockImpl);
+
+    render(
+      <Wrapper>
+        <TodayExpensesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByTestId('expense-actions-toggle-e1'));
+    fireEvent.click(screen.getByText('Eliminar'));
+
+    await waitFor(() =>
+      expect(confirmDialogMock).toHaveBeenCalledWith({
+        title: 'Confirmación para eliminar',
+        message: '¿Está seguro que desea eliminar este Gasto?',
+        confirmButtonText: 'Si',
+        cancelButtonText: 'No',
+      }),
+    );
+    await waitFor(() => expect(deleteExpenseMock).toHaveBeenCalledWith('e1'));
+  });
+
+  it('T5: does NOT call deleteExpense when the confirmDialog is cancelled', async () => {
+    const expense = makeExpense();
+    const deleteExpenseMock = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockImpl = () =>
+      ({
+        getStorageExpenses: vi.fn().mockReturnValue([expense]),
+        getExpensesInDayObservable: vi.fn().mockReturnValue(expensesResponse([expense])),
+        create: vi.fn(),
+        update: vi.fn(),
+        deleteExpense: deleteExpenseMock,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any;
+    vi.mocked(ExpenseOfflineService).mockImplementationOnce(mockImpl);
+    confirmDialogMock.mockResolvedValueOnce(false);
+
+    render(
+      <Wrapper>
+        <TodayExpensesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByTestId('expense-actions-toggle-e1'));
+    fireEvent.click(screen.getByText('Eliminar'));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
+    expect(deleteExpenseMock).not.toHaveBeenCalled();
   });
 });
 

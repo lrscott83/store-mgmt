@@ -100,9 +100,28 @@ describe('CsvProductImporterModal — parse-on-import + error text parity', () =
     ]);
   });
 
-  it('shows "Error al importar los productos" when parsing throws on import', async () => {
+  // T3 (Angular parity, component.ts:71-78 handleError): `error.message || fallback` — the
+  // caught error's OWN message surfaces verbatim, not always the hardcoded literal.
+  it('T3: surfaces the caught error\'s own message (Angular error.message || fallback)', async () => {
     vi.spyOn(csvParser, 'parseCsvProducts').mockImplementation(() => {
       throw new Error('boom');
+    });
+    render(
+      <Wrapper>
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
+    fireEvent.click(screen.getByTestId('csv-import-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'boom'),
+    );
+  });
+
+  it('T3: falls back to "Error al importar los productos" when the thrown error has no message', async () => {
+    vi.spyOn(csvParser, 'parseCsvProducts').mockImplementation(() => {
+      throw new Error('');
     });
     render(
       <Wrapper>

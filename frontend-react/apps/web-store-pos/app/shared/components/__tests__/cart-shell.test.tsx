@@ -46,8 +46,12 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
 // Mock the SweetAlert2 wrapper — CartShell's increase/decrease guard shows a blocking
 // error identical to Angular's nav-right.component.ts increaseProduct/decreaseProduct.
 const showBlockingErrorMock = vi.hoisted(() => vi.fn());
+// T4 (Angular parity, nav-right.component.ts:164/177/190 createOrder validation guards):
+// blocking info Swals, mocked via the shared wrapper rather than asserting inline DOM text.
+const showAcknowledgeErrorMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: showBlockingErrorMock,
+  showAcknowledgeError: showAcknowledgeErrorMock,
 }));
 
 // Mock useAuthStore (needed for OrderOfflineService instantiation + credits-module gating).
@@ -502,7 +506,8 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     expect(screen.getByText('Registrar').closest('button')).toBeDisabled();
   });
 
-  it('CART-03: shows DON_NOT_SALE_CREDIT_WITHOUT_CLIENT when isCredit=true and client is empty', async () => {
+  // T4 (Angular parity, nav-right.component.ts:190): blocking info Swal, not an inline banner.
+  it('CART-03: shows DON_NOT_SALE_CREDIT_WITHOUT_CLIENT via showAcknowledgeError (icon info) when isCredit=true and client is empty', async () => {
     const product = makeProduct();
     mockCartState({
       items: [{ product, quantity: 1 }],
@@ -516,9 +521,12 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     fireEvent.click(screen.getByText('Registrar'));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Usted no puede realizar la venta por cobrar sin especificar el cliente.'),
-      ).toBeInTheDocument();
+      expect(showAcknowledgeErrorMock).toHaveBeenCalledWith({
+        title: 'Información',
+        message: 'Usted no puede realizar la venta por cobrar sin especificar el cliente.',
+        confirmButtonText: 'Ok',
+        icon: 'info',
+      });
     });
   });
 
@@ -536,13 +544,12 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     fireEvent.click(screen.getByText('Registrar'));
 
     await waitFor(() => {
-      expect(
-        screen.queryByText('Usted no puede realizar la venta por cobrar sin especificar el cliente.'),
-      ).not.toBeInTheDocument();
+      expect(showAcknowledgeErrorMock).not.toHaveBeenCalled();
     });
   });
 
-  it('CART-06: shows DON_NOT_PAY_LESS_THAN_CART_TOTAL when payment is less than total', async () => {
+  // T4 (Angular parity, nav-right.component.ts:177): blocking info Swal, not an inline banner.
+  it('CART-06: shows DON_NOT_PAY_LESS_THAN_CART_TOTAL via showAcknowledgeError (icon info) when payment is less than total', async () => {
     const product = makeProduct();
     mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(10) });
     renderCartShell();
@@ -552,9 +559,12 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     fireEvent.click(screen.getByText('Registrar'));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Usted no puede realizar la venta porque el pago es menor que el total.'),
-      ).toBeInTheDocument();
+      expect(showAcknowledgeErrorMock).toHaveBeenCalledWith({
+        title: 'Información',
+        message: 'Usted no puede realizar la venta porque el pago es menor que el total.',
+        confirmButtonText: 'Ok',
+        icon: 'info',
+      });
     });
   });
 

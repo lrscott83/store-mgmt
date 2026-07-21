@@ -16,7 +16,7 @@ import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
-import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -157,7 +157,10 @@ export function CartShell() {
     setSubmitError(null);
     setSubmitSuccess(null);
 
-    // 1:1 port of Angular's NavRightComponent.createOrder() validation sequence.
+    // 1:1 port of Angular's NavRightComponent.createOrder() validation sequence
+    // (nav-right.component.ts:164/177/190) — each guard is a blocking, OK-only Swal
+    // (icon 'info', GENERAL.INFORMATION title, #3456ff/#dc3545, confirmButtonText GENERAL.OK),
+    // not an inline banner.
     const validationError = validateCartSubmission({
       itemCount,
       payment,
@@ -166,15 +169,30 @@ export function CartShell() {
       client: clientName,
     });
     if (validationError === 'EMPTY_CART') {
-      setSubmitError(intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_PAY_EMPTY_CART' }));
+      showAcknowledgeError({
+        title: intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+        message: intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_PAY_EMPTY_CART' }),
+        confirmButtonText: intl.formatMessage({ id: 'GENERAL.OK' }),
+        icon: 'info',
+      });
       return;
     }
     if (validationError === 'PAYMENT_LESS_THAN_TOTAL') {
-      setSubmitError(intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL' }));
+      showAcknowledgeError({
+        title: intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+        message: intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_PAY_LESS_THAN_CART_TOTAL' }),
+        confirmButtonText: intl.formatMessage({ id: 'GENERAL.OK' }),
+        icon: 'info',
+      });
       return;
     }
     if (validationError === 'CREDIT_WITHOUT_CLIENT') {
-      setSubmitError(intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT' }));
+      showAcknowledgeError({
+        title: intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+        message: intl.formatMessage({ id: 'SHOPPING_CART.DON_NOT_SALE_CREDIT_WITHOUT_CLIENT' }),
+        confirmButtonText: intl.formatMessage({ id: 'GENERAL.OK' }),
+        icon: 'info',
+      });
       return;
     }
 

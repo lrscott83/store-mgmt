@@ -58,17 +58,20 @@ export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporte
     if (selected) setShowRequired(false);
   }
 
-  function showImportError() {
+  // Angular handleError (component.ts:71-78): `const message = error.message || 'Error al
+  // importar los productos'` — surface the caught error's own message, falling back to the
+  // hardcoded literal only when the error carries none.
+  function showImportError(message?: string) {
     showBlockingError(
       intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-      'Error al importar los productos',
+      message || 'Error al importar los productos',
     );
   }
 
   // Angular importProducts() (component.ts:38-50): required-file guard, then parse the file and
   // hand the rows off. On ANY read/parse failure Angular's handleError (component.ts:71-78) opens a
-  // blocking Swal error dialog (icon 'error', title GENERAL.RESPONSE.ERROR_TITLE, hardcoded Spanish
-  // text), surfaced here via showBlockingError — same shape, not inline text.
+  // blocking Swal error dialog (icon 'error', title GENERAL.RESPONSE.ERROR_TITLE, error.message
+  // falling back to a hardcoded Spanish literal), surfaced here via showBlockingError.
   function handleImport() {
     if (!file) {
       setShowRequired(true);
@@ -81,11 +84,11 @@ export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporte
         const text = event.target?.result as string;
         const result = parseCsvProducts(text);
         onImport(result.products);
-      } catch {
-        showImportError();
+      } catch (err) {
+        showImportError(err instanceof Error ? err.message : undefined);
       }
     };
-    reader.onerror = () => showImportError();
+    reader.onerror = () => showImportError(reader.error?.message);
     reader.readAsText(file);
   }
 

@@ -6,6 +6,7 @@ import { Button } from '~/shared/components/ui/button';
 import { FileInput } from '~/shared/components/ui/file-input';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 export interface ImportFormProps {
   /**
@@ -57,16 +58,23 @@ export function ImportForm({ onImport }: ImportFormProps) {
         // Angular shows only a single success toast — no per-entity counts.
         setSuccess(true);
       } else {
-        // Angular surfaces the first domain error, else the generic message.
-        setError(
+        // Angular parity (receive-data.component.ts:48-54): a blocking error Swal (icon
+        // 'error', GENERAL.RESPONSE.ERROR_TITLE), text = the first domain error, else the
+        // generic message — not an inline banner.
+        showBlockingError(
+          intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
           syncResult.errors[0]?.message ??
             intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }),
         );
       }
     } catch {
-      // Angular collapses every failure (wrong password, corrupt file,
-      // unexpected) into one generic message; never leak a raw err.message.
-      setError(intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }));
+      // Angular parity (receive-data.component.ts:55-59): same blocking error Swal shape.
+      // Angular collapses every failure (wrong password, corrupt file, unexpected) into one
+      // generic message; never leak a raw err.message.
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }),
+      );
     } finally {
       setBusy(false);
     }

@@ -12,6 +12,7 @@ import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
 import { ExpenseFormModal } from '../components/expense-form-modal';
 import type { ExpenseFormInput } from '../components/expense-form-modal';
+import { confirmDialog } from '~/shared/lib/blocking-alert';
 
 export const clientLoader = featureLoader([EFeatures.TodayExpenses]);
 
@@ -22,7 +23,6 @@ export function TodayExpensesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>();
   const [modalError, setModalError] = useState('');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Angular parity (expenses-today.component.ts:28): loads today's expenses via
   // getExpensesInDayObservable(new Date()) and unwraps the BaseResponseModel `.data`.
@@ -85,18 +85,27 @@ export function TodayExpensesPage() {
     setModalError('');
   }
 
-  function handleDeleteRequest(expense: Expense) {
-    setDeleteConfirmId(expense.id);
-  }
+  // T5 (Angular parity, expense-list.component.ts:52-68 onDeleteExpense): a blocking
+  // confirmDialog Swal (question icon, GENERAL.DELETE_CONFIRM_TITLE/MESSAGE with
+  // {name: GENERAL.EXPENSE}, GENERAL.YES/NO) gates the delete — replaces the React-only
+  // custom div modal (different copy: EXPENSES.DELETE_CONFIRM / "Confirmar"/"Cancelar").
+  async function handleDeleteRequest(expense: Expense) {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
+      message: intl.formatMessage(
+        { id: 'GENERAL.DELETE_CONFIRM_MESSAGE' },
+        { name: intl.formatMessage({ id: 'GENERAL.EXPENSE' }) },
+      ),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
 
-  function handleDeleteConfirm() {
-    if (!deleteConfirmId) return;
     const svc = new ExpenseOfflineService(storeId);
     // Angular parity (expense-list.component.ts:64): deleteExpense is the real soft-delete
     // command, called fire-and-forget (its Result is ignored — the id always exists, coming
     // straight from the rendered list).
-    svc.deleteExpense(deleteConfirmId);
-    setDeleteConfirmId(null);
+    svc.deleteExpense(expense.id);
     void loadExpenses();
   }
 
@@ -140,29 +149,6 @@ export function TodayExpensesPage() {
         expense={editingExpense}
         error={modalError}
       />
-
-      {/* Delete confirmation */}
-      {deleteConfirmId && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-        >
-          <div className="w-full max-w-sm rounded-lg bg-surface p-6 shadow-xl">
-            <p className="mb-4 text-sm text-text">
-              {intl.formatMessage({ id: 'EXPENSES.DELETE_CONFIRM' })}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="danger" className="flex-1" onClick={handleDeleteConfirm}>
-                {intl.formatMessage({ id: 'GENERAL.CONFIRM' })}
-              </Button>
-              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
-                {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </Card>
   );
 }

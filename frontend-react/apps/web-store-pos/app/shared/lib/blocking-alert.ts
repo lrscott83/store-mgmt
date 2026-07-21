@@ -74,19 +74,27 @@ export interface AcknowledgeErrorOptions {
   title: string;
   message: string;
   confirmButtonText: string;
+  /**
+   * Defaults to 'error'. `nav-right.component.ts:164-206` (`createOrder` validation guards —
+   * empty cart / payment < total / credit without client) uses this SAME OK-only shape
+   * (showCancelButton false, #3456ff/#dc3545, translated confirmButtonText) but with
+   * `icon: 'info'` instead of 'error' — reuse this wrapper rather than adding a near-duplicate.
+   */
+  icon?: 'error' | 'info';
 }
 
 /**
- * Blocking, OK-only error alert with an EXPLICIT translated confirm button and Angular's
- * button colors. Mirrors `order-item-list.component.ts:124-135` (`showErrorMessage`) —
- * the one Angular call site that overrides `confirmButtonText` (`GENERAL.OK`) and sets both
- * button colors on an error-icon dialog, distinct from the simpler `showBlockingError` shape.
+ * Blocking, OK-only alert with an EXPLICIT translated confirm button and Angular's button
+ * colors. Mirrors `order-item-list.component.ts:124-135` (`showErrorMessage`, icon 'error') and
+ * `nav-right.component.ts:164-206` (`createOrder` validation guards, icon 'info') — both
+ * override `confirmButtonText` and set both button colors, distinct from the simpler
+ * `showBlockingError`/`showBlockingInfo` shapes (which use SweetAlert2's default button).
  */
 export function showAcknowledgeError(options: AcknowledgeErrorOptions): void {
   void Swal.fire({
     title: options.title,
     text: options.message,
-    icon: 'error',
+    icon: options.icon ?? 'error',
     showCancelButton: false,
     confirmButtonColor: '#3456ff',
     cancelButtonColor: '#dc3545',

@@ -6,6 +6,13 @@ import { ImportForm } from '../import-form';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
 import { WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
 
+// T6 (Angular parity, receive-data.component.ts:48/55): the two import-failure paths are
+// blocking error Swals, mocked via the shared wrapper rather than asserting inline DOM text.
+const showBlockingErrorMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+}));
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
@@ -102,7 +109,9 @@ describe('ImportForm — S-IMPORT-3: success shows Angular single-line message (
 });
 
 describe('ImportForm — S-IMPORT-4: wrong-password collapses into Angular generic error + no writes', () => {
-  it('shows the generic Angular import error (no distinct wrong-password text)', async () => {
+  // T6 (Angular parity, receive-data.component.ts:55-59): a blocking error Swal, not inline
+  // DOM text.
+  it('shows the generic Angular import error via showBlockingError (no distinct wrong-password text)', async () => {
     const onImport = vi.fn().mockRejectedValue(new WrongPasswordError());
     render(
       <Wrapper>
@@ -122,12 +131,11 @@ describe('ImportForm — S-IMPORT-4: wrong-password collapses into Angular gener
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText(/Ha ocurrido un error al importar los datos/i),
-      ).toBeInTheDocument(),
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
+      ),
     );
-    // Angular has no distinct "wrong password" text
-    expect(screen.queryByText(/Contraseña incorrecta/i)).not.toBeInTheDocument();
     // Success message must NOT appear (no writes)
     expect(
       screen.queryByText(/Los datos se importaron correctamente/i),
@@ -136,7 +144,9 @@ describe('ImportForm — S-IMPORT-4: wrong-password collapses into Angular gener
 });
 
 describe('ImportForm — S-IMPORT-5: corrupt-file collapses into Angular generic error + no writes', () => {
-  it('shows the generic Angular import error (no distinct corrupt-file text)', async () => {
+  // T6 (Angular parity, receive-data.component.ts:55-59): a blocking error Swal, not inline
+  // DOM text.
+  it('shows the generic Angular import error via showBlockingError (no distinct corrupt-file text)', async () => {
     const onImport = vi.fn().mockRejectedValue(new CorruptFileError());
     render(
       <Wrapper>
@@ -156,11 +166,11 @@ describe('ImportForm — S-IMPORT-5: corrupt-file collapses into Angular generic
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText(/Ha ocurrido un error al importar los datos/i),
-      ).toBeInTheDocument(),
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
+      ),
     );
-    expect(screen.queryByText(/El archivo está dañado/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Los datos se importaron correctamente/i),
     ).not.toBeInTheDocument();
@@ -232,7 +242,9 @@ describe('ImportForm — S-IMPORT-8: password show/hide toggle', () => {
 });
 
 describe('ImportForm — S-IMPORT-9: unexpected error collapses into Angular generic message', () => {
-  it('shows the generic Angular import error, never a raw err.message', async () => {
+  // T6 (Angular parity, receive-data.component.ts:55-59): a blocking error Swal, not inline
+  // DOM text.
+  it('shows the generic Angular import error via showBlockingError, never a raw err.message', async () => {
     const onImport = vi.fn().mockRejectedValue(new Error('raw boom, do not leak me'));
     render(
       <Wrapper>
@@ -249,11 +261,39 @@ describe('ImportForm — S-IMPORT-9: unexpected error collapses into Angular gen
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText(/Ha ocurrido un error al importar los datos/i),
-      ).toBeInTheDocument(),
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
+      ),
     );
     expect(screen.queryByText(/raw boom/i)).not.toBeInTheDocument();
+  });
+
+  // T6: the `!syncResult.succeeded` branch (synchronizer returns a domain error rather than
+  // throwing) is the SAME blocking error Swal shape, surfacing the first domain error's message.
+  it('shows the domain error message via showBlockingError when the synchronizer resolves succeeded:false', async () => {
+    const onImport = vi.fn().mockResolvedValue({
+      succeeded: false,
+      errors: [{ message: 'La categoría X no existe.' }],
+      merges: [],
+    });
+    render(
+      <Wrapper>
+        <ImportForm onImport={onImport} />
+      </Wrapper>,
+    );
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(fileInput, 'files', { value: [makeZipFile()], configurable: true });
+    fireEvent.change(fileInput);
+    fireEvent.change(screen.getByLabelText(/contraseña de cifrado/i), {
+      target: { value: 'secret123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /importar/i }));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'La categoría X no existe.'),
+    );
   });
 });
 

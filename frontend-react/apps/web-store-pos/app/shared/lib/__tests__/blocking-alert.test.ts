@@ -102,6 +102,27 @@ describe('showAcknowledgeError', () => {
       confirmButtonText: 'Ok',
     });
   });
+
+  // T4 (Angular parity, nav-right.component.ts:164-206 createOrder validation guards): the
+  // SAME OK-only shape but with icon 'info' instead of the default 'error' — reused rather
+  // than adding a near-duplicate wrapper.
+  it('fires an OK-only INFO dialog with the exact Angular colors and confirm text when icon is overridden', () => {
+    showAcknowledgeError({
+      title: 'Información',
+      message: 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
+      confirmButtonText: 'Ok',
+      icon: 'info',
+    });
+    expect(fireMock).toHaveBeenCalledWith({
+      title: 'Información',
+      text: 'La venta no tiene ningún producto. Usted debe adicionar algún producto a la venta para pagar.',
+      icon: 'info',
+      showCancelButton: false,
+      confirmButtonColor: '#3456ff',
+      cancelButtonColor: '#dc3545',
+      confirmButtonText: 'Ok',
+    });
+  });
 });
 
 describe('showUpdateAvailable', () => {
