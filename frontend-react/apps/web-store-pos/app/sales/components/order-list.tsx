@@ -101,7 +101,7 @@ export function OrderList({ orders, readOnly = true, onEditOrder, onDeactivateOr
                 <span className="text-sm font-semibold text-text">
                   ${getOrderTotal(order).toFixed(2)}
                 </span>
-                <ChevronDownIcon isExpanded={isExpanded} />
+                <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
               </span>
             </button>
             {isExpanded && (

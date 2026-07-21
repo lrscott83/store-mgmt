@@ -74,7 +74,7 @@ function ExpansionPanel({
         <span>{title}</span>
         <span className="flex items-center gap-2">
           <span className={amountClassName}>{amount}</span>
-          <ChevronDownIcon isExpanded={isOpen} />
+          <ChevronDownIcon isExpanded={isOpen} className="text-text-muted" />
         </span>
       </button>
       {isOpen && <div className="p-2">{children}</div>}

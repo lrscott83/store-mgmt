@@ -183,7 +183,7 @@ export function ExpensesHistoryPage() {
                     <span className="text-sm font-semibold text-danger">
                       ${dayGroup.total.toFixed(2)}
                     </span>
-                    <ChevronDownIcon isExpanded={isExpanded} />
+                    <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>
                 </button>
                 {isExpanded && (

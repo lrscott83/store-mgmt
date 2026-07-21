@@ -93,7 +93,7 @@ export function InventoryProductList({ categories }: InventoryProductListProps) 
                   <span className="text-sm font-semibold text-primary">
                     ${cat.totalCostPrice.toFixed(2)}
                   </span>
-                  <ChevronDownIcon isExpanded={isExpanded} />
+                  <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
               </button>
               {isExpanded && (

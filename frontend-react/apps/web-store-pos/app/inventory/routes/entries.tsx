@@ -161,7 +161,7 @@ export function EntriesPage() {
                     <span className="text-sm font-semibold text-primary">
                       ${dayGroup.total.toFixed(2)}
                     </span>
-                    <ChevronDownIcon isExpanded={isExpanded} />
+                    <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>
                 </button>
                 {isExpanded && (

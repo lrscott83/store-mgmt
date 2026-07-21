@@ -88,7 +88,7 @@ function TutorialStep({ title, content }: { title: string; content: React.ReactN
         aria-expanded={isOpen}
       >
         <span>{title}</span>
-        <ChevronDownIcon isExpanded={isOpen} />
+        <ChevronDownIcon isExpanded={isOpen} className="text-text-muted" />
       </button>
       {isOpen && <div className="mt-2">{content}</div>}
     </div>

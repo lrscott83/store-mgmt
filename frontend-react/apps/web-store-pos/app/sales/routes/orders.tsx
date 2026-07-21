@@ -192,7 +192,7 @@ export function OrdersPage() {
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
-                  <ChevronDownIcon isExpanded={isExpanded} />
+                  <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
               </button>
               {isExpanded && (

@@ -131,7 +131,7 @@ export function SaleCreditsPage() {
                   <span className="text-sm font-semibold text-danger">
                     ${dateSaleCredit.creditsTotal.toFixed(2)}
                   </span>
-                  <ChevronDownIcon isExpanded={isExpanded} />
+                  <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
               </button>
               {isExpanded && (
