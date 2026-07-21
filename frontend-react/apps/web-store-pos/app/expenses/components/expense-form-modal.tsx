@@ -69,8 +69,13 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
     };
   }
   return {
-    type: ExpenseType.Otro,
-    total: 0,
+    // Angular parity (edit-expense-modal.component.ts:60): create-mode default type is
+    // ExpenseType.Salario, not Otro.
+    type: ExpenseType.Salario,
+    // Angular parity (edit-expense-modal.component.ts:88-92): total is Validators.required —
+    // there is no valid default total on create, so it starts as NaN (invalid) until the user
+    // types a value. `0` typed explicitly stays valid via the existing `>=0` check below.
+    total: NaN,
     paymentType: PaymentType.Efectivo,
     note: '',
   };
@@ -148,7 +153,7 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
               id="expense-form-total"
               type="number"
               step="0.01"
-              value={form.total}
+              value={Number.isNaN(form.total) ? '' : form.total}
               onChange={(e) => setForm((f) => ({ ...f, total: parseFloat(e.target.value) }))}
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />

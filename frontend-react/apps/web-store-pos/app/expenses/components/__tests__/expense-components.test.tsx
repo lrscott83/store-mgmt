@@ -94,6 +94,86 @@ describe('ExpenseFormModal — total validation (Angular parity: required + min(
   });
 });
 
+// Angular reference: edit-expense-modal.component.ts:60 — create-mode default `type` is
+// `ExpenseType.Salario`, not `ExpenseType.Otro`.
+describe('ExpenseFormModal — create-mode default type (Angular parity: edit-expense-modal.component.ts:60)', () => {
+  it('preselects Salario (not Otro) when opened in create mode', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    // The Type <select> is the first combobox in the form (Payment type is the second).
+    const typeSelect = screen.getAllByRole('combobox')[0] as HTMLSelectElement;
+    expect(typeSelect.value).toBe(String(ExpenseType.Salario));
+  });
+});
+
+// Angular reference: edit-expense-modal.component.ts:88-92 `Validators.required` on total — a
+// brand-new expense has NO default total, so Save must stay disabled/invalid until the user
+// types a value. Only after typing does `0` become an accepted value (Validators.min(0)).
+describe('ExpenseFormModal — total is required on create (Angular parity: Validators.required)', () => {
+  it('is invalid/disabled by default in create mode, before the user types anything', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('El total debe ser mayor a 0')).toBeInTheDocument();
+    expect(screen.getByText('Salvar').closest('button')).toBeDisabled();
+  });
+
+  it('does not call onSave when Save is clicked before entering a total', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={onSave} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('Salvar'));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('becomes valid once the user explicitly types 0', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={onSave} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText('Total'), { target: { value: '0' } });
+    expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Salvar'));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].total).toBe(0);
+  });
+
+  it('edit mode is unaffected — an existing expense keeps its own total as valid by default', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal
+          isOpen
+          onClose={() => {}}
+          onSave={() => {}}
+          expense={{
+            id: 'e1',
+            type: ExpenseType.Comida,
+            total: 10,
+            date: new Date('2024-03-15T10:00:00.000'),
+            paymentType: PaymentType.Efectivo,
+            note: '',
+            isActive: true,
+            createdDate: new Date('2024-03-15T10:00:00.000'),
+            createdByName: '',
+          }}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
+    expect(screen.getByText('Salvar').closest('button')).not.toBeDisabled();
+  });
+});
+
 // ─── ExpenseList ─────────────────────────────────────────────────────────────
 
 import { ExpenseList } from '../expense-list';
