@@ -46,6 +46,9 @@ const messages: Record<string, string> = {
   // dialogs, e.g. order-item-list.component.ts:35-38 deactivateOrder)
   'GENERAL.DELETE_CONFIRM_TITLE': 'Confirmación para eliminar',
   'GENERAL.DELETE_CONFIRM_MESSAGE_A': '¿Está seguro que desea eliminar esta {name}?',
+  // GENERAL.DELETE_CONFIRM_MESSAGE (masculine variant, Angular vocabs/es.ts:159) — used by
+  // expense-list.component.ts:56 (onDeleteExpense) with name=GENERAL.EXPENSE.
+  'GENERAL.DELETE_CONFIRM_MESSAGE': '¿Está seguro que desea eliminar este {name}?',
   // GENERAL.CONFIRM_TITLE / GENERAL.WIZARD_DIRTY_MESSAGE (Angular vocabs/es.ts:175,190) —
   // the unsaved-changes SweetAlert shown by can-deactivate.guard.ts (view-text-parity).
   'GENERAL.CONFIRM_TITLE': 'Confirmación',
@@ -210,6 +213,9 @@ const messages: Record<string, string> = {
 
   // GENERAL.PAY — Angular's mat-form-field label for the cart's payment/tendered-amount input.
   'GENERAL.PAY': 'Pago',
+  // GENERAL.EXPENSE (Angular vocabs/es.ts:225) — the {name} interpolated into
+  // GENERAL.DELETE_CONFIRM_MESSAGE by expense-list.component.ts:56 (onDeleteExpense).
+  'GENERAL.EXPENSE': 'Gasto',
 
   // Products (Angular PRODUCT.* / PRODUCT_CATEGORY.* — literal Spanish strings from
   // frontend/src/app/_modules/i18n/vocabs/es.ts, kept byte-identical for L6 parity)
@@ -257,6 +263,10 @@ const messages: Record<string, string> = {
   // EDIT_PRODUCT_CATEGORY) for the per-category "edit" button, and EDIT_CATEGORY's Spanish
   // value in vocabs/es.ts is literally 'Categoría' — same text as NEW_PRODUCT_CATEGORY.
   'PRODUCT_CATEGORY.EDIT_CATEGORY': 'Categoría',
+  // PRODUCT.TEXT (Angular vocabs/es.ts:365) — used by Swal's DELETE_CONFIRM_MESSAGE_A
+  // interpolation in category-product-list.component.ts:88 (onDeleteProduct). Angular
+  // literally leaves this untranslated ('Product', not 'Producto') — preserved verbatim.
+  'PRODUCT.TEXT': 'Product',
   'PRODUCT.PRODUCTS': 'Productos',
   'PRODUCT.NEW_PRODUCT': 'Producto',
   'PRODUCT.NEW_PRODUCTS': 'Productos',
@@ -414,6 +424,9 @@ const messages: Record<string, string> = {
   'INVENTORY.CATEGORY_PRODUCT_NO_FOUND': 'No existe ningún producto disponible en la categoría',
   // Angular INVENTORY_ENTRY.* namespace (vocabs/es.ts:420-426) — today-entries add/edit modal
   // + today-entries empty state (was previously covered by the overloaded INVENTORY.EMPTY_STATE).
+  // INVENTORY_ENTRY.TEXT (Angular vocabs/es.ts:421) — used by Swal's DELETE_CONFIRM_MESSAGE_A
+  // interpolation in entry-list.component.ts:70 (onDeleteInventoryEntry).
+  'INVENTORY_ENTRY.TEXT': 'Entrada',
   'INVENTORY_ENTRY.ENTRIES_IN_DAY': 'Entradas del día',
   'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY': 'No existe ninguna entrada en el día',
   'INVENTORY_ENTRY.NEW_INVENTORY_ENTRY': 'Adicionar Entrada',

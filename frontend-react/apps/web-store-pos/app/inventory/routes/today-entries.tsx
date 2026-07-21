@@ -11,6 +11,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
+import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
 import { InventoryDailyEntries } from '../components/inventory-daily-entries';
 import { EditInventoryEntryModal } from '../components/edit-inventory-entry-modal';
 import type { EditInventoryEntryInput } from '../components/edit-inventory-entry-modal';
@@ -82,14 +83,43 @@ export function TodayEntriesPage() {
   // WU2 (service-return-shape-parity Slice 1): deactivate() now returns Result (never
   // throws) — check `.succeeded` instead of try/catch. Fase 4: renamed to
   // deleteInventoryEntry(productId, entryId) — Angular-exact param order.
-  function handleDeactivate(entry: InventoryEntryView) {
+  // Angular parity (entry-list.component.ts:57-94, onDeleteInventoryEntry): (1) isNotSoldEntry
+  // is checked FIRST — on failure, a blocking error Swal (GENERAL.ERROR + the guard's own
+  // description) and no confirm dialog; (2) otherwise a confirmDialog Swal
+  // (GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A with {name: INVENTORY_ENTRY.TEXT}); (3) on
+  // confirm, deleteInventoryEntry — on failure, a second blocking error Swal.
+  async function handleDeactivate(entry: InventoryEntryView) {
     const svc = new InventoryOfflineService(
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
+
+    const soldEntryResult = svc.isNotSoldEntry(entry.productId, entry.id);
+    if (!soldEntryResult.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        soldEntryResult.errors[0]?.description ?? '',
+      );
+      return;
+    }
+
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
+      message: intl.formatMessage(
+        { id: 'GENERAL.DELETE_CONFIRM_MESSAGE_A' },
+        { name: intl.formatMessage({ id: 'INVENTORY_ENTRY.TEXT' }) },
+      ),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
     const result = svc.deleteInventoryEntry(entry.productId, entry.id);
     if (!result.succeeded) {
-      console.error(result.errors[0]?.description ?? 'InventoryEntry could not be deactivated');
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        result.errors[0]?.description ?? '',
+      );
       return;
     }
     loadEntries();

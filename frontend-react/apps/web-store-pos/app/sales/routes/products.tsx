@@ -8,7 +8,7 @@ import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
-import { showBlockingError, showBlockingSuccess, showBlockingInfo } from '~/shared/lib/blocking-alert';
+import { showBlockingError, showBlockingSuccess, showBlockingInfo, confirmDialog } from '~/shared/lib/blocking-alert';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
@@ -144,8 +144,22 @@ export function ProductsPage() {
   }
 
   // --- Delete product ---
-  // Angular parity: deleteProduct always resolves success (soft-delete, never fails) — silent.
+  // Angular parity (category-product-list.component.ts:86-103, onDeleteProduct): a blocking
+  // confirmDialog Swal (question icon, GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A with
+  // {name: PRODUCT.TEXT}) gates the delete — only proceeds on isConfirmed. deleteProduct
+  // itself always resolves success (soft-delete, never fails) once confirmed.
   async function handleDeleteProduct(id: string) {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
+      message: intl.formatMessage(
+        { id: 'GENERAL.DELETE_CONFIRM_MESSAGE_A' },
+        { name: intl.formatMessage({ id: 'PRODUCT.TEXT' }) },
+      ),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
     await productService.deleteProduct(id);
     loadData();
     setModal(null);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { InventoryEntryView, Order, OrderItem, Product, ProductCategory } from '@store-mgmt/domain';
@@ -36,7 +36,21 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
     createInventoryEntry: vi.fn(),
     update: vi.fn(),
     deleteInventoryEntry: vi.fn(),
+    // Angular parity (entry-list.component.ts:57-94, onDeleteInventoryEntry): checked BEFORE
+    // the confirm dialog. Defaults to success so pre-existing scenarios that don't care about
+    // it keep passing.
+    isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
   })),
+}));
+
+// Angular parity (entry-list.component.ts:57-94, onDeleteInventoryEntry): the delete flow
+// is gated by a confirmDialog Swal, mirrored via the shared blocking-alert wrapper. Defaults
+// confirmDialog to resolving true so pre-existing handleDeactivate scenarios keep passing.
+const confirmDialogMock = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+const showBlockingErrorMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
 }));
 
 // Mutable fixtures for the EgressPage (Mayorista sale) tests below — declared here so the
@@ -380,10 +394,15 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
   beforeEach(() => {
     mockEgressProducts = [makeEgressProduct({ id: 'p1', name: 'Ron' })];
     mockEgressCategories = [makeCategory({ id: 'cat-1' })];
+    confirmDialogMock.mockClear();
+    confirmDialogMock.mockResolvedValue(true);
+    showBlockingErrorMock.mockClear();
   });
 
-  it('handleDeactivate: on Result.Failure, logs the error and does not crash (no throw to catch)', () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  // T2 (Angular parity, entry-list.component.ts:57-94 onDeleteInventoryEntry): confirmDialog
+  // gates the delete; on deleteInventoryEntry failure a second blocking error Swal replaces
+  // the previous console.error-only behavior.
+  it('T2: confirms via confirmDialog, then on deleteInventoryEntry failure shows a blocking error Swal', async () => {
     const todayEntries: InventoryEntryView[] = [
       { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
     ];
@@ -401,6 +420,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
           createInventoryEntry: vi.fn(),
           update: vi.fn(),
           deleteInventoryEntry: deactivateMock,
+          isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -411,13 +431,20 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     );
     fireEvent.click(screen.getByText('Eliminar'));
 
-    expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1');
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    consoleErrorSpy.mockRestore();
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledWith({
+      title: 'Confirmación para eliminar',
+      message: '¿Está seguro que desea eliminar esta Entrada?',
+      confirmButtonText: 'Si',
+      cancelButtonText: 'No',
+    }));
+    await waitFor(() => expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1'));
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      'Error',
+      'Existe una venta que corresponde con esta entrada.',
+    );
   });
 
-  it('handleDeactivate: on Result.Success, reloads entries (no console.error)', () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('T2: confirms via confirmDialog, then on deleteInventoryEntry success reloads entries (no Swal)', async () => {
     const todayEntries: InventoryEntryView[] = [
       { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
     ];
@@ -433,6 +460,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
           createInventoryEntry: vi.fn(),
           update: vi.fn(),
           deleteInventoryEntry: deactivateMock,
+          isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
         }) as unknown as InstanceType<typeof InventoryOfflineService>,
     );
 
@@ -444,10 +472,79 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     const callsBeforeClick = getByDateMock.mock.calls.length;
     fireEvent.click(screen.getByText('Eliminar'));
 
-    expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1');
+    await waitFor(() => expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1'));
     expect(getByDateMock.mock.calls.length).toBeGreaterThan(callsBeforeClick);
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
-    consoleErrorSpy.mockRestore();
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('T2: isNotSoldEntry failure shows the blocking error Swal and skips the confirm dialog entirely', async () => {
+    const todayEntries: InventoryEntryView[] = [
+      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+    ];
+    const deactivateMock = vi.fn();
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          createInventoryEntry: vi.fn(),
+          update: vi.fn(),
+          deleteInventoryEntry: deactivateMock,
+          isNotSoldEntry: vi.fn().mockReturnValue({
+            succeeded: false,
+            errors: [{ code: 'Inventory.SaleExistsWithThisEntry', description: 'Existe una venta que corresponde con esta entrada.' }],
+          }),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('Eliminar'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Existe una venta que corresponde con esta entrada.',
+      ),
+    );
+    expect(confirmDialogMock).not.toHaveBeenCalled();
+    expect(deactivateMock).not.toHaveBeenCalled();
+  });
+
+  it('T2: does NOT call deleteInventoryEntry when the confirmDialog is cancelled', async () => {
+    const todayEntries: InventoryEntryView[] = [
+      { id: 'e1', productId: 'p1', productName: 'Ron', quantity: 5, costPrice: 3, date: new Date(), isActive: true },
+    ];
+    const deactivateMock = vi.fn();
+    confirmDialogMock.mockResolvedValueOnce(false);
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm(todayEntries)),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          createInventoryEntry: vi.fn(),
+          update: vi.fn(),
+          deleteInventoryEntry: deactivateMock,
+          isNotSoldEntry: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('Eliminar'));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
+    expect(deactivateMock).not.toHaveBeenCalled();
   });
 
   it('handleSave (create): on DataResult failure, shows the modal error from errors[0].description', async () => {

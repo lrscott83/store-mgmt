@@ -86,10 +86,15 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
 const showBlockingErrorMock = vi.fn();
 const showBlockingSuccessMock = vi.fn((..._args: unknown[]) => Promise.resolve());
 const showBlockingInfoMock = vi.fn((..._args: unknown[]) => Promise.resolve());
+// Angular parity (category-product-list.component.ts:86-103, onDeleteProduct): a confirmDialog
+// Swal gates deleteProduct. Defaults to resolving true so pre-existing delete-flow tests that
+// don't care about the confirm step keep passing; tests exercising cancel override this.
+const confirmDialogMock = vi.fn((..._args: unknown[]) => Promise.resolve(true));
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
   showBlockingSuccess: (...args: unknown[]) => showBlockingSuccessMock(...args),
   showBlockingInfo: (...args: unknown[]) => showBlockingInfoMock(...args),
+  confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -134,6 +139,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     productServiceSpies.updateProduct.mockClear();
     productServiceSpies.updateProduct.mockResolvedValue(okEnvelope);
     productServiceSpies.deleteProduct.mockClear();
+    confirmDialogMock.mockClear();
+    confirmDialogMock.mockResolvedValue(true);
     productServiceSpies.getMaxOrder.mockClear();
     productServiceSpies.getMaxOrder.mockResolvedValue({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
     categoryServiceSpies.createProductCategory.mockClear();
@@ -423,8 +430,11 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.queryByTestId('confirm-delete-button')).not.toBeInTheDocument();
   });
 
-  // Angular parity: handleDeleteProduct routes through the async deleteProduct(id) surface.
-  it('calls deleteProduct(id) from the product row action menu (WU4.3)', async () => {
+  // Angular parity (category-product-list.component.ts:86-103, onDeleteProduct): a
+  // confirmDialog Swal (question icon, GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A with
+  // {name: PRODUCT.TEXT}, GENERAL.YES/NO) gates the delete — deleteProduct(id) only fires
+  // on isConfirmed.
+  it('T1: confirms via confirmDialog with the exact Angular keys, then calls deleteProduct(id) (WU4.3)', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
 
@@ -438,7 +448,34 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByLabelText('Acciones'));
     fireEvent.click(screen.getByText('Eliminar Producto'));
 
+    await waitFor(() =>
+      expect(confirmDialogMock).toHaveBeenCalledWith({
+        title: 'Confirmación para eliminar',
+        message: '¿Está seguro que desea eliminar esta Product?',
+        confirmButtonText: 'Si',
+        cancelButtonText: 'No',
+      }),
+    );
     await waitFor(() => expect(productServiceSpies.deleteProduct).toHaveBeenCalledWith('prod-1'));
+  });
+
+  it('T1: does NOT call deleteProduct when the confirmDialog is cancelled', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    confirmDialogMock.mockResolvedValueOnce(false);
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Eliminar Producto'));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
+    expect(productServiceSpies.deleteProduct).not.toHaveBeenCalled();
   });
 
   // Angular has no updateMany (removed): the bulk price-edit UI re-expresses as a per-item
