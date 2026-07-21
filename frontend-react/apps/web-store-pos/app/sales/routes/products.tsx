@@ -7,7 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
+import { PlusIcon, PaperclipIcon, ChevronDownIcon } from '~/shared/components/ui/icons';
 import { showBlockingError, showBlockingSuccess, showBlockingInfo, confirmDialog } from '~/shared/lib/blocking-alert';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
@@ -309,16 +309,7 @@ export function ProductsPage() {
                     aria-label="Expandir o contraer categoría"
                     aria-expanded={isExpanded}
                   >
-                    {/* Angular's mat-expansion-panel toggle indicator (rotates when open). */}
-                    <svg
-                      className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                    </svg>
+                    <ChevronDownIcon isExpanded={isExpanded} />
                   </button>
                 </div>
                 {isExpanded && (

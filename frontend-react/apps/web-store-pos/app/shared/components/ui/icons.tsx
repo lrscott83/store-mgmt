@@ -61,6 +61,25 @@ export function SettingsIcon({ className = '' }: IconProps) {
   );
 }
 
+/**
+ * Angular Material's `mat-expansion-panel` toggle indicator (a chevron that rotates 180°
+ * when its panel is expanded). Extracted from the one-off inline SVG that used to live only
+ * in `products.tsx` so every collapsible-panel header can share it.
+ */
+export function ChevronDownIcon({ className = '', isExpanded = false }: IconProps & { isExpanded?: boolean }) {
+  return (
+    <svg
+      className={`${BASE} transition-transform ${isExpanded ? 'rotate-180' : ''} ${className}`.trim()}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+    </svg>
+  );
+}
+
 /** Material `close` (modal header/footer close button, e.g. edit-expense-modal.component.html:7,71). */
 export function CloseIcon({ className = '' }: IconProps) {
   return (
