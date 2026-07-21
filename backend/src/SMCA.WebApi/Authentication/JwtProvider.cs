@@ -27,12 +27,16 @@ namespace SMCA.WebApi.Authentication
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256);
 
+            // Fallback to 35 days if unconfigured/zero — a 0 would mint
+            // instantly-expired tokens. Matches the client's offline window.
+            var lifetimeDays = _jwtOptions.TokenLifetimeDays > 0 ? _jwtOptions.TokenLifetimeDays : 35;
+
             var token = new JwtSecurityToken(
                 _jwtOptions.Issuer,
                 _jwtOptions.Audience,
                 claims,
                 null,
-                DateTime.UtcNow.AddHours(1),
+                DateTime.UtcNow.AddDays(lifetimeDays),
                 signingCredentials);
 
             string userToken = new JwtSecurityTokenHandler().WriteToken(token);
