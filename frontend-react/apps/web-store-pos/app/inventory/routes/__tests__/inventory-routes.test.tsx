@@ -402,6 +402,28 @@ describe('TodayEntriesPage — edit/deactivate actions stay reachable (regressio
   });
 });
 
+describe('TodayEntriesPage — empty-day message (Angular parity: today-entries.component.html:18-20)', () => {
+  it('shows the entry-specific empty message, not EntryList’s generic product message, when the day has no entries', () => {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([])),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+
+    // Angular shows INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY on an empty day; EntryList's generic
+    // empty branch renders the product-oriented INVENTORY.NO_ENTRY_FOUND, which is wrong here.
+    expect(screen.getByText('No existe ninguna entrada en el día')).toBeInTheDocument();
+    expect(screen.queryByText('No existe ningún producto disponible')).not.toBeInTheDocument();
+  });
+});
+
 // WU2 (service-return-shape-parity Slice 1): create/update/deactivate no longer throw — they
 // return DataResult<InventoryEntryView> / Result. handleSave/handleDeactivate must check
 // `.succeeded` instead of try/catch (task 2.12).

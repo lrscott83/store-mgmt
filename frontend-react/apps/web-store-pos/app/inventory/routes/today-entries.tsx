@@ -9,6 +9,7 @@ import { InventoryOfflineService } from '../lib/services/inventory-offline-servi
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { Card } from '~/shared/components/ui/card';
+import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
 import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
@@ -176,13 +177,22 @@ export function TodayEntriesPage() {
         </div>
       }
     >
-      <EntryList
-        entries={entries}
-        onEdit={handleEdit}
-        onDeactivate={handleDeactivate}
-        readOnly={false}
-        isOwnerAdmin={isOwnerAdmin}
-      />
+      {/* Angular parity (today-entries.component.html:18-20): the parent owns the empty state
+          with the entry-specific message, rather than falling through to EntryList's generic
+          product-oriented empty text. */}
+      {entries.length === 0 ? (
+        <InfoBox variant="primary" className="text-center">
+          {intl.formatMessage({ id: 'INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY' })}
+        </InfoBox>
+      ) : (
+        <EntryList
+          entries={entries}
+          onEdit={handleEdit}
+          onDeactivate={handleDeactivate}
+          readOnly={false}
+          isOwnerAdmin={isOwnerAdmin}
+        />
+      )}
 
       <EditInventoryEntryModal
         isOpen={isModalOpen}
