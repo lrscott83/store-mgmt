@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
 
@@ -126,8 +127,11 @@ export function SaleCreditsPage() {
                 <span className="text-sm font-medium text-text">
                   {formatDateOnly(dateSaleCredit.date)} ({dateSaleCredit.creditsCount})
                 </span>
-                <span className="text-sm font-semibold text-danger">
-                  ${dateSaleCredit.creditsTotal.toFixed(2)}
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-danger">
+                    ${dateSaleCredit.creditsTotal.toFixed(2)}
+                  </span>
+                  <ChevronDownIcon isExpanded={isExpanded} />
                 </span>
               </button>
               {isExpanded && (

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Order } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { OrderItemList } from './order-item-list';
 
 interface OrderListProps {
@@ -100,6 +101,7 @@ export function OrderList({ orders, readOnly = true, onEditOrder, onDeactivateOr
                 <span className="text-sm font-semibold text-text">
                   ${getOrderTotal(order).toFixed(2)}
                 </span>
+                <ChevronDownIcon isExpanded={isExpanded} />
               </span>
             </button>
             {isExpanded && (

@@ -37,18 +37,18 @@ Chain strategy: pending
 
 Each screen already has `<button className="flex ... justify-between">` header with a right-side span and per-item `isExpanded` derived from a `Set<string>`. Wrap the existing right-side content plus `<ChevronDownIcon isExpanded={...} />` in `<span className="flex items-center gap-2">` (or append to the existing right-side flex span for `order-list.tsx`, which already has one).
 
-- [ ] 2.1 RED: `expenses-history.test.tsx` — add assertion: day-panel header renders a chevron; chevron has `rotate-180` iff panel expanded; clicking header still toggles body (extend existing toggle test, don't replace it).
-- [ ] 2.2 GREEN: `apps/web-store-pos/app/expenses/routes/expenses-history.tsx` (~L177-184) — wrap amount span + `ChevronDownIcon isExpanded={isExpanded}` in a right-cluster span.
-- [ ] 2.3 RED: `entries.test.tsx` — same 3 assertions as 2.1 for the inventory-entries day-panel.
-- [ ] 2.4 GREEN: `apps/web-store-pos/app/inventory/routes/entries.tsx` (~L155-161) — same wrap pattern as 2.2.
-- [ ] 2.5 RED: `inventory-product-list.test.tsx` — same 3 assertions for the category panel (covers `available.tsx` consumer transitively).
-- [ ] 2.6 GREEN: `apps/web-store-pos/app/inventory/components/inventory-product-list.tsx` (~L86-93) — same wrap pattern.
-- [ ] 2.7 RED: `order-list.test.tsx` — same 3 assertions for the order panel (covers `orders.tsx`/`today-orders` route consumers transitively).
-- [ ] 2.8 GREEN: `apps/web-store-pos/app/sales/components/order-list.tsx` (~L95-103) — right side is ALREADY `flex items-center gap-2` (PaymentTypeIcon+amount); append `<ChevronDownIcon isExpanded={isExpanded} />` as the last child, no new wrapper.
-- [ ] 2.9 RED: `orders.test.tsx` — same 3 assertions for the date-group panel.
-- [ ] 2.10 GREEN: `apps/web-store-pos/app/sales/routes/orders.tsx` (~L189-192) — same wrap pattern as 2.2.
-- [ ] 2.11 RED: `credits.test.tsx` — same 3 assertions for the date-group panel.
-- [ ] 2.12 GREEN: `apps/web-store-pos/app/credits/routes/credits.tsx` (~L126-131) — wrap amount span + chevron.
+- [x] 2.1 RED: `expenses-history.test.tsx` — add assertion: day-panel header renders a chevron; chevron has `rotate-180` iff panel expanded; clicking header still toggles body (extend existing toggle test, don't replace it). (Actual file: `expenses/routes/__tests__/expenses-routes.test.tsx`.)
+- [x] 2.2 GREEN: `apps/web-store-pos/app/expenses/routes/expenses-history.tsx` (~L177-184) — wrap amount span + `ChevronDownIcon isExpanded={isExpanded}` in a right-cluster span.
+- [x] 2.3 RED: `entries.test.tsx` — same 3 assertions as 2.1 for the inventory-entries day-panel. (Actual file: `inventory/routes/__tests__/inventory-routes.test.tsx`.)
+- [x] 2.4 GREEN: `apps/web-store-pos/app/inventory/routes/entries.tsx` (~L155-161) — same wrap pattern as 2.2.
+- [x] 2.5 RED: `inventory-product-list.test.tsx` — same 3 assertions for the category panel (covers `available.tsx` consumer transitively). (Actual file: `inventory/components/__tests__/inventory-components.test.tsx`.)
+- [x] 2.6 GREEN: `apps/web-store-pos/app/inventory/components/inventory-product-list.tsx` (~L86-93) — same wrap pattern.
+- [x] 2.7 RED: `order-list.test.tsx` — same 3 assertions for the order panel (covers `orders.tsx`/`today-orders` route consumers transitively). (Actual file: `sales/components/__tests__/order-components.test.tsx`.)
+- [x] 2.8 GREEN: `apps/web-store-pos/app/sales/components/order-list.tsx` (~L95-103) — right side is ALREADY `flex items-center gap-2` (PaymentTypeIcon+amount); append `<ChevronDownIcon isExpanded={isExpanded} />` as the last child, no new wrapper.
+- [x] 2.9 RED: `orders.test.tsx` — same 3 assertions for the date-group panel. (Actual file: `sales/routes/__tests__/sales-routes.test.tsx`.)
+- [x] 2.10 GREEN: `apps/web-store-pos/app/sales/routes/orders.tsx` (~L189-192) — same wrap pattern as 2.2.
+- [x] 2.11 RED: `credits.test.tsx` — same 3 assertions for the date-group panel. (Actual file: `sales/routes/__tests__/credits-routes.test.tsx`; actual page path is `sales/routes/credits.tsx`, not `credits/routes/credits.tsx`.)
+- [x] 2.12 GREEN: `apps/web-store-pos/app/sales/routes/credits.tsx` (~L126-131) — wrap amount span + chevron.
 
 ## Phase 3: today-stats.tsx Restructure (details → controlled)
 

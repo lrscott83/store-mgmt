@@ -206,4 +206,39 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
     // Angular parity: history always calls the filter with four nulls.
     expect(filter).toHaveBeenCalledWith(null, null, null, null);
   });
+
+  // Parity fix (collapsible-panel-chevron-parity): the date-group panel header must render
+  // the shared ChevronDownIcon and rotate it (rotate-180) iff the panel is expanded.
+  it('renders a chevron on the date-panel header that rotates iff the panel is expanded', async () => {
+    const filter = vi.fn().mockResolvedValue({
+      data: [makeCredit({ total: 40, date: new Date('2024-03-15T10:00:00.000') })],
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: filter,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    const toggle = await screen.findByTestId('credit-date-panel-toggle-2024-03-15');
+    const svgClass = () => toggle.querySelector('svg')?.getAttribute('class') ?? '';
+    expect(toggle.querySelector('svg')).toBeInTheDocument();
+    expect(svgClass()).not.toContain('rotate-180');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(svgClass()).toContain('rotate-180');
+  });
 });

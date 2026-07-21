@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { OrderList } from '../components/order-list';
 
@@ -189,7 +190,10 @@ export function OrdersPage() {
                 <span className="text-sm font-medium text-text">
                   {formatDateOnly(dateOrder.date)} ({dateOrder.count})
                 </span>
-                <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
+                  <ChevronDownIcon isExpanded={isExpanded} />
+                </span>
               </button>
               {isExpanded && (
                 <div className="border-t border-border px-4 py-3">

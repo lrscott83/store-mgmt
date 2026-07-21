@@ -767,6 +767,26 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
     expect(screen.queryByText('Hasta')).not.toBeInTheDocument();
     expect(screen.queryAllByRole('radio')).toHaveLength(0);
   });
+
+  // Parity fix (collapsible-panel-chevron-parity): the day-panel header must render the
+  // shared ChevronDownIcon and rotate it (rotate-180) iff the panel is expanded.
+  it('renders a chevron on the day-panel header that rotates iff the panel is expanded', () => {
+    mockEntries([...dayOneEntries]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+    const toggle = screen.getByTestId('entry-day-panel-toggle-2026-06-30');
+    const svgClass = () => toggle.querySelector('svg')?.getAttribute('class') ?? '';
+    expect(toggle.querySelector('svg')).toBeInTheDocument();
+    expect(svgClass()).not.toContain('rotate-180');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(svgClass()).toContain('rotate-180');
+  });
 });
 
 // ─── EntriesPage — read-only history (Angular parity, diff-matrix #19) ──────

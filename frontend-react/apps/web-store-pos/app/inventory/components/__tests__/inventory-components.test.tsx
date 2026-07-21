@@ -187,6 +187,25 @@ describe('InventoryProductList — collapsible accordion (Angular parity)', () =
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'coca' } });
     expect(screen.getByText('Coca Cola')).toBeInTheDocument();
   });
+
+  // Parity fix (collapsible-panel-chevron-parity): the category header must render the
+  // shared ChevronDownIcon and rotate it (rotate-180) iff the category is expanded.
+  it('renders a chevron on the category header that rotates iff the category is expanded', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    const toggle = screen.getByTestId('inventory-category-toggle-cat1');
+    const svgClass = () => toggle.querySelector('svg')?.getAttribute('class') ?? '';
+    expect(toggle.querySelector('svg')).toBeInTheDocument();
+    expect(svgClass()).not.toContain('rotate-180');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(svgClass()).toContain('rotate-180');
+  });
 });
 
 // ─── InventoryProductList — weighted avg cost + total value (gap #4/#5, Angular parity) ────

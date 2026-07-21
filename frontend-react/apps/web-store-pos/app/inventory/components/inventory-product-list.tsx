@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 
 interface InventoryProductListProps {
@@ -86,10 +87,13 @@ export function InventoryProductList({ categories }: InventoryProductListProps) 
                 <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wide">
                   {cat.categoryName} ({cat.totalQuantity})
                 </h2>
-                {/* Category total inventory value — Angular's mat-expansion-panel-header
-                    category.totalCostPrice chip (inventory-available.component.html:26). */}
-                <span className="text-sm font-semibold text-primary">
-                  ${cat.totalCostPrice.toFixed(2)}
+                <span className="flex items-center gap-2">
+                  {/* Category total inventory value — Angular's mat-expansion-panel-header
+                      category.totalCostPrice chip (inventory-available.component.html:26). */}
+                  <span className="text-sm font-semibold text-primary">
+                    ${cat.totalCostPrice.toFixed(2)}
+                  </span>
+                  <ChevronDownIcon isExpanded={isExpanded} />
                 </span>
               </button>
               {isExpanded && (

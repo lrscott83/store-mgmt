@@ -186,6 +186,27 @@ describe('OrderList', () => {
     expect(screen.getByTestId('edit-order-button')).toBeInTheDocument();
     expect(screen.queryByTestId('deactivate-order-button')).toBeNull();
   });
+
+  // Parity fix (collapsible-panel-chevron-parity): the order-panel header must render the
+  // shared ChevronDownIcon and rotate it (rotate-180) iff the order panel is expanded.
+  it('renders a chevron on the order-panel header that rotates iff the panel is expanded', () => {
+    const orders = [makeOrder({ id: 'o1' })];
+    render(
+      <Wrapper>
+        <OrderList orders={orders} />
+      </Wrapper>,
+    );
+    const toggle = screen.getByTestId('order-panel-toggle-o1');
+    const svgs = () => Array.from(toggle.querySelectorAll('svg'));
+    const chevron = () => svgs()[svgs().length - 1]; // last svg is the chevron (PaymentTypeIcon is first)
+    expect(chevron()).toBeInTheDocument();
+    expect(chevron()?.getAttribute('class') ?? '').not.toContain('rotate-180');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(chevron()?.getAttribute('class') ?? '').toContain('rotate-180');
+  });
 });
 
 // --- EditOrderModal (matches Angular's edit-order-modal.component: payment-type only) ---

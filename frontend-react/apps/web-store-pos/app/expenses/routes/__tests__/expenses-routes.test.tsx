@@ -377,6 +377,39 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
   });
 
+  // Parity fix (collapsible-panel-chevron-parity): the day-panel header must render the
+  // shared ChevronDownIcon and rotate it (rotate-180) iff the panel is expanded.
+  it('renders a chevron on the day-panel header that rotates iff the panel is expanded', async () => {
+    const day1 = makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 });
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          filterExpensesObservable: vi.fn().mockReturnValue(expensesResponse([day1])),
+          create: vi.fn(),
+          update: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <ExpensesHistoryPage />
+      </Wrapper>,
+    );
+
+    const toggle = await screen.findByTestId('expense-day-panel-toggle-2024-03-15');
+    const svgClass = () => toggle.querySelector('svg')?.getAttribute('class') ?? '';
+    expect(toggle.querySelector('svg')).toBeInTheDocument();
+    expect(svgClass()).not.toContain('rotate-180');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // Toggle behavior unchanged: clicking still expands the panel (aria-expanded flips)
+    // AND the chevron rotates in lockstep.
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(svgClass()).toContain('rotate-180');
+  });
+
   it('filters by payment type', async () => {
     const cash = makeExpense({ id: 'a', paymentType: PaymentType.Efectivo, total: 10 });
     const card = makeExpense({ id: 'b', paymentType: PaymentType.Tarjeta, total: 25 });

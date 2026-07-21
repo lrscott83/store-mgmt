@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
 
@@ -178,8 +179,11 @@ export function ExpensesHistoryPage() {
                   <span className="text-sm font-medium text-text">
                     {formatDateOnly(dayGroup.date)} ({dayGroup.count})
                   </span>
-                  <span className="text-sm font-semibold text-danger">
-                    ${dayGroup.total.toFixed(2)}
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-danger">
+                      ${dayGroup.total.toFixed(2)}
+                    </span>
+                    <ChevronDownIcon isExpanded={isExpanded} />
                   </span>
                 </button>
                 {isExpanded && (

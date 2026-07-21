@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
 import type { Order, SaleCredit, Product, ProductCategory } from '@store-mgmt/domain';
+import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 
 // --- Global mocks ---
 
@@ -185,6 +186,39 @@ describe('OrdersPage — smoke render', () => {
     );
     expect(screen.getByText('Historial de Ventas')).toBeInTheDocument();
     expect(screen.getByText('No se encontró ninguna venta')).toBeInTheDocument();
+  });
+
+  // Parity fix (collapsible-panel-chevron-parity): the date-group panel header must render
+  // the shared ChevronDownIcon and rotate it (rotate-180) iff the panel is expanded.
+  it('renders a chevron on the date-panel header that rotates iff the panel is expanded', () => {
+    const order = makeOrder({ id: 'o1', date: new Date('2025-01-01T10:00:00Z') });
+    vi.mocked(OrderOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getStorageOrders: vi.fn().mockReturnValue([order]),
+          getActiveOrdersInDay: vi.fn().mockReturnValue([]),
+          getCategoryCartItemsView: vi.fn().mockReturnValue({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] }),
+          deactivateOrder: vi.fn().mockReturnValue({ succeeded: true, errors: [] }),
+          updateTodayOrder: vi.fn().mockReturnValue({ data: undefined, succeeded: true, errors: [] }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+
+    const toggle = screen.getByTestId('date-panel-toggle-2025-01-01');
+    const svgClass = () => toggle.querySelector('svg')?.getAttribute('class') ?? '';
+    expect(toggle.querySelector('svg')).toBeInTheDocument();
+    expect(svgClass()).not.toContain('rotate-180');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(svgClass()).toContain('rotate-180');
   });
 });
 

@@ -10,6 +10,7 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { EntryList } from '../components/entry-list';
 
 export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
@@ -156,8 +157,11 @@ export function EntriesPage() {
                   <span className="text-sm font-medium text-text">
                     {formatDateOnly(dayGroup.date)}
                   </span>
-                  <span className="text-sm font-semibold text-primary">
-                    ${dayGroup.total.toFixed(2)}
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-primary">
+                      ${dayGroup.total.toFixed(2)}
+                    </span>
+                    <ChevronDownIcon isExpanded={isExpanded} />
                   </span>
                 </button>
                 {isExpanded && (
