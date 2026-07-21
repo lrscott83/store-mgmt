@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { PaymentType, OrderType, ExpenseType, EModules } from '@store-mgmt/domain';
@@ -155,6 +155,8 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
       </Wrapper>,
     );
     expect(screen.getByText('Resumen Efectivo')).toBeInTheDocument();
+    // Panel body (the "Ventas" row) is collapsed by default — expand it first.
+    fireEvent.click(screen.getByRole('button', { name: /Resumen Efectivo/ }));
     expect(screen.getByText('Ventas')).toBeInTheDocument();
     // No expenses module available in default mock user -> Gastos row and panel hidden
     expect(screen.queryByText('Gastos')).toBeNull();
@@ -230,5 +232,101 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     // Angular's literal template bug: header shows getPaidSaleCreditsTotal() (a currency
     // sum), not a count, inside the "(...)" slot — preserved verbatim, see today-stats.tsx.
     expect(await screen.findByText('Créditos Pagados (60)')).toBeInTheDocument();
+  });
+
+  // Parity fix (collapsible-panel-chevron-parity): ExpansionPanel converts from uncontrolled
+  // <details>/<summary> to a controlled div+button+useState+conditional-body pattern (matching
+  // the other 6 list-screen panels), preserving exact default-collapsed + independent-toggle
+  // semantics (guards ADR-2), and now renders a rotating ChevronDownIcon.
+  describe('ExpansionPanel — controlled restructure (collapsible-panel-chevron-parity)', () => {
+    it('defaults every panel to collapsed (body not rendered)', async () => {
+      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+      mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(
+        creditsEnvelope([makeCredit({ total: 40, client: 'Ana' })]),
+      );
+
+      render(
+        <Wrapper>
+          <TodayStatsPage />
+        </Wrapper>,
+      );
+
+      // Panel headers/titles are always visible (they're on the button itself)...
+      expect(await screen.findByText('Gastos (1)')).toBeInTheDocument();
+      expect(await screen.findByText('Créditos Por Cobrar (1)')).toBeInTheDocument();
+      // ...but panel BODY content is not rendered until expanded.
+      expect(screen.queryByText('Ana')).not.toBeInTheDocument();
+    });
+
+    it('opens a panel on click, revealing its body, and renders a chevron rotated only while open', async () => {
+      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+
+      render(
+        <Wrapper>
+          <TodayStatsPage />
+        </Wrapper>,
+      );
+
+      const toggle = await screen.findByRole('button', { name: /Gastos \(1\)/ });
+      const svgClass = () => toggle.querySelector('svg')?.getAttribute('class') ?? '';
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(svgClass()).not.toContain('rotate-180');
+      expect(screen.queryByText('Otro')).not.toBeInTheDocument(); // EXPENSES.TYPE.OTRO row, body-only
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(svgClass()).toContain('rotate-180');
+      expect(screen.getByText('Otro')).toBeInTheDocument();
+    });
+
+    it('closes an open panel on a second click (body removed again, chevron un-rotates)', async () => {
+      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+
+      render(
+        <Wrapper>
+          <TodayStatsPage />
+        </Wrapper>,
+      );
+
+      const toggle = await screen.findByRole('button', { name: /Gastos \(1\)/ });
+      fireEvent.click(toggle);
+      expect(screen.getByText('Otro')).toBeInTheDocument();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle.querySelector('svg')?.getAttribute('class') ?? '').not.toContain('rotate-180');
+      expect(screen.queryByText('Otro')).not.toBeInTheDocument();
+    });
+
+    it('toggles two panel instances independently', async () => {
+      mockGetExpensesInDayObservable.mockResolvedValue(expensesEnvelope([makeExpense({ total: 15 })]));
+      mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(
+        creditsEnvelope([makeCredit({ total: 40, client: 'Ana' })]),
+      );
+
+      render(
+        <Wrapper>
+          <TodayStatsPage />
+        </Wrapper>,
+      );
+
+      const expensesToggle = await screen.findByRole('button', { name: /Gastos \(1\)/ });
+      const creditsToggle = screen.getByRole('button', { name: /Créditos Por Cobrar \(1\)/ });
+
+      // Expand only the Gastos panel — Créditos body must stay collapsed.
+      fireEvent.click(expensesToggle);
+      expect(screen.getByText('Otro')).toBeInTheDocument();
+      expect(screen.queryByText('Ana')).not.toBeInTheDocument();
+
+      // Now expand the Créditos panel too — both bodies visible, independently controlled.
+      fireEvent.click(creditsToggle);
+      expect(screen.getByText('Otro')).toBeInTheDocument();
+      expect(screen.getByText('Ana')).toBeInTheDocument();
+
+      // Collapsing Gastos again must not affect the still-open Créditos panel.
+      fireEvent.click(expensesToggle);
+      expect(screen.queryByText('Otro')).not.toBeInTheDocument();
+      expect(screen.getByText('Ana')).toBeInTheDocument();
+    });
   });
 });

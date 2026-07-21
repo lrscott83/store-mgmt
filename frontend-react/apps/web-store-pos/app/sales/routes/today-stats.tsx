@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { Card } from '~/shared/components/ui/card';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
@@ -42,8 +43,12 @@ function valueClassName(value: number): string {
 }
 
 /**
- * `<details>`/`<summary>` panel matching Angular Material's `mat-expansion-panel`
- * (collapsed by default, `[expanded]="false"` in every panel on this view).
+ * Controlled panel matching Angular Material's `mat-expansion-panel` (collapsed by default,
+ * `[expanded]="false"` in every panel on this view). Converted from an uncontrolled
+ * `<details>/<summary>` to a `div + button(aria-expanded) + conditional body` pattern —
+ * matching the other 6 list-screen panels — so it can host the shared rotating
+ * `ChevronDownIcon` (collapsible-panel-chevron-parity). Each instance owns its own
+ * `isOpen` state, so multiple panels toggle independently.
  */
 function ExpansionPanel({
   title,
@@ -56,14 +61,24 @@ function ExpansionPanel({
   amountClassName: string;
   children: React.ReactNode;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <details className="border-b border-border last:border-0">
-      <summary className="flex cursor-pointer list-none items-center justify-between p-2 text-sm font-medium text-text hover:bg-primary-light/40">
+    <div className="border-b border-border last:border-0">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex w-full cursor-pointer items-center justify-between p-2 text-left text-sm font-medium text-text hover:bg-primary-light/40"
+        aria-expanded={isOpen}
+      >
         <span>{title}</span>
-        <span className={amountClassName}>{amount}</span>
-      </summary>
-      <div className="p-2">{children}</div>
-    </details>
+        <span className="flex items-center gap-2">
+          <span className={amountClassName}>{amount}</span>
+          <ChevronDownIcon isExpanded={isOpen} />
+        </span>
+      </button>
+      {isOpen && <div className="p-2">{children}</div>}
+    </div>
   );
 }
 

@@ -52,11 +52,11 @@ Each screen already has `<button className="flex ... justify-between">` header w
 
 ## Phase 3: today-stats.tsx Restructure (details → controlled)
 
-- [ ] 3.1 RED: In `apps/web-store-pos/app/sales/routes/today-stats.test.tsx`, add tests for the local `ExpansionPanel`: defaults to collapsed (body not in DOM/hidden), clicking header opens it, clicking again closes it, and two independent panel instances toggle independently (guards ADR-2).
-- [ ] 3.2 RED: Extend the same test file to assert each panel header renders `ChevronDownIcon` with `rotate-180` present only when that panel is expanded.
-- [ ] 3.3 GREEN: In `apps/web-store-pos/app/sales/routes/today-stats.tsx`, convert `ExpansionPanel` (L48-68) from `<details>/<summary>` to `div + button(aria-expanded) + conditional body`, backed by local `useState(false)` per instance (component-scoped, not lifted to parent) — preserving default-collapsed + independent-toggle semantics.
-- [ ] 3.4 GREEN: In the same `ExpansionPanel`, render `<ChevronDownIcon isExpanded={isOpen} />` next to the amount span in the header's right cluster.
-- [ ] 3.5 Verify panel body content/markup for all 5 `ExpansionPanel` call sites (Resumen Efectivo, Gastos, Créditos Por Cobrar, Créditos Pagados, Ventas) is byte-identical to pre-change — no accidental content diffs.
+- [x] 3.1 RED: In `apps/web-store-pos/app/sales/routes/today-stats.test.tsx`, add tests for the local `ExpansionPanel`: defaults to collapsed (body not in DOM/hidden), clicking header opens it, clicking again closes it, and two independent panel instances toggle independently (guards ADR-2). (Actual file: `sales/routes/__tests__/today-stats.test.tsx`.)
+- [x] 3.2 RED: Extend the same test file to assert each panel header renders `ChevronDownIcon` with `rotate-180` present only when that panel is expanded.
+- [x] 3.3 GREEN: In `apps/web-store-pos/app/sales/routes/today-stats.tsx`, convert `ExpansionPanel` (L48-68) from `<details>/<summary>` to `div + button(aria-expanded) + conditional body`, backed by local `useState(false)` per instance (component-scoped, not lifted to parent) — preserving default-collapsed + independent-toggle semantics.
+- [x] 3.4 GREEN: In the same `ExpansionPanel`, render `<ChevronDownIcon isExpanded={isOpen} />` next to the amount span in the header's right cluster.
+- [x] 3.5 Verify panel body content/markup for all 5 `ExpansionPanel` call sites (Resumen Efectivo, Gastos, Créditos Por Cobrar, Créditos Pagados, Ventas) is byte-identical to pre-change — no accidental content diffs. (Confirmed: only wrapper markup changed `<details>`→`div+button`; children props/JSX passed to each call site untouched.)
 
 ## Phase 4: tutorial.tsx Restructure (details → controlled)
 
