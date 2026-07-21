@@ -12,7 +12,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
 import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
-import { InventoryDailyEntries } from '../components/inventory-daily-entries';
+import { EntryList } from '../components/entry-list';
 import { EditInventoryEntryModal } from '../components/edit-inventory-entry-modal';
 import type { EditInventoryEntryInput } from '../components/edit-inventory-entry-modal';
 
@@ -176,10 +176,11 @@ export function TodayEntriesPage() {
         </div>
       }
     >
-      <InventoryDailyEntries
+      <EntryList
         entries={entries}
         onEdit={handleEdit}
         onDeactivate={handleDeactivate}
+        readOnly={false}
         isOwnerAdmin={isOwnerAdmin}
       />
 

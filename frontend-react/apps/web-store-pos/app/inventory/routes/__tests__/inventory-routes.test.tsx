@@ -444,6 +444,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
         <TodayEntriesPage />
       </Wrapper>,
     );
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
     fireEvent.click(screen.getByText('Eliminar'));
 
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledWith({
@@ -485,6 +486,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
       </Wrapper>,
     );
     const callsBeforeClick = getByDateMock.mock.calls.length;
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
     fireEvent.click(screen.getByText('Eliminar'));
 
     await waitFor(() => expect(deactivateMock).toHaveBeenCalledWith('p1', 'e1'));
@@ -519,6 +521,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
         <TodayEntriesPage />
       </Wrapper>,
     );
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
     fireEvent.click(screen.getByText('Eliminar'));
 
     await waitFor(() =>
@@ -556,6 +559,7 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
         <TodayEntriesPage />
       </Wrapper>,
     );
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
     fireEvent.click(screen.getByText('Eliminar'));
 
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
