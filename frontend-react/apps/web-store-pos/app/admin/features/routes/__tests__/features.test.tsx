@@ -17,6 +17,13 @@ vi.mock('~/admin/features/lib/services/feature-http-service', () => ({
   },
 }));
 
+// ─── blocking-alert mock ───────────────────────────────────────────────────────
+
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingSuccess: vi.fn().mockResolvedValue(undefined),
+  showBlockingError: vi.fn(),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -99,6 +106,22 @@ describe('FeaturesPage — render', () => {
     });
     expect(button.querySelector('svg')).toBeTruthy();
   });
+
+  it('uses the EditIcon (pencil), not a gear/SettingsIcon (Angular mat-icon "edit")', async () => {
+    const { FeaturesPage } = await import('../features');
+    render(
+      <Wrapper>
+        <FeaturesPage />
+      </Wrapper>
+    );
+    const button = screen.getByRole('button', {
+      name: esMessages['FEATURES.ACTIVATE_FEATURES'],
+    });
+    // EditIcon's distinctive pencil path (from ui/icons.tsx) — SettingsIcon's gear path is
+    // a completely different `d` value, so this proves the icon actually swapped.
+    const path = button.querySelector('svg path');
+    expect(path?.getAttribute('d')).toContain('M16.862 4.487l1.687-1.688');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -141,10 +164,11 @@ describe('FeaturesPage — button click', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('FeaturesPage — success state', () => {
-  it('shows FEATURES.FEATURES_ACTIVATED when succeeded is true', async () => {
+  it('calls showBlockingSuccess with FEATURES.FEATURES_ACTIVATED when succeeded is true (no static <p>)', async () => {
     const { featureHttpService } = await import(
       '~/admin/features/lib/services/feature-http-service'
     );
+    const { showBlockingSuccess } = await import('~/shared/lib/blocking-alert');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: true,
       data: true,
@@ -165,10 +189,15 @@ describe('FeaturesPage — success state', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText(esMessages['FEATURES.FEATURES_ACTIVATED'])
-      ).toBeInTheDocument();
+      expect(showBlockingSuccess).toHaveBeenCalledWith(
+        esMessages['FEATURES.FEATURES_ACTIVATED']
+      );
     });
+    // Angular's success feedback is a toastr, not a static persisted <p> — proves the
+    // old non-dismissing text node is gone.
+    expect(
+      screen.queryByText(esMessages['FEATURES.FEATURES_ACTIVATED'])
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -177,10 +206,11 @@ describe('FeaturesPage — success state', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('FeaturesPage — error state (succeeded false)', () => {
-  it('shows FEATURES.UNEXPECTED_ERROR when succeeded is false', async () => {
+  it('calls showBlockingError with FEATURES.UNEXPECTED_ERROR when succeeded is false (no static <p>)', async () => {
     const { featureHttpService } = await import(
       '~/admin/features/lib/services/feature-http-service'
     );
+    const { showBlockingError } = await import('~/shared/lib/blocking-alert');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: false,
       data: false,
@@ -201,10 +231,14 @@ describe('FeaturesPage — error state (succeeded false)', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText(esMessages['FEATURES.UNEXPECTED_ERROR'])
-      ).toBeInTheDocument();
+      expect(showBlockingError).toHaveBeenCalledWith(
+        esMessages['GENERAL.RESPONSE.ERROR_TITLE'],
+        esMessages['FEATURES.UNEXPECTED_ERROR']
+      );
     });
+    expect(
+      screen.queryByText(esMessages['FEATURES.UNEXPECTED_ERROR'])
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -224,6 +258,7 @@ describe('FeaturesPage — double-submit guard', () => {
     );
 
     vi.mocked(featureHttpService.activateFeatures).mockReturnValueOnce(firstCall as any);
+    const { showBlockingSuccess } = await import('~/shared/lib/blocking-alert');
 
     const { FeaturesPage } = await import('../features');
     render(
@@ -246,7 +281,9 @@ describe('FeaturesPage — double-submit guard', () => {
     resolveFirst({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
 
     await waitFor(() => {
-      expect(screen.getByText(esMessages['FEATURES.FEATURES_ACTIVATED'])).toBeInTheDocument();
+      expect(showBlockingSuccess).toHaveBeenCalledWith(
+        esMessages['FEATURES.FEATURES_ACTIVATED']
+      );
     });
 
     // activateFeatures must have been called exactly once
@@ -259,10 +296,11 @@ describe('FeaturesPage — double-submit guard', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('FeaturesPage — error state (HTTP error)', () => {
-  it('shows FEATURES.UNEXPECTED_ERROR when activateFeatures throws', async () => {
+  it('calls showBlockingError with FEATURES.UNEXPECTED_ERROR when activateFeatures throws', async () => {
     const { featureHttpService } = await import(
       '~/admin/features/lib/services/feature-http-service'
     );
+    const { showBlockingError } = await import('~/shared/lib/blocking-alert');
     vi.mocked(featureHttpService.activateFeatures).mockRejectedValue(
       new Error('Network error')
     );
@@ -279,9 +317,10 @@ describe('FeaturesPage — error state (HTTP error)', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText(esMessages['FEATURES.UNEXPECTED_ERROR'])
-      ).toBeInTheDocument();
+      expect(showBlockingError).toHaveBeenCalledWith(
+        esMessages['GENERAL.RESPONSE.ERROR_TITLE'],
+        esMessages['FEATURES.UNEXPECTED_ERROR']
+      );
     });
   });
 });
