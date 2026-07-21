@@ -16,6 +16,12 @@ Chained PRs recommended: No
 Chain strategy: pending
 400-line budget risk: Low
 
+> **Actual outcome (see verify-report.md)**: actual diff was 523 insertions + 52 deletions = 575
+> changed lines — over 2x this forecast. Delivered as commits-only on the feature branch per
+> project convention, so the PR-review-budget guard was not actually tripped, but the forecast
+> itself was inaccurate. Flagged as a calibration note for future sdd-tasks runs on similar
+> multi-screen additive changes with heavy test-file coverage.
+
 ### Suggested Work Units
 
 | Unit | Goal | Likely PR | Notes |
@@ -73,3 +79,7 @@ Locked in-scope by the orchestrator (overrides design ADR-4 deferral). Same TDD 
 - [x] 5.1 Run `pnpm test` (full suite) — confirm all new and existing tests are green, no regressions. Result: 128 test files, 1871/1871 tests passing.
 - [x] 5.2 Run `pnpm -C apps/web-store-pos exec tsc --noEmit` — confirm no type errors introduced. Result: clean, zero errors.
 - [x] 5.3 Run `pnpm -C apps/web-store-pos build` — confirm production build succeeds. Result: client + SSR + service-worker builds all succeeded.
+
+## Phase 6: Post-Verify Color-Parity Polish (added after sdd-verify)
+
+- [x] 6.1 Verify report flagged WARNING 1 (chevron rendered without `className="text-text-muted"` at the 7 non-products call sites, diverging from design's stated integration plan). Fixed in commit `db8d2ae` by passing `className="text-text-muted"` to `ChevronDownIcon` at all 8 non-products call sites (the 6 list screens + today-stats + tutorial).

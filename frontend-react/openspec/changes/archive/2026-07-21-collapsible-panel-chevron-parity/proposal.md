@@ -61,8 +61,8 @@ Revert the work-unit commits. The shared `ChevronDownIcon` is additive; removing
 
 ## Success Criteria
 
-- [ ] All 7 in-scope panels show a Material-style chevron that rotates 180° on expand, matching products.tsx.
-- [ ] products.tsx uses the shared `ChevronDownIcon` (no duplicated inline SVG).
-- [ ] No change to toggle logic, state shape, animation, or panel bodies.
-- [ ] today-stats "Cuadre del día" panels show the arrow (original bug fixed).
-- [ ] `pnpm test` passes.
+- [x] All 7 in-scope panels show a Material-style chevron that rotates 180° on expand, matching products.tsx (tutorial.tsx was additionally locked in-scope during tasks phase — 8 screens total, see tasks.md).
+- [x] products.tsx uses the shared `ChevronDownIcon` (no duplicated inline SVG).
+- [x] No change to toggle logic, state shape, animation, or panel bodies.
+- [x] today-stats "Cuadre del día" panels show the arrow (original bug fixed).
+- [x] `pnpm test` passes (1871/1871).

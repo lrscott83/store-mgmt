@@ -137,6 +137,11 @@ recipe applies: convert the `<details>`/`<summary>` (tutorial.tsx L80-83) to
 right-aligned in the header. Recording it here so the recipe is captured; the tasks phase should
 mark it as deferred and NOT generate implementation tasks for it unless the user re-scopes.
 
+> **Superseded (tasks phase)**: the orchestrator subsequently locked tutorial.tsx IN-SCOPE
+> (tasks.md Phase 4 / WU4), overriding ADR-4 below. The final spec, tasks, and implementation
+> all treat tutorial.tsx as in-scope; ADR-4 is retained here as the original design-time
+> rationale, not the final delivered scope.
+
 ## Data Flow
 
 No data flow changes. `isExpanded` already computed in each render (from the screen's
@@ -184,11 +189,13 @@ No data flow changes. `isExpanded` already computed in each render (from the scr
 - **Rejected**: Third top-level flex child under `justify-between` (would space value and chevron
   apart, breaking the right-cluster look).
 
-### ADR-4: tutorial.tsx stays native (honor proposal scope)
+### ADR-4: tutorial.tsx stays native (honor proposal scope) — SUPERSEDED, see note above
 - **Decision**: Do not modify tutorial.tsx in this change.
 - **Rationale**: Proposal marked it DEFER/out-of-scope; it is already functional with a native
   triangle. Touching it is scope creep on a parity fix. Recipe captured above for a future pass.
 - **Rejected**: Fold it in now. Rejected to keep the change tight and honor the ratified scope.
+- **Outcome**: the orchestrator overrode this ADR during the tasks phase and locked tutorial.tsx
+  in-scope (see tasks.md Phase 4 / WU4). Implemented and verified as part of this change.
 
 ## Testing Strategy (Strict TDD)
 
