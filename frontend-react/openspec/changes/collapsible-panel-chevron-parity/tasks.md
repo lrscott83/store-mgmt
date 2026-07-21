@@ -70,6 +70,6 @@ Locked in-scope by the orchestrator (overrides design ADR-4 deferral). Same TDD 
 
 ## Phase 5: Full Verification
 
-- [ ] 5.1 Run `pnpm test` (full suite) — confirm all new and existing tests are green, no regressions.
-- [ ] 5.2 Run `pnpm -C apps/web-store-pos exec tsc --noEmit` — confirm no type errors introduced.
-- [ ] 5.3 Run `pnpm -C apps/web-store-pos build` — confirm production build succeeds.
+- [x] 5.1 Run `pnpm test` (full suite) — confirm all new and existing tests are green, no regressions. Result: 128 test files, 1871/1871 tests passing.
+- [x] 5.2 Run `pnpm -C apps/web-store-pos exec tsc --noEmit` — confirm no type errors introduced. Result: clean, zero errors.
+- [x] 5.3 Run `pnpm -C apps/web-store-pos build` — confirm production build succeeds. Result: client + SSR + service-worker builds all succeeded.
