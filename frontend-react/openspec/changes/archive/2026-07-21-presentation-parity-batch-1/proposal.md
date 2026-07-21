@@ -31,7 +31,7 @@ An adversarial code-only presentation-layer parity audit (Angular `frontend/src/
 - **[10 — LARGE]** `auth/components/auth-layout.tsx`: port guest-footer (Cookies/Privacy/Terms/Contact legal links + copyright). `auth/routes/register.tsx`: remove invented interim `REGISTRATION.SUCCESS_REDIRECT` screen; navigate straight to /login. Do NOT add password eye-toggle (Bucket C, deferred).
 
 ### Out of Scope (user's explicit choice — do not touch)
-Category ⚙️ gear menu (keep), Reports invented dashboard (keep), Statistics charts→tables revert (keep charts), Tutorial 4→1 panels (keep), the whole Bucket-C fab/password/Cerrar/modal-icon sweep, all Bucket-D enhancements, all Bucket-E cosmetics.
+Category gear menu (keep), Reports invented dashboard (keep), Statistics charts→tables revert (keep charts), Tutorial 4→1 panels (keep), the whole Bucket-C fab/password/Cerrar/modal-icon sweep, all Bucket-D enhancements, all Bucket-E cosmetics.
 
 ## Capabilities
 
@@ -64,7 +64,11 @@ Commits-only per work unit on `feat/presentation-parity-batch-1`. Revert any ind
 
 ## Success Criteria
 
-- [ ] All 10 fixes match Angular source (code-only parity).
-- [ ] Each fix has failing-first tests, then green; `pnpm test` passes.
-- [ ] recharts charts retained on statistics; out-of-scope items untouched.
-- [ ] Commits-only on `feat/presentation-parity-batch-1`, no PR.
+- [x] All 10 fixes match Angular source (code-only parity).
+- [x] Each fix has failing-first tests, then green; `pnpm test` passes.
+- [x] recharts charts retained on statistics; out-of-scope items untouched.
+- [x] Commits-only on `feat/presentation-parity-batch-1`, no PR.
+
+## Post-Verify Addendum
+
+An adversarial Angular↔React parity review (run after `sdd-verify` PASS) found 3 minor footer nits, all resolved before archive — see `archive-report.md` for disposition (F-1 fixed, F-2 refuted, F-3 kept as-is).
