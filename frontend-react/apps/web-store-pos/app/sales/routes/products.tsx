@@ -8,7 +8,7 @@ import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon } from '~/shared/components/ui/icons';
-import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { showBlockingError, showBlockingSuccess, showBlockingInfo } from '~/shared/lib/blocking-alert';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
@@ -203,9 +203,22 @@ export function ProductsPage() {
     const csvProducts = rows
       .filter((row) => row.category)
       .map((row) => ({ category: row.category as string, name: row.name, price: row.price }));
-    await productService.createCsvProducts(csvProducts);
+    const result = await productService.createCsvProducts(csvProducts);
     loadData();
     setModal(null);
+
+    // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
+    // toast with the imported count, PLUS a conditional info dialog when the response did not
+    // fully succeed ("some already exist"). React has no toast system, so both Angular messages
+    // are surfaced via Swal wrappers; the Spanish literals are Angular's own (component.ts:60,64),
+    // preserved verbatim. Shown sequentially since Swal is modal.
+    await showBlockingSuccess(`Importados ${csvProducts.length} productos correctamente.`);
+    if (!result.succeeded) {
+      await showBlockingInfo(
+        intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+        'Algunos productos no fueron importados porque ya existen.',
+      );
+    }
   }
 
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order);

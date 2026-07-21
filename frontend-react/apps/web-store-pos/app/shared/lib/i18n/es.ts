@@ -8,6 +8,9 @@ const messages: Record<string, string> = {
   'GENERAL.DISCARD': 'Descartar',
   'GENERAL.CONFIRM': 'Confirmar',
   'GENERAL.CLOSE': 'Cerrar',
+  'GENERAL.INFORMATION': 'Información',
+  'GENERAL.IMPORT': 'Importar',
+  'GENERAL.FILE': 'Fichero',
   'GENERAL.SELECT_FILE': 'Seleccionar archivo',
   'GENERAL.NO_FILE_SELECTED': 'Ningún archivo seleccionado',
   'GENERAL.CREDIT': 'Crédito',
@@ -248,6 +251,7 @@ const messages: Record<string, string> = {
   'PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY_ALERT_MESSAGE':
     'Para adicionar un producto debe primero adicionar una categoría',
   'PRODUCT_CATEGORY.IMPORT_PRODUCTS': 'Importar Productos',
+  'PRODUCT_CATEGORY.DOWNLOAD_SAMPLE': 'Descargar Ejemplo',
   'PRODUCT_CATEGORY.NO_PRODUCT_FOUND': 'No hay productos en esta categoría.',
   // NOTE: Angular's category-product-list.component.html:15 uses key EDIT_CATEGORY (not
   // EDIT_PRODUCT_CATEGORY) for the per-category "edit" button, and EDIT_CATEGORY's Spanish

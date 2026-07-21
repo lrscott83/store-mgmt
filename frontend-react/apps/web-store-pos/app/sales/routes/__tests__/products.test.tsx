@@ -84,8 +84,12 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
 }));
 
 const showBlockingErrorMock = vi.fn();
+const showBlockingSuccessMock = vi.fn((..._args: unknown[]) => Promise.resolve());
+const showBlockingInfoMock = vi.fn((..._args: unknown[]) => Promise.resolve());
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+  showBlockingSuccess: (...args: unknown[]) => showBlockingSuccessMock(...args),
+  showBlockingInfo: (...args: unknown[]) => showBlockingInfoMock(...args),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -149,6 +153,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       errors: [],
     });
     productServiceSpies.createCsvProducts.mockClear();
+    showBlockingSuccessMock.mockClear();
+    showBlockingInfoMock.mockClear();
     showBlockingErrorMock.mockClear();
   });
 
@@ -602,6 +608,55 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
         { category: 'Snacks', name: 'Chips', price: 10 },
       ]);
+    });
+
+    // Angular handleSuccess parity (csv-product-importer-modal.component.ts:52-65): ALWAYS a
+    // success message with the imported count; a conditional "some already exist" info dialog
+    // ONLY when the response did not fully succeed.
+    it('always shows the success message with the imported count', async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showBlockingSuccessMock).toHaveBeenCalledWith('Importados 1 productos correctamente.'),
+      );
+      expect(showBlockingInfoMock).not.toHaveBeenCalled();
+    });
+
+    it('shows the "already exist" info dialog only when the response did not fully succeed', async () => {
+      productServiceSpies.createCsvProducts.mockResolvedValueOnce({
+        data: false,
+        succeeded: false,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showBlockingInfoMock).toHaveBeenCalledWith(
+          'Información',
+          'Algunos productos no fueron importados porque ya existen.',
+        ),
+      );
+      expect(showBlockingSuccessMock).toHaveBeenCalledTimes(1);
     });
   });
 

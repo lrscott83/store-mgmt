@@ -5,9 +5,13 @@ import esMessages from '~/shared/lib/i18n/es';
 import { CsvProductImporterModal } from '../csv-product-importer-modal';
 import * as csvParser from '../../lib/csv-product-parser';
 
-// Text parity with Angular's csv-product-importer-modal.component.ts:71-78 — a single
-// hardcoded Spanish fallback message ('Error al importar los productos') shown for ANY
-// import failure, regardless of whether it was a parse error or a file-read error.
+// Angular's handleError (component.ts:71-78) opens a blocking Swal error dialog, mirrored here
+// via showBlockingError — assert the wrapper call, not inline DOM text.
+const showBlockingErrorMock = vi.fn();
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+}));
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
@@ -17,15 +21,86 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 function makeFile(): File {
-  return new File(['name,price\nCoke,1.5'], 'products.csv', { type: 'text/csv' });
+  return new File(['category,name,price\nBebidas,Coke,1.5'], 'products.csv', { type: 'text/csv' });
 }
 
-describe('CsvProductImporterModal — error text parity (Angular generic import-error message)', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+// Strict parity with Angular's csv-product-importer-modal: expected-structure card + sample
+// download, a required file field, and Cerrar / Importar. No client-side preview table.
+describe('CsvProductImporterModal — Angular structure/sample parity', () => {
+  it('renders the required CSV structure literal and the sample rows', () => {
+    render(
+      <Wrapper>
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Estructura requerida del archivo (.csv):')).toBeInTheDocument();
+    // sampleData is a single <code> node — assert on its text content.
+    expect(screen.getByText(/Pizzas,Pizza de Queso,150/)).toBeInTheDocument();
+    expect(screen.getByText('Descargar Ejemplo')).toBeInTheDocument();
   });
 
-  it('shows "Error al importar los productos" when parsing throws', async () => {
+  it('downloadSample triggers an anchor download of productos_ejemplo.csv', () => {
+    // jsdom implements neither URL.createObjectURL nor revokeObjectURL — define them so the
+    // component's blob-download path can run (and be asserted) without a real object URL.
+    const createUrl = vi.fn().mockReturnValue('blob:sample');
+    const revokeUrl = vi.fn();
+    URL.createObjectURL = createUrl as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeUrl as unknown as typeof URL.revokeObjectURL;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    render(
+      <Wrapper>
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('Descargar Ejemplo'));
+
+    expect(createUrl).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(revokeUrl).toHaveBeenCalledTimes(1);
+
+    clickSpy.mockRestore();
+  });
+});
+
+describe('CsvProductImporterModal — required-file guard (Angular importProducts form validation)', () => {
+  it('shows the required error and does NOT import when Importar is clicked with no file', () => {
+    const onImport = vi.fn();
+    render(
+      <Wrapper>
+        <CsvProductImporterModal onImport={onImport} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('csv-import-button'));
+
+    expect(screen.getByText('Fichero es requerido')).toBeInTheDocument();
+    expect(onImport).not.toHaveBeenCalled();
+  });
+});
+
+describe('CsvProductImporterModal — parse-on-import + error text parity', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    showBlockingErrorMock.mockClear();
+  });
+
+  it('parses the file on Importar and hands the parsed rows to onImport', async () => {
+    const onImport = vi.fn();
+    render(
+      <Wrapper>
+        <CsvProductImporterModal onImport={onImport} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
+    fireEvent.click(screen.getByTestId('csv-import-button'));
+
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
+    expect(onImport).toHaveBeenCalledWith([
+      expect.objectContaining({ name: 'Coke', price: 1.5, category: 'Bebidas' }),
+    ]);
+  });
+
+  it('shows "Error al importar los productos" when parsing throws on import', async () => {
     vi.spyOn(csvParser, 'parseCsvProducts').mockImplementation(() => {
       throw new Error('boom');
     });
@@ -35,7 +110,11 @@ describe('CsvProductImporterModal — error text parity (Angular generic import-
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
-    await waitFor(() => expect(screen.getByText('Error al importar los productos')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('csv-import-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'Error al importar los productos'),
+    );
   });
 
   it('shows the SAME "Error al importar los productos" message when reading the file fails', async () => {
@@ -50,48 +129,11 @@ describe('CsvProductImporterModal — error text parity (Angular generic import-
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
-    await waitFor(() => expect(screen.getByText('Error al importar los productos')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('csv-import-button'));
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'Error al importar los productos'),
+    );
 
     FileReader.prototype.readAsText = originalReadAsText;
-  });
-});
-
-// This client-side CSV preview table (parse + per-row validation) has NO Angular
-// counterpart — flagged separately as React-added scope. Regardless, all its rendered text
-// must be Spanish per the blanket text-parity rule; these table headers/badges/row-error
-// messages were previously hardcoded English.
-describe('CsvProductImporterModal — preview table text is Spanish (no hardcoded English)', () => {
-  it('renders Spanish column headers and a Spanish "Válido" status badge for a valid row', async () => {
-    render(
-      <Wrapper>
-        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
-      </Wrapper>,
-    );
-    const csv = ['name,price,barcode,category', 'Coca Cola,1.50,123456,Bebidas'].join('\n');
-    fireEvent.change(screen.getByTestId('csv-file-input'), {
-      target: { files: [new File([csv], 'products.csv', { type: 'text/csv' })] },
-    });
-    await waitFor(() => expect(screen.getByText('Coca Cola')).toBeInTheDocument());
-
-    expect(screen.getByText('Fila')).toBeInTheDocument();
-    expect(screen.getByText('Estado')).toBeInTheDocument();
-    expect(screen.getByText('Válido')).toBeInTheDocument();
-    expect(screen.queryByText('Row')).not.toBeInTheDocument();
-    expect(screen.queryByText('Status')).not.toBeInTheDocument();
-    expect(screen.queryByText('Valid')).not.toBeInTheDocument();
-  });
-
-  it('renders the Spanish PRODUCTS.CSV.ERROR message (not a raw English errorCode) for an invalid row', async () => {
-    render(
-      <Wrapper>
-        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
-      </Wrapper>,
-    );
-    const csv = ['name,price', ',1.50'].join('\n');
-    fireEvent.change(screen.getByTestId('csv-file-input'), {
-      target: { files: [new File([csv], 'products.csv', { type: 'text/csv' })] },
-    });
-    await waitFor(() => expect(screen.getByText('El nombre es requerido')).toBeInTheDocument());
-    expect(screen.getByText('Estado')).toBeInTheDocument();
   });
 });

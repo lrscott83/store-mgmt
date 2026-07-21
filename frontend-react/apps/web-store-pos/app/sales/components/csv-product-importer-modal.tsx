@@ -1,170 +1,182 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
-import { FileInput } from '~/shared/components/ui/file-input';
-import type { ParsedProductRow, CsvRowError } from '../lib/csv-product-parser';
+import { Button } from '~/shared/components/ui/button';
+import { PaperclipIcon, CloseIcon } from '~/shared/components/ui/icons';
+import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { parseCsvProducts } from '../lib/csv-product-parser';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
 
-// Maps each parser errorCode to its existing Spanish i18n key — same error-code -> i18n-key
-// mapping pattern as app/sales/lib/product-availability.ts's PRODUCT_AVAILABILITY_ERROR_MESSAGE_KEYS.
-const CSV_ROW_ERROR_MESSAGE_KEYS: Record<CsvRowError['errorCode'], string> = {
-  MISSING_NAME: 'PRODUCTS.CSV.ERROR.MISSING_NAME',
-  MISSING_PRICE: 'PRODUCTS.CSV.ERROR.MISSING_PRICE',
-  INVALID_PRICE: 'PRODUCTS.CSV.ERROR.INVALID_PRICE',
-  MISSING_CATEGORY: 'PRODUCTS.CSV.ERROR.MISSING_CATEGORY',
-};
+// Byte-identical to Angular's `sampleData` (csv-product-importer-modal.component.ts:27-30).
+const SAMPLE_DATA = `category,name,price
+Pizzas,Pizza de Queso,150
+Pizzas,Pizza Especial,200
+Confituras,Caramelo,20`;
+
+// Small inline download glyph — Angular renders <mat-icon>file_download</mat-icon>; there is no
+// shared DownloadIcon in the icon set, so it is inlined here (same precedent as the cart SVG).
+function DownloadIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+    </svg>
+  );
+}
 
 interface CsvProductImporterModalProps {
   onImport: (products: ParsedProductRow[]) => void;
   onClose: () => void;
 }
 
+/**
+ * Strict parity with Angular's `csv-product-importer-modal.component.html/.ts`: a required-file
+ * form showing the expected CSV structure + a downloadable sample, then Cerrar / Importar. The
+ * file is parsed on Importar (not on selection), and the parsed rows are handed to `onImport`,
+ * which owns creation (mirrors Angular's importProducts -> parseCsv -> createCsvProducts split).
+ * No client-side preview table — Angular has none (invalid rows are dropped by the parent's
+ * validateProducts-parity filter, matching Angular).
+ */
 export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporterModalProps) {
   const intl = useIntl();
-  const [products, setProducts] = useState<ParsedProductRow[]>([]);
-  const [errors, setErrors] = useState<CsvRowError[]>([]);
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [hasFile, setHasFile] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [showRequired, setShowRequired] = useState(false);
 
-  function handleFileChange(file: File | null) {
-    if (!file) return;
+  // Angular downloadSample() (component.ts:80-88): blob of sampleData -> productos_ejemplo.csv.
+  function downloadSample() {
+    const blob = new Blob([SAMPLE_DATA], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'productos_ejemplo.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0] ?? null;
+    setFile(selected);
+    if (selected) setShowRequired(false);
+  }
+
+  function showImportError() {
+    showBlockingError(
+      intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+      'Error al importar los productos',
+    );
+  }
+
+  // Angular importProducts() (component.ts:38-50): required-file guard, then parse the file and
+  // hand the rows off. On ANY read/parse failure Angular's handleError (component.ts:71-78) opens a
+  // blocking Swal error dialog (icon 'error', title GENERAL.RESPONSE.ERROR_TITLE, hardcoded Spanish
+  // text), surfaced here via showBlockingError — same shape, not inline text.
+  function handleImport() {
+    if (!file) {
+      setShowRequired(true);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
         const result = parseCsvProducts(text);
-        setProducts(result.products);
-        setErrors(result.errors);
-        setParseError(null);
-        setHasFile(true);
+        onImport(result.products);
       } catch {
-        // Angular's fallback for ANY import failure is a single hardcoded Spanish literal
-        // (csv-product-importer-modal.component.ts:71-78), not an i18n key. Kept byte-identical
-        // and unified across both failure paths (parse error and file-read error below).
-        setParseError('Error al importar los productos');
-        setProducts([]);
-        setErrors([]);
-        setHasFile(false);
+        showImportError();
       }
     };
-    reader.onerror = () => {
-      setParseError('Error al importar los productos');
-      setHasFile(false);
-    };
+    reader.onerror = () => showImportError();
     reader.readAsText(file);
   }
 
-  function handleImport() {
-    onImport(products);
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-2xl rounded-xl bg-white shadow-lg p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-4">
-          {intl.formatMessage({ id: 'PRODUCTS.CSV.TITLE' })}
-        </h2>
-
-        {/* File input */}
-        <div className="mb-4">
-          <FileInput
-            accept=".csv,text/csv"
-            onFileChange={handleFileChange}
-            data-testid="csv-file-input"
-          />
-        </div>
-
-        {parseError && (
-          <p className="mb-4 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">{parseError}</p>
-        )}
-
-        {/* Summary */}
-        {hasFile && (
-          <div className="mb-3 flex gap-4 text-sm">
-            <span className="text-green-700 font-medium">
-              {intl.formatMessage({ id: 'PRODUCTS.CSV.VALID_ROWS' }, { count: products.length })}
-            </span>
-            {errors.length > 0 && (
-              <span className="text-red-600 font-medium">
-                {intl.formatMessage({ id: 'PRODUCTS.CSV.ERROR_ROWS' }, { count: errors.length })}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Preview table */}
-        {hasFile && (products.length > 0 || errors.length > 0) && (
-          <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-lg mb-4">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">
-                    {intl.formatMessage({ id: 'PRODUCTS.CSV.COL_ROW' })}
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">
-                    {intl.formatMessage({ id: 'PRODUCTS.FORM.NAME' })}
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">
-                    {intl.formatMessage({ id: 'PRODUCTS.FORM.PRICE' })}
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">
-                    {intl.formatMessage({ id: 'PRODUCTS.FORM.CATEGORY' })}
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">
-                    {intl.formatMessage({ id: 'PRODUCTS.CSV.COL_STATUS' })}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {products.map((product, i) => (
-                  <tr key={`valid-${i}`} className="bg-white">
-                    <td className="px-3 py-1.5 text-gray-500">{i + 1}</td>
-                    <td className="px-3 py-1.5 text-gray-800">{product.name}</td>
-                    <td className="px-3 py-1.5 text-gray-800">${product.price.toFixed(2)}</td>
-                    <td className="px-3 py-1.5 text-gray-500">{product.category}</td>
-                    <td className="px-3 py-1.5">
-                      <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
-                        {intl.formatMessage({ id: 'PRODUCTS.CSV.STATUS_VALID' })}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {errors.map((err) => (
-                  <tr key={`err-${err.row}`} className="bg-red-50">
-                    <td className="px-3 py-1.5 text-gray-500">{err.row}</td>
-                    <td colSpan={3} className="px-3 py-1.5 text-red-700">
-                      {intl.formatMessage({ id: CSV_ROW_ERROR_MESSAGE_KEYS[err.errorCode] })}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <span className="text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">
-                        {intl.formatMessage({ id: 'GENERAL.ERROR' })}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-lg">
+        {/* Header — Angular modal-header: title + top-right close */}
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h2 className="text-lg font-semibold text-text">
+            {intl.formatMessage({ id: 'PRODUCT_CATEGORY.IMPORT_PRODUCTS' })}
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+            className="text-muted hover:text-text transition-colors"
           >
-            {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
+            <CloseIcon />
           </button>
-          {products.length > 0 && (
-            <button
-              type="button"
-              onClick={handleImport}
-              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700"
-              data-testid="csv-import-button"
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {/* Structure card — Angular card.border-primary */}
+          <div className="rounded-lg border border-primary p-4">
+            {/* Angular hardcodes this literal (no translate pipe) — preserved verbatim. */}
+            <p className="mb-2 text-sm text-muted">Estructura requerida del archivo (.csv):</p>
+            <div className="rounded-md bg-gray-100 p-3">
+              <pre className="mb-0 overflow-x-auto text-xs text-text">
+                <code>{SAMPLE_DATA}</code>
+              </pre>
+            </div>
+
+            <Button variant="fab" onClick={downloadSample} className="mt-4">
+              <DownloadIcon className="h-5 w-5" />
+              {intl.formatMessage({ id: 'PRODUCT_CATEGORY.DOWNLOAD_SAMPLE' })}
+            </Button>
+          </div>
+
+          {/* File field — Angular mat-form-field "Fichero" with attach_file suffix + required */}
+          <div className="mt-4">
+            <label className="mb-1 block text-sm text-muted">
+              {intl.formatMessage({ id: 'GENERAL.FILE' })}
+              <span className="text-danger"> *</span>
+            </label>
+            <div
+              className={`flex items-center gap-2 rounded-md border px-3 py-2 ${
+                showRequired ? 'border-danger' : 'border-border'
+              }`}
             >
-              {intl.formatMessage({ id: 'PRODUCTS.CSV.IMPORT_VALID' })}
-            </button>
-          )}
+              <span className={`min-w-0 flex-1 truncate text-sm ${file ? 'text-text' : 'text-muted'}`}>
+                {file?.name ?? intl.formatMessage({ id: 'GENERAL.FILE' })}
+              </span>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                aria-label={intl.formatMessage({ id: 'GENERAL.SELECT_FILE' })}
+                className="shrink-0 text-primary hover:text-primary-hover transition-colors"
+              >
+                <PaperclipIcon />
+              </button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleFileChange}
+                className="hidden"
+                data-testid="csv-file-input"
+              />
+            </div>
+            {showRequired && (
+              <p className="mt-1 text-xs text-danger">
+                {intl.formatMessage(
+                  { id: 'GENERAL.VALIDATION.REQUIRED' },
+                  { name: intl.formatMessage({ id: 'GENERAL.FILE' }) },
+                )}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer — Angular modal-footer: Cerrar + Importar (both always shown) */}
+        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+          <Button variant="fab" onClick={onClose}>
+            <CloseIcon />
+            {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+          </Button>
+          <Button variant="fab" onClick={handleImport} data-testid="csv-import-button">
+            <DownloadIcon className="h-5 w-5" />
+            {intl.formatMessage({ id: 'GENERAL.IMPORT' })}
+          </Button>
         </div>
       </div>
     </div>

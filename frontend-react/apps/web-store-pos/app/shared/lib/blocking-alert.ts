@@ -21,6 +21,26 @@ export function showBlockingError(title: string, message: string): void {
   void Swal.fire({ icon: 'error', title, text: message });
 }
 
+/**
+ * Blocking success alert. React has no toast system, so Angular's `toastrService.success(...)`
+ * notifications (e.g. `csv-product-importer-modal.component.ts:64` handleSuccess) are surfaced
+ * through the app's standard Swal wrapper instead — same message, blocking instead of a
+ * non-blocking toast. No title (Angular's toastr success shows the message only). Returns the
+ * promise so sequential dialogs can be awaited.
+ */
+export function showBlockingSuccess(message: string): Promise<void> {
+  return Swal.fire({ icon: 'success', text: message }).then(() => undefined);
+}
+
+/**
+ * Blocking info alert. Mirrors Angular's `Swal.fire({ icon: 'info', title, text })` — e.g. the
+ * conditional "some products already exist" dialog in `csv-product-importer-modal.component.ts:56-62`.
+ * Returns the promise so it can be awaited after another dialog.
+ */
+export function showBlockingInfo(title: string, message: string): Promise<void> {
+  return Swal.fire({ icon: 'info', title, text: message }).then(() => undefined);
+}
+
 export interface ConfirmDialogOptions {
   title: string;
   message: string;
