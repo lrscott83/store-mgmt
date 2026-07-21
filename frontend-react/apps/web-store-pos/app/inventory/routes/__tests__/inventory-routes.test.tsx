@@ -326,6 +326,73 @@ describe('InventoryAvailablePage — renders getInventoryCategoriesView() output
   });
 });
 
+// ─── InventoryAvailablePage — empty-state message (Angular parity) ──────────
+//
+// Angular's InventoryAvailableComponent shows INVENTORY.NO_ENTRY_FOUND when there are zero
+// categories at all — a distinct message from InventoryProductList's own per-category/search
+// "empty category" message (INVENTORY.CATEGORY_PRODUCT_NO_FOUND), which only applies once at
+// least one category exists.
+
+describe('InventoryAvailablePage — empty-state message (Angular parity: zero categories)', () => {
+  it('shows INVENTORY.NO_ENTRY_FOUND when there are zero categories, not the per-category message', async () => {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryAvailablePage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText('No existe ningún producto disponible')).toBeInTheDocument();
+    expect(
+      screen.queryByText('No existe ningún producto disponible en la categoría'),
+    ).not.toBeInTheDocument();
+    // No search box either — InventoryProductList (which owns the search box) isn't rendered.
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  });
+
+  it('still renders the per-category list (with its own search box) when at least one category exists', async () => {
+    const categories: InventoryCategoryView[] = [
+      {
+        categoryId: 'cat-1',
+        categoryName: 'Bebidas',
+        totalQuantity: 5,
+        totalCostPrice: 10,
+        products: [
+          {
+            productId: 'p1',
+            productName: 'Ron',
+            categoryId: 'cat-1',
+            categoryName: 'Bebidas',
+            totalAvailable: 5,
+            avgCostPrice: 2,
+          },
+        ],
+      },
+    ];
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm(categories)),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryAvailablePage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByRole('searchbox')).toBeInTheDocument();
+    expect(screen.queryByText('No existe ningún producto disponible')).not.toBeInTheDocument();
+  });
+});
+
 // ─── TodayEntriesPage ────────────────────────────────────────────────────────
 
 import { TodayEntriesPage } from '../today-entries';

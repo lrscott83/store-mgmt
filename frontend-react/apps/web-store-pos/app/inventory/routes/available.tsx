@@ -50,7 +50,17 @@ export function InventoryAvailablePage() {
         </div>
       }
     >
-      <InventoryProductList categories={categories} />
+      {/* Angular parity (InventoryAvailableComponent): INVENTORY.NO_ENTRY_FOUND is shown when
+          there are zero categories at all; the per-category/search empty message
+          (INVENTORY.CATEGORY_PRODUCT_NO_FOUND, owned by InventoryProductList) only applies
+          once at least one category exists. */}
+      {categories.length === 0 ? (
+        <div className="py-8 text-center text-text-muted">
+          {intl.formatMessage({ id: 'INVENTORY.NO_ENTRY_FOUND' })}
+        </div>
+      ) : (
+        <InventoryProductList categories={categories} />
+      )}
     </Card>
   );
 }
