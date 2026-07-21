@@ -88,54 +88,54 @@ Angular ref: `edit-inventory-entry-modal.component.html` `[disabled]="true"` on 
 ### WU1 — `admin/stores/components/store-card-list.tsx` color fix
 Angular ref: `store-list.component.ts:205-209` `getStoreBackgroundColor` + `.scss` (`disapproved-store` → `$warning`, `deactive-store` → `$danger`).
 
-- [ ] 1.1 RED: test in `admin/stores/components/__tests__/store-card-list.test.tsx` — a not-approved-but-active store's card has `bg-warning/10 border-warning` classes (NOT `bg-success/...`); a deactivated store still gets `bg-danger/10 border-danger` (unchanged); an approved+active store has no state class.
-- [ ] 1.2 GREEN: in `getStoreCardClass`, change `if (!store.approved) return 'bg-success/10 border border-success';` → `'bg-warning/10 border border-warning';`.
-- [ ] 1.3 Commit: `fix(admin): store card not-approved state uses warning color matching Angular`
+- [x] 1.1 RED: test in `admin/stores/components/__tests__/store-card-list.test.tsx` — a not-approved-but-active store's card has `bg-warning/10 border-warning` classes (NOT `bg-success/...`); a deactivated store still gets `bg-danger/10 border-danger` (unchanged); an approved+active store has no state class.
+- [x] 1.2 GREEN: in `getStoreCardClass`, change `if (!store.approved) return 'bg-success/10 border border-success';` → `'bg-warning/10 border border-warning';`.
+- [x] 1.3 Commit: `fix(admin): store card not-approved state uses warning color matching Angular` — actual commit `ccc3d54`
 
 ### WU2 — `statistics/routes/dashboard.tsx` full rework (LARGEST)
 Angular ref: `frontend/src/app/presentation/statistics/dashboard/dashboard.component.ts`/`.html`. All backing service methods already exist and are ported (no service changes needed): `OrderOfflineService.getActiveOrdersPriceToday/Yesterday`, `getActiveOrdersProfitToday/Yesterday`, `getTopProductsProfitInLastMonth`, `getTopProductsSaleQuantityInLastMonth`; `ExpenseOfflineService.getActiveExpensesPriceToday/Yesterday`; `SaleCreditOfflineService.getActiveUnpaidSaleCreditsPriceToday/Yesterday`; `authorization-service.hasExpensesModuleAvailable/hasCreditsModuleAvailable`; `statistics/lib/services/currency-service.ts` (`getCurrentCurrency`/`setCurrency`). KEEP the existing `SalesChart`/`ProfitChart` (recharts) sections untouched — do not remove or replace with tables.
 
-- [ ] 2a.1 RED: currency selector test — renders a CUP/USD `<select>` seeded from `getCurrentCurrency()`; selecting USD reveals a rate `<input type="number">`; changing either calls `setCurrency({currency, rate})` (mock the module).
-- [ ] 2a.2 GREEN: add local `currency`/`rate` state seeded from `getCurrentCurrency()`; on change, update state + call `setCurrency`; compute `divisor = currency === 'USD' ? rate : 1` and `sufijo = currency` for use across KPIs/lists.
-- [ ] 2b.1 RED: KPI cards test — "Ventas Hoy" card always renders with `(getActiveOrdersPriceToday()/divisor).toFixed(2)`; "Gastos Hoy" card renders ONLY when `hasExpensesModuleAvailable(user)` is true; "Créditos Por Cobrar" card renders ONLY when `hasCreditsModuleAvailable(user)` is true; "Ganancias Hoy" always renders, value = `profitToday - (hasExpensesModuleAvailable ? expenseToday : 0)`, all divided by `divisor`.
-- [ ] 2b.2 GREEN: read `user` via `useAuthStore`; compute today/yesterday values from the services above; render the 4 KPI cards with the same trend logic as Angular's `getTrendClass`/`getTrendIcon` (`actual===anterior→secondary/dash`, `actual>=anterior→success/up`, else `danger/down`) — reuse Tailwind `text-success`/`text-danger`/`text-secondary` equivalents; gate Gastos/Créditos cards on the two `hasXModuleAvailable` checks.
-- [ ] 2c.1 RED: top-products test — top-profit list renders `getTopProductsProfitInLastMonth()` items as `name` + `(value/divisor).toFixed(2) sufijo`; top-sale-quantity list renders `getTopProductsSaleQuantityInLastMonth()` items as `name` + raw `value` (no currency suffix).
-- [ ] 2c.2 GREEN: add the 2 list sections (`<ul>`/rows), sourced from `OrderOfflineService`.
-- [ ] 2d RED+GREEN: regression test asserting `SalesChart`/`ProfitChart` sections still render with their existing data/props unchanged after the rework.
-- [ ] 2.5 Commit: `feat(statistics): wire currency selector, KPI cards, and top-products lists on dashboard`
+- [x] 2a.1 RED: currency selector test — renders a CUP/USD `<select>` seeded from `getCurrentCurrency()`; selecting USD reveals a rate `<input type="number">`; changing either calls `setCurrency({currency, rate})` (mock the module).
+- [x] 2a.2 GREEN: add local `currency`/`rate` state seeded from `getCurrentCurrency()`; on change, update state + call `setCurrency`; compute `divisor = currency === 'USD' ? rate : 1` and `sufijo = currency` for use across KPIs/lists.
+- [x] 2b.1 RED: KPI cards test — "Ventas Hoy" card always renders with `(getActiveOrdersPriceToday()/divisor).toFixed(2)`; "Gastos Hoy" card renders ONLY when `hasExpensesModuleAvailable(user)` is true; "Créditos Por Cobrar" card renders ONLY when `hasCreditsModuleAvailable(user)` is true; "Ganancias Hoy" always renders, value = `profitToday - (hasExpensesModuleAvailable ? expenseToday : 0)`, all divided by `divisor`.
+- [x] 2b.2 GREEN: read `user` via `useAuthStore`; compute today/yesterday values from the services above; render the 4 KPI cards with the same trend logic as Angular's `getTrendClass`/`getTrendIcon` (`actual===anterior→secondary/dash`, `actual>=anterior→success/up`, else `danger/down`) — reuse Tailwind `text-success`/`text-danger`/`text-secondary` equivalents; gate Gastos/Créditos cards on the two `hasXModuleAvailable` checks.
+- [x] 2c.1 RED: top-products test — top-profit list renders `getTopProductsProfitInLastMonth()` items as `name` + `(value/divisor).toFixed(2) sufijo`; top-sale-quantity list renders `getTopProductsSaleQuantityInLastMonth()` items as `name` + raw `value` (no currency suffix).
+- [x] 2c.2 GREEN: add the 2 list sections (`<ul>`/rows), sourced from `OrderOfflineService`.
+- [x] 2d RED+GREEN: regression test asserting `SalesChart`/`ProfitChart` sections still render with their existing data/props unchanged after the rework.
+- [x] 2.5 Commit: `feat(statistics): wire currency selector, KPI cards, and top-products lists on dashboard` — actual commit `a2f5cd8 fix(statistics): restore KPI cards, currency selector and top-products lists`
 
 ### WU9 — `admin/features/routes/features.tsx` icon + blocking alerts
 Angular ref: `features.component.html:10` `<mat-icon>edit</mat-icon>`.
 
-- [ ] 9.1 RED: test in a new/existing `admin/features/routes/__tests__/*` — button renders `EditIcon` (not `SettingsIcon`); on `activateFeatures` success, `showBlockingSuccess` is called with `FEATURES.FEATURES_ACTIVATED` (mock `blocking-alert`), and the static `<p>` success/error text nodes are gone; on failure/thrown error, `showBlockingError` is called with `FEATURES.UNEXPECTED_ERROR`.
-- [ ] 9.2 GREEN: swap `SettingsIcon`→`EditIcon`; replace `setSuccessMessage`/`setErrorMessage` + `<p>` rendering with `showBlockingSuccess(...)`/`showBlockingError(title, message)` calls from `~/shared/lib/blocking-alert`.
-- [ ] 9.3 Commit: `fix(admin): features activation uses EditIcon and blocking alerts matching Angular`
+- [x] 9.1 RED: test in a new/existing `admin/features/routes/__tests__/*` — button renders `EditIcon` (not `SettingsIcon`); on `activateFeatures` success, `showBlockingSuccess` is called with `FEATURES.FEATURES_ACTIVATED` (mock `blocking-alert`), and the static `<p>` success/error text nodes are gone; on failure/thrown error, `showBlockingError` is called with `FEATURES.UNEXPECTED_ERROR`.
+- [x] 9.2 GREEN: swap `SettingsIcon`→`EditIcon`; replace `setSuccessMessage`/`setErrorMessage` + `<p>` rendering with `showBlockingSuccess(...)`/`showBlockingError(title, message)` calls from `~/shared/lib/blocking-alert`.
+- [x] 9.3 Commit: `fix(admin): features activation uses EditIcon and blocking alerts matching Angular` — actual commit `8f0cef0`
 
 ### WU4 — `profile/components/edit-profile-form.tsx` cellPhone mask + required
 Angular ref: mirrors `management/users` cellPhone pattern already ported (`UserDetailsForm.tsx`/`UserCreateForm.tsx` using `management/users/lib/cell-phone-mask`).
 
-- [ ] 4.1 RED: test — cellPhone input displays `formatCellPhone(digits)` (e.g. raw `51234567` renders `+53 5 123-4567`); typing non-digit chars is stripped via `toDigits` before storage; submitting with an empty cellPhone shows a required validation error (new check — Angular parity) and does NOT call `onSubmit`.
-- [ ] 4.2 GREEN: import `toDigits`/`formatCellPhone` from `~/management/users/lib/cell-phone-mask`; store `cellPhone` as raw digits in state (`toDigits` on change), display via `formatCellPhone(cellPhone)`; add `!cellPhone.trim()` to the existing required-field validation block (alongside `fullName`).
-- [ ] 4.3 Commit: `fix(profile): mask cellPhone field and make it required matching Angular`
+- [x] 4.1 RED: test — cellPhone input displays `formatCellPhone(digits)` (e.g. raw `51234567` renders `+53 5 123-4567`); typing non-digit chars is stripped via `toDigits` before storage; submitting with an empty cellPhone shows a required validation error (new check — Angular parity) and does NOT call `onSubmit`.
+- [x] 4.2 GREEN: import `toDigits`/`formatCellPhone` from `~/management/users/lib/cell-phone-mask`; store `cellPhone` as raw digits in state (`toDigits` on change), display via `formatCellPhone(cellPhone)`; add `!cellPhone.trim()` to the existing required-field validation block (alongside `fullName`).
+- [x] 4.3 Commit: `fix(profile): mask cellPhone field and make it required matching Angular` — actual commit `cc909e1`
 
 ### WU10 — auth footer + register cleanup (LARGE)
 Angular ref: `layouts/guest/guest-footer/guest-footer.component.html` (Cookies/Privacy/Terms links + Contact + copyright, 2 `<p>` lines with `{year}` interpolation).
 
-- [ ] 10.1 RED: `auth-layout.tsx` test — renders links to `/cookies-private` (Cookies), `/private-police` (Privacy), `/terms-conditions` (Terms) each `target="_blank"`; renders a Contact trigger; renders 2 copyright lines, one interpolating the current year.
-- [ ] 10.2 GREEN: add a footer block below `<Outlet/>` in `auth-layout.tsx` porting the 3 legal `<Link>`s + a Contact action (can be a `mailto:`/simple link — no Angular modal port required beyond the existing scope) + copyright `<p>`s using `FOOTER.COOKIES_POLICE`/`FOOTER.PRIVACY_POLICE`/`FOOTER.TERMS_CONDITIONS`/`FOOTER.CONTACT_US`/`FOOTER.COPYRIGHT1`(`{year}`)/`FOOTER.COPYRIGHT2` i18n keys (add to `es.ts` if missing).
-- [ ] 10.3 RED: `register.tsx` test — on successful registration, navigates straight to `/login` and does NOT render the `REGISTRATION.SUCCESS_REDIRECT` interim screen.
-- [ ] 10.4 GREEN: remove the `success` state branch/`<div>` block in `register.tsx`; `navigate('/login')` already fires on success — just delete the dead `if (success) {...}` early-return and its `setSuccess(true)` call (or keep `setSuccess` removed entirely since it's now unused).
-- [ ] 10.5 Commit: `fix(auth): port guest-footer to auth-layout and drop invented register success screen`
+- [x] 10.1 RED: `auth-layout.tsx` test — renders links to `/cookies-private` (Cookies), `/private-police` (Privacy), `/terms-conditions` (Terms) each `target="_blank"`; renders a Contact trigger; renders 2 copyright lines, one interpolating the current year.
+- [x] 10.2 GREEN: add a footer block below `<Outlet/>` in `auth-layout.tsx` porting the 3 legal `<Link>`s + a Contact action (can be a `mailto:`/simple link — no Angular modal port required beyond the existing scope) + copyright `<p>`s using `FOOTER.COOKIES_POLICE`/`FOOTER.PRIVACY_POLICE`/`FOOTER.TERMS_CONDITIONS`/`FOOTER.CONTACT_US`/`FOOTER.COPYRIGHT1`(`{year}`)/`FOOTER.COPYRIGHT2` i18n keys (add to `es.ts` if missing). Implemented by reusing the existing shared `shared/components/footer.tsx` (already ported from Angular's near-identical `client-footer.component.html`) inside `auth-layout.tsx`, rather than duplicating markup; fixed a `target="_blank"` parity gap on that shared component (benefits both the client and guest layouts) and turned the Contact span into a no-op button trigger (Angular's own `showEmailDialog()` handler is empty).
+- [x] 10.3 RED: `register.tsx` test — on successful registration, navigates straight to `/login` and does NOT render the `REGISTRATION.SUCCESS_REDIRECT` interim screen.
+- [x] 10.4 GREEN: remove the `success` state branch/`<div>` block in `register.tsx`; `navigate('/login')` already fires on success — just delete the dead `if (success) {...}` early-return and its `setSuccess(true)` call (or keep `setSuccess` removed entirely since it's now unused). Also removed the now-dead `REGISTRATION.SUCCESS_REDIRECT` i18n key from `es.ts` (its own comment confirmed it was a React-invented key with no Angular correlate).
+- [x] 10.5 Commit: `fix(auth): port guest-footer to auth-layout and drop invented register success screen` — actual commit `928f716 fix(auth): add guest footer and drop invented register success screen`
 
 ### Batch 2 verification
-- [ ] B2.1 `pnpm test`
-- [ ] B2.2 `pnpm -C apps/web-store-pos exec tsc --noEmit`
-- [ ] B2.3 `pnpm -C apps/web-store-pos build`
+- [x] B2.1 `pnpm test` — 1913/1913 passed, 129 files, no regressions.
+- [x] B2.2 `pnpm -C apps/web-store-pos exec tsc --noEmit` (clean, no errors)
+- [x] B2.3 `pnpm -C apps/web-store-pos build` (succeeded)
 
 ---
 
 ## Final (overall)
-- [ ] F.1 `pnpm test` (full suite, both batches applied)
-- [ ] F.2 `pnpm -C apps/web-store-pos exec tsc --noEmit`
-- [ ] F.3 `pnpm -C apps/web-store-pos build`
-- [ ] F.4 Confirm all 10 commits present on `feat/presentation-parity-batch-1`, no PR opened.
+- [x] F.1 `pnpm test` (full suite, both batches applied) — 1913/1913 passed, 129 files.
+- [x] F.2 `pnpm -C apps/web-store-pos exec tsc --noEmit` (clean)
+- [x] F.3 `pnpm -C apps/web-store-pos build` (succeeded)
+- [x] F.4 Confirm all 10 fixes present as commits on `feat/presentation-parity-batch-1` (9 commits — WU6+WU7 share one commit, all others 1:1), no PR opened. Commits: `15fa7e8`(WU8) `399b0a5`(WU6+7) `a9dc81f`(WU5) `55f81ba`(WU3) `ccc3d54`(WU1) `8f0cef0`(WU9) `cc909e1`(WU4) `928f716`(WU10) `a2f5cd8`(WU2).
