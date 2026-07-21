@@ -165,27 +165,21 @@ export function ProductsPage() {
     setModal(null);
   }
 
-  // --- Bulk edit (per-category "Nuevo Productos" -> bulk price edit) ---
-  // Angular has no `updateMany` on ProductService (removed, Phase 2 step 6 / spec.md decision
-  // #3): the bulk price-edit UI feature stays, re-expressed as a per-item `updateProduct` loop
-  // against the async surface.
-  async function handleBulkSave(updatedProducts: Product[]) {
-    for (const p of updatedProducts) {
-      await productService.updateProduct(
-        p.id,
-        p.categoryId,
-        p.name,
-        p.price,
-        p.businessId,
-        p.order,
-        p.isActive,
-        p.availableToSale,
-        p.discountFromInvantory,
-        p.barcode,
+  // --- Bulk create (per-category "Nuevo Productos" -> bulk-CREATE, Angular parity) ---
+  // Angular parity (edit-products-modal.component.ts:74-107): "Nuevo Productos" bulk-CREATES
+  // new products (createProducts) — it never edits existing ones. Angular's onSubmit closes
+  // the modal and emits the update event UNCONDITIONALLY (before checking `response.succeeded`);
+  // the Swal error is purely informational when some names already existed.
+  async function handleBulkSave(categoryId: string, items: { name: string; price: number }[]) {
+    const result = await productService.createProducts(categoryId, items);
+    setModal(null);
+    loadData();
+    if (!result.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        'Algunos productos no fueron adicionados porque ya existen.',
       );
     }
-    loadData();
-    setModal(null);
   }
 
   // --- Category save ---
@@ -347,7 +341,7 @@ export function ProductsPage() {
 
       {modal?.type === 'bulk' && (
         <EditProductsModal
-          products={productsByCategory[modal.category.id] ?? []}
+          categoryId={modal.category.id}
           onSave={handleBulkSave}
           onClose={() => setModal(null)}
         />

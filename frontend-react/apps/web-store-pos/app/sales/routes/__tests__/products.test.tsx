@@ -26,6 +26,7 @@ const productServiceSpies = vi.hoisted(() => ({
   updateProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   deleteProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   createCsvProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  createProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   getMaxOrder: vi.fn((..._args: unknown[]) => Promise.resolve({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] })),
 }));
 
@@ -42,6 +43,7 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
     updateProduct: productServiceSpies.updateProduct,
     deleteProduct: productServiceSpies.deleteProduct,
     createCsvProducts: productServiceSpies.createCsvProducts,
+    createProducts: productServiceSpies.createProducts,
     getMaxOrder: productServiceSpies.getMaxOrder,
   })),
 }));
@@ -139,6 +141,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     productServiceSpies.updateProduct.mockClear();
     productServiceSpies.updateProduct.mockResolvedValue(okEnvelope);
     productServiceSpies.deleteProduct.mockClear();
+    productServiceSpies.createProducts.mockClear();
+    productServiceSpies.createProducts.mockResolvedValue(okEnvelope);
     confirmDialogMock.mockClear();
     confirmDialogMock.mockResolvedValue(true);
     productServiceSpies.getMaxOrder.mockClear();
@@ -478,9 +482,10 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(productServiceSpies.deleteProduct).not.toHaveBeenCalled();
   });
 
-  // Angular has no updateMany (removed): the bulk price-edit UI re-expresses as a per-item
-  // updateProduct loop (WU4.4). One product -> one updateProduct call carrying the edited price.
-  it('re-expresses bulk save as a per-item updateProduct loop carrying the edited price (WU4.4)', async () => {
+  // Angular parity (edit-products-modal.component.ts:74-107): "Nuevo Productos" bulk-CREATES
+  // new products via createProducts(categoryId, items), it does NOT edit existing ones (WU3
+  // rework — supersedes the former per-item updateProduct-loop test, WU4.4).
+  it('calls createProducts(categoryId, items) for the filled rows and reloads the list', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
 
@@ -492,13 +497,50 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-products-button'));
-    fireEvent.change(await screen.findByTestId('price-input-prod-1'), { target: { value: '9.99' } });
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
-    await waitFor(() => expect(productServiceSpies.updateProduct).toHaveBeenCalledTimes(1));
-    const args = productServiceSpies.updateProduct.mock.calls[0];
-    expect(args[0]).toBe('prod-1'); // id
-    expect(args[3]).toBe(9.99); // price
+    await waitFor(() => expect(productServiceSpies.createProducts).toHaveBeenCalledTimes(1));
+    expect(productServiceSpies.createProducts).toHaveBeenCalledWith('cat-1', [
+      { name: 'Fanta', price: 9.99 },
+    ]);
+    expect(productServiceSpies.updateProduct).not.toHaveBeenCalled();
+  });
+
+  // Angular parity (edit-products-modal.component.ts:97-107): closeModal() + emit() run
+  // unconditionally, THEN a Swal error is shown if !response.succeeded (some names already
+  // existed) — mirrored via showBlockingError.
+  it('shows a blocking error when createProducts reports some products already existed, but still closes the modal', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.createProducts.mockResolvedValueOnce({
+      data: false,
+      succeeded: false,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Algunos productos no fueron adicionados porque ya existen.',
+      ),
+    );
+    expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
   });
 
   // Angular parity (edit-product-modal.component.ts:106-110): a failed createProduct surfaces

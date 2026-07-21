@@ -21,6 +21,9 @@ const messages: Record<string, string> = {
   'GENERAL.PRICE': 'Precio',
   'GENERAL.NAME': 'Nombre',
   'GENERAL.ADD': 'Adicionar',
+  // GENERAL.NEW — Angular vocabs/es.ts:221, "+ Nuevo" add-row button
+  // (edit-products-modal.component.html:74).
+  'GENERAL.NEW': 'Nuevo',
   // Angular GENERAL.ENTRY / GENERAL.INSERT (vocabs/es.ts:220,178) — add-entry CTA label and
   // the create-mode save button text (edit-inventory-entry-modal.component.html:84).
   'GENERAL.ENTRY': 'Entrada',
@@ -273,6 +276,9 @@ const messages: Record<string, string> = {
   'PRODUCT.EDIT_PRODUCT': 'Editar Producto',
   'PRODUCT.DELETE_PRODUCT': 'Eliminar Producto',
   'PRODUCT.AVAILABLE_TO_SALE': 'Disponible para Vender',
+  // PRODUCT.ADD_PRODUCTS (Angular vocabs/es.ts:373) — edit-products-modal title
+  // (edit-products-modal.component.html:4).
+  'PRODUCT.ADD_PRODUCTS': 'Adicionar Productos',
 
   // Sale / POS screen (Angular SALES.* — frontend/src/app/_modules/i18n/vocabs/es.ts)
   'SALES.HEADER': 'Productos para vender',
