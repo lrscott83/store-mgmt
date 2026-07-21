@@ -458,7 +458,6 @@ const messages: Record<string, string> = {
   'INVENTORY.ENTRY.CATEGORY': 'Categoría',
   'INVENTORY.ENTRY.QUANTITY': 'Cantidad',
   'INVENTORY.ENTRY.COST_PRICE': 'Precio de costo',
-  'INVENTORY.ENTRY.DATE': 'Fecha',
   'INVENTORY.ENTRY.AVAILABLE': 'Disponible',
   'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_EDIT': 'No se puede editar una entrada que ya tiene ventas asociadas',
   'INVENTORY.ERRORS.SOLD_ENTRY_CANNOT_DELETE': 'No se puede eliminar una entrada que ya tiene ventas asociadas',
