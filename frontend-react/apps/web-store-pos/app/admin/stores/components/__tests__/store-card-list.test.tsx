@@ -189,7 +189,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
     expect(card).toHaveClass('bg-danger/10', 'border-danger');
   });
 
-  it('unapproved-but-active store applies the success state class', async () => {
+  it('unapproved-but-active store applies the warning state class (matches Angular disapproved-store)', async () => {
     const { StoreCardList } = await import('../store-card-list');
     const { container } = render(
       <Wrapper>
@@ -202,7 +202,8 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
       </Wrapper>
     );
     const card = container.querySelector('[data-slot="card"]');
-    expect(card).toHaveClass('bg-success/10', 'border-success');
+    expect(card).toHaveClass('bg-warning/10', 'border-warning');
+    expect(card).not.toHaveClass('bg-success/10');
   });
 
   it('normal store (active and approved) has no extra state class', async () => {
@@ -219,10 +220,10 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card).not.toHaveClass('bg-danger/10');
-    expect(card).not.toHaveClass('bg-success/10');
+    expect(card).not.toHaveClass('bg-warning/10');
   });
 
-  it('inactive + unapproved store applies danger, NOT success (precedence)', async () => {
+  it('inactive + unapproved store applies danger, NOT warning (precedence)', async () => {
     const { StoreCardList } = await import('../store-card-list');
     const { container } = render(
       <Wrapper>
@@ -236,7 +237,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
     );
     const card = container.querySelector('[data-slot="card"]');
     expect(card).toHaveClass('bg-danger/10', 'border-danger');
-    expect(card).not.toHaveClass('bg-success/10');
+    expect(card).not.toHaveClass('bg-warning/10');
   });
 });
 

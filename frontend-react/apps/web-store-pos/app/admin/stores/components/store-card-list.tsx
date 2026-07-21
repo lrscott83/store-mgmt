@@ -22,7 +22,7 @@ interface StoreCardListProps {
  */
 function getStoreCardClass(store: Store): string {
   if (!store.isActive) return 'bg-danger/10 border border-danger';
-  if (!store.approved) return 'bg-success/10 border border-success';
+  if (!store.approved) return 'bg-warning/10 border border-warning';
   return '';
 }
 
