@@ -44,4 +44,11 @@ describe('Footer — parity with Angular client-footer.component.html', () => {
     expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute('target', '_blank');
     expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute('target', '_blank');
   });
+
+  it('renders the email icon before "Contáctanos", matching Angular <mat-icon>email</mat-icon>', () => {
+    renderFooter();
+    const contact = screen.getByText('Contáctanos').closest('button');
+    expect(contact).not.toBeNull();
+    expect(contact?.querySelector('svg')).not.toBeNull();
+  });
 });

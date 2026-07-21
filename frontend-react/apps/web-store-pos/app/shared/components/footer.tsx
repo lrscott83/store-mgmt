@@ -1,5 +1,6 @@
 import { useIntl } from 'react-intl';
 import { Link } from 'react-router';
+import { EmailIcon } from './ui/icons';
 
 /**
  * Matches Angular's `client-footer.component.html` (and the near-identical
@@ -47,7 +48,12 @@ export function Footer() {
           </Link>
         </li>
         <li>
-          <button type="button" onClick={() => {}} className="text-gray-500">
+          <button
+            type="button"
+            onClick={() => {}}
+            className="inline-flex items-center gap-1 text-gray-500"
+          >
+            <EmailIcon className="h-4 w-4" />
             {intl.formatMessage({ id: 'FOOTER.CONTACT_US' })}
           </button>
         </li>
