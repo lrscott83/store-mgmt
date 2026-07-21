@@ -90,13 +90,11 @@ describe('api-client (AUTH-06)', () => {
     });
   });
 
-  describe('Response interceptor — 401 delegates to useAuthStore.logout() (Angular error-interceptor.service.ts:62-66 parity)', () => {
-    it('calls useAuthStore.getState().logout() exactly once on a 401 response', async () => {
+  describe('Response interceptor — 401 does NOT logout (offline-first: local session is authoritative)', () => {
+    it('does NOT call useAuthStore.getState().logout() on a 401 response', async () => {
       const { apiClient } = await import('../api-client');
-      // Dynamically import from the SAME module registry cycle as api-client
-      // (both resolve to the identical module instance since no
-      // vi.resetModules() runs between these two imports) so the spy attaches
-      // to the exact store instance the interceptor calls into.
+      // Same module-registry cycle (no vi.resetModules() between imports) so the
+      // spy attaches to the exact store instance the interceptor would call into.
       const { useAuthStore } = await import('../../stores/auth-store');
       const logoutSpy = vi.spyOn(useAuthStore.getState(), 'logout');
 
@@ -115,15 +113,15 @@ describe('api-client (AUTH-06)', () => {
         // Expected: interceptor always rejects
       }
 
-      expect(logoutSpy).toHaveBeenCalledTimes(1);
+      expect(logoutSpy).not.toHaveBeenCalled();
     });
 
-    it('removes only AUTH_MODEL on 401 — token and currentUser survive (Angular auth.service.ts:83-98 parity, Decision 1)', async () => {
+    it('preserves AUTH_MODEL, token, and currentUser on a 401 — the local session survives', async () => {
       const { apiClient } = await import('../api-client');
 
       // Seed AFTER import: auth-store self-initializes on module evaluation
-      // (mirrors Angular's APP_INITIALIZER) and would otherwise race a
-      // background /me revalidation against these locally-seeded values.
+      // (mirrors Angular's APP_INITIALIZER) and would otherwise race against
+      // these locally-seeded values.
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
         JSON.stringify({ authToken: 'test-token', expiresIn: Date.now() + 1000 })
@@ -146,37 +144,13 @@ describe('api-client (AUTH-06)', () => {
         // Expected: interceptor always rejects
       }
 
-      expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
+      // Offline-first: a 401 must NOT destroy the local session.
+      expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).not.toBeNull();
       expect(localStorage.getItem(TOKEN_KEY)).toBe('test-token');
       expect(localStorage.getItem(StorageKeys.CURRENT_USER)).toBe('user-data');
     });
 
-    it('does NOT hard-redirect when already on /login (anti-loop guard regression, Angular auth.service.ts:90-96)', async () => {
-      window.history.pushState({}, '', '/login');
-      const { apiClient } = await import('../api-client');
-      const { registerAuthRedirect } = await import('../../stores/auth-store');
-      const redirectSpy = vi.fn();
-      registerAuthRedirect(redirectSpy);
-
-      const rejected = getResponseInterceptor(apiClient);
-      const mockError = new axios.AxiosError('Unauthorized', '401', undefined, undefined, {
-        status: 401,
-        data: {},
-        headers: {},
-        config: {} as InternalAxiosRequestConfig,
-        statusText: 'Unauthorized',
-      });
-
-      try {
-        await rejected(mockError);
-      } catch {
-        // Expected: interceptor always rejects
-      }
-
-      expect(redirectSpy).not.toHaveBeenCalled();
-    });
-
-    it('redirects to /login via the injected navigate fn (not window.location.href) when NOT already on /login', async () => {
+    it('does NOT redirect on a 401', async () => {
       window.history.pushState({}, '', '/sales');
       const { apiClient } = await import('../api-client');
       const { registerAuthRedirect } = await import('../../stores/auth-store');
@@ -198,7 +172,7 @@ describe('api-client (AUTH-06)', () => {
         // Expected: interceptor always rejects
       }
 
-      expect(redirectSpy).toHaveBeenCalledWith('/login');
+      expect(redirectSpy).not.toHaveBeenCalled();
     });
 
     it('does not clear tokens on non-401 errors (e.g. 500)', async () => {

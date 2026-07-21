@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { StorageService } from '../auth/storage-service';
-import { useAuthStore } from '../stores/auth-store';
 import { useLoadingStore } from '../stores/loading-store';
 import { showBlockingError } from '../blocking-alert';
 import esMessages from '../i18n/es';
@@ -46,8 +45,13 @@ apiClient.interceptors.request.use((config) => {
 // Mirrors Angular's _interceptors/error-interceptor.service.ts response-error
 // handling (rule 9 — error contract, not RxJS mechanics): 30s timeout (already
 // enforced by API_TIMEOUT above, axios' analogue of `timeout(30000)`),
-// network-error tagging, 401 -> AuthService.logout() delegation, 500 -> Swal
-// blocking dialog.
+// network-error tagging, and 500 -> Swal blocking dialog.
+//
+// OFFLINE-FIRST DIVERGENCE from Angular: a 401 does NOT log the user out. The
+// local session (AUTH_MODEL/currentUser) is authoritative for its 35-day window;
+// only an explicit logout or local token expiry ends it. A 401 just rejects so
+// the calling request can handle it — a rejected/rotated token server-side must
+// not destroy a locally-valid offline session.
 apiClient.interceptors.response.use(
   (response) => {
     // Angular finalize() success path (loading-interceptor.service.ts:18-20).
@@ -78,15 +82,9 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      if (error.response.status === 401) {
-        // Angular error-interceptor.service.ts:62-66 delegates to
-        // AuthService.logout() instead of duplicating token-clearing/redirect
-        // logic here. useAuthStore.logout() mirrors AuthService.logout()
-        // exactly: AUTH_MODEL-only clear (token/currentUser survive) + the
-        // already-on-/login anti-loop redirect guard.
-        useAuthStore.getState().logout();
-        return Promise.reject(error);
-      }
+      // OFFLINE-FIRST: a 401 is NOT special — it falls through to the generic
+      // reject below, leaving the local session untouched (no logout, no
+      // redirect). Diverges deliberately from Angular's logout-on-401.
 
       if (error.response.status === 500) {
         // Angular error-interceptor.service.ts:77-85 shows a blocking Swal
