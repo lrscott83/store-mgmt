@@ -62,11 +62,11 @@ Each screen already has `<button className="flex ... justify-between">` header w
 
 Locked in-scope by the orchestrator (overrides design ADR-4 deferral). Same TDD care as Phase 3: uncontrolled `<details>` → controlled div+button+state, since there is currently no React state backing this component at all.
 
-- [ ] 4.1 RED: Create `apps/web-store-pos/app/help/routes/tutorial.test.tsx` (new file — none exists today) asserting: each step panel defaults to collapsed, clicking a step's header opens only that step's body, clicking again closes it, and two step panels toggle independently.
-- [ ] 4.2 RED: Extend the same test to assert each step header renders `ChevronDownIcon` with `rotate-180` present only when that step is expanded.
-- [ ] 4.3 GREEN: In `apps/web-store-pos/app/help/routes/tutorial.tsx` (L79-84), replace the `STEPS.map` `<details><summary>` block with a per-step component using local `useState(false)` (mirroring the `today-stats.tsx` `ExpansionPanel` pattern) + `div + button(aria-expanded) + conditional body`.
-- [ ] 4.4 GREEN: Render `<ChevronDownIcon isExpanded={isOpen} />` next to the step title in the header.
-- [ ] 4.5 Verify each step's `content` (images/paragraphs, L6-65) renders unchanged inside the new conditional body wrapper.
+- [x] 4.1 RED: Create `apps/web-store-pos/app/help/routes/tutorial.test.tsx` (new file — none exists today) asserting: each step panel defaults to collapsed, clicking a step's header opens only that step's body, clicking again closes it, and two step panels toggle independently. **Deviation**: a `tutorial.test.tsx` already existed on disk (S-HELP-CONTENT-1/2/3, S-HELP-TEST-2) asserting the OLD `<details>/<summary>` structure and unconditional image visibility. Updated its S-HELP-CONTENT-2/3 assertions to match the new div+button markup (structural change only — step count/labels/image set unchanged) instead of creating a duplicate file, then added the new collapsed/toggle/independent-toggle assertions in a new describe block.
+- [x] 4.2 RED: Extend the same test to assert each step header renders `ChevronDownIcon` with `rotate-180` present only when that step is expanded.
+- [x] 4.3 GREEN: In `apps/web-store-pos/app/help/routes/tutorial.tsx` (L79-84), replace the `STEPS.map` `<details><summary>` block with a per-step component (`TutorialStep`) using local `useState(false)` (mirroring the `today-stats.tsx` `ExpansionPanel` pattern) + `div + button(aria-expanded) + conditional body`.
+- [x] 4.4 GREEN: Render `<ChevronDownIcon isExpanded={isOpen} />` next to the step title in the header.
+- [x] 4.5 Verify each step's `content` (images/paragraphs, L6-65) renders unchanged inside the new conditional body wrapper (props passed through untouched; only the wrapper changed).
 
 ## Phase 5: Full Verification
 

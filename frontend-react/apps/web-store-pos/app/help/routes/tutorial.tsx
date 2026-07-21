@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 
 const STEPS = [
   {
@@ -66,6 +68,33 @@ const STEPS = [
   },
 ] as const;
 
+/**
+ * Controlled step panel — converted from an uncontrolled native `<details>/<summary>` to a
+ * `div + button(aria-expanded) + conditional body` pattern (mirroring the other
+ * collapsible-panel screens, e.g. `today-stats.tsx`'s `ExpansionPanel`) so it can host the
+ * shared rotating `ChevronDownIcon` (collapsible-panel-chevron-parity). Each instance owns
+ * its own `isOpen` state, so steps toggle independently. Default-collapsed + click-to-toggle
+ * semantics are unchanged from the previous `<details>` version.
+ */
+function TutorialStep({ title, content }: { title: string; content: React.ReactNode }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="rounded border border-border p-3">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-2 text-left font-semibold"
+        aria-expanded={isOpen}
+      >
+        <span>{title}</span>
+        <ChevronDownIcon isExpanded={isOpen} />
+      </button>
+      {isOpen && <div className="mt-2">{content}</div>}
+    </div>
+  );
+}
+
 export function TutorialPage() {
   const intl = useIntl();
 
@@ -77,10 +106,7 @@ export function TutorialPage() {
 
       <div className="space-y-2">
         {STEPS.map((step) => (
-          <details key={step.title} className="rounded border border-border p-3">
-            <summary className="cursor-pointer font-semibold">{step.title}</summary>
-            <div className="mt-2">{step.content}</div>
-          </details>
+          <TutorialStep key={step.title} title={step.title} content={step.content} />
         ))}
       </div>
     </div>
