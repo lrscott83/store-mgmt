@@ -356,7 +356,7 @@ describe('TodayEntriesPage — smoke render', () => {
 // screen below, diff-matrix #19) ────────────────────────────────────────────
 
 describe('TodayEntriesPage — edit/deactivate actions stay reachable (regression guard)', () => {
-  it('renders row-level edit/deactivate actions for today entries', () => {
+  it('renders the compact EntryList row (name + quantity), reaches Editar/Eliminar via the gear ActionMenu, and shows no Fecha column or product-grouping headers/pill buttons (Angular parity: entry-list.component.html has no date column and no grouping)', () => {
     const todayEntries: InventoryEntryView[] = [
       {
         id: 'e1',
@@ -381,9 +381,24 @@ describe('TodayEntriesPage — edit/deactivate actions stay reachable (regressio
       </Wrapper>,
     );
 
+    // Compact row data still renders.
+    expect(screen.getByText('Ron')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+
+    // Actions are hidden behind the gear ActionMenu (EntryList), not inline pill buttons.
+    expect(screen.queryByText('Editar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('entry-actions-toggle-e1')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('entry-actions-toggle-e1'));
     expect(screen.getByText('Editar')).toBeInTheDocument();
     // CRITICAL bug fix (Angular parity: GENERAL.DELETE = 'Eliminar', not ORDERS.DEACTIVATE).
     expect(screen.getByText('Eliminar')).toBeInTheDocument();
+
+    // No invented "Fecha" column/date cell (Angular entry-list.component.html has no date
+    // column at all — productName | quantity | costPrice(owner-admin) | gear).
+    expect(screen.queryByText('Fecha')).not.toBeInTheDocument();
+    // No product-name grouping header (InventoryDailyEntries invention removed).
+    expect(screen.queryByRole('heading', { name: 'Ron' })).not.toBeInTheDocument();
   });
 });
 
