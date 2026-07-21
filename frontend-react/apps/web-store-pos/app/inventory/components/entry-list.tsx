@@ -58,9 +58,6 @@ export function EntryList({
                 {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}
               </th>
             )}
-            <th className="px-4 py-2 text-left font-medium text-text-muted">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.DATE' })}
-            </th>
             {showActions && <th className="px-4 py-2" />}
           </tr>
         </thead>
@@ -76,9 +73,6 @@ export function EntryList({
                   ${entry.costPrice.toFixed(2)}
                 </td>
               )}
-              <td className="px-4 py-3 text-text-muted">
-                {new Date(entry.date).toLocaleDateString('es')}
-              </td>
               {showActions && (
                 <td className="px-4 py-3 text-right">
                   <ActionMenu testId={`entry-actions-toggle-${entry.id}`}>
