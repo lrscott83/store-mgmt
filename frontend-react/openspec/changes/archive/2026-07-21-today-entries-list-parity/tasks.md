@@ -63,3 +63,9 @@ from Angular in both the today-entries and entries (history) screens.
 - [x] 4.2 Ran `pnpm -C apps/web-store-pos exec tsc --noEmit` — clean, no dangling references.
 - [x] 4.3 Ran `pnpm -C apps/web-store-pos build` — build succeeds.
 - [x] 4.4 Parity check: `today-entries.tsx` now renders `EntryList` identically to `entries.tsx`'s usage (aside from `readOnly={false}` vs `readOnly` — Angular parity, `today-entries.component.html:24` vs `entries.component.html:46`).
+
+## Phase 5: Post-verify regression fix (adversarial parity review finding)
+
+- [x] 5.1 Adversarial Angular↔React parity review found ONE confirmed regression: the today-entries empty-day state rendered the generic product-list empty message instead of Angular's entry-specific `INVENTORY_ENTRY.NO_ENTRY_FOUND_IN_DAY` copy.
+- [x] 5.2 Fixed with RED-first test: added a parent-owned empty-state `InfoBox` in `today-entries.tsx` gated on an empty entries array, rendering the entry-specific i18n string, matching Angular's `today-entries.component.html` empty-state block. (commit `cbc4726`)
+- [x] 5.3 Full suite re-verified green: 1867/1867 tests, `tsc --noEmit` clean, build succeeds.

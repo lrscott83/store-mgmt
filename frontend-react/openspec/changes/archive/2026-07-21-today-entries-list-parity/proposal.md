@@ -69,7 +69,7 @@ and files. No data or schema impact.
 
 ## Success Criteria
 
-- [ ] `today-entries.tsx` renders `EntryList` (compact rows + gear menu, no date).
-- [ ] `inventory-daily-entries.tsx` + its test are deleted; no dangling imports.
-- [ ] `pnpm test` passes (Strict TDD).
-- [ ] Parity review confirms today screen matches Angular `today-entries` + `entry-list`.
+- [x] `today-entries.tsx` renders `EntryList` (compact rows + gear menu, no date).
+- [x] `inventory-daily-entries.tsx` + its test are deleted; no dangling imports.
+- [x] `pnpm test` passes (Strict TDD).
+- [x] Parity review confirms today screen matches Angular `today-entries` + `entry-list`.
