@@ -27,22 +27,6 @@ interface AuthState {
   logout: () => void;
 }
 
-// Decision 4 (auth-service-parity, Slice 3): background revalidation reuses the
-// STORED session expiry — it never recomputes a fresh 35-day stamp and never
-// rewrites AUTH_MODEL. Only the cached profile (CURRENT_USER) + in-memory state
-// are refreshed. Mirrors Angular auth.service.ts's validateToken (~line 200).
-async function validateTokenWithServer(authToken: string, expiresIn: number): Promise<void> {
-  try {
-    const { authHttpService } = await import('../http/auth-http-service');
-    const fresh = await authHttpService.getMe();
-    const userWithExpiry: UserModel = { ...fresh, authToken, expiresIn, password: '' };
-    StorageService.setCurrentUser(userWithExpiry);
-    useAuthStore.setState({ user: userWithExpiry });
-  } catch {
-    // AUTH-03: background refresh must never surface errors.
-  }
-}
-
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -89,13 +73,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         authToken: auth.authToken,
         expiresIn: auth.expiresIn,
       };
+      // OFFLINE-FIRST: a valid cached session is authoritative on startup — make
+      // NO backend call. Angular fires a background /me here (auth.service.ts:159),
+      // but that /me's 401 is turned into a session-destroying logout() by the
+      // shared HTTP error interceptor (api-client.ts / Angular error-interceptor
+      // .service.ts:62), which breaks offline use — so the revalidation is removed.
       set({ user: userWithExpiry, isAuthenticated: true, error: null });
-
-      // AUTH-03: fire background revalidation if online — must NOT block
-      // render or surface errors on failure.
-      if (typeof navigator !== 'undefined' && navigator.onLine) {
-        void validateTokenWithServer(auth.authToken, auth.expiresIn);
-      }
       return userWithExpiry;
     }
 

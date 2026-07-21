@@ -299,8 +299,8 @@ describe('useAuthStore', () => {
     });
   });
 
-  describe('AUTH-03: Background /me on startup', () => {
-    it('fires background /me call when online and token exists — does not block render', async () => {
+  describe('AUTH-03: cached session on startup (offline-first, no backend call)', () => {
+    it('hydrates synchronously from cache when online — state set immediately', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
@@ -308,23 +308,16 @@ describe('useAuthStore', () => {
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       localStorage.setItem(StorageKeys.TOKEN, 'token123');
-
-      // Mock apiClient before initialize
-      const mockGet = vi.fn().mockResolvedValue({ data: { data: { ...user, fullName: 'Updated Name' } } });
-      vi.doMock('~/shared/lib/http/api-client', () => ({ apiClient: { get: mockGet } }));
-
-      // Mock navigator.onLine as true (jsdom default)
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       useAuthStore.getState().initialize();
 
-      // Initialize must be synchronous — state is set immediately
       const state = useAuthStore.getState();
       expect(state.isAuthenticated).toBe(true);
       expect(state.user?.id).toBe('u1');
     });
 
-    it('does not throw when /me fails (offline) — AUTH-03 background /me fail scenario', async () => {
+    it('hydrates from cache when offline without throwing', () => {
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
@@ -332,53 +325,47 @@ describe('useAuthStore', () => {
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
       localStorage.setItem(StorageKeys.TOKEN, 'token123');
-
-      // Mock navigator.onLine as false
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
 
       expect(() => useAuthStore.getState().initialize()).not.toThrow();
 
       const state = useAuthStore.getState();
-      expect(state.isAuthenticated).toBe(true); // still authenticated from cache
+      expect(state.isAuthenticated).toBe(true); // authenticated from cache
     });
+  });
 
-    it('does not leak an unhandled rejection when the background /me wiring fails — AUTH-03', async () => {
+  // OFFLINE-FIRST: a valid cached session must never touch the backend on
+  // startup. The previous background /me revalidation issued GET /auth/me, whose
+  // 401 was turned into a global logout() by the shared HTTP error interceptor
+  // (api-client.ts) — destroying the local session and breaking offline use.
+  describe('OFFLINE-FIRST: cached session makes no backend call on startup', () => {
+    it('does NOT call authHttpService.getMe when a valid cached session exists (online)', async () => {
+      vi.resetModules();
+      const mockGetMe = vi.fn().mockResolvedValue(makeUser({ fullName: 'FromServer' }));
+      vi.doMock('~/shared/lib/http/auth-http-service', () => ({
+        authHttpService: { getMe: mockGetMe },
+      }));
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
       const user = makeUser();
       localStorage.setItem(
         StorageKeys.AUTH_MODEL,
         JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
       );
       localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
-      localStorage.setItem(StorageKeys.TOKEN, 'token123');
-      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
-      // Force the background refresh wiring to fail: apiClient has no `get`, so the
-      // outer import().then() callback throws synchronously. Without an outer .catch,
-      // that rejection is unhandled (AUTH-03: background refresh must never surface errors).
-      vi.doMock('~/shared/lib/http/api-client', () => ({ apiClient: {} }));
+      const { useAuthStore: freshStore } = await import('../auth-store');
+      await freshStore.getState().getUserByToken();
+      // Flush any fire-and-forget background work so a stray call would surface.
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
 
-      const rejections: unknown[] = [];
-      const onRejection = (reason: unknown): void => {
-        rejections.push(reason);
-      };
-      process.on('unhandledRejection', onRejection);
-      try {
-        useAuthStore.getState().initialize();
-        // Flush microtasks + a macrotask so any unhandled rejection would surface.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      } finally {
-        process.off('unhandledRejection', onRejection);
-      }
+      expect(mockGetMe).not.toHaveBeenCalled();
+      expect(freshStore.getState().isAuthenticated).toBe(true);
+      expect(freshStore.getState().user?.id).toBe('u1');
 
-      expect(rejections).toHaveLength(0);
+      vi.doUnmock('~/shared/lib/http/auth-http-service');
     });
-
-    // NOTE: the background /me SUCCESS write path (initialize → apiClient.get('/me') →
-    // StorageService.setCurrentUser + minimal AUTH_MODEL) is not asserted here because the
-    // async dynamic `import('../http/api-client')` cannot be mock-intercepted deterministically
-    // across full-suite run order (module caching). Its split-layout persistence uses the exact
-    // same StorageService.setCurrentUser + minimal-AUTH_MODEL pattern that `setUser`/`updateUser`
-    // already cover deterministically above.
   });
 
   describe('getUserByToken — consolidated (Decision 3+4)', () => {
@@ -435,30 +422,6 @@ describe('useAuthStore', () => {
 
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
       expect(useAuthStore.getState().user?.id).toBe('u1');
-    });
-
-    it('(e) background revalidation preserves stored expiresIn and does not rewrite AUTH_MODEL', async () => {
-      const storedExpiry = Date.now() + THIRTY_FIVE_DAYS_MS;
-      const user = makeUser({ expiresIn: storedExpiry });
-      localStorage.setItem(
-        StorageKeys.AUTH_MODEL,
-        JSON.stringify({ authToken: user.authToken, expiresIn: storedExpiry })
-      );
-      localStorage.setItem(StorageKeys.CURRENT_USER, JSON.stringify(user));
-      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
-
-      const mockGetMe = vi.fn().mockResolvedValue({ ...user, fullName: 'Revalidated' });
-      vi.doMock('~/shared/lib/http/auth-http-service', () => ({
-        authHttpService: { getMe: mockGetMe },
-      }));
-
-      await useAuthStore.getState().getUserByToken();
-      // Flush microtasks/macrotasks so the fire-and-forget background call settles.
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      const storedAuthModel = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!);
-      expect(storedAuthModel.expiresIn).toBe(storedExpiry);
-      expect(storedAuthModel.authToken).toBe(user.authToken);
     });
 
     it('(g) no-cache branch sets user synchronously before any await (cold-boot, AUTH-03 REV2)', () => {
