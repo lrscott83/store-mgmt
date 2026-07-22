@@ -159,3 +159,91 @@ API base URL: `import.meta.env['API_URL']` (axios, `app/shared/lib/http/api-clie
 - Confirm token lifetime (`expiresIn`) and whether any refresh mechanism exists; the shorter the TTL, the less the revocation gap matters.
 
 **Verdict for now:** functionally correct (users can log out); flagged as a security/design item to revisit while React is the active codebase.
+
+---
+
+## 9. E2E test coverage plan
+
+This section turns the role/usage map above into an e2e testing roadmap. It is the master index; each
+controller gets its own doc-pair under `docs/backend/`.
+
+### 9.1 Scope rule (non-negotiable)
+
+Only the endpoints in §4 (Angular) / §6 (React) are in scope — the **real frontend surface** given
+`USE_ONLINE_SERVICE = false`. Offline/dead endpoints (Products, ProductCategories, and the
+`*OnlineService` paths) are **out of scope**: testing them tests dead code. All in-scope endpoints are
+equal priority — they are all the ones actually used.
+
+### 9.2 Structure
+
+- **One doc-pair per controller:** `NN_<controller>-e2e-test-plan.md` (design: per-endpoint case list,
+  contract facts, 4 categories) **+** `NN_<controller>-e2e-implementation-plan.md` (self-contained
+  tasks: `- [ ]` steps with compilable code, seeding, `dotnet test` commands, checkpoints).
+- **Endpoint-by-endpoint inside each controller**, each with the 4 categories: happy / edge / error /
+  integration.
+- **Every implementation-plan is self-contained** — implementable and testable standalone. If the
+  shared harness is not on disk, the plan bootstraps it (Task 0) before the endpoint tasks.
+- **Shared harness:** in-process `WebApplicationFactory<Program>` + config-provided `smca_test`
+  Postgres (migrations applied → all seed data) + JWT minted in-test via the app's own `IJwtProvider`
+  (authorization is DB-live, so the real pipeline runs).
+
+### 9.3 Order of attack
+
+1. **Auth** — planned: `01`/`02` (login, register, me, ping) + `03` (logout).
+2. **Stores** — planned: `04` test-plan + implementation-plan (by-current-user, {id}, POST, PUT,
+   approve, disapprove). ← current focus.
+3. **Authorization (cross-cutting)** — see §9.4. Next after stores.
+4. **Users / StoreUsers** — profile edit, change-password, list, activate, delete, create StoreUser.
+5. **Owners / ReSellers / Features / Usages** — admin surface + usage tracking.
+
+### 9.4 Cross-cutting: authenticated-user permissions (100% coverage target)
+
+Permissions are **one engine with two windows**, and both must be covered:
+
+- **`GET /auth/me`** — *reports* the computed permissions (`CurrentUserDto`: `IsSuperAdmin`,
+  `IsOwnerAdmin`, `IsReSeller`, `FeatureIds`, `Roles[]` = storeId+moduleId+featureIds,
+  `SelectedStoreId`, `StoreModuleIds`). The **frontend trusts this** for all client-side guards and
+  menu filtering.
+- **`HasPermission` filter** — *enforces* the same computation on every protected endpoint. This is
+  the **real security boundary** (frontend guards are client-side; in React a 401 does not even force
+  logout — see §8).
+
+Both read the same core: `ClaimsTransformerService` (IsSuperAdmin / IsOwnerAdmin / IsReSeller +
+tenant/store claims, recomputed from the DB per request) + `AllowedFeaturesService
+.GetAllowedFeatureIdsForCurrentUserAsync` + the role/feature repositories. So `/me` is a read-only
+window into the exact computation `HasPermission` enforces. Cover the engine through both windows over
+the role × feature × scope matrix:
+
+| Case | `/me` expects | `HasPermission` (over Stores) |
+|---|---|---|
+| SuperAdmin | `IsSuperAdmin=true` | bypass: passes all, incl. SuperAdmin-only approve/disapprove |
+| OwnerAdmin, selected store **has** active Management module | `IsOwnerAdmin=true`, `FeatureIds` includes Stores (73) | passes class-level; approve → **403** |
+| OwnerAdmin, selected store **without** Management | `FeatureIds` excludes Stores | stores → **403** |
+| StoreUser with a `StoreRoleFeature` for the feature in the selected store | `Roles[]` reflects it | passes that endpoint; others → 403 |
+| StoreUser without the feature / wrong `SelectedStoreId` | empty scope | **403** (store-scoping) |
+| ReSeller | `IsReSeller=true`, `FeatureIds` only Owners | stores → **403** always |
+| Inactive user (`User.IsActive=false`) | SignOut + `User.Inactive` 404 | — |
+| Inactive `UserRole` / tenant mismatch (IsStoreAdmin requires `ur.TenantId == ur.User.TenantId`) | role not recognized | 403 |
+| No token | — | **401** |
+
+These rows exercise every branch of `ClaimsTransformerService` + `HasPermissionAttribute`. This is a
+**cross-cutting** plan (the deliberate exception to one-plan-per-controller): the logic lives in a
+filter + a service used across controllers, so it uses `/me` as the read window and one protected
+controller (Stores) as the enforcement window.
+
+### 9.5 Frontend-behavior coverage beyond CRUD
+
+Areas that drive what the frontend renders/allows, worth explicit e2e coverage:
+
+1. **Login → `/me` bootstrap (the front door).** Login only admits users with an "active store"
+   (`AuthenticationService.IsValidUserAsync`); the frontend then immediately calls `/me` to build the
+   session. First thing every user executes; folds into the Authorization plan (same engine).
+2. **Store-scoping via `SelectedStoreId`.** `SetMyStore` (`PUT /stores`) changes `SelectedStoreId`;
+   `/me` then recomputes `StoreModuleIds` / `FeatureIds` / `Roles` for the new store. Switching store
+   must change the permission payload — core multi-store behavior.
+3. **`POST /usages/store-daily-usage`.** Fired by the frontend on every login + app bootstrap
+   (`registerActivity`). High-frequency, low-logic — at least a smoke/contract test so a failure there
+   does not break bootstrap.
+
+Explicitly **not** worth testing: Sales, Inventory, Expenses, Credits, Reports, Statistics — all
+localStorage (`USE_ONLINE_SERVICE=false`), zero backend calls.
