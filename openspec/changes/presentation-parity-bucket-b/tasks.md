@@ -59,7 +59,7 @@ No design artifact exists for this change (pure presentation-parity revert/port 
 
 ## Phase 5: WU5 — Final verification
 
-- [ ] 5.1 Run full suite: `pnpm test` (web-store-pos) — all green, no regressions.
-- [ ] 5.2 Run `pnpm -C apps/web-store-pos exec tsc --noEmit` — clean.
-- [ ] 5.3 Run `pnpm -C apps/web-store-pos build` — succeeds.
-- [ ] 5.4 Confirm all 5 spec requirements satisfied; confirm `AdminStoreListPage` remains untouched.
+- [x] 5.1 Run full suite: `pnpm test` (web-store-pos) — all green, no regressions.
+- [x] 5.2 Run `pnpm -C apps/web-store-pos exec tsc --noEmit` — clean.
+- [x] 5.3 Run `pnpm -C apps/web-store-pos build` — succeeds.
+- [x] 5.4 Confirm all 5 spec requirements satisfied; confirm `AdminStoreListPage` remains untouched.
