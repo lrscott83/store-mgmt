@@ -204,6 +204,16 @@ export function PayIcon({ className = '' }: IconProps) {
   );
 }
 
+/** Material `payment` (credit-card glyph — sale-credit submit fabs, same path as `PaymentMethodIcon` kind='card', promoted to `BASE` size). */
+export function PaymentIcon({ className = '' }: IconProps) {
+  return (
+    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM2 10h20M6 15h4" />
+    </svg>
+  );
+}
+
 /** Material `check_circle` (action-menu `activate`/`approve` intents). */
 export function CheckCircleIcon({ className = '' }: IconProps) {
   return (
