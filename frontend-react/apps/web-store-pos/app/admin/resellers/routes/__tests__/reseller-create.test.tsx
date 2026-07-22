@@ -393,3 +393,12 @@ describe('ResellerCreatePage — password visibility toggle', () => {
     expect(confirm).toHaveAttribute('type', 'password');
   });
 });
+
+describe('ResellerCreatePage — submit renders as fab (create-reseller.component.html:95 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', async () => {
+    await renderPage();
+    const submit = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
+    expect(submit).toHaveClass('rounded-full');
+    expect(submit).not.toHaveClass('rounded');
+  });
+});

@@ -133,6 +133,29 @@ describe('ResellerEditPage — submit label parity (Req: Resellers L6 Text Parit
   });
 });
 
+describe('ResellerEditPage — submit renders as fab (edit-reseller-details.component.html:63 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      const submit = screen.getByRole('button', { name: 'Actualizar' });
+      expect(submit).toHaveClass('rounded-full');
+      expect(submit).not.toHaveClass('rounded');
+    });
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PARITY-EDIT-2 — discount labels match Angular literal copy
 // ═══════════════════════════════════════════════════════════════════════════════
