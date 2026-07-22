@@ -69,9 +69,6 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
                 {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
               </span>
             </div>
-            {expense.note && (
-              <p className="mt-0.5 truncate text-xs text-text-muted">{expense.note}</p>
-            )}
           </div>
 
           {!readOnly && (

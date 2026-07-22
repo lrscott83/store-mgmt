@@ -370,3 +370,18 @@ describe('ExpenseList — gear action menu (S-GM-EXPENSE)', () => {
     expect(onDelete).toHaveBeenCalledWith(MOCK_EXPENSE);
   });
 });
+
+// Angular parity: expense-list.component.html renders only type, payment icon, total,
+// payment-type text and the actions menu — it never renders `expense.note` in the list.
+// The React-only note preview was an invention (migration invents nothing new) → removed.
+describe('ExpenseList — no note preview (Angular parity: expense-list.component.html omits the note)', () => {
+  it('does not render the expense note text in the list row', () => {
+    const withNote: Expense = { ...MOCK_EXPENSE, note: 'Compra de insumos secreta' };
+    render(
+      <Wrapper>
+        <ExpenseList expenses={[withNote]} readOnly={false} onEdit={() => {}} onDelete={() => {}} />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Compra de insumos secreta')).not.toBeInTheDocument();
+  });
+});
