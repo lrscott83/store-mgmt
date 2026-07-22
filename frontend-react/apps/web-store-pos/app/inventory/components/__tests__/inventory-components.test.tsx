@@ -689,3 +689,43 @@ describe('EditInventoryEntryModal — footer close button label (Angular parity:
     expect(screen.queryByText('Cancelar')).not.toBeInTheDocument();
   });
 });
+
+// ─── EditInventoryEntryModal — CloseIcon/SaveIcon parity ────────────────────
+//
+// Angular reference: edit-inventory-entry-modal.component.html:78-85 — mat-fab
+// extended Close/Save buttons carry `close`/`save` mat-icons; header close is a
+// glyph button (not a literal "✕" text character).
+
+describe('EditInventoryEntryModal — CloseIcon/SaveIcon parity (edit-inventory-entry-modal.component.html:78-85)', () => {
+  it('renders a CloseIcon svg in the header close control, not a literal "✕" character', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    // Both header and footer close controls share accessible name "Cerrar" —
+    // the header one is first in DOM order.
+    const [headerClose] = screen.getAllByRole('button', { name: 'Cerrar' });
+    expect(headerClose).not.toHaveTextContent('✕');
+    expect(headerClose.querySelector('svg')).not.toBeNull();
+  });
+
+  it('renders a CloseIcon svg inside the footer close button', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    const [, footerClose] = screen.getAllByRole('button', { name: 'Cerrar' });
+    expect(footerClose.querySelector('svg')).not.toBeNull();
+  });
+
+  it('renders a SaveIcon svg inside the footer save button', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Adicionar' }).querySelector('svg')).not.toBeNull();
+  });
+});

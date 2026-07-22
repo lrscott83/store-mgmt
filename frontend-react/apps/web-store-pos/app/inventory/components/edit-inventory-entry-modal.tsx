@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import type { InventoryEntry, ProductSelectView } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { createProductService } from '~/sales/lib/services/product-service.factory';
 
 export interface EditInventoryEntryInput {
@@ -129,7 +130,7 @@ export function EditInventoryEntryModal({
                 className="text-text-muted hover:text-text"
                 aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
               >
-                ✕
+                <CloseIcon />
               </button>
             </div>
           }
@@ -201,9 +202,11 @@ export function EditInventoryEntryModal({
             {/* Angular parity: edit-inventory-entry-modal.component.html:77-85 —
                 `mat-fab extended` Close/Save buttons. */}
             <Button variant="fab" onClick={onClose}>
+              <CloseIcon />
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
             <Button variant="fab" onClick={handleSave}>
+              <SaveIcon />
               {/* Angular parity: edit-inventory-entry-modal.component.html:84 toggles between
                   GENERAL.INSERT (create) and GENERAL.UPDATE (edit) — was hardcoded to
                   GENERAL.SAVE regardless of mode. */}
