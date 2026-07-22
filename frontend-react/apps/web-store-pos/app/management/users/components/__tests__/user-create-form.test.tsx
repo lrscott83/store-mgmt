@@ -237,6 +237,20 @@ describe('UserCreateForm — password visibility toggle (create-store-user.compo
   });
 });
 
+describe('UserCreateForm — submit renders as fab (create-store-user.component.html:106 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} />
+      </Wrapper>
+    );
+    const submit = screen.getByRole('button', { name: 'Adicionar' });
+    expect(submit).toHaveClass('rounded-full');
+    expect(submit).not.toHaveClass('rounded');
+  });
+});
+
 describe('UserCreateForm — PRES-5: no login/password clash with details shape', () => {
   it('does not render isActive toggle (that belongs to UserDetailsForm)', async () => {
     const { UserCreateForm } = await import('../UserCreateForm');
