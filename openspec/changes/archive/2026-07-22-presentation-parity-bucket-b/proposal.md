@@ -22,6 +22,7 @@ Bucket B of the Angular→React presentation-parity audit: five STRUCTURAL diver
 - Batch-1 already-done: auth legal footer, register success-screen removal — untouched.
 - Buckets C (fab/icon sweep — in flight), D, E (cosmetic) — separate changes.
 - Angular's `generateReportWithBorder()` variant (bordered/hardcoded demo rows) — not the ported generator.
+- **Auth decorative shell — CUT from scope mid-change by user decision.** Not implemented; confirmed via empty `*/auth/*` diff in the final verification.
 
 ## PDF Fidelity — Angular vs Orphaned React Port
 
@@ -79,8 +80,8 @@ Strict TDD applies to testable changes: tutorial single-panel structure, owner T
 
 ## Success Criteria
 
-- [ ] Tutorial renders ONE "Pasos para realizar una venta" panel with 4 steps + `TUTORIAL.TITLE`.
-- [ ] Owner Tiendas tab shows only the store grid — no duplicated title/add-button; `AdminStoreListPage` untouched.
-- [ ] "Generar Reporte" button above the dashboard opens a real PDF matching Angular's 13-column layout.
-- [ ] Category menu + statistics charts unchanged; documented as accepted divergences.
-- [ ] Delivered as commits on the current branch.
+- [x] Tutorial renders ONE "Pasos para realizar una venta" panel with 4 steps + `TUTORIAL.TITLE`.
+- [x] Owner Tiendas tab shows only the store grid — no duplicated title/add-button; `AdminStoreListPage` untouched.
+- [x] "Generar Reporte" button above the dashboard opens a real PDF matching Angular's 13-column layout.
+- [x] Category menu + statistics charts unchanged; documented as accepted divergences.
+- [x] Delivered as commits on the current branch.
