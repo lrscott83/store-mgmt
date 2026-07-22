@@ -53,9 +53,9 @@ No design artifact exists for this change (pure presentation-parity revert/port 
 
 ## Phase 4: WU4 — Regression guards for KEEP items (Requirements: "Category actions menu stays the single action path", "Statistics charts remain recharts")
 
-- [ ] 4.1 Add/confirm test in `sales/components/category-actions-menu.test.tsx` (or category-list test) asserting only `CategoryActionsMenu` (⚙️) renders per row and no inline per-action fab buttons are present.
-- [ ] 4.2 Add/confirm test in `statistics/routes/dashboard.test.tsx` asserting `SalesChart` and `ProfitChart` render (not plain tables) and KPI/currency-selector/top-products sections still render.
-- [ ] 4.3 No implementation changes for either file — commit as a test-only regression-guard commit.
+- [x] 4.1 Add/confirm test in `sales/components/category-actions-menu.test.tsx` (or category-list test) asserting only `CategoryActionsMenu` (⚙️) renders per row and no inline per-action fab buttons are present.
+- [x] 4.2 Add/confirm test in `statistics/routes/dashboard.test.tsx` asserting `SalesChart` and `ProfitChart` render (not plain tables) and KPI/currency-selector/top-products sections still render.
+- [x] 4.3 No implementation changes for either file — commit as a test-only regression-guard commit.
 
 ## Phase 5: WU5 — Final verification
 

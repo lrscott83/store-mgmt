@@ -770,5 +770,35 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
       expect(screen.getByText('Coca Cola')).toBeInTheDocument();
     });
+
+    // REGRESSION GUARD (presentation-parity-bucket-b, KEEP — spec "Category actions menu
+    // stays the single action path"): the gear (CategoryActionsMenu) is the ONLY UI path for
+    // category actions — Angular's 3 separate inline fabs (Editar Categoría / Nuevo Producto /
+    // Nuevo Productos) must NOT be duplicated as standalone buttons on the row.
+    it('REGRESSION: only the gear menu is the category-actions path — no inline per-action fab buttons on the row', async () => {
+      mockCategories = [makeCategory()];
+      mockProducts = [makeProduct()];
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      await screen.findByTestId('category-actions-toggle-cat-1');
+
+      // Exactly one gear toggle for the category, and the menu's action buttons are not
+      // rendered until it's opened.
+      expect(screen.getAllByTestId('category-actions-toggle-cat-1')).toHaveLength(1);
+      expect(screen.queryByTestId('edit-category-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('add-product-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('add-products-button')).not.toBeInTheDocument();
+
+      // The category header row itself only has 3 buttons: panel toggle, gear toggle,
+      // chevron toggle — no extra inline action buttons.
+      const row = screen.getByTestId('category-panel-toggle-cat-1').closest('div');
+      const rowButtons = row ? Array.from(row.querySelectorAll('button')) : [];
+      expect(rowButtons).toHaveLength(3);
+    });
   });
 });

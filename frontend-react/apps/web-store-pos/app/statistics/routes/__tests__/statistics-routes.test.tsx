@@ -441,3 +441,40 @@ describe('DashboardPage — regression: charts still render after the KPI/curren
     expect(screen.getByTestId('profit-chart')).toHaveTextContent('profit-chart(1)');
   });
 });
+
+// REGRESSION GUARD (presentation-parity-bucket-b, KEEP — spec "Statistics charts remain
+// recharts"): SalesChart/ProfitChart (recharts) stay as an accepted intentional divergence
+// from Angular's plain Día|Ventas/Ganancias tables, and batch-1 KPI/currency/top-products
+// parity stays intact alongside them.
+describe('DashboardPage — REGRESSION (bucket-b, KEEP): charts + KPI/currency/top-products coexist', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    resetAllMocks();
+  });
+
+  it('renders SalesChart and ProfitChart components (not plain Día|Ventas/Ganancias tables) alongside KPI cards, currency selector, and top-products sections', () => {
+    mockOrderService.getLastMonthSales.mockReturnValue([{ label: new Date(), value: 10 }]);
+    mockOrderService.getLastMonthSaleProfits.mockReturnValue([{ label: new Date(), value: 5 }]);
+    mockOrderService.getTopProductsProfitInLastMonth.mockReturnValue([{ name: 'Ron', value: 100 }]);
+    mockOrderService.getTopProductsSaleQuantityInLastMonth.mockReturnValue([{ name: 'Ron', value: 20 }]);
+
+    render(
+      <Wrapper>
+        <DashboardPage />
+      </Wrapper>,
+    );
+
+    // Chart components render (recharts wrappers), no plain table markup replaced them.
+    expect(screen.getByTestId('sales-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('profit-chart')).toBeInTheDocument();
+
+    // KPI cards still render.
+    expect(screen.getByText(/Ventas Hoy/i)).toBeInTheDocument();
+
+    // Currency selector still renders.
+    expect(screen.getByLabelText(/moneda/i)).toBeInTheDocument();
+
+    // Top-products sections still render.
+    expect(screen.getAllByText('Ron').length).toBeGreaterThan(0);
+  });
+});
