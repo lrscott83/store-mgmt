@@ -95,6 +95,44 @@ describe('OwnerCardList — renders a Card grid (Req: Owners List Card Grid)', (
   });
 });
 
+// Parity fix (presentation-parity-bucket-e item 4): owners.component.html:70 renders
+// `{{ price | currency }} {{ getOwnerStoreCountText }}` → price first, then "en N tiendas",
+// no em-dash. React's correct pluralization is preserved (Angular's own text is always
+// singular — a bug we do NOT replicate).
+describe('OwnerCardList — price·stores label order (Angular parity: owners.component.html:70)', () => {
+  it('renders "$100.00 en 3 tiendas" (price first, "en" connective, plural preserved)', async () => {
+    const { OwnerCardList } = await import('../owner-card-list');
+    const owners = [
+      makeOwner({
+        id: 'o1',
+        storeModules: [makeModule(40), makeModule(60)],
+      }),
+    ];
+    render(
+      <Wrapper>
+        <OwnerCardList {...baseProps} owners={owners} />
+      </Wrapper>
+    );
+    expect(screen.getByText('$100.00 en 2 tiendas')).toBeInTheDocument();
+  });
+
+  it('keeps singular "1 tienda" for a single store (React pluralization, not Angular\'s always-singular bug)', async () => {
+    const { OwnerCardList } = await import('../owner-card-list');
+    const owners = [
+      makeOwner({
+        id: 'o2',
+        storeModules: [makeModule(100)],
+      }),
+    ];
+    render(
+      <Wrapper>
+        <OwnerCardList {...baseProps} owners={owners} />
+      </Wrapper>
+    );
+    expect(screen.getByText('$100.00 en 1 tienda')).toBeInTheDocument();
+  });
+});
+
 describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Actions Only)', () => {
   it('menu is closed by default, opens on gear click, shows Editar + Eliminar only', async () => {
     const { OwnerCardList } = await import('../owner-card-list');
