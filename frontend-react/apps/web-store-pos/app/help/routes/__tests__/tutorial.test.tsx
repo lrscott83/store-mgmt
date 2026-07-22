@@ -46,31 +46,18 @@ describe('TutorialPage — S-HELP-CONTENT-1: title renders from TUTORIAL.TITLE',
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-HELP-CONTENT-2 — Accordion contains exactly 4 steps
-//
-// Parity fix (collapsible-panel-chevron-parity): the accordion was restructured from
-// uncontrolled native <details>/<summary> to a controlled div+button(aria-expanded)+
-// conditional-body pattern (mirroring today-stats.tsx's ExpansionPanel) so it can host the
-// shared rotating ChevronDownIcon. These assertions were updated to match the new markup —
-// the underlying step count/labels are unchanged.
+// presentation-parity-bucket-b WU1 — Tutorial reverts to a SINGLE grouped panel
+// (Angular tutorial.component.html: ONE mat-expansion-panel titled literally
+// "Pasos para realizar una venta" containing all 4 numbered steps). The prior
+// 4-independent-collapsibles structure is removed.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('TutorialPage — S-HELP-CONTENT-2: accordion has exactly 4 steps', () => {
+describe('TutorialPage — bucket-b WU1: single grouped panel (no 4 independent panels)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders exactly 4 step toggle buttons', async () => {
-    const { TutorialPage } = await import('../tutorial');
-    render(
-      <Wrapper>
-        <TutorialPage />
-      </Wrapper>,
-    );
-    expect(screen.getAllByRole('button')).toHaveLength(4);
-  });
-
-  it('each step toggle button carries its step label', async () => {
+  it('renders exactly ONE collapsible toggle, titled "Pasos para realizar una venta"', async () => {
     const { TutorialPage } = await import('../tutorial');
     render(
       <Wrapper>
@@ -78,20 +65,75 @@ describe('TutorialPage — S-HELP-CONTENT-2: accordion has exactly 4 steps', () 
       </Wrapper>,
     );
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(4);
-    expect(buttons[0]).toHaveTextContent(/adicionar un producto/i);
-    expect(buttons[1]).toHaveTextContent(/adicionar una entrada/i);
-    expect(buttons[2]).toHaveTextContent(/adicionar el producto a la venta/i);
-    expect(buttons[3]).toHaveTextContent(/registrar la venta/i);
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveTextContent('Pasos para realizar una venta');
+  });
+
+  it('defaults to collapsed', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const [panelButton] = screen.getAllByRole('button');
+    expect(panelButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByAltText('Menú principal')).not.toBeInTheDocument();
+  });
+
+  it('expanding the single panel reveals all 4 numbered steps', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const [panelButton] = screen.getAllByRole('button');
+    fireEvent.click(panelButton);
+
+    expect(panelButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/1\. Adicionar un producto al catálogo\./i)).toBeInTheDocument();
+    expect(screen.getByText(/2\. Adicionar una entrada al inventario\./i)).toBeInTheDocument();
+    expect(screen.getByText(/3\. Adicionar el producto a la venta actual\./i)).toBeInTheDocument();
+    expect(screen.getByText(/4\. Registrar la venta\./i)).toBeInTheDocument();
+  });
+
+  it('collapsing the panel again hides the steps', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const [panelButton] = screen.getAllByRole('button');
+    fireEvent.click(panelButton);
+    expect(screen.getByAltText('Menú principal')).toBeInTheDocument();
+
+    fireEvent.click(panelButton);
+    expect(panelButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByAltText('Menú principal')).not.toBeInTheDocument();
+  });
+
+  it('renders a chevron on the panel header that rotates when expanded', async () => {
+    const { TutorialPage } = await import('../tutorial');
+    render(
+      <Wrapper>
+        <TutorialPage />
+      </Wrapper>,
+    );
+    const [panelButton] = screen.getAllByRole('button');
+    const svgClass = () => panelButton.querySelector('svg')?.getAttribute('class') ?? '';
+
+    expect(panelButton.querySelector('svg')).toBeInTheDocument();
+    expect(svgClass()).not.toContain('rotate-180');
+
+    fireEvent.click(panelButton);
+    expect(svgClass()).toContain('rotate-180');
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-HELP-CONTENT-3 — Exactly 6 images with /images/help/ src (once every step is expanded)
-//
-// Parity fix (collapsible-panel-chevron-parity): step bodies are now conditionally
-// rendered (collapsed by default), so images only appear once their step is expanded —
-// expand all 4 steps first, matching the new default-collapsed contract.
+// S-HELP-CONTENT-3 — Exactly 6 images with /images/help/ src (once the panel is expanded)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths', () => {
@@ -99,18 +141,18 @@ describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths',
     vi.clearAllMocks();
   });
 
-  function expandAllSteps() {
-    screen.getAllByRole('button').forEach((button) => fireEvent.click(button));
+  function expandPanel() {
+    fireEvent.click(screen.getAllByRole('button')[0]);
   }
 
-  it('renders exactly 6 <img> elements once every step is expanded', async () => {
+  it('renders exactly 6 <img> elements once the panel is expanded', async () => {
     const { TutorialPage } = await import('../tutorial');
     const { container } = render(
       <Wrapper>
         <TutorialPage />
       </Wrapper>,
     );
-    expandAllSteps();
+    expandPanel();
     const images = container.querySelectorAll('img');
     expect(images).toHaveLength(6);
   });
@@ -122,7 +164,7 @@ describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths',
         <TutorialPage />
       </Wrapper>,
     );
-    expandAllSteps();
+    expandPanel();
     const images = Array.from(container.querySelectorAll('img'));
     expect(images).toHaveLength(6);
     for (const img of images) {
@@ -137,7 +179,7 @@ describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths',
         <TutorialPage />
       </Wrapper>,
     );
-    expandAllSteps();
+    expandPanel();
     const srcs = Array.from(container.querySelectorAll('img')).map((img) => img.getAttribute('src'));
     expect(srcs).toContain('/images/help/menu.png');
     expect(srcs).toContain('/images/help/add-cat-dialog.png');
@@ -145,80 +187,6 @@ describe('TutorialPage — S-HELP-CONTENT-3: 6 images with /images/help/ paths',
     expect(srcs).toContain('/images/help/add-product-dialog.png');
     expect(srcs).toContain('/images/help/add-entry-dialog.png');
     expect(srcs).toContain('/images/help/register.png');
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Collapsible-panel-chevron-parity — controlled toggle + chevron (new coverage)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('TutorialPage — controlled step toggle + chevron (collapsible-panel-chevron-parity)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('defaults every step to collapsed (body not rendered)', async () => {
-    const { TutorialPage } = await import('../tutorial');
-    render(
-      <Wrapper>
-        <TutorialPage />
-      </Wrapper>,
-    );
-    // Step 1's body content (a paragraph unique to it) must not be in the document yet.
-    expect(screen.queryByAltText('Menú principal')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button')[0]).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('clicking a step header opens only that step, leaving siblings collapsed', async () => {
-    const { TutorialPage } = await import('../tutorial');
-    render(
-      <Wrapper>
-        <TutorialPage />
-      </Wrapper>,
-    );
-    const buttons = screen.getAllByRole('button');
-    fireEvent.click(buttons[0]);
-
-    expect(buttons[0]).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByAltText('Menú principal')).toBeInTheDocument();
-    // Step 2 (Adicionar una entrada) stays collapsed — its body must not appear.
-    expect(buttons[1]).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByAltText('Diálogo agregar entrada')).not.toBeInTheDocument();
-  });
-
-  it('clicking an open step header closes it again', async () => {
-    const { TutorialPage } = await import('../tutorial');
-    render(
-      <Wrapper>
-        <TutorialPage />
-      </Wrapper>,
-    );
-    const buttons = screen.getAllByRole('button');
-    fireEvent.click(buttons[0]);
-    expect(screen.getByAltText('Menú principal')).toBeInTheDocument();
-
-    fireEvent.click(buttons[0]);
-    expect(buttons[0]).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByAltText('Menú principal')).not.toBeInTheDocument();
-  });
-
-  it('renders a chevron on each step header that rotates iff that step is expanded', async () => {
-    const { TutorialPage } = await import('../tutorial');
-    render(
-      <Wrapper>
-        <TutorialPage />
-      </Wrapper>,
-    );
-    const buttons = screen.getAllByRole('button');
-    const svgClass = (btn: HTMLElement) => btn.querySelector('svg')?.getAttribute('class') ?? '';
-
-    expect(buttons[0].querySelector('svg')).toBeInTheDocument();
-    expect(svgClass(buttons[0])).not.toContain('rotate-180');
-
-    fireEvent.click(buttons[0]);
-    expect(svgClass(buttons[0])).toContain('rotate-180');
-    // Sibling step's chevron is unaffected.
-    expect(svgClass(buttons[1])).not.toContain('rotate-180');
   });
 });
 
