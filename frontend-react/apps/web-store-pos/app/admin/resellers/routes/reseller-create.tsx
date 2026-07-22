@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
+import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 
 export const clientLoader = superAdminLoader;
 
@@ -28,6 +29,9 @@ export function ResellerCreatePage() {
   const [validationError, setValidationError] = useState('');
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // create-reseller.component.html:42-47,64-69: a SINGLE showPassword boolean
+  // drives BOTH password + confirmPassword fields.
+  const [showPassword, setShowPassword] = useState(false);
 
   const isDirty = Boolean(fullName || login || password || confirmPassword || cellPhone || email || description);
 
@@ -125,28 +129,52 @@ export function ResellerCreatePage() {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
             {formatMessage({ id: 'GENERAL.PASSWORD' })}
           </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="relative mt-1">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={formatMessage({
+                id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+              })}
+              className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+            >
+              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         <div>
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
             {formatMessage({ id: 'USERS.CONFIRM_PASSWORD' })}
           </label>
-          <input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="relative mt-1">
+            <input
+              id="confirmPassword"
+              type={showPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={formatMessage({
+                id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+              })}
+              className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+            >
+              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         <div>
