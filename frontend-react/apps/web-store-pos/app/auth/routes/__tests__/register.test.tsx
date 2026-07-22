@@ -443,3 +443,14 @@ describe('RegisterPage — password visibility toggle (register.component.html:1
     expect(screen.getAllByRole('button', { name: 'Mostrar contraseña' })).toHaveLength(2);
   });
 });
+
+// register.component.html:207 — Angular renders the submit as a `mat-fab extended`
+// (pill-shaped, elevated), not a plain rectangular button.
+describe('RegisterPage — submit control renders as fab (register.component.html:207 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', () => {
+    renderRegister();
+    const submit = screen.getByRole('button', { name: 'Registrar' });
+    expect(submit).toHaveClass('rounded-full');
+    expect(submit).not.toHaveClass('rounded-lg');
+  });
+});

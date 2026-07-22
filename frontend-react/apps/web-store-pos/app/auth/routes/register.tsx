@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useIntl } from 'react-intl';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
+import { Button } from '~/shared/components/ui/button';
 import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 import { guestOnlyLoader } from './loaders';
 
@@ -328,15 +329,16 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <button
+        <Button
           type="submit"
+          variant="fab"
           disabled={isLoading || !accepted}
-          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full justify-center"
         >
           {isLoading
             ? intl.formatMessage({ id: 'AUTH.REGISTERING' })
             : intl.formatMessage({ id: 'REGISTRATION.SIGNUP_BUTTON' })}
-        </button>
+        </Button>
       </form>
 
       <div className="mt-6 text-center text-sm text-gray-600">
