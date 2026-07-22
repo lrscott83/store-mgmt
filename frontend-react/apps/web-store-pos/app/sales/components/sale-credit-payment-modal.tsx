@@ -4,7 +4,7 @@ import type { SaleCredit } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
-import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
+import { CloseIcon, PayIcon } from '~/shared/components/ui/icons';
 import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface SaleCreditPaymentModalProps {
@@ -147,7 +147,7 @@ export function SaleCreditPaymentModal({
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
             <Button variant="fab" onClick={handleSubmitClick} data-testid="sale-credit-payment-submit">
-              <SaveIcon />
+              <PayIcon />
               {/* SALE_CREDIT.TO_PAY — the real SweetAlert2 confirm dialog (not a button-text
                   swap) now gates the actual payment, matching Angular exactly. */}
               {intl.formatMessage({ id: 'SALE_CREDIT.TO_PAY' })}

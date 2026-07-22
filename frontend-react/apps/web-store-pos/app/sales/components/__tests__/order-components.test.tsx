@@ -294,10 +294,10 @@ describe('EditOrderModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  // Angular: edit-order-modal.component.html:39-45 — mat-fab extended Close/
-  // Actualizar buttons carry `close`/`save` mat-icons; header close is a
+  // Angular: edit-order-modal.component.html:19-26 — mat-fab extended Close/
+  // Actualizar buttons carry `close`/`edit` mat-icons; header close is a
   // glyph button (not a literal "✕" text character).
-  describe('CloseIcon/SaveIcon parity (edit-order-modal.component.html:39-45)', () => {
+  describe('CloseIcon/EditIcon parity (edit-order-modal.component.html:19-26)', () => {
     it('renders CloseIcon (svg) in the header close control, not a literal "✕" character', () => {
       const order = makeOrder();
       render(
@@ -322,14 +322,19 @@ describe('EditOrderModal', () => {
       expect(screen.getByTestId('edit-order-close-button').querySelector('svg')).not.toBeNull();
     });
 
-    it('renders a SaveIcon svg inside the footer update button', () => {
+    it('renders an EditIcon svg (not SaveIcon) inside the footer update button', () => {
       const order = makeOrder();
       render(
         <Wrapper>
           <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
         </Wrapper>,
       );
-      expect(screen.getByTestId('edit-order-update-button').querySelector('svg')).not.toBeNull();
+      const path = screen
+        .getByTestId('edit-order-update-button')
+        .querySelector('svg path')
+        ?.getAttribute('d');
+      // EditIcon's distinctive path opening — SaveIcon's path starts "M5 21h14a2...".
+      expect(path).toContain('16.862 4.487');
     });
   });
 });

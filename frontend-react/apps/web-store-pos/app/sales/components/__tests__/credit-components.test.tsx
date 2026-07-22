@@ -271,9 +271,9 @@ describe('EditSaleCreditModal', () => {
   });
 
   // Angular: edit-sale-credit-modal.component.html:43-49 — mat-fab extended
-  // Cerrar/Pagar buttons carry `close`/`save` mat-icons; header close is a
+  // Cerrar/Pagar buttons carry `close`/`payment` mat-icons; header close is a
   // glyph button (not a literal "✕" text character).
-  describe('CloseIcon/SaveIcon parity (edit-sale-credit-modal.component.html:43-49)', () => {
+  describe('CloseIcon/PayIcon parity (edit-sale-credit-modal.component.html:43-49)', () => {
     it('renders a CloseIcon svg in the header close control, not a literal "✕" character', () => {
       const credit = makeCredit();
       render(
@@ -296,14 +296,19 @@ describe('EditSaleCreditModal', () => {
       expect(screen.getByTestId('edit-sale-credit-close').querySelector('svg')).not.toBeNull();
     });
 
-    it('renders a SaveIcon svg inside the footer submit button', () => {
+    it('renders a PayIcon svg (not SaveIcon) inside the footer submit button', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
           <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />
         </Wrapper>,
       );
-      expect(screen.getByTestId('edit-sale-credit-submit').querySelector('svg')).not.toBeNull();
+      const path = screen
+        .getByTestId('edit-sale-credit-submit')
+        .querySelector('svg path')
+        ?.getAttribute('d');
+      // PayIcon's distinctive path opening — SaveIcon's path starts "M5 21h14a2...".
+      expect(path).toContain('3 6h18M3 6v12');
     });
   });
 });
@@ -430,9 +435,9 @@ describe('SaleCreditPaymentModal', () => {
   });
 
   // Angular: sale-credit-payment-modal.component.html:33-39 — mat-fab extended
-  // Cerrar/Pagar buttons carry `close`/`save` mat-icons; header close is a
+  // Cerrar/Pagar buttons carry `close`/`payment` mat-icons; header close is a
   // glyph button (not a literal "✕" text character).
-  describe('CloseIcon/SaveIcon parity (sale-credit-payment-modal.component.html:33-39)', () => {
+  describe('CloseIcon/PayIcon parity (sale-credit-payment-modal.component.html:33-39)', () => {
     it('renders a CloseIcon svg in the header close control, not a literal "✕" character', () => {
       const credit = makeCredit();
       render(
@@ -455,14 +460,19 @@ describe('SaleCreditPaymentModal', () => {
       expect(screen.getByTestId('sale-credit-payment-close').querySelector('svg')).not.toBeNull();
     });
 
-    it('renders a SaveIcon svg inside the footer submit button', () => {
+    it('renders a PayIcon svg (not SaveIcon) inside the footer submit button', () => {
       const credit = makeCredit();
       render(
         <Wrapper>
           <SaleCreditPaymentModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onConfirm={vi.fn()} />
         </Wrapper>,
       );
-      expect(screen.getByTestId('sale-credit-payment-submit').querySelector('svg')).not.toBeNull();
+      const path = screen
+        .getByTestId('sale-credit-payment-submit')
+        .querySelector('svg path')
+        ?.getAttribute('d');
+      // PayIcon's distinctive path opening — SaveIcon's path starts "M5 21h14a2...".
+      expect(path).toContain('3 6h18M3 6v12');
     });
   });
 });

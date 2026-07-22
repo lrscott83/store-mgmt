@@ -93,19 +93,21 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     expect(screen.getByRole('button', { name: /adicionar/i })).toBeInTheDocument();
   });
 
-  // sale-product-row.component.html:41 (mat-mini-fab) — the cart-add control must
-  // reuse the shared `FloatingButton` (h-14 w-14 circular fab), not a hand-rolled
-  // 40px circular <button> with inline SVG duplicated ad hoc.
-  it('renders the cart-add button as the shared FloatingButton (h-14 w-14), not the old hand-rolled 40px button', () => {
+  // sale-product-row.component.html:41-43 (mat-mini-fab, 40px) — the cart-add
+  // control must be a 40px circular button, NOT the shared `FloatingButton`
+  // (h-14 w-14 = 56px), which mirrors Angular's regular mat-fab elsewhere. A
+  // prior change wrongly promoted this control to FloatingButton.
+  it('renders the cart-add button as a 40px mini-fab (h-10 w-10), not the shared 56px FloatingButton', () => {
     render(
       <Wrapper>
         <SaleProductRow product={makeProduct()} orderType={OrderType.Normal} onAdded={vi.fn()} />
       </Wrapper>,
     );
     const addButton = screen.getByRole('button', { name: /adicionar/i });
-    expect(addButton).toHaveClass('h-14');
-    expect(addButton).toHaveClass('w-14');
-    expect(addButton).not.toHaveClass('h-10');
+    expect(addButton).toHaveClass('h-10');
+    expect(addButton).toHaveClass('w-10');
+    expect(addButton).not.toHaveClass('h-14');
+    expect(addButton).not.toHaveClass('w-14');
   });
 
   it('calls onAdded with productId, quantity and price when clicked (no checkAvailability wired)', () => {
