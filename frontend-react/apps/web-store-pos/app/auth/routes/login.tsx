@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
+import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
@@ -30,6 +31,7 @@ export default function LoginPage() {
   const [form, setForm] = useState<FormState>({ email: '', password: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isOffline, setIsOffline] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   // AUTH-FLICKER: covers the WHOLE login flow (login -> getUserByToken ->
   // resolveUserHomePath -> navigate) with one loading state, so the form never
   // flashes back between the individual API calls (whose per-request overlay
@@ -155,15 +157,27 @@ export default function LoginPage() {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             {intl.formatMessage({ id: 'AUTH.PASSWORD' })}
           </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            value={form.password}
-            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            aria-describedby={errors.password ? 'password-error' : undefined}
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              aria-describedby={errors.password ? 'password-error' : undefined}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={intl.formatMessage({
+                id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+              })}
+              className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+            >
+              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+            </button>
+          </div>
           {errors.password && (
             <p id="password-error" className="mt-1 text-xs text-red-600">
               {errors.password}

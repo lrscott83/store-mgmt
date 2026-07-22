@@ -78,7 +78,7 @@ describe('LoginPage (AUTH-01)', () => {
     // GENERAL.LOGIN = "Usuario" (view-text-parity: forced literal parity, not AUTH.EMAIL)
     expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
     // "Contraseña" is the Spanish label for password
-    expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
     // "Iniciar sesión" is the Spanish text for the submit button
     expect(screen.getByRole('button', { name: /iniciar sesión/i })).toBeInTheDocument();
   });
@@ -101,7 +101,7 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
       target: { value: 'password123' },
     });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
@@ -120,7 +120,7 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
       target: { value: 'password123' },
     });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
@@ -137,7 +137,7 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
       target: { value: 'password123' },
     });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
@@ -155,7 +155,7 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
       target: { value: 'wrong' },
     });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
@@ -184,7 +184,7 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
       target: { value: 'password123' },
     });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
@@ -213,7 +213,7 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.change(screen.getByLabelText('Usuario'), {
       target: { value: 'user@test.com' },
     });
-    fireEvent.change(screen.getByLabelText(/contraseña/i), {
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
       target: { value: 'password123' },
     });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
@@ -234,6 +234,24 @@ describe('LoginPage (AUTH-01)', () => {
     renderLogin();
     // AUTH.REGISTER = "Crear cuenta"
     expect(screen.getByRole('link', { name: /crear cuenta/i })).toBeInTheDocument();
+  });
+
+  // PARITY-BUCKET-C: login.component.html:84-87 — showPassword toggle (visibility/
+  // visibility_off mat-icon suffix). Default hidden, flips type + icon on click.
+  it('password field defaults to hidden and toggles to visible on click (parity)', () => {
+    renderLogin();
+    const passwordInput = screen.getByLabelText('Contraseña');
+    expect(passwordInput).toHaveAttribute('type', 'password');
+
+    const toggle = screen.getByRole('button', { name: 'Mostrar contraseña' });
+    fireEvent.click(toggle);
+
+    expect(passwordInput).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: 'Ocultar contraseña' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }));
+    expect(passwordInput).toHaveAttribute('type', 'password');
+    expect(screen.getByRole('button', { name: 'Mostrar contraseña' })).toBeInTheDocument();
   });
 });
 
