@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { Button } from '~/shared/components/ui/button';
 import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 
 // LOCKED regex per spec PWD-4
@@ -143,15 +144,11 @@ export function ChangePasswordForm({
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={submitDisabled}
-        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-      >
+      <Button type="submit" variant="fab" disabled={submitDisabled}>
         {isLoading
           ? intl.formatMessage({ id: 'GENERAL.LOADING' })
           : intl.formatMessage({ id: 'PROFILE.CHANGE_PASSWORD_SUBMIT' })}
-      </button>
+      </Button>
     </form>
   );
 }

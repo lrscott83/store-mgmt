@@ -167,3 +167,16 @@ describe('ChangePasswordForm — calls onSubmit with correct payload when valid'
     });
   });
 });
+
+describe('ChangePasswordForm — submit renders as fab (edit-user-credentials.component.html:61 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', () => {
+    render(
+      <Wrapper>
+        <ChangePasswordForm isOnline isLoading={false} onSubmit={vi.fn()} />
+      </Wrapper>,
+    );
+    const submit = screen.getByRole('button', { name: /cambiar contraseña/i });
+    expect(submit).toHaveClass('rounded-full');
+    expect(submit).not.toHaveClass('rounded');
+  });
+});
