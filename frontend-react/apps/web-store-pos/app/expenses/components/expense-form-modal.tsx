@@ -217,13 +217,13 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
         </div>
 
         <div className="mt-4 flex gap-2">
-          <Button variant="fab" className="flex-1 justify-center" onClick={handleSubmit}>
-            <SaveIcon />
-            {intl.formatMessage({ id: 'GENERAL.SAVE' })}
-          </Button>
           <Button variant="fab" onClick={onClose}>
             <CloseIcon />
             {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+          </Button>
+          <Button variant="fab" className="flex-1 justify-center" onClick={handleSubmit}>
+            <SaveIcon />
+            {intl.formatMessage({ id: 'GENERAL.SAVE' })}
           </Button>
         </div>
       </div>

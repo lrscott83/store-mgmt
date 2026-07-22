@@ -222,6 +222,22 @@ describe('ExpenseFormModal — footer close button renders as fab (Angular parit
   });
 });
 
+// Angular: edit-expense-modal.component.html:70-77 — the footer renders Close
+// BEFORE Save. The sibling edit-inventory-entry-modal already matches this order.
+describe('ExpenseFormModal — footer button order (Angular parity: Close before Save)', () => {
+  it('renders the Close button before the Save button in the footer', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    const buttons = screen.getAllByRole('button').filter(
+      (b) => b.textContent === 'Salvar' || b.textContent === 'Cerrar',
+    );
+    expect(buttons.map((b) => b.textContent)).toEqual(['Cerrar', 'Salvar']);
+  });
+});
+
 // ─── ExpenseList ─────────────────────────────────────────────────────────────
 
 import { ExpenseList } from '../expense-list';
