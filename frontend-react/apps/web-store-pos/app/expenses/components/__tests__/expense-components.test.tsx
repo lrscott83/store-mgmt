@@ -207,6 +207,21 @@ describe('ExpenseFormModal — footer close button icon (Angular parity: CloseIc
   });
 });
 
+// Angular: edit-expense-modal.component.html:70 — the close button is
+// `mat-fab extended color="primary"`, same fab styling as the save button.
+describe('ExpenseFormModal — footer close button renders as fab (Angular parity)', () => {
+  it('renders the footer close button as a fab (Button variant="fab"), not outline', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    const closeButton = screen.getByText('Cerrar').closest('button');
+    expect(closeButton).toHaveClass('rounded-full');
+    expect(closeButton).not.toHaveClass('border-primary');
+  });
+});
+
 // ─── ExpenseList ─────────────────────────────────────────────────────────────
 
 import { ExpenseList } from '../expense-list';
