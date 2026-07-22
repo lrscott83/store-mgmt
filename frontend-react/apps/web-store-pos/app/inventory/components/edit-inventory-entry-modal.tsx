@@ -201,7 +201,7 @@ export function EditInventoryEntryModal({
             {/* Angular parity: edit-inventory-entry-modal.component.html:77-85 —
                 `mat-fab extended` Close/Save buttons. */}
             <Button variant="fab" onClick={onClose}>
-              {intl.formatMessage({ id: 'GENERAL.CANCEL' })}
+              {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
             <Button variant="fab" onClick={handleSave}>
               {/* Angular parity: edit-inventory-entry-modal.component.html:84 toggles between

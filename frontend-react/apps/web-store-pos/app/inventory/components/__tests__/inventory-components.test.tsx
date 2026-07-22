@@ -670,3 +670,22 @@ describe('EditInventoryEntryModal — validation messages (Angular parity)', () 
     expect(screen.getByText('Precio de costo mínimo valor es 0')).toBeInTheDocument();
   });
 });
+
+// ─── EditInventoryEntryModal — footer close label (Angular parity) ─────────
+//
+// Angular reference: edit-inventory-entry-modal.component.html:78-81 binds the
+// footer close button to GENERAL.CLOSE ("Cerrar"), not GENERAL.CANCEL ("Cancelar").
+
+describe('EditInventoryEntryModal — footer close button label (Angular parity: GENERAL.CLOSE)', () => {
+  it('renders the footer close button as "Cerrar", not "Cancelar"', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    // The header ✕ button also has aria-label="Cerrar" (GENERAL.CLOSE), so scope
+    // this assertion to the footer button's own visible text content.
+    expect(screen.getByText('Cerrar')).toBeInTheDocument();
+    expect(screen.queryByText('Cancelar')).not.toBeInTheDocument();
+  });
+});

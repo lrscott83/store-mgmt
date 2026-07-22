@@ -180,6 +180,20 @@ describe('ExpenseFormModal — total is required on create (Angular parity: Vali
   });
 });
 
+// Angular reference: edit-expense-modal.component.html:70-73 binds the footer
+// close button to GENERAL.CLOSE ("Cerrar"), not GENERAL.CANCEL ("Cancelar").
+describe('ExpenseFormModal — footer close button label (Angular parity: GENERAL.CLOSE)', () => {
+  it('renders the footer close button as "Cerrar", not "Cancelar"', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Cerrar')).toBeInTheDocument();
+    expect(screen.queryByText('Cancelar')).not.toBeInTheDocument();
+  });
+});
+
 // ─── ExpenseList ─────────────────────────────────────────────────────────────
 
 import { ExpenseList } from '../expense-list';
