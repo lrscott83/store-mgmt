@@ -7,6 +7,7 @@ import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
+import { Button } from '~/shared/components/ui/button';
 import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 import type { ReSeller } from '@store-mgmt/domain';
 
@@ -259,13 +260,9 @@ export function OwnerCreatePage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={!isDirty || isSubmitting}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
+        <Button type="submit" variant="fab" disabled={!isDirty || isSubmitting}>
           {intl.formatMessage({ id: 'GENERAL.ADD' })}
-        </button>
+        </Button>
       </form>
     </div>
   );

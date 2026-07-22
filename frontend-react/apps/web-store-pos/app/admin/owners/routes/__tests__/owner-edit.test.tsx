@@ -222,6 +222,18 @@ describe('OwnerEditPage — submit label parity (Req: Owners L6 Text Parity)', (
   });
 });
 
+describe('OwnerEditPage — submit renders as fab (edit-owner-details.component.html:82 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', async () => {
+    await renderPage(false);
+
+    await waitFor(() => {
+      const submit = screen.getByRole('button', { name: 'Actualizar' });
+      expect(submit).toHaveClass('rounded-full');
+      expect(submit).not.toHaveClass('rounded');
+    });
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-EDIT-DETAILS-2 — loads owner and pre-populates form
 // ═══════════════════════════════════════════════════════════════════════════════

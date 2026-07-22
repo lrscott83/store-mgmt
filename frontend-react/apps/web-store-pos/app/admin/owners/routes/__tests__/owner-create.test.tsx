@@ -479,3 +479,12 @@ describe('OwnerCreatePage — password visibility toggle', () => {
     expect(confirm).toHaveAttribute('type', 'password');
   });
 });
+
+describe('OwnerCreatePage — submit renders as fab (create-owner.component.html:82 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', async () => {
+    await renderPage(false);
+    const submit = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
+    expect(submit).toHaveClass('rounded-full');
+    expect(submit).not.toHaveClass('rounded');
+  });
+});
