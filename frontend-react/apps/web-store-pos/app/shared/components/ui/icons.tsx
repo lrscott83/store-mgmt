@@ -232,6 +232,34 @@ export function BanIcon({ className = '' }: IconProps) {
   );
 }
 
+/** Material `login` (auth submit fab leading glyph, login.component.html:97). */
+export function LoginIcon({ className = '' }: IconProps) {
+  return (
+    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H3"
+      />
+    </svg>
+  );
+}
+
+/** Material `lock_open` (register submit fab leading glyph, register.component.html:208). */
+export function LockOpenIcon({ className = '' }: IconProps) {
+  return (
+    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+      />
+    </svg>
+  );
+}
+
 /**
  * Empty-state "boxes" icon — Angular's byte-identical inline SVG path
  * (inventory-today-quantities.component.html empty-state, 64×64, stroke-width 1.5).

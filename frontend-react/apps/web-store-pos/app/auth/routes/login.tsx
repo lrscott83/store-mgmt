@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { Button } from '~/shared/components/ui/button';
-import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
+import { EyeIcon, EyeOffIcon, LoginIcon } from '~/shared/components/ui/icons';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
@@ -187,6 +187,7 @@ export default function LoginPage() {
         </div>
 
         <Button type="submit" variant="fab" disabled={isLoading} className="w-full justify-center">
+          <LoginIcon />
           {isLoading
             ? intl.formatMessage({ id: 'AUTH.SIGNING_IN' })
             : intl.formatMessage({ id: 'AUTH.SIGN_IN' })}

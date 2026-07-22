@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { toDigits, formatCellPhone } from '~/management/users/lib/cell-phone-mask';
 import { Button } from '~/shared/components/ui/button';
+import { EditIcon } from '~/shared/components/ui/icons';
 
 interface DetailsFormValues {
   fullName: string;
@@ -121,6 +122,7 @@ export function UserDetailsForm({
       )}
 
       <Button type="submit" variant="fab" disabled={!isOnline || isLoading}>
+        <EditIcon />
         {intl.formatMessage({ id: 'USERS.UPDATE' })}
       </Button>
     </form>

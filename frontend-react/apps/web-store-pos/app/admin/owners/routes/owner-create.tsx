@@ -8,7 +8,7 @@ import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-htt
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
-import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
+import { EyeIcon, EyeOffIcon, PlusIcon } from '~/shared/components/ui/icons';
 import type { ReSeller } from '@store-mgmt/domain';
 
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
@@ -261,6 +261,7 @@ export function OwnerCreatePage() {
         )}
 
         <Button type="submit" variant="fab" disabled={!isDirty || isSubmitting}>
+          <PlusIcon />
           {intl.formatMessage({ id: 'GENERAL.ADD' })}
         </Button>
       </form>

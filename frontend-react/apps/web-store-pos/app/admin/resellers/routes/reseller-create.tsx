@@ -5,7 +5,7 @@ import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
-import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
+import { EyeIcon, EyeOffIcon, PlusIcon } from '~/shared/components/ui/icons';
 
 export const clientLoader = superAdminLoader;
 
@@ -220,6 +220,7 @@ export function ResellerCreatePage() {
         </div>
 
         <Button type="submit" variant="fab" disabled={!isDirty || isSubmitting}>
+          <PlusIcon />
           {formatMessage({ id: 'GENERAL.ADD' })}
         </Button>
       </form>

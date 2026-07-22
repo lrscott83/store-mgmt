@@ -8,7 +8,7 @@ import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-htt
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
-import { PlusIcon } from '~/shared/components/ui/icons';
+import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
 // Stage 4 (management-stores-parity): management/stores/routes/store-list.tsx (the old
 // list+lifecycle route) was deleted — /admin/stores (AdminStoreListPage) is now the SOLE
 // super-admin store lifecycle list. Reusing it here keeps this "Stores" tab on the same
@@ -289,6 +289,7 @@ export function OwnerEditPage() {
       )}
 
       <Button type="submit" variant="fab" disabled={!isDirty || isSubmitting}>
+        <EditIcon />
         {intl.formatMessage({ id: 'GENERAL.UPDATE' })}
       </Button>
     </form>

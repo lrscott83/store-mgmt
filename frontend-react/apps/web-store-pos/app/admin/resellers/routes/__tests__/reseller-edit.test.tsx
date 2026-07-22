@@ -154,6 +154,28 @@ describe('ResellerEditPage — submit renders as fab (edit-reseller-details.comp
       expect(submit).not.toHaveClass('rounded');
     });
   });
+
+  // edit-reseller-details.component.html:99 — the fab carries a leading `edit` mat-icon.
+  it('renders EditIcon inside the submit fab', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      const submit = screen.getByRole('button', { name: 'Actualizar' });
+      const path = submit.querySelector('svg path')?.getAttribute('d');
+      expect(path).toContain('16.862 4.487');
+    });
+  });
 });
 
 // edit-reseller.component.html:5-8 — a toolbar "+" fab (navigateToCreateReSeller),

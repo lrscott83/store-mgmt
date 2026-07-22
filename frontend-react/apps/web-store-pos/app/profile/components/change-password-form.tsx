@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
-import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
+import { EyeIcon, EyeOffIcon, EditIcon } from '~/shared/components/ui/icons';
 
 // LOCKED regex per spec PWD-4
 export const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;
@@ -145,6 +145,7 @@ export function ChangePasswordForm({
       </div>
 
       <Button type="submit" variant="fab" disabled={submitDisabled}>
+        <EditIcon />
         {isLoading
           ? intl.formatMessage({ id: 'GENERAL.LOADING' })
           : intl.formatMessage({ id: 'PROFILE.CHANGE_PASSWORD_SUBMIT' })}

@@ -4,7 +4,7 @@ import { useIntl } from 'react-intl';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { Button } from '~/shared/components/ui/button';
-import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
+import { EyeIcon, EyeOffIcon, LockOpenIcon } from '~/shared/components/ui/icons';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -335,6 +335,7 @@ export default function RegisterPage() {
           disabled={isLoading || !accepted}
           className="w-full justify-center"
         >
+          <LockOpenIcon />
           {isLoading
             ? intl.formatMessage({ id: 'AUTH.REGISTERING' })
             : intl.formatMessage({ id: 'REGISTRATION.SIGNUP_BUTTON' })}

@@ -462,4 +462,12 @@ describe('RegisterPage — submit control renders as fab (register.component.htm
     expect(submit).toHaveClass('rounded-full');
     expect(submit).not.toHaveClass('rounded-lg');
   });
+
+  // register.component.html:208 — the fab carries a leading `lock_open` mat-icon.
+  it('renders LockOpenIcon inside the submit fab', () => {
+    renderRegister();
+    const submit = screen.getByRole('button', { name: 'Registrar' });
+    const path = submit.querySelector('svg path')?.getAttribute('d');
+    expect(path).toContain('13.5 10.5V6.75');
+  });
 });

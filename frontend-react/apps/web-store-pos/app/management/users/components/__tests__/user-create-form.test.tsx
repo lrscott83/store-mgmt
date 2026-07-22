@@ -256,6 +256,19 @@ describe('UserCreateForm — submit renders as fab (create-store-user.component.
     expect(submit).toHaveClass('rounded-full');
     expect(submit).not.toHaveClass('rounded');
   });
+
+  // create-store-user.component.html:107 — the fab carries a leading `add` mat-icon.
+  it('renders PlusIcon inside the submit fab', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} />
+      </Wrapper>
+    );
+    const submit = screen.getByRole('button', { name: 'Adicionar' });
+    const path = submit.querySelector('svg path')?.getAttribute('d');
+    expect(path).toBe('M12 4.5v15m7.5-7.5h-15');
+  });
 });
 
 describe('UserCreateForm — PRES-5: no login/password clash with details shape', () => {

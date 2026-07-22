@@ -494,4 +494,12 @@ describe('OwnerCreatePage — submit renders as fab (create-owner.component.html
     expect(submit).toHaveClass('rounded-full');
     expect(submit).not.toHaveClass('rounded');
   });
+
+  // create-owner.component.html:129 — the fab carries a leading `add` mat-icon.
+  it('renders PlusIcon inside the submit fab', async () => {
+    await renderPage(false);
+    const submit = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
+    const path = submit.querySelector('svg path')?.getAttribute('d');
+    expect(path).toBe('M12 4.5v15m7.5-7.5h-15');
+  });
 });

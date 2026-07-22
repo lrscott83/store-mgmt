@@ -186,4 +186,16 @@ describe('ChangePasswordForm — submit renders as fab (edit-user-credentials.co
     expect(submit).toHaveClass('rounded-full');
     expect(submit).not.toHaveClass('rounded');
   });
+
+  // edit-user-credentials.component.html:62 — the fab carries a leading `edit` mat-icon.
+  it('renders EditIcon inside the submit fab', () => {
+    render(
+      <Wrapper>
+        <ChangePasswordForm isOnline isLoading={false} onSubmit={vi.fn()} />
+      </Wrapper>,
+    );
+    const submit = screen.getByRole('button', { name: /cambiar contraseña/i });
+    const path = submit.querySelector('svg path')?.getAttribute('d');
+    expect(path).toContain('16.862 4.487');
+  });
 });

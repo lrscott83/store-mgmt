@@ -232,6 +232,17 @@ describe('OwnerEditPage — submit renders as fab (edit-owner-details.component.
       expect(submit).not.toHaveClass('rounded');
     });
   });
+
+  // edit-owner-details.component.html:86 — the fab carries a leading `edit` mat-icon.
+  it('renders EditIcon inside the submit fab', async () => {
+    await renderPage(false);
+
+    await waitFor(() => {
+      const submit = screen.getByRole('button', { name: 'Actualizar' });
+      const path = submit.querySelector('svg path')?.getAttribute('d');
+      expect(path).toContain('16.862 4.487');
+    });
+  });
 });
 
 // edit-owner.component.html:5-8 — a toolbar "+" fab (openCreateOwnerModal), DISTINCT

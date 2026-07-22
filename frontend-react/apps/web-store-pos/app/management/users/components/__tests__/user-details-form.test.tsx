@@ -221,4 +221,17 @@ describe('UserDetailsForm — submit renders as fab (edit-user-details.component
     expect(submit).toHaveClass('rounded-full');
     expect(submit).not.toHaveClass('rounded');
   });
+
+  // edit-user-credentials.component.html:62 — the fab carries a leading `edit` mat-icon.
+  it('renders EditIcon inside the submit fab', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} />
+      </Wrapper>
+    );
+    const submit = screen.getByRole('button', { name: 'Actualizar' });
+    const path = submit.querySelector('svg path')?.getAttribute('d');
+    expect(path).toContain('16.862 4.487');
+  });
 });

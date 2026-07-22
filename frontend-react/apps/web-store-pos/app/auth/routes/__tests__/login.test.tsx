@@ -271,6 +271,14 @@ describe('LoginPage (AUTH-01)', () => {
     expect(submit).toHaveClass('rounded-full');
     expect(submit).not.toHaveClass('rounded-lg');
   });
+
+  // login.component.html:97 — the fab carries a leading `login` mat-icon.
+  it('renders LoginIcon inside the submit fab', () => {
+    renderLogin();
+    const submit = screen.getByRole('button', { name: /iniciar sesión/i });
+    const path = submit.querySelector('svg path')?.getAttribute('d');
+    expect(path).toContain('15.75 9V5.25');
+  });
 });
 
 describe('LoginPage — view-text-parity: identifier label forced literal parity (GENERAL.LOGIN)', () => {
