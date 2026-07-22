@@ -156,6 +156,55 @@ describe('ResellerEditPage — submit renders as fab (edit-reseller-details.comp
   });
 });
 
+// edit-reseller.component.html:5-8 — a toolbar "+" fab (navigateToCreateReSeller),
+// DISTINCT from the details-form submit above. Angular's own click handler is an
+// empty no-op (edit-reseller.component.ts:12-13), so React mirrors that: renders,
+// does nothing on click.
+describe('ResellerEditPage — toolbar add-reseller fab (edit-reseller.component.html:5-8 parity)', () => {
+  it('renders the toolbar "+" fab labeled RESELLER.ADD_RESELLER, distinct from the details submit', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Adicionar Gestor' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Actualizar' })).toBeInTheDocument();
+    });
+  });
+
+  it('does nothing on click (mirrors Angular navigateToCreateReSeller empty no-op)', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: true,
+      data: makeReseller(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Adicionar Gestor' })).toBeInTheDocument();
+    });
+    expect(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar Gestor' }));
+    }).not.toThrow();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PARITY-EDIT-2 — discount labels match Angular literal copy
 // ═══════════════════════════════════════════════════════════════════════════════

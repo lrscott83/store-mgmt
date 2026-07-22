@@ -5,6 +5,7 @@ import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
+import { PlusIcon } from '~/shared/components/ui/icons';
 import type { ReSeller } from '@store-mgmt/domain';
 
 export const clientLoader = superAdminLoader;
@@ -132,6 +133,11 @@ export function ResellerEditPage() {
     }
   }
 
+  // edit-reseller.component.ts:12-13 (navigateToCreateReSeller): the Angular handler
+  // body is empty — a no-op. Mirrored literally here, not implemented as a real
+  // create-navigation flow.
+  function navigateToCreateReSeller() {}
+
   if (loadError) {
     return (
       <div className="space-y-4 p-4">
@@ -153,6 +159,15 @@ export function ResellerEditPage() {
       <h1 className="text-xl font-semibold">
         {formatMessage({ id: 'RESELLERS.EDIT_TITLE' })}
       </h1>
+
+      {/* edit-reseller.component.html:4-9 — card-toolbar "+" fab, distinct from the
+          details-form submit fab below. */}
+      <div className="flex justify-end">
+        <Button type="button" variant="fab" onClick={navigateToCreateReSeller}>
+          <PlusIcon />
+          {formatMessage({ id: 'RESELLER.ADD_RESELLER' })}
+        </Button>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {(validationError || serverError) && (

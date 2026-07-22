@@ -234,6 +234,41 @@ describe('OwnerEditPage — submit renders as fab (edit-owner-details.component.
   });
 });
 
+// edit-owner.component.html:5-8 — a toolbar "+" fab (openCreateOwnerModal), DISTINCT
+// from the details-form submit above. Angular's own click handler is an empty no-op
+// (edit-owner.component.ts:28-29), so React mirrors that: renders, does nothing on click.
+describe('OwnerEditPage — toolbar add-owner fab (edit-owner.component.html:5-8 parity)', () => {
+  it('renders the toolbar "+" fab labeled OWNER.ADD_OWNER, distinct from the details submit', async () => {
+    await renderPage(false);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Adicionar Propietario' })).toBeInTheDocument();
+      // Distinct from the details-form "Actualizar" submit button.
+      expect(screen.getByRole('button', { name: 'Actualizar' })).toBeInTheDocument();
+    });
+  });
+
+  it('renders the toolbar fab for both reseller and super-admin roles (unconditional in Angular)', async () => {
+    await renderPage(true);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Adicionar Propietario' })).toBeInTheDocument();
+    });
+  });
+
+  it('does nothing on click (mirrors Angular openCreateOwnerModal empty no-op)', async () => {
+    await renderPage(false);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Adicionar Propietario' })).toBeInTheDocument();
+    });
+    expect(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar Propietario' }));
+    }).not.toThrow();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-EDIT-DETAILS-2 — loads owner and pre-populates form
 // ═══════════════════════════════════════════════════════════════════════════════

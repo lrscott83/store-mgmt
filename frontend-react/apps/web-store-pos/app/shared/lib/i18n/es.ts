@@ -667,6 +667,10 @@ const messages: Record<string, string> = {
   'RESELLERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'RESELLERS.PHONE_FORMAT': 'El teléfono debe tener formato cubano (+53 X XXX-XXXX).',
   'RESELLERS.ERROR': 'Ocurrió un error. Intentá de nuevo.',
+  // Angular's own literal key (edit-reseller.component.html:7 toolbar fab) —
+  // note the SINGULAR "RESELLER" namespace, distinct from "RESELLERS" above;
+  // Angular's vocab literally has both (es.ts:478-480).
+  'RESELLER.ADD_RESELLER': 'Adicionar Gestor',
 
   // Admin — Features
   'FEATURES.TITLE': 'Funcionalidades',
@@ -678,6 +682,9 @@ const messages: Record<string, string> = {
   'OWNER.LIST_TITLE': 'Propietarios',
   // Angular OWNER.ADD_OWNER (es.ts:474) — literal parity.
   'OWNER.CREATE_TITLE': 'Adicionar Propietario',
+  // Angular's own literal key (edit-owner.component.html:7 toolbar fab) — same
+  // text as OWNER.CREATE_TITLE above, kept as its own key for 1:1 id parity.
+  'OWNER.ADD_OWNER': 'Adicionar Propietario',
   'OWNER.EDIT_TITLE': 'Editar propietario',
   'OWNER.EDIT_OWNER': 'Editar Propietario',
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',

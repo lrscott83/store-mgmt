@@ -8,6 +8,7 @@ import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-htt
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
+import { PlusIcon } from '~/shared/components/ui/icons';
 // Stage 4 (management-stores-parity): management/stores/routes/store-list.tsx (the old
 // list+lifecycle route) was deleted — /admin/stores (AdminStoreListPage) is now the SOLE
 // super-admin store lifecycle list. Reusing it here keeps this "Stores" tab on the same
@@ -153,6 +154,10 @@ export function OwnerEditPage() {
     }
   }
 
+  // edit-owner.component.ts:28-29 (openCreateOwnerModal): the Angular handler body is
+  // empty — a no-op. Mirrored literally here, not implemented as a real create flow.
+  function openCreateOwnerModal() {}
+
   if (loadError) {
     return (
       <div className="space-y-4 p-4">
@@ -289,6 +294,17 @@ export function OwnerEditPage() {
     </form>
   );
 
+  // edit-owner.component.html:4-9 — card-toolbar "+" fab, rendered unconditionally
+  // (outside the isSuperAdmin @if), distinct from the details-form submit fab above.
+  const toolbarFab = (
+    <div className="flex justify-end">
+      <Button type="button" variant="fab" onClick={openCreateOwnerModal}>
+        <PlusIcon />
+        {intl.formatMessage({ id: 'OWNER.ADD_OWNER' })}
+      </Button>
+    </div>
+  );
+
   // Reseller: Details only, no tab shell
   if (!isSuperAdmin) {
     return (
@@ -296,6 +312,7 @@ export function OwnerEditPage() {
         <h1 className="text-xl font-semibold">
           {intl.formatMessage({ id: 'OWNER.EDIT_TITLE' })}
         </h1>
+        {toolbarFab}
         {detailsForm}
       </div>
     );
@@ -307,6 +324,7 @@ export function OwnerEditPage() {
       <h1 className="text-xl font-semibold">
         {intl.formatMessage({ id: 'OWNER.EDIT_TITLE' })}
       </h1>
+      {toolbarFab}
 
       {/* Tab buttons */}
       <div className="flex gap-2 border-b pb-2">
