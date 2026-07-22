@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import type { Product, Result } from '@store-mgmt/domain';
 import { OrderType } from '@store-mgmt/domain';
 import { ProductErrors } from '@store-mgmt/domain';
+import { FloatingButton } from '~/shared/components/ui/button';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface SaleProductRowProps {
@@ -81,17 +82,15 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
         />
       </label>
 
-      <button
-        type="button"
+      <FloatingButton
         onClick={handleAddToCart}
         aria-label={intl.formatMessage({ id: 'GENERAL.ADD' })}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-card hover:bg-primary-hover transition-colors"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
-      </button>
+      </FloatingButton>
     </form>
   );
 }
