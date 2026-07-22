@@ -62,7 +62,7 @@ Decision baked in: password toggle aria-label reuses existing `SYNC.SHOW_PASSWOR
 - [x] 4.5 `profile/components/change-password-form.tsx` submit → fab. Commit 3e3aece.
 - [x] 4.6 `admin/owners/routes/owner-create.tsx` + `owner-edit.tsx` submit → fab. Commit 92fae4b.
 - [x] 4.7 `admin/resellers/routes/reseller-create.tsx` + `reseller-edit.tsx` submit → fab. Commit 85df7cd.
-- [x] 4.8 `sales/components/sale-product-row.tsx` → `FloatingButton` (h-14 w-14), SVG markup preserved as children. Commit 161eb6b.
+- [x] 4.8 `sales/components/sale-product-row.tsx` → `FloatingButton` (h-14 w-14), SVG markup preserved as children. Commit 161eb6b. **REVERTED in Round 2** (commit 3c2445d) — Angular actually uses `mat-mini-fab` (40px), not `mat-fab` (56px); restored the local 40px button.
 - [x] 4.9 `expenses/components/expense-form-modal.tsx` close button `variant="outline"`→`variant="fab"` (confirmed both close+save are `mat-fab extended color="primary"` in Angular source). Commit 2cc2239.
 
 ## Phase 5: Conditional — owner/reseller toolbar "+" fab — DONE (implemented)
@@ -98,3 +98,13 @@ ALL 6 Round-2 fixes complete. Full `web-store-pos` suite: 1968/1968 passed, 129/
 ## Combined final state (both rounds)
 
 29 total confirmed parity fixes (23 Round-1 tasks + 6 Round-2 fixes) across 24 commits on `feat/presentation-parity-bucket-c`. Full suite green: 1968/1968 tests, 129/129 files.
+
+---
+
+## Round 3 — Adjacent gap fixed post-archive-prep (not part of original Bucket C scope, discovered during Round-2 follow-up)
+
+- [x] R3.1 (adjacent gap) `expense-form-modal.tsx` Save button label was hardcoded `GENERAL.SAVE` ("Salvar"); Angular toggles `GENERAL.INSERT`/`GENERAL.UPDATE` per create/edit mode (`edit-expense-modal.component.html:74-77`), matching the sibling `edit-inventory-entry-modal.tsx:213-215` pattern. Fixed via TDD. Engram `bugfix` observation #1392.
+
+## Final state (all rounds)
+
+30 total confirmed parity fixes across 25 commits on `feat/presentation-parity-bucket-c`. Full suite green: 1970/1970 tests. Typecheck clean. Parity-review vs Angular source: CLEAN (final pass).
