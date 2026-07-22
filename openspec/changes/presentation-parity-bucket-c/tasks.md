@@ -74,6 +74,27 @@ Decision baked in: password toggle aria-label reuses existing `SYNC.SHOW_PASSWOR
 - `reports/routes/today-report.tsx` refresh button — low-confidence match, left unchanged.
 - `sales/components/edit-order-details-modal.tsx` — ratified dead/unwired component, left unchanged.
 
-## Final state
+## Round 1 final state
 
-ALL tasks complete. Full `web-store-pos` suite: 1958/1958 passed, 129/129 files. Branch `feat/presentation-parity-bucket-c`, 20 commits (all TDD RED→GREEN, commits-only delivery).
+ALL Round-1 tasks complete. Full `web-store-pos` suite: 1958/1958 passed, 129/129 files. Branch `feat/presentation-parity-bucket-c`, 20 commits (all TDD RED→GREEN, commits-only delivery).
+
+---
+
+## Round 2 — Follow-up parity-review fixes (post-verify, 6 confirmed divergences, not in original scope above)
+
+A parity review vs Angular source found 6 further divergences after Round 1's `sdd-verify` passed. Fixed all 6 with strict TDD (RED then GREEN per fix), grouped into 4 commits:
+
+- [x] R2.1 (CRITICAL) Password eye icon inverted on all 11 toggle instances (`login.tsx`, `register.tsx` x2, `owner-create.tsx` x2, `reseller-create.tsx` x2, `UserCreateForm.tsx` x2, `change-password-form.tsx` x2). Angular: `showPassword ? 'visibility' : 'visibility_off'` (open eye when revealed). Ternary was backwards in React; fixed. Commit `fa3d7e2`. `import-form.tsx`/`export-form.tsx` have the same bug, explicitly out of scope, left untouched.
+- [x] R2.2 (WARNING) fab submit buttons missing Angular's mat-icon glyph — added `LoginIcon` (new) + `LockOpenIcon` (new) to `icons.tsx`, reused `PlusIcon` (create forms: owner-create, reseller-create, UserCreateForm) and `EditIcon` (edit forms: owner-edit, reseller-edit, UserDetailsForm, change-password-form) across 9 submit fabs. Commit `cb8e7fd`.
+- [x] R2.3 (WARNING) `edit-order-modal.tsx` update button used `SaveIcon`; Angular uses `edit` — swapped to `EditIcon`. Commit `3c2445d`.
+- [x] R2.4 (WARNING) `edit-sale-credit-modal.tsx` + `sale-credit-payment-modal.tsx` TO_PAY buttons used `SaveIcon`; Angular uses `payment` on both — swapped to `PayIcon` (both files). Commit `3c2445d`.
+- [x] R2.5 (WARNING) `expense-form-modal.tsx` footer button order was Save-then-Close; Angular is Close-then-Save (matches sibling `edit-inventory-entry-modal`). Reordered. Commit `89c5429`.
+- [x] R2.6 (WARNING) `sale-product-row.tsx` cart button was wrongly promoted to `FloatingButton` (56px mat-fab) by Round-1 task 4.8; Angular uses `mat-mini-fab` (40px). Reverted to the local 40px button, same inline SVG kept. Commit `3c2445d`.
+
+### Round 2 final state
+
+ALL 6 Round-2 fixes complete. Full `web-store-pos` suite: 1968/1968 passed, 129/129 files. Branch `feat/presentation-parity-bucket-c`, +4 commits on top of Round 1 (`fa3d7e2`, `cb8e7fd`, `3c2445d`, `89c5429`).
+
+## Combined final state (both rounds)
+
+29 total confirmed parity fixes (23 Round-1 tasks + 6 Round-2 fixes) across 24 commits on `feat/presentation-parity-bucket-c`. Full suite green: 1968/1968 tests, 129/129 files.
