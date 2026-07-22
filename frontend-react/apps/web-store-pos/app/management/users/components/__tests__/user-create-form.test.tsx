@@ -225,13 +225,20 @@ describe('UserCreateForm — password visibility toggle (create-store-user.compo
 
     const toggles = screen.getAllByRole('button', { name: 'Mostrar contraseña' });
     expect(toggles).toHaveLength(2);
+    // EyeOffIcon (hidden) renders 1 <path>; EyeIcon (revealed) renders 2 — catches
+    // an inverted icon even when the aria-label direction is still correct.
+    expect(toggles[0].querySelectorAll('svg path')).toHaveLength(1);
+    expect(toggles[1].querySelectorAll('svg path')).toHaveLength(1);
 
     fireEvent.click(toggles[0]);
     expect(password).toHaveAttribute('type', 'text');
     expect(confirm).toHaveAttribute('type', 'text');
-    expect(screen.getAllByRole('button', { name: 'Ocultar contraseña' })).toHaveLength(2);
+    const revealedToggles = screen.getAllByRole('button', { name: 'Ocultar contraseña' });
+    expect(revealedToggles).toHaveLength(2);
+    expect(revealedToggles[0].querySelectorAll('svg path')).toHaveLength(2);
+    expect(revealedToggles[1].querySelectorAll('svg path')).toHaveLength(2);
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Ocultar contraseña' })[1]);
+    fireEvent.click(revealedToggles[1]);
     expect(password).toHaveAttribute('type', 'password');
     expect(confirm).toHaveAttribute('type', 'password');
   });

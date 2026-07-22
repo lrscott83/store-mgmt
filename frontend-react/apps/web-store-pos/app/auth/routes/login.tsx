@@ -176,7 +176,7 @@ export default function LoginPage() {
               })}
               className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
             >
-              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+              {showPassword ? <EyeIcon className="h-5 w-5" /> : <EyeOffIcon className="h-5 w-5" />}
             </button>
           </div>
           {errors.password && (

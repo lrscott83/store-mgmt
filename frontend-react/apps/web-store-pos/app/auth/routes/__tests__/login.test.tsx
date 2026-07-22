@@ -243,15 +243,24 @@ describe('LoginPage (AUTH-01)', () => {
     const passwordInput = screen.getByLabelText('Contraseña');
     expect(passwordInput).toHaveAttribute('type', 'password');
 
+    // EyeOffIcon (hidden state, `visibility_off`) renders a single crossed-eye
+    // <path>; EyeIcon (revealed state, `visibility`) renders 2 <path> children
+    // (eyeball outline + pupil). Asserting path count catches an inverted icon
+    // even when the aria-label direction (Mostrar/Ocultar) is still correct.
     const toggle = screen.getByRole('button', { name: 'Mostrar contraseña' });
+    expect(toggle.querySelectorAll('svg path')).toHaveLength(1);
     fireEvent.click(toggle);
 
     expect(passwordInput).toHaveAttribute('type', 'text');
-    expect(screen.getByRole('button', { name: 'Ocultar contraseña' })).toBeInTheDocument();
+    const revealed = screen.getByRole('button', { name: 'Ocultar contraseña' });
+    expect(revealed).toBeInTheDocument();
+    expect(revealed.querySelectorAll('svg path')).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }));
+    fireEvent.click(revealed);
     expect(passwordInput).toHaveAttribute('type', 'password');
-    expect(screen.getByRole('button', { name: 'Mostrar contraseña' })).toBeInTheDocument();
+    const hiddenAgain = screen.getByRole('button', { name: 'Mostrar contraseña' });
+    expect(hiddenAgain).toBeInTheDocument();
+    expect(hiddenAgain.querySelectorAll('svg path')).toHaveLength(1);
   });
 
   // login.component.html:96 — Angular renders the submit as a `mat-fab extended`
