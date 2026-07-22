@@ -293,4 +293,43 @@ describe('EditOrderModal', () => {
     expect(onUpdate).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
+
+  // Angular: edit-order-modal.component.html:39-45 — mat-fab extended Close/
+  // Actualizar buttons carry `close`/`save` mat-icons; header close is a
+  // glyph button (not a literal "✕" text character).
+  describe('CloseIcon/SaveIcon parity (edit-order-modal.component.html:39-45)', () => {
+    it('renders CloseIcon (svg) in the header close control, not a literal "✕" character', () => {
+      const order = makeOrder();
+      render(
+        <Wrapper>
+          <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
+        </Wrapper>,
+      );
+      // Both the header glyph button and the footer fab now share the
+      // "Cerrar" accessible name — the header one is the first in DOM order.
+      const [headerClose] = screen.getAllByRole('button', { name: 'Cerrar' });
+      expect(headerClose).not.toHaveTextContent('✕');
+      expect(headerClose.querySelector('svg')).not.toBeNull();
+    });
+
+    it('renders a CloseIcon svg inside the footer close button', () => {
+      const order = makeOrder();
+      render(
+        <Wrapper>
+          <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('edit-order-close-button').querySelector('svg')).not.toBeNull();
+    });
+
+    it('renders a SaveIcon svg inside the footer update button', () => {
+      const order = makeOrder();
+      render(
+        <Wrapper>
+          <EditOrderModal order={order} isOpen={true} onClose={vi.fn()} onUpdate={vi.fn()} />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('edit-order-update-button').querySelector('svg')).not.toBeNull();
+    });
+  });
 });

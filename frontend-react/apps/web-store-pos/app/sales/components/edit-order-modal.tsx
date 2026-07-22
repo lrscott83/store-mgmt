@@ -4,6 +4,7 @@ import type { Order } from '@store-mgmt/domain';
 import { PaymentType } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface EditOrderModalProps {
@@ -74,7 +75,7 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
                 className="text-text-muted hover:text-text"
                 aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
               >
-                ✕
+                <CloseIcon />
               </button>
             </div>
           }
@@ -97,10 +98,12 @@ export function EditOrderModal({ order, isOpen, onClose, onUpdate }: EditOrderMo
 
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="fab" onClick={onClose} data-testid="edit-order-close-button">
+              <CloseIcon />
               {/* GENERAL.CLOSE */}
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
             <Button variant="fab" onClick={handleSubmit} data-testid="edit-order-update-button">
+              <SaveIcon />
               {/* GENERAL.UPDATE */}
               {intl.formatMessage({ id: 'GENERAL.UPDATE' })}
             </Button>
