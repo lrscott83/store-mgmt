@@ -208,3 +208,17 @@ describe('UserDetailsForm — PRES-9: offline disables submit and shows notice',
     expect(screen.getByText('Sin conexión. Conéctate para guardar cambios.')).toBeInTheDocument();
   });
 });
+
+describe('UserDetailsForm — submit renders as fab (edit-user-details.component.html:54 parity)', () => {
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', async () => {
+    const { UserDetailsForm } = await import('../UserDetailsForm');
+    render(
+      <Wrapper>
+        <UserDetailsForm {...baseProps} />
+      </Wrapper>
+    );
+    const submit = screen.getByRole('button', { name: 'Actualizar' });
+    expect(submit).toHaveClass('rounded-full');
+    expect(submit).not.toHaveClass('rounded');
+  });
+});

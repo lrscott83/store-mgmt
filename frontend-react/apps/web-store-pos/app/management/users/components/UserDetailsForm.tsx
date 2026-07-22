@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { toDigits, formatCellPhone } from '~/management/users/lib/cell-phone-mask';
+import { Button } from '~/shared/components/ui/button';
 
 interface DetailsFormValues {
   fullName: string;
@@ -119,13 +120,9 @@ export function UserDetailsForm({
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={!isOnline || isLoading}
-        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button type="submit" variant="fab" disabled={!isOnline || isLoading}>
         {intl.formatMessage({ id: 'USERS.UPDATE' })}
-      </button>
+      </Button>
     </form>
   );
 }
