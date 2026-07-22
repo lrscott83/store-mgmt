@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { toDigits, formatCellPhone } from '~/management/users/lib/cell-phone-mask';
+import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 
 const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;
 
@@ -35,6 +36,9 @@ export function UserCreateForm({
   const [cellPhone, setCellPhone] = useState('');
   const [email, setEmail] = useState('');
   const [validationError, setValidationError] = useState('');
+  // create-store-user.component.html:43-48,63-68: a SINGLE showPassword
+  // boolean drives BOTH password + confirmPassword fields.
+  const [showPassword, setShowPassword] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,28 +107,52 @@ export function UserCreateForm({
         <label htmlFor="password" className="block text-sm font-medium text-gray-700">
           {intl.formatMessage({ id: 'USERS.PASSWORD' })}
         </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <div className="relative mt-1">
+          <input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={intl.formatMessage({
+              id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+            })}
+            className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+          >
+            {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       <div>
         <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
           {intl.formatMessage({ id: 'USERS.CONFIRM_PASSWORD' })}
         </label>
-        <input
-          id="confirmPassword"
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <div className="relative mt-1">
+          <input
+            id="confirmPassword"
+            type={showPassword ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={intl.formatMessage({
+              id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+            })}
+            className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+          >
+            {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       <div>

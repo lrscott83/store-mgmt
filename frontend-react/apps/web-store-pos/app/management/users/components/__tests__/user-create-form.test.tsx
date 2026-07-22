@@ -208,6 +208,35 @@ describe('UserCreateForm — PRES-10: error prop renders inline', () => {
   });
 });
 
+describe('UserCreateForm — password visibility toggle (create-store-user.component.html:43-48,63-68 parity)', () => {
+  // Angular binds a SINGLE showPassword boolean to BOTH password + confirmPassword
+  // inputs (two buttons, one shared state) — both flip together on either click.
+  it('password and confirmPassword share one toggle state (both flip together)', async () => {
+    const { UserCreateForm } = await import('../UserCreateForm');
+    render(
+      <Wrapper>
+        <UserCreateForm {...baseProps} />
+      </Wrapper>
+    );
+    const password = screen.getByLabelText(/^contraseña$/i);
+    const confirm = screen.getByLabelText(/confirmar contraseña/i);
+    expect(password).toHaveAttribute('type', 'password');
+    expect(confirm).toHaveAttribute('type', 'password');
+
+    const toggles = screen.getAllByRole('button', { name: 'Mostrar contraseña' });
+    expect(toggles).toHaveLength(2);
+
+    fireEvent.click(toggles[0]);
+    expect(password).toHaveAttribute('type', 'text');
+    expect(confirm).toHaveAttribute('type', 'text');
+    expect(screen.getAllByRole('button', { name: 'Ocultar contraseña' })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Ocultar contraseña' })[1]);
+    expect(password).toHaveAttribute('type', 'password');
+    expect(confirm).toHaveAttribute('type', 'password');
+  });
+});
+
 describe('UserCreateForm — PRES-5: no login/password clash with details shape', () => {
   it('does not render isActive toggle (that belongs to UserDetailsForm)', async () => {
     const { UserCreateForm } = await import('../UserCreateForm');
