@@ -39,10 +39,10 @@ No design artifact exists for this change (pure presentation-parity revert/port 
 
 ## Phase 2: WU2 — Owner Tiendas tab revert (Requirement: "Owner Tiendas tab renders the store grid only")
 
-- [ ] 2.1 RED: write test in `admin/owners/routes/owner-edit.test.tsx` (Tiendas tab section) asserting `StoreCardList` renders store cards, no `<h1>` with `STORES.LIST_TITLE`, no "+ Agregar" fab within the tab.
-- [ ] 2.2 RED (cont.): add assertion that approve/disapprove/edit handlers on a rendered store card fire the same as `/admin/stores` (mirror expectations from `admin/stores/routes/store-list.test.tsx` if it exists, else assert callback invocation directly).
-- [ ] 2.3 GREEN: in `admin/owners/routes/owner-edit.tsx`, replace the `AdminStoreListPage` mount with direct `StoreCardList` render; copy fetch/approve/disapprove/edit logic from `admin/stores/routes/store-list.tsx:26-70`. Do not modify `admin/stores/routes/store-list.tsx` (`AdminStoreListPage` stays intact).
-- [ ] 2.4 Verify: `pnpm test admin/owners/routes/owner-edit` passes; confirm `admin/stores/routes/store-list.test.tsx` (if present) is unaffected.
+- [x] 2.1 RED: write test in `admin/owners/routes/owner-edit.test.tsx` (Tiendas tab section) asserting `StoreCardList` renders store cards, no `<h1>` with `STORES.LIST_TITLE`, no "+ Agregar" fab within the tab.
+- [x] 2.2 RED (cont.): add assertion that approve/disapprove/edit handlers on a rendered store card fire the same as `/admin/stores` (mirror expectations from `admin/stores/routes/store-list.test.tsx` if it exists, else assert callback invocation directly).
+- [x] 2.3 GREEN: in `admin/owners/routes/owner-edit.tsx`, replace the `AdminStoreListPage` mount with direct `StoreCardList` render; copy fetch/approve/disapprove/edit logic from `admin/stores/routes/store-list.tsx:26-70`. Do not modify `admin/stores/routes/store-list.tsx` (`AdminStoreListPage` stays intact).
+- [x] 2.4 Verify: `pnpm test admin/owners/routes/owner-edit` passes; confirm `admin/stores/routes/store-list.test.tsx` (if present) is unaffected.
 
 ## Phase 3: WU3 — Auth decorative shell (Requirement: "Auth layout renders the decorative shell on the light theme")
 

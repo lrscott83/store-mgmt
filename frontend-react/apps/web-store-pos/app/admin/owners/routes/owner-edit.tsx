@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
@@ -9,12 +9,16 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
-// Stage 4 (management-stores-parity): management/stores/routes/store-list.tsx (the old
-// list+lifecycle route) was deleted — /admin/stores (AdminStoreListPage) is now the SOLE
-// super-admin store lifecycle list. Reusing it here keeps this "Stores" tab on the same
-// single source of truth instead of re-implementing a second list.
-import { AdminStoreListPage } from '~/admin/stores/routes/store-list';
-import type { Owner, ReSeller } from '@store-mgmt/domain';
+// presentation-parity-bucket-b WU2: Angular's app-store-list (store-list.component.html)
+// is grid-only — no page title, no add-store fab. The old approach mounted the FULL
+// AdminStoreListPage here, duplicating its own STORES.LIST_TITLE h1 + "+ Agregar" fab
+// inside this tab. Render StoreCardList directly instead, with fetch/approve/disapprove/
+// edit logic copied from `admin/stores/routes/store-list.tsx:26-70`. AdminStoreListPage
+// itself stays untouched — still the sole list mounted at /admin/stores.
+import { StoreCardList } from '~/admin/stores/components/store-card-list';
+import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { confirmDialog } from '~/shared/lib/blocking-alert';
+import type { Owner, ReSeller, Store } from '@store-mgmt/domain';
 
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
 
@@ -45,6 +49,7 @@ function makeSnapshot(o: Owner): Snapshot {
 
 export function OwnerEditPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const intl = useIntl();
   const { user } = useAuthStore();
   const isSuperAdmin = user?.isSuperAdmin ?? false;
@@ -71,6 +76,53 @@ export function OwnerEditPage() {
 
   // ADR-9: local tab state
   const [activeTab, setActiveTab] = useState<TabKey>('details');
+
+  // presentation-parity-bucket-b WU2: Tiendas tab grid state (copied from
+  // admin/stores/routes/store-list.tsx:23-38, 40-70).
+  const [stores, setStores] = useState<Store[]>([]);
+  const [storesError, setStoresError] = useState<string | undefined>(undefined);
+
+  async function loadStores() {
+    try {
+      const res = await storeHttpService.listStores();
+      setStores(res.data);
+      setStoresError(undefined);
+    } catch {
+      setStoresError(intl.formatMessage({ id: 'STORES.ERROR' }));
+    }
+  }
+
+  async function handleApproveStore(storeId: string) {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'STORES.APPROVE_CONFIRM_TITLE' }),
+      message: intl.formatMessage({ id: 'STORES.APPROVE_CONFIRM_MESSAGE' }),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+    try {
+      await storeHttpService.approveStore(storeId);
+      await loadStores();
+    } catch {
+      setStoresError(intl.formatMessage({ id: 'STORES.ERROR' }));
+    }
+  }
+
+  async function handleDisapproveStore(storeId: string) {
+    const confirmed = await confirmDialog({
+      title: intl.formatMessage({ id: 'STORES.DISAPPROVE_CONFIRM_TITLE' }),
+      message: intl.formatMessage({ id: 'STORES.DISAPPROVE_CONFIRM_MESSAGE' }),
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+    try {
+      await storeHttpService.disapproveStore(storeId);
+      await loadStores();
+    } catch {
+      setStoresError(intl.formatMessage({ id: 'STORES.ERROR' }));
+    }
+  }
 
   // Dirty = any Details field differs from snapshot
   const isDirty = snapshot
@@ -115,6 +167,15 @@ export function OwnerEditPage() {
       // non-critical
     });
   }, [isSuperAdmin]);
+
+  // presentation-parity-bucket-b WU2: the Tiendas tab lazy-renders (ADR-9), so fetch
+  // stores each time it becomes active — mirrors AdminStoreListPage's own mount-driven
+  // fetch (`admin/stores/routes/store-list.tsx:36-38`).
+  useEffect(() => {
+    if (!isSuperAdmin || activeTab !== 'stores') return;
+    loadStores();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin, activeTab]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -356,8 +417,14 @@ export function OwnerEditPage() {
       {activeTab === 'details' && detailsForm}
 
       {activeTab === 'stores' && (
-        <div>
-          <AdminStoreListPage />
+        <div className="space-y-4">
+          {storesError && <p role="alert" className="text-sm text-red-600">{storesError}</p>}
+          <StoreCardList
+            stores={stores}
+            onEdit={(storeId) => navigate(`/management/stores/edit/${storeId}`)}
+            onApprove={handleApproveStore}
+            onDisapprove={handleDisapproveStore}
+          />
         </div>
       )}
 

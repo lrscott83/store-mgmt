@@ -44,16 +44,42 @@ vi.mock('~/shared/lib/stores/auth-store', () => ({
   useAuthStore: vi.fn(),
 }));
 
-// ─── AdminStoreListPage mock ───────────────────────────────────────────────────
-// Stage 4 (management-stores-parity): owner-edit's "Stores" tab now mounts the SOLE
-// super-admin store list at /admin/stores (management/stores/routes/store-list.tsx, the
-// old list+lifecycle route, was deleted). AdminStoreListPage self-loads via useEffect
-// (does NOT use useLoaderData) — safe to mount as child; mocked here to isolate
-// edit-page tests from store fetch.
-vi.mock('~/admin/stores/routes/store-list', () => ({
-  AdminStoreListPage: () => <div data-testid="store-list-page">StoreListPage</div>,
-  default: () => <div data-testid="store-list-page">StoreListPage</div>,
+// ─── storeHttpService mock ────────────────────────────────────────────────────
+// presentation-parity-bucket-b WU2: the "Tiendas" tab no longer mounts the whole
+// AdminStoreListPage (which duplicates its own STORES.LIST_TITLE h1 + "+ Agregar"
+// fab). It now renders `StoreCardList` directly with fetch/approve/disapprove/edit
+// logic copied from `admin/stores/routes/store-list.tsx`.
+vi.mock('~/management/stores/lib/services/store-http-service', () => ({
+  storeHttpService: {
+    listStores: vi.fn(),
+    approveStore: vi.fn(),
+    disapproveStore: vi.fn(),
+  },
 }));
+
+// ─── blocking-alert (confirmDialog) mock ──────────────────────────────────────
+
+const mockConfirmDialog = vi.fn();
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  confirmDialog: (...args: unknown[]) => mockConfirmDialog(...args),
+}));
+
+function makeStore(overrides: Partial<import('@store-mgmt/domain').Store> = {}) {
+  return {
+    id: 's1',
+    name: 'Store One',
+    displayName: 'Store One',
+    ownerId: 'o1',
+    ownerName: 'Owner One',
+    address: '123 Main St',
+    description: 'A store',
+    approved: true,
+    paymentStartDate: new Date(),
+    modules: [],
+    isActive: true,
+    ...overrides,
+  };
+}
 
 // ─── useUnsavedChangesPrompt mock ─────────────────────────────────────────────
 
@@ -62,9 +88,19 @@ vi.mock('~/shared/lib/hooks/use-unsaved-changes-prompt', () => ({
   useUnsavedChangesPrompt: (isDirty: boolean) => mockUseUnsavedChangesPrompt(isDirty),
 }));
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   mockParams.id = 'o42';
+  const { storeHttpService } = await import(
+    '~/management/stores/lib/services/store-http-service'
+  );
+  vi.mocked(storeHttpService.listStores).mockResolvedValue({
+    succeeded: true,
+    data: [],
+    message: '',
+    actionCode: 0,
+    errors: [],
+  });
 });
 
 function makeOwner(overrides: Partial<Owner> = {}): Owner {
@@ -591,11 +627,23 @@ describe('OwnerEditPage — Reseller sees Details only', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-OWNERS-EDIT-TABS-3 — Stores tab mounts StoreListPage
+// presentation-parity-bucket-b WU2 — Stores tab renders the grid ONLY
+// (StoreCardList), matching Angular's app-store-list (grid-only, no title/add-fab).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('OwnerEditPage — Stores tab', () => {
-  it('renders StoreListPage when Stores tab is active (SuperAdmin)', async () => {
+describe('OwnerEditPage — Tiendas tab renders grid only (bucket-b WU2)', () => {
+  async function openStoresTab(stores: ReturnType<typeof makeStore>[] = [makeStore()]) {
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: stores as never,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
     await renderPage(true);
 
     await waitFor(() => {
@@ -604,9 +652,114 @@ describe('OwnerEditPage — Stores tab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }));
 
+    return storeHttpService;
+  }
+
+  it('renders store cards via StoreCardList', async () => {
+    await openStoresTab([makeStore({ id: 's1', name: 'Store Alpha' })]);
+
     await waitFor(() => {
-      expect(screen.getByTestId('store-list-page')).toBeInTheDocument();
+      expect(screen.getByText('Store Alpha')).toBeInTheDocument();
     });
+  });
+
+  it('does NOT render a duplicated STORES.LIST_TITLE <h1> heading inside the tab', async () => {
+    await openStoresTab([makeStore({ id: 's1', name: 'Store Alpha' })]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Alpha')).toBeInTheDocument();
+    });
+
+    // STORES.LIST_TITLE and GENERAL.STORES (the tab button label) share the same
+    // literal "Tiendas" string in es.ts — assert specifically on heading level 1,
+    // which is what AdminStoreListPage renders and what must NOT be duplicated here.
+    const h1Headings = screen.queryAllByRole('heading', { level: 1 });
+    expect(h1Headings.some((h) => h.textContent === esMessages['STORES.LIST_TITLE'])).toBe(false);
+  });
+
+  it('does NOT render a "+ Agregar" add-store fab inside the tab', async () => {
+    await openStoresTab([makeStore({ id: 's1', name: 'Store Alpha' })]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Alpha')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: esMessages['GENERAL.ADD'] })).not.toBeInTheDocument();
+  });
+
+  it('approve handler fires exactly as it does on /admin/stores', async () => {
+    const storeHttpService = await openStoresTab([
+      makeStore({ id: 's1', name: 'Store Alpha', approved: false }),
+    ]);
+    vi.mocked(storeHttpService.approveStore).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    mockConfirmDialog.mockResolvedValue(true);
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Alpha')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.APPROVE'] }));
+
+    await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.APPROVE_CONFIRM_TITLE'],
+        message: esMessages['STORES.APPROVE_CONFIRM_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
+      expect(storeHttpService.approveStore).toHaveBeenCalledWith('s1');
+    });
+  });
+
+  it('disapprove handler fires exactly as it does on /admin/stores', async () => {
+    const storeHttpService = await openStoresTab([
+      makeStore({ id: 's2', name: 'Store Beta', approved: true }),
+    ]);
+    vi.mocked(storeHttpService.disapproveStore).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    mockConfirmDialog.mockResolvedValue(true);
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Beta')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s2'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.DISAPPROVE'] }));
+
+    await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.DISAPPROVE_CONFIRM_TITLE'],
+        message: esMessages['STORES.DISAPPROVE_CONFIRM_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
+      expect(storeHttpService.disapproveStore).toHaveBeenCalledWith('s2');
+    });
+  });
+
+  it('edit handler navigates to /management/stores/edit/:id exactly as /admin/stores does', async () => {
+    await openStoresTab([makeStore({ id: 's3', name: 'Store Gamma' })]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Gamma')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s3'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.EDIT'] }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/management/stores/edit/s3');
   });
 });
 
