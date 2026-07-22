@@ -222,6 +222,7 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
             {intl.formatMessage({ id: 'GENERAL.SAVE' })}
           </Button>
           <Button variant="outline" onClick={onClose}>
+            <CloseIcon />
             {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
           </Button>
         </div>

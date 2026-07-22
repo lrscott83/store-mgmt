@@ -194,6 +194,19 @@ describe('ExpenseFormModal — footer close button label (Angular parity: GENERA
   });
 });
 
+// Angular: edit-expense-modal.component.html:70-77 — mat-fab extended
+// Close/Save buttons carry `close`/`save` mat-icons.
+describe('ExpenseFormModal — footer close button icon (Angular parity: CloseIcon)', () => {
+  it('renders a CloseIcon svg inside the footer close button', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Cerrar').closest('button')?.querySelector('svg')).not.toBeNull();
+  });
+});
+
 // ─── ExpenseList ─────────────────────────────────────────────────────────────
 
 import { ExpenseList } from '../expense-list';
