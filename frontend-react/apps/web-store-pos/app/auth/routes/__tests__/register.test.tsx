@@ -413,3 +413,31 @@ describe('RegisterPage — terms-acceptance toggle (Angular parity: register.com
     expect(screen.getByRole('button', { name: 'Registrar' })).not.toBeDisabled();
   });
 });
+
+describe('RegisterPage — password visibility toggle (register.component.html:100-103,122-125 parity)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  it('password field defaults to hidden and toggles independently of confirm-password', () => {
+    renderRegister();
+    const password = screen.getByLabelText('Contraseña');
+    const confirm = screen.getByLabelText('Confirmar Contraseña');
+    expect(password).toHaveAttribute('type', 'password');
+    expect(confirm).toHaveAttribute('type', 'password');
+
+    const toggles = screen.getAllByRole('button', { name: 'Mostrar contraseña' });
+    expect(toggles).toHaveLength(2);
+
+    fireEvent.click(toggles[0]);
+    expect(password).toHaveAttribute('type', 'text');
+    expect(confirm).toHaveAttribute('type', 'password');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }));
+    expect(confirm).toHaveAttribute('type', 'text');
+    expect(password).toHaveAttribute('type', 'text');
+
+    expect(screen.getAllByRole('button', { name: 'Ocultar contraseña' })).toHaveLength(2);
+  });
+});

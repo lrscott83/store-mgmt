@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useIntl } from 'react-intl';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
+import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
@@ -47,6 +48,8 @@ export default function RegisterPage() {
   const [isOffline, setIsOffline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
 
   const PASSWORD_POLICY_REGEX = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
 
@@ -243,14 +246,26 @@ export default function RegisterPage() {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             {intl.formatMessage({ id: 'GENERAL.PASSWORD' })}
           </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            value={form.password}
-            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              aria-label={intl.formatMessage({
+                id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+              })}
+              className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+            >
+              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+            </button>
+          </div>
           {errors.password && (
             <p className="mt-1 text-xs text-red-600">{errors.password}</p>
           )}
@@ -260,14 +275,30 @@ export default function RegisterPage() {
           <label htmlFor="passwordConfirmation" className="block text-sm font-medium text-gray-700 mb-1">
             {intl.formatMessage({ id: 'GENERAL.CONFIRM_PASSWORD' })}
           </label>
-          <input
-            id="passwordConfirmation"
-            type="password"
-            autoComplete="new-password"
-            value={form.passwordConfirmation}
-            onChange={(e) => setForm((f) => ({ ...f, passwordConfirmation: e.target.value }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-          />
+          <div className="relative">
+            <input
+              id="passwordConfirmation"
+              type={showPasswordConfirmation ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={form.passwordConfirmation}
+              onChange={(e) => setForm((f) => ({ ...f, passwordConfirmation: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPasswordConfirmation((visible) => !visible)}
+              aria-label={intl.formatMessage({
+                id: showPasswordConfirmation ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+              })}
+              className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+            >
+              {showPasswordConfirmation ? (
+                <EyeOffIcon className="h-5 w-5" />
+              ) : (
+                <EyeIcon className="h-5 w-5" />
+              )}
+            </button>
+          </div>
           {errors.passwordConfirmation && (
             <p className="mt-1 text-xs text-red-600">{errors.passwordConfirmation}</p>
           )}
