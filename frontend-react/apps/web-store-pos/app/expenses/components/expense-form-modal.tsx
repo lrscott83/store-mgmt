@@ -223,7 +223,12 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
           </Button>
           <Button variant="fab" className="flex-1 justify-center" onClick={handleSubmit}>
             <SaveIcon />
-            {intl.formatMessage({ id: 'GENERAL.SAVE' })}
+            {/* Angular parity: edit-expense-modal.component.html:74-77 toggles between
+                GENERAL.INSERT (create) and GENERAL.UPDATE (edit) — was hardcoded to
+                GENERAL.SAVE regardless of mode. */}
+            {expense
+              ? intl.formatMessage({ id: 'GENERAL.UPDATE' })
+              : intl.formatMessage({ id: 'GENERAL.INSERT' })}
           </Button>
         </div>
       </div>

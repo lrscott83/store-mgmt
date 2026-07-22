@@ -26,7 +26,7 @@ describe('ExpenseFormModal — total validation (Angular parity: required + min(
       </Wrapper>,
     );
     fireEvent.change(screen.getByLabelText('Total'), { target: { value: '0' } });
-    fireEvent.click(screen.getByText('Salvar'));
+    fireEvent.click(screen.getByText('Adicionar'));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave.mock.calls[0][0].total).toBe(0);
   });
@@ -40,7 +40,7 @@ describe('ExpenseFormModal — total validation (Angular parity: required + min(
     );
     fireEvent.change(screen.getByLabelText('Total'), { target: { value: '-5' } });
     expect(screen.getByText('El total debe ser mayor a 0')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Salvar'));
+    fireEvent.click(screen.getByText('Adicionar'));
     expect(onSave).not.toHaveBeenCalled();
   });
 
@@ -123,7 +123,7 @@ describe('ExpenseFormModal — total is required on create (Angular parity: Vali
       </Wrapper>,
     );
     expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
-    expect(screen.getByText('Salvar').closest('button')).not.toBeDisabled();
+    expect(screen.getByText('Adicionar').closest('button')).not.toBeDisabled();
   });
 
   it('does not call onSave when Save is clicked before entering a total, and surfaces the error afterwards (markAllAsTouched)', () => {
@@ -134,10 +134,10 @@ describe('ExpenseFormModal — total is required on create (Angular parity: Vali
       </Wrapper>,
     );
     expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Salvar'));
+    fireEvent.click(screen.getByText('Adicionar'));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByText('El total debe ser mayor a 0')).toBeInTheDocument();
-    expect(screen.getByText('Salvar').closest('button')).not.toBeDisabled();
+    expect(screen.getByText('Adicionar').closest('button')).not.toBeDisabled();
   });
 
   it('becomes valid once the user explicitly types 0', () => {
@@ -149,7 +149,7 @@ describe('ExpenseFormModal — total is required on create (Angular parity: Vali
     );
     fireEvent.change(screen.getByLabelText('Total'), { target: { value: '0' } });
     expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Salvar'));
+    fireEvent.click(screen.getByText('Adicionar'));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave.mock.calls[0][0].total).toBe(0);
   });
@@ -176,7 +176,7 @@ describe('ExpenseFormModal — total is required on create (Angular parity: Vali
       </Wrapper>,
     );
     expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
-    expect(screen.getByText('Salvar').closest('button')).not.toBeDisabled();
+    expect(screen.getByText('Actualizar').closest('button')).not.toBeDisabled();
   });
 });
 
@@ -232,9 +232,49 @@ describe('ExpenseFormModal — footer button order (Angular parity: Close before
       </Wrapper>,
     );
     const buttons = screen.getAllByRole('button').filter(
-      (b) => b.textContent === 'Salvar' || b.textContent === 'Cerrar',
+      (b) => b.textContent === 'Adicionar' || b.textContent === 'Cerrar',
     );
-    expect(buttons.map((b) => b.textContent)).toEqual(['Cerrar', 'Salvar']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['Cerrar', 'Adicionar']);
+  });
+});
+
+// Angular reference: edit-expense-modal.component.html:74-77 —
+// `{{ (!expense ? 'GENERAL.INSERT' : 'GENERAL.UPDATE') | translate }}`. The Save
+// button label toggles by mode; it was hardcoded to GENERAL.SAVE regardless.
+describe('ExpenseFormModal — save button label toggles INSERT/UPDATE (Angular parity)', () => {
+  it('shows GENERAL.INSERT ("Adicionar") in create mode (no expense prop)', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Adicionar')).toBeInTheDocument();
+    expect(screen.queryByText('Salvar')).not.toBeInTheDocument();
+  });
+
+  it('shows GENERAL.UPDATE ("Actualizar") in edit mode (expense prop present)', () => {
+    render(
+      <Wrapper>
+        <ExpenseFormModal
+          isOpen
+          onClose={() => {}}
+          onSave={() => {}}
+          expense={{
+            id: 'e1',
+            type: ExpenseType.Comida,
+            total: 10,
+            date: new Date('2024-03-15T10:00:00.000'),
+            paymentType: PaymentType.Efectivo,
+            note: '',
+            isActive: true,
+            createdDate: new Date('2024-03-15T10:00:00.000'),
+            createdByName: '',
+          }}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Actualizar')).toBeInTheDocument();
+    expect(screen.queryByText('Salvar')).not.toBeInTheDocument();
   });
 });
 

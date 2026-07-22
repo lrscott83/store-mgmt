@@ -135,7 +135,7 @@ describe('TodayExpensesPage — smoke render', () => {
     // loadExpenses is now async (getExpensesInDayObservable) — wait for the row to appear.
     fireEvent.click(await screen.findByTestId('expense-actions-toggle-e1'));
     fireEvent.click(screen.getByText('Editar'));
-    fireEvent.click(screen.getByText('Salvar'));
+    fireEvent.click(screen.getByText('Actualizar'));
     expect(screen.getByText('El gasto no existe.')).toBeInTheDocument();
   });
 });
