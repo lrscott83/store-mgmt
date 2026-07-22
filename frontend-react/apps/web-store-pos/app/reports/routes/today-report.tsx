@@ -8,6 +8,10 @@ import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offl
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
+import { generateProductRows } from '~/reports/lib/pdf/generate-product-rows';
+import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
+import { Button } from '~/shared/components/ui/button';
+import { DownloadIcon } from '~/shared/components/ui/icons';
 
 export const clientLoader = featureLoader([EFeatures.TodayReports]);
 
@@ -108,6 +112,22 @@ export function TodayReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
+  // presentation-parity-bucket-b WU3: 1:1 port of Angular's
+  // InventoryTodaySaleComponent.generateReport() (inventory-today-sale.component.ts:44-99,
+  // currently disabled — angular-bugs-policy #511) wired to the faithful React PDF port
+  // (reports/lib/pdf/inventory-today-sale-pdf.ts). Rows are built by generateProductRows()
+  // (reports/lib/pdf/generate-product-rows.ts, the ported inventory-today-sale.component.ts:176-226
+  // aggregation) from the same offline services computeTodayReport already uses.
+  const handleGenerateReport = useCallback(async () => {
+    const categoryRepository = new ProductCategoryRepository(storeId);
+    const productRepository = new ProductRepository(storeId, categoryRepository);
+    const orderService = new OrderOfflineService(storeId);
+    const inventoryService = new InventoryOfflineService(storeId, productRepository);
+
+    const rows = generateProductRows(productRepository, orderService, inventoryService);
+    await exportInventoryTodaySalePdf(rows);
+  }, [storeId]);
+
   const summary = report ?? {
     date: new Date(),
     orderCount: 0,
@@ -131,6 +151,15 @@ export function TodayReportPage() {
         >
           {intl.formatMessage({ id: 'REPORTS.REFRESH' })}
         </button>
+      </div>
+
+      {/* presentation-parity-bucket-b WU3: mirrors Angular's inventory-today-sale.component.html
+          mat-fab extended "Generar Reporte" PDF-export button — ABOVE the dashboard. */}
+      <div className="flex justify-end">
+        <Button type="button" variant="fab" onClick={handleGenerateReport}>
+          <DownloadIcon />
+          {intl.formatMessage({ id: 'REPORT.INVENTORY_TODAY_SALE' })}
+        </Button>
       </div>
 
       {/* Sales Summary Section */}

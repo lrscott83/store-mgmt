@@ -47,9 +47,9 @@ No design artifact exists for this change (pure presentation-parity revert/port 
 
 - [x] 3.1 RED: create `reports/lib/pdf/generate-product-rows.test.ts` — port test cases from Angular `generateProductRows()` (`inventory-today-sale.component.ts:176-226`), covering normal data plus edge cases (zero sales, zero available stock — no divide-by-zero, no dropped rows).
 - [x] 3.2 GREEN: create `reports/lib/pdf/generate-product-rows.ts` exporting a function producing `InventoryTodaySaleRow[]` (13 columns, col-2 `unit` literal `'U'`) from real offline data, matching Angular's aggregation exactly.
-- [ ] 3.3 RED: write test in `reports/routes/today-report.test.tsx` asserting a "Generar Reporte" button renders ABOVE the existing KPI summary + inventory table, and that activating it calls the row-builder then invokes `inventory-today-sale-pdf.ts` (mock the pdf module) with rows matching the built shape.
-- [ ] 3.4 GREEN: edit `reports/routes/today-report.tsx` to add the "Generar Reporte" fab-equivalent button above the dashboard, wired to call `generate-product-rows.ts` then the existing `inventory-today-sale-pdf.ts`. Do not alter the existing KPI/inventory-table dashboard markup.
-- [ ] 3.5 Verify: `pnpm test reports/` passes; confirm dashboard sections render unchanged alongside the new button.
+- [x] 3.3 RED: write test in `reports/routes/today-report.test.tsx` asserting a "Generar Reporte" button renders ABOVE the existing KPI summary + inventory table, and that activating it calls the row-builder then invokes `inventory-today-sale-pdf.ts` (mock the pdf module) with rows matching the built shape.
+- [x] 3.4 GREEN: edit `reports/routes/today-report.tsx` to add the "Generar Reporte" fab-equivalent button above the dashboard, wired to call `generate-product-rows.ts` then the existing `inventory-today-sale-pdf.ts`. Do not alter the existing KPI/inventory-table dashboard markup.
+- [x] 3.5 Verify: `pnpm test reports/` passes; confirm dashboard sections render unchanged alongside the new button.
 
 ## Phase 4: WU4 — Regression guards for KEEP items (Requirements: "Category actions menu stays the single action path", "Statistics charts remain recharts")
 

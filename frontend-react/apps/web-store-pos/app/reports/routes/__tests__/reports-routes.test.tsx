@@ -1,8 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { InventoryEntry, Product, ProductCategory } from '@store-mgmt/domain';
+
+// ─── PDF export mock (presentation-parity-bucket-b WU3) ───────────────────────
+// Mock only the PDF module — generateProductRows() itself runs for real against
+// localStorage (same convention as the rest of this file), so the wiring test
+// exercises the real row-building aggregation, not a stub.
+const exportInventoryTodaySalePdfMock = vi.fn().mockResolvedValue(undefined);
+vi.mock('~/reports/lib/pdf/inventory-today-sale-pdf', () => ({
+  exportInventoryTodaySalePdf: (...args: unknown[]) => exportInventoryTodaySalePdfMock(...args),
+}));
 
 // ─── Global mocks ─────────────────────────────────────────────────────────────
 
@@ -244,5 +253,73 @@ describe('TodayReportPage — available inventory table (real getInventoryCatego
 
     expect(screen.queryByText('Sold Out Item')).not.toBeInTheDocument();
     expect(screen.getByText(/Sin stock disponible/i)).toBeInTheDocument();
+  });
+});
+
+// ─── "Generar Reporte" PDF export button (presentation-parity-bucket-b WU3) ───────────────
+//
+// Angular's inventory-today-sale.component.html renders a `mat-fab extended` button
+// (file_download icon, label REPORT.INVENTORY_TODAY_SALE) that calls generateReport() — a
+// disabled no-op in Angular (angular-bugs-policy #511). React wires it to actually work:
+// generateProductRows() (real, unmocked) builds the 13-col ledger from live offline data,
+// then exportInventoryTodaySalePdf (mocked here) is invoked with those rows.
+describe('TodayReportPage — Generar Reporte PDF export button', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    exportInventoryTodaySalePdfMock.mockClear();
+  });
+
+  it('renders the button above the Sales Summary / Inventory Status dashboard sections', () => {
+    render(
+      <Wrapper>
+        <TodayReportPage />
+      </Wrapper>,
+    );
+
+    const button = screen.getByRole('button', { name: /Inventario a precio de venta/i });
+    const salesSummaryHeading = screen.getByText(/Resumen de ventas/i);
+
+    expect(button).toBeInTheDocument();
+    // DOCUMENT_POSITION_FOLLOWING (4) means salesSummaryHeading comes AFTER button.
+    // eslint-disable-next-line no-bitwise
+    expect(button.compareDocumentPosition(salesSummaryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps the existing KPI/inventory dashboard sections unchanged alongside the new button', () => {
+    render(
+      <Wrapper>
+        <TodayReportPage />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText(/Resumen de ventas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Estado de inventario/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pedidos/i)).toBeInTheDocument();
+  });
+
+  it('activating the button builds rows from real offline data and invokes the PDF export with them', async () => {
+    seedProducts([makeProduct('p1', { name: 'Coca Cola 500ml', categoryId: 'cat-1' })]);
+    seedCategories([makeCategory('cat-1', { name: 'Bebidas' })]);
+    seedInventory(new Map([['p1', [makeEntry('e1', 'p1', { available: 5, quantity: 5, costPrice: 2 })]]]));
+
+    render(
+      <Wrapper>
+        <TodayReportPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Inventario a precio de venta/i }));
+
+    await waitFor(() => expect(exportInventoryTodaySalePdfMock).toHaveBeenCalledTimes(1));
+
+    const rows = exportInventoryTodaySalePdfMock.mock.calls[0][0];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      productId: 'p1',
+      productName: 'Coca Cola 500ml',
+      unit: 'U',
+      disponible: 5,
+      vendido: 0,
+    });
   });
 });

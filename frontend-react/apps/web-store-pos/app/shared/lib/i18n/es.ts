@@ -532,6 +532,10 @@ const messages: Record<string, string> = {
   'REPORTS.INVENTORY.PRODUCT': 'Producto',
   'REPORTS.INVENTORY.AVAILABLE': 'Disponible',
   'REPORTS.INVENTORY.EMPTY_STATE': 'Sin stock disponible',
+  // Angular literal key (inventory-today-sale.component.html, es.ts:496) — the
+  // "Generar Reporte" PDF export button label. Kept under the singular `REPORT.*`
+  // namespace (not `REPORTS.*`) to match Angular's key 1:1.
+  'REPORT.INVENTORY_TODAY_SALE': 'Inventario a precio de venta',
 
   // Statistics — Dashboard
   'STATISTICS.DASHBOARD.TITLE': 'Dashboard',
