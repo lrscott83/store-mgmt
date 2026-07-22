@@ -429,6 +429,27 @@ describe('OwnerCreatePage — reSellerId label is GENERAL.RESELLER', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-CREATE-3 — Gestor (reSeller) field renders FIRST (create-owner.component.html:17-28)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — Gestor (reSeller) field position (Angular parity)', () => {
+  it('renders the reSeller select before the Full Name field, in DOM order', async () => {
+    await renderPage(true);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['GENERAL.RESELLER'])).toBeInTheDocument();
+    });
+
+    const reSellerSelect = screen.getByLabelText(esMessages['GENERAL.RESELLER']);
+    const fullNameInput = screen.getByLabelText(esMessages['GENERAL.FULL_NAME']);
+
+    expect(
+      reSellerSelect.compareDocumentPosition(fullNameInput) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-CREATE-9 — unsaved changes prompt
 // ═══════════════════════════════════════════════════════════════════════════════
 

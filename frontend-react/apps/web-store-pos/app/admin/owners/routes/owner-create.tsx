@@ -118,6 +118,27 @@ export function OwnerCreatePage() {
           </p>
         )}
 
+        {isSuperAdmin && (
+          <div>
+            <label htmlFor="reSellerId" className="block text-sm font-medium text-gray-700">
+              {intl.formatMessage({ id: 'GENERAL.RESELLER' })}
+            </label>
+            <select
+              id="reSellerId"
+              value={reSellerId}
+              onChange={(e) => setReSellerId(e.target.value)}
+              className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">--</option>
+              {resellers.map((r) => (
+                <option key={r.id as string} value={r.id as string}>
+                  {r.fullName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div>
           <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
             {intl.formatMessage({ id: 'GENERAL.FULL_NAME' })}
@@ -238,27 +259,6 @@ export function OwnerCreatePage() {
             className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-
-        {isSuperAdmin && (
-          <div>
-            <label htmlFor="reSellerId" className="block text-sm font-medium text-gray-700">
-              {intl.formatMessage({ id: 'GENERAL.RESELLER' })}
-            </label>
-            <select
-              id="reSellerId"
-              value={reSellerId}
-              onChange={(e) => setReSellerId(e.target.value)}
-              className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">--</option>
-              {resellers.map((r) => (
-                <option key={r.id as string} value={r.id as string}>
-                  {r.fullName}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         <Button type="submit" variant="fab" disabled={!isDirty || isSubmitting}>
           <PlusIcon />

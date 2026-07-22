@@ -356,6 +356,31 @@ describe('OwnerEditPage — reSellerId SuperAdmin-only', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PARITY-EDIT-1 — Gestor (reSeller) field position (edit-owner-details.component.html:27-39)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — Gestor (reSeller) field position (Angular parity)', () => {
+  it('renders the reSeller select after Full Name and before the Activo toggle', async () => {
+    await renderPage(true);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['GENERAL.RESELLER'])).toBeInTheDocument();
+    });
+
+    const fullNameInput = screen.getByLabelText(esMessages['GENERAL.FULL_NAME']);
+    const reSellerSelect = screen.getByLabelText(esMessages['GENERAL.RESELLER']);
+    const isActiveToggle = screen.getByLabelText(esMessages['USERS.IS_ACTIVE']);
+
+    expect(
+      fullNameInput.compareDocumentPosition(reSellerSelect) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      reSellerSelect.compareDocumentPosition(isActiveToggle) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-EDIT-DETAILS-5 — login NOT in PUT body
 // ═══════════════════════════════════════════════════════════════════════════════
 
