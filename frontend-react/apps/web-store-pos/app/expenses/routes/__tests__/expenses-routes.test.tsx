@@ -341,6 +341,24 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(screen.getByText('Zelle')).toBeInTheDocument();
   });
 
+  // Parity fix (presentation-parity-bucket-e item 1b): expenses.component.html:15-23 shows the
+  // payment glyph before each real payment-type label, but the "Todas" (null) option has none.
+  it('shows a PaymentMethodIcon before each real payment-type label, but not before "Todas"', () => {
+    render(
+      <Wrapper>
+        <ExpensesHistoryPage />
+      </Wrapper>,
+    );
+
+    const todasLabel = screen.getByText('Todas').closest('label');
+    expect(todasLabel?.querySelector('svg')).toBeNull();
+
+    for (const text of ['Efectivo', 'Tarjeta', 'Zelle']) {
+      const label = screen.getByText(text).closest('label');
+      expect(label?.querySelector('svg')).not.toBeNull();
+    }
+  });
+
   it('groups expenses by day (collapsed by default), shows per-day count + total, and never renders edit/delete', async () => {
     const day1 = makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 });
     const day1b = makeExpense({ id: 'b', date: new Date('2024-03-15T14:00:00.000'), total: 15 });

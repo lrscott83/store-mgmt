@@ -6,7 +6,8 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
+import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
 
@@ -152,6 +153,9 @@ export function ExpensesHistoryPage() {
                 onChange={() => setPaymentType(opt.value)}
                 className="text-primary focus:ring-primary"
               />
+              {opt.value != null && (
+                <PaymentMethodIcon kind={getPaymentTypeIconKind(opt.value)} className="text-success" />
+              )}
               {intl.formatMessage({ id: opt.labelKey })}
             </label>
           ))}

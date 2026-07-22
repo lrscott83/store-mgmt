@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { PaymentType, OrderType, ExpenseType, EModules } from '@store-mgmt/domain';
@@ -232,6 +232,29 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     // Angular's literal template bug: header shows getPaidSaleCreditsTotal() (a currency
     // sum), not a count, inside the "(...)" slot — preserved verbatim, see today-stats.tsx.
     expect(await screen.findByText('Créditos Pagados (60)')).toBeInTheDocument();
+  });
+
+  // Parity fix (presentation-parity-bucket-e item 1a): Angular's expense-list.component.html:12
+  // renders the payment-method glyph immediately before the total amount — React's Gastos row
+  // in Cuadre del día had lost it.
+  it('renders a PaymentMethodIcon immediately before the Gastos row total (Angular parity)', async () => {
+    mockGetExpensesInDayObservable.mockResolvedValue(
+      expensesEnvelope([makeExpense({ total: 15, paymentType: PaymentType.Tarjeta })]),
+    );
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    const toggle = await screen.findByRole('button', { name: /Gastos \(1\)/ });
+    fireEvent.click(toggle);
+
+    const row = screen.getByText('Otro').closest('tr');
+    expect(row).not.toBeNull();
+    const totalWrapper = within(row as HTMLElement).getByText('$15.00');
+    expect(totalWrapper.firstChild?.nodeName.toLowerCase()).toBe('svg');
   });
 
   // Parity fix (collapsible-panel-chevron-parity): ExpansionPanel converts from uncontrolled
