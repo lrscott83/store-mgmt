@@ -321,8 +321,8 @@ describe('InventoryAvailablePage — renders getInventoryCategoriesView() output
     const toggle = await screen.findByTestId('inventory-category-toggle-cat-1');
     fireEvent.click(toggle);
 
-    expect(screen.getByText('Ron Activo')).toBeInTheDocument();
-    expect(screen.getByText('Ron Inactivo')).toBeInTheDocument();
+    expect(screen.getByText('Ron Activo (10)')).toBeInTheDocument();
+    expect(screen.getByText('Ron Inactivo (5)')).toBeInTheDocument();
   });
 });
 

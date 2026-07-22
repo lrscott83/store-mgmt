@@ -129,8 +129,8 @@ describe('InventoryProductList — smoke render', () => {
     );
     const input = screen.getByRole('searchbox');
     fireEvent.change(input, { target: { value: 'coca' } });
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
-    expect(screen.queryByText('Fanta')).not.toBeInTheDocument();
+    expect(screen.getByText('Coca Cola (10)')).toBeInTheDocument();
+    expect(screen.queryByText(/^Fanta/)).not.toBeInTheDocument();
   });
 });
 
@@ -148,8 +148,8 @@ describe('InventoryProductList — collapsible accordion (Angular parity)', () =
     // Category-level summary always visible, even collapsed.
     expect(screen.getByText('Bebidas (15)')).toBeInTheDocument();
     // Per-product rows are hidden until expanded.
-    expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
-    expect(screen.queryByText('Fanta')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Coca Cola/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Fanta/)).not.toBeInTheDocument();
   });
 
   it('expands a category on click, revealing its products', () => {
@@ -159,10 +159,10 @@ describe('InventoryProductList — collapsible accordion (Angular parity)', () =
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
-    expect(screen.getByText('Fanta')).toBeInTheDocument();
+    expect(screen.getByText('Coca Cola (10)')).toBeInTheDocument();
+    expect(screen.getByText('Fanta (5)')).toBeInTheDocument();
     // Other category stays collapsed.
-    expect(screen.queryByText('Papas Lays')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Papas Lays/)).not.toBeInTheDocument();
   });
 
   it('collapses an expanded category back on a second click', () => {
@@ -173,9 +173,9 @@ describe('InventoryProductList — collapsible accordion (Angular parity)', () =
     );
     const toggle = screen.getByTestId('inventory-category-toggle-cat1');
     fireEvent.click(toggle);
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    expect(screen.getByText('Coca Cola (10)')).toBeInTheDocument();
     fireEvent.click(toggle);
-    expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Coca Cola/)).not.toBeInTheDocument();
   });
 
   it('auto-expands a category with matching search results', () => {
@@ -185,7 +185,7 @@ describe('InventoryProductList — collapsible accordion (Angular parity)', () =
       </Wrapper>,
     );
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'coca' } });
-    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+    expect(screen.getByText('Coca Cola (10)')).toBeInTheDocument();
   });
 
   // Parity fix (collapsible-panel-chevron-parity): the category header must render the
@@ -264,6 +264,28 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
     expect(screen.getByText('$15.00')).toBeInTheDocument();
     // $40.00 also appears as the Snacks category total (same numeric value, expected coincidence)
     expect(screen.getAllByText('$40.00').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// Parity fix (presentation-parity-bucket-e item 5): inventory-product-list.component.html:12-29
+// renders the row name as `{{productName}} ({{quantity}})` inline, with no categoryName
+// sub-label (already the accordion header) and no separate "Disponible" stat block.
+describe('InventoryProductList — Disponible row cleanup (Angular parity)', () => {
+  it('renders "Coca Cola (10)" inline, no categoryName sub-label, no Disponible label, currency cells intact', () => {
+    render(
+      <Wrapper>
+        <InventoryProductList categories={MOCK_CATEGORIES} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
+
+    expect(screen.getByText('Coca Cola (10)')).toBeInTheDocument();
+    expect(screen.queryByText('Bebidas', { selector: 'p' })).not.toBeInTheDocument();
+    expect(screen.queryByText('INVENTORY.ENTRY.AVAILABLE')).not.toBeInTheDocument();
+    expect(screen.queryByText(esMessages['INVENTORY.ENTRY.AVAILABLE'])).not.toBeInTheDocument();
+    // Currency cells (avg cost, total value) still render.
+    expect(screen.getByText('$2.00')).toBeInTheDocument();
+    expect(screen.getByText('$20.00')).toBeInTheDocument();
   });
 });
 

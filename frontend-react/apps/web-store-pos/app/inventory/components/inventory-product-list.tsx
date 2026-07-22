@@ -101,14 +101,11 @@ export function InventoryProductList({ categories }: InventoryProductListProps) 
                   {cat.products.map((p) => (
                     <div key={p.productId} className="flex items-center justify-between px-4 py-3">
                       <div>
-                        <p className="font-medium text-text">{p.productName}</p>
-                        <p className="text-xs text-text-muted">{p.categoryName}</p>
+                        <p className="font-medium text-text">
+                          {p.productName} ({p.totalAvailable})
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-primary">{p.totalAvailable}</p>
-                        <p className="text-xs text-text-muted">
-                          {intl.formatMessage({ id: 'INVENTORY.ENTRY.AVAILABLE' })}
-                        </p>
                         {/* Weighted-average unit cost + per-product total value — Angular's
                             product.costPrice / product.costPrice*product.quantity currency cells
                             (inventory-product-list.component.html:20-29). */}
