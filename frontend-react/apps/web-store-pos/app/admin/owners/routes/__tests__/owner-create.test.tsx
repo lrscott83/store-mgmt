@@ -451,3 +451,31 @@ describe('OwnerCreatePage — unsaved changes prompt', () => {
     expect(mockUseUnsavedChangesPrompt).toHaveBeenCalledWith(false);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// password visibility toggle (create-owner.component.html:56-61,76-81 parity)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — password visibility toggle', () => {
+  // Angular binds a SINGLE showPassword boolean to password + confirmPassword
+  // (two buttons, one shared state) — both flip together on either click.
+  it('password and confirmPassword share one toggle state (both flip together)', async () => {
+    await renderPage(false);
+    const password = screen.getByLabelText(esMessages['GENERAL.PASSWORD']);
+    const confirm = screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']);
+    expect(password).toHaveAttribute('type', 'password');
+    expect(confirm).toHaveAttribute('type', 'password');
+
+    const toggles = screen.getAllByRole('button', { name: 'Mostrar contraseña' });
+    expect(toggles).toHaveLength(2);
+
+    fireEvent.click(toggles[0]);
+    expect(password).toHaveAttribute('type', 'text');
+    expect(confirm).toHaveAttribute('type', 'text');
+    expect(screen.getAllByRole('button', { name: 'Ocultar contraseña' })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Ocultar contraseña' })[1]);
+    expect(password).toHaveAttribute('type', 'password');
+    expect(confirm).toHaveAttribute('type', 'password');
+  });
+});
