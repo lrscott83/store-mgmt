@@ -84,9 +84,16 @@ function emptyForm(expense?: Expense): ExpenseFormInput {
 export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: ExpenseFormModalProps) {
   const intl = useIntl();
   const [form, setForm] = useState<ExpenseFormInput>(() => emptyForm(expense));
+  // Angular parity: isControlInvalid(name, validator) only reports an error once the
+  // control is `dirty || touched` (edit-expense-modal.component.ts:118-125) — a fresh
+  // modal shows no error even though `total` starts invalid. `touched` here stands in
+  // for "dirty || touched": it flips true as soon as the user edits/blurs the total
+  // field, or after a blocked submit attempt (onSubmit's markAllAsTouched(), :52-56).
+  const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     setForm(emptyForm(expense));
+    setTouched(false);
   }, [expense, isOpen]);
 
   if (!isOpen) return null;
@@ -94,9 +101,16 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
   // Angular parity: Validators.required + Validators.min(0) — a total of exactly 0 IS valid
   // (edit-expense-modal.component.ts:88-92). Only a negative/NaN total is invalid.
   const isValid = Number.isFinite(form.total) && form.total >= 0;
+  const showError = !isValid && touched;
 
   function handleSubmit() {
-    if (!isValid) return;
+    // Angular parity (edit-expense-modal.component.ts:52-56): onSubmit() always runs on
+    // click (the Save button has no [disabled] binding); when the form is invalid it
+    // marks all controls touched (surfacing the error) and returns without saving.
+    if (!isValid) {
+      setTouched(true);
+      return;
+    }
     onSave(form, expense?.id);
   }
 
@@ -154,10 +168,14 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
               type="number"
               step="0.01"
               value={Number.isNaN(form.total) ? '' : form.total}
-              onChange={(e) => setForm((f) => ({ ...f, total: parseFloat(e.target.value) }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, total: parseFloat(e.target.value) }));
+                setTouched(true);
+              }}
+              onBlur={() => setTouched(true)}
               className="w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            {!isValid && (
+            {showError && (
               <p className="mt-1 text-xs text-danger">
                 {intl.formatMessage({ id: 'EXPENSES.FORM.TOTAL_REQUIRED' })}
               </p>
@@ -199,7 +217,7 @@ export function ExpenseFormModal({ isOpen, onClose, onSave, expense, error }: Ex
         </div>
 
         <div className="mt-4 flex gap-2">
-          <Button variant="fab" className="flex-1 justify-center" onClick={handleSubmit} disabled={!isValid}>
+          <Button variant="fab" className="flex-1 justify-center" onClick={handleSubmit}>
             <SaveIcon />
             {intl.formatMessage({ id: 'GENERAL.SAVE' })}
           </Button>

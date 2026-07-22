@@ -110,28 +110,34 @@ describe('ExpenseFormModal — create-mode default type (Angular parity: edit-ex
 });
 
 // Angular reference: edit-expense-modal.component.ts:88-92 `Validators.required` on total — a
-// brand-new expense has NO default total, so Save must stay disabled/invalid until the user
-// types a value. Only after typing does `0` become an accepted value (Validators.min(0)).
+// brand-new expense has NO default total, so submitting empty is blocked. But per
+// isControlInvalid (component.ts:118-125), the error only surfaces once the control is
+// `dirty || touched`, and the Save button has no [disabled] binding at all
+// (edit-expense-modal.component.html:74) — so a fresh modal shows neither the error nor a
+// disabled Save.
 describe('ExpenseFormModal — total is required on create (Angular parity: Validators.required)', () => {
-  it('is invalid/disabled by default in create mode, before the user types anything', () => {
+  it('shows no error and a clickable Save on a fresh mount, before any interaction', () => {
     render(
       <Wrapper>
         <ExpenseFormModal isOpen onClose={() => {}} onSave={() => {}} />
       </Wrapper>,
     );
-    expect(screen.getByText('El total debe ser mayor a 0')).toBeInTheDocument();
-    expect(screen.getByText('Salvar').closest('button')).toBeDisabled();
+    expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
+    expect(screen.getByText('Salvar').closest('button')).not.toBeDisabled();
   });
 
-  it('does not call onSave when Save is clicked before entering a total', () => {
+  it('does not call onSave when Save is clicked before entering a total, and surfaces the error afterwards (markAllAsTouched)', () => {
     const onSave = vi.fn();
     render(
       <Wrapper>
         <ExpenseFormModal isOpen onClose={() => {}} onSave={onSave} />
       </Wrapper>,
     );
+    expect(screen.queryByText('El total debe ser mayor a 0')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Salvar'));
     expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByText('El total debe ser mayor a 0')).toBeInTheDocument();
+    expect(screen.getByText('Salvar').closest('button')).not.toBeDisabled();
   });
 
   it('becomes valid once the user explicitly types 0', () => {
