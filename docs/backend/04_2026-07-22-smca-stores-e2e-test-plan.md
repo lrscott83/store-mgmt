@@ -212,6 +212,22 @@ SuperAdmin-only filter, same validator/THROW semantics, same always-`Success(boo
 
 ---
 
+## Role access matrix (all endpoints — class-level `[HasPermission(SuperAdmin, StoresAdmin)]`)
+
+Every stores endpoint enforces the same class-level filter; approve/disapprove add method-level
+SuperAdmin-only. Covered end-to-end (see the implementation plan Tasks 7-8):
+
+| Caller | Class-level (all endpoints) | approve / disapprove (method-level) |
+|---|---|---|
+| SuperAdmin | pass (bypass) | pass |
+| OwnerAdmin/StoresAdmin (selected store has active Management module) | **pass** | **403** |
+| StoreUser (no Stores `StoreRoleFeature`) | **403** | 403 |
+| ReSeller (only Owners feature) | **403** | 403 |
+| No token | **401** | 401 |
+
+All validator failures across the 5 stores validators surface as **HTTP 400** with
+`errors[].code` = the property name (`"Id"` / `"Name"` / `"OwnerId"` / `"ModuleIds"`).
+
 ## Data isolation
 
 - Reuse `DbTestHelpers.CleanupTenantCascadeAsync` (FK order: StoreRoleFeature → StoreModule → Store

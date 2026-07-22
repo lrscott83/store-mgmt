@@ -1,4 +1,9 @@
-# E2E test plan — SMCA.WebApi `/auth/logout` (closes the endpoint gap)
+# E2E test plan — SMCA.WebApi `/auth`: logout + validation (03)
+
+> Scope note: this plan (the `03` pair) covers the `/auth/logout` suite **and** the full
+> validation-error suite for the auth endpoints that have validators (`login`, `register`).
+> `me`/`ping`/`logout` have no validators. Implementation lives in
+> `03_...-logout-validation-implementation-plan.md`.
 
 Date: 2026-07-22
 Status: Draft (pending user review)
@@ -112,6 +117,33 @@ Route: `GET api/v1/auth/logout`. Assert on HTTP status + deserialized
    The e2e value here is the **branch/status contract** (cases 1–5) plus proving the seeded user
    is reachable through the real repository in branch B. Server-side session assertion is not
    applicable (stateless JWT — see Risks).
+
+## Validation error cases — `login` + `register`
+
+Every FluentValidation failure throws `ValidationException` → **HTTP 400**, `errors[].code` = the
+**property name**. `me`/`ping`/`logout` have no validators (nothing to cover).
+
+### POST `api/v1/auth/login` — `LoginCommandValidator`
+
+| Rule | Case | code |
+|---|---|---|
+| `Login` required | `Login=""` | `Login` |
+| `Password` required | `Password=""` | `Password` |
+| `Password` MinimumLength(8) | `Password="abc"` | `Password` |
+
+### POST `api/v1/auth/register` — `RegisterCommandValidator`
+
+| Rule | Case | code |
+|---|---|---|
+| `Login` required | `Login=""` | `Login` |
+| `Login` unique (IsUniqueName) | duplicate | **not here** — bypassed by query-filter bug; pinned as the register-duplicate 500 in `02` |
+| `Password` required | `Password=""` | `Password` |
+| `Password` MinimumLength(8) | `Password="Ab1"` | `Password` |
+| `Password` uppercase | `Password="password123"` | `Password` |
+| `FullName` required | `FullName=""` | `FullName` |
+| `CellPhone` required | `CellPhone=""` | `CellPhone` |
+| `Email` format (When non-empty) | `Email="not-an-email"` | `Email` |
+| `StoreName` required | `StoreName=""` | `StoreName` |
 
 ## Data isolation
 

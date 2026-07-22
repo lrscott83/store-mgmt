@@ -1,88 +1,76 @@
-# SMCA.WebApi `/stores` E2E — Implementation Plan (self-contained)
+# SMCA.WebApi `/stores` E2E — Implementation Plan (self-contained, complete)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended)
-> or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development / executing-plans.
+> Steps use `- [ ]`. This is the COMPLETE stores e2e suite — every in-scope endpoint, every validation
+> failure, the full authorization matrix for the Stores controller, and cross-tenant visibility.
 
-**Goal:** Implement the e2e suite for the 6 in-scope `StoresController` endpoints described in
-`04_2026-07-22-smca-stores-e2e-test-plan.md`, executable against a real Postgres via `dotnet test`.
+**Goal:** Implement the full e2e suite for the 6 in-scope `StoresController` endpoints
+(`04_...-test-plan.md`), executable against a real Postgres via `dotnet test`.
 
-**Self-contained:** This plan does **not** assume the auth `01`/`02` harness is already on disk.
-`Task 0` bootstraps the whole `SMCA.WebApi.E2ETests` project (factory, fixture, response DTOs,
-DB helpers). If the project already exists from implementing `01`/`02`, skip the files that are
-already present and only add the store-specific helpers + the 6 endpoint test classes.
+**Self-contained:** Does not assume the auth `01`/`02` harness is on disk. `Task 0` bootstraps the whole
+`SMCA.WebApi.E2ETests` project. If it already exists, skip present files and add only what's new.
 
 **Architecture:** In-process `WebApplicationFactory<Program>` boots the real API against `smca_test`
-Postgres (migrations applied → all seed data: Roles 1-4, Modules 1-7, Features, SystemConfiguration,
-DefaultTenant/DefaultStore). Authorization is **DB-live** (JWT carries only userId+login;
-`ClaimsTransformerService` recomputes permissions per request), so a seeded `User` +
-`UserRole(SuperAdmin)` + a JWT minted via the app's own `IJwtProvider` passes all 6 endpoints,
-including the two SuperAdmin-only ones.
+Postgres (migrations applied → seed data: Roles 1-4, Modules 1-7, Features, SystemConfiguration,
+DefaultTenant/DefaultStore). Authorization is DB-live (JWT carries only userId+login;
+`ClaimsTransformerService` recomputes permissions per request from the DB).
 
 **Tech Stack:** .NET 8, xUnit 2.4, FluentAssertions 6.12, `Microsoft.AspNetCore.Mvc.Testing`,
 EF Core 8 + Npgsql, Postgres.
 
 ## Global Constraints
 
-- Target framework `net8.0`. Test DB `smca_test` ONLY (never `smca`). Provided via config, not Docker.
-- Route base `api/v1/stores` (`BaseApiController` → `[Route("api/v1/[controller]")]`).
-- `ResponseResult<T>` serializes (camelCase) as `{ succeeded, data, errors:[{code,description}], actionCode, message }`.
-- Password hash for seeding = `Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))`.
-- Verified entity factories (namespaces `Domain.Entities.*`, constants `Domain.Common.*`):
-  - `User.Create(login, password, fullName, cellPhone, email, tenantId)` — IsActive defaults true; `SelectedStoreId` is a settable property.
-  - `UserRole.Create(userId, roleId, tenantId)` — IsActive defaults true.
-  - `Owner.Create(userId, guest, tenantId, description)` (also an overload with a leading `Guid id`).
-  - `Store.Create(name, ownerId, approved, tenantId, paymentStartDate /*DateOnly*/, address = null, description = null)` — **Id is auto-generated (init-only); capture `store.Id` after Create**, you cannot force it. StoreModules are NOT populated by Create.
+- Target `net8.0`. Test DB `smca_test` ONLY, via config (not Docker).
+- `ResponseResult<T>` serializes camelCase: `{ succeeded, data, errors:[{code,description}], actionCode, message }`.
+- Password hash = `Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))`.
+- Verified entity factories (`Domain.Entities.*`, constants `Domain.Common.*`):
+  - `User.Create(login, password, fullName, cellPhone, email, tenantId)` — IsActive default true; `SelectedStoreId` settable.
+  - `UserRole.Create(userId, roleId, tenantId)` — IsActive default true.
+  - `Owner.Create(userId, guest, tenantId, description)`.
+  - `Store.Create(name, ownerId, approved, tenantId, paymentStartDate /*DateOnly*/, address=null, description=null)` — Id auto-generated; capture after Create.
   - `StoreModule.Create(storeId, moduleId, price, modulePriceIncluded, modulePrice, moduleDiscountPrice, modulePercentDiscountPrice, tenantId)`.
   - `StoreRoleFeature.Create(storeId, roleId, featureId, tenantId)`.
-  - `RoleType.SuperAdmin = 1`, `OwnerAdmin = 2`. `DataUtils.DefaultTenant.Id = B58BF718-C4ED-4EE9-A958-BB5A5DB4F7E8`, `DataUtils.DefaultStore.Id = 0ED24A91-6748-4F04-8902-7981A0CA79E0`.
-  - **Valid test `ModuleId` = `7`** ("Management"/Gestión, AvailableToStore=true). Do NOT use Module 6.
-- Seed all store fixtures under `DataUtils.DefaultTenant.Id` so the SuperAdmin's
-  `IgnoreQueryFilters()` path (`IsSuperAdmin && TenantId == DefaultTenant.Id`) resolves them and the
-  Store global query filter does not hide them. Clean up per test with fine-grained helpers (never a
-  whole-tenant cascade on DefaultTenant — it would delete the SuperAdmin).
-- **Error-code contract (verified):** validator not-found/required failures → `errors[].code` = the
-  **property name** (`"Id"`, `"Name"`, `"OwnerId"`, `"ModuleIds"`); create 0-row save →
-  `Store.NotCreated` (HTTP 200 + `actionCode 400`); update name-collision → `ValidationException(string)`
-  with **empty `errors[]`** (HTTP 400, status-only). `StoreErrors` has no `Store.NotFound`.
-- Permission failure → **HTTP 403** (`ForbidResult`); no token → **HTTP 401**.
-- Per project policy the human runs ALL git commands. Every "Checkpoint" step is a PAUSE — ask the
-  user to commit; do not run git yourself. Do not run `dotnet build`/migrations for the app outside
-  the test commands below.
+  - `Tenant.Create(name, description, createdDate /*DateTimeOffset*/, connectionString=null)`.
+  - `RoleType`: SuperAdmin=1, OwnerAdmin=2, StoreUser=3, ReSeller=4. `DataUtils.DefaultTenant.Id = B58BF718-C4ED-4EE9-A958-BB5A5DB4F7E8`, `DataUtils.DefaultStore.Id = 0ED24A91-6748-4F04-8902-7981A0CA79E0`.
+  - **Valid test `ModuleId` = 7** (Management). An **invalid/not-available** ModuleId for negative tests = `999999`.
+- Seed store fixtures under `DefaultTenant.Id` (SuperAdmin `IgnoreQueryFilters` path + Store query filter resolve them). Fine-grained cleanup (never a DefaultTenant cascade).
+- **Contract facts (verified):**
+  - Permission failure → **HTTP 403** (`ForbidResult`); no token → **HTTP 401**.
+  - Every validator failure → **HTTP 400**, `errors[].code` = the **FluentValidation property name**
+    (`"Id"`, `"Name"`, `"OwnerId"`, `"ModuleIds"`), description localized. **No `Store.NotFound` code exists.**
+  - UpdateStore name-collision → `throw new ValidationException(string)` → HTTP 400 with **empty `errors[]`** (status-only).
+  - Update/Approve/Disapprove never return Failure → `Success(saveChanges>0)`; no-op → 200 `succeeded=true, data=false`.
+  - PUT route `{id}` is authoritative (body `Id` discarded).
+  - UpdateStore SuperAdmin without `PaymentStartDate` → `ApiException("UserNotFound", 400)`.
+  - UpdateStore writes `Name`/`Address` always; `Description`/`Approved`/`IsActive`/`PaymentStartDate` only if SuperAdmin.
+  - `StoreRoleFeatures.SuperAdmin` has no feature → approve/disapprove are unconditionally SuperAdmin-only (OwnerAdmin/StoresAdmin → 403).
+- Per project policy the human runs ALL git commands. Every "Checkpoint" is a PAUSE — ask the user to commit.
 
 ---
 
 ## File Structure
 
 Task 0 (harness — skip any that already exist):
-- Create: `backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj`
-- Create: `backend/src/SMCA.WebApi.E2ETests/appsettings.Tests.json`
-- Create: `backend/src/SMCA.WebApi.E2ETests/Infrastructure/AppTestFactory.cs`
-- Create: `backend/src/SMCA.WebApi.E2ETests/Infrastructure/WebAppFixture.cs`
-- Create: `backend/src/SMCA.WebApi.E2ETests/Infrastructure/ApiResponse.cs`
-- Create: `backend/src/SMCA.WebApi.E2ETests/Infrastructure/DbTestHelpers.cs`
-- Create: `backend/src/SMCA.WebApi.E2ETests/Infrastructure/StoreSeed.cs` (store-specific seeding)
-- Create: `backend/src/SMCA.WebApi.E2ETests/Infrastructure/TestDtos.cs` (`StoreData`, `ModuleData`)
-- Create: `backend/src/SMCA.WebApi.E2ETests/Stores/StoresHarnessSmokeTests.cs`
-- Modify: `backend/src/SMCA.WebApi/Program.cs` — append `public partial class Program { }` (skip if present).
-- Modify: `backend/src/SMCA.sln` — add the test project (skip if present).
+- `SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj`, `appsettings.Tests.json`
+- `Infrastructure/AppTestFactory.cs`, `WebAppFixture.cs`, `ApiResponse.cs`, `TestDtos.cs`, `DbTestHelpers.cs`, `StoreSeed.cs`
+- `Stores/StoresHarnessSmokeTests.cs`
+- Modify `SMCA.WebApi/Program.cs` (append `public partial class Program {}`), `SMCA.sln` (add project).
 
-Endpoint tasks:
-- Create: `backend/src/SMCA.WebApi.E2ETests/Stores/StoresByCurrentUserTests.cs` (Task 1)
-- Create: `backend/src/SMCA.WebApi.E2ETests/Stores/StoreGetByIdTests.cs` (Task 2)
-- Create: `backend/src/SMCA.WebApi.E2ETests/Stores/StoreCreateTests.cs` (Task 3)
-- Create: `backend/src/SMCA.WebApi.E2ETests/Stores/StoreUpdateTests.cs` (Task 4)
-- Create: `backend/src/SMCA.WebApi.E2ETests/Stores/StoreApproveTests.cs` (Task 5)
-- Create: `backend/src/SMCA.WebApi.E2ETests/Stores/StoreDisapproveTests.cs` (Task 6)
+Endpoint + authorization tasks:
+- `Stores/StoresByCurrentUserTests.cs` (Task 1)
+- `Stores/StoreGetByIdTests.cs` (Task 2)
+- `Stores/StoreCreateTests.cs` (Task 3)
+- `Stores/StoreUpdateTests.cs` (Task 4)
+- `Stores/StoreApproveTests.cs` (Task 5)
+- `Stores/StoreDisapproveTests.cs` (Task 6)
+- `Stores/StoreAuthorizationTests.cs` (Task 7 — OwnerAdmin class-vs-method + field-drop)
+- `Stores/StoreRoleAccessTests.cs` (Task 8 — StoreUser/ReSeller → 403)
 
 ---
 
-## Task 0: Bootstrap harness + store seeding + smoke test
+## Task 0: Bootstrap harness + seeding + smoke
 
-**Interfaces produced:** `AppTestFactory : WebApplicationFactory<Program>`; `WebAppFixture` (`Factory`,
-collection `"e2e"`); `ApiResponse<T>` / `ApiResponse.Json`; `DbTestHelpers` (auth seed + JWT mint);
-`StoreSeed` (store fixtures + cleanup); `StoreData` / `ModuleData`.
-
-- [ ] **Step 1: Test project file** — `SMCA.WebApi.E2ETests.csproj`
+- [ ] **Step 1: `SMCA.WebApi.E2ETests.csproj`**
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -129,12 +117,7 @@ collection `"e2e"`); `ApiResponse<T>` / `ApiResponse.Json`; `DbTestHelpers` (aut
 }
 ```
 
-- [ ] **Step 3: Expose `Program`** — append to end of `SMCA.WebApi/Program.cs`:
-
-```csharp
-
-public partial class Program { }
-```
+- [ ] **Step 3:** Append to `SMCA.WebApi/Program.cs`: `public partial class Program { }`
 
 - [ ] **Step 4: `Infrastructure/AppTestFactory.cs`**
 
@@ -219,7 +202,6 @@ public static class ApiResponse
 ```csharp
 namespace SMCA.WebApi.E2ETests.Infrastructure;
 
-// Mirrors Application.Dtos.StoreManagement.StoreDto (camelCase JSON).
 public sealed class StoreData
 {
     public Guid Id { get; set; }
@@ -235,8 +217,6 @@ public sealed class StoreData
     public List<ModuleData> Modules { get; set; } = new();
 }
 
-// Minimal shape for asserting the modules array is populated.
-// Verify ModuleDto's exact field names during implementation if deeper asserts are needed.
 public sealed class ModuleData
 {
     public int Id { get; set; }
@@ -244,9 +224,10 @@ public sealed class ModuleData
 }
 ```
 
-- [ ] **Step 8: `Infrastructure/DbTestHelpers.cs`** (auth seed + JWT mint)
+- [ ] **Step 8: `Infrastructure/DbTestHelpers.cs`** (auth seed + JWT mint + authed client + role seed)
 
 ```csharp
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using Application.Abstractions.Authentication;
@@ -262,6 +243,8 @@ namespace SMCA.WebApi.E2ETests.Infrastructure;
 
 public static class DbTestHelpers
 {
+    public sealed record UserFixture(Guid UserId, string Login);
+
     public static string HashPassword(string password)
         => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(password)));
 
@@ -269,12 +252,24 @@ public static class DbTestHelpers
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var user = User.Create(login, HashPassword(password), "E2E Super Admin", "0000000000", login,
-            DataUtils.DefaultTenant.Id);
+        var user = User.Create(login, HashPassword(password), "E2E Super Admin", "0000000000", login, DataUtils.DefaultTenant.Id);
         db.Set<User>().Add(user);
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.SuperAdmin, DataUtils.DefaultTenant.Id));
         await db.SaveChangesAsync();
         return user.Id;
+    }
+
+    // Seeds a bare user with a single role (StoreUser=3 / ReSeller=4) under DefaultTenant.
+    public static async Task<UserFixture> SeedUserWithRoleAsync(AppTestFactory factory, int roleId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var login = $"role{roleId}-{Guid.NewGuid():N}@test.com";
+        var user = User.Create(login, HashPassword("Password123"), "E2E Role User", "0000000000", login, DataUtils.DefaultTenant.Id);
+        db.Set<User>().Add(user);
+        db.Set<UserRole>().Add(UserRole.Create(user.Id, roleId, DataUtils.DefaultTenant.Id));
+        await db.SaveChangesAsync();
+        return new UserFixture(user.Id, login);
     }
 
     public static async Task CleanupUserAsync(AppTestFactory factory, Guid userId)
@@ -292,17 +287,26 @@ public static class DbTestHelpers
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtProvider>();
         return jwt.GenerateToken(userId, login);
     }
+
+    public static HttpClient AuthedClient(AppTestFactory factory, Guid userId, string login)
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", MintToken(factory, userId, login));
+        return client;
+    }
 }
 ```
 
-- [ ] **Step 9: `Infrastructure/StoreSeed.cs`** (store fixtures + fine-grained cleanup)
+- [ ] **Step 9: `Infrastructure/StoreSeed.cs`** (store/owner/tenant fixtures + cleanup)
 
 ```csharp
 using Domain.Common.Constants;
+using Domain.Common.Enums;
 using Domain.Entities.Owners;
 using Domain.Entities.StoreModules;
 using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.Stores;
+using Domain.Entities.Tenants;
 using Domain.Entities.Users;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -313,17 +317,20 @@ namespace SMCA.WebApi.E2ETests.Infrastructure;
 public static class StoreSeed
 {
     public const int ManagementModuleId = 7;
+    public const int UnavailableModuleId = 999999;
 
     public sealed record OwnerFixture(Guid OwnerId, Guid UserId);
     public sealed record StoreFixture(Guid StoreId, Guid OwnerId, Guid OwnerUserId);
+    public sealed record StoresAdminFixture(Guid UserId, string Login, Guid StoreId, Guid OwnerId);
+    public sealed record TenantStoreFixture(Guid TenantId, Guid StoreId, Guid OwnerId, Guid OwnerUserId);
+    public sealed record StoreRow(string Name, string? Address, string? Description, bool Approved, bool IsActive);
 
-    public static async Task<OwnerFixture> SeedOwnerAsync(AppTestFactory factory, string? fullName = null)
+    public static async Task<OwnerFixture> SeedOwnerAsync(AppTestFactory factory)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var login = $"owner-{Guid.NewGuid():N}@test.com";
-        var user = User.Create(login, DbTestHelpers.HashPassword("Password123"),
-            fullName ?? "E2E Owner", "0000000000", login, DataUtils.DefaultTenant.Id);
+        var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), "E2E Owner", "0000000000", login, DataUtils.DefaultTenant.Id);
         db.Set<User>().Add(user);
         var owner = Owner.Create(user.Id, false, DataUtils.DefaultTenant.Id, "E2E owner");
         db.Set<Owner>().Add(owner);
@@ -331,14 +338,12 @@ public static class StoreSeed
         return new OwnerFixture(owner.Id, user.Id);
     }
 
-    public static async Task<StoreFixture> SeedStoreAsync(AppTestFactory factory, string name,
-        bool approved, IReadOnlyCollection<int>? moduleIds = null)
+    public static async Task<StoreFixture> SeedStoreAsync(AppTestFactory factory, string name, bool approved, IReadOnlyCollection<int>? moduleIds = null)
     {
         var owner = await SeedOwnerAsync(factory);
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var store = Store.Create(name, owner.OwnerId, approved, DataUtils.DefaultTenant.Id,
-            DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create(name, owner.OwnerId, approved, DataUtils.DefaultTenant.Id, DateOnly.FromDateTime(DateTime.UtcNow));
         db.Set<Store>().Add(store);
         foreach (var moduleId in moduleIds ?? new[] { ManagementModuleId })
             db.Set<StoreModule>().Add(StoreModule.Create(store.Id, moduleId, 0, true, 0, 0, 0, DataUtils.DefaultTenant.Id));
@@ -346,12 +351,71 @@ public static class StoreSeed
         return new StoreFixture(store.Id, owner.OwnerId, owner.UserId);
     }
 
+    // OwnerAdmin (StoresAdmin) whose selected store has active Management(7): passes class-level filter, fails method-level SuperAdmin-only.
+    public static async Task<StoresAdminFixture> SeedStoresAdminUserAsync(AppTestFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var tenantId = DataUtils.DefaultTenant.Id;
+        var login = $"sadmin-{Guid.NewGuid():N}@test.com";
+        var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), "E2E StoresAdmin", "0000000000", login, tenantId);
+        db.Set<User>().Add(user);
+        var owner = Owner.Create(user.Id, false, tenantId, "E2E StoresAdmin owner");
+        db.Set<Owner>().Add(owner);
+        await db.SaveChangesAsync();
+        var store = Store.Create($"SA-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+        db.Set<Store>().Add(store);
+        await db.SaveChangesAsync();
+        db.Set<StoreModule>().Add(StoreModule.Create(store.Id, ManagementModuleId, 0, true, 0, 0, 0, tenantId));
+        db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.OwnerAdmin, tenantId));
+        user.SelectedStoreId = store.Id;
+        await db.SaveChangesAsync();
+        return new StoresAdminFixture(user.Id, login, store.Id, owner.Id);
+    }
+
+    // A store under a fresh, non-default Tenant (for cross-tenant SuperAdmin visibility).
+    public static async Task<TenantStoreFixture> SeedStoreInNewTenantAsync(AppTestFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var tenant = Tenant.Create($"T2-{Guid.NewGuid():N}", "e2e tenant", DateTimeOffset.UtcNow);
+        db.Set<Tenant>().Add(tenant);
+        var login = $"t2owner-{Guid.NewGuid():N}@test.com";
+        var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), "T2 Owner", "0000000000", login, tenant.Id);
+        db.Set<User>().Add(user);
+        var owner = Owner.Create(user.Id, false, tenant.Id, "t2 owner");
+        db.Set<Owner>().Add(owner);
+        await db.SaveChangesAsync();
+        var store = Store.Create($"T2-Store-{Guid.NewGuid():N}", owner.Id, false, tenant.Id, DateOnly.FromDateTime(DateTime.UtcNow));
+        db.Set<Store>().Add(store);
+        await db.SaveChangesAsync();
+        db.Set<StoreModule>().Add(StoreModule.Create(store.Id, ManagementModuleId, 0, true, 0, 0, 0, tenant.Id));
+        await db.SaveChangesAsync();
+        return new TenantStoreFixture(tenant.Id, store.Id, owner.Id, user.Id);
+    }
+
     public static async Task<bool> GetApprovedAsync(AppTestFactory factory, Guid storeId)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var store = await db.Set<Store>().IgnoreQueryFilters().FirstAsync(s => s.Id == storeId);
-        return store.Approved;
+        return (await db.Set<Store>().IgnoreQueryFilters().FirstAsync(s => s.Id == storeId)).Approved;
+    }
+
+    public static async Task<StoreRow> GetStoreRowAsync(AppTestFactory factory, Guid storeId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var s = await db.Set<Store>().IgnoreQueryFilters().FirstAsync(x => x.Id == storeId);
+        return new StoreRow(s.Name, s.Address, s.Description, s.Approved, s.IsActive);
+    }
+
+    public static async Task DeactivateStoreAsync(AppTestFactory factory, Guid storeId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var s = await db.Set<Store>().IgnoreQueryFilters().FirstAsync(x => x.Id == storeId);
+        s.IsActive = false;
+        await db.SaveChangesAsync();
     }
 
     public static async Task CleanupStoreAsync(AppTestFactory factory, Guid storeId)
@@ -378,10 +442,36 @@ public static class StoreSeed
         await CleanupStoreAsync(factory, f.StoreId);
         await CleanupOwnerAsync(factory, f.OwnerId, f.OwnerUserId);
     }
+
+    public static async Task CleanupStoresAdminAsync(AppTestFactory factory, StoresAdminFixture f)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Set<StoreRoleFeature>().RemoveRange(await db.Set<StoreRoleFeature>().IgnoreQueryFilters().Where(x => x.StoreId == f.StoreId).ToListAsync());
+        db.Set<StoreModule>().RemoveRange(await db.Set<StoreModule>().IgnoreQueryFilters().Where(x => x.StoreId == f.StoreId).ToListAsync());
+        db.Set<Store>().RemoveRange(await db.Set<Store>().IgnoreQueryFilters().Where(x => x.Id == f.StoreId).ToListAsync());
+        db.Set<UserRole>().RemoveRange(await db.Set<UserRole>().IgnoreQueryFilters().Where(x => x.UserId == f.UserId).ToListAsync());
+        db.Set<Owner>().RemoveRange(await db.Set<Owner>().IgnoreQueryFilters().Where(x => x.Id == f.OwnerId).ToListAsync());
+        db.Set<User>().RemoveRange(await db.Set<User>().IgnoreQueryFilters().Where(x => x.Id == f.UserId).ToListAsync());
+        await db.SaveChangesAsync();
+    }
+
+    public static async Task CleanupTenantStoreAsync(AppTestFactory factory, TenantStoreFixture f)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Set<StoreRoleFeature>().RemoveRange(await db.Set<StoreRoleFeature>().IgnoreQueryFilters().Where(x => x.StoreId == f.StoreId).ToListAsync());
+        db.Set<StoreModule>().RemoveRange(await db.Set<StoreModule>().IgnoreQueryFilters().Where(x => x.StoreId == f.StoreId).ToListAsync());
+        db.Set<Store>().RemoveRange(await db.Set<Store>().IgnoreQueryFilters().Where(x => x.Id == f.StoreId).ToListAsync());
+        db.Set<Owner>().RemoveRange(await db.Set<Owner>().IgnoreQueryFilters().Where(x => x.Id == f.OwnerId).ToListAsync());
+        db.Set<User>().RemoveRange(await db.Set<User>().IgnoreQueryFilters().Where(x => x.Id == f.OwnerUserId).ToListAsync());
+        db.Set<Tenant>().RemoveRange(await db.Set<Tenant>().IgnoreQueryFilters().Where(x => x.Id == f.TenantId).ToListAsync());
+        await db.SaveChangesAsync();
+    }
 }
 ```
 
-- [ ] **Step 10: Smoke test** — `Stores/StoresHarnessSmokeTests.cs` (no token → 401 proves the pipeline + authz boot)
+- [ ] **Step 10: Smoke** — `Stores/StoresHarnessSmokeTests.cs`
 
 ```csharp
 using System.Net;
@@ -406,23 +496,19 @@ public sealed class StoresHarnessSmokeTests
 }
 ```
 
-- [ ] **Step 11: Add project to solution** — `dotnet sln backend/src/SMCA.sln add backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` (skip if already added).
-- [ ] **Step 12: Verify entity signatures compile.** Before running, confirm the factory signatures in Steps 8-9 against the actual `Domain.Entities.*` sources (they were captured by exploration; if any differ, adjust the call — do not weaken it). Then create `smca_test` if needed (`CREATE DATABASE smca_test;`).
-- [ ] **Step 13: Run smoke** — `dotnet test backend/src/SMCA.WebApi.E2ETests --filter FullyQualifiedName~StoresHarnessSmokeTests` → PASS (1). Proves host boots, migrations apply, authz returns 401.
-- [ ] **Step 14: Checkpoint — ask the user to commit.** Suggested: `test(webapi): bootstrap e2e harness + stores seeding + smoke`.
+- [ ] **Step 11:** `dotnet sln backend/src/SMCA.sln add backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` (skip if present).
+- [ ] **Step 12:** Verify entity factory signatures compile (adjust a call only if a signature differs — never weaken). Create `smca_test` if missing.
+- [ ] **Step 13:** `dotnet test backend/src/SMCA.WebApi.E2ETests --filter FullyQualifiedName~StoresHarnessSmokeTests` → PASS (1).
+- [ ] **Step 14: Checkpoint** — `test(webapi): bootstrap e2e harness + stores seeding + smoke`.
 
 ---
 
 ## Task 1: GET `by-current-user`
 
-**Consumes:** `DbTestHelpers` (SeedSuperAdmin, MintToken, CleanupUser), `StoreSeed`, `StoreData`.
-An authenticated client helper is inlined per class for clarity.
-
-- [ ] **Step 1:** Create `Stores/StoresByCurrentUserTests.cs`
+Create `Stores/StoresByCurrentUserTests.cs`:
 
 ```csharp
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using SMCA.WebApi.E2ETests.Infrastructure;
@@ -433,80 +519,80 @@ namespace SMCA.WebApi.E2ETests.Stores;
 [Collection("e2e")]
 public sealed class StoresByCurrentUserTests
 {
-    private readonly AppTestFactory _factory;
-    public StoresByCurrentUserTests(WebAppFixture fixture) => _factory = fixture.Factory;
-
-    private HttpClient AuthedClient(Guid userId, string login)
-    {
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", DbTestHelpers.MintToken(_factory, userId, login));
-        return client;
-    }
+    private readonly AppTestFactory _f;
+    public StoresByCurrentUserTests(WebAppFixture fixture) => _f = fixture.Factory;
 
     [Fact]
     public async Task SuperAdmin_gets_seeded_stores_excluding_default()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var name = $"Store-{Guid.NewGuid():N}";
-        var fixture = await StoreSeed.SeedStoreAsync(_factory, name, approved: true);
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fixture = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: true);
         try
         {
-            var response = await AuthedClient(adminId, login).GetAsync("/api/v1/stores/by-current-user");
-
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login).GetAsync("/api/v1/stores/by-current-user");
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreData>>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
             body.Data!.Should().Contain(s => s.Id == fixture.StoreId);
             body.Data.Should().NotContain(s => s.Id == Domain.Common.Constants.DataUtils.DefaultStore.Id);
         }
-        finally
-        {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, fixture);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fixture); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
-    public async Task Returns_inactive_stores_too()
+    public async Task SuperAdmin_by_current_user_includes_inactive_stores()
     {
-        // by-current-user hard-codes includeInactive=true for the non-super path; the super path
-        // uses IgnoreQueryFilters and also returns inactive stores. Pin that an inactive store shows.
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var fixture = await StoreSeed.SeedStoreAsync(_factory, $"Inactive-{Guid.NewGuid():N}", approved: false);
-        // deactivate directly
-        // (kept simple: the seed is active by default; asserting presence is enough to prove no active-only filter)
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fixture = await StoreSeed.SeedStoreAsync(_f, $"Inactive-{Guid.NewGuid():N}", approved: false);
+        await StoreSeed.DeactivateStoreAsync(_f, fixture.StoreId);
         try
         {
-            var response = await AuthedClient(adminId, login).GetAsync("/api/v1/stores/by-current-user");
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login).GetAsync("/api/v1/stores/by-current-user");
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreData>>>(ApiResponse.Json);
-            body!.Data!.Should().Contain(s => s.Id == fixture.StoreId);
+            body!.Data!.Should().Contain(s => s.Id == fixture.StoreId && s.IsActive == false);
         }
-        finally
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fixture); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task SuperAdmin_by_current_user_sees_stores_across_tenants()
+    {
+        // SuperAdmin branch uses IgnoreQueryFilters -> returns stores of ANY tenant.
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var other = await StoreSeed.SeedStoreInNewTenantAsync(_f);
+        try
         {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, fixture);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login).GetAsync("/api/v1/stores/by-current-user");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreData>>>(ApiResponse.Json);
+            body!.Data!.Should().Contain(s => s.Id == other.StoreId);
         }
+        finally { await StoreSeed.CleanupTenantStoreAsync(_f, other); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task By_current_user_without_token_returns_401()
+    {
+        var response = await _f.CreateClient().GetAsync("/api/v1/stores/by-current-user");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }
 ```
 
-- [ ] **Step 2:** Run `--filter FullyQualifiedName~StoresByCurrentUserTests` → PASS (2). If the list is
-  empty, confirm the SuperAdmin `UserRole` row is active and `RoleType.SuperAdmin == 1`.
-- [ ] **Step 3: Checkpoint** — `test(webapi): add stores by-current-user e2e tests`.
+- [ ] Run `--filter ~StoresByCurrentUserTests` → PASS (4). **Checkpoint** — `test(webapi): stores by-current-user e2e`.
 
 ---
 
 ## Task 2: GET `{id}`
 
-- [ ] **Step 1:** Create `Stores/StoreGetByIdTests.cs`
+Create `Stores/StoreGetByIdTests.cs`:
 
 ```csharp
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using SMCA.WebApi.E2ETests.Infrastructure;
@@ -517,82 +603,83 @@ namespace SMCA.WebApi.E2ETests.Stores;
 [Collection("e2e")]
 public sealed class StoreGetByIdTests
 {
-    private readonly AppTestFactory _factory;
-    public StoreGetByIdTests(WebAppFixture fixture) => _factory = fixture.Factory;
-
-    private HttpClient AuthedClient(Guid userId, string login)
-    {
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", DbTestHelpers.MintToken(_factory, userId, login));
-        return client;
-    }
+    private readonly AppTestFactory _f;
+    public StoreGetByIdTests(WebAppFixture fixture) => _f = fixture.Factory;
 
     [Fact]
-    public async Task Get_existing_store_returns_dto()
+    public async Task Get_existing_store_returns_dto_and_maps_payment_dates()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var name = $"Store-{Guid.NewGuid():N}";
-        var fixture = await StoreSeed.SeedStoreAsync(_factory, name, approved: true);
+        var fixture = await StoreSeed.SeedStoreAsync(_f, name, approved: true);
         try
         {
-            var response = await AuthedClient(adminId, login).GetAsync($"/api/v1/stores/{fixture.StoreId}");
-
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login).GetAsync($"/api/v1/stores/{fixture.StoreId}");
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
             body.Data!.Id.Should().Be(fixture.StoreId);
             body.Data.Name.Should().Be(name);
             body.Data.Modules.Should().NotBeEmpty();
+            body.Data.PaymentStartDate.Should().Be(today);
+            // CHARACTERIZATION: NextPaymentDate has no backing property/mapping -> default. Update if a computed value is added.
+            body.Data.NextPaymentDate.Should().Be(default(DateOnly));
         }
-        finally
-        {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, fixture);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fixture); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
-    public async Task Get_unknown_store_returns_400_with_property_code_Id()
+    public async Task Get_unknown_store_returns_400_property_code_Id()
     {
-        // Validator MustAsync(StoreExists) fails -> ValidationException -> HTTP 400.
-        // Body error code is the FluentValidation property name "Id" (NOT "Store.NotFound", NOT 404, NOT 200-null).
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         try
         {
-            var response = await AuthedClient(adminId, login).GetAsync($"/api/v1/stores/{Guid.NewGuid()}");
-
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login).GetAsync($"/api/v1/stores/{Guid.NewGuid()}");
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
             body!.Succeeded.Should().BeFalse();
             body.Errors.Should().Contain(e => e.Code == "Id");
         }
-        finally { await DbTestHelpers.CleanupUserAsync(_factory, adminId); }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task Get_empty_id_returns_400_property_code_Id()
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login).GetAsync($"/api/v1/stores/{Guid.Empty}");
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Errors.Should().Contain(e => e.Code == "Id");
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
     public async Task Get_without_token_returns_401()
     {
-        var response = await _factory.CreateClient().GetAsync($"/api/v1/stores/{Guid.NewGuid()}");
+        var response = await _f.CreateClient().GetAsync($"/api/v1/stores/{Guid.NewGuid()}");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }
 ```
 
-- [ ] **Step 2:** Run `--filter FullyQualifiedName~StoreGetByIdTests` → PASS (3).
-- [ ] **Step 3: Checkpoint** — `test(webapi): add stores get-by-id e2e tests`.
+- [ ] Run `--filter ~StoreGetByIdTests` → PASS (4). **Checkpoint** — `test(webapi): stores get-by-id e2e`.
 
 ---
 
-## Task 3: POST `/stores` (create, incl. duplicate-name bug pin)
+## Task 3: POST `/stores` (create — happy + all validation failures + dup-name bug)
 
-- [ ] **Step 1:** Create `Stores/StoreCreateTests.cs`
+Create `Stores/StoreCreateTests.cs`:
 
 ```csharp
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Infrastructure.Persistence.Contexts;
@@ -606,142 +693,129 @@ namespace SMCA.WebApi.E2ETests.Stores;
 [Collection("e2e")]
 public sealed class StoreCreateTests
 {
-    private readonly AppTestFactory _factory;
-    public StoreCreateTests(WebAppFixture fixture) => _factory = fixture.Factory;
+    private readonly AppTestFactory _f;
+    public StoreCreateTests(WebAppFixture fixture) => _f = fixture.Factory;
 
-    private HttpClient AuthedClient(Guid userId, string login)
-    {
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", DbTestHelpers.MintToken(_factory, userId, login));
-        return client;
-    }
+    private static object Body(Guid ownerId, string name, IEnumerable<int> moduleIds) => new
+    { OwnerId = ownerId, Name = name, Address = (string?)null, Description = (string?)null, Approved = false, ModuleIds = moduleIds };
 
     [Fact]
     public async Task Create_with_valid_payload_persists_store_and_modules()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var owner = await StoreSeed.SeedOwnerAsync(_factory);
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await StoreSeed.SeedOwnerAsync(_f);
         var name = $"Store-{Guid.NewGuid():N}";
-        Guid createdStoreId = Guid.Empty;
+        Guid created = Guid.Empty;
         try
         {
-            var response = await AuthedClient(adminId, login).PostAsJsonAsync("/api/v1/stores", new
-            {
-                OwnerId = owner.OwnerId,
-                Name = name,
-                Address = "addr",
-                Description = "desc",
-                Approved = false,
-                ModuleIds = new[] { StoreSeed.ManagementModuleId }
-            });
-
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, name, new[] { StoreSeed.ManagementModuleId }));
             response.StatusCode.Should().Be(HttpStatusCode.OK);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
-            createdStoreId = body.Data!.Id;
-
-            using var scope = _factory.Services.CreateScope();
+            created = body.Data!.Id;
+            using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            (await db.Set<Domain.Entities.Stores.Store>().IgnoreQueryFilters().AnyAsync(s => s.Id == createdStoreId)).Should().BeTrue();
-            (await db.Set<Domain.Entities.StoreModules.StoreModule>().IgnoreQueryFilters().AnyAsync(m => m.StoreId == createdStoreId)).Should().BeTrue();
+            (await db.Set<Domain.Entities.Stores.Store>().IgnoreQueryFilters().AnyAsync(s => s.Id == created)).Should().BeTrue();
+            (await db.Set<Domain.Entities.StoreModules.StoreModule>().IgnoreQueryFilters().AnyAsync(m => m.StoreId == created)).Should().BeTrue();
         }
         finally
         {
-            if (createdStoreId != Guid.Empty) await StoreSeed.CleanupStoreAsync(_factory, createdStoreId);
-            await StoreSeed.CleanupOwnerAsync(_factory, owner.OwnerId, owner.UserId);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
+            if (created != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, created);
+            await StoreSeed.CleanupOwnerAsync(_f, owner.OwnerId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
         }
     }
 
     [Fact]
-    public async Task Create_with_missing_name_returns_400_property_code_Name()
-    {
-        var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var owner = await StoreSeed.SeedOwnerAsync(_factory);
-        try
-        {
-            var response = await AuthedClient(adminId, login).PostAsJsonAsync("/api/v1/stores", new
-            {
-                OwnerId = owner.OwnerId, Name = "", Address = (string?)null, Description = (string?)null,
-                Approved = false, ModuleIds = new[] { StoreSeed.ManagementModuleId }
-            });
+    public async Task Create_with_empty_name_returns_400_code_Name()
+        => await AssertCreate400(owner => Body(owner.OwnerId, "", new[] { StoreSeed.ManagementModuleId }), "Name");
 
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            body!.Errors.Should().Contain(e => e.Code == "Name");
-        }
-        finally
-        {
-            await StoreSeed.CleanupOwnerAsync(_factory, owner.OwnerId, owner.UserId);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
-    }
+    [Fact]
+    public async Task Create_with_empty_owner_returns_400_code_OwnerId()
+        => await AssertCreate400(_ => Body(Guid.Empty, $"S-{Guid.NewGuid():N}", new[] { StoreSeed.ManagementModuleId }), "OwnerId", seedOwner: false);
 
+    [Fact]
+    public async Task Create_with_unknown_owner_returns_400_code_OwnerId()
+        => await AssertCreate400(_ => Body(Guid.NewGuid(), $"S-{Guid.NewGuid():N}", new[] { StoreSeed.ManagementModuleId }), "OwnerId", seedOwner: false);
+
+    [Fact]
+    public async Task Create_with_empty_modules_returns_400_code_ModuleIds()
+        => await AssertCreate400(owner => Body(owner.OwnerId, $"S-{Guid.NewGuid():N}", Array.Empty<int>()), "ModuleIds");
+
+    [Fact]
+    public async Task Create_with_unavailable_module_returns_400_code_ModuleIds()
+        => await AssertCreate400(owner => Body(owner.OwnerId, $"S-{Guid.NewGuid():N}", new[] { StoreSeed.UnavailableModuleId }), "ModuleIds");
+
+    // KNOWN BUG: IsUniqueName checks User.Login, not Store.Name -> duplicate store names are allowed.
     [Fact]
     public async Task Create_with_duplicate_name_currently_succeeds_KNOWN_BUG()
     {
-        // KNOWN BUG: CreateStoreCommandValidator.IsUniqueName checks the store Name against
-        // User.Login (IUserRepository.IsUniqueLoginAsync), NOT against Store.Name. The correct
-        // IStoreRepository.IsUniqueNameAsync is never called. So two stores with the same Name
-        // are both created. When fixed, the second create should fail -> update this test.
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var owner1 = await StoreSeed.SeedOwnerAsync(_factory);
-        var owner2 = await StoreSeed.SeedOwnerAsync(_factory);
-        var dupName = $"Dup-{Guid.NewGuid():N}";
-        Guid first = Guid.Empty, second = Guid.Empty;
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var o1 = await StoreSeed.SeedOwnerAsync(_f);
+        var o2 = await StoreSeed.SeedOwnerAsync(_f);
+        var dup = $"Dup-{Guid.NewGuid():N}";
+        Guid s1 = Guid.Empty, s2 = Guid.Empty;
         try
         {
-            var client = AuthedClient(adminId, login);
-            object Body(Guid ownerId) => new { OwnerId = ownerId, Name = dupName, Address = (string?)null,
-                Description = (string?)null, Approved = false, ModuleIds = new[] { StoreSeed.ManagementModuleId } };
-
-            var r1 = await client.PostAsJsonAsync("/api/v1/stores", Body(owner1.OwnerId));
-            var b1 = await r1.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
-            b1!.Succeeded.Should().BeTrue(); first = b1.Data!.Id;
-
-            var r2 = await client.PostAsJsonAsync("/api/v1/stores", Body(owner2.OwnerId));
-            var b2 = await r2.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
-            b2!.Succeeded.Should().BeTrue("duplicate store names are NOT enforced (known bug)");
-            second = b2.Data!.Id;
+            var client = DbTestHelpers.AuthedClient(_f, adminId, login);
+            var b1 = await (await client.PostAsJsonAsync("/api/v1/stores", Body(o1.OwnerId, dup, new[] { StoreSeed.ManagementModuleId })))
+                .Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
+            b1!.Succeeded.Should().BeTrue(); s1 = b1.Data!.Id;
+            var b2 = await (await client.PostAsJsonAsync("/api/v1/stores", Body(o2.OwnerId, dup, new[] { StoreSeed.ManagementModuleId })))
+                .Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
+            b2!.Succeeded.Should().BeTrue("duplicate store names are NOT enforced (known bug)"); s2 = b2.Data!.Id;
         }
         finally
         {
-            if (first != Guid.Empty) await StoreSeed.CleanupStoreAsync(_factory, first);
-            if (second != Guid.Empty) await StoreSeed.CleanupStoreAsync(_factory, second);
-            await StoreSeed.CleanupOwnerAsync(_factory, owner1.OwnerId, owner1.UserId);
-            await StoreSeed.CleanupOwnerAsync(_factory, owner2.OwnerId, owner2.UserId);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
+            if (s1 != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, s1);
+            if (s2 != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, s2);
+            await StoreSeed.CleanupOwnerAsync(_f, o1.OwnerId, o1.UserId);
+            await StoreSeed.CleanupOwnerAsync(_f, o2.OwnerId, o2.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
         }
     }
 
     [Fact]
     public async Task Create_without_token_returns_401()
     {
-        var response = await _factory.CreateClient().PostAsJsonAsync("/api/v1/stores", new
-        { OwnerId = Guid.NewGuid(), Name = "x", Approved = false, ModuleIds = new[] { StoreSeed.ManagementModuleId } });
+        var response = await _f.CreateClient().PostAsJsonAsync("/api/v1/stores", Body(Guid.NewGuid(), "x", new[] { StoreSeed.ManagementModuleId }));
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task AssertCreate400(Func<StoreSeed.OwnerFixture, object> body, string expectedCode, bool seedOwner = true)
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        StoreSeed.OwnerFixture? owner = seedOwner ? await StoreSeed.SeedOwnerAsync(_f) : null;
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores", body(owner ?? new StoreSeed.OwnerFixture(Guid.Empty, Guid.Empty)));
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == expectedCode);
+        }
+        finally
+        {
+            if (owner is not null) await StoreSeed.CleanupOwnerAsync(_f, owner.OwnerId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+        }
     }
 }
 ```
 
-- [ ] **Step 2:** Run `--filter FullyQualifiedName~StoreCreateTests` → PASS (4). If create 500s, read
-  `errors[0].description`; the usual cause is a missing available `Module` — confirm Module 7 is
-  migration-seeded and `AvailableToStore=true`.
-- [ ] **Step 3: Checkpoint** — `test(webapi): add stores create e2e tests + duplicate-name bug pin`.
+- [ ] Run `--filter ~StoreCreateTests` → PASS (8). **Checkpoint** — `test(webapi): stores create e2e (all validations + dup-name bug)`.
 
 ---
 
-## Task 4: PUT `{id}` (update, incl. PaymentStartDate + route-id + name-collision)
+## Task 4: PUT `{id}` (update — happy + all validations + quirks + route-id)
 
-- [ ] **Step 1:** Create `Stores/StoreUpdateTests.cs`
+Create `Stores/StoreUpdateTests.cs`:
 
 ```csharp
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using SMCA.WebApi.E2ETests.Infrastructure;
@@ -752,138 +826,153 @@ namespace SMCA.WebApi.E2ETests.Stores;
 [Collection("e2e")]
 public sealed class StoreUpdateTests
 {
-    private readonly AppTestFactory _factory;
-    public StoreUpdateTests(WebAppFixture fixture) => _factory = fixture.Factory;
+    private readonly AppTestFactory _f;
+    public StoreUpdateTests(WebAppFixture fixture) => _f = fixture.Factory;
 
-    private HttpClient AuthedClient(Guid userId, string login)
+    private static object Body(Guid bodyId, string name, IEnumerable<int> moduleIds, bool withPaymentDate = true) => new
     {
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", DbTestHelpers.MintToken(_factory, userId, login));
-        return client;
-    }
-
-    private static object UpdateBody(string name, bool includePaymentDate) => new
-    {
-        Id = Guid.Empty, // ignored by the controller (route id wins)
-        Name = name,
-        Address = "updated-addr",
-        Description = "updated-desc",
-        Approved = false,
-        PaymentStartDate = includePaymentDate ? DateTime.UtcNow : (DateTime?)null,
-        ModuleIds = new[] { StoreSeed.ManagementModuleId },
-        IsActive = true
+        Id = bodyId, Name = name, Address = "a", Description = "d", Approved = false,
+        PaymentStartDate = withPaymentDate ? DateTime.UtcNow : (DateTime?)null, ModuleIds = moduleIds, IsActive = true
     };
 
     [Fact]
     public async Task Update_as_superadmin_with_payment_date_succeeds()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var fixture = await StoreSeed.SeedStoreAsync(_factory, $"Store-{Guid.NewGuid():N}", approved: false);
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: false);
         try
         {
             var newName = $"Renamed-{Guid.NewGuid():N}";
-            var response = await AuthedClient(adminId, login)
-                .PutAsJsonAsync($"/api/v1/stores/{fixture.StoreId}", UpdateBody(newName, includePaymentDate: true));
-
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
-            body!.Succeeded.Should().BeTrue();
-            body.Data.Should().BeTrue();
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}", Body(Guid.Empty, newName, new[] { StoreSeed.ManagementModuleId }));
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue(); b.Data.Should().BeTrue();
+            (await StoreSeed.GetStoreRowAsync(_f, fx.StoreId)).Name.Should().Be(newName);
         }
-        finally
-        {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, fixture);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
     public async Task Update_as_superadmin_without_payment_date_returns_400_KNOWN_QUIRK()
     {
-        // KNOWN QUIRK: SuperAdmin caller omitting PaymentStartDate throws ApiException("UserNotFound", 400).
-        // The message is misleading; the real rule is a required-field check. Pin current behavior.
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var fixture = await StoreSeed.SeedStoreAsync(_factory, $"Store-{Guid.NewGuid():N}", approved: false);
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: false);
         try
         {
-            var response = await AuthedClient(adminId, login)
-                .PutAsJsonAsync($"/api/v1/stores/{fixture.StoreId}", UpdateBody($"n-{Guid.NewGuid():N}", includePaymentDate: false));
-
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}", Body(Guid.Empty, $"n-{Guid.NewGuid():N}", new[] { StoreSeed.ManagementModuleId }, withPaymentDate: false));
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest); // ApiException("UserNotFound") - misleading message, SuperAdmin must supply PaymentStartDate
         }
-        finally
-        {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, fixture);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
-    public async Task Update_unknown_store_returns_400_property_code_Id()
+    public async Task Update_uses_route_id_not_body_id()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var target = await StoreSeed.SeedStoreAsync(_f, $"Target-{Guid.NewGuid():N}", approved: false);
+        var decoy = await StoreSeed.SeedStoreAsync(_f, $"Decoy-{Guid.NewGuid():N}", approved: false);
         try
         {
-            var response = await AuthedClient(adminId, login)
-                .PutAsJsonAsync($"/api/v1/stores/{Guid.NewGuid()}", UpdateBody("x", includePaymentDate: true));
-
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            body!.Errors.Should().Contain(e => e.Code == "Id");
+            var newName = $"Routed-{Guid.NewGuid():N}";
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PutAsJsonAsync($"/api/v1/stores/{target.StoreId}", Body(decoy.StoreId, newName, new[] { StoreSeed.ManagementModuleId }));
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await StoreSeed.GetStoreRowAsync(_f, target.StoreId)).Name.Should().Be(newName);
+            (await StoreSeed.GetStoreRowAsync(_f, decoy.StoreId)).Name.Should().NotBe(newName);
         }
-        finally { await DbTestHelpers.CleanupUserAsync(_factory, adminId); }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, target); await StoreSeed.CleanupStoreFixtureAsync(_f, decoy); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
-    public async Task Update_with_name_colliding_with_another_store_returns_400_empty_errors()
+    public async Task Update_name_colliding_with_another_store_returns_400_empty_errors()
     {
-        // Handler throws ValidationException(string message) -> empty errors[] -> HTTP 400, status-only.
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var taken = $"Taken-{Guid.NewGuid():N}";
-        var other = await StoreSeed.SeedStoreAsync(_factory, taken, approved: false);
-        var target = await StoreSeed.SeedStoreAsync(_factory, $"Store-{Guid.NewGuid():N}", approved: false);
+        var other = await StoreSeed.SeedStoreAsync(_f, taken, approved: false);
+        var target = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: false);
         try
         {
-            var response = await AuthedClient(adminId, login)
-                .PutAsJsonAsync($"/api/v1/stores/{target.StoreId}", UpdateBody(taken, includePaymentDate: true));
-
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PutAsJsonAsync($"/api/v1/stores/{target.StoreId}", Body(Guid.Empty, taken, new[] { StoreSeed.ManagementModuleId }));
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest); // ValidationException(string) -> empty errors[]
         }
-        finally
-        {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, other);
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, target);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, other); await StoreSeed.CleanupStoreFixtureAsync(_f, target); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
+
+    [Fact]
+    public async Task Update_unknown_id_returns_400_code_Id()
+        => await AssertUpdate400(Guid.NewGuid(), Body(Guid.Empty, "x", new[] { StoreSeed.ManagementModuleId }), "Id", seedStore: false);
+
+    [Fact]
+    public async Task Update_empty_route_id_returns_400_code_Id()
+        => await AssertUpdate400(Guid.Empty, Body(Guid.Empty, "x", new[] { StoreSeed.ManagementModuleId }), "Id", seedStore: false);
+
+    [Fact]
+    public async Task Update_empty_name_returns_400_code_Name()
+        => await AssertUpdate400WithStore(fx => Body(Guid.Empty, "", new[] { StoreSeed.ManagementModuleId }), "Name");
+
+    [Fact]
+    public async Task Update_empty_modules_returns_400_code_ModuleIds()
+        => await AssertUpdate400WithStore(fx => Body(Guid.Empty, $"n-{Guid.NewGuid():N}", Array.Empty<int>()), "ModuleIds");
+
+    [Fact]
+    public async Task Update_unavailable_module_returns_400_code_ModuleIds()
+        => await AssertUpdate400WithStore(fx => Body(Guid.Empty, $"n-{Guid.NewGuid():N}", new[] { StoreSeed.UnavailableModuleId }), "ModuleIds");
 
     [Fact]
     public async Task Update_without_token_returns_401()
     {
-        var response = await _factory.CreateClient()
-            .PutAsJsonAsync($"/api/v1/stores/{Guid.NewGuid()}", UpdateBody("x", includePaymentDate: true));
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var r = await _f.CreateClient().PutAsJsonAsync($"/api/v1/stores/{Guid.NewGuid()}", Body(Guid.Empty, "x", new[] { StoreSeed.ManagementModuleId }));
+        r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task AssertUpdate400(Guid routeId, object body, string code, bool seedStore)
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PutAsJsonAsync($"/api/v1/stores/{routeId}", body);
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == code);
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    private async Task AssertUpdate400WithStore(Func<StoreSeed.StoreFixture, object> body, string code)
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: false);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}", body(fx));
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == code);
+        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 }
 ```
 
-- [ ] **Step 2:** Run `--filter FullyQualifiedName~StoreUpdateTests` → PASS (5).
-- [ ] **Step 3: Checkpoint** — `test(webapi): add stores update e2e tests (payment-date + name-collision pins)`.
+- [ ] Run `--filter ~StoreUpdateTests` → PASS (10). **Checkpoint** — `test(webapi): stores update e2e (all validations + quirks + route-id)`.
 
 ---
 
 ## Task 5: POST `approve` (SuperAdmin-only)
 
-- [ ] **Step 1:** Create `Stores/StoreApproveTests.cs`
+Create `Stores/StoreApproveTests.cs`:
 
 ```csharp
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using SMCA.WebApi.E2ETests.Infrastructure;
@@ -894,141 +983,321 @@ namespace SMCA.WebApi.E2ETests.Stores;
 [Collection("e2e")]
 public sealed class StoreApproveTests
 {
-    private readonly AppTestFactory _factory;
-    public StoreApproveTests(WebAppFixture fixture) => _factory = fixture.Factory;
-
-    private HttpClient AuthedClient(Guid userId, string login)
-    {
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", DbTestHelpers.MintToken(_factory, userId, login));
-        return client;
-    }
+    private readonly AppTestFactory _f;
+    public StoreApproveTests(WebAppFixture fixture) => _f = fixture.Factory;
 
     [Fact]
     public async Task Approve_sets_approved_true()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var fixture = await StoreSeed.SeedStoreAsync(_factory, $"Store-{Guid.NewGuid():N}", approved: false);
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: false);
         try
         {
-            var response = await AuthedClient(adminId, login)
-                .PostAsJsonAsync("/api/v1/stores/approve", new { Id = fixture.StoreId });
-
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
-            body!.Succeeded.Should().BeTrue();
-            body.Data.Should().BeTrue();
-            (await StoreSeed.GetApprovedAsync(_factory, fixture.StoreId)).Should().BeTrue();
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/approve", new { Id = fx.StoreId });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue(); b.Data.Should().BeTrue();
+            (await StoreSeed.GetApprovedAsync(_f, fx.StoreId)).Should().BeTrue();
         }
-        finally
-        {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, fixture);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
     public async Task Approve_already_approved_returns_succeeded_data_false()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        var fixture = await StoreSeed.SeedStoreAsync(_factory, $"Store-{Guid.NewGuid():N}", approved: true);
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: true);
         try
         {
-            var response = await AuthedClient(adminId, login)
-                .PostAsJsonAsync("/api/v1/stores/approve", new { Id = fixture.StoreId });
-
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
-            body!.Succeeded.Should().BeTrue();
-            body.Data.Should().BeFalse(); // 0-row change, no Failure path
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/approve", new { Id = fx.StoreId });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue(); b.Data.Should().BeFalse();
         }
-        finally
-        {
-            await StoreSeed.CleanupStoreFixtureAsync(_factory, fixture);
-            await DbTestHelpers.CleanupUserAsync(_factory, adminId);
-        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]
-    public async Task Approve_unknown_store_returns_400_property_code_Id()
-    {
-        var login = $"admin-{Guid.NewGuid():N}@test.com";
-        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
-        try
-        {
-            var response = await AuthedClient(adminId, login)
-                .PostAsJsonAsync("/api/v1/stores/approve", new { Id = Guid.NewGuid() });
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            body!.Errors.Should().Contain(e => e.Code == "Id");
-        }
-        finally { await DbTestHelpers.CleanupUserAsync(_factory, adminId); }
-    }
+    public async Task Approve_unknown_store_returns_400_code_Id()
+        => await AssertApprove400(Guid.NewGuid());
+
+    [Fact]
+    public async Task Approve_empty_id_returns_400_code_Id()
+        => await AssertApprove400(Guid.Empty);
 
     [Fact]
     public async Task Approve_without_token_returns_401()
     {
-        var response = await _factory.CreateClient()
-            .PostAsJsonAsync("/api/v1/stores/approve", new { Id = Guid.NewGuid() });
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var r = await _f.CreateClient().PostAsJsonAsync("/api/v1/stores/approve", new { Id = Guid.NewGuid() });
+        r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task AssertApprove400(Guid id)
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/approve", new { Id = id });
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "Id");
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 }
 ```
 
-- [ ] **Step 2:** Run `--filter FullyQualifiedName~StoreApproveTests` → PASS (4).
-- [ ] **Step 3: Checkpoint** — `test(webapi): add stores approve e2e tests`.
-
-> **Note on the StoresAdmin-not-SuperAdmin 403 case:** proving it requires seeding an OwnerAdmin
-> whose *selected* store has an active `Management` module (so it passes the class-level filter but
-> is rejected by the method-level SuperAdmin-only filter). That seed is heavier (User +
-> UserRole(OwnerAdmin, TenantId==User.TenantId) + Store + StoreModule(7) + User.SelectedStoreId).
-> Implement `StoreSeed.SeedStoresAdminUserAsync` and add the 403 test here as a follow-up step once
-> the SuperAdmin path is green — it is the one case that exercises the class-vs-method filter split.
+- [ ] Run `--filter ~StoreApproveTests` → PASS (5). **Checkpoint** — `test(webapi): stores approve e2e`.
 
 ---
 
-## Task 6: POST `disapprove` (SuperAdmin-only, mirror of approve)
+## Task 6: POST `disapprove` (SuperAdmin-only)
 
-- [ ] **Step 1:** Create `Stores/StoreDisapproveTests.cs` — mirror Task 5 with `disapprove`, seeding
-  `approved: true`, asserting `Approved == false` after; the already-disapproved edge seeds
-  `approved: false` and expects `succeeded=true, data=false`; unknown id → 400 code `"Id"`;
-  no token → 401. (Same structure as `StoreApproveTests`; swap the route and the approved flags.)
+Create `Stores/StoreDisapproveTests.cs` — mirror of approve (seed `approved: true`, assert `Approved == false`):
 
-- [ ] **Step 2:** Run `--filter FullyQualifiedName~StoreDisapproveTests` → PASS (4).
-- [ ] **Step 3: Run the whole suite** — `dotnet test backend/src/SMCA.WebApi.E2ETests` → PASS (all).
-- [ ] **Step 4: Checkpoint** — `test(webapi): add stores disapprove e2e tests`.
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.Stores;
+
+[Collection("e2e")]
+public sealed class StoreDisapproveTests
+{
+    private readonly AppTestFactory _f;
+    public StoreDisapproveTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    [Fact]
+    public async Task Disapprove_sets_approved_false()
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: true);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/disapprove", new { Id = fx.StoreId });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue(); b.Data.Should().BeTrue();
+            (await StoreSeed.GetApprovedAsync(_f, fx.StoreId)).Should().BeFalse();
+        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task Disapprove_already_disapproved_returns_succeeded_data_false()
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: false);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/disapprove", new { Id = fx.StoreId });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue(); b.Data.Should().BeFalse();
+        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task Disapprove_unknown_store_returns_400_code_Id()
+        => await AssertDisapprove400(Guid.NewGuid());
+
+    [Fact]
+    public async Task Disapprove_empty_id_returns_400_code_Id()
+        => await AssertDisapprove400(Guid.Empty);
+
+    [Fact]
+    public async Task Disapprove_without_token_returns_401()
+    {
+        var r = await _f.CreateClient().PostAsJsonAsync("/api/v1/stores/disapprove", new { Id = Guid.NewGuid() });
+        r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task AssertDisapprove400(Guid id)
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/disapprove", new { Id = id });
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "Id");
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+}
+```
+
+- [ ] Run `--filter ~StoreDisapproveTests` → PASS (5). **Checkpoint** — `test(webapi): stores disapprove e2e`.
 
 ---
 
-## Deferred (documented, not implemented here)
+## Task 7: Authorization — OwnerAdmin (class passes, method 403, field-drop)
 
-- **StoresAdmin-not-SuperAdmin 403** on approve/disapprove — needs `SeedStoresAdminUserAsync` (see
-  the note under Task 5). High value (only case proving the class-vs-method filter split); add once
-  the SuperAdmin paths are green.
-- **OwnerAdmin authored update** (field-drop asymmetry: Description/Approved/IsActive/PaymentStartDate
-  silently ignored) — needs the OwnerAdmin seed; assert those fields do NOT change.
-- **Create 0-row Failure** (`Store.NotCreated`, HTTP 200 + actionCode 400) — hard to trigger
-  naturally; documented as the known Failure shape rather than forced.
+Create `Stores/StoreAuthorizationTests.cs`:
 
-## Open Items to verify during implementation
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
 
-- Confirm the entity factory signatures in Steps 8-9 compile against `Domain.Entities.*` (adjust the
-  call if a signature differs — do not weaken the seed).
-- Confirm `ModuleDto` field names if deeper `Modules` assertions are wanted (Task 2 asserts non-empty only).
-- Confirm `StoreData.NextPaymentDate` real value (may be `default` / 0001-01-01 — do not assert a
-  computed value without checking).
-- Confirm migrations apply cleanly to an empty `smca_test` and seed Module 7 + SystemConfiguration.
+namespace SMCA.WebApi.E2ETests.Stores;
+
+[Collection("e2e")]
+public sealed class StoreAuthorizationTests
+{
+    private readonly AppTestFactory _f;
+    public StoreAuthorizationTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    [Fact] // validity anchor: proves the seed PASSES the class-level filter
+    public async Task OwnerAdmin_can_reach_stores_controller()
+    {
+        var sa = await StoreSeed.SeedStoresAdminUserAsync(_f);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login).GetAsync("/api/v1/stores/by-current-user");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<List<StoreData>>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue();
+            b.Data!.Should().Contain(s => s.Id == sa.StoreId);
+        }
+        finally { await StoreSeed.CleanupStoresAdminAsync(_f, sa); }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_cannot_approve_returns_403()
+    {
+        var sa = await StoreSeed.SeedStoresAdminUserAsync(_f);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login).PostAsJsonAsync("/api/v1/stores/approve", new { Id = sa.StoreId });
+            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        finally { await StoreSeed.CleanupStoresAdminAsync(_f, sa); }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_cannot_disapprove_returns_403()
+    {
+        var sa = await StoreSeed.SeedStoresAdminUserAsync(_f);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login).PostAsJsonAsync("/api/v1/stores/disapprove", new { Id = sa.StoreId });
+            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        finally { await StoreSeed.CleanupStoresAdminAsync(_f, sa); }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_update_ignores_superadmin_only_fields()
+    {
+        var sa = await StoreSeed.SeedStoresAdminUserAsync(_f); // seeded: Description=null, Approved=false, IsActive=true
+        try
+        {
+            var newName = $"Renamed-{Guid.NewGuid():N}";
+            var r = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login).PutAsJsonAsync($"/api/v1/stores/{sa.StoreId}", new
+            {
+                Id = Guid.Empty, Name = newName, Address = "owner-addr", Description = "SHOULD-BE-IGNORED",
+                Approved = true, PaymentStartDate = (DateTime?)null, ModuleIds = new[] { StoreSeed.ManagementModuleId }, IsActive = false
+            });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var row = await StoreSeed.GetStoreRowAsync(_f, sa.StoreId);
+            row.Name.Should().Be(newName);
+            row.Address.Should().Be("owner-addr");
+            row.Description.Should().BeNull();   // dropped
+            row.Approved.Should().BeFalse();     // dropped
+            row.IsActive.Should().BeTrue();      // dropped
+        }
+        finally { await StoreSeed.CleanupStoresAdminAsync(_f, sa); }
+    }
+}
+```
+
+- [ ] Run `--filter ~StoreAuthorizationTests` → PASS (4). If `OwnerAdmin_can_reach_stores_controller`
+  is 403, verify Module 7 active/available and `UserRole(OwnerAdmin).TenantId == User.TenantId`.
+  **Checkpoint** — `test(webapi): stores authorization e2e (OwnerAdmin class-vs-method + field-drop)`.
+
+---
+
+## Task 8: Role enforcement — StoreUser / ReSeller → 403
+
+Both fail the class-level `[HasPermission(SuperAdmin, StoresAdmin)]` on the Stores controller:
+StoreUser has no `StoreRoleFeature` granting Stores; ReSeller's only feature is Owners.
+
+Create `Stores/StoreRoleAccessTests.cs`:
+
+```csharp
+using System.Net;
+using FluentAssertions;
+using Domain.Common.Enums;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.Stores;
+
+[Collection("e2e")]
+public sealed class StoreRoleAccessTests
+{
+    private readonly AppTestFactory _f;
+    public StoreRoleAccessTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    [Fact]
+    public async Task StoreUser_cannot_reach_stores_controller_returns_403()
+    {
+        var u = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.StoreUser);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, u.UserId, u.Login).GetAsync("/api/v1/stores/by-current-user");
+            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, u.UserId); }
+    }
+
+    [Fact]
+    public async Task ReSeller_cannot_reach_stores_controller_returns_403()
+    {
+        var u = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.ReSeller);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, u.UserId, u.Login).GetAsync("/api/v1/stores/by-current-user");
+            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, u.UserId); }
+    }
+}
+```
+
+- [ ] Run `--filter ~StoreRoleAccessTests` → PASS (2).
+- [ ] **Run the whole suite** — `dotnet test backend/src/SMCA.WebApi.E2ETests` → PASS (all).
+- [ ] **Checkpoint** — `test(webapi): stores role-access e2e (StoreUser/ReSeller 403)`.
+
+---
+
+## Coverage summary
+
+- **by-current-user:** SuperAdmin happy, inactive appears, cross-tenant, 401.
+- **{id}:** happy + date mapping, unknown→400"Id", empty→400"Id", 401.
+- **POST:** happy+persistence, dup-name bug, empty Name/OwnerId/ModuleIds, unknown OwnerId, unavailable ModuleId, 401.
+- **PUT:** superadmin happy, payment-date quirk, route-id-wins, name-collision (empty errors), unknown/empty Id, empty Name, empty/unavailable ModuleIds, 401.
+- **approve / disapprove:** happy, no-op (data:false), unknown/empty Id → 400"Id", 401.
+- **Authorization matrix (Stores controller):** SuperAdmin passes all; OwnerAdmin passes class / 403 method + field-drop; StoreUser → 403; ReSeller → 403.
+- **Every validator rule** across the 5 stores validators is exercised (property-name codes). No `Store.NotFound` code is asserted (it does not exist).
+- Cleanup in `finally` for every write; fixtures under DefaultTenant except the cross-tenant seed.
 
 ## Self-Review
 
-- **Self-contained:** Task 0 bootstraps the full harness (no dependency on 01/02 being on disk). ✓
-- **Coverage:** all 6 in-scope endpoints, 4 categories each; bugs pinned (duplicate-name, PaymentStartDate
-  quirk); 403/401 distinguished from body-level failures; corrected error-code contract (property-name
-  codes, empty errors[] for name-collision, no `Store.NotFound`). ✓
-- **No placeholders:** every task has full compilable code except Task 6 (explicit mirror instruction)
-  and the two deferred heavy-seed cases (documented with rationale). ✓
-- **Cleanup:** every write-heavy test cleans up in a `finally` with fine-grained helpers (never a
-  DefaultTenant cascade). ✓
+- Self-contained (Task 0 bootstraps harness) ✓. All 6 endpoints + full validation + authorization + roles ✓.
+- No placeholders; every task has compilable code ✓.
+- Open items: confirm entity factory signatures compile; confirm `ModuleDto` field names if deeper
+  `Modules` asserts are wanted; confirm migrations seed Module 7 + SystemConfiguration.
