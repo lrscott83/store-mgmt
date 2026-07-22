@@ -7,7 +7,14 @@ import { Footer } from '~/shared/components/footer';
  * `guest-footer.component.html` (legal links + Contact + copyright) below the
  * form card, reusing the shared `Footer` component (near-identical markup to
  * Angular's `client-footer.component.html`, already ported for the client
- * layout — see `shared/components/footer.tsx`).
+ * layout — see `shared/components/footer.tsx`) with `variant="guest"` so the
+ * Contact trigger gets the gold pill styling from
+ * `guest-footer.component.scss` `.contact-link` (client-footer.component.scss
+ * is empty, so the authenticated app's Footer stays plain). Angular's guest
+ * legal links also carry a cream/gold palette in that stylesheet, but it's
+ * dark-theme-only (depends on `login.component.scss`'s `--color-bg: #0a0a0a`);
+ * this light auth layout intentionally keeps the legal links on the shared
+ * light-theme styling instead — see `shared/components/footer.tsx` for detail.
  */
 export default function AuthLayout() {
   const intl = useIntl();
@@ -27,7 +34,7 @@ export default function AuthLayout() {
           <Outlet />
         </div>
       </div>
-      <Footer />
+      <Footer variant="guest" />
     </div>
   );
 }

@@ -37,6 +37,21 @@ describe('AuthLayout — guest footer (Req: parity with guest-footer.component.h
     expect(screen.getByText(esMessages['FOOTER.CONTACT_US'])).toBeInTheDocument();
   });
 
+  it('renders the Contact Us trigger with the guest gold-pill styling (guest-footer.component.scss .contact-link)', () => {
+    renderLayout();
+    const contact = screen.getByText(esMessages['FOOTER.CONTACT_US']).closest('button');
+    expect(contact).toHaveClass('rounded-full');
+    expect(contact?.querySelector('svg')).toHaveClass('text-[#f5b026]');
+  });
+
+  it('renders the Contact Us text in a legible color on the light auth background (not Angular\'s dark-theme cream literal)', () => {
+    renderLayout();
+    const contact = screen.getByText(esMessages['FOOTER.CONTACT_US']).closest('button');
+    expect(contact).toHaveClass('text-gray-700');
+    expect(contact).not.toHaveClass('text-[rgba(232,228,220,0.7)]');
+    expect(contact).toHaveClass('hover:text-text');
+  });
+
   it('renders 2 copyright lines, the first interpolating the current year', () => {
     renderLayout();
     const year = new Date().getFullYear();
