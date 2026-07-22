@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import type { SaleCredit } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
+import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 
 interface EditSaleCreditModalProps {
@@ -77,7 +78,7 @@ export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: Edi
                 className="text-text-muted hover:text-text"
                 aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
               >
-                ✕
+                <CloseIcon />
               </button>
             </div>
           }
@@ -126,10 +127,12 @@ export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: Edi
 
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="fab" onClick={onClose} data-testid="edit-sale-credit-close">
+              <CloseIcon />
               {/* GENERAL.CLOSE */}
               {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
             </Button>
             <Button variant="fab" onClick={handleSubmit} data-testid="edit-sale-credit-submit">
+              <SaveIcon />
               {/* SALE_CREDIT.TO_PAY — Angular's literal submit label on this client/note-only form */}
               {intl.formatMessage({ id: 'SALE_CREDIT.TO_PAY' })}
             </Button>

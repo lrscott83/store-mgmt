@@ -269,6 +269,43 @@ describe('EditSaleCreditModal', () => {
     expect(onSave).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
+
+  // Angular: edit-sale-credit-modal.component.html:43-49 — mat-fab extended
+  // Cerrar/Pagar buttons carry `close`/`save` mat-icons; header close is a
+  // glyph button (not a literal "✕" text character).
+  describe('CloseIcon/SaveIcon parity (edit-sale-credit-modal.component.html:43-49)', () => {
+    it('renders a CloseIcon svg in the header close control, not a literal "✕" character', () => {
+      const credit = makeCredit();
+      render(
+        <Wrapper>
+          <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />
+        </Wrapper>,
+      );
+      const headerClose = screen.getByTestId('edit-sale-credit-close-x');
+      expect(headerClose).not.toHaveTextContent('✕');
+      expect(headerClose.querySelector('svg')).not.toBeNull();
+    });
+
+    it('renders a CloseIcon svg inside the footer close button', () => {
+      const credit = makeCredit();
+      render(
+        <Wrapper>
+          <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('edit-sale-credit-close').querySelector('svg')).not.toBeNull();
+    });
+
+    it('renders a SaveIcon svg inside the footer submit button', () => {
+      const credit = makeCredit();
+      render(
+        <Wrapper>
+          <EditSaleCreditModal saleCredit={credit} isOpen={true} onClose={vi.fn()} onSave={vi.fn()} />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('edit-sale-credit-submit').querySelector('svg')).not.toBeNull();
+    });
+  });
 });
 
 // --- SaleCreditPaymentModal (matches Angular's sale-credit-payment-modal.component) ---
