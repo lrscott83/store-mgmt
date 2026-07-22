@@ -420,7 +420,9 @@ describe('RegisterPage — password visibility toggle (register.component.html:1
     vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
   });
 
-  it('password field defaults to hidden and toggles independently of confirm-password', () => {
+  // Angular binds a SINGLE showPassword boolean to BOTH inputs (two buttons,
+  // one shared state) — clicking either toggle flips both fields together.
+  it('password and confirm-password share one toggle state (both flip together)', () => {
     renderRegister();
     const password = screen.getByLabelText('Contraseña');
     const confirm = screen.getByLabelText('Confirmar Contraseña');
@@ -432,12 +434,12 @@ describe('RegisterPage — password visibility toggle (register.component.html:1
 
     fireEvent.click(toggles[0]);
     expect(password).toHaveAttribute('type', 'text');
-    expect(confirm).toHaveAttribute('type', 'password');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }));
     expect(confirm).toHaveAttribute('type', 'text');
-    expect(password).toHaveAttribute('type', 'text');
-
     expect(screen.getAllByRole('button', { name: 'Ocultar contraseña' })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Ocultar contraseña' })[1]);
+    expect(password).toHaveAttribute('type', 'password');
+    expect(confirm).toHaveAttribute('type', 'password');
+    expect(screen.getAllByRole('button', { name: 'Mostrar contraseña' })).toHaveLength(2);
   });
 });

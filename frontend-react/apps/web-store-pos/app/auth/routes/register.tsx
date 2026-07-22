@@ -48,8 +48,10 @@ export default function RegisterPage() {
   const [isOffline, setIsOffline] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  // Angular register.component.html:100-103,122-125: a SINGLE showPassword
+  // boolean drives BOTH the password and confirm-password fields — two
+  // buttons, one shared state, not independent toggles.
   const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
 
   const PASSWORD_POLICY_REGEX = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
 
@@ -278,7 +280,7 @@ export default function RegisterPage() {
           <div className="relative">
             <input
               id="passwordConfirmation"
-              type={showPasswordConfirmation ? 'text' : 'password'}
+              type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
               value={form.passwordConfirmation}
               onChange={(e) => setForm((f) => ({ ...f, passwordConfirmation: e.target.value }))}
@@ -286,17 +288,13 @@ export default function RegisterPage() {
             />
             <button
               type="button"
-              onClick={() => setShowPasswordConfirmation((visible) => !visible)}
+              onClick={() => setShowPassword((visible) => !visible)}
               aria-label={intl.formatMessage({
-                id: showPasswordConfirmation ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+                id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
               })}
               className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
             >
-              {showPasswordConfirmation ? (
-                <EyeOffIcon className="h-5 w-5" />
-              ) : (
-                <EyeIcon className="h-5 w-5" />
-              )}
+              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
             </button>
           </div>
           {errors.passwordConfirmation && (
