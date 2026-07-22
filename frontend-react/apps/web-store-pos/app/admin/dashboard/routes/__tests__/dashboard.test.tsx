@@ -368,6 +368,54 @@ describe('AdminDashboardPage — succeeded:false leaves table empty', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PAGE-6 — range-button active state (Angular parity: admin-dashboard.component.html:13-14)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminDashboardPage — range-button active state', () => {
+  it('marks the 7-day button active on load, and moves the active state to 30-day on click', async () => {
+    const { usageHttpService } = await import(
+      '~/admin/dashboard/lib/services/usage-http-service'
+    );
+    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
+      succeeded: true,
+      data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 5 },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(usageHttpService.getStoresLastMonth).mockResolvedValue({
+      succeeded: true,
+      data: { storeUsagesCountDays: Array.from({ length: 30 }, (_, i) => i + 1), activeStoreCount: 5 },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminDashboardPage } = await import('../dashboard');
+    render(
+      <Wrapper>
+        <AdminDashboardPage />
+      </Wrapper>
+    );
+
+    const btn7 = await screen.findByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_7_DAYS'] });
+    const btn30 = screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] });
+
+    await waitFor(() => {
+      expect(btn7).toHaveAttribute('aria-pressed', 'true');
+    });
+    expect(btn30).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(btn30);
+
+    await waitFor(() => {
+      expect(btn30).toHaveAttribute('aria-pressed', 'true');
+    });
+    expect(btn7).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PAGE-4 (extended) — value||0 fallback when response array is shorter than labels
 // ═══════════════════════════════════════════════════════════════════════════════
 

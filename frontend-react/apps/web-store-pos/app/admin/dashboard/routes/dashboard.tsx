@@ -56,6 +56,8 @@ export function AdminDashboardPage() {
       <div>
         <button
           type="button"
+          className={viewType === '7days' ? 'active' : undefined}
+          aria-pressed={viewType === '7days'}
           onClick={() => {
             setViewType('7days');
             loadData('7days');
@@ -65,6 +67,8 @@ export function AdminDashboardPage() {
         </button>
         <button
           type="button"
+          className={viewType === '30days' ? 'active' : undefined}
+          aria-pressed={viewType === '30days'}
           onClick={() => {
             setViewType('30days');
             loadData('30days');
