@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 
 // LOCKED regex per spec PWD-4
 export const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;
@@ -27,6 +28,9 @@ export function ChangePasswordForm({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [validationError, setValidationError] = useState('');
+  // edit-user-credentials.component.html:22-27,42-47: a SINGLE showPassword
+  // boolean drives newPassword + confirmPassword (oldPassword has no toggle).
+  const [showPassword, setShowPassword] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,14 +92,26 @@ export function ChangePasswordForm({
         <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
           {intl.formatMessage({ id: 'PROFILE.NEW_PASSWORD' })}
         </label>
-        <input
-          id="newPassword"
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          disabled={isLoading}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-        />
+        <div className="relative mt-1">
+          <input
+            id="newPassword"
+            type={showPassword ? 'text' : 'password'}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            disabled={isLoading}
+            className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={intl.formatMessage({
+              id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+            })}
+            className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+          >
+            {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+          </button>
+        </div>
         <p className="mt-1 text-xs text-gray-500">
           {intl.formatMessage({ id: 'PROFILE.PASSWORD_RULES' })}
         </p>
@@ -105,14 +121,26 @@ export function ChangePasswordForm({
         <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
           {intl.formatMessage({ id: 'PROFILE.CONFIRM_PASSWORD' })}
         </label>
-        <input
-          id="confirmPassword"
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={isLoading}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-        />
+        <div className="relative mt-1">
+          <input
+            id="confirmPassword"
+            type={showPassword ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={isLoading}
+            className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={intl.formatMessage({
+              id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+            })}
+            className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+          >
+            {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       <button
