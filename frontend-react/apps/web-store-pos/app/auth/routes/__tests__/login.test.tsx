@@ -253,6 +253,15 @@ describe('LoginPage (AUTH-01)', () => {
     expect(passwordInput).toHaveAttribute('type', 'password');
     expect(screen.getByRole('button', { name: 'Mostrar contraseña' })).toBeInTheDocument();
   });
+
+  // login.component.html:96 — Angular renders the submit as a `mat-fab extended`
+  // (pill-shaped, elevated), not a plain rectangular button.
+  it('renders the submit control as a fab (Button variant="fab"), not a plain button', () => {
+    renderLogin();
+    const submit = screen.getByRole('button', { name: /iniciar sesión/i });
+    expect(submit).toHaveClass('rounded-full');
+    expect(submit).not.toHaveClass('rounded-lg');
+  });
 });
 
 describe('LoginPage — view-text-parity: identifier label forced literal parity (GENERAL.LOGIN)', () => {
