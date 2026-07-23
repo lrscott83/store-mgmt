@@ -16,7 +16,8 @@ import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
-import { showBlockingError, showAcknowledgeError, showBlockingSuccess } from '~/shared/lib/blocking-alert';
+import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
+import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -63,7 +64,6 @@ function PaymentTypeIcon({ kind }: { kind: PaymentTypeIconKind }) {
 export function CartShell() {
   const intl = useIntl();
   const [isOpen, setIsOpen] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // UI-only state, NOT persisted to the order — matches Angular's NavRightComponent
   // fields `payment` and `mustGenerateFacture`, which live on the component, not the
@@ -105,7 +105,6 @@ export function CartShell() {
   function handleClear() {
     clear();
     resetTransientFields();
-    setSubmitError(null);
   }
 
   // 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
@@ -143,17 +142,14 @@ export function CartShell() {
   }
 
   function clearCartAfterSuccessfulOrder() {
-    // Same cart-reset as handleClear, but preserves the just-set success message
-    // (Angular calls clearShoppingCart() after showing the toastr success message —
-    // the two are independent side effects, not a single combined reset).
+    // Same cart-reset as handleClear (Angular calls clearShoppingCart() after showing the
+    // toastr success message — the two are independent side effects, not a single combined
+    // reset).
     clear();
     resetTransientFields();
-    setSubmitError(null);
   }
 
   async function handleCreateOrder() {
-    setSubmitError(null);
-
     // 1:1 port of Angular's NavRightComponent.createOrder() validation sequence
     // (nav-right.component.ts:164/177/190) — each guard is a blocking, OK-only Swal
     // (icon 'info', GENERAL.INFORMATION title, #3456ff/#dc3545, confirmButtonText GENERAL.OK),
@@ -206,7 +202,15 @@ export function CartShell() {
         clientName.trim(),
       );
       if (!result.succeeded) {
-        setSubmitError(intl.formatMessage({ id: 'GENERAL.ERROR' }));
+        // Angular createOrder `else` branch (nav-right.component.ts:222-225):
+        // toastrService.error(SHOPPING_CART.ORDER_NOT_CREATED, ...) — a non-blocking error
+        // toast, not a persisted inline banner. Title uses the corrected
+        // GENERAL.RESPONSE.ERROR_TITLE ("Error"), not Angular's own broken
+        // GENERAL.RESPONSE.ERROR key (TOAST-ERROR-TITLE-FIX).
+        showToastError(
+          intl.formatMessage({ id: 'SHOPPING_CART.ORDER_NOT_CREATED' }),
+          intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        );
         return;
       }
       // NOTE (parity, intentionally not implemented): Angular's mustGenerateFacture branch
@@ -216,12 +220,24 @@ export function CartShell() {
       clearCartAfterSuccessfulOrder();
       // Angular createOrder success (nav-right.component.ts:213-221): toastrService.success(...)
       // then the ngbDropdown (autoClose="true") closes. React closes the panel explicitly and
-      // surfaces the success through showBlockingSuccess (the app's toastr stand-in) since the
-      // panel — and its inline banner — is now gone.
+      // fires the same success toast, restoring the "Éxito" title Angular carries
+      // (GENERAL.RESPONSE.SUCCESS_TITLE) that the prior Swal stand-in had dropped.
       setIsOpen(false);
-      showBlockingSuccess(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }));
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : intl.formatMessage({ id: 'GENERAL.ERROR' }));
+      showToastSuccess(
+        intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }),
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }),
+      );
+    } catch {
+      // T2.0 verification (toast-notifications-parity, deviation from design ADR-4's literal
+      // assumption): Angular's `.subscribe((response) => {...})` registers ONLY a `next`
+      // handler (nav-right.component.ts:211-226) — no RxJS error callback — and
+      // OrderOfflineService.createOrder always resolves via `Success$(order)`, never emitting
+      // an Observable error (order-offline.service.ts:42-65). Angular therefore shows NO
+      // user-facing feedback on a thrown/rejected createOrder call; this branch mirrors that
+      // absence rather than firing the same error toast as the `succeeded:false` branch. Per
+      // design §3.1 (non-negotiable regardless of the T2.0 finding): never surface a raw
+      // `err.message`, and no persisted inline banner — both are satisfied by doing nothing
+      // user-visible here.
     } finally {
       setIsSubmitting(false);
     }
@@ -440,13 +456,6 @@ export function CartShell() {
               </ul>
             )}
           </div>
-
-          {/* Feedback messages */}
-          {submitError && (
-            <p className="px-4 py-2 text-xs text-danger text-center" role="alert">
-              {submitError}
-            </p>
-          )}
         </div>
       )}
     </div>

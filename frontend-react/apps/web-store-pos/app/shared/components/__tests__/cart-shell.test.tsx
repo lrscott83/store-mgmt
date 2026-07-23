@@ -49,13 +49,19 @@ const showBlockingErrorMock = vi.hoisted(() => vi.fn());
 // T4 (Angular parity, nav-right.component.ts:164/177/190 createOrder validation guards):
 // blocking info Swals, mocked via the shared wrapper rather than asserting inline DOM text.
 const showAcknowledgeErrorMock = vi.hoisted(() => vi.fn());
-// Angular's createOrder success path fires toastrService.success(...) (nav-right.component.ts:213);
-// React surfaces it through showBlockingSuccess, the app's toastr stand-in, since the panel closes.
-const showBlockingSuccessMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: showBlockingErrorMock,
   showAcknowledgeError: showAcknowledgeErrorMock,
-  showBlockingSuccess: showBlockingSuccessMock,
+}));
+
+// TOAST-CALLSITES #2/#3 (toast-notifications-parity): Angular's createOrder success
+// (toastrService.success, nav-right.component.ts:213) and NEW failure toast
+// (toastrService.error, :222) now go through the shared toast helper, not Swal/inline state.
+const showToastSuccessMock = vi.hoisted(() => vi.fn());
+const showToastErrorMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: showToastSuccessMock,
+  showToastError: showToastErrorMock,
 }));
 
 // Mock useAuthStore (needed for OrderOfflineService instantiation + credits-module gating).
@@ -572,7 +578,7 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     });
   });
 
-  it('CART-07: closes the cart popup, shows the ORDER_CREATED success alert, and clears the cart on a valid submission', async () => {
+  it('CART-07: closes the cart popup, shows the ORDER_CREATED success toast (with "Éxito" title), and clears the cart on a valid submission', async () => {
     const product = makeProduct();
     const clear = vi.fn();
     mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
@@ -583,11 +589,73 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     fireEvent.click(screen.getByText('Registrar'));
 
     await waitFor(() => {
-      expect(showBlockingSuccessMock).toHaveBeenCalledWith('La venta fue creada satisfactoriamente.');
+      expect(showToastSuccessMock).toHaveBeenCalledWith('La venta fue creada satisfactoriamente.', 'Éxito');
     });
     expect(clear).toHaveBeenCalledTimes(1);
     // Sale registered -> the cart popup closes (Angular ngbDropdown autoClose parity).
     expect(screen.queryByText('Venta actual')).not.toBeInTheDocument();
+  });
+
+  // TOAST-CALLSITES #3 (NEW behavior, toast-notifications-parity): Angular's createOrder
+  // `else` branch (nav-right.component.ts:222-225) fires `toastrService.error(ORDER_NOT_CREATED,
+  // ...)` when `response.succeeded` is false. Previously React had no equivalent (generic
+  // inline `GENERAL.ERROR`) — this closes that functional gap.
+  it('CART-08: shows the ORDER_NOT_CREATED error toast (with "Error" title) when createOrder resolves succeeded:false, without closing the cart or clearing it', async () => {
+    const product = makeProduct();
+    const clear = vi.fn();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    createOrderMock.mockResolvedValueOnce({
+      data: null,
+      succeeded: false,
+      message: '',
+      actionCode: 400,
+      errors: [],
+    });
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => {
+      expect(showToastErrorMock).toHaveBeenCalledWith(
+        'Ocurrío un error creando la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
+        'Error',
+      );
+    });
+    expect(clear).not.toHaveBeenCalled();
+    // The cart panel stays open — Angular's failure branch never calls closeCartDropdown().
+    expect(screen.getByText('Venta actual')).toBeInTheDocument();
+    // The old generic inline error surface is gone.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // T2.0 verification finding (toast-notifications-parity): Angular's `.subscribe((response) =>
+  // {...})` in nav-right.component.ts registers ONLY a `next` handler — no RxJS error callback
+  // — and OrderOfflineService.createOrder (order-offline.service.ts:42-65) always resolves via
+  // `Success$(order)` and never emits an Observable error. Angular therefore has NO
+  // user-facing feedback for a thrown/rejected createOrder call; it is not a code path Angular
+  // exercises. Per design ADR-4's non-negotiable ("never a raw err.message, no persisted
+  // banner"), React's catch branch mirrors that absence of feedback rather than assuming the
+  // same error toast as the succeeded:false branch (a deviation from the design's literal
+  // assumption, flagged in the apply report).
+  it('CART-09 (T2.0 finding): a thrown/rejected createOrder shows NO toast (mirrors Angular\'s absent error handler) and leaks no raw err.message', async () => {
+    const product = makeProduct();
+    const clear = vi.fn();
+    mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
+    createOrderMock.mockRejectedValueOnce(new Error('raw boom, do not leak me'));
+    renderCartShell();
+    openCart();
+
+    fireEvent.click(screen.getByText('Registrar'));
+
+    await waitFor(() => {
+      expect(createOrderMock).toHaveBeenCalledTimes(1);
+    });
+    expect(showToastSuccessMock).not.toHaveBeenCalled();
+    expect(showToastErrorMock).not.toHaveBeenCalled();
+    expect(clear).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/raw boom/)).not.toBeInTheDocument();
   });
 
   // WU3 — createOrder must thread the cart store's orderDescription into the `details`
