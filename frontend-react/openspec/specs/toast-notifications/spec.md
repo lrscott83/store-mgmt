@@ -2,7 +2,7 @@
 
 **Change:** toast-notifications-parity
 **Phase:** Spec
-**Status:** Draft
+**Status:** Implemented
 **Date:** 2026-07-23
 **Mode:** OpenSpec
 

@@ -400,5 +400,3 @@ Scope guard: change ONLY PAGE-5/PAGE-6. Do NOT touch the broader admin "no toast
 - **Stale sibling specs** — `admin/spec.md` PAGE-7 ("no loading/disabled state") is already stale vs
   the shipped `features.tsx` (which has an `isLoading` guard), but it is OUT OF SCOPE here; do not
   broaden the supersession beyond PAGE-5/PAGE-6.
-</content>
-</invoke>
