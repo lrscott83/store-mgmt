@@ -1,8 +1,8 @@
-# SMCA.WebApi `/auth` heavy happy-paths E2E — Implementation Plan
+# SMCA.WebApi `/auth` E2E — Consolidated Implementation Plan (happy paths + failures + validation + logout)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add three e2e tests to the existing `SMCA.WebApi.E2ETests` project covering login full success (super-admin), register full success, and the register-duplicate 500 bug-pin — against real Postgres.
+**Goal:** Add the full `/auth` e2e coverage to the existing `SMCA.WebApi.E2ETests` project — against real Postgres. Tasks 1–3 cover the happy paths (login full success, register full success, register-duplicate 500 bug-pin); Tasks 4–8 add the failure, `/me`, logout, and validation cases consolidated from the `03`/`03b` plans. Helper classes (`DbTestHelpers`, `AuthTestHelpers`, `SeedInactiveUserAsync`) are NOT redefined here — they are defined by their owning plans (`02` Task 1, `03` Task 0, `03b`) and reused, since every plan targets the same project.
 
 **Architecture:** Reuse the `01` harness (`AppTestFactory`, `WebAppFixture`, `ApiResponse<T>`). A shared `DbTestHelpers` static class seeds a super-admin, looks up users, and cleans created rows in FK order via `context.Set<T>().IgnoreQueryFilters()`. Each test cleans up in a `finally`.
 
@@ -406,8 +406,360 @@ Suggested message: `test(webapi): pin register-duplicate 500 (known bug) e2e tes
 
 ---
 
+## Task 4: `/auth/login` failure paths (from `03b`)
+
+**Files:** Create `backend/src/SMCA.WebApi.E2ETests/Auth/AuthLoginFailureTests.cs`.
+**Reuses (do not redefine):** `DbTestHelpers.SeedSuperAdminAsync`, `DbTestHelpers.CleanupUserAsync` (`02` Task 1); `DbTestHelpers.SeedInactiveUserAsync` (`03b`).
+
+- [ ] **Step 1: Write the login-failure tests**
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.Auth;
+
+[Collection("e2e")]
+public sealed class AuthLoginFailureTests
+{
+    private readonly WebAppFixture _fixture;
+
+    public AuthLoginFailureTests(WebAppFixture fixture) => _fixture = fixture;
+
+    // Distinct branch from Login_with_unknown_user: user EXISTS and is active, only the password is wrong.
+    [Fact]
+    public async Task Login_with_wrong_password_for_active_user_returns_200_with_InvalidPassword()
+    {
+        var login = $"wrongpass_{Guid.NewGuid():N}@test.com";
+        var userId = await DbTestHelpers.SeedSuperAdminAsync(_fixture.Factory, login, "Password123");
+        try
+        {
+            var client = _fixture.Factory.CreateClient();
+            var res = await client.PostAsJsonAsync("/api/v1/auth/login",
+                new { Login = login, Password = "WrongPassword1" });
+
+            res.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body.ActionCode.Should().Be(400);
+            body.Errors.Should().ContainSingle(e => e.Code == "User.InvalidPassword");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupUserAsync(_fixture.Factory, userId);
+        }
+    }
+
+    // IsValidUserAsync short-circuits on !IsActive BEFORE the password check, so the password here is correct.
+    [Fact]
+    public async Task Login_with_inactive_user_returns_200_with_Inactive()
+    {
+        var login = $"inactive_{Guid.NewGuid():N}@test.com";
+        var userId = await DbTestHelpers.SeedInactiveUserAsync(_fixture.Factory, login, "Password123");
+        try
+        {
+            var client = _fixture.Factory.CreateClient();
+            var res = await client.PostAsJsonAsync("/api/v1/auth/login",
+                new { Login = login, Password = "Password123" });
+
+            res.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body.ActionCode.Should().Be(400);
+            body.Errors.Should().ContainSingle(e => e.Code == "User.Inactive");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupUserAsync(_fixture.Factory, userId);
+        }
+    }
+}
+```
+
+- [ ] **Step 2:** Run `--filter ~AuthLoginFailureTests` → PASS (2). **Checkpoint** — `test(webapi): auth login failure-path e2e`.
+
+---
+
+## Task 5: `/auth/me` failure paths (from `03b`)
+
+**Files:** Create `backend/src/SMCA.WebApi.E2ETests/Auth/AuthMeFailureTests.cs`.
+**Reuses (do not redefine):** `AuthTestHelpers.MintToken`, `AuthTestHelpers.BearerClient` (`03`); `DbTestHelpers.SeedInactiveUserAsync`, `DbTestHelpers.CleanupUserAsync` (`03b`/`02`).
+
+- [ ] **Step 1: Write the `/me` failure tests**
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.Auth;
+
+[Collection("e2e")]
+public sealed class AuthMeFailureTests
+{
+    private readonly WebAppFixture _fixture;
+
+    public AuthMeFailureTests(WebAppFixture fixture) => _fixture = fixture;
+
+    // Distinct from Me_without_token_returns_401: a token IS sent, but it fails JWT validation -> pipeline 401.
+    [Fact]
+    public async Task Me_with_malformed_token_returns_401()
+    {
+        var client = AuthTestHelpers.BearerClient(_fixture.Factory, "not-a-real-jwt");
+
+        var res = await client.GetAsync("/api/v1/auth/me");
+
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // Structurally valid JWT for a Guid with no User row: [Authorize] passes, handler returns NotFound wrapped in 200.
+    [Fact]
+    public async Task Me_with_token_for_unknown_user_returns_200_with_NotFound_body()
+    {
+        var unknownId = Guid.NewGuid();
+        var token = AuthTestHelpers.MintToken(_fixture.Factory, unknownId, $"ghost_{unknownId:N}@test.com");
+        var client = AuthTestHelpers.BearerClient(_fixture.Factory, token);
+
+        var res = await client.GetAsync("/api/v1/auth/me");
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+        body!.Succeeded.Should().BeFalse();
+        body.ActionCode.Should().Be(404);
+        body.Errors.Should().ContainSingle(e => e.Code == "User.NotFound");
+    }
+
+    // Handler's SignOut branch: valid token, user exists but IsActive == false -> Inactive wrapped in 200.
+    [Fact]
+    public async Task Me_with_token_for_inactive_user_returns_200_with_Inactive_body()
+    {
+        var login = $"inactive_me_{Guid.NewGuid():N}@test.com";
+        var userId = await DbTestHelpers.SeedInactiveUserAsync(_fixture.Factory, login, "Password123");
+        try
+        {
+            var token = AuthTestHelpers.MintToken(_fixture.Factory, userId, login);
+            var client = AuthTestHelpers.BearerClient(_fixture.Factory, token);
+
+            var res = await client.GetAsync("/api/v1/auth/me");
+
+            res.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body.ActionCode.Should().Be(404);
+            body.Errors.Should().ContainSingle(e => e.Code == "User.Inactive");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupUserAsync(_fixture.Factory, userId);
+        }
+    }
+}
+```
+
+- [ ] **Step 2:** Run `--filter ~AuthMeFailureTests` → PASS (3). **Checkpoint** — `test(webapi): auth /me failure-path e2e`.
+
+---
+
+## Task 6: `/auth/logout` (from `03`)
+
+**Files:** Create `backend/src/SMCA.WebApi.E2ETests/Auth/AuthLogoutTests.cs`.
+**Reuses (do not redefine):** `AuthTestHelpers.SeedActiveUserAsync`, `AuthTestHelpers.MintToken`, `AuthTestHelpers.BearerClient`, `AuthTestHelpers.CleanupUserAsync` (`03`).
+
+- [ ] **Step 1: Write the logout tests**
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.Auth;
+
+[Collection("e2e")]
+public sealed class AuthLogoutTests
+{
+    private readonly AppTestFactory _f;
+    public AuthLogoutTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    [Fact]
+    public async Task Logout_anonymous_returns_200_true()
+    {
+        var r = await _f.CreateClient().GetAsync("/api/v1/auth/logout");
+        r.StatusCode.Should().Be(HttpStatusCode.OK);
+        var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+        b!.Succeeded.Should().BeTrue(); b.Data.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Logout_with_valid_token_for_seeded_user_returns_200_true()
+    {
+        var login = $"lo-{Guid.NewGuid():N}@test.com";
+        var userId = await AuthTestHelpers.SeedActiveUserAsync(_f, login);
+        try
+        {
+            var token = AuthTestHelpers.MintToken(_f, userId, login);
+            var r = await AuthTestHelpers.BearerClient(_f, token).GetAsync("/api/v1/auth/logout");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue(); b.Data.Should().BeTrue();
+        }
+        finally { await AuthTestHelpers.CleanupUserAsync(_f, userId); }
+    }
+
+    [Fact]
+    public async Task Logout_with_malformed_token_returns_200_true()
+    {
+        // [AllowAnonymous]: a bad token does NOT 401 (contrast with /me). Falls to branch A.
+        var r = await AuthTestHelpers.BearerClient(_f, "not-a-real-jwt").GetAsync("/api/v1/auth/logout");
+        r.StatusCode.Should().Be(HttpStatusCode.OK);
+        var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+        b!.Succeeded.Should().BeTrue(); b.Data.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Logout_with_token_for_unknown_user_returns_200_with_NotFound_body()
+    {
+        // Branch C: valid token, no matching User -> Failure(UserErrors.NotFound, 404).
+        // Controller Ok() => HTTP 200; the 404 lives in the body (actionCode + code "User.NotFound").
+        var token = AuthTestHelpers.MintToken(_f, Guid.NewGuid(), $"ghost-{Guid.NewGuid():N}@test.com");
+        var r = await AuthTestHelpers.BearerClient(_f, token).GetAsync("/api/v1/auth/logout");
+        r.StatusCode.Should().Be(HttpStatusCode.OK);
+        var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+        b!.Succeeded.Should().BeFalse();
+        b.ActionCode.Should().Be(404);
+        b.Errors.Should().Contain(e => e.Code == "User.NotFound");
+    }
+}
+```
+
+- [ ] **Step 2:** Run `--filter ~AuthLogoutTests` → PASS (4). **Checkpoint** — `test(webapi): auth logout e2e`.
+
+---
+
+## Task 7: `/auth/login` validation (from `03`)
+
+**Files:** Create `backend/src/SMCA.WebApi.E2ETests/Auth/AuthLoginValidationTests.cs`.
+
+- [ ] **Step 1: Write the login-validation tests**
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.Auth;
+
+[Collection("e2e")]
+public sealed class AuthLoginValidationTests
+{
+    private readonly HttpClient _client;
+    public AuthLoginValidationTests(WebAppFixture fixture) => _client = fixture.Factory.CreateClient();
+
+    private async Task Assert400(object body, string code)
+    {
+        var r = await _client.PostAsJsonAsync("/api/v1/auth/login", body);
+        r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+        b!.Succeeded.Should().BeFalse();
+        b.Errors.Should().Contain(e => e.Code == code);
+    }
+
+    [Fact] public Task Login_empty_login_400_code_Login()
+        => Assert400(new { Login = "", Password = "Password123" }, "Login");
+
+    [Fact] public Task Login_empty_password_400_code_Password()
+        => Assert400(new { Login = "user@test.com", Password = "" }, "Password");
+
+    [Fact] public Task Login_short_password_400_code_Password()
+        => Assert400(new { Login = "user@test.com", Password = "abc" }, "Password"); // MinimumLength(8)
+}
+```
+
+- [ ] **Step 2:** Run `--filter ~AuthLoginValidationTests` → PASS (3). **Checkpoint** — `test(webapi): auth login validation e2e`.
+
+---
+
+## Task 8: `/auth/register` validation (from `03`)
+
+**Files:** Create `backend/src/SMCA.WebApi.E2ETests/Auth/AuthRegisterValidationTests.cs`.
+
+- [ ] **Step 1: Write the register-validation tests**
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.Auth;
+
+[Collection("e2e")]
+public sealed class AuthRegisterValidationTests
+{
+    private readonly HttpClient _client;
+    public AuthRegisterValidationTests(WebAppFixture fixture) => _client = fixture.Factory.CreateClient();
+
+    // Valid baseline; each test mutates ONE field to the invalid value under test.
+    private static object Register(string? login = null, string password = "Password123", string fullName = "E2E User",
+        string cellPhone = "0000000000", string? email = null, string? storeName = "E2E Store") => new
+    {
+        Login = login ?? $"reg-{Guid.NewGuid():N}@test.com",
+        Password = password, FullName = fullName, CellPhone = cellPhone,
+        Email = email, StoreName = storeName, Code = (string?)null
+    };
+
+    private async Task Assert400(object body, string code)
+    {
+        var r = await _client.PostAsJsonAsync("/api/v1/auth/register", body);
+        r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+        b!.Succeeded.Should().BeFalse();
+        b.Errors.Should().Contain(e => e.Code == code);
+    }
+
+    [Fact] public Task Register_empty_login_400_code_Login()
+        => Assert400(Register(login: ""), "Login");
+
+    [Fact] public Task Register_empty_password_400_code_Password()
+        => Assert400(Register(password: ""), "Password");
+
+    [Fact] public Task Register_short_password_400_code_Password()
+        => Assert400(Register(password: "Ab1"), "Password"); // MinimumLength(8), has uppercase
+
+    [Fact] public Task Register_password_without_uppercase_400_code_Password()
+        => Assert400(Register(password: "password123"), "Password"); // >=8, no uppercase
+
+    [Fact] public Task Register_empty_fullname_400_code_FullName()
+        => Assert400(Register(fullName: ""), "FullName");
+
+    [Fact] public Task Register_empty_cellphone_400_code_CellPhone()
+        => Assert400(Register(cellPhone: ""), "CellPhone");
+
+    [Fact] public Task Register_invalid_email_400_code_Email()
+        => Assert400(Register(email: "not-an-email"), "Email"); // When(non-empty) EmailAddress()
+
+    [Fact] public Task Register_empty_storename_400_code_StoreName()
+        => Assert400(Register(storeName: ""), "StoreName");
+}
+```
+
+- [ ] **Step 2:** Run `--filter ~AuthRegisterValidationTests` → PASS (8).
+- [ ] **Step 3: Run the whole e2e suite** — `dotnet test backend/src/SMCA.WebApi.E2ETests` → PASS (all `01` + the 23 `/auth` tests). **Checkpoint** — `test(webapi): auth register validation e2e`.
+
+---
+
 ## Self-Review
 
 - **Spec coverage:** login full success ✓ Task 1; register full success + persistence assert with `IgnoreQueryFilters()` ✓ Task 2; register duplicate 500 pin ✓ Task 3; manual per-test cleanup in `finally`, FK order ✓ `DbTestHelpers.CleanupTenantCascadeAsync`; no new packages/project ✓; super-admin cheapest seed ✓ Task 1.
+- **Consolidated coverage (Tasks 4–8, from `03`/`03b`):** login failures (wrong password, inactive) ✓ Task 4; `/me` failures (malformed token 401, unknown user 404-body, inactive 404-body) ✓ Task 5; logout (anonymous, valid, malformed, unknown user) ✓ Task 6; login validation (3) ✓ Task 7; register validation (8) ✓ Task 8. **23 `/auth` tests total.** Helpers are reused, not redefined: `DbTestHelpers` (`02` Task 1) + `SeedInactiveUserAsync` (`03b`), `AuthTestHelpers` (`03`). Duplication with the standalone `03`/`03b` plans is intentional (both target the same project; running the suite once exercises each test once regardless of which plan authored it).
 - **Placeholder scan:** none — every step has full file content and exact commands.
 - **Type consistency:** `DbTestHelpers.{HashPassword,SeedSuperAdminAsync,GetUserByLoginAsync,CleanupUserAsync,CleanupTenantCascadeAsync}`, `AuthData.{Login,AuthToken}`, `ApiResponse<T>`/`ApiResponse.Json`, entity factories `User.Create`, `UserRole.Create(userId,roleId,tenantId)`, `RoleType.SuperAdmin`, `DataUtils.DefaultTenant.Id`, `ApplicationDbContext.Set<T>().IgnoreQueryFilters()` — consistent across tasks and matching the verified backend signatures.
