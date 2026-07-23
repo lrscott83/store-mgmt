@@ -217,16 +217,16 @@ export function CartShell() {
       // calls generateTicket(), which is dead/disabled code in Angular itself (no-op
       // console.log — jsPDF generation is commented out). The toggle is preserved for
       // parity but produces no print output here either, matching Angular exactly.
-      clearCartAfterSuccessfulOrder();
-      // Angular createOrder success (nav-right.component.ts:213-221): toastrService.success(...)
-      // then the ngbDropdown (autoClose="true") closes. React closes the panel explicitly and
-      // fires the same success toast, restoring the "Éxito" title Angular carries
-      // (GENERAL.RESPONSE.SUCCESS_TITLE) that the prior Swal stand-in had dropped.
-      setIsOpen(false);
+      // Angular createOrder success order (nav-right.component.ts:213-221): toastrService.success(...)
+      // FIRES FIRST, then clearShoppingCart() runs. Mirror that order exactly — toast, then clear.
+      // The panel close is React-specific (Angular's ngbDropdown autoCloses); it follows the clear.
+      // The "Éxito" title (GENERAL.RESPONSE.SUCCESS_TITLE) restores what the prior Swal stand-in dropped.
       showToastSuccess(
         intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }),
         intl.formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }),
       );
+      clearCartAfterSuccessfulOrder();
+      setIsOpen(false);
     } catch {
       // T2.0 verification (toast-notifications-parity, deviation from design ADR-4's literal
       // assumption): Angular's `.subscribe((response) => {...})` registers ONLY a `next`

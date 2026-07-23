@@ -592,6 +592,9 @@ describe('CartShell — createOrder validations (Registrar)', () => {
       expect(showToastSuccessMock).toHaveBeenCalledWith('La venta fue creada satisfactoriamente.', 'Éxito');
     });
     expect(clear).toHaveBeenCalledTimes(1);
+    // Angular fires the success toast FIRST, then clears the cart (nav-right.component.ts:213-221:
+    // toastrService.success(...) precedes clearShoppingCart()). Assert that ordering here.
+    expect(showToastSuccessMock.mock.invocationCallOrder[0]).toBeLessThan(clear.mock.invocationCallOrder[0]);
     // Sale registered -> the cart popup closes (Angular ngbDropdown autoClose parity).
     expect(screen.queryByText('Venta actual')).not.toBeInTheDocument();
   });
