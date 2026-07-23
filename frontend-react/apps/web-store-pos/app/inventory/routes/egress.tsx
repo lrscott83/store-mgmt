@@ -99,28 +99,14 @@ export function EgressPage() {
   }
 
   return (
-    <Card title={intl.formatMessage({ id: 'INVENTORY_EGRESS.HEADER' })}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => selectCategory(category)}
-              className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                category.id === selectedCategoryId
-                  ? 'bg-primary text-white'
-                  : 'bg-primary-light text-primary hover:bg-primary/20'
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Angular: mat-form-field with hardcoded (non-translated) "Tipo" label +
-            OrderTypeUtils.getOrderTypes() options (egress.component.html:7-16). */}
-        <label className="flex flex-col gap-0.5 text-xs text-text-muted">
+    <Card
+      title={intl.formatMessage({ id: 'INVENTORY_EGRESS.HEADER' })}
+      headerAction={
+        // Angular egress.component.html:6-16: the "Tipo" selector lives in the card header
+        // toolbar (beside the title), NOT in the categories row — so the category scrollmenu
+        // spans the full width exactly like sale.component.html. Hardcoded (non-translated)
+        // "Tipo" label + OrderTypeUtils.getOrderTypes() options.
+        <label className="flex items-center gap-2 whitespace-nowrap text-xs text-text-muted">
           Tipo
           <select
             aria-label="Tipo"
@@ -135,6 +121,25 @@ export function EgressPage() {
             ))}
           </select>
         </label>
+      }
+    >
+      {/* Full-width category scrollmenu, identical to sale.tsx (Angular's shared
+          `.scrollmenu.no-scrollbar`, egress.component.html:20-27). */}
+      <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto pb-1">
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            onClick={() => selectCategory(category)}
+            className={`whitespace-nowrap rounded-md px-1 py-2 text-sm font-medium transition-colors ${
+              category.id === selectedCategoryId
+                ? 'bg-primary text-white'
+                : 'bg-primary-light text-primary hover:bg-primary/20'
+            }`}
+          >
+            {category.name}
+          </button>
+        ))}
       </div>
 
       <SaleCategoryProducts

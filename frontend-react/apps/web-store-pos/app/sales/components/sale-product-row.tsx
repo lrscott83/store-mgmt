@@ -54,23 +54,28 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
     <form className="flex items-center gap-3 border-b border-border py-2 last:border-b-0">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-text">{product.name}</p>
-        {isNormalSale ? (
+        {isNormalSale && (
           <span className="text-sm text-primary">${product.price.toFixed(2)}</span>
-        ) : (
-          <label className="mt-1 flex flex-col gap-0.5 text-xs text-muted">
-            {intl.formatMessage({ id: 'GENERAL.PRICE' })}
-            <input
-              type="number"
-              min={0}
-              value={price}
-              onChange={(e) => setPrice(Number(e.target.value))}
-              className="w-24 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </label>
         )}
       </div>
 
-      <label className="flex flex-col gap-0.5 text-xs text-muted">
+      {/* Editable price only for non-Normal sales (Mayorista/etc). Label sits INLINE beside the
+          input and shares the row with Cantidad so both textboxes align on the same line —
+          Angular renders both as side-by-side mat-form-fields (sale-product-row.component.html). */}
+      {!isNormalSale && (
+        <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
+          {intl.formatMessage({ id: 'GENERAL.PRICE' })}
+          <input
+            type="number"
+            min={0}
+            value={price}
+            onChange={(e) => setPrice(Number(e.target.value))}
+            className="w-24 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </label>
+      )}
+
+      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
         {intl.formatMessage({ id: 'GENERAL.QUANTITY' })}
         <input
           type="number"
