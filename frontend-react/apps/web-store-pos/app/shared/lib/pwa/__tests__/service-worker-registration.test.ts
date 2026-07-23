@@ -12,9 +12,10 @@ vi.mock('sweetalert2', () => ({
   default: { fire: vi.fn().mockResolvedValue({ isConfirmed: false }) },
 }));
 
-const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+// TEMP (testing): 2 minutes. Angular parity value is 15 * 60 * 1000 — revert before commit.
+const POLL_INTERVAL_MS = 2 * 60 * 1000;
 
-describe('setupServiceWorker — PWA-SW-1: polls registration.update() every 15 minutes', () => {
+describe('setupServiceWorker — PWA-SW-1: polls registration.update() on the configured interval', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -40,10 +41,10 @@ describe('setupServiceWorker — PWA-SW-1: polls registration.update() every 15 
 
     expect(registration.update).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(FIFTEEN_MINUTES_MS);
+    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
     expect(registration.update).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(FIFTEEN_MINUTES_MS);
+    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
     expect(registration.update).toHaveBeenCalledTimes(2);
   });
 

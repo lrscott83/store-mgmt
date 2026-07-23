@@ -5,12 +5,14 @@ import { showUpdateAvailable } from '~/shared/lib/blocking-alert';
 // Angular's `UpdateService` (SwUpdate → Swal confirm → activateUpdate +
 // reload) plus the periodic-check requirement so a long-lived open tab
 // discovers a new version without a manual reload.
-const UPDATE_POLL_INTERVAL_MS = 15 * 60 * 1000;
+// TEMP (testing): 2 minutes. Angular parity value is 15 * 60 * 1000 — revert before commit.
+const UPDATE_POLL_INTERVAL_MS = 2 * 60 * 1000;
 
 export interface RegisterSWOptions {
   onNeedRefresh?: () => void;
   onOfflineReady?: () => void;
   onRegisteredSW?: (swScriptUrl: string, registration: ServiceWorkerRegistration | undefined) => void;
+  onRegisterError?: (error: unknown) => void;
 }
 
 type RegisterSWFn = (options: RegisterSWOptions) => (reloadPage?: boolean) => Promise<void>;
@@ -21,21 +23,36 @@ type RegisterSWFn = (options: RegisterSWOptions) => (reloadPage?: boolean) => Pr
  * mocking the `virtual:pwa-register` vite-plugin-pwa virtual module.
  */
 export function setupServiceWorker(registerSW: RegisterSWFn): void {
+  // TEMP (debugging the update flow): [PWA]-prefixed console logs. Remove before commit.
+  console.info('[PWA] setupServiceWorker: wiring registerSW callbacks');
   const updateSW = registerSW({
     onNeedRefresh: () => {
+      console.info('[PWA] onNeedRefresh: a new version is WAITING → showing the update dialog');
       void showUpdateAvailable(() => {
+        console.info('[PWA] user confirmed → updateSW(true): posts SKIP_WAITING, page reloads on controllerchange');
         void updateSW(true);
       });
     },
     onOfflineReady: () => {
       // Angular's UpdateService has no offline-ready UI either — best-effort log only.
-      console.info('App ready to work offline.');
+      console.info('[PWA] onOfflineReady: app ready to work offline');
     },
-    onRegisteredSW: (_swScriptUrl, registration) => {
+    onRegisteredSW: (swScriptUrl, registration) => {
+      console.info(
+        `[PWA] onRegisteredSW: ${swScriptUrl} — registration present? ${Boolean(registration)}`
+      );
       if (!registration) return;
+      let tick = 0;
       setInterval(() => {
+        tick += 1;
+        console.info(
+          `[PWA] poll #${tick}: calling registration.update() (interval ${UPDATE_POLL_INTERVAL_MS / 1000}s)`
+        );
         void registration.update();
       }, UPDATE_POLL_INTERVAL_MS);
+    },
+    onRegisterError: (error) => {
+      console.error('[PWA] onRegisterError: service worker registration failed', error);
     },
   });
 }

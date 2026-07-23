@@ -29,11 +29,14 @@ const FONTS_CACHE = 'fonts-v1';
 // FIRST install (no existing controller) there is no `waiting` phase: the worker
 // activates directly and `activate`'s `clients.claim()` takes control.
 self.addEventListener('install', (event) => {
+  // TEMP (debugging the update flow): [SW]-prefixed console logs. Remove before commit.
+  console.info('[SW] install: precaching shell — NOT calling skipWaiting (stays waiting until user confirms)');
   event.waitUntil(
     caches.open(PRECACHE_NAME).then(async (cache) => {
       // self.__WB_MANIFEST is injected by vite-plugin-pwa (workbox) at build time
       const manifest = self.__WB_MANIFEST ?? [];
       const urls = manifest.map((entry) => entry.url);
+      console.info(`[SW] install: ${urls.length} manifest entries to precache`);
       if (urls.length > 0) {
         await cache.addAll(urls);
       }
@@ -43,6 +46,7 @@ self.addEventListener('install', (event) => {
 
 // Activate: clean old caches and claim clients
 self.addEventListener('activate', (event) => {
+  console.info('[SW] activate: cleaning old caches + clients.claim() (new version is now controlling)');
   const currentCaches = [PRECACHE_NAME, APP_CHUNKS_CACHE, FONTS_CACHE];
 
   event.waitUntil(
@@ -151,6 +155,7 @@ self.addEventListener('message', (event) => {
   }
 
   if (event.data?.type === 'SKIP_WAITING') {
+    console.info('[SW] SKIP_WAITING received → skipWaiting() (user confirmed the update)');
     self.skipWaiting();
   }
 });
