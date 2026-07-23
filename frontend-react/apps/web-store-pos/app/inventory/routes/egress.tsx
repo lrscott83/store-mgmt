@@ -98,43 +98,46 @@ export function EgressPage() {
     });
   }
 
-  return (
-    <Card title={intl.formatMessage({ id: 'INVENTORY_EGRESS.HEADER' })}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              type="button"
-              onClick={() => selectCategory(category)}
-              className={`whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                category.id === selectedCategoryId
-                  ? 'bg-primary text-white'
-                  : 'bg-primary-light text-primary hover:bg-primary/20'
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
-        </div>
+  // Angular: mat-form-field with hardcoded (non-translated) "Tipo" label +
+  // OrderTypeUtils.getOrderTypes() options, rendered in the card-toolbar / top-right
+  // (egress.component.html:6-17).
+  const typeSelector = (
+    <label className="flex items-center gap-2 text-xs text-text-muted">
+      Tipo
+      <select
+        aria-label="Tipo"
+        value={orderType}
+        onChange={(e) => setOrderType(Number(e.target.value) as OrderType)}
+        className="rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
+      >
+        {ORDER_TYPE_OPTIONS.map((type) => (
+          <option key={type.value} value={type.value}>
+            {type.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
-        {/* Angular: mat-form-field with hardcoded (non-translated) "Tipo" label +
-            OrderTypeUtils.getOrderTypes() options (egress.component.html:7-16). */}
-        <label className="flex flex-col gap-0.5 text-xs text-text-muted">
-          Tipo
-          <select
-            aria-label="Tipo"
-            value={orderType}
-            onChange={(e) => setOrderType(Number(e.target.value) as OrderType)}
-            className="rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
+  return (
+    <Card title={intl.formatMessage({ id: 'INVENTORY_EGRESS.HEADER' })} headerAction={typeSelector}>
+      {/* Category scrollmenu — 1:1 with the Sale screen (sale.tsx): smaller buttons,
+          hidden scrollbar (Angular's `scrollmenu no-scrollbar`, egress.component.html:21). */}
+      <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto pb-1">
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            onClick={() => selectCategory(category)}
+            className={`whitespace-nowrap rounded-md px-1 py-2 text-sm font-medium transition-colors ${
+              category.id === selectedCategoryId
+                ? 'bg-primary text-white'
+                : 'bg-primary-light text-primary hover:bg-primary/20'
+            }`}
           >
-            {ORDER_TYPE_OPTIONS.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            {category.name}
+          </button>
+        ))}
       </div>
 
       <SaleCategoryProducts

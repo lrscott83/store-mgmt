@@ -57,7 +57,7 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
         {isNormalSale ? (
           <span className="text-sm text-primary">${product.price.toFixed(2)}</span>
         ) : (
-          <label className="mt-1 flex flex-col gap-0.5 text-xs text-muted">
+          <label className="mt-1 flex items-center gap-2 text-xs text-muted">
             {intl.formatMessage({ id: 'GENERAL.PRICE' })}
             <input
               type="number"
