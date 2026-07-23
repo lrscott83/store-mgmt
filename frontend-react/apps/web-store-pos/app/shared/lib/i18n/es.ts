@@ -297,6 +297,9 @@ const messages: Record<string, string> = {
   // GENERAL.RESPONSE.* (Angular GENERAL.RESPONSE — used as the blocking-error-modal title,
   // e.g. sale-product-row.component.ts:72 Swal.fire title)
   'GENERAL.RESPONSE.ERROR_TITLE': 'Error',
+  // GENERAL.RESPONSE.SUCCESS_TITLE (toast-notifications-parity) — Angular's toastrService
+  // success-toast title (e.g. nav-right.component.ts:215, features.component.ts:31).
+  'GENERAL.RESPONSE.SUCCESS_TITLE': 'Éxito',
   // GENERAL.RESPONSE.ERROR500_MESSAGE — Angular's generic technical-support fallback.
   'GENERAL.RESPONSE.ERROR500_MESSAGE':
     'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.',
