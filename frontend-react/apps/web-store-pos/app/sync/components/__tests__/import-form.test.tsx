@@ -13,6 +13,14 @@ vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
 }));
 
+// TOAST-CALLSITES #4 (toast-notifications-parity): sync import success now fires a toast
+// instead of the inline <InfoBox variant="primary"> success banner.
+const showToastSuccessMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+  showToastError: vi.fn(),
+}));
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
@@ -75,8 +83,8 @@ describe('ImportForm — S-IMPORT-2: missing password blocked', () => {
   });
 });
 
-describe('ImportForm — S-IMPORT-3: success shows Angular single-line message (no per-entity counts)', () => {
-  it('shows the Angular success line and NO counts panel after success', async () => {
+describe('ImportForm — S-IMPORT-3: success shows Angular single-line toast (no per-entity counts)', () => {
+  it('fires showToastSuccess with the Angular success line, no title, and renders no counts panel', async () => {
     const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
     render(
       <Wrapper>
@@ -96,11 +104,13 @@ describe('ImportForm — S-IMPORT-3: success shows Angular single-line message (
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText('Los datos se importaron correctamente.'),
-      ).toBeInTheDocument(),
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Los datos se importaron correctamente.'),
     );
 
+    // The old inline success InfoBox is gone (toast-notifications-parity #4).
+    expect(
+      screen.queryByText('Los datos se importaron correctamente.'),
+    ).not.toBeInTheDocument();
     // Angular shows no summary panel, no per-entity breakdown, no counts
     expect(screen.queryByText(/Importación completada/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/insertado/i)).not.toBeInTheDocument();
@@ -199,7 +209,7 @@ describe('ImportForm — S-IMPORT-7: shared UI kit (Card/Button fab/InfoBox)', (
     expect(screen.getByRole('button', { name: /importar/i }).className).toContain('rounded-full');
   });
 
-  it('renders the success message inside an InfoBox banner', async () => {
+  it('fires the success toast instead of an InfoBox banner (toast-notifications-parity #4)', async () => {
     const onImport = vi.fn().mockResolvedValue(SUCCESS_RESULT);
     render(
       <Wrapper>
@@ -216,9 +226,9 @@ describe('ImportForm — S-IMPORT-7: shared UI kit (Card/Button fab/InfoBox)', (
     fireEvent.click(screen.getByRole('button', { name: /importar/i }));
 
     await waitFor(() => {
-      const banner = screen.getByText('Los datos se importaron correctamente.');
-      expect(banner.closest('[role="status"]')).not.toBeNull();
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Los datos se importaron correctamente.');
     });
+    expect(screen.queryByText('Los datos se importaron correctamente.')).not.toBeInTheDocument();
   });
 });
 

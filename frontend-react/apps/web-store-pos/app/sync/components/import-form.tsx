@@ -7,6 +7,7 @@ import { FileInput } from '~/shared/components/ui/file-input';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { showToastSuccess } from '~/shared/lib/toast';
 
 export interface ImportFormProps {
   /**
@@ -28,18 +29,15 @@ export function ImportForm({ onImport }: ImportFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   function handleFileChange(file: File | null) {
     setSelectedFile(file);
     setError('');
-    setSuccess(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    setSuccess(false);
 
     if (!selectedFile) {
       setError(intl.formatMessage({ id: 'SYNC.ERROR_NO_FILE' }));
@@ -55,8 +53,8 @@ export function ImportForm({ onImport }: ImportFormProps) {
     try {
       const syncResult: SyncResult = await onImport(selectedFile, password);
       if (syncResult.succeeded) {
-        // Angular shows only a single success toast — no per-entity counts.
-        setSuccess(true);
+        // Angular shows only a single success toast — no per-entity counts, no title.
+        showToastSuccess(intl.formatMessage({ id: 'SYNC.IMPORT_SUCCESS' }));
       } else {
         // Angular parity (receive-data.component.ts:48-54): a blocking error Swal (icon
         // 'error', GENERAL.RESPONSE.ERROR_TITLE), text = the first domain error, else the
@@ -128,12 +126,6 @@ export function ImportForm({ onImport }: ImportFormProps) {
         <Button type="submit" variant="fab" disabled={busy}>
           {intl.formatMessage({ id: 'SYNC.IMPORT_BUTTON' })}
         </Button>
-
-        {success && (
-          <InfoBox variant="primary">
-            {intl.formatMessage({ id: 'SYNC.IMPORT_SUCCESS' })}
-          </InfoBox>
-        )}
       </form>
     </Card>
   );
