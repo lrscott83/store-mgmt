@@ -11,6 +11,14 @@ vi.mock('react-router', async (importOriginal) => {
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+    // `Meta`/`Links` need the framework-mode router context that only the real dev/SSR
+    // server provides (`<HydratedRouter>`); Vitest never runs that server. They render
+    // nothing user-visible, so they're stubbed as no-ops here to let `Layout` render in
+    // isolation for the ToastContainer assertion below.
+    Meta: () => null,
+    Links: () => null,
+    ScrollRestoration: () => null,
+    Scripts: () => null,
   };
 });
 
@@ -30,7 +38,19 @@ vi.mock('~/shared/lib/i18n/i18n-provider', () => ({
   I18nProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-import App, { ErrorBoundary } from '../root';
+// TOAST-CONTAINER (toast-notifications-parity): recording stub so the test can assert
+// root.tsx mounts exactly one <ToastContainer> with the Angular-equivalent config, without
+// pulling in the real react-toastify runtime.
+const containerProps = vi.fn();
+vi.mock('react-toastify', () => ({
+  ToastContainer: (props: Record<string, unknown>) => {
+    containerProps(props);
+    return null;
+  },
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+import App, { ErrorBoundary, Layout } from '../root';
 
 function mockRouteError(status: number, statusText = '') {
   return { status, statusText, internal: false, data: null };
@@ -129,6 +149,27 @@ describe('App (root) — global PWA install button (Angular app.component parity
     );
 
     expect(screen.getByRole('button', { name: /instalar app/i })).toBeInTheDocument();
+  });
+});
+
+// TOAST-CONTAINER (toast-notifications-parity): mirrors Angular's `ToastrModule.forRoot({
+// closeButton: true, timeOut: 1000, positionClass: 'toast-top-right' })` (app.module.ts:50-55).
+describe('Layout — mounts a single global <ToastContainer> (Angular ToastrModule.forRoot parity)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('mounts exactly one ToastContainer configured top-right, 1000ms autoClose, close button enabled', () => {
+    render(
+      <MemoryRouter>
+        <Layout>{null}</Layout>
+      </MemoryRouter>,
+    );
+
+    expect(containerProps).toHaveBeenCalledTimes(1);
+    expect(containerProps).toHaveBeenCalledWith(
+      expect.objectContaining({ position: 'top-right', autoClose: 1000, closeButton: true }),
+    );
   });
 });
 

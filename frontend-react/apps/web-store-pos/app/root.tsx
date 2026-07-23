@@ -17,8 +17,10 @@ import { registerAuthRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { InstallAppButton } from '~/shared/components/install-app-button';
+import { ToastContainer } from 'react-toastify';
 
 import '@store-mgmt/web-common/styles.css';
+import 'react-toastify/ReactToastify.css';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -54,6 +56,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <I18nProvider>{children}</I18nProvider>
+        {/* Mirrors Angular's ToastrModule.forRoot({ closeButton: true, timeOut: 1000,
+            positionClass: 'toast-top-right', preventDuplicates: true }) (app.module.ts:50-55).
+            Single global container — react-toastify's event bus fires toasts from anywhere
+            in the tree, so mounting more than one here would double-render. Duplicate
+            prevention is enforced via a message-keyed `toastId` in `shared/lib/toast.tsx`,
+            not a container prop. */}
+        <ToastContainer position="top-right" autoClose={1000} closeButton />
         <ScrollRestoration />
         <Scripts />
       </body>
