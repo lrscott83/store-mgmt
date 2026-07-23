@@ -8,7 +8,8 @@ import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon, ChevronDownIcon } from '~/shared/components/ui/icons';
-import { showBlockingError, showBlockingSuccess, showBlockingInfo, confirmDialog } from '~/shared/lib/blocking-alert';
+import { showBlockingError, showBlockingInfo, confirmDialog } from '~/shared/lib/blocking-alert';
+import { showToastSuccess } from '~/shared/lib/toast';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
@@ -216,11 +217,11 @@ export function ProductsPage() {
     setModal(null);
 
     // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
-    // toast with the imported count, PLUS a conditional info dialog when the response did not
-    // fully succeed ("some already exist"). React has no toast system, so both Angular messages
-    // are surfaced via Swal wrappers; the Spanish literals are Angular's own (component.ts:60,64),
-    // preserved verbatim. Shown sequentially since Swal is modal.
-    await showBlockingSuccess(`Importados ${csvProducts.length} productos correctamente.`);
+    // toast with the imported count (no title), PLUS a conditional info dialog when the
+    // response did not fully succeed ("some already exist") — the Spanish literal is
+    // Angular's own (component.ts:60,64), preserved verbatim. The toast is non-blocking, so
+    // it's no longer sequenced behind an awaited call before the conditional info dialog.
+    showToastSuccess(`Importados ${csvProducts.length} productos correctamente.`);
     if (!result.succeeded) {
       await showBlockingInfo(
         intl.formatMessage({ id: 'GENERAL.INFORMATION' }),

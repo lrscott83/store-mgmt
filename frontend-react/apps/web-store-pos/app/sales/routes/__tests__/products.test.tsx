@@ -86,7 +86,6 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
 }));
 
 const showBlockingErrorMock = vi.fn();
-const showBlockingSuccessMock = vi.fn((..._args: unknown[]) => Promise.resolve());
 const showBlockingInfoMock = vi.fn((..._args: unknown[]) => Promise.resolve());
 // Angular parity (category-product-list.component.ts:86-103, onDeleteProduct): a confirmDialog
 // Swal gates deleteProduct. Defaults to resolving true so pre-existing delete-flow tests that
@@ -94,9 +93,17 @@ const showBlockingInfoMock = vi.fn((..._args: unknown[]) => Promise.resolve());
 const confirmDialogMock = vi.fn((..._args: unknown[]) => Promise.resolve(true));
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
-  showBlockingSuccess: (...args: unknown[]) => showBlockingSuccessMock(...args),
   showBlockingInfo: (...args: unknown[]) => showBlockingInfoMock(...args),
   confirmDialog: (...args: unknown[]) => confirmDialogMock(...args),
+}));
+
+// TOAST-CALLSITES #1 (toast-notifications-parity): CSV import success now fires a toast
+// instead of a blocking Swal.
+const showToastSuccessMock = vi.hoisted(() => vi.fn());
+const showToastErrorMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+  showToastError: (...args: unknown[]) => showToastErrorMock(...args),
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -164,9 +171,10 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       errors: [],
     });
     productServiceSpies.createCsvProducts.mockClear();
-    showBlockingSuccessMock.mockClear();
     showBlockingInfoMock.mockClear();
     showBlockingErrorMock.mockClear();
+    showToastSuccessMock.mockClear();
+    showToastErrorMock.mockClear();
   });
 
   it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {
@@ -705,7 +713,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showBlockingSuccessMock).toHaveBeenCalledWith('Importados 1 productos correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos correctamente.'),
       );
       expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
@@ -735,7 +743,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
           'Algunos productos no fueron importados porque ya existen.',
         ),
       );
-      expect(showBlockingSuccessMock).toHaveBeenCalledTimes(1);
+      expect(showToastSuccessMock).toHaveBeenCalledTimes(1);
     });
   });
 
