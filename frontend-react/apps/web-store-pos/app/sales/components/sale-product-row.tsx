@@ -51,52 +51,50 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
   }
 
   return (
-    <form className="flex items-center gap-3 border-b border-border py-2 last:border-b-0">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-text">{product.name}</p>
-        {isNormalSale && (
-          <span className="text-sm text-primary">${product.price.toFixed(2)}</span>
-        )}
-      </div>
+    <form className="flex flex-col gap-1 border-b border-border py-2 last:border-b-0">
+      {/* Angular sale-product-row.component.html: the product name spans its own line on top;
+          the price + quantity fields and the add-to-cart button sit on the row below, aligned. */}
+      <p className="truncate text-sm text-text">{product.name}</p>
 
-      {/* Editable price only for non-Normal sales (Mayorista/etc). Label sits INLINE beside the
-          input and shares the row with Cantidad so both textboxes align on the same line —
-          Angular renders both as side-by-side mat-form-fields (sale-product-row.component.html). */}
-      {!isNormalSale && (
-        <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
-          {intl.formatMessage({ id: 'GENERAL.PRICE' })}
+      <div className="flex items-end gap-3">
+        {isNormalSale ? (
+          <span className="text-sm text-primary">${product.price.toFixed(2)}</span>
+        ) : (
+          <label className="flex flex-col gap-0.5 text-xs text-muted">
+            {intl.formatMessage({ id: 'GENERAL.PRICE' })}
+            <input
+              type="number"
+              min={0}
+              value={price}
+              onChange={(e) => setPrice(Number(e.target.value))}
+              className="w-24 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+        )}
+
+        <label className="flex flex-col gap-0.5 text-xs text-muted">
+          {intl.formatMessage({ id: 'GENERAL.QUANTITY' })}
           <input
             type="number"
-            min={0}
-            value={price}
-            onChange={(e) => setPrice(Number(e.target.value))}
+            min={1}
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
             className="w-24 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </label>
-      )}
 
-      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
-        {intl.formatMessage({ id: 'GENERAL.QUANTITY' })}
-        <input
-          type="number"
-          min={1}
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-          className="w-16 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </label>
-
-      <button
-        type="button"
-        onClick={handleAddToCart}
-        aria-label={intl.formatMessage({ id: 'GENERAL.ADD' })}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-card hover:bg-primary-hover transition-colors"
-      >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-      </button>
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          aria-label={intl.formatMessage({ id: 'GENERAL.ADD' })}
+          className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-card hover:bg-primary-hover transition-colors"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </button>
+      </div>
     </form>
   );
 }
