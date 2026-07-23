@@ -69,11 +69,18 @@ the shared `apiClient`.
 
 **PAGE-4** — Clicking the button MUST call `featureHttpService.activateFeatures()`.
 
-**PAGE-5** — When the response has `succeeded === true`, the page MUST display an inline success
-message using the i18n key `FEATURES.FEATURES_ACTIVATED`. No toast is used.
+**PAGE-5** — When the response has `succeeded === true`, the page MUST surface a non-blocking
+success **toast** via `showToastSuccess` (`~/shared/lib/toast`), using the i18n key
+`FEATURES.FEATURES_ACTIVATED` as the message and `GENERAL.RESPONSE.SUCCESS_TITLE` ("Éxito") as the
+title, mirroring Angular's `toastrService.success(...)` (`features.component.ts:30-32`). No
+persisted inline message is used. (Supersedes the earlier "inline / no toast" wording and the
+`frontend-parity-audit` "inline (not toastr)" decision — toast-notifications-parity.)
 
 **PAGE-6** — When the response has `succeeded === false` OR the HTTP call throws, the page MUST
-display an inline error message using the i18n key `FEATURES.UNEXPECTED_ERROR`. No toast is used.
+surface a non-blocking error **toast** via `showToastError`, using `FEATURES.UNEXPECTED_ERROR` as
+the message and `GENERAL.RESPONSE.ERROR_TITLE` ("Error") as the title. This intentionally corrects
+Angular's broken `GENERAL.RESPONSE.ERROR` missing-key title; the message text is identical to
+Angular. No persisted inline message is used. (toast-notifications-parity)
 
 **PAGE-7** — No loading state or button-disabled state is implemented (Angular has none).
 
