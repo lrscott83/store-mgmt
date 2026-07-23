@@ -49,9 +49,13 @@ const showBlockingErrorMock = vi.hoisted(() => vi.fn());
 // T4 (Angular parity, nav-right.component.ts:164/177/190 createOrder validation guards):
 // blocking info Swals, mocked via the shared wrapper rather than asserting inline DOM text.
 const showAcknowledgeErrorMock = vi.hoisted(() => vi.fn());
+// Angular's createOrder success path fires toastrService.success(...) (nav-right.component.ts:213);
+// React surfaces it through showBlockingSuccess, the app's toastr stand-in, since the panel closes.
+const showBlockingSuccessMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: showBlockingErrorMock,
   showAcknowledgeError: showAcknowledgeErrorMock,
+  showBlockingSuccess: showBlockingSuccessMock,
 }));
 
 // Mock useAuthStore (needed for OrderOfflineService instantiation + credits-module gating).
@@ -568,19 +572,22 @@ describe('CartShell — createOrder validations (Registrar)', () => {
     });
   });
 
-  it('CART-07: shows ORDER_CREATED success message and clears the cart on a valid submission', async () => {
+  it('CART-07: closes the cart popup, shows the ORDER_CREATED success alert, and clears the cart on a valid submission', async () => {
     const product = makeProduct();
     const clear = vi.fn();
     mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5), clear });
     renderCartShell();
     openCart();
+    expect(screen.getByText('Venta actual')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Registrar'));
 
     await waitFor(() => {
-      expect(screen.getByText('La venta fue creada satisfactoriamente.')).toBeInTheDocument();
+      expect(showBlockingSuccessMock).toHaveBeenCalledWith('La venta fue creada satisfactoriamente.');
     });
     expect(clear).toHaveBeenCalledTimes(1);
+    // Sale registered -> the cart popup closes (Angular ngbDropdown autoClose parity).
+    expect(screen.queryByText('Venta actual')).not.toBeInTheDocument();
   });
 
   // WU3 — createOrder must thread the cart store's orderDescription into the `details`

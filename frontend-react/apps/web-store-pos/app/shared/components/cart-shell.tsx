@@ -16,7 +16,7 @@ import { getOrderTypeText } from '~/sales/lib/order-type-utils';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
-import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
+import { showBlockingError, showAcknowledgeError, showBlockingSuccess } from '~/shared/lib/blocking-alert';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -64,7 +64,6 @@ export function CartShell() {
   const intl = useIntl();
   const [isOpen, setIsOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // UI-only state, NOT persisted to the order — matches Angular's NavRightComponent
   // fields `payment` and `mustGenerateFacture`, which live on the component, not the
@@ -107,7 +106,6 @@ export function CartShell() {
     clear();
     resetTransientFields();
     setSubmitError(null);
-    setSubmitSuccess(null);
   }
 
   // 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
@@ -155,7 +153,6 @@ export function CartShell() {
 
   async function handleCreateOrder() {
     setSubmitError(null);
-    setSubmitSuccess(null);
 
     // 1:1 port of Angular's NavRightComponent.createOrder() validation sequence
     // (nav-right.component.ts:164/177/190) — each guard is a blocking, OK-only Swal
@@ -216,8 +213,13 @@ export function CartShell() {
       // calls generateTicket(), which is dead/disabled code in Angular itself (no-op
       // console.log — jsPDF generation is commented out). The toggle is preserved for
       // parity but produces no print output here either, matching Angular exactly.
-      setSubmitSuccess(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }));
       clearCartAfterSuccessfulOrder();
+      // Angular createOrder success (nav-right.component.ts:213-221): toastrService.success(...)
+      // then the ngbDropdown (autoClose="true") closes. React closes the panel explicitly and
+      // surfaces the success through showBlockingSuccess (the app's toastr stand-in) since the
+      // panel — and its inline banner — is now gone.
+      setIsOpen(false);
+      showBlockingSuccess(intl.formatMessage({ id: 'SHOPPING_CART.ORDER_CREATED' }));
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : intl.formatMessage({ id: 'GENERAL.ERROR' }));
     } finally {
@@ -443,11 +445,6 @@ export function CartShell() {
           {submitError && (
             <p className="px-4 py-2 text-xs text-danger text-center" role="alert">
               {submitError}
-            </p>
-          )}
-          {submitSuccess && (
-            <p className="px-4 py-2 text-xs text-success text-center" role="status">
-              {submitSuccess}
             </p>
           )}
         </div>
