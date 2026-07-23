@@ -5,7 +5,7 @@ import { featureHttpService } from '~/admin/features/lib/services/feature-http-s
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { EditIcon } from '~/shared/components/ui/icons';
-import { showBlockingSuccess, showBlockingError } from '~/shared/lib/blocking-alert';
+import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 
 export const clientLoader = superAdminLoader;
 
@@ -19,17 +19,20 @@ export function FeaturesPage() {
     try {
       const result = await featureHttpService.activateFeatures();
       if (result.succeeded) {
-        await showBlockingSuccess(formatMessage({ id: 'FEATURES.FEATURES_ACTIVATED' }));
+        showToastSuccess(
+          formatMessage({ id: 'FEATURES.FEATURES_ACTIVATED' }),
+          formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }),
+        );
       } else {
-        showBlockingError(
+        showToastError(
+          formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }),
           formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-          formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' })
         );
       }
     } catch {
-      showBlockingError(
+      showToastError(
+        formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }),
         formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-        formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' })
       );
     } finally {
       setIsLoading(false);

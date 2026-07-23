@@ -17,11 +17,11 @@ vi.mock('~/admin/features/lib/services/feature-http-service', () => ({
   },
 }));
 
-// ─── blocking-alert mock ───────────────────────────────────────────────────────
+// ─── toast mock (toast-notifications-parity #5/#6/#7) ───────────────────────────
 
-vi.mock('~/shared/lib/blocking-alert', () => ({
-  showBlockingSuccess: vi.fn().mockResolvedValue(undefined),
-  showBlockingError: vi.fn(),
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: vi.fn(),
+  showToastError: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -164,11 +164,11 @@ describe('FeaturesPage — button click', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('FeaturesPage — success state', () => {
-  it('calls showBlockingSuccess with FEATURES.FEATURES_ACTIVATED when succeeded is true (no static <p>)', async () => {
+  it('calls showToastSuccess with FEATURES.FEATURES_ACTIVATED + "Éxito" title when succeeded is true (no static <p>)', async () => {
     const { featureHttpService } = await import(
       '~/admin/features/lib/services/feature-http-service'
     );
-    const { showBlockingSuccess } = await import('~/shared/lib/blocking-alert');
+    const { showToastSuccess } = await import('~/shared/lib/toast');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: true,
       data: true,
@@ -189,8 +189,9 @@ describe('FeaturesPage — success state', () => {
     );
 
     await waitFor(() => {
-      expect(showBlockingSuccess).toHaveBeenCalledWith(
-        esMessages['FEATURES.FEATURES_ACTIVATED']
+      expect(showToastSuccess).toHaveBeenCalledWith(
+        esMessages['FEATURES.FEATURES_ACTIVATED'],
+        esMessages['GENERAL.RESPONSE.SUCCESS_TITLE'],
       );
     });
     // Angular's success feedback is a toastr, not a static persisted <p> — proves the
@@ -206,11 +207,11 @@ describe('FeaturesPage — success state', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('FeaturesPage — error state (succeeded false)', () => {
-  it('calls showBlockingError with FEATURES.UNEXPECTED_ERROR when succeeded is false (no static <p>)', async () => {
+  it('calls showToastError with FEATURES.UNEXPECTED_ERROR + "Error" title when succeeded is false (no static <p>)', async () => {
     const { featureHttpService } = await import(
       '~/admin/features/lib/services/feature-http-service'
     );
-    const { showBlockingError } = await import('~/shared/lib/blocking-alert');
+    const { showToastError } = await import('~/shared/lib/toast');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: false,
       data: false,
@@ -231,9 +232,9 @@ describe('FeaturesPage — error state (succeeded false)', () => {
     );
 
     await waitFor(() => {
-      expect(showBlockingError).toHaveBeenCalledWith(
+      expect(showToastError).toHaveBeenCalledWith(
+        esMessages['FEATURES.UNEXPECTED_ERROR'],
         esMessages['GENERAL.RESPONSE.ERROR_TITLE'],
-        esMessages['FEATURES.UNEXPECTED_ERROR']
       );
     });
     expect(
@@ -258,7 +259,7 @@ describe('FeaturesPage — double-submit guard', () => {
     );
 
     vi.mocked(featureHttpService.activateFeatures).mockReturnValueOnce(firstCall as any);
-    const { showBlockingSuccess } = await import('~/shared/lib/blocking-alert');
+    const { showToastSuccess } = await import('~/shared/lib/toast');
 
     const { FeaturesPage } = await import('../features');
     render(
@@ -281,8 +282,9 @@ describe('FeaturesPage — double-submit guard', () => {
     resolveFirst({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
 
     await waitFor(() => {
-      expect(showBlockingSuccess).toHaveBeenCalledWith(
-        esMessages['FEATURES.FEATURES_ACTIVATED']
+      expect(showToastSuccess).toHaveBeenCalledWith(
+        esMessages['FEATURES.FEATURES_ACTIVATED'],
+        esMessages['GENERAL.RESPONSE.SUCCESS_TITLE'],
       );
     });
 
@@ -296,11 +298,11 @@ describe('FeaturesPage — double-submit guard', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('FeaturesPage — error state (HTTP error)', () => {
-  it('calls showBlockingError with FEATURES.UNEXPECTED_ERROR when activateFeatures throws', async () => {
+  it('calls showToastError with FEATURES.UNEXPECTED_ERROR + "Error" title when activateFeatures throws', async () => {
     const { featureHttpService } = await import(
       '~/admin/features/lib/services/feature-http-service'
     );
-    const { showBlockingError } = await import('~/shared/lib/blocking-alert');
+    const { showToastError } = await import('~/shared/lib/toast');
     vi.mocked(featureHttpService.activateFeatures).mockRejectedValue(
       new Error('Network error')
     );
@@ -317,9 +319,9 @@ describe('FeaturesPage — error state (HTTP error)', () => {
     );
 
     await waitFor(() => {
-      expect(showBlockingError).toHaveBeenCalledWith(
+      expect(showToastError).toHaveBeenCalledWith(
+        esMessages['FEATURES.UNEXPECTED_ERROR'],
         esMessages['GENERAL.RESPONSE.ERROR_TITLE'],
-        esMessages['FEATURES.UNEXPECTED_ERROR']
       );
     });
   });
