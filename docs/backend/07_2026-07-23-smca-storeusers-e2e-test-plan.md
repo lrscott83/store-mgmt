@@ -68,6 +68,16 @@ SuperAdmin (bypasses both gates → cheapest seeding).
 - `Get_by_id_as_store_user_with_users_feature_returns_400_guard`
 - `Create_as_store_user_with_users_feature_returns_400_guard`
 
+### `StoreUsersCreateGapTests`
+- `Create_with_multiple_roles_persists_a_userrole_each` (DB assert — one `UserRole` per `RoleId`,
+  verified `foreach` at `CreateStoreUserCommand.cs:69-71`)
+- `Create_with_valid_email_persists_email`
+
+### `StoreUsersListGapTests`
+- `List_includeInactive_true_includes_inactive_store_user`
+- `List_includeInactive_false_excludes_inactive_store_user`
+  (the flag filters on `StoreUser.IsActive`, `StoreUserRepository.cs:47,56`; matched by `StoreUserDto.Login`)
+
 ## 5. Seeding needs (reuse `04`/`05`; no new helper class)
 
 - SuperAdmin actor: `DbTestHelpers.SeedSuperAdminAsync`.

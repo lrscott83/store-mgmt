@@ -361,6 +361,180 @@ public sealed class StoreUsersGuardTests
 
 ---
 
+## Task 6: `StoreUsersCreateGapTests` (multi-role + email)
+
+**Reuses:** `DbTestHelpers.{SeedSuperAdminAsync, GetUserByLoginAsync, AuthedClient, CleanupUserAsync}`,
+`StoreSeed.{SeedStoreAsync, CleanupStoreFixtureAsync}`. Verified: `CreateStoreUserCommand` loops
+`foreach (roleId in RoleIds) UserRole.Create(...)` (`CreateStoreUserCommand.cs:69-71`).
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using Infrastructure.Persistence.Contexts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.StoreUsers;
+
+[Collection("e2e")]
+public sealed class StoreUsersCreateGapTests
+{
+    private readonly AppTestFactory _f;
+    private const int StoreUserRoleId = 3; // RoleType.StoreUser
+    private const int ReSellerRoleId = 4;  // RoleType.ReSeller — both visible to a SuperAdmin actor
+    public StoreUsersCreateGapTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    [Fact]
+    public async Task Create_with_multiple_roles_persists_a_userrole_each()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var store = await StoreSeed.SeedStoreAsync(_f, $"SUG-{Guid.NewGuid():N}", approved: true);
+        var newLogin = $"su-{Guid.NewGuid():N}@test.com";
+        Guid createdUserId = Guid.Empty;
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).PostAsJsonAsync("/api/v1/StoreUsers", new
+            {
+                StoreId = store.StoreId, Login = newLogin, Password = "Password123",
+                FullName = "E2E MultiRole", CellPhone = "0000000000", Email = (string?)null,
+                RoleIds = new[] { StoreUserRoleId, ReSellerRoleId }
+            });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var created = await DbTestHelpers.GetUserByLoginAsync(_f, newLogin);
+            createdUserId = created!.Id;
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var roleIds = await db.Set<Domain.Entities.UserRoles.UserRole>().IgnoreQueryFilters()
+                .Where(x => x.UserId == createdUserId).Select(x => x.RoleId).ToListAsync();
+            roleIds.Should().Contain(new[] { StoreUserRoleId, ReSellerRoleId });
+        }
+        finally
+        {
+            if (createdUserId != Guid.Empty) await DbTestHelpers.CleanupUserAsync(_f, createdUserId);
+            await StoreSeed.CleanupStoreFixtureAsync(_f, store);
+            await DbTestHelpers.CleanupUserAsync(_f, admin);
+        }
+    }
+
+    [Fact]
+    public async Task Create_with_valid_email_persists_email()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var store = await StoreSeed.SeedStoreAsync(_f, $"SUE-{Guid.NewGuid():N}", approved: true);
+        var newLogin = $"su-{Guid.NewGuid():N}@test.com";
+        var email = $"mail-{Guid.NewGuid():N}@test.com";
+        Guid createdUserId = Guid.Empty;
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).PostAsJsonAsync("/api/v1/StoreUsers", new
+            {
+                StoreId = store.StoreId, Login = newLogin, Password = "Password123",
+                FullName = "E2E Email", CellPhone = "0000000000", Email = email,
+                RoleIds = new[] { StoreUserRoleId }
+            });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var created = await DbTestHelpers.GetUserByLoginAsync(_f, newLogin);
+            created!.Email.Should().Be(email);
+            createdUserId = created.Id;
+        }
+        finally
+        {
+            if (createdUserId != Guid.Empty) await DbTestHelpers.CleanupUserAsync(_f, createdUserId);
+            await StoreSeed.CleanupStoreFixtureAsync(_f, store);
+            await DbTestHelpers.CleanupUserAsync(_f, admin);
+        }
+    }
+}
+```
+
+- [ ] Run `--filter ~StoreUsersCreateGapTests`. **Checkpoint** — `test(webapi): storeusers create gaps e2e`.
+
+---
+
+## Task 7: `StoreUsersListGapTests` (includeInactive filtering)
+
+**Reuses:** `DbTestHelpers`, `AuthzSeed.{SeedStoreUserAsync, CleanupStoreGraphAsync}`. Verified: the repo
+filters `Where(u => includeInactive || u.IsActive)` on the **StoreUser** entity (`StoreUserRepository.cs:47,56`);
+`StoreUserDto` exposes `Login`+`IsActive`.
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using Infrastructure.Persistence.Contexts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.StoreUsers;
+
+[Collection("e2e")]
+public sealed class StoreUsersListGapTests
+{
+    private readonly AppTestFactory _f;
+    public StoreUsersListGapTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    private sealed class StoreUserRow { public string Login { get; set; } = ""; public bool IsActive { get; set; } }
+
+    // Deactivate the seeded StoreUser row (the includeInactive flag filters on StoreUser.IsActive).
+    private async Task DeactivateStoreUserAsync(Guid userId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var row = await db.Set<Domain.Entities.StoreUsers.StoreUser>().IgnoreQueryFilters().FirstAsync(x => x.UserId == userId);
+        row.IsActive = false;
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task List_includeInactive_true_includes_inactive_store_user()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var su = await AuthzSeed.SeedStoreUserAsync(_f, grantedFeatureId: null);
+        await DeactivateStoreUserAsync(su.UserId);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync("/api/v1/StoreUsers/list/true");
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<List<StoreUserRow>>>(ApiResponse.Json);
+            b!.Data!.Should().Contain(u => u.Login == su.Login && !u.IsActive);
+        }
+        finally { await AuthzSeed.CleanupStoreGraphAsync(_f, su.StoreId, su.UserId, su.OwnerUserId); await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+
+    [Fact]
+    public async Task List_includeInactive_false_excludes_inactive_store_user()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var su = await AuthzSeed.SeedStoreUserAsync(_f, grantedFeatureId: null);
+        await DeactivateStoreUserAsync(su.UserId);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync("/api/v1/StoreUsers/list/false");
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<List<StoreUserRow>>>(ApiResponse.Json);
+            b!.Data!.Should().NotContain(u => u.Login == su.Login);
+        }
+        finally { await AuthzSeed.CleanupStoreGraphAsync(_f, su.StoreId, su.UserId, su.OwnerUserId); await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+}
+```
+
+- [ ] Run `--filter ~StoreUsersListGapTests`.
+- [ ] **Run the whole suite** — `dotnet test backend/src/SMCA.WebApi.E2ETests` → PASS.
+- [ ] **Checkpoint** — `test(webapi): storeusers list includeInactive e2e`.
+
+---
+
 ## Self-Review
 
 - **Endpoint coverage:** list ✓ (super + owner), get-by-id ✓ (happy + UserNotFound + empty-guid), create ✓
