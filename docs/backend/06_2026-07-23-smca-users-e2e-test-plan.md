@@ -94,6 +94,23 @@ a light "wrong role → 403" smoke per gate to confirm wiring.
 - `Change_password_missing_newpassword_returns_400` (`IsRequired`)
 - `Change_password_persists_plaintext` **(PIN BUG #2 — assert stored == raw)**
 
+### Scenario-gap classes (feature ids `Users=72`, `Profile=70`)
+
+- `UsersListGapTests` — `GET all` `includeInactive` true includes / false excludes an inactive user;
+  `GET all` StoreUser-scoped branch (StoreUser with Users(72) feature) → 200; `GET {id}` `Guid.Empty` →
+  400 `IsRequired`.
+- `UsersUpdateGapTests` — `PUT {id}` `IsActive` NOT applied for a StoreUser editing self (privileged
+  field); non-privileged fields still apply.
+- `UsersDeleteActivateGapTests` — `DELETE {id}` and `POST activate` by a StoreUser (passed the gate via
+  Users(72) feature) → handler guard **400** (`IsSuperAdminOrOwnerAdmin`).
+- `UsersRolesGapTests` — `AddUserRoles` OwnerAdmin assigning SuperAdmin role → 400 `RoleNotFound`;
+  `DeleteUserRoles` nonexistent user → 400 `UserNotFound`; empty `RoleIds` → 400 `IsRequired`.
+- `UsersChangePasswordGapTests` — nonexistent user → 400 `UserNotFound`; empty `OldPassword` → 400
+  `IsRequired`.
+
+> `GET all/{includeInactive}` include/exclude asserts assume the handler honors the flag for a SuperAdmin
+> caller — confirm at implementation.
+
 ## 5. Seeding needs (reuse `04`/`05`; add only what's missing)
 
 - OwnerAdmin actor: `AuthzSeed.SeedOwnerAdminAsync(_, withManagementModule:true)` (has `UsersAdmin`/`ProfileAdmin` via Management).

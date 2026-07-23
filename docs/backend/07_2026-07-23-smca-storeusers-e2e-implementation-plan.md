@@ -1,43 +1,36 @@
-# 07 — SMCA.WebApi StoreUsers E2E — Test Suite
+# 07 — SMCA.WebApi StoreUsers E2E — Implementation Plan (self-contained)
 
-**Date:** 2026-07-23
-**Scope:** all 3 endpoints of `StoreUsersController` (`api/v1/StoreUsers`) — none are covered by plans
-`01`–`06` (verified: StoreUsers appears there only as cleanup/seed-helper/cross-reference, never as an
-endpoint test). Generated via the `api-endpoint-tests` workflow.
-**Depends on / reuses:** the `04`/`05` harness (`AppTestFactory`, `WebAppFixture`, `ApiResponse<T>`,
-`DbTestHelpers`, `StoreSeed`, `AuthzSeed`) against real Postgres `smca_test`.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development / executing-plans.
+> Steps use `- [ ]`. Materializes the `07` test-plan: the 3 `StoreUsersController` endpoints, exhaustively,
+> including the controller-specific double-gate. Permission-matrix coverage belongs to `05`.
 
----
+**Goal:** Implement, against real Postgres via `dotnet test`, the StoreUsers endpoint behavior, all
+`CreateStoreUserCommand` validators, and the `IsSuperAdminOrOwnerAdmin` handler guard.
 
-## What the controller does + dependencies
+**Reuses (do NOT redefine):** `04`/`05` harness — `DbTestHelpers.{SeedSuperAdminAsync, SeedUserWithRoleAsync,
+AuthedClient, CleanupUserAsync, GetUserByLoginAsync}`, `StoreSeed.{SeedStoreAsync, CleanupStoreFixtureAsync}`,
+`AuthzSeed.{SeedOwnerAdminAsync, SeedStoreUserAsync, CleanupStoreGraphAsync}`. No new helper class.
 
-`StoreUsersController` (`api/v1/StoreUsers`) — class-level `[HasPermission(StoreRoleFeatures.UsersAdmin)]`,
-and **every handler additionally hard-gates on `IsSuperAdminOrOwnerAdmin`** → throws
-`ApiException(..., BadRequest)` (real **400**) for any other caller.
+**Actor strategy:** default = SuperAdmin (bypasses `[HasPermission]` and the `IsSuperAdminOrOwnerAdmin`
+handler guard). The guard tests deliberately use a StoreUser with the Users(72) feature.
 
-- **Dependencies:** real Postgres (`smca_test`), MediatR handlers, `IVisibleRoleService`. No mocks — full
-  e2e through the real pipeline.
-- **Contract facts (verified):** controllers `return Ok(...)` → HTTP 200 unless a handler/pipeline throws;
-  validation failure = **HTTP 400** (`ValidationException` → `ErrorHandlerMiddleware`), `Errors[].code` =
-  validator key (`IsRequired`, `UserNotFound`, `StoreNotFound`, `UserAlreadyExists`, `EmailFormatInvalid`,
-  `RoleNotFound`); non-admin handler guard = **real 400** (`ApiException`).
-- **Actor:** SuperAdmin (bypasses the `[HasPermission]` gate and the `IsSuperAdminOrOwnerAdmin` handler
-  guard) — cheapest seeding. Create needs a seeded `Store` and a visible `RoleId` (`StoreUser=3`).
+## Global Constraints (verified — `07` test-plan §2)
 
-Endpoints:
-| Verb + route | Query/Command | Notes |
-|---|---|---|
-| `GET StoreUsers/list/{includeInactive}` | `GetStoreUsersQuery(bool)` | no validator; SuperAdmin all / OwnerAdmin store-scoped |
-| `GET StoreUsers/{id}` | `GetStoreUserByIdQuery(Guid StoreUserId)` | validator `IsRequired` + `UserExists`→`UserNotFound` |
-| `POST StoreUsers` | `CreateStoreUserCommand(StoreId, Login, Password, FullName, CellPhone?, Email?, RoleIds)` | validators below; persists User+StoreUser+UserRole |
+- Class-level `[HasPermission(UsersAdmin)]`; every handler hard-gates `IsSuperAdminOrOwnerAdmin` →
+  `ApiException` real **400**.
+- `Ok(...)` → 200 unless thrown; validation = **400** with validator-key codes; no `StoreUserErrors`.
+- Create success = 200 `Success(saved>0)`, persists User+StoreUser+UserRole.
+- `FeatureType.Users = 72`; visible role for create = `StoreUser=3`.
+- Human runs ALL git. Every Checkpoint is a PAUSE.
 
-`CreateStoreUserCommandValidator`: `StoreId` `IsRequired`+`StoreExists`(`StoreNotFound`); `Login`
-`IsRequired`+`IsUniqueName`(`UserAlreadyExists`); `Password` `IsRequired`; `FullName` `IsRequired`;
-`Email` `EmailFormatInvalid` when non-empty; `RoleIds` `IsRequired`+`AreRolesVisibles`(`RoleNotFound`).
+## File Structure
+
+- Create: `StoreUsers/StoreUsersListTests.cs`, `StoreUsersGetByIdTests.cs`, `StoreUsersCreateTests.cs`,
+  `StoreUsersCreateValidationTests.cs`, `StoreUsersGuardTests.cs`.
 
 ---
 
-## `StoreUsers/StoreUsersListTests.cs`
+## Task 1: `StoreUsersListTests`
 
 ```csharp
 using System.Net;
@@ -83,9 +76,11 @@ public sealed class StoreUsersListTests
 }
 ```
 
+- [ ] Run `--filter ~StoreUsersListTests`. **Checkpoint** — `test(webapi): storeusers list e2e`.
+
 ---
 
-## `StoreUsers/StoreUsersGetByIdTests.cs`
+## Task 2: `StoreUsersGetByIdTests`
 
 ```csharp
 using System.Net;
@@ -131,12 +126,29 @@ public sealed class StoreUsersGetByIdTests
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
+
+    [Fact]
+    public async Task Get_store_user_by_id_empty_guid_returns_400_IsRequired()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync($"/api/v1/StoreUsers/{Guid.Empty}");
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
 }
 ```
 
+- [ ] Run `--filter ~StoreUsersGetByIdTests`. **Checkpoint** — `test(webapi): storeusers get-by-id e2e`.
+
 ---
 
-## `StoreUsers/StoreUsersCreateTests.cs` (integration: DB assertions)
+## Task 3: `StoreUsersCreateTests` (integration: DB)
 
 ```csharp
 using System.Net;
@@ -155,7 +167,6 @@ public sealed class StoreUsersCreateTests
 {
     private readonly AppTestFactory _f;
     private const int StoreUserRoleId = 3; // RoleType.StoreUser — visible to Super/OwnerAdmin
-
     public StoreUsersCreateTests(WebAppFixture fixture) => _f = fixture.Factory;
 
     [Fact]
@@ -200,9 +211,11 @@ public sealed class StoreUsersCreateTests
 }
 ```
 
+- [ ] Run `--filter ~StoreUsersCreateTests`. **Checkpoint** — `test(webapi): storeusers create e2e`.
+
 ---
 
-## `StoreUsers/StoreUsersCreateValidationTests.cs`
+## Task 4: `StoreUsersCreateValidationTests`
 
 ```csharp
 using System.Net;
@@ -218,10 +231,8 @@ public sealed class StoreUsersCreateValidationTests
 {
     private readonly AppTestFactory _f;
     private const int StoreUserRoleId = 3;
-
     public StoreUsersCreateValidationTests(WebAppFixture fixture) => _f = fixture.Factory;
 
-    // Seeds a SuperAdmin + a valid store, then posts a `mutate`d body; asserts 400 + validator code.
     private async Task Assert400(Func<Guid, object> body, string code)
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -245,28 +256,15 @@ public sealed class StoreUsersCreateValidationTests
         Email = email, RoleIds = roleIds ?? new[] { StoreUserRoleId }
     };
 
-    [Fact] public Task Create_empty_login_400_IsRequired()
-        => Assert400(s => Valid(s, login: ""), "IsRequired");
+    [Fact] public Task Create_empty_login_400_IsRequired() => Assert400(s => Valid(s, login: ""), "IsRequired");
+    [Fact] public Task Create_empty_password_400_IsRequired() => Assert400(s => Valid(s, password: ""), "IsRequired");
+    [Fact] public Task Create_empty_fullname_400_IsRequired() => Assert400(s => Valid(s, fullName: ""), "IsRequired");
+    [Fact] public Task Create_empty_roleids_400_IsRequired() => Assert400(s => Valid(s, roleIds: Array.Empty<int>()), "IsRequired");
+    [Fact] public Task Create_invalid_email_400_EmailFormatInvalid() => Assert400(s => Valid(s, email: "not-an-email"), "EmailFormatInvalid");
+    [Fact] public Task Create_nonexistent_store_400_StoreNotFound() => Assert400(_ => Valid(Guid.NewGuid()), "StoreNotFound");
+    [Fact] public Task Create_invisible_role_400_RoleNotFound() => Assert400(s => Valid(s, roleIds: new[] { 999999 }), "RoleNotFound");
 
-    [Fact] public Task Create_empty_password_400_IsRequired()
-        => Assert400(s => Valid(s, password: ""), "IsRequired");
-
-    [Fact] public Task Create_empty_fullname_400_IsRequired()
-        => Assert400(s => Valid(s, fullName: ""), "IsRequired");
-
-    [Fact] public Task Create_empty_roleids_400_IsRequired()
-        => Assert400(s => Valid(s, roleIds: Array.Empty<int>()), "IsRequired");
-
-    [Fact] public Task Create_invalid_email_400_EmailFormatInvalid()
-        => Assert400(s => Valid(s, email: "not-an-email"), "EmailFormatInvalid");
-
-    [Fact] public Task Create_nonexistent_store_400_StoreNotFound()
-        => Assert400(_ => Valid(Guid.NewGuid()), "StoreNotFound");
-
-    [Fact] public Task Create_invisible_role_400_RoleNotFound()
-        => Assert400(s => Valid(s, roleIds: new[] { 999999 }), "RoleNotFound");
-
-    // Duplicate login -> IsUniqueName -> UserAlreadyExists. Needs an existing user with the same login.
+    // Duplicate login -> IsUniqueName -> UserAlreadyExists (needs an existing user with the same login).
     [Fact]
     public async Task Create_duplicate_login_400_UserAlreadyExists()
     {
@@ -287,21 +285,88 @@ public sealed class StoreUsersCreateValidationTests
 }
 ```
 
+> `RoleNotFound` with `RoleId 999999` assumes `AreRolesVisibles` returns false for a nonexistent role. If
+> `IVisibleRoleService` NPEs on a nonexistent id, use `SuperAdmin=1` with an OwnerAdmin actor instead.
+
+- [ ] Run `--filter ~StoreUsersCreateValidationTests`. **Checkpoint** — `test(webapi): storeusers create validation e2e`.
+
 ---
 
-## Coverage & notes
+## Task 5: `StoreUsersGuardTests` (double-gate — controller-specific)
 
-- **4 QA categories:** happy (list ×2, get-by-id, create), edge/error (get-by-id `UserNotFound`, 7 create
-  validators), integration (create persists User+StoreUser+UserRole, asserted in DB). All 3 endpoints
-  touched; 0 duplication with `01`–`06`.
-- **Confirm before running (flagged inline — not invented):**
-  1. `GetStoreUserByIdQuery.StoreUserId` semantics — `User.Id` vs `StoreUser`-entity id. If the latter,
-     replace `su.UserId` with the entity id.
-  2. `RoleNotFound` with `RoleId 999999` — assumes a nonexistent role fails `AreRolesVisibles`. If
-     `IVisibleRoleService` NPEs on a nonexistent id instead of returning false, use an existing-but-not-
-     visible role (e.g. `SuperAdmin=1` with an OwnerAdmin actor).
-- **Deliberately excluded (not padded):** the double-gate edge case "a StoreUser WITH the `Users` feature
-  passes `[HasPermission]` but the handler rejects with 400". It needs seeding a StoreUser with the `Users`
-  feature granted — **feature id unverified**; confirm the id before adding.
-- **Files:** `StoreUsers/StoreUsersListTests.cs`, `StoreUsersGetByIdTests.cs`, `StoreUsersCreateTests.cs`,
-  `StoreUsersCreateValidationTests.cs`.
+A StoreUser with the Users(72) feature passes `[HasPermission(UsersAdmin)]` but is rejected inside each
+handler by `IsSuperAdminOrOwnerAdmin` → real 400.
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+
+namespace SMCA.WebApi.E2ETests.StoreUsers;
+
+[Collection("e2e")]
+public sealed class StoreUsersGuardTests
+{
+    private readonly AppTestFactory _f;
+    private const int StoreUserRoleId = 3;
+    public StoreUsersGuardTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    [Fact]
+    public async Task List_as_store_user_with_users_feature_returns_400_guard()
+    {
+        var su = await AuthzSeed.SeedStoreUserAsync(_f, grantedFeatureId: 72);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, su.UserId, su.Login).GetAsync("/api/v1/StoreUsers/list/false");
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        finally { await AuthzSeed.CleanupStoreGraphAsync(_f, su.StoreId, su.UserId, su.OwnerUserId); }
+    }
+
+    [Fact]
+    public async Task Get_by_id_as_store_user_with_users_feature_returns_400_guard()
+    {
+        var su = await AuthzSeed.SeedStoreUserAsync(_f, grantedFeatureId: 72);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, su.UserId, su.Login).GetAsync($"/api/v1/StoreUsers/{su.UserId}");
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        finally { await AuthzSeed.CleanupStoreGraphAsync(_f, su.StoreId, su.UserId, su.OwnerUserId); }
+    }
+
+    [Fact]
+    public async Task Create_as_store_user_with_users_feature_returns_400_guard()
+    {
+        var su = await AuthzSeed.SeedStoreUserAsync(_f, grantedFeatureId: 72);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, su.UserId, su.Login).PostAsJsonAsync("/api/v1/StoreUsers", new
+            {
+                StoreId = su.StoreId, Login = $"x-{Guid.NewGuid():N}@test.com", Password = "Password123",
+                FullName = "X", CellPhone = "0", Email = (string?)null, RoleIds = new[] { StoreUserRoleId }
+            });
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        finally { await AuthzSeed.CleanupStoreGraphAsync(_f, su.StoreId, su.UserId, su.OwnerUserId); }
+    }
+}
+```
+
+- [ ] Run `--filter ~StoreUsersGuardTests`.
+- [ ] **Run the whole suite** — `dotnet test backend/src/SMCA.WebApi.E2ETests` → PASS.
+- [ ] **Checkpoint** — `test(webapi): storeusers handler-guard e2e`.
+
+---
+
+## Self-Review
+
+- **Endpoint coverage:** list ✓ (super + owner), get-by-id ✓ (happy + UserNotFound + empty-guid), create ✓
+  (integration DB), create validation ✓ (8 rules), double-gate guard ✓ (all 3 endpoints → 400). 16 tests.
+- **Verified facts baked in:** validation=400 with validator-key codes; handler guard=real 400
+  (`ApiException`); create persists User+StoreUser+UserRole; SuperAdmin actor bypasses both gates.
+- **Helpers reused, not redefined:** all from `04`/`05`; no new helper class.
+- **Open confirmations (flagged inline):** `StoreUserId` id-semantics; `RoleNotFound` NPE-vs-false.
+- **Supersedes** the single-file `07_...-suite.md` (removed).
