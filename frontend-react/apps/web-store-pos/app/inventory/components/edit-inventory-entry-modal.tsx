@@ -145,9 +145,11 @@ export function EditInventoryEntryModal({
                 value={productId}
                 onChange={(e) => setProductId(e.target.value)}
                 className={inputClass}
-                // Angular parity (edit-inventory-entry-modal.component.html:17):
-                // [disabled]="true" unconditionally, in BOTH create and edit mode.
-                disabled
+                // Angular parity: edit-inventory-entry-modal.component.html:17 has
+                // [disabled]="true" on the mat-select, but that is a no-op in reactive forms
+                // (template [disabled] on a formControlName control is ignored). The disabled
+                // state comes from the FormControl model, created with disabled:false
+                // (component.ts:105), so the Angular dropdown is enabled/selectable in both modes.
               >
                 <option value="">
                   {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}...

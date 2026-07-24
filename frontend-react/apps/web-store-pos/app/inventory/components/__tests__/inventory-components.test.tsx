@@ -599,28 +599,33 @@ describe('EditInventoryEntryModal — title/save button toggle by mode (Angular 
   });
 });
 
-// ─── EditInventoryEntryModal — product select always disabled (Angular parity) ──
+// ─── EditInventoryEntryModal — product select is selectable (Angular parity) ──
 //
-// Angular reference: edit-inventory-entry-modal.component.html:17 `[disabled]="true"` on the
-// product mat-select — unconditional, in BOTH create and edit mode (not gated on `entry`).
+// Angular reference: edit-inventory-entry-modal.component.html:17 has `[disabled]="true"` on the
+// product mat-select, BUT that is a no-op in reactive forms: `[disabled]` bound in the template
+// on a `formControlName` control is ignored (dev-mode warning only) — the disabled state comes
+// solely from the FormControl model, which is created with `disabled: false`
+// (edit-inventory-entry-modal.component.ts:105). So in the running Angular app the product
+// dropdown is ENABLED and selectable, in BOTH create and edit mode. The React port previously
+// mistranslated the literal template text into a real native `disabled`, breaking selection.
 
-describe('EditInventoryEntryModal — product select disabled (Angular parity: [disabled]="true")', () => {
-  it('disables the product select in create mode (no entry passed)', () => {
+describe('EditInventoryEntryModal — product select is selectable (Angular parity: control disabled:false)', () => {
+  it('does not disable the product select in create mode (no entry passed)', () => {
     render(
       <Wrapper>
         <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
       </Wrapper>,
     );
-    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('combobox')).not.toBeDisabled();
   });
 
-  it('disables the product select in edit mode (entry passed)', () => {
+  it('does not disable the product select in edit mode (entry passed)', () => {
     render(
       <Wrapper>
         <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" entry={makeEntry()} />
       </Wrapper>,
     );
-    expect(screen.getByRole('combobox')).toBeDisabled();
+    expect(screen.getByRole('combobox')).not.toBeDisabled();
   });
 });
 
