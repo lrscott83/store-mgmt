@@ -1,6 +1,7 @@
 import { useIntl } from 'react-intl';
 import type { InventoryEntryView } from '@store-mgmt/domain';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface EntryListProps {
   entries: InventoryEntryView[];
@@ -43,38 +44,38 @@ export function EntryList({
   }
 
   return (
-    <div className="rounded border border-border bg-surface">
+    <div className="bg-surface">
       <table className="w-full text-sm">
-        <thead className="border-b border-border bg-background">
+        <thead>
           <tr>
-            <th className="px-4 py-2 text-left font-medium text-text-muted">
+            <th className="p-2 text-left font-medium text-text-muted">
               {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}
             </th>
-            <th className="px-4 py-2 text-right font-medium text-text-muted">
+            <th className="p-2 text-right font-medium text-text-muted">
               {intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' })}
             </th>
             {isOwnerAdmin && (
-              <th className="px-4 py-2 text-right font-medium text-text-muted">
+              <th className="p-2 text-right font-medium text-text-muted">
                 {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}
               </th>
             )}
-            {showActions && <th className="px-4 py-2" />}
+            {showActions && <th className="p-2" />}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody>
           {entries.map((entry) => (
             <tr key={entry.id} className="hover:bg-background">
-              <td className="px-4 py-3 font-medium text-text">
+              <td className="p-2 font-medium text-text">
                 {entry.productName || entry.productId}
               </td>
-              <td className="px-4 py-3 text-right text-text-muted">{entry.quantity}</td>
+              <td className="p-2 text-right text-text-muted">{entry.quantity}</td>
               {isOwnerAdmin && (
-                <td className="px-4 py-3 text-right text-success">
-                  ${entry.costPrice.toFixed(2)}
+                <td className="p-2 text-right text-success">
+                  {formatCurrency(entry.costPrice)}
                 </td>
               )}
               {showActions && (
-                <td className="px-4 py-3 text-right">
+                <td className="p-2 text-right">
                   <ActionMenu testId={`entry-actions-toggle-${entry.id}`}>
                     <ActionMenuItem intent="edit" onClick={() => onEdit?.(entry)}>
                       {intl.formatMessage({ id: 'GENERAL.EDIT' })}

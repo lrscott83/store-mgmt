@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import type { SaleCredit } from '@store-mgmt/domain';
 import type { PaymentType } from '@store-mgmt/domain';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { EditSaleCreditModal } from './edit-sale-credit-modal';
 import { SaleCreditPaymentModal } from './sale-credit-payment-modal';
 
@@ -57,18 +58,18 @@ export function SaleCreditList({ saleCredits, readOnly = true, onSave, onPay }: 
       <table className="w-full text-sm">
         <tbody>
           {saleCredits.map((saleCredit) => (
-            <tr key={saleCredit.id} className="border-b border-border last:border-0">
+            <tr key={saleCredit.id}>
               <td className="p-1">
                 <span className="text-text">{saleCredit.client}</span>
               </td>
               <td className="p-1 text-right">
                 <span className={saleCredit.isPaid ? 'text-success' : 'text-danger'}>
-                  ${saleCredit.total.toFixed(2)}
+                  {formatCurrency(saleCredit.total)}
                 </span>
               </td>
               <td className="p-1 text-right">
                 {saleCredit.isPaid && (
-                  <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+                  <span className="text-xs font-semibold text-success">
                     {formatDateOnly(saleCredit.paidDate)}
                   </span>
                 )}

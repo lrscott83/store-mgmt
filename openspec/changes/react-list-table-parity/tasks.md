@@ -62,9 +62,9 @@ Rationale: bulk of lines are mechanical (16 route files = one `padding="tight"` 
 
 ## Phase 5: entry-list + sale-credit-list sweep (WU5)
 
-- [ ] 5.1 RED: failing tests per component — no wrapper border/divider, compact cells, sale-credit paid-date plain `text-success` span (not chip), amounts via `formatCurrency`.
-- [ ] 5.2 GREEN: sweep `entry-list.tsx:73` and `sale-credit-list.tsx:66,71` per above.
-- [ ] 5.3 Commit WU5.
+- [x] 5.1 RED: failing tests per component — no wrapper border/divider, compact cells, sale-credit paid-date plain `text-success` span (not chip), amounts via `formatCurrency`.
+- [x] 5.2 GREEN: sweep `entry-list.tsx:73` and `sale-credit-list.tsx:66,71` per above.
+- [x] 5.3 Commit WU5.
 
 ## Phase 6: order-item-list + order-list sweep (WU6)
 
