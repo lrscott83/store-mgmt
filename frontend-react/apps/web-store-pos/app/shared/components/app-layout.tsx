@@ -53,7 +53,7 @@ export function AppLayout() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar isSidebarOpen={isSidebarOpen} onSidebarToggle={() => setIsSidebarOpen((v) => !v)} />
         <Breadcrumbs />
-        <main className="flex-1 overflow-y-auto p-4">
+        <main className="flex-1 overflow-y-auto px-2 py-4 md:px-12 md:py-6">
           <Outlet />
         </main>
         <Footer />

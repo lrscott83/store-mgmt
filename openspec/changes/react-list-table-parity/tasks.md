@@ -48,11 +48,11 @@ Rationale: bulk of lines are mechanical (16 route files = one `padding="tight"` 
 
 ## Phase 3: app-layout + button (WU3)
 
-- [ ] 3.1 RED: failing test asserting `<main>` classList contains `px-2 py-4 md:px-12 md:py-6`.
-- [ ] 3.2 GREEN: replace flat `p-4` in `app-layout.tsx:56` with responsive classes.
-- [ ] 3.3 RED: failing test asserting FAB button contains `px-5` not `px-6`, keeps `text-sm font-medium`.
-- [ ] 3.4 GREEN: trim `button.tsx:13` FAB padding `px-6`→`px-5`.
-- [ ] 3.5 Commit WU3.
+- [x] 3.1 RED: failing test asserting `<main>` classList contains `px-2 py-4 md:px-12 md:py-6`.
+- [x] 3.2 GREEN: replace flat `p-4` in `app-layout.tsx:56` with responsive classes.
+- [x] 3.3 RED: failing test asserting FAB button contains `px-5` not `px-6`, keeps `text-sm font-medium`.
+- [x] 3.4 GREEN: trim `button.tsx:13` FAB padding `px-6`→`px-5`.
+- [x] 3.5 Commit WU3.
 
 ## Phase 4: expense-list sweep (WU4)
 

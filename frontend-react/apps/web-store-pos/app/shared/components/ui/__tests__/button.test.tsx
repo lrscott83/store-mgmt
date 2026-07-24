@@ -83,11 +83,19 @@ describe('Button — variant="fab" (Angular mat-fab extended: pill, purple, elev
     expect(btn.className).toContain('shadow-lg');
   });
 
-  it('applies generous padding matching the extended-FAB look', () => {
+  it('applies trimmed padding matching Angular parity (px-5, not px-6)', () => {
     render(<Button variant="fab">+ Categoría</Button>);
     const btn = screen.getByRole('button', { name: '+ Categoría' });
-    expect(btn.className).toContain('px-6');
+    expect(btn.className).toContain('px-5');
+    expect(btn.className).not.toContain('px-6');
     expect(btn.className).toContain('py-3');
+  });
+
+  it('keeps text-sm font-medium on the fab variant (font unchanged by the px trim)', () => {
+    render(<Button variant="fab">+ Categoría</Button>);
+    const btn = screen.getByRole('button', { name: '+ Categoría' });
+    expect(btn.className).toContain('text-sm');
+    expect(btn.className).toContain('font-medium');
   });
 
   it('is not the small rectangular radius used by other variants', () => {

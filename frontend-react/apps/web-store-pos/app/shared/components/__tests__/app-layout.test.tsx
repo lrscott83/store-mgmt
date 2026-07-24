@@ -148,3 +148,18 @@ describe('AppLayout — does not render its own PWA install button (moved to roo
     expect(screen.queryByRole('button', { name: /instalar app/i })).not.toBeInTheDocument();
   });
 });
+
+// Angular mirrors 3 breakpoints via pc-common.scss .pc-container .coded-content:
+// mobile (<768px) 8px sides/16px top; desktop (>=768px) 48px sides/24px top.
+// This is a responsive mirror, not a flat p-4 shrink.
+describe('AppLayout — <main> responsive padding (Angular 3-breakpoint parity)', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+  });
+
+  it('applies mobile padding (px-2 py-4) and desktop padding (md:px-12 md:py-6) via responsive classes', () => {
+    renderLayout();
+    const main = screen.getByRole('main');
+    expect(main.className).toContain('px-2 py-4 md:px-12 md:py-6');
+  });
+});

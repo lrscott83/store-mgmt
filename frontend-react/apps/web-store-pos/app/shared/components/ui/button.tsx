@@ -10,7 +10,7 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   // Extended FAB, matching Angular's `mat-fab extended` prominent actions (e.g. Products'
   // "+ Categoría" / "Importar Productos"): pill-shaped, filled purple, white text, elevated
   // shadow, comfortable padding.
-  fab: 'rounded-full px-6 py-3 shadow-lg bg-primary text-white hover:bg-primary-hover',
+  fab: 'rounded-full px-5 py-3 shadow-lg bg-primary text-white hover:bg-primary-hover',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
