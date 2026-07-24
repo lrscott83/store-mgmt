@@ -10,6 +10,7 @@ import type { UserModel } from '@store-mgmt/domain';
 function makeDomainUser(overrides: Partial<User> = {}): User {
   return {
     id: 'u1',
+    login: 'user1',
     fullName: 'User One',
     cellPhone: '+123',
     email: 'user@test.com',

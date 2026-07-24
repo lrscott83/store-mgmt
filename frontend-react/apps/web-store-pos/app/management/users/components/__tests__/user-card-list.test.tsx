@@ -7,6 +7,7 @@ import type { User } from '@store-mgmt/domain';
 function makeUser(overrides: Partial<User> = {}): User {
   return {
     id: 'u1',
+    login: 'user1',
     fullName: 'User One',
     cellPhone: '+123',
     email: 'user@test.com',
@@ -34,14 +35,17 @@ describe('UserCardList — renders a Card grid (Req: Users List Uses Shared Chro
   it('renders a card per user with fullName, cellPhone and email', async () => {
     const { UserCardList } = await import('../user-card-list');
     const users = [
-      makeUser({ id: 'u1', fullName: 'Alice Smith', cellPhone: '+53 5 123-4567', email: 'alice@test.com' }),
-      makeUser({ id: 'u2', fullName: 'Bob Jones' }),
+      makeUser({ id: 'u1', login: 'alice', fullName: 'Alice Smith', cellPhone: '+53 5 123-4567', email: 'alice@test.com' }),
+      makeUser({ id: 'u2', login: 'bob', fullName: 'Bob Jones' }),
     ];
     render(
       <Wrapper>
         <UserCardList {...baseProps} users={users} />
       </Wrapper>
     );
+    // Card header is the login; the name renders as the first content row.
+    expect(screen.getByText('alice')).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
     expect(screen.getByText('Alice Smith')).toBeInTheDocument();
     expect(screen.getByText('+53 5 123-4567')).toBeInTheDocument();
     expect(screen.getByText('alice@test.com')).toBeInTheDocument();

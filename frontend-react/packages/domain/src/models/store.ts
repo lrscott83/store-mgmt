@@ -80,6 +80,8 @@ export interface StoreUser {
 
 export interface User {
   id: string;
+  // Backend returns Login on both list (UserListDto) and detail (UserDto) responses.
+  login: string;
   fullName: string;
   cellPhone: string;
   email: string;

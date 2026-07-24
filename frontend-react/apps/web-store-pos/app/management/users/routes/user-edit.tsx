@@ -90,6 +90,7 @@ export function UserEditPage() {
           {intl.formatMessage({ id: 'USERS.UPDATE' })}
         </h2>
         <UserDetailsForm
+          login={storeUser.login}
           initialValues={{
             fullName: storeUser.fullName,
             cellPhone: storeUser.cellPhone,

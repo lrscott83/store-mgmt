@@ -43,10 +43,11 @@ export function UserCardList({ users, onCreate, onEdit, onActivate, onDeactivate
           {users.map((user) => (
             <Card
               key={user.id}
-              title={user.fullName}
+              title={user.login}
               className={!user.isActive ? 'bg-danger/10 border border-danger' : ''}
             >
               <div className="space-y-2">
+                <p className="text-sm font-medium text-text">{user.fullName}</p>
                 <p className="text-sm text-text-muted">{user.cellPhone}</p>
                 {user.email && <p className="text-sm text-text-muted">{user.email}</p>}
                 <div className="flex justify-end pt-2">

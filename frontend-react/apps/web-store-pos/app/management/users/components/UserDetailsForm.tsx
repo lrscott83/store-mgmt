@@ -13,6 +13,8 @@ interface DetailsFormValues {
 
 interface UserDetailsFormProps {
   initialValues?: Partial<DetailsFormValues>;
+  /** Display-only login (username). Rendered as a non-editable field; never submitted. */
+  login?: string;
   isOnline: boolean;
   isLoading: boolean;
   canToggleActive: boolean;
@@ -22,6 +24,7 @@ interface UserDetailsFormProps {
 
 export function UserDetailsForm({
   initialValues,
+  login,
   isOnline,
   isLoading,
   canToggleActive,
@@ -60,6 +63,22 @@ export function UserDetailsForm({
         <p role="alert" className="text-sm text-red-600">
           {error}
         </p>
+      )}
+
+      {login !== undefined && (
+        <div>
+          <label htmlFor="login" className="block text-sm font-medium text-gray-700">
+            {intl.formatMessage({ id: 'USERS.LOGIN' })}
+          </label>
+          <input
+            id="login"
+            type="text"
+            value={login}
+            readOnly
+            disabled
+            className="mt-1 block w-full cursor-not-allowed rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-500"
+          />
+        </div>
       )}
 
       <div>
