@@ -1,12 +1,15 @@
 # 10 — SMCA.WebApi Usages E2E — Test Plan
 
 **Date:** 2026-07-24
-**Scope:** the 3 endpoints of `UsagesController` (`api/v1/usages`) with a **hybrid** depth (per master
-index §9.5.3, Usages is "high-frequency, low-logic — at least a smoke/contract test"):
-- `POST store-daily-usage` → **full** treatment (it carries real logic: per-`(user, store)` day dedup,
-  two `400` guards, a `500` date-parse pin, and the `ProfileAdmin` grant path).
-- `GET stores-last-week` / `GET stores-last-month` → **contract-level** (near-identical, `SuperAdmin`-only,
-  low logic): success shape + the `7`/`30` padding contract + the per-endpoint auth (401/403).
+**Scope:** the 3 endpoints of `UsagesController` (`api/v1/usages`), **exhaustive** — every reachable
+behavior, edge, error and auth path is **implemented as a test**:
+- `POST store-daily-usage` → full behavior (per-`(user, store)` day dedup incl. the intra-request dedup
+  gap, the client-sync `Saved` flag, the `400` store guard, the `500` date/`ActiveDays` paths, inactive-store
+  acceptance, the `405` verb surface) + the `ProfileAdmin` grant paths (StoreUser and OwnerAdmin branches)
+  + auth (401/403, malformed + inactive token).
+- `GET stores-last-week` / `GET stores-last-month` → success shape + the `7`/`30` padding contract, the
+  window/boundary/inactive-store count filters, `ActiveStoreCount`, `405` verb, and the full per-window
+  auth matrix (401/403).
 **Depends on / reuses:** the `04`/`05`/`09` harness (`AppTestFactory`, `WebAppFixture`,
 `[Collection("e2e")]`, `ApiResponse<T>`, `DbTestHelpers`, `AuthzSeed`, `StoreSeed`) against real Postgres
 `smca_test`. Unlike `08`/`09`, **the harness already exists as code** on disk
@@ -104,8 +107,29 @@ New folder `SMCA.WebApi.E2ETests/Usages/`. `Auth/UsagesSmokeTests.cs` is retired
   **only** because SuperAdmin bypasses the filter (`HasPermissionAttribute.cs:47`) and still reaches the
   handler's store check.
 - `Post_malformed_date_returns_500` **(PIN)** — POST `{ ActiveDays: [{ Day: "not-a-date", Saved: true }] }`
-  as SuperAdmin with a selected store; assert `500` (`App.Unexpected`). Documents the missing date
-  validation (§5).
+  as SuperAdmin with a selected store; assert `500` (`App.Unexpected`). Pins the missing date validation.
+- `Post_multiple_new_days_inserts_all` **(from 10c A1)** — POST 3 new days → `Data==true`, 3 rows.
+- `Post_same_day_two_users_inserts_both` **(from 10c A2)** — dedup key is `(userId, storeId)`; two admins,
+  same store+day → 2 rows.
+- `Post_same_day_two_stores_inserts_both` **(from 10c A3)** — same user+day across two selected stores → 2 rows.
+- `Post_as_owner_admin_profile_returns_200` **(from 10c A4)** — `AuthzSeed.SeedOwnerAdminAsync(withManagementModule:
+  true)`; exercises the `IsOwnerAdmin` filter branch (Profile allowed via the active Management module).
+- `Post_duplicate_days_within_request_inserts_all` **(from 10c A5 · BUG-REVEAL)** — `[D1,D1,D2]` → **3 rows**
+  (dedup is only vs the DB, not within the request).
+- `Post_saved_false_still_inserts` **(from 10c A6)** — `Saved:false` still inserts. **Correct behavior:**
+  `Saved` is a client-side sync flag (the client sends only `saved:false` days and flips them to `true`
+  after a 200 — `store-usage-tracker.service.ts:73,89-90`); the backend rightly ignores it. Not a bug.
+- `Post_day_with_time_component_is_distinct_from_midnight` **(from 10c A7)** — `"…T15:30:00"` and `"…"` are 2 rows.
+- `Post_future_day_is_accepted` **(from 10c A8)** — far-future day → `200 Data==true` (no range validation).
+- `Post_empty_day_string_returns_500` **(from 10c A9 · BUG-REVEAL)** — `Day:""` → `DateTime.Parse` throws → `500`.
+- `Post_missing_activeDays_returns_500` **(from 10c A10 · BUG-REVEAL)** — `{}` body → null `ActiveDays` → NRE → `500`.
+- `Post_against_inactive_store_returns_200` **(from 10c A11 · FINDING)** — deactivate the selected store; POST
+  still `200` (no `IsActive` filter on the store lookup).
+- `Get_verb_on_store_daily_usage_returns_405` **(from 10c A12)** · `Put_verb_on_store_daily_usage_returns_405`
+  **(from 10c A13)** — POST-only route.
+- `Post_malformed_json_returns_400` **(from 10c A14 · VERIFY&PIN)** — malformed JSON body → model-binding `400`.
+- `Post_persists_non_null_context_fields` **(from 10c A16)** — asserts the inserted row's `IpAddress`/`GfDevice`/
+  `GfDeviceId`/`GfSessionId` are non-null (handler wires them from httpContext, `""` when absent).
 
 ### `StoreDailyUsageAuthTests`
 - `Post_no_token_returns_401` — **(migrated from
@@ -115,55 +139,56 @@ New folder `SMCA.WebApi.E2ETests/Usages/`. `Auth/UsagesSmokeTests.cs` is retired
   `HasFeature(Profile)` leg → `403`. Never reaches the handler. Cleanup the store graph in `finally`.
 - `Post_malformed_token_returns_401` — a garbage/expired bearer is rejected by auth middleware before the
   class filter (distinct from the no-token case).
+- `Post_as_inactive_user_is_rejected` **(from 10c A15 · VERIFY&PIN)** — `SeedInactiveUserAsync`; pin the
+  status the pipeline returns (`401`/`404`, or the handler's `400` if the inactive-SuperAdmin bypass reaches it).
 
 ### `StoreLastUsagesTests`
 - `LastWeek_as_super_admin_returns_200_array_length_7` **(PIN)** — SuperAdmin; `GET stores-last-week`;
   assert `200` + `Succeeded` + `StoreUsagesCountDays.Count == 7`.
 - `LastMonth_as_super_admin_returns_200_array_length_30` **(PIN)** — same for `stores-last-month`, length
   `== 30`.
-- `LastWeek_counts_reflect_seeded_usage_days` — seed a throwaway store + `StoreUsage` rows on N distinct
-  days inside the 7-day window; `GET stores-last-week`; assert the buckets for those days are non-zero and
-  the returned `ActiveStoreCount` is `>=` the number of active stores seeded. Contract-level (one data test
-  is enough given the low-logic classification). Cleanup seeded StoreUsage + store in `finally`.
+- `LastWeek_counts_reflect_seeded_usage_days` — seed a throwaway store + `StoreUsage` rows on 3 distinct
+  days inside the 7-day window; assert the buckets sum `>= 3` and `ActiveStoreCount >= 1`.
+- `LastMonth_counts_reflect_seeded_usage_days` **(from 10c B1)** — same for the 30-day window.
+- `LastWeek_counts_are_non_negative` **(from 10c B2 · VERIFY&PIN)** — every bucket `>= 0` (shared DB blocks an
+  exact all-zero assertion).
+- `LastWeek_excludes_out_of_window_and_inactive_store_usage` **(from 10c B3)** — delta assertion (serial
+  `[Collection("e2e")]`): out-of-window usage and inactive-store usage do **not** change the sum; an in-window
+  active usage adds exactly `+1`.
+- `LastWeek_includes_boundary_day` **(from 10c B4)** — usage on `today-7` adds `+1` (`>=` boundary).
+- `LastWeek_activeStoreCount_counts_active_only` **(from 10c B5)** — seed 2 active stores → `+2`; deactivate 1
+  → `+1`.
+- `Post_verb_on_stores_last_week_returns_405` **(from 10c B6)** · `Post_verb_on_stores_last_month_returns_405`
+  **(from 10c B7)** — GET-only routes.
 
 ### `StoreLastUsagesAuthTests`
-Full matrix on `stores-last-week`; `stores-last-month` gets only a `401` smoke (auth is identical, no need
-to duplicate the full matrix twice).
-- `LastWeek_no_token_returns_401`
-- `LastMonth_no_token_returns_401`
-- `LastWeek_as_owner_admin_returns_403` — `DbTestHelpers.SeedUserWithRoleAsync((int)RoleType.OwnerAdmin)`.
-- `LastWeek_as_store_user_returns_403` — `SeedUserWithRoleAsync((int)RoleType.StoreUser)`.
-- `LastWeek_as_reseller_returns_403` — `SeedUserWithRoleAsync((int)RoleType.ReSeller)`.
-- `LastWeek_malformed_token_returns_401` — garbage bearer rejected before the filter.
+Full 403 matrix on **both** windows.
+- `LastWeek_no_token_returns_401` · `LastMonth_no_token_returns_401`
+- `LastWeek_malformed_token_returns_401` · `LastMonth_malformed_token_returns_401` **(from 10c B11)**
+- `LastWeek_as_owner_admin_returns_403` · `LastWeek_as_store_user_returns_403` · `LastWeek_as_reseller_returns_403`
+- `LastMonth_as_owner_admin_returns_403` · `LastMonth_as_store_user_returns_403` · `LastMonth_as_reseller_returns_403`
+  **(from 10c B8/B9/B10)**
+- `LastWeek_as_inactive_super_admin_is_rejected_or_pinned` **(from 10c B12 · VERIFY&PIN)** — pin `401`/`404`/`200`.
 
-## 5. Findings — documented, NOT asserted (like `08` §6 / `09` §6)
+## 5. Coverage notes
 
-- **Unreachable handler gate (dead code) — 2 spots.** No e2e test can trigger either (same situation as
-  Features `09` §6):
-  - **GET `IsSuperAdmin` re-check** — `GetStoreLastUsagesQuery` re-checks `if (!IsSuperAdmin) throw
-    ApiException(400)` (`GetStoreLastUsagesQuery.cs:37-38`), but both GET endpoints are already
-    `[HasPermission(SuperAdmin)]` at the method — no actor passes the filter yet fails the handler check.
-  - **POST `UserNotFound` re-check** — `UpdateStoreDailyUsageCommand` throws `400` if
-    `userRepository.GetByIdAsync(userId) == null` (`:47-48`), but this is **unreachable**: a missing user
-    gets **no `SuperAdmin` claim** in `ClaimsTransformerService` (`ClaimsTransformerService.cs:32-46`, the
-    `if (currentUser != null)` guard), so `IsSuperAdmin` is false and the class `ProfileAdmin` filter takes
-    the non-SuperAdmin branch and returns `ForbidResult` → **403** before the handler runs
-    (`HasPermissionAttribute.cs:47-68`). Any request that *does* reach the handler had a non-null user in
-    the same DB the handler reads. Originally planned as a `Post_with_deleted_user_returns_400` test;
-    **dropped** after verifying it yields `403`, not `400`.
-  Pin observable behavior only. A `10b`-style handler unit test (mock `IHttpContextService` with
-  `IsSuperAdmin=false` / a null user, assert `ApiException(BadRequest)`) is **available if parity is later
-  wanted** but intentionally **not created here** — the hybrid/low-logic scope for Usages does not warrant
-  it.
-- **Missing date validation → 500.** `UpdateStoreDailyUsageCommand` parses `Day` with unguarded
-  `DateTime.Parse`; a malformed string yields a `500` instead of a `400`. Pinned as-is by
-  `Post_malformed_date_returns_500`; flagged for a separate production-code review (add a validator /
-  `DateTime.TryParse` guard).
-- **POST action method is misnamed `ApproveStoreAsync`** (`UsagesController.cs:19`) — a copy-paste leftover
-  from `StoresController`; cosmetic, no behavior impact.
-- **Double `[HasPermission]` on the GETs** (class `ProfileAdmin` + method `SuperAdmin`): the tests assert
-  the observable `403` for every non-SuperAdmin actor, so the endpoints are covered regardless of how the
-  two attributes compose internally.
+- **Unreachable handler guards (documented, not asserted).** Two guards no e2e request can reach (the
+  `HasPermission` filters reject first): GET `IsSuperAdmin` re-check (`GetStoreLastUsagesQuery.cs:37-38`) and
+  POST `UserNotFound` re-check (`UpdateStoreDailyUsageCommand.cs:47-48` — a missing user gets no `SuperAdmin`
+  claim in `ClaimsTransformerService.cs:32-46`, so the `ProfileAdmin` filter forbids → `403` first). The
+  reachable inactive-user path is pinned by `Post_as_inactive_user_is_rejected`; the `StoreNotFound` guard is
+  reachable via the SuperAdmin bypass (`Post_without_selected_store_returns_400`). Handler unit tests for the
+  two truly-unreachable gates are out of scope here.
+- **Latent robustness paths — asserted as pins (behavior the real client never triggers).** The Angular/React
+  clients guard duplicates (`wasUsedToday`) and always send valid `YYYY-MM-DD` dates, so these are direct-call
+  robustness surfaces, not user-facing bugs:
+  - Intra-request dedup gap → `Post_duplicate_days_within_request_inserts_all` (A5).
+  - Missing date/`ActiveDays` validation → `500` → `Post_malformed_date_returns_500`,
+    `Post_empty_day_string_returns_500`, `Post_missing_activeDays_returns_500` (A9/A10).
+  - Usage accepted against an inactive store → `Post_against_inactive_store_returns_200` (A11).
+- **`Saved` is correct, not a bug** — see `Post_saved_false_still_inserts` (client-side sync flag).
+- **Double `[HasPermission]` on the GETs** (class `ProfileAdmin` + method `SuperAdmin`) → asserted by the
+  full `403` matrix in `StoreLastUsagesAuthTests` (every non-SuperAdmin actor, both windows).
 
 ## 6. Seeding needs (reuse `04`/`05`/`09`; duplicate locally if absent)
 
