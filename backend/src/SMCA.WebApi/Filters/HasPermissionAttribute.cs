@@ -71,7 +71,7 @@ namespace SMCA.WebApi.Filters
             }
             else
             {
-                context.Result = new ForbidResult();
+                context.Result = new UnauthorizedResult();
             }
         }
     }

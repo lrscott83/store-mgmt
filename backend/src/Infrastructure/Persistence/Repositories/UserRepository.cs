@@ -74,7 +74,7 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<bool> IsUniqueLoginAsync(string login)
         {
-            return await Task.FromResult(_users.All(t => t.Login != login));
+            return await Task.FromResult(_users.IgnoreQueryFilters().All(t => t.Login != login));
         }
     }
 }

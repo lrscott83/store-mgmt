@@ -65,8 +65,8 @@ namespace SMCA.WebApi.Services
             var request = _httpContextAccessor.HttpContext.Request;
             if (request.Headers.ContainsKey("X-Forwarded-For"))
                 return request.Headers["X-Forwarded-For"];
-            else
-                return _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.MapToIPv4().ToString();
+            var remoteIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress;
+            return remoteIp != null ? remoteIp.MapToIPv4().ToString() : "0.0.0.0";
         }
 
         private string GetClaimValue(string claimType)
