@@ -45,4 +45,23 @@ describe('CategoryStats (Angular category-stats.component.html 1:1 port)', () =>
     const { container } = render(<CategoryStats category={null} />);
     expect(container.firstChild).toBeNull();
   });
+
+  it('renders the items-count as plain text, not a chip (WU7 list-parity sweep)', () => {
+    render(<CategoryStats category={makeCategory()} />);
+    const count = screen.getByText('(5)');
+    expect(count.className).not.toMatch(/rounded-full/);
+    expect(count.className).toMatch(/font-bold/);
+    expect(count.className).toMatch(/text-success/);
+  });
+
+  it('renders the summary row without a row border (WU7 list-parity sweep)', () => {
+    const { container } = render(<CategoryStats category={makeCategory()} />);
+    const summaryRow = container.querySelector('tr') as HTMLElement;
+    expect(summaryRow.className).not.toMatch(/border-b/);
+  });
+
+  it('formats totals with thousands separator via formatCurrency (WU7 list-parity sweep)', () => {
+    render(<CategoryStats category={makeCategory({ total: 2000 })} />);
+    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+  });
 });

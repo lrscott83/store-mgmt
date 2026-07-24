@@ -2,6 +2,7 @@ import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface CategoryProductListProps {
   products: Product[];
@@ -60,14 +61,15 @@ interface ProductRowProps {
 
 function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
   const intl = useIntl();
-  const formattedPrice = `$${product.price.toFixed(2)}`;
+  const formattedPrice = formatCurrency(product.price);
 
   return (
     <li className="flex items-center justify-between py-3">
       <span className="text-sm text-text">{product.name}</span>
       <div className="flex items-center gap-4">
         {/* Angular formats with `currency:'USD':'symbol':'1.2-2'` -> literal $X.XX,
-            not locale-formatted (es locale would render "2,00 US$"). */}
+            not locale-formatted (es locale would render "2,00 US$"). formatCurrency
+            hard-codes 'en-US' to match, independent of the app's own 'es' display locale. */}
         <span className="text-sm font-medium text-primary">{formattedPrice}</span>
         <ActionMenu>
           <ActionMenuItem intent="edit" onClick={onEdit}>

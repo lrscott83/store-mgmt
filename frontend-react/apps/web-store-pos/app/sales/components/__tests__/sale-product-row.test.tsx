@@ -65,6 +65,15 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     expect(screen.queryByLabelText('Precio')).not.toBeInTheDocument();
   });
 
+  it('formats the read-only price with a thousands separator via formatCurrency (WU7 list-parity sweep)', () => {
+    render(
+      <Wrapper>
+        <SaleProductRow product={makeProduct({ price: 2000 })} orderType={OrderType.Normal} onAdded={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+  });
+
   it('shows an editable price input for a non-Normal sale (e.g. Mayorista)', () => {
     render(
       <Wrapper>

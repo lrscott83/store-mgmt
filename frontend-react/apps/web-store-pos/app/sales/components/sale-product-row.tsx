@@ -4,6 +4,7 @@ import type { Product, Result } from '@store-mgmt/domain';
 import { OrderType } from '@store-mgmt/domain';
 import { ProductErrors } from '@store-mgmt/domain';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface SaleProductRowProps {
   product: Product;
@@ -55,7 +56,7 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-text">{product.name}</p>
         {isNormalSale ? (
-          <span className="text-sm text-primary">${product.price.toFixed(2)}</span>
+          <span className="text-sm text-primary">{formatCurrency(product.price)}</span>
         ) : (
           <label className="mt-1 flex items-center gap-2 text-xs text-muted">
             {intl.formatMessage({ id: 'GENERAL.PRICE' })}

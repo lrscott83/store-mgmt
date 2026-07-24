@@ -1,4 +1,5 @@
 import type { CategoryCartItemsView } from '../lib/category-cart-items-view';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface CategoryStatsProps {
   category: CategoryCartItemsView;
@@ -18,17 +19,15 @@ export function CategoryStats({ category }: CategoryStatsProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <tbody>
-          <tr className="border-b border-black">
+          <tr>
             <td className="p-1">
               <span className="font-bold text-text">{category.name}</span>
             </td>
             <td className="p-1 text-right">
-              <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                ({category.itemsCount})
-              </span>
+              <span className="font-bold text-success">({category.itemsCount})</span>
             </td>
             <td className="p-1 text-right">
-              <span className="font-bold text-success">${category.total.toFixed(2)}</span>
+              <span className="font-bold text-success">{formatCurrency(category.total)}</span>
             </td>
           </tr>
           {category.productItems.map((product) => (
@@ -37,12 +36,10 @@ export function CategoryStats({ category }: CategoryStatsProps) {
                 <span className="font-bold text-text">{product.name}</span>
               </td>
               <td className="p-1 text-right">
-                <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                  ({product.itemsCount})
-                </span>
+                <span className="font-bold text-success">({product.itemsCount})</span>
               </td>
               <td className="p-1 text-right">
-                <span className="font-bold text-success">${product.total.toFixed(2)}</span>
+                <span className="font-bold text-success">{formatCurrency(product.total)}</span>
               </td>
             </tr>
           ))}

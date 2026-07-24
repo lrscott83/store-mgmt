@@ -73,6 +73,19 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
     expect(screen.getByText('$2.00')).toBeInTheDocument();
   });
 
+  it('formats the price with a thousands separator via formatCurrency (WU7 list-parity sweep)', () => {
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[makeProduct({ name: 'Sprite', price: 2000 })]}
+          onEditProduct={vi.fn()}
+          onDeleteProduct={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+  });
+
   it('opens a per-product actions menu with "Editar Producto" / "Eliminar Producto"', () => {
     render(
       <Wrapper>

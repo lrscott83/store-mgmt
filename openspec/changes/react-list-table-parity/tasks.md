@@ -74,10 +74,10 @@ Rationale: bulk of lines are mechanical (16 route files = one `padding="tight"` 
 
 ## Phase 7: category-stats + currency-only files (WU7)
 
-- [ ] 7.1 RED: failing tests — category-stats no chip wrapper, count `font-bold text-success` plain span, no row border/divider; category-product-list and sale-product-row amounts render via `formatCurrency` (no other DOM change).
-- [ ] 7.2 GREEN: sweep `category-stats.tsx`; currency-only edit `category-product-list.tsx:63` (keep `ul divide-y`) and `sale-product-row.tsx:58` (keep `border-b`).
-- [ ] 7.3 Confirm `statistics/` and `today-report.tsx` untouched (explicitly excluded from currency migration).
-- [ ] 7.4 Commit WU7.
+- [x] 7.1 RED: failing tests — category-stats no chip wrapper, count `font-bold text-success` plain span, no row border/divider; category-product-list and sale-product-row amounts render via `formatCurrency` (no other DOM change).
+- [x] 7.2 GREEN: sweep `category-stats.tsx`; currency-only edit `category-product-list.tsx:63` (keep `ul divide-y`) and `sale-product-row.tsx:58` (keep `border-b`).
+- [x] 7.3 Confirm `statistics/` and `today-report.tsx` untouched (explicitly excluded from currency migration).
+- [x] 7.4 Commit WU7.
 
 ## Phase 8: Route `padding="tight"` sweep (WU8)
 
