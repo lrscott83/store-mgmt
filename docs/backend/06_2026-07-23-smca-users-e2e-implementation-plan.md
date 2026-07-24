@@ -19,8 +19,8 @@ behavior depends on the role (list scoping, the `IsActive`-privilege case).
 ## Global Constraints (verified — `06` test-plan §2/§3)
 
 - Controllers `return Ok(...)` → HTTP 200 unless a handler/pipeline throws.
-- Validation failure = **HTTP 400** (`ValidationException` → `ErrorHandlerMiddleware`); `Errors[].code` =
-  validator key (`IsRequired`, `UserNotFound`, `EmailFormatInvalid`, `RoleNotFound`).
+- Validation failure = **HTTP 400** (`ValidationException` → `ErrorHandlerMiddleware`); `Errors[].Code` =
+  the PROPERTY NAME (the validator message key lives in the `Description`).
 - `change-password` wrong-old / non-admin-other = **soft 200**, `Succeeded=false`, `ActionCode=400`, code
   `User.InvalidPassword`.
 - `DELETE {id}` = soft-deactivate (`IsActive=false`, row kept); non-admin → real 400.
@@ -112,7 +112,7 @@ public sealed class UsersListTests
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync($"/api/v1/Users/{Guid.NewGuid()}");
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "UserNotFound");
+            b!.Errors.Should().Contain(e => e.Code == "UserId");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -178,7 +178,7 @@ public sealed class UsersUpdateTests
                 new { FullName = "", CellPhone = "1112223333", Email = (string?)null, IsActive = true });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+            b!.Errors.Should().Contain(e => e.Code == "FullName");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, target.UserId); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -195,7 +195,7 @@ public sealed class UsersUpdateTests
                 new { FullName = "Name", CellPhone = "1", Email = "not-an-email", IsActive = true });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "EmailFormatInvalid");
+            b!.Errors.Should().Contain(e => e.Code == "Email");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, target.UserId); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -211,7 +211,7 @@ public sealed class UsersUpdateTests
                 new { FullName = "Name", CellPhone = "1", Email = (string?)null, IsActive = true });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "UserNotFound");
+            b!.Errors.Should().Contain(e => e.Code == "Id");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -364,7 +364,7 @@ public sealed class UsersRolesTests
                 .PostAsJsonAsync("/api/v1/Users/AddUserRoles", new { UserId = target.UserId, RoleIds = Array.Empty<int>() });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+            b!.Errors.Should().Contain(e => e.Code == "RoleIds");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, target.UserId); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -380,7 +380,7 @@ public sealed class UsersRolesTests
                 .PostAsJsonAsync("/api/v1/Users/AddUserRoles", new { UserId = Guid.NewGuid(), RoleIds = new[] { StoreUserRoleId } });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "UserNotFound");
+            b!.Errors.Should().Contain(e => e.Code == "UserId");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -489,7 +489,7 @@ public sealed class UsersChangePasswordTests
                     new { UserId = target.UserId, OldPassword = "Password123", NewPassword = "" });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+            b!.Errors.Should().Contain(e => e.Code == "NewPassword");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, target.UserId); }
     }
@@ -598,7 +598,7 @@ public sealed class UsersListGapTests
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync($"/api/v1/Users/{Guid.Empty}");
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+            b!.Errors.Should().Contain(e => e.Code == "UserId");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -733,7 +733,7 @@ public sealed class UsersRolesGapTests
                 .PostAsJsonAsync("/api/v1/Users/AddUserRoles", new { UserId = target.UserId, RoleIds = new[] { SuperAdminRoleId } });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "RoleNotFound");
+            b!.Errors.Should().Contain(e => e.Code == "RoleIds");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, target.UserId); await AuthzSeed.CleanupStoreGraphAsync(_f, actor.StoreId, actor.UserId); }
     }
@@ -750,7 +750,7 @@ public sealed class UsersRolesGapTests
                 .PostAsJsonAsync("/api/v1/Users/DeleteUserRoles", new { UserId = Guid.NewGuid(), RoleIds = new[] { StoreUserRoleId } });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "UserNotFound");
+            b!.Errors.Should().Contain(e => e.Code == "UserId");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -768,7 +768,7 @@ public sealed class UsersRolesGapTests
                 .PostAsJsonAsync("/api/v1/Users/DeleteUserRoles", new { UserId = target.UserId, RoleIds = Array.Empty<int>() });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+            b!.Errors.Should().Contain(e => e.Code == "RoleIds");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, target.UserId); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -808,7 +808,7 @@ public sealed class UsersChangePasswordGapTests
                 new { UserId = Guid.NewGuid(), OldPassword = "Password123", NewPassword = "NewPass123" });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "UserNotFound");
+            b!.Errors.Should().Contain(e => e.Code == "UserId");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -823,7 +823,7 @@ public sealed class UsersChangePasswordGapTests
                 new { UserId = target.UserId, OldPassword = "", NewPassword = "NewPass123" });
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+            b!.Errors.Should().Contain(e => e.Code == "OldPassword");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, target.UserId); }
     }

@@ -24,7 +24,8 @@ SuperAdmin (bypasses both gates → cheapest seeding).
   who passes `[HasPermission(UsersAdmin)]` (via a `StoreRoleFeature` granting Users=72) is still rejected
   with 400 inside the handler.
 - Controllers `return Ok(...)` → HTTP 200 unless thrown. Validation failure = **HTTP 400**
-  (`ValidationException` → `ErrorHandlerMiddleware`); `Errors[].code` = validator key.
+  (`ValidationException` → `ErrorHandlerMiddleware`); `Errors[].Code` = the PROPERTY NAME (the validator
+  message key lives in the `Description`; `ValidationException.cs` builds `new Error(PropertyName, ErrorMessage)`).
 - **No `StoreUserErrors` class exists** — StoreUsers handler failures throw a generic
   `ApiException(_localizer["UserNotFound"], BadRequest)` (real 400), never a coded soft failure.
 - `GetStoreUsersQuery` and `GetStoreUserByIdQuery` scoping: SuperAdmin ignores query filters; OwnerAdmin is

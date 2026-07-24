@@ -18,7 +18,8 @@ handler guard). The guard tests deliberately use a StoreUser with the Users(72) 
 
 - Class-level `[HasPermission(UsersAdmin)]`; every handler hard-gates `IsSuperAdminOrOwnerAdmin` →
   `ApiException` real **400**.
-- `Ok(...)` → 200 unless thrown; validation = **400** with validator-key codes; no `StoreUserErrors`.
+- `Ok(...)` → 200 unless thrown; validation = **400** with `Errors[].Code` = the PROPERTY NAME (the
+  validator message key lives in the `Description`); no `StoreUserErrors`.
 - Create success = 200 `Success(saved>0)`, persists User+StoreUser+UserRole.
 - `FeatureType.Users = 72`; visible role for create = `StoreUser=3`.
 - Human runs ALL git. Every Checkpoint is a PAUSE.
@@ -122,7 +123,7 @@ public sealed class StoreUsersGetByIdTests
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync($"/api/v1/StoreUsers/{Guid.NewGuid()}");
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "UserNotFound");
+            b!.Errors.Should().Contain(e => e.Code == "StoreUserId");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -137,7 +138,7 @@ public sealed class StoreUsersGetByIdTests
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync($"/api/v1/StoreUsers/{Guid.Empty}");
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "IsRequired");
+            b!.Errors.Should().Contain(e => e.Code == "StoreUserId");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
@@ -256,13 +257,13 @@ public sealed class StoreUsersCreateValidationTests
         Email = email, RoleIds = roleIds ?? new[] { StoreUserRoleId }
     };
 
-    [Fact] public Task Create_empty_login_400_IsRequired() => Assert400(s => Valid(s, login: ""), "IsRequired");
-    [Fact] public Task Create_empty_password_400_IsRequired() => Assert400(s => Valid(s, password: ""), "IsRequired");
-    [Fact] public Task Create_empty_fullname_400_IsRequired() => Assert400(s => Valid(s, fullName: ""), "IsRequired");
-    [Fact] public Task Create_empty_roleids_400_IsRequired() => Assert400(s => Valid(s, roleIds: Array.Empty<int>()), "IsRequired");
-    [Fact] public Task Create_invalid_email_400_EmailFormatInvalid() => Assert400(s => Valid(s, email: "not-an-email"), "EmailFormatInvalid");
-    [Fact] public Task Create_nonexistent_store_400_StoreNotFound() => Assert400(_ => Valid(Guid.NewGuid()), "StoreNotFound");
-    [Fact] public Task Create_invisible_role_400_RoleNotFound() => Assert400(s => Valid(s, roleIds: new[] { 999999 }), "RoleNotFound");
+    [Fact] public Task Create_empty_login_400_IsRequired() => Assert400(s => Valid(s, login: ""), "Login");
+    [Fact] public Task Create_empty_password_400_IsRequired() => Assert400(s => Valid(s, password: ""), "Password");
+    [Fact] public Task Create_empty_fullname_400_IsRequired() => Assert400(s => Valid(s, fullName: ""), "FullName");
+    [Fact] public Task Create_empty_roleids_400_IsRequired() => Assert400(s => Valid(s, roleIds: Array.Empty<int>()), "RoleIds");
+    [Fact] public Task Create_invalid_email_400_EmailFormatInvalid() => Assert400(s => Valid(s, email: "not-an-email"), "Email");
+    [Fact] public Task Create_nonexistent_store_400_StoreNotFound() => Assert400(_ => Valid(Guid.NewGuid()), "StoreId");
+    [Fact] public Task Create_invisible_role_400_RoleNotFound() => Assert400(s => Valid(s, roleIds: new[] { 999999 }), "RoleIds");
 
     // Duplicate login -> IsUniqueName -> UserAlreadyExists (needs an existing user with the same login).
     [Fact]
@@ -278,7 +279,7 @@ public sealed class StoreUsersCreateValidationTests
                 Valid(store.StoreId, login: existing.Login));
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "UserAlreadyExists");
+            b!.Errors.Should().Contain(e => e.Code == "Login");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, existing.UserId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }

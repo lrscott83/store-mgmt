@@ -21,8 +21,9 @@ a light "wrong role → 403" smoke per gate to confirm wiring.
   (`ErrorHandlerMiddleware.cs:24-70`).
 - **Validation = HTTP 400.** `ValidationBehaviour` throws `ValidationException` on any failed rule
   (`ValidationBehaviour.cs:16-28`); `ErrorHandlerMiddleware` maps it to **400**. Body `Errors` = list of
-  `(PropertyName, ErrorMessage)`; the **code is the validator error key** (`IsRequired`, `UserNotFound`,
-  `EmailFormatInvalid`, `RoleNotFound`), NOT a `UserErrors` code.
+  `(PropertyName, ErrorMessage)`; the **`Errors[].Code` is the PROPERTY NAME** (`Login`, `Id`, `UserId`,
+  `RoleIds`, …) — the validator message key (`IsRequired`, `UserNotFound`, …) lives in the `Description`,
+  NOT the `Code` (`ValidationException.cs` builds `new Error(failure.PropertyName, failure.ErrorMessage)`).
 - `UsersController` is `[Authorize]` class-level, no class-level `[HasPermission]`
   (`UsersController.cs:20-22`). Each method carries its own `[HasPermission]`.
 - Per-endpoint permission: list/get-by-id/delete/activate/AddUserRoles/DeleteUserRoles →

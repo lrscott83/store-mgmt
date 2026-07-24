@@ -189,12 +189,15 @@ equal priority — they are all the ones actually used.
 
 ### 9.3 Order of attack
 
-1. **Auth** — planned: `01`/`02` (login, register, me, ping) + `03` (logout).
-2. **Stores** — planned: `04` test-plan + implementation-plan (by-current-user, {id}, POST, PUT,
-   approve, disapprove). ← current focus.
-3. **Authorization (cross-cutting)** — see §9.4. Next after stores.
-4. **Users / StoreUsers** — profile edit, change-password, list, activate, delete, create StoreUser.
-5. **Owners / ReSellers / Features / Usages** — admin surface + usage tracking.
+1. **Auth** — done: `01`/`02` (login, register, me, ping) + `03`/`03b` (logout + gap-fill). ✓
+2. **Stores** — done: `04` test-plan + implementation-plan (by-current-user, {id}, POST, PUT,
+   approve, disapprove). ✓
+3. **Authorization (cross-cutting)** — done: `05` (see §9.4). ✓
+4. **Users / StoreUsers** — done: `06` (Users) + `07` (StoreUsers). ✓
+5. **Owners** — done: `08` (list, {id}, POST, PUT, DELETE + delete-500 pin). ✓
+6. **Features** — done: `09` (all/{includeInactive}, activate, available). ← current focus.
+7. **Usages** — pending: `store-daily-usage` smoke/contract (§9.5.3).
+8. **ReSellers** — pending, **last** (deliberately deferred to the end).
 
 ### 9.4 Cross-cutting: authenticated-user permissions (100% coverage target)
 
