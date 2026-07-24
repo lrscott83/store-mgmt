@@ -453,7 +453,10 @@ describe('EntryList — isOwnerAdmin gating (Angular parity)', () => {
         <EntryList entries={MOCK_ENTRIES} onEdit={vi.fn()} onDeactivate={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.queryByText('Precio de costo')).not.toBeInTheDocument();
+    // EntryList renders NO header row (Angular parity: bare <tbody>, no <thead>). The
+    // cost-price column is the VALUE cell, so gating is verified by the value's absence,
+    // not a non-existent "Precio de costo" header label.
+    expect(screen.queryByText('$0.80')).not.toBeInTheDocument();
     expect(screen.queryByText('Editar')).not.toBeInTheDocument();
     expect(screen.queryByText('Eliminar')).not.toBeInTheDocument();
     // Data still renders — only cost-price/actions columns are gated.
@@ -466,7 +469,7 @@ describe('EntryList — isOwnerAdmin gating (Angular parity)', () => {
         <EntryList entries={MOCK_ENTRIES} isOwnerAdmin />
       </Wrapper>,
     );
-    expect(screen.getByText('Precio de costo')).toBeInTheDocument();
+    // The cost-price cell renders the formatted VALUE (there is no header label to assert).
     expect(screen.getByText('$0.80')).toBeInTheDocument();
   });
 
