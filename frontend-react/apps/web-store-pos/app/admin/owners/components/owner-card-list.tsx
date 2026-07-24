@@ -2,6 +2,7 @@ import { useIntl } from 'react-intl';
 import type { Owner } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface OwnerCardListProps {
   owners: Owner[];
@@ -23,18 +24,6 @@ function getCardClass(owner: Owner): string {
   return '';
 }
 
-// Angular's `{{ price | currency }}` (owners.component.html:70) renders "$100.00" — the
-// CurrencyPipe's default en-US style ($ symbol, period decimals) — independent of the app's
-// own display locale ('es'). Matches `formatUSD` in management/stores/module-picker.tsx.
-function formatUSD(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) {
   const intl = useIntl();
 
@@ -51,7 +40,7 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
           <Card key={owner.id} title={owner.fullName} className={getCardClass(owner)}>
             <div className="space-y-2">
               <p className="text-sm text-text-muted">
-                {formatUSD(totalPrice)}
+                {formatCurrency(totalPrice)}
                 {' en '}
                 {intl.formatMessage({ id: 'OWNER.STORE_PRICE_LABEL' }, { count: storeCount })}
               </p>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useIntl } from 'react-intl';
 import type { Module } from '@store-mgmt/domain';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface ModulePickerProps {
   modules: Module[];
@@ -13,15 +14,6 @@ function computeChecked(modules: Module[]): Set<number> {
       .filter((m) => m.priceIncluded || m.selected)
       .map((m) => m.id)
   );
-}
-
-function formatUSD(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
 }
 
 export function ModulePicker({ modules, onChange }: ModulePickerProps) {
@@ -120,11 +112,11 @@ export function ModulePicker({ modules, onChange }: ModulePickerProps) {
                   {!isLocked && (
                     m.price !== m.currentPrice ? (
                       <span className="inline-flex flex-col items-end">
-                        <span className="font-semibold text-gray-900">{formatUSD(m.currentPrice)}</span>
-                        <span className="text-xs text-gray-400 line-through">{formatUSD(m.price)}</span>
+                        <span className="font-semibold text-gray-900">{formatCurrency(m.currentPrice)}</span>
+                        <span className="text-xs text-gray-400 line-through">{formatCurrency(m.price)}</span>
                       </span>
                     ) : (
-                      <span className="font-semibold">{formatUSD(m.currentPrice)}</span>
+                      <span className="font-semibold">{formatCurrency(m.currentPrice)}</span>
                     )
                   )}
                 </td>
@@ -140,7 +132,7 @@ export function ModulePicker({ modules, onChange }: ModulePickerProps) {
             </td>
             <td className="py-1 text-right font-semibold">
               {/* Finding 7: format total as USD currency */}
-              {formatUSD(total)}
+              {formatCurrency(total)}
             </td>
           </tr>
         </tfoot>
