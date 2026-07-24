@@ -1,12 +1,12 @@
 # 10 — SMCA.WebApi Usages E2E — Implementation Plan (self-contained)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development / executing-plans.
-> Steps use `- [ ]`. Materializes the `10` test-plan + the `10c` QA gap suite **merged in** (every `10c`
-> scenario folded into its class, tagged `(from 10c)`; nothing discarded).
+> Steps use `- [ ]`. Materializes the `10` test-plan, including the full gap-scenario coverage folded into
+> each class (scenario ids `A*`/`B*`); nothing discarded.
 
 **Goal:** Implement, against real Postgres via `dotnet test`, the full Usages endpoint behavior — the
 `store-daily-usage` dedup/insert + its `ProfileAdmin`/`SuperAdmin` auth, and the
-`stores-last-week`/`stores-last-month` SuperAdmin-only count contract — plus the `10c` edge/error/integration
+`stores-last-week`/`stores-last-month` SuperAdmin-only count contract — plus the edge/error/integration
 gaps and the bug-reveal pins.
 
 **Reuses (do NOT redefine):** the on-disk harness — `DbTestHelpers.{SeedSuperAdminAsync,
@@ -19,7 +19,7 @@ handlers and the POST store-check). `ProfileAdmin` actors = `AuthzSeed.SeedStore
 (StoreUser branch) and `AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true)` (OwnerAdmin branch).
 No-grant actor = `SeedStoreUserAsync(_f, null)`. GET-403 role actors = `SeedUserWithRoleAsync((int)RoleType.{...})`.
 
-## Global Constraints (verified — `10` test-plan §2 + `10c`)
+## Global Constraints (verified — `10` test-plan §2)
 
 - **Failures are thrown → real HTTP status** (`ErrorHandlerMiddleware`): `ApiException` → its `StatusCode`
   (400); any other unhandled exception → **500** (`App.Unexpected`). No token → **401**; authenticated but
@@ -56,7 +56,7 @@ Folder `SMCA.WebApi.E2ETests/Usages/`:
 
 ---
 
-## Task 1: `StoreDailyUsageTests` (POST behavior — full + 10c gaps)
+## Task 1: `StoreDailyUsageTests` (POST behavior — full + gaps)
 
 **Files:**
 - Create: `backend/src/SMCA.WebApi.E2ETests/Usages/StoreDailyUsageTests.cs`
@@ -235,9 +235,9 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    // ----- 10c gaps -----
+    // ----- gap scenarios -----
 
-    [Fact] // (from 10c A1) multiple all-new days -> all inserted
+    [Fact] // (A1) multiple all-new days -> all inserted
     public async Task Post_multiple_new_days_inserts_all()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -251,7 +251,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A2) dedup key is (userId, storeId): same day, two users -> both inserted
+    [Fact] // (A2) dedup key is (userId, storeId): same day, two users -> both inserted
     public async Task Post_same_day_two_users_inserts_both()
     {
         var store = await StoreSeed.SeedStoreAsync(_f, $"Usg-{Guid.NewGuid():N}", approved: true);
@@ -272,7 +272,7 @@ public sealed class StoreDailyUsageTests
         }
     }
 
-    [Fact] // (from 10c A3) dedup is per store: same user+day, two stores -> both inserted
+    [Fact] // (A3) dedup is per store: same user+day, two stores -> both inserted
     public async Task Post_same_day_two_stores_inserts_both()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -299,7 +299,7 @@ public sealed class StoreDailyUsageTests
         }
     }
 
-    [Fact] // (from 10c A4) ProfileAdmin via the OwnerAdmin filter branch (Management module -> Profile allowed)
+    [Fact] // (A4) ProfileAdmin via the OwnerAdmin filter branch (Management module -> Profile allowed)
     public async Task Post_as_owner_admin_profile_returns_200()
     {
         var actor = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
@@ -313,7 +313,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(actor.StoreId); await AuthzSeed.CleanupStoreGraphAsync(_f, actor.StoreId, actor.UserId); }
     }
 
-    [Fact] // (from 10c A5) BUG-REVEAL: dedup is only vs DB, not within the request -> [D1,D1,D2] inserts 3 rows
+    [Fact] // (A5) BUG-REVEAL: dedup is only vs DB, not within the request -> [D1,D1,D2] inserts 3 rows
     public async Task Post_duplicate_days_within_request_inserts_all()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -326,7 +326,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A6) CORRECT: Saved is a client-side sync flag; backend ignores it -> Saved:false still inserts
+    [Fact] // (A6) CORRECT: Saved is a client-side sync flag; backend ignores it -> Saved:false still inserts
     public async Task Post_saved_false_still_inserts()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -341,7 +341,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A7) a timed Day and a midnight Day for the same date are distinct -> both inserted
+    [Fact] // (A7) a timed Day and a midnight Day for the same date are distinct -> both inserted
     public async Task Post_day_with_time_component_is_distinct_from_midnight()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -354,7 +354,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A8) no date-range validation -> a far-future day is accepted
+    [Fact] // (A8) no date-range validation -> a far-future day is accepted
     public async Task Post_future_day_is_accepted()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -367,7 +367,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A9) BUG-REVEAL: empty Day string -> DateTime.Parse throws -> 500
+    [Fact] // (A9) BUG-REVEAL: empty Day string -> DateTime.Parse throws -> 500
     public async Task Post_empty_day_string_returns_500()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -380,7 +380,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A10) BUG-REVEAL: no validator -> null ActiveDays -> NRE -> 500
+    [Fact] // (A10) BUG-REVEAL: no validator -> null ActiveDays -> NRE -> 500
     public async Task Post_missing_activeDays_returns_500()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -392,7 +392,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A11) FINDING: no IsActive filter on the store lookup -> usage against an INACTIVE store is accepted
+    [Fact] // (A11) FINDING: no IsActive filter on the store lookup -> usage against an INACTIVE store is accepted
     public async Task Post_against_inactive_store_returns_200()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -406,7 +406,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A12) POST-only route -> GET verb -> 405
+    [Fact] // (A12) POST-only route -> GET verb -> 405
     public async Task Get_verb_on_store_daily_usage_returns_405()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -419,7 +419,7 @@ public sealed class StoreDailyUsageTests
         finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A13) POST-only route -> PUT verb -> 405
+    [Fact] // (A13) POST-only route -> PUT verb -> 405
     public async Task Put_verb_on_store_daily_usage_returns_405()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -432,7 +432,7 @@ public sealed class StoreDailyUsageTests
         finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A14) VERIFY&PIN: malformed JSON body -> model-binding 400 (pin the actual status)
+    [Fact] // (A14) VERIFY&PIN: malformed JSON body -> model-binding 400 (pin the actual status)
     public async Task Post_malformed_json_returns_400()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -445,7 +445,7 @@ public sealed class StoreDailyUsageTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c A16) the handler wires httpContext fields; with no headers they persist as "" (never null)
+    [Fact] // (A16) the handler wires httpContext fields; with no headers they persist as "" (never null)
     public async Task Post_persists_non_null_context_fields()
     {
         var (adminId, client, store) = await SeedAdminWithSelectedStoreAsync();
@@ -473,7 +473,7 @@ public sealed class StoreDailyUsageTests
 
 ---
 
-## Task 2: `StoreDailyUsageAuthTests` (POST auth + 10c gap)
+## Task 2: `StoreDailyUsageAuthTests` (POST auth + gap)
 
 **Files:**
 - Create: `backend/src/SMCA.WebApi.E2ETests/Usages/StoreDailyUsageAuthTests.cs`
@@ -526,7 +526,7 @@ public sealed class StoreDailyUsageAuthTests
         r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact] // (from 10c A15) VERIFY&PIN: inactive user with a valid minted token -> pipeline rejects; pin the status.
+    [Fact] // (A15) VERIFY&PIN: inactive user with a valid minted token -> pipeline rejects; pin the status.
     public async Task Post_as_inactive_user_is_rejected()
     {
         var login = $"inact-{Guid.NewGuid():N}@test.com";
@@ -549,7 +549,7 @@ public sealed class StoreDailyUsageAuthTests
 
 ---
 
-## Task 3: `StoreLastUsagesTests` (GET behavior — contract + 10c gaps)
+## Task 3: `StoreLastUsagesTests` (GET behavior — contract + gaps)
 
 **Files:**
 - Create: `backend/src/SMCA.WebApi.E2ETests/Usages/StoreLastUsagesTests.cs`
@@ -644,7 +644,7 @@ public sealed class StoreLastUsagesTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c B1) month counts reflect seeded days inside the 30-day window
+    [Fact] // (B1) month counts reflect seeded days inside the 30-day window
     public async Task LastMonth_counts_reflect_seeded_usage_days()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -662,7 +662,7 @@ public sealed class StoreLastUsagesTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c B2) VERIFY&PIN: every bucket is non-negative (shared DB blocks an exact all-zero assertion)
+    [Fact] // (B2) VERIFY&PIN: every bucket is non-negative (shared DB blocks an exact all-zero assertion)
     public async Task LastWeek_counts_are_non_negative()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -675,7 +675,7 @@ public sealed class StoreLastUsagesTests
         finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    // (from 10c B3) usage older than the window OR on an inactive store is excluded from the counts.
+    // (B3) usage older than the window OR on an inactive store is excluded from the counts.
     // Relies on the serial [Collection("e2e")] execution: no concurrent mutation of the shared sum.
     [Fact]
     public async Task LastWeek_excludes_out_of_window_and_inactive_store_usage()
@@ -708,7 +708,7 @@ public sealed class StoreLastUsagesTests
         }
     }
 
-    [Fact] // (from 10c B4) usage exactly on the window boundary (today - 7) is included (>=)
+    [Fact] // (B4) usage exactly on the window boundary (today - 7) is included (>=)
     public async Task LastWeek_includes_boundary_day()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -725,7 +725,7 @@ public sealed class StoreLastUsagesTests
         finally { await CleanupUsagesAsync(store.StoreId); await StoreSeed.CleanupStoreFixtureAsync(_f, store); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c B5) ActiveStoreCount reflects active stores only
+    [Fact] // (B5) ActiveStoreCount reflects active stores only
     public async Task LastWeek_activeStoreCount_counts_active_only()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -742,7 +742,7 @@ public sealed class StoreLastUsagesTests
         finally { await StoreSeed.CleanupStoreFixtureAsync(_f, s1); await StoreSeed.CleanupStoreFixtureAsync(_f, s2); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c B6) GET-only route -> POST verb -> 405 (week)
+    [Fact] // (B6) GET-only route -> POST verb -> 405 (week)
     public async Task Post_verb_on_stores_last_week_returns_405()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -755,7 +755,7 @@ public sealed class StoreLastUsagesTests
         finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
-    [Fact] // (from 10c B7) GET-only route -> POST verb -> 405 (month)
+    [Fact] // (B7) GET-only route -> POST verb -> 405 (month)
     public async Task Post_verb_on_stores_last_month_returns_405()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
@@ -822,16 +822,16 @@ public sealed class StoreLastUsagesAuthTests
     [Fact] public Task LastWeek_as_store_user_returns_403() => AssertRoleForbidden((int)RoleType.StoreUser, "/api/v1/usages/stores-last-week");
     [Fact] public Task LastWeek_as_reseller_returns_403() => AssertRoleForbidden((int)RoleType.ReSeller, "/api/v1/usages/stores-last-week");
 
-    // (from 10c B8/B9/B10) full 403 matrix on the month window too
+    // (B8/B9/B10) full 403 matrix on the month window too
     [Fact] public Task LastMonth_as_owner_admin_returns_403() => AssertRoleForbidden((int)RoleType.OwnerAdmin, "/api/v1/usages/stores-last-month");
     [Fact] public Task LastMonth_as_store_user_returns_403() => AssertRoleForbidden((int)RoleType.StoreUser, "/api/v1/usages/stores-last-month");
     [Fact] public Task LastMonth_as_reseller_returns_403() => AssertRoleForbidden((int)RoleType.ReSeller, "/api/v1/usages/stores-last-month");
 
-    [Fact] // (from 10c B11)
+    [Fact] // (B11)
     public async Task LastMonth_malformed_token_returns_401()
     { (await AuthTestHelpers.BearerClient(_f, "not.a.valid.jwt").GetAsync("/api/v1/usages/stores-last-month")).StatusCode.Should().Be(HttpStatusCode.Unauthorized); }
 
-    [Fact] // (from 10c B12) VERIFY&PIN: inactive SuperAdmin on a GET -> pin 401/404 (or 200 if no active-user gate)
+    [Fact] // (B12) VERIFY&PIN: inactive SuperAdmin on a GET -> pin 401/404 (or 200 if no active-user gate)
     public async Task LastWeek_as_inactive_super_admin_is_rejected_or_pinned()
     {
         var login = $"inact-{Guid.NewGuid():N}@test.com";
@@ -867,8 +867,8 @@ public sealed class StoreLastUsagesAuthTests
 
 ## Self-Review
 
-- **Coverage vs `10` test-plan + `10c` gap suite — 47 e2e tests + 3 `10b` unit tests, nothing dropped:**
-  - `StoreDailyUsageTests` (22): 7 plan behavior + 15 `(from 10c)` (A1–A14, A16).
+- **Coverage — 47 e2e tests, nothing dropped:**
+  - `StoreDailyUsageTests` (22): 7 base behavior + 15 gap scenarios (A1–A14, A16).
   - `StoreDailyUsageAuthTests` (4): 3 plan auth + A15.
   - `StoreLastUsagesTests` (10): 3 plan behavior + B1–B7.
   - `StoreLastUsagesAuthTests` (11): 6 plan auth + B8–B12.

@@ -108,27 +108,27 @@ New folder `SMCA.WebApi.E2ETests/Usages/`. `Auth/UsagesSmokeTests.cs` is retired
   handler's store check.
 - `Post_malformed_date_returns_500` **(PIN)** — POST `{ ActiveDays: [{ Day: "not-a-date", Saved: true }] }`
   as SuperAdmin with a selected store; assert `500` (`App.Unexpected`). Pins the missing date validation.
-- `Post_multiple_new_days_inserts_all` **(from 10c A1)** — POST 3 new days → `Data==true`, 3 rows.
-- `Post_same_day_two_users_inserts_both` **(from 10c A2)** — dedup key is `(userId, storeId)`; two admins,
+- `Post_multiple_new_days_inserts_all` **(A1)** — POST 3 new days → `Data==true`, 3 rows.
+- `Post_same_day_two_users_inserts_both` **(A2)** — dedup key is `(userId, storeId)`; two admins,
   same store+day → 2 rows.
-- `Post_same_day_two_stores_inserts_both` **(from 10c A3)** — same user+day across two selected stores → 2 rows.
-- `Post_as_owner_admin_profile_returns_200` **(from 10c A4)** — `AuthzSeed.SeedOwnerAdminAsync(withManagementModule:
+- `Post_same_day_two_stores_inserts_both` **(A3)** — same user+day across two selected stores → 2 rows.
+- `Post_as_owner_admin_profile_returns_200` **(A4)** — `AuthzSeed.SeedOwnerAdminAsync(withManagementModule:
   true)`; exercises the `IsOwnerAdmin` filter branch (Profile allowed via the active Management module).
-- `Post_duplicate_days_within_request_inserts_all` **(from 10c A5 · BUG-REVEAL)** — `[D1,D1,D2]` → **3 rows**
+- `Post_duplicate_days_within_request_inserts_all` **(A5 · BUG-REVEAL)** — `[D1,D1,D2]` → **3 rows**
   (dedup is only vs the DB, not within the request).
-- `Post_saved_false_still_inserts` **(from 10c A6)** — `Saved:false` still inserts. **Correct behavior:**
+- `Post_saved_false_still_inserts` **(A6)** — `Saved:false` still inserts. **Correct behavior:**
   `Saved` is a client-side sync flag (the client sends only `saved:false` days and flips them to `true`
   after a 200 — `store-usage-tracker.service.ts:73,89-90`); the backend rightly ignores it. Not a bug.
-- `Post_day_with_time_component_is_distinct_from_midnight` **(from 10c A7)** — `"…T15:30:00"` and `"…"` are 2 rows.
-- `Post_future_day_is_accepted` **(from 10c A8)** — far-future day → `200 Data==true` (no range validation).
-- `Post_empty_day_string_returns_500` **(from 10c A9 · BUG-REVEAL)** — `Day:""` → `DateTime.Parse` throws → `500`.
-- `Post_missing_activeDays_returns_500` **(from 10c A10 · BUG-REVEAL)** — `{}` body → null `ActiveDays` → NRE → `500`.
-- `Post_against_inactive_store_returns_200` **(from 10c A11 · FINDING)** — deactivate the selected store; POST
+- `Post_day_with_time_component_is_distinct_from_midnight` **(A7)** — `"…T15:30:00"` and `"…"` are 2 rows.
+- `Post_future_day_is_accepted` **(A8)** — far-future day → `200 Data==true` (no range validation).
+- `Post_empty_day_string_returns_500` **(A9 · BUG-REVEAL)** — `Day:""` → `DateTime.Parse` throws → `500`.
+- `Post_missing_activeDays_returns_500` **(A10 · BUG-REVEAL)** — `{}` body → null `ActiveDays` → NRE → `500`.
+- `Post_against_inactive_store_returns_200` **(A11 · FINDING)** — deactivate the selected store; POST
   still `200` (no `IsActive` filter on the store lookup).
-- `Get_verb_on_store_daily_usage_returns_405` **(from 10c A12)** · `Put_verb_on_store_daily_usage_returns_405`
-  **(from 10c A13)** — POST-only route.
-- `Post_malformed_json_returns_400` **(from 10c A14 · VERIFY&PIN)** — malformed JSON body → model-binding `400`.
-- `Post_persists_non_null_context_fields` **(from 10c A16)** — asserts the inserted row's `IpAddress`/`GfDevice`/
+- `Get_verb_on_store_daily_usage_returns_405` **(A12)** · `Put_verb_on_store_daily_usage_returns_405`
+  **(A13)** — POST-only route.
+- `Post_malformed_json_returns_400` **(A14 · VERIFY&PIN)** — malformed JSON body → model-binding `400`.
+- `Post_persists_non_null_context_fields` **(A16)** — asserts the inserted row's `IpAddress`/`GfDevice`/
   `GfDeviceId`/`GfSessionId` are non-null (handler wires them from httpContext, `""` when absent).
 
 ### `StoreDailyUsageAuthTests`
@@ -139,7 +139,7 @@ New folder `SMCA.WebApi.E2ETests/Usages/`. `Auth/UsagesSmokeTests.cs` is retired
   `HasFeature(Profile)` leg → `403`. Never reaches the handler. Cleanup the store graph in `finally`.
 - `Post_malformed_token_returns_401` — a garbage/expired bearer is rejected by auth middleware before the
   class filter (distinct from the no-token case).
-- `Post_as_inactive_user_is_rejected` **(from 10c A15 · VERIFY&PIN)** — `SeedInactiveUserAsync`; pin the
+- `Post_as_inactive_user_is_rejected` **(A15 · VERIFY&PIN)** — `SeedInactiveUserAsync`; pin the
   status the pipeline returns (`401`/`404`, or the handler's `400` if the inactive-SuperAdmin bypass reaches it).
 
 ### `StoreLastUsagesTests`
@@ -149,26 +149,26 @@ New folder `SMCA.WebApi.E2ETests/Usages/`. `Auth/UsagesSmokeTests.cs` is retired
   `== 30`.
 - `LastWeek_counts_reflect_seeded_usage_days` — seed a throwaway store + `StoreUsage` rows on 3 distinct
   days inside the 7-day window; assert the buckets sum `>= 3` and `ActiveStoreCount >= 1`.
-- `LastMonth_counts_reflect_seeded_usage_days` **(from 10c B1)** — same for the 30-day window.
-- `LastWeek_counts_are_non_negative` **(from 10c B2 · VERIFY&PIN)** — every bucket `>= 0` (shared DB blocks an
+- `LastMonth_counts_reflect_seeded_usage_days` **(B1)** — same for the 30-day window.
+- `LastWeek_counts_are_non_negative` **(B2 · VERIFY&PIN)** — every bucket `>= 0` (shared DB blocks an
   exact all-zero assertion).
-- `LastWeek_excludes_out_of_window_and_inactive_store_usage` **(from 10c B3)** — delta assertion (serial
+- `LastWeek_excludes_out_of_window_and_inactive_store_usage` **(B3)** — delta assertion (serial
   `[Collection("e2e")]`): out-of-window usage and inactive-store usage do **not** change the sum; an in-window
   active usage adds exactly `+1`.
-- `LastWeek_includes_boundary_day` **(from 10c B4)** — usage on `today-7` adds `+1` (`>=` boundary).
-- `LastWeek_activeStoreCount_counts_active_only` **(from 10c B5)** — seed 2 active stores → `+2`; deactivate 1
+- `LastWeek_includes_boundary_day` **(B4)** — usage on `today-7` adds `+1` (`>=` boundary).
+- `LastWeek_activeStoreCount_counts_active_only` **(B5)** — seed 2 active stores → `+2`; deactivate 1
   → `+1`.
-- `Post_verb_on_stores_last_week_returns_405` **(from 10c B6)** · `Post_verb_on_stores_last_month_returns_405`
-  **(from 10c B7)** — GET-only routes.
+- `Post_verb_on_stores_last_week_returns_405` **(B6)** · `Post_verb_on_stores_last_month_returns_405`
+  **(B7)** — GET-only routes.
 
 ### `StoreLastUsagesAuthTests`
 Full 403 matrix on **both** windows.
 - `LastWeek_no_token_returns_401` · `LastMonth_no_token_returns_401`
-- `LastWeek_malformed_token_returns_401` · `LastMonth_malformed_token_returns_401` **(from 10c B11)**
+- `LastWeek_malformed_token_returns_401` · `LastMonth_malformed_token_returns_401` **(B11)**
 - `LastWeek_as_owner_admin_returns_403` · `LastWeek_as_store_user_returns_403` · `LastWeek_as_reseller_returns_403`
 - `LastMonth_as_owner_admin_returns_403` · `LastMonth_as_store_user_returns_403` · `LastMonth_as_reseller_returns_403`
-  **(from 10c B8/B9/B10)**
-- `LastWeek_as_inactive_super_admin_is_rejected_or_pinned` **(from 10c B12 · VERIFY&PIN)** — pin `401`/`404`/`200`.
+  **(B8/B9/B10)**
+- `LastWeek_as_inactive_super_admin_is_rejected_or_pinned` **(B12 · VERIFY&PIN)** — pin `401`/`404`/`200`.
 
 ## 5. Coverage notes
 
