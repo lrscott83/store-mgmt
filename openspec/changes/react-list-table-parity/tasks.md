@@ -68,9 +68,9 @@ Rationale: bulk of lines are mechanical (16 route files = one `padding="tight"` 
 
 ## Phase 6: order-item-list + order-list sweep (WU6)
 
-- [ ] 6.1 RED: failing tests — order-item-list no wrapper/divider, qty plain `font-semibold text-primary` span; order-list no payment icon (delete local `PaymentTypeIcon` fn), outer panel border `rounded-lg border border-border` STILL PRESENT (regression guard).
-- [ ] 6.2 GREEN: sweep `order-item-list.tsx:97,103`; delete `order-list.tsx:15-47,100,102` `PaymentTypeIcon` fn/usage, keep outer panel border, amounts via `formatCurrency`.
-- [ ] 6.3 Commit WU6.
+- [x] 6.1 RED: failing tests — order-item-list no wrapper/divider, qty plain `font-semibold text-primary` span; order-list no payment icon (delete local `PaymentTypeIcon` fn), outer panel border `rounded-lg border border-border` STILL PRESENT (regression guard).
+- [x] 6.2 GREEN: sweep `order-item-list.tsx:97,103`; delete `order-list.tsx:15-47,100,102` `PaymentTypeIcon` fn/usage, keep outer panel border, amounts via `formatCurrency`.
+- [x] 6.3 Commit WU6.
 
 ## Phase 7: category-stats + currency-only files (WU7)
 

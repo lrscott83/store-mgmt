@@ -2,6 +2,7 @@ import { useIntl } from 'react-intl';
 import type { Order } from '@store-mgmt/domain';
 import { Button } from '~/shared/components/ui/button';
 import { confirmDialog, showAcknowledgeError } from '~/shared/lib/blocking-alert';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface OrderItemListProps {
   order: Order;
@@ -89,18 +90,16 @@ export function OrderItemList({
           <table className="w-full text-sm">
             <tbody>
               {order.orderItems.map((item, idx) => (
-                <tr key={idx} className="border-b border-border last:border-0">
+                <tr key={idx}>
                   <td className="p-2">
                     <span className="font-semibold text-text">{item.name}</span>
                   </td>
                   <td className="p-2 text-right">
-                    <span className="rounded-full bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary">
-                      {item.quantity}
-                    </span>
+                    <span className="text-xs font-semibold text-primary">{item.quantity}</span>
                   </td>
                   <td className="p-2 text-right">
                     <span className="font-semibold text-text">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      {formatCurrency(item.price * item.quantity)}
                     </span>
                   </td>
                 </tr>
