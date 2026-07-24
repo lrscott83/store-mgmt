@@ -19,19 +19,12 @@ export const clientLoader = featureLoader([EFeatures.TodayReports]);
 // components (today-orders.component.ts, inventory-today-sales-profit.component.ts,
 // inventory-available.component.ts); no shared aggregation service/model exists on
 // the Angular side, so React does not invent one either (rule 12).
-interface TodayReportProductAvailable {
-  productId: string;
-  productName: string;
-  available: number;
-}
-
 interface TodayReportSummary {
   date: Date;
   orderCount: number;
   totalRevenue: number;
   totalCost: number;
   totalProfit: number;
-  available: TodayReportProductAvailable[];
 }
 
 /**
@@ -45,10 +38,6 @@ interface TodayReportSummary {
  */
 function computeTodayReport(storeId: string, date: Date = new Date()): TodayReportSummary {
   const orderService = new OrderOfflineService(storeId);
-  const inventoryService = new InventoryOfflineService(
-    storeId,
-    new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
-  );
 
   const orders = orderService.getActiveOrdersInDay(date);
 
@@ -65,36 +54,12 @@ function computeTodayReport(storeId: string, date: Date = new Date()): TodayRepo
 
   const totalProfit = totalRevenue - totalCost;
 
-  // available = per-product totalAvailable, sourced from
-  // InventoryOfflineService.getInventoryCategoriesView() — the 1:1 port of Angular's
-  // getInventoryCategoriesView/getInventoryCategoriesViewObservable, which
-  // inventory-available.component.ts feeds (as `categories$`) into
-  // inventory-product-list.component.ts to render the available-stock table.
-  // Mirrors Angular's `if (response && response.succeeded) { categories$.next(response.data) }`
-  // guard: on failure the available list simply stays empty.
-  const available: TodayReportProductAvailable[] = [];
-  const categoriesResponse = inventoryService.getInventoryCategoriesView();
-  if (categoriesResponse.succeeded) {
-    for (const category of categoriesResponse.data) {
-      for (const product of category.products) {
-        if (product.totalAvailable > 0) {
-          available.push({
-            productId: product.productId,
-            productName: product.productName,
-            available: product.totalAvailable,
-          });
-        }
-      }
-    }
-  }
-
   return {
     date,
     orderCount: orders.length,
     totalRevenue,
     totalCost,
     totalProfit,
-    available,
   };
 }
 
@@ -134,23 +99,15 @@ export function TodayReportPage() {
     totalRevenue: 0,
     totalCost: 0,
     totalProfit: 0,
-    available: [],
   };
 
   return (
     <div className="space-y-6 p-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="text-xl font-semibold">
           {intl.formatMessage({ id: 'REPORTS.TODAY.TITLE' })}
         </h1>
-        <button
-          type="button"
-          onClick={loadReport}
-          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {intl.formatMessage({ id: 'REPORTS.REFRESH' })}
-        </button>
       </div>
 
       {/* presentation-parity-bucket-b WU3: mirrors Angular's inventory-today-sale.component.html
@@ -199,42 +156,6 @@ export function TodayReportPage() {
             </div>
           </div>
         </div>
-      </section>
-
-      {/* Inventory Status Section */}
-      <section className="rounded border bg-white p-4 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-gray-700">
-          {intl.formatMessage({ id: 'REPORTS.INVENTORY.TITLE' })}
-        </h2>
-
-        {summary.available.length === 0 ? (
-          <div className="py-6 text-center text-gray-400">
-            {intl.formatMessage({ id: 'REPORTS.INVENTORY.EMPTY_STATE' })}
-          </div>
-        ) : (
-          <div className="rounded border">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">
-                    {intl.formatMessage({ id: 'REPORTS.INVENTORY.PRODUCT' })}
-                  </th>
-                  <th className="px-4 py-2 text-right font-medium text-gray-600">
-                    {intl.formatMessage({ id: 'REPORTS.INVENTORY.AVAILABLE' })}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {summary.available.map((item) => (
-                  <tr key={item.productId} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{item.productName}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{item.available}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </section>
     </div>
   );

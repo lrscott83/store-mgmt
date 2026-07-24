@@ -121,15 +121,6 @@ describe('TodayReportPage — smoke render', () => {
     expect(screen.getByText(/Reportes de hoy/i)).toBeInTheDocument();
   });
 
-  it('shows the Actualizar refresh button', () => {
-    render(
-      <Wrapper>
-        <TodayReportPage />
-      </Wrapper>,
-    );
-    expect(screen.getByText(/Actualizar/i)).toBeInTheDocument();
-  });
-
   it('shows sales summary section', () => {
     render(
       <Wrapper>
@@ -137,15 +128,6 @@ describe('TodayReportPage — smoke render', () => {
       </Wrapper>,
     );
     expect(screen.getByText(/Resumen de ventas/i)).toBeInTheDocument();
-  });
-
-  it('shows inventory status section', () => {
-    render(
-      <Wrapper>
-        <TodayReportPage />
-      </Wrapper>,
-    );
-    expect(screen.getByText(/Estado de inventario/i)).toBeInTheDocument();
   });
 
   it('shows zero values in empty state without crashing', () => {
@@ -165,94 +147,6 @@ describe('TodayReportPage — smoke render', () => {
       </Wrapper>,
     );
     expect(screen.getByText(/Pedidos/i)).toBeInTheDocument();
-  });
-
-  it('shows inventory empty state when no items available', () => {
-    render(
-      <Wrapper>
-        <TodayReportPage />
-      </Wrapper>,
-    );
-    expect(screen.getByText(/Sin stock disponible/i)).toBeInTheDocument();
-  });
-});
-
-// ─── Regression: available-inventory table (getInventoryCategoriesView parity) ────────────
-//
-// CRITICAL bug (fixed here): computeTodayReport used to build the "available" table from
-// InventoryOfflineService.getActiveInventoryEntriesStorage() cast through `as unknown as
-// {available}` — but InventoryEntryView has no `available` field (only `quantity`), so
-// `entry.available` was always `undefined` -> `av=0` -> the `available > 0` filter never
-// passed -> the table was PERMANENTLY EMPTY regardless of real stock. The fix rebuilds the
-// table from InventoryOfflineService.getInventoryCategoriesView() (the real 1:1 port of
-// Angular's getInventoryCategoriesView, already consumed by inventory-available.component.ts
-// + inventory-product-list.component.ts in Angular), which correctly reads entry.available.
-describe('TodayReportPage — available inventory table (real getInventoryCategoriesView)', () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
-  it('lists products with real stock in the available table instead of showing the empty state', () => {
-    seedProducts([makeProduct('p1', { name: 'Coca Cola 500ml', categoryId: 'cat-1' })]);
-    seedCategories([makeCategory('cat-1', { name: 'Bebidas' })]);
-    seedInventory(
-      new Map([
-        ['p1', [makeEntry('e1', 'p1', { available: 5, costPrice: 2 })]],
-      ]),
-    );
-
-    render(
-      <Wrapper>
-        <TodayReportPage />
-      </Wrapper>,
-    );
-
-    // The empty state must NOT be shown — real stock exists.
-    expect(screen.queryByText(/Sin stock disponible/i)).not.toBeInTheDocument();
-    expect(screen.getByText('Coca Cola 500ml')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
-  });
-
-  it('sums available across multiple active entries for the same product', () => {
-    seedProducts([makeProduct('p1', { name: 'Water 1L', categoryId: 'cat-1' })]);
-    seedCategories([makeCategory('cat-1', { name: 'Bebidas' })]);
-    seedInventory(
-      new Map([
-        [
-          'p1',
-          [
-            makeEntry('e1', 'p1', { order: 0, available: 3, costPrice: 1 }),
-            makeEntry('e2', 'p1', { order: 1, available: 4, costPrice: 1.5 }),
-          ],
-        ],
-      ]),
-    );
-
-    render(
-      <Wrapper>
-        <TodayReportPage />
-      </Wrapper>,
-    );
-
-    expect(screen.getByText('Water 1L')).toBeInTheDocument();
-    expect(screen.getByText('7')).toBeInTheDocument();
-  });
-
-  it('excludes products whose entries are fully depleted (available = 0)', () => {
-    seedProducts([makeProduct('p1', { name: 'Sold Out Item', categoryId: 'cat-1' })]);
-    seedCategories([makeCategory('cat-1', { name: 'Bebidas' })]);
-    seedInventory(
-      new Map([['p1', [makeEntry('e1', 'p1', { available: 0, costPrice: 1 })]]]),
-    );
-
-    render(
-      <Wrapper>
-        <TodayReportPage />
-      </Wrapper>,
-    );
-
-    expect(screen.queryByText('Sold Out Item')).not.toBeInTheDocument();
-    expect(screen.getByText(/Sin stock disponible/i)).toBeInTheDocument();
   });
 });
 
@@ -285,7 +179,7 @@ describe('TodayReportPage — Generar Reporte PDF export button', () => {
     expect(button.compareDocumentPosition(salesSummaryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('keeps the existing KPI/inventory dashboard sections unchanged alongside the new button', () => {
+  it('keeps the existing sales-summary dashboard section unchanged alongside the new button', () => {
     render(
       <Wrapper>
         <TodayReportPage />
@@ -293,7 +187,6 @@ describe('TodayReportPage — Generar Reporte PDF export button', () => {
     );
 
     expect(screen.getByText(/Resumen de ventas/i)).toBeInTheDocument();
-    expect(screen.getByText(/Estado de inventario/i)).toBeInTheDocument();
     expect(screen.getByText(/Pedidos/i)).toBeInTheDocument();
   });
 
