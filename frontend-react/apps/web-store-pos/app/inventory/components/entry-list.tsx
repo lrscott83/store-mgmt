@@ -45,23 +45,9 @@ export function EntryList({
 
   return (
     <div className="bg-surface">
+      {/* Angular entry-list.component.html is a `table-borderless` with a bare <tbody> — no
+          header row. React must not invent a <thead> with column labels. */}
       <table className="w-full text-sm">
-        <thead>
-          <tr>
-            <th className="p-2 text-left font-medium text-text-muted">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}
-            </th>
-            <th className="p-2 text-right font-medium text-text-muted">
-              {intl.formatMessage({ id: 'INVENTORY.ENTRY.QUANTITY' })}
-            </th>
-            {isOwnerAdmin && (
-              <th className="p-2 text-right font-medium text-text-muted">
-                {intl.formatMessage({ id: 'INVENTORY.ENTRY.COST_PRICE' })}
-              </th>
-            )}
-            {showActions && <th className="p-2" />}
-          </tr>
-        </thead>
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.id} className="hover:bg-background">

@@ -6,8 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { Card } from '~/shared/components/ui/card';
-import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
-import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -233,10 +232,10 @@ export function TodayStatsPage() {
                         {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
                       </td>
                       <td className="p-1 text-right text-danger">
-                        <span className="inline-flex items-center justify-end gap-1">
-                          <PaymentMethodIcon kind={getPaymentTypeIconKind(expense.paymentType)} className="text-success" />
-                          {formatCurrency(expense.total)}
-                        </span>
+                        {/* Angular renders this via <app-expense-list>, whose payment marker is
+                            `<i class="bi …">` — but the bootstrap-icons font is imported nowhere
+                            (styles.scss/index.html/angular.json), so no glyph renders. No icon. */}
+                        {formatCurrency(expense.total)}
                       </td>
                       <td className="p-1 text-right">
                         <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">

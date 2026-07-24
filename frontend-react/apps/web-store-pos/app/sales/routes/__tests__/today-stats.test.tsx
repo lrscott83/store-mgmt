@@ -250,10 +250,11 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     expect(await screen.findByText('Créditos Pagados (60)')).toBeInTheDocument();
   });
 
-  // Parity fix (presentation-parity-bucket-e item 1a): Angular's expense-list.component.html:12
-  // renders the payment-method glyph immediately before the total amount — React's Gastos row
-  // in Cuadre del día had lost it.
-  it('renders a PaymentMethodIcon immediately before the Gastos row total (Angular parity)', async () => {
+  // Parity fix (react-list-table-parity follow-up): Angular renders the expenses breakdown via
+  // <app-expense-list>, whose payment marker is `<i class="bi …">`. The bootstrap-icons font is
+  // imported nowhere (not styles.scss/index.html/angular.json), so NO glyph renders. React had a
+  // Material PaymentMethodIcon SVG here that Angular does not show — removed for parity.
+  it('renders no payment-method icon in the Gastos row (Angular parity: bootstrap-icons font unloaded)', async () => {
     mockGetExpensesInDayObservable.mockResolvedValue(
       expensesEnvelope([makeExpense({ total: 15, paymentType: PaymentType.Tarjeta })]),
     );
@@ -269,8 +270,9 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
 
     const row = screen.getByText('Otro').closest('tr');
     expect(row).not.toBeNull();
+    expect((row as HTMLElement).querySelector('svg')).toBeNull();
     const totalWrapper = within(row as HTMLElement).getByText('$15.00');
-    expect(totalWrapper.firstChild?.nodeName.toLowerCase()).toBe('svg');
+    expect(totalWrapper.firstChild?.nodeName.toLowerCase()).not.toBe('svg');
   });
 
   // Parity fix (collapsible-panel-chevron-parity): ExpansionPanel converts from uncontrolled

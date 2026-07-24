@@ -38,15 +38,16 @@ describe('EntryList — list/table parity sweep (WU5)', () => {
     expect(wrapper.className).not.toMatch(/\brounded\b/);
   });
 
-  it('renders without a thead border or tbody row dividers', () => {
+  it('renders no column header row (Angular entry-list has a bare tbody, no thead)', () => {
     const { container } = render(
       <Wrapper>
         <EntryList entries={[makeEntry()]} isOwnerAdmin onEdit={vi.fn()} onDeactivate={vi.fn()} />
       </Wrapper>,
     );
-    const thead = container.querySelector('thead') as HTMLElement;
+    // Angular entry-list.component.html is a `table-borderless` with a bare <tbody> — no header row.
+    expect(container.querySelector('thead')).toBeNull();
+    expect(container.querySelectorAll('th').length).toBe(0);
     const tbody = container.querySelector('tbody') as HTMLElement;
-    expect(thead.className).not.toMatch(/border-b/);
     expect(tbody.className).not.toMatch(/divide-y/);
   });
 

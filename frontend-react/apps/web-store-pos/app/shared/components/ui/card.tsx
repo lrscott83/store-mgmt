@@ -12,10 +12,10 @@ interface CardProps {
   children: ReactNode;
   className?: string;
   /**
-   * `'default'` (24px / p-6) matches Angular's form/detail card body padding —
-   * used unless a route explicitly opts into `'tight'` (8px / p-2), which
-   * mirrors Angular's list/table screens. Defaults to `'default'` so existing
-   * form/detail/admin-grid cards stay unaffected.
+   * `card-body` padding, mirroring each Angular screen's actual `card-body` class —
+   * NOT a form-vs-list rule: `'default'` is roomy (24px / p-6), `'tight'` is compact
+   * (8px / p-2, e.g. Angular's sync `send-data`/`receive-data` forms use `card-body p-2`).
+   * Pick whichever matches the Angular template being ported. Defaults to `'default'`.
    */
   padding?: 'tight' | 'default';
 }

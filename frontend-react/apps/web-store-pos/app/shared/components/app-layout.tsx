@@ -53,7 +53,9 @@ export function AppLayout() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar isSidebarOpen={isSidebarOpen} onSidebarToggle={() => setIsSidebarOpen((v) => !v)} />
         <Breadcrumbs />
-        <main className="flex-1 overflow-y-auto px-2 py-4 md:px-12 md:py-6">
+        {/* Angular .coded-content (pc-common.scss): top 16px->24px@md, sides 8px->48px@md,
+            and NO bottom padding — so the vertical padding is top-only (pt-*), not py-*. */}
+        <main className="flex-1 overflow-y-auto px-2 pt-4 md:px-12 md:pt-6">
           <Outlet />
         </main>
         <Footer />
