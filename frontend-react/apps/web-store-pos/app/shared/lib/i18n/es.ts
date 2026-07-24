@@ -541,6 +541,8 @@ const messages: Record<string, string> = {
   'REPORT.INVENTORY_TODAY_SALE': 'Inventario a precio de venta',
 
   // Statistics — Dashboard
+  // Angular parity: DASHBOARD.HEADER (vocabs/es.ts:501-503) is the card-header title.
+  'DASHBOARD.HEADER': 'Panel de Control',
   'STATISTICS.DASHBOARD.TITLE': 'Dashboard',
   'STATISTICS.LAST_30_DAYS': 'Últimos 30 días',
   'STATISTICS.SALES.TITLE': 'Ventas',

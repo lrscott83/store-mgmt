@@ -136,13 +136,13 @@ describe('DashboardPage — smoke render', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('shows the statistics dashboard title', () => {
+  it('shows the dashboard header title (Angular parity: DASHBOARD.HEADER)', () => {
     render(
       <Wrapper>
         <DashboardPage />
       </Wrapper>,
     );
-    expect(screen.getByText(/Dashboard/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Panel de Control' })).toBeInTheDocument();
   });
 
   it('renders the sales chart section', () => {

@@ -143,14 +143,12 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 p-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'STATISTICS.DASHBOARD.TITLE' })}
+      {/* Header — Angular parity: dashboard.component.html:1-6 (card-header with the
+          DASHBOARD.HEADER title and a bottom divider). */}
+      <div className="border-b border-gray-200 pb-3">
+        <h1 className="text-2xl font-semibold">
+          {intl.formatMessage({ id: 'DASHBOARD.HEADER' })}
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {intl.formatMessage({ id: 'STATISTICS.LAST_30_DAYS' })}
-        </p>
       </div>
 
       {/* Currency selector — Angular dashboard.component.html:9-20 (literal, untranslated
@@ -179,8 +177,9 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* KPI cards — Angular dashboard.component.html:24-84 (literal, untranslated titles). */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPI cards — Angular dashboard.component.html:24-84 (literal, untranslated titles).
+          Angular lays them out as two `.row`s of two `.col`s each → two cards per row. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <KpiCard
           title="Ventas Hoy"
           value={(salePriceToday / divisor).toFixed(2)}
