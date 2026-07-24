@@ -8,6 +8,7 @@ import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/
 import { Card } from '~/shared/components/ui/card';
 import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
 import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
@@ -164,7 +165,7 @@ export function TodayStatsPage() {
           {/* TODAY_STATS.HEADER */}
           <span>{intl.formatMessage({ id: 'TODAY_STATS.HEADER' })}</span>
           <span className={`text-lg font-bold ${valueClassName(total)}`}>
-            ${total.toFixed(2)}
+            {formatCurrency(total)}
           </span>
         </div>
       }
@@ -173,7 +174,7 @@ export function TodayStatsPage() {
         {/* BEGIN CASH */}
         <ExpansionPanel
           title="Resumen Efectivo"
-          amount={`$${cashTotal.toFixed(2)}`}
+          amount={formatCurrency(cashTotal)}
           amountClassName={valueClassName(cashTotal)}
         >
           <table className="w-full text-sm">
@@ -183,7 +184,7 @@ export function TodayStatsPage() {
                   <span className="font-bold text-text">Ventas</span>
                 </td>
                 <td className="p-1 text-right">
-                  <span className="font-bold text-success">${salesCashTotal.toFixed(2)}</span>
+                  <span className="font-bold text-success">{formatCurrency(salesCashTotal)}</span>
                 </td>
               </tr>
               {hasCreditsModule && (
@@ -192,7 +193,7 @@ export function TodayStatsPage() {
                     <span className="font-bold text-text">Créditos Pagados</span>
                   </td>
                   <td className="p-1 text-right">
-                    <span className="font-bold text-success">${paidCreditsCashTotal.toFixed(2)}</span>
+                    <span className="font-bold text-success">{formatCurrency(paidCreditsCashTotal)}</span>
                   </td>
                 </tr>
               )}
@@ -202,7 +203,7 @@ export function TodayStatsPage() {
                     <span className="font-bold text-text">Gastos</span>
                   </td>
                   <td className="p-1 text-right">
-                    <span className="font-bold text-danger">${expensesCashTotal.toFixed(2)}</span>
+                    <span className="font-bold text-danger">{formatCurrency(expensesCashTotal)}</span>
                   </td>
                 </tr>
               )}
@@ -215,7 +216,7 @@ export function TodayStatsPage() {
         {hasExpensesModule && (
           <ExpansionPanel
             title={`Gastos (${expensesCount})`}
-            amount={`$${expensesTotal.toFixed(2)}`}
+            amount={formatCurrency(expensesTotal)}
             amountClassName="text-danger"
           >
             {expenses.length === 0 ? (
@@ -234,7 +235,7 @@ export function TodayStatsPage() {
                       <td className="p-1 text-right text-danger">
                         <span className="inline-flex items-center justify-end gap-1">
                           <PaymentMethodIcon kind={getPaymentTypeIconKind(expense.paymentType)} className="text-success" />
-                          ${expense.total.toFixed(2)}
+                          {formatCurrency(expense.total)}
                         </span>
                       </td>
                       <td className="p-1 text-right">
@@ -255,7 +256,7 @@ export function TodayStatsPage() {
         {hasCreditsModule && (
           <ExpansionPanel
             title={`Créditos Por Cobrar (${creditsCount})`}
-            amount={`$${creditsTotal.toFixed(2)}`}
+            amount={formatCurrency(creditsTotal)}
             amountClassName="text-danger"
           >
             <SaleCreditsTable saleCredits={saleCredits} />
@@ -269,7 +270,7 @@ export function TodayStatsPage() {
         {hasCreditsModule && (
           <ExpansionPanel
             title={`Créditos Pagados (${paidSaleCreditsTotal})`}
-            amount={`$${paidSaleCreditsTotal.toFixed(2)}`}
+            amount={formatCurrency(paidSaleCreditsTotal)}
             amountClassName="text-success"
           >
             <SaleCreditsTable saleCredits={paidSaleCredits} />
@@ -280,7 +281,7 @@ export function TodayStatsPage() {
         {/* BEGIN SALES */}
         <ExpansionPanel
           title={`Ventas (${ordersItemsCount} productos)`}
-          amount={`$${ordersTotal.toFixed(2)}`}
+          amount={formatCurrency(ordersTotal)}
           amountClassName="text-success"
         >
           {categories.map((category) => (
@@ -317,7 +318,7 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
             </td>
             <td className="p-1 text-right">
               <span className={saleCredit.isPaid ? 'text-success' : 'text-danger'}>
-                ${saleCredit.total.toFixed(2)}
+                {formatCurrency(saleCredit.total)}
               </span>
             </td>
             <td className="p-1 text-right">

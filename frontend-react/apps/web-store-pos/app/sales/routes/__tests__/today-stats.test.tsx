@@ -201,6 +201,22 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
     expect(screen.queryByText(/^Créditos Por Cobrar/)).toBeNull();
     expect(screen.queryByText(/^Créditos Pagados/)).toBeNull();
   });
+
+  // Parity fix (react-list-table-parity follow-up): Angular's today-stats.component.html
+  // pipes EVERY amount through `| currency:'USD':'symbol':'1.2-2'` (thousands separator).
+  // A prior WU8 sweep migrated other list/table views to formatCurrency but missed this
+  // route's raw `.toFixed(2)` money displays.
+  it('formats totals with a thousands separator via formatCurrency (money ≥ 1000)', () => {
+    mockGetActiveOrdersInDay.mockReturnValue([
+      makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo, isCredit: false, total: 2000 }),
+    ]);
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('$2,000.00').length).toBeGreaterThan(0);
+  });
 });
 
 describe('TodayStatsPage — with Expenses + Credits modules available', () => {
