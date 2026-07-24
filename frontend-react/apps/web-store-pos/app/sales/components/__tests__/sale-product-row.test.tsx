@@ -55,6 +55,20 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     expect(screen.getByText('Sprite')).toBeInTheDocument();
   });
 
+  // Parity fix (react-list-table-parity follow-up): Angular's
+  // sale-category-products.component.html wraps each row in a `table-borderless` +
+  // `border-1` (Bootstrap 5.3, no `.border`) <tr> — no visible divider. A stray
+  // `border-b` on the React row wrapper diverges from Angular's rendered screen.
+  it('renders the row wrapper with no bottom-border divider (Angular table-borderless has none)', () => {
+    const { container } = render(
+      <Wrapper>
+        <SaleProductRow product={makeProduct()} orderType={OrderType.Normal} onAdded={vi.fn()} />
+      </Wrapper>,
+    );
+    const form = container.querySelector('form') as HTMLElement;
+    expect(form.className).not.toMatch(/border-b/);
+  });
+
   it('shows the read-only price (not an input) for a Normal-type sale', () => {
     render(
       <Wrapper>
