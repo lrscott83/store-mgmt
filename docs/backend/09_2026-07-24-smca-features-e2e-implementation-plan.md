@@ -36,6 +36,9 @@ StoresAdmin actor. All 403/401 cases use throwaway role actors.
   `FeaturesActivateTests.cs`, `FeaturesActivateAuthTests.cs`, `FeaturesAvailableTests.cs`,
   `FeaturesAvailableAuthTests.cs`, and a local helper `FeatureSeed.cs` (inactive-feature insert + activate
   snapshot/restore).
+- **09c gap tests:** `FeaturesListGapTests.cs` (Task 5), `FeaturesActivateGapTests.cs` (Task 6),
+  `FeaturesAvailableGapTests.cs` (Task 7). They reuse the same `FeatureSeed` helper, extended with the
+  gap-fill helpers in Task 0b.
 
 ---
 
@@ -112,6 +115,70 @@ public static class FeatureSeed
         }
         await db.SaveChangesAsync();
     }
+
+    // ---------- gap-fill helpers (09c) ----------
+
+    // Active/inactive feature under an arbitrary module (id 909x range). Delete via DeleteFeatureAsync.
+    public static async Task<int> InsertFeatureUnderModuleAsync(AppTestFactory f, int moduleId, bool isActive, int id)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var feature = Feature.Create(id, $"E2E-{id}", "e2e gap feature", moduleId, 995, true, isActive);
+        db.Set<Feature>().Add(feature);
+        await db.SaveChangesAsync();
+        return feature.Id;
+    }
+
+    // Throwaway INACTIVE module (9090) + ACTIVE feature (9092) under it. Delete feature THEN module.
+    public static async Task<(int ModuleId, int FeatureId)> InsertInactiveModuleWithActiveFeatureAsync(AppTestFactory f)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        // Module.Create(id, name, order, priceIncluded, price, availableToStore, isActive) — isActive=false.
+        var module = Module.Create(9090, "E2E-InactiveModule", 990, false, 0f, false, false);
+        db.Set<Module>().Add(module);
+        var feature = Feature.Create(9092, "E2E-UnderInactiveModule", "e2e", 9090, 996, true, true); // feature IS active
+        db.Set<Feature>().Add(feature);
+        await db.SaveChangesAsync();
+        return (module.Id, feature.Id);
+    }
+
+    public static async Task DeleteModuleAsync(AppTestFactory f, int id)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var m = await db.Set<Module>().FindAsync(id);
+        if (m is not null) { db.Set<Module>().Remove(m); await db.SaveChangesAsync(); }
+    }
+
+    // Force the activate create-branch: ensure Egress(33) is ABSENT. Restore via ActivateSnapshot(EgressExisted=false).
+    public static async Task DeleteEgressAsync(AppTestFactory f)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var egress = await db.Set<Feature>().FindAsync((int)Domain.Common.Enums.FeatureType.Egress);
+        if (egress is not null) { db.Set<Feature>().Remove(egress); await db.SaveChangesAsync(); }
+    }
+
+    // Egress(33) is a PK row, so this is 0 or 1 — pins that activate never double-inserts it.
+    public static async Task<int> EgressCountAsync(AppTestFactory f)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var egress = await db.Set<Feature>().FindAsync((int)Domain.Common.Enums.FeatureType.Egress);
+        return egress is null ? 0 : 1;
+    }
+
+    // Flip the Management(7) module IsActive flag; returns the PREVIOUS value so the caller can restore it.
+    public static async Task<bool> SetManagementModuleActiveAsync(AppTestFactory f, bool isActive)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var m = await db.Set<Module>().FindAsync((int)Domain.Common.Enums.ModuleType.Management);
+        var previous = m?.IsActive ?? false;
+        if (m is not null) { m.IsActive = isActive; await db.SaveChangesAsync(); }
+        return previous;
+    }
 }
 ```
 
@@ -182,8 +249,15 @@ public sealed class FeaturesListTests
     }
 }
 
-// Local DTO shape for deserialization (Id is enough for the inclusion asserts).
-public sealed class FeatureDtoShape { public int Id { get; set; } public string? Name { get; set; } }
+// Local DTO shape for deserialization. Expanded for the 09c gap tests (module/order/shape asserts).
+public sealed class FeatureDtoShape
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public int ModuleId { get; set; }
+    public int Order { get; set; }
+    public bool AvailableToStore { get; set; }
+}
 ```
 
 - [ ] Run `--filter ~FeaturesListTests`. **Checkpoint** — `test(webapi): features list e2e`.
@@ -420,6 +494,343 @@ public sealed class FeaturesAvailableAuthTests
 
 ---
 
+## Task 5: `FeaturesListGapTests` (09c — 4 tests)
+
+```csharp
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+using ModuleType = Domain.Common.Enums.ModuleType;
+
+namespace SMCA.WebApi.E2ETests.Features;
+
+[Collection("e2e")]
+public sealed class FeaturesListGapTests
+{
+    private readonly AppTestFactory _f;
+    public FeaturesListGapTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    // Non-bool route segment fails bool model-binding. Pin whichever status the pipeline returns.
+    [Fact]
+    public async Task List_includeInactive_nonbool_route_returns_400_or_404()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync("/api/v1/Features/all/not-a-bool");
+            r.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+
+    // DTO shape: every item has a Name and a resolved ModuleId (Include(Module) + mapping).
+    // DisplayName is NOT on the Feature entity, so it is not asserted.
+    [Fact]
+    public async Task List_returned_items_have_module_and_dto_shape()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync("/api/v1/Features/all/true");
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<List<FeatureDtoShape>>>(ApiResponse.Json);
+            b!.Data.Should().NotBeEmpty();
+            b.Data.Should().OnlyContain(x => !string.IsNullOrWhiteSpace(x.Name) && x.ModuleId > 0);
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+
+    // PIN: `all` has NO OrderBy (unlike `available`). Assert membership only, never sequence.
+    [Fact]
+    public async Task List_result_is_not_guaranteed_ordered()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var a = await FeatureSeed.InsertFeatureUnderModuleAsync(_f, (int)ModuleType.Inventory, true, 9093);
+        var b = await FeatureSeed.InsertFeatureUnderModuleAsync(_f, (int)ModuleType.Inventory, true, 9094);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync("/api/v1/Features/all/true");
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<List<FeatureDtoShape>>>(ApiResponse.Json);
+            body!.Data.Select(x => x.Id).Should().Contain(new[] { 9093, 9094 }); // present regardless of order
+        }
+        finally
+        {
+            await FeatureSeed.DeleteFeatureAsync(_f, a);
+            await FeatureSeed.DeleteFeatureAsync(_f, b);
+            await DbTestHelpers.CleanupUserAsync(_f, admin);
+        }
+    }
+
+    // Malformed bearer is rejected by the auth middleware before the class filter.
+    [Fact]
+    public async Task List_malformed_token_returns_401()
+    {
+        var client = _f.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-a-real-jwt");
+        var r = await client.GetAsync("/api/v1/Features/all/true");
+        r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+}
+```
+
+- [ ] Run `--filter ~FeaturesListGapTests`. **Checkpoint** — `test(webapi): features list gap e2e (09c)`.
+
+---
+
+## Task 6: `FeaturesActivateGapTests` (09c — 5 tests, snapshot+restore)
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using System.Text;
+using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Domain.Entities.Features;
+using Infrastructure.Persistence.Contexts;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+using FeatureType = Domain.Common.Enums.FeatureType;
+using ModuleType = Domain.Common.Enums.ModuleType;
+
+namespace SMCA.WebApi.E2ETests.Features;
+
+[Collection("e2e")]
+public sealed class FeaturesActivateGapTests
+{
+    private readonly AppTestFactory _f;
+    public FeaturesActivateGapTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    // Create branch: Egress(33) absent -> activate creates it (Inventory=3, order 71, both flags true).
+    [Fact]
+    public async Task Activate_creates_Egress_when_missing()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var snap = await FeatureSeed.SnapshotAsync(_f);
+        await FeatureSeed.DeleteEgressAsync(_f); // force the create branch
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).PostAsync("/api/v1/Features/activate", null);
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var egress = await db.Set<Feature>().FindAsync((int)FeatureType.Egress);
+            egress.Should().NotBeNull();
+            egress!.ModuleId.Should().Be((int)ModuleType.Inventory);
+            egress.Order.Should().Be(71);
+            egress.IsActive.Should().BeTrue();
+            egress.AvailableToStore.Should().BeTrue();
+        }
+        // snap.EgressExisted was false (we deleted it) -> RestoreAsync removes the created row.
+        finally { await FeatureSeed.RestoreAsync(_f, snap); await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+
+    // Existing branch: after two activates, Egress(33) is a single PK row, not duplicated.
+    [Fact]
+    public async Task Activate_does_not_duplicate_Egress_when_present()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var snap = await FeatureSeed.SnapshotAsync(_f);
+        try
+        {
+            var client = DbTestHelpers.AuthedClient(_f, admin, login);
+            await client.PostAsync("/api/v1/Features/activate", null); // ensures Egress exists
+            await client.PostAsync("/api/v1/Features/activate", null); // 2nd call must not re-insert
+            (await FeatureSeed.EgressCountAsync(_f)).Should().Be(1);
+        }
+        finally { await FeatureSeed.RestoreAsync(_f, snap); await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+
+    // Null-guard tolerance: with an optional target (TodayReports=50) absent, activate still 200 (no throw).
+    // Capture the row, delete it, run, then recreate it in finally. If a StoreRoleFeature FK references it,
+    // remove those child rows before the delete (confirm at implementation).
+    [Fact]
+    public async Task Activate_tolerates_missing_optional_seed_row()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var snap = await FeatureSeed.SnapshotAsync(_f);
+
+        int moduleId = 0, order = 0; bool availableToStore = false, existed;
+        string name = "TodayReports", description = "";
+        using (var scope = _f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var tr = await db.Set<Feature>().FindAsync((int)FeatureType.TodayReports);
+            existed = tr is not null;
+            if (tr is not null)
+            {
+                moduleId = tr.ModuleId; order = tr.Order; availableToStore = tr.AvailableToStore;
+                name = tr.Name; description = tr.Description;
+                db.Set<Feature>().Remove(tr);
+                await db.SaveChangesAsync();
+            }
+        }
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).PostAsync("/api/v1/Features/activate", null);
+            r.StatusCode.Should().Be(HttpStatusCode.OK); // null-guard skips the missing row, no throw
+        }
+        finally
+        {
+            if (existed)
+            {
+                using var scope = _f.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                if (await db.Set<Feature>().FindAsync((int)FeatureType.TodayReports) is null)
+                {
+                    db.Set<Feature>().Add(Feature.Create((int)FeatureType.TodayReports,
+                        name, description, moduleId, order, availableToStore, true));
+                    await db.SaveChangesAsync();
+                }
+            }
+            await FeatureSeed.RestoreAsync(_f, snap);
+            await DbTestHelpers.CleanupUserAsync(_f, admin);
+        }
+    }
+
+    // Verb mismatch: GET on the POST-only activate route.
+    [Fact]
+    public async Task Activate_with_GET_verb_returns_405()
+    {
+        var r = await _f.CreateClient().GetAsync("/api/v1/Features/activate");
+        r.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+    }
+
+    // Command is a parameterless record: an unexpected body is ignored, call still 200.
+    [Fact]
+    public async Task Activate_ignores_unexpected_request_body()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var snap = await FeatureSeed.SnapshotAsync(_f);
+        try
+        {
+            var body = new StringContent("{\"junk\":true}", Encoding.UTF8, "application/json");
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).PostAsync("/api/v1/Features/activate", body);
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+        finally { await FeatureSeed.RestoreAsync(_f, snap); await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+}
+```
+
+- [ ] Run `--filter ~FeaturesActivateGapTests`. **Checkpoint** — `test(webapi): features activate gap e2e (09c)`.
+
+---
+
+## Task 7: `FeaturesAvailableGapTests` (09c — 7 tests)
+
+```csharp
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using SMCA.WebApi.E2ETests.Infrastructure;
+using Xunit;
+using ModuleType = Domain.Common.Enums.ModuleType;
+
+namespace SMCA.WebApi.E2ETests.Features;
+
+[Collection("e2e")]
+public sealed class FeaturesAvailableGapTests
+{
+    private readonly AppTestFactory _f;
+    public FeaturesAvailableGapTests(WebAppFixture fixture) => _f = fixture.Factory;
+
+    // Helper: call `available` as a fresh SuperAdmin and return the DTO list (cleans up its own actor).
+    private async Task<List<FeatureDtoShape>> AvailableAsSuperAdminAsync()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync("/api/v1/Features/available");
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<List<FeatureDtoShape>>>(ApiResponse.Json);
+            return b!.Data!;
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
+    }
+
+    // Predicate: ModuleId != Administration. An active feature under Administration(1) is excluded.
+    [Fact]
+    public async Task Available_excludes_Administration_module_features()
+    {
+        var id = await FeatureSeed.InsertFeatureUnderModuleAsync(_f, (int)ModuleType.Administration, true, 9095);
+        try { (await AvailableAsSuperAdminAsync()).Select(x => x.Id).Should().NotContain(9095); }
+        finally { await FeatureSeed.DeleteFeatureAsync(_f, id); }
+    }
+
+    // Predicate: Module.IsActive. An active feature under an INACTIVE module is excluded.
+    [Fact]
+    public async Task Available_excludes_features_whose_module_is_inactive()
+    {
+        var (moduleId, featureId) = await FeatureSeed.InsertInactiveModuleWithActiveFeatureAsync(_f);
+        try { (await AvailableAsSuperAdminAsync()).Select(x => x.Id).Should().NotContain(featureId); }
+        finally { await FeatureSeed.DeleteFeatureAsync(_f, featureId); await FeatureSeed.DeleteModuleAsync(_f, moduleId); }
+    }
+
+    // Predicate: Feature.IsActive. An inactive feature under an active module is excluded.
+    [Fact]
+    public async Task Available_excludes_inactive_features()
+    {
+        var id = await FeatureSeed.InsertFeatureUnderModuleAsync(_f, (int)ModuleType.Inventory, false, 9096);
+        try { (await AvailableAsSuperAdminAsync()).Select(x => x.Id).Should().NotContain(9096); }
+        finally { await FeatureSeed.DeleteFeatureAsync(_f, id); }
+    }
+
+    // Sort: available applies OrderBy(f.Order) ascending.
+    [Fact]
+    public async Task Available_is_ordered_by_Order_ascending()
+    {
+        (await AvailableAsSuperAdminAsync()).Select(x => x.Order).Should().BeInAscendingOrder();
+    }
+
+    // DTO shape + module resolution.
+    [Fact]
+    public async Task Available_items_have_dto_shape_and_module()
+    {
+        (await AvailableAsSuperAdminAsync()).Should().OnlyContain(x => !string.IsNullOrWhiteSpace(x.Name) && x.ModuleId > 0);
+    }
+
+    // Verb mismatch: POST on the GET-only available route.
+    [Fact]
+    public async Task Available_with_POST_verb_returns_405()
+    {
+        var r = await _f.CreateClient().PostAsync("/api/v1/Features/available", null);
+        r.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+    }
+
+    // StoresAdmin second leg: OwnerAdmin WITH Stores feature but Management module INACTIVE -> 403.
+    [Fact]
+    public async Task Available_as_owner_admin_with_inactive_management_module_returns_403()
+    {
+        var actor = await StoreSeed.SeedStoresAdminUserAsync(_f);
+        var previousManagementActive = await FeatureSeed.SetManagementModuleActiveAsync(_f, false);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login).GetAsync("/api/v1/Features/available");
+            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        finally
+        {
+            await FeatureSeed.SetManagementModuleActiveAsync(_f, previousManagementActive);
+            await StoreSeed.CleanupStoresAdminUserAsync(_f, actor);
+        }
+    }
+}
+```
+
+- [ ] Run `--filter ~FeaturesAvailableGapTests`. **Checkpoint** — `test(webapi): features available gap e2e (09c)`.
+
+---
+
 ## Confirm at implementation (from `09` test-plan §5–§7)
 
 - Exact `Feature.Create(...)` signature and `Module`/`Feature` property names (`IsActive`, `Price`) —
@@ -429,3 +840,15 @@ public sealed class FeaturesAvailableAuthTests
 - `SeedUserWithRoleAsync` fixture shape (`UserId`/`Login`) — see `04` `UserFixture`.
 - **Do NOT** implement tests for the two unreachable handler gates (`09` §6); the deferred approach is in
   `09` §7 — a separate task.
+- **09c helpers/asserts** — confirm before compiling Tasks 5–7:
+  - `Feature` props read by the gap tests: `Order`, `ModuleId`, `AvailableToStore`, `IsActive`, `Name`,
+    `Description` (verified against `Feature.cs`).
+  - `Module.Create(int id, string name, int order, bool priceIncluded, float price, bool availableToStore,
+    bool isActive)` — the 7-arg overload used by `InsertInactiveModuleWithActiveFeatureAsync`.
+  - `Activate_tolerates_missing_optional_seed_row`: if a `StoreRoleFeature` FK references TodayReports(50),
+    delete those child rows before removing the feature and recreate them in `finally` (or pick a target
+    feature with no child FKs).
+  - Verb-mismatch tests assume the pipeline returns **405** (not 404) for a matched route + wrong method;
+    if routing returns 404 in this app, update the two `MethodNotAllowed` asserts.
+  - `Available_..._inactive_management_module`: `SetManagementModuleActiveAsync` mutates the shared
+    Management(7) row — the `[Collection("e2e")]` serialization + `finally` restore keep it safe.

@@ -47,6 +47,17 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
 - **`activate` return is not idempotent.** 1st call mutates rows → `SaveChanges>0` → `200 { Data:true }`.
   2nd call (all already active + Egress exists) → `SaveChanges==0` → `200 { Data:false }`. Pin both;
   update if the contract is later made idempotent.
+- `Activate_creates_Egress_when_missing` **(from 09c)** — snapshot, then delete Egress(33) to force the
+  create branch; POST; assert Egress now exists with `ModuleId==Inventory(3)`, `Order==71`,
+  `IsActive==true`, `AvailableToStore==true`; restore in `finally`.
+- `Activate_does_not_duplicate_Egress_when_present` **(from 09c)** — Egress pre-exists; POST twice; assert
+  a single Egress(33) row (no duplicate insert); snapshot+restore in `finally`.
+- `Activate_tolerates_missing_optional_seed_row` **(from 09c)** — capture+delete an optional target
+  (TodayReports=50); POST; the handler null-guard skips the missing row → `200`, no throw; recreate the row
+  + restore snapshot in `finally`.
+- `Activate_with_GET_verb_returns_405` **(from 09c)** — `GET .../activate` on the POST-only route → `405`.
+- `Activate_ignores_unexpected_request_body` **(from 09c)** — the command is a parameterless record; a
+  non-empty JSON body is ignored → `200`; snapshot+restore in `finally`.
 
 ## 4. Endpoints → test classes
 
@@ -62,12 +73,21 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
   appears; delete it in `finally`.
 - `List_includeInactive_false_excludes_inactive_feature` — same seeded inactive feature is absent when
   `includeInactive=false`.
+- `List_includeInactive_nonbool_route_returns_400_or_404` **(from 09c)** — `all/not-a-bool`; bool route
+  model-binding fails. Pin whichever status the pipeline returns (`400` vs `404`).
+- `List_returned_items_have_module_and_dto_shape` **(from 09c)** — every `FeatureDto` has a non-empty
+  `Name` and a resolved `ModuleId` (proves `Include(Module)` + mapping). `DisplayName` is not asserted (not
+  on the `Feature` entity).
+- `List_result_is_not_guaranteed_ordered` **(from 09c) (PIN)** — `all` has no `OrderBy`; assert set
+  membership only, never sequence. Update if an order contract is later added.
 
 ### `FeaturesListAuthTests`
 - `List_no_token_returns_401`
 - `List_as_owner_admin_returns_403` (class filter is SuperAdmin-only)
 - `List_as_store_user_returns_403`
 - `List_as_reseller_returns_403`
+- `List_malformed_token_returns_401` **(from 09c)** — a garbage/expired bearer is rejected by the auth
+  middleware before the class filter (distinct from the no-token case).
 
 ### `FeaturesActivateTests`
 - `Activate_as_super_admin_returns_200_true` — **snapshot** Statistics(6)/Reports(5) modules +
@@ -88,6 +108,17 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
 - `Available_as_super_admin_returns_200`
 - `Available_as_stores_admin_returns_200` — `StoreSeed.SeedStoresAdminUserAsync` (OwnerAdmin + Stores
   feature + active Management module) passes the widened filter; `finally` cleans the seeded graph.
+- `Available_excludes_Administration_module_features` **(from 09c)** — seed an active feature under module
+  `Administration(1)`; assert absent (`ModuleId != Administration` predicate); `finally` cleanup.
+- `Available_excludes_features_whose_module_is_inactive` **(from 09c)** — seed an active feature under a
+  throwaway INACTIVE module; assert absent (`Module.IsActive` predicate); `finally` delete feature+module.
+- `Available_excludes_inactive_features` **(from 09c)** — seed an inactive feature under an active module;
+  assert absent (`Feature.IsActive` predicate); `finally` cleanup.
+- `Available_is_ordered_by_Order_ascending` **(from 09c)** — assert the returned sequence is sorted
+  ascending by `Order` (pins the `OrderBy(f.Order)` that `all` lacks).
+- `Available_items_have_dto_shape_and_module` **(from 09c)** — every item has a non-empty `Name` and a
+  resolved `ModuleId`.
+- `Available_with_POST_verb_returns_405` **(from 09c)** — `POST .../available` on the GET-only route → `405`.
 
 ### `FeaturesAvailableAuthTests`
 - `Available_no_token_returns_401`
@@ -95,6 +126,9 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
 - `Available_as_reseller_returns_403`
 - `Available_as_owner_admin_without_stores_feature_returns_403` — an OwnerAdmin lacking the Stores
   feature / Management module fails the `StoresAdmin` grant → 403 (never reaches the handler).
+- `Available_as_owner_admin_with_inactive_management_module_returns_403` **(from 09c)** — the StoresAdmin
+  actor's Management module is flipped inactive; fails the `HasModule(Management)` leg → 403. Complements
+  the missing-Stores-feature case so both `StoresAdmin` legs are covered; restore the flag in `finally`.
 
 ## 5. Seeding needs (reuse `04`/`05`; duplicate locally if absent)
 
@@ -135,5 +169,7 @@ production — a separate production-code change, out of scope for a test task.
 - `ReSellers` / `Usages` controllers → later plans (`ReSellers` is deliberately **last**).
 - The generic role×feature×scope matrix over Stores (the `05` cross-cutting engine). This plan asserts
   only the per-endpoint auth of the 3 Features endpoints.
-- Repository-level content correctness of `GetAvailableFeaturesToStore()` / `GetFeaturesIncludingModule`
-  beyond the active/inactive inclusion asserted in §4.
+
+> **Note (09c merge):** the previous out-of-scope item — repository-level content correctness of
+> `GetAvailableFeaturesToStore()` (Administration exclusion, inactive-module / inactive-feature exclusion,
+> `Order` sort) — is now **in scope** and covered by the `(from 09c)` scenarios above.
