@@ -105,7 +105,7 @@ Per route: CONFIRM the route renders a list/table (not a form) before threading,
 
 ## Phase 9: Final gate
 
-- [ ] 9.1 Run `npm run typecheck` — must pass with zero errors.
-- [ ] 9.2 Run full `vitest run` — must pass (no regressions).
+- [x] 9.1 Run `npm run typecheck` — must pass with zero errors. PASS (zero errors).
+- [x] 9.2 Run full `vitest run` — must pass (no regressions). PASS (137 test files, 2037 tests).
 - [ ] 9.3 Run parity-review-vs-Angular-source on all swept views.
 - [ ] 9.4 Run `sdd-verify` against this spec/design before `sdd-archive`.
