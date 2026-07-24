@@ -79,7 +79,7 @@ export function ImportForm({ onImport }: ImportFormProps) {
   }
 
   return (
-    <Card title={intl.formatMessage({ id: 'SYNC.IMPORT_TITLE' })}>
+    <Card padding="tight" title={intl.formatMessage({ id: 'SYNC.IMPORT_TITLE' })}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="import-file" className="block text-sm font-medium text-text">

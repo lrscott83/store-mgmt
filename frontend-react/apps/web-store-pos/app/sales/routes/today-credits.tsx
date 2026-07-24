@@ -55,6 +55,7 @@ export function TodaySaleCreditsPage() {
 
   return (
     <Card
+      padding="tight"
       title={
         // SALE_CREDIT.TODAY_CREDITS
         intl.formatMessage({ id: 'SALE_CREDIT.TODAY_CREDITS' })

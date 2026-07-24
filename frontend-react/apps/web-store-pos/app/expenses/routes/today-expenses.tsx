@@ -111,6 +111,7 @@ export function TodayExpensesPage() {
 
   return (
     <Card
+      padding="tight"
       title={
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'EXPENSES.TODAY.TITLE' })}</span>

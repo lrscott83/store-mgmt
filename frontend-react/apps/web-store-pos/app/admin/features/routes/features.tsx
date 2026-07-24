@@ -40,7 +40,7 @@ export function FeaturesPage() {
   }
 
   return (
-    <Card title={formatMessage({ id: 'FEATURES.TITLE' })}>
+    <Card padding="tight" title={formatMessage({ id: 'FEATURES.TITLE' })}>
       <div className="space-y-4">
         <div className="flex justify-end">
           <Button variant="fab" onClick={handleActivate} disabled={isLoading}>

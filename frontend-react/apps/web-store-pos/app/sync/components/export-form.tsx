@@ -39,7 +39,7 @@ export function ExportForm({ onExport }: ExportFormProps) {
   }
 
   return (
-    <Card title={intl.formatMessage({ id: 'SYNC.EXPORT_TITLE' })}>
+    <Card padding="tight" title={intl.formatMessage({ id: 'SYNC.EXPORT_TITLE' })}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="export-password" className="block text-sm font-medium text-text">

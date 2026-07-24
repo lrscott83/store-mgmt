@@ -120,7 +120,7 @@ export function EgressPage() {
   );
 
   return (
-    <Card title={intl.formatMessage({ id: 'INVENTORY_EGRESS.HEADER' })} headerAction={typeSelector}>
+    <Card padding="tight" title={intl.formatMessage({ id: 'INVENTORY_EGRESS.HEADER' })} headerAction={typeSelector}>
       {/* Category scrollmenu — 1:1 with the Sale screen (sale.tsx): smaller buttons,
           hidden scrollbar (Angular's `scrollmenu no-scrollbar`, egress.component.html:21). */}
       <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto pb-1">

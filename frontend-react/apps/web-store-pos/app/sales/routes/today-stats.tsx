@@ -158,6 +158,7 @@ export function TodayStatsPage() {
 
   return (
     <Card
+      padding="tight"
       title={
         <div className="flex items-center justify-between">
           {/* TODAY_STATS.HEADER */}

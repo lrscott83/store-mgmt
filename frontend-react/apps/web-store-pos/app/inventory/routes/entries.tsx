@@ -122,6 +122,7 @@ export function EntriesPage() {
 
   return (
     <Card
+      padding="tight"
       title={
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">

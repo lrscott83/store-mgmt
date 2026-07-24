@@ -235,6 +235,7 @@ export function ProductsPage() {
   return (
     <div className="space-y-4">
       <Card
+        padding="tight"
         title={
           <div className="flex items-center justify-between">
             {/* PRODUCT.PRODUCTS */}

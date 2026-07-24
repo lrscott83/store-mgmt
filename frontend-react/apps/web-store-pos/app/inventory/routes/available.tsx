@@ -41,6 +41,7 @@ export function InventoryAvailablePage() {
 
   return (
     <Card
+      padding="tight"
       title={
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'INVENTORY.AVAILABLE.TITLE' })}</span>

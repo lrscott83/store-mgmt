@@ -83,25 +83,25 @@ Rationale: bulk of lines are mechanical (16 route files = one `padding="tight"` 
 
 Per route: CONFIRM the route renders a list/table (not a form) before threading, then add `padding="tight"` to its route-level `Card`.
 
-- [ ] 8.1 `expenses/routes/today-expenses.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.2 `expenses/routes/expenses-history.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.3 `inventory/routes/today-entries.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.4 `inventory/routes/entries.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.5 `inventory/routes/available.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.6 `inventory/routes/egress.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.7 `sales/routes/orders.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.8 `sales/routes/today-orders.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.9 `sales/routes/credits.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.10 `sales/routes/today-credits.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.11 `sales/routes/sale.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.12 `sales/routes/products.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.13 `sales/routes/today-stats.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.14 `admin/features/routes/features.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.15 `sync/routes/import.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.16 `sync/routes/export.tsx` — confirm list, add `padding="tight"`.
-- [ ] 8.17 Confirm KEEP-default routes untouched: admin stores/owners/resellers + management/users grids, store-form, all edit-*/modal cards, `today-quantities`, `today-sales-profit`, `landing-deep`.
-- [ ] 8.18 Lint-check: verify `PaymentMethodIcon` import in `expenses-history.tsx` is still used (filter dropdown, line ~157) after WU4 removes it from `expense-list.tsx` row — no orphaned import.
-- [ ] 8.19 Commit WU8.
+- [x] 8.1 `expenses/routes/today-expenses.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.2 `expenses/routes/expenses-history.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.3 `inventory/routes/today-entries.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.4 `inventory/routes/entries.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.5 `inventory/routes/available.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.6 `inventory/routes/egress.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.7 `sales/routes/orders.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.8 `sales/routes/today-orders.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.9 `sales/routes/credits.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.10 `sales/routes/today-credits.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.11 `sales/routes/sale.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.12 `sales/routes/products.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.13 `sales/routes/today-stats.tsx` — confirm list, add `padding="tight"`.
+- [x] 8.14 `admin/features/routes/features.tsx` — confirm list, add `padding="tight"`. (Angular's own `features.component.html` uses `card-body p-2` despite being a single-action screen, not a list — verified against source, no fork.)
+- [x] 8.15 `sync/routes/import.tsx` — the route's `<Card>` actually lives in `sync/components/import-form.tsx` (design.md's File Changes table already targets the component, not the route); threaded there. Angular's `receive-data.component.html` uses `card-body p-2` too, confirming the padding despite it being a form.
+- [x] 8.16 `sync/routes/export.tsx` — same as 8.15: threaded on `sync/components/export-form.tsx` (Angular `send-data.component.html` also uses `card-body p-2`).
+- [x] 8.17 Confirm KEEP-default routes untouched: admin stores/owners/resellers + management/users grids, store-form, all edit-*/modal cards, `today-quantities`, `today-sales-profit`, `landing-deep`. (git diff confirms exactly 16 files touched, matching this task's file set — no KEEP-default route modified.)
+- [x] 8.18 Lint-check: verify `PaymentMethodIcon` import in `expenses-history.tsx` is still used (filter dropdown, line ~157) after WU4 removes it from `expense-list.tsx` row — no orphaned import. Confirmed via grep.
+- [x] 8.19 Commit WU8.
 
 ## Phase 9: Final gate
 
