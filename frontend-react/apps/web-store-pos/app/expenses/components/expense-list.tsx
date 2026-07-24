@@ -1,10 +1,9 @@
 import { useIntl } from 'react-intl';
 import type { Expense } from '@store-mgmt/domain';
 import { ExpenseType, PaymentType } from '@store-mgmt/domain';
-import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { PaymentMethodIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 const EXPENSE_TYPE_KEYS: Record<ExpenseType, string> = {
   [ExpenseType.Salario]: 'EXPENSES.TYPE.SALARIO',
@@ -53,19 +52,18 @@ export function ExpenseList({ expenses, readOnly = false, onEdit, onDelete }: Ex
   }
 
   return (
-    <div className="divide-y divide-border rounded border border-border bg-surface">
+    <div className="bg-surface">
       {expenses.map((expense) => (
-        <div key={expense.id} className="flex items-center justify-between px-4 py-3">
+        <div key={expense.id} className="flex items-center justify-between p-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-background px-2 py-0.5 text-xs text-text-muted">
+              <span className="text-xs text-text-muted">
                 {intl.formatMessage({ id: EXPENSE_TYPE_KEYS[expense.type] })}
               </span>
-              <span className="flex items-center gap-1 text-sm font-semibold text-danger">
-                <PaymentMethodIcon kind={getPaymentTypeIconKind(expense.paymentType)} className="text-success" />
-                ${expense.total.toFixed(2)}
+              <span className="text-sm font-semibold text-danger">
+                {formatCurrency(expense.total)}
               </span>
-              <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+              <span className="text-xs font-semibold text-success">
                 {intl.formatMessage({ id: PAYMENT_TYPE_KEYS[expense.paymentType] })}
               </span>
             </div>

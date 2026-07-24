@@ -56,9 +56,9 @@ Rationale: bulk of lines are mechanical (16 route files = one `padding="tight"` 
 
 ## Phase 4: expense-list sweep (WU4)
 
-- [ ] 4.1 RED: failing tests — no wrapper `border`/`rounded`, no `divide-y`/`border-b`, cells `p-1`/`p-2`, no `PaymentMethodIcon` SVG, expense type/payment render as plain text (no chip), amount uses `formatCurrency`.
-- [ ] 4.2 GREEN: strip border/divider wrapper, compact cell padding, remove `PaymentMethodIcon` usage + unused import (lines 4,6,65), replace chips with plain `span` (type muted, payment `font-semibold text-success`), wire `formatCurrency`.
-- [ ] 4.3 Commit WU4.
+- [x] 4.1 RED: failing tests — no wrapper `border`/`rounded`, no `divide-y`/`border-b`, cells `p-1`/`p-2`, no `PaymentMethodIcon` SVG, expense type/payment render as plain text (no chip), amount uses `formatCurrency`.
+- [x] 4.2 GREEN: strip border/divider wrapper, compact cell padding, remove `PaymentMethodIcon` usage + unused import (lines 4,6,65), replace chips with plain `span` (type muted, payment `font-semibold text-success`), wire `formatCurrency`.
+- [x] 4.3 Commit WU4.
 
 ## Phase 5: entry-list + sale-credit-list sweep (WU5)
 
