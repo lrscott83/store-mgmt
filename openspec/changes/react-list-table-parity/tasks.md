@@ -41,10 +41,10 @@ Rationale: bulk of lines are mechanical (16 route files = one `padding="tight"` 
 
 ## Phase 2: Card padding variant (WU2)
 
-- [ ] 2.1 RED: failing test asserting `Card` default body has `p-6`, `padding="tight"` body has `p-2`, header font uses `font-medium`.
-- [ ] 2.2 GREEN: add `padding?: 'tight'|'default'` (default `'default'`) to `card.tsx`; body `p-6`/`p-2`, header `px-6 py-4`/`px-6 py-2`; title weight `font-semibold`→`font-medium`.
-- [ ] 2.3 Confirm existing form/detail Card consumers unaffected (no prop passed → default unchanged).
-- [ ] 2.4 Commit WU2.
+- [x] 2.1 RED: failing test asserting `Card` default body has `p-6`, `padding="tight"` body has `p-2`, header font uses `font-medium`.
+- [x] 2.2 GREEN: add `padding?: 'tight'|'default'` (default `'default'`) to `card.tsx`; body `p-6`/`p-2`, header `px-6 py-4`/`px-6 py-2`; title weight `font-semibold`→`font-medium`.
+- [x] 2.3 Confirm existing form/detail Card consumers unaffected (no prop passed → default unchanged).
+- [x] 2.4 Commit WU2.
 
 ## Phase 3: app-layout + button (WU3)
 
