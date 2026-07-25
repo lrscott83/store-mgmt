@@ -300,9 +300,14 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
   it('renders module catalog in the form', async () => {
     const { EditStorePage } = await import('../edit-store');
     render(<Wrapper><EditStorePage /></Wrapper>);
+    // Wait for the fetched catalog to land (paid total reflects the loaded module's price)
+    // before switching tabs — otherwise the async modules update races the click and
+    // resets the tab back to the active plan.
     await waitFor(() => {
-      expect(screen.getByLabelText('Catalog Module')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('$8.00');
     });
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    expect(screen.getByText('Catalog Module')).toBeInTheDocument();
     expect(mockGetModulesToStore).toHaveBeenCalledTimes(1);
   });
 });

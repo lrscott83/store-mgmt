@@ -4,7 +4,7 @@ import type { Module, Owner, Store } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
-import { ModulePicker } from './module-picker';
+import { PlanPicker } from './plan-picker';
 
 interface StoreFormValues {
   name: string;
@@ -233,7 +233,7 @@ export function StoreForm({
             </div>
           )}
 
-          <ModulePicker modules={modules} onChange={setModuleIds} />
+          <PlanPicker modules={modules} onChange={setModuleIds} />
         </div>
       </Card>
     </form>
