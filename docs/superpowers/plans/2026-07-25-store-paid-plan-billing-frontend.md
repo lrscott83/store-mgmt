@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Design spec (read first for full rationale & rules):** [`docs/superpowers/specs/2026-07-25-store-paid-plan-billing-enforcement-design.md`](../specs/2026-07-25-store-paid-plan-billing-enforcement-design.md)
+**Companion plan (backend, implement BEFORE this):** [`docs/superpowers/plans/2026-07-25-store-paid-plan-billing-backend.md`](2026-07-25-store-paid-plan-billing-backend.md)
+
 **Goal:** Surface the backend paid-plan billing state in the React app: extend `UserModel`/`getMe`, show a trial/due/overdue banner, lock the `PlanPicker` for an already-activated owner, and add the collections and reseller-commission views.
 
 **Architecture:** New `getMe` fields flow through `auth-http-service` → `auth-store` → `useAuthStore().user`. A `PaymentBanner` mounted in `app-layout` reads that state. Two new routes (collections, commissions) call new `store-http-service` methods. All presentational; the backend already enforces entitlement (`storeModuleIds` is pre-filtered).

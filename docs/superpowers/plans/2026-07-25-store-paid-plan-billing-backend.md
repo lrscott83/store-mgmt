@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Design spec (read first for full rationale & rules):** [`docs/superpowers/specs/2026-07-25-store-paid-plan-billing-enforcement-design.md`](../specs/2026-07-25-store-paid-plan-billing-enforcement-design.md)
+**Companion plan (frontend, implement after this):** [`docs/superpowers/plans/2026-07-25-store-paid-plan-billing-frontend.md`](2026-07-25-store-paid-plan-billing-frontend.md)
+
 **Goal:** Add per-store paid-plan billing to the .NET backend: nullable plan-start, a manual "record payment" flow (super admin + reseller) that computes the reseller commission, payment-status computation, auto-downgrade of overdue stores to free (compute-on-read), plus collections and commission read queries.
 
 **Architecture:** Pure billing math lives in a static `StoreBillingUtils` (mirrors the existing `CurrentPriceServiceUtils`). An application service `IStoreBillingService` orchestrates repositories + config + utils. Enforcement filters paid modules out of the entitlement path (`GetMeQueryHandler` and `HasUserPermissionRequirementFilter`) when a store is overdue — no destructive writes, no background job. Payments are recorded via a new `RegisterStorePaymentCommand`. Two read queries back the collections and commission views.
