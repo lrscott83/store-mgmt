@@ -77,3 +77,59 @@ describe('PlanPicker — PLAN-4: active badge', () => {
     expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('Activo');
   });
 });
+
+describe('PlanPicker — PLAN-5: initial selection = active plan, no emit on mount', () => {
+  it('marks the active plan as selected and does not call onChange on mount', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    const onChange = vi.fn();
+    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} /></Wrapper>);
+    // active = free; free tab is shown and marked selected
+    expect(screen.getByText('Plan seleccionado')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlanPicker — PLAN-6: activating Pago emits ALL module ids', () => {
+  it('emits every module id when the paid plan is activated', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    const onChange = vi.fn();
+    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} /></Wrapper>);
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
+    expect(onChange).toHaveBeenCalledWith([1, 2, 3]);
+  });
+});
+
+describe('PlanPicker — PLAN-7: activating Gratis emits only free ids', () => {
+  it('emits only priceIncluded ids when the free plan is activated', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    const onChange = vi.fn();
+    // active = paid (Reportes selected) so Gratis is not the selected plan
+    const modules = CATALOG.map((m) => (m.id === 2 ? { ...m, selected: true } : m));
+    render(<Wrapper><PlanPicker modules={modules} onChange={onChange} /></Wrapper>);
+    fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
+    expect(onChange).toHaveBeenCalledWith([1]);
+  });
+});
+
+describe('PlanPicker — PLAN-8: "Se activará al guardar" hint', () => {
+  it('shows the hint on the selected plan when it differs from the active plan', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
+    // active = free; activate Pago → selected(paid) !== active(free)
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
+    expect(screen.getByText('Se activará al guardar')).toBeInTheDocument();
+  });
+});
+
+describe('PlanPicker — PLAN-9: re-syncs to active plan when modules arrive async', () => {
+  it('moves the Activo badge to Pago after modules load with a paid module selected', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    const { rerender } = render(<Wrapper><PlanPicker modules={[]} onChange={vi.fn()} /></Wrapper>);
+    const loaded = CATALOG.map((m) => (m.id === 2 ? { ...m, selected: true } : m));
+    rerender(<Wrapper><PlanPicker modules={loaded} onChange={vi.fn()} /></Wrapper>);
+    expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('Activo');
+  });
+});
