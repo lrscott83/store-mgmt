@@ -11,6 +11,16 @@
 
 **Tech Stack:** React 19, React Router 7 (SPA, `app/routes.ts`), react-intl, Tailwind, Zustand (`auth-store`), Vitest + @testing-library/react (`<IntlProvider locale="es" messages={esMessages}>` wrapper). Package: `frontend-react/apps/web-store-pos`; shared types in `frontend-react/packages/domain`.
 
+## Backend contract alignment (verified against code — 2026-07-25)
+
+These facts were confirmed by reading the actual code (backend .NET + frontend React), not comments/specs. They override any conflicting assumption elsewhere in this plan:
+
+- **JSON is camelCase.** ASP.NET Core MVC serializes camelCase by default (the entire existing frontend already consumes `data`/`fullName`/`succeeded`). So backend `PaymentDueDate`/`IsInTrial`/`PaymentStatus` arrive as `paymentDueDate`/`isInTrial`/`paymentStatus`, and the DTOs `StoreToCollectDto`/`ReSellerCommissionDto` arrive with camelCase keys. Field names in this plan align 1:1 — no remapping.
+- **`getMe` and `store-http-service` are raw passthroughs.** `authHttpService.getMe()` is `return response.data.data` and `store-http-service` methods are `return response.data` — neither does any field mapping. The new fields flow through automatically once the **TypeScript types** are extended; do NOT add a mapping layer. Defensive defaulting lives at the consumer (the banner uses `?? 'NoAplica'`).
+- **API paths stay `/v1/stores/...`.** `apiClient.baseURL = import.meta.env['API_URL']` (no `/api` appended in code); the `/api` prefix lives in the `API_URL` env value. Backend serves `api/v1/stores/...`; frontend code correctly calls `/v1/stores/...`. Do NOT add `/api` in code.
+- **Route gating for the two new views = `resellerFeatureLoader([EFeatures.Owners])`** (super admin + reseller). This mirrors the backend gate `[HasPermission(StoreRoleFeatures.OwnersAdmin)]` (whose `HasRoles` = `{SuperAdmin, ReSeller}` + feature `Owners`) and the existing `admin/owners` routes. `adminFeatureLoader` is WRONG here — it authorizes `{SuperAdmin, OwnerAdmin}` and excludes the ReSeller.
+- **Envelope** = `BaseResponseModel<T>` `{ data, succeeded, message, actionCode, errors }` (camelCase). New store-http methods return `BaseResponseModel<T>` (matching `store-http-service` style); `getMe` alone unwraps to `.data.data`.
+
 ## Global Constraints
 
 - **This plan depends on the BACKEND plan being merged** — it consumes `GetMe` fields `paymentDueDate` (ISO date string | null), `isInTrial` (bool), `paymentStatus` (`"NoAplica"|"AlDia"|"PorVencer"|"EnGracia"|"Vencido"`), and endpoints `GET /v1/stores/to-collect`, `GET /v1/stores/reseller-commissions`, `POST /v1/stores/{storeId}/payments`.
@@ -47,12 +57,12 @@ and add to `UserModel`:
 ```
 Run `pnpm -C frontend-react/packages/domain build`.
 
-- [ ] **Step 2: Write the failing mapping test**
+- [ ] **Step 2: Write the failing passthrough test**
 
-In the auth-http-service test, add a case asserting that a `getMe` response carrying `paymentDueDate/isInTrial/paymentStatus` maps onto the returned `UserModel` (and that missing fields default to `null/false/'NoAplica'`):
+`getMe()` is a raw passthrough (`return response.data.data`) — there is NO mapping layer and none should be added. This test only proves the new fields survive the passthrough once the type is extended (it fails to compile until Step 1's type change lands). The axios body is `{ data: UserModel }`, so `apiClient.get` resolves to `{ data: { data: {...} } }` (note the double nesting):
 ```ts
-it('maps payment billing fields from getMe', async () => {
-  // mock apiClient.get to resolve { data: { ...user, paymentDueDate: '2026-03-10', isInTrial: true, paymentStatus: 'PorVencer' } }
+it('carries payment billing fields from getMe', async () => {
+  // mock apiClient.get to resolve { data: { data: { ...user, paymentDueDate: '2026-03-10', isInTrial: true, paymentStatus: 'PorVencer' } } }
   const user = await authHttpService.getMe();
   expect(user.paymentDueDate).toBe('2026-03-10');
   expect(user.isInTrial).toBe(true);
@@ -62,14 +72,9 @@ it('maps payment billing fields from getMe', async () => {
 
 - [ ] **Step 3: Run — verify it fails.** `./node_modules/.bin/vitest run app/shared/lib/http/__tests__/auth-http-service.test.ts`
 
-- [ ] **Step 4: Map the fields**
+- [ ] **Step 4: No mapping to add — passthrough already carries the fields**
 
-In `auth-http-service.ts` `getMe` mapping, add (defaulting for safety):
-```ts
-    paymentDueDate: res.data.paymentDueDate ?? null,
-    isInTrial: res.data.isInTrial ?? false,
-    paymentStatus: res.data.paymentStatus ?? 'NoAplica',
-```
+Do NOT touch `getMe`'s body. Once `UserModel` (Step 1) declares the three fields, the existing `return response.data.data` carries them through with no code change. The backend always serializes them (`CurrentUserDto` defaults `PaymentStatus` to `"NoAplica"`, `IsInTrial` to `false`, `PaymentDueDate` to `null`), so there is nothing to default here; the banner (Task 2) still guards with `?? 'NoAplica'` for the pre-backend/offline case where an older payload lacks them.
 
 - [ ] **Step 5: Run — verify it passes; typecheck.**
 
@@ -164,19 +169,18 @@ git commit -m "feat(ui): trial/due/overdue payment banner in app shell"
 ### Task 3: `PlanPicker` read-only lock after activation
 
 **Files:**
-- Modify: `frontend-react/packages/domain/src/models/store.ts` (`Store.paymentStartDate` → `Date | null`)
-- Modify: `frontend-react/apps/web-store-pos/app/management/stores/lib/services/store-http-service.ts` (map nullable)
-- Modify: `frontend-react/apps/web-store-pos/app/management/stores/components/plan-picker.tsx` (add `readOnly` prop)
-- Modify: `frontend-react/apps/web-store-pos/app/management/stores/components/store-form.tsx` (pass `readOnly`)
+- Modify: `frontend-react/packages/domain/src/models/store.ts` (`Store.paymentStartDate` → `string | null`)
+- Modify: `frontend-react/apps/web-store-pos/app/management/stores/components/plan-picker.tsx` (add `readOnly` prop — current props are only `{ modules, onChange }`)
+- Modify: `frontend-react/apps/web-store-pos/app/management/stores/components/store-form.tsx` (pass `readOnly`; `store-form` already holds `isSuperAdmin` + `initialValues`)
 - Test: `frontend-react/apps/web-store-pos/app/management/stores/components/__tests__/plan-picker.test.tsx` (extend)
 
 **Interfaces:**
 - Consumes: `Store.paymentStartDate`, `store-form`'s `isSuperAdmin`.
 - Produces: `PlanPicker` accepts `readOnly?: boolean`; when true, tabs still render but no "Activar este plan" button and no plan switching (the current plan is shown, no `onChange` fires).
 
-- [ ] **Step 1: Make `Store.paymentStartDate` nullable**
+- [ ] **Step 1: Make `Store.paymentStartDate` nullable (and truthfully typed)**
 
-In `packages/domain/src/models/store.ts`: `paymentStartDate: Date | null;`. Rebuild domain. Update `store-http-service.ts` mapping to `res.paymentStartDate ? new Date(res.paymentStartDate) : null`.
+In `packages/domain/src/models/store.ts`: `paymentStartDate: string | null;` — NOT `Date`. `store-http-service` does **no mapping** (raw passthrough), so at runtime this field is the backend's ISO date string (`"2026-03-10"`) or `null` (backend `DateOnly?` → JSON string/null). Rebuild domain. **No `store-http-service.ts` change** — there is no mapping layer to update. `store-form.tsx` already coerces it for the date input (`initialValues?.paymentStartDate ? new Date(initialValues.paymentStartDate)... : ''`), which works for a string and yields `''` for `null`; the read-only gate uses `initialValues?.paymentStartDate != null`.
 
 - [ ] **Step 2: Write the failing test**
 ```tsx
@@ -282,9 +286,9 @@ i18n:
 
 - [ ] **Step 3: Run — verify it fails.**
 
-- [ ] **Step 4: Implement `collections.tsx`** — follow `user-list.tsx` shape: `clientLoader = adminFeatureLoader([EFeatures.Stores])`, `useState` list, `useEffect` load via `getStoresToCollect`, a table with columns (store/owner/amount/due/status) + a "Registrar pago" button per row calling `registerStorePayment` then reloading. Amount via `formatCurrency`. Empty-state text `BILLING.COLLECTIONS.EMPTY`.
+- [ ] **Step 4: Implement `collections.tsx`** — follow the `user-list.tsx` shape (loader export + `useState`/`useEffect` fetch via the module http service), but gate for super admin + reseller: `export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);` (import from `~/auth/routes/loaders`). This mirrors the backend `[HasPermission(StoreRoleFeatures.OwnersAdmin)]` and the `admin/owners` routes — do NOT use `adminFeatureLoader` (it excludes the ReSeller). `useEffect` load via `getStoresToCollect`, a table with columns (store/owner/amount/due/status) + a "Registrar pago" button per row calling `registerStorePayment` then reloading. Amount via `formatCurrency`. Empty-state text `BILLING.COLLECTIONS.EMPTY`.
 
-- [ ] **Step 5: Register the route** in `app/routes.ts` under the management/admin layout (mirror the existing stores route registration), path e.g. `management/stores/collections`.
+- [ ] **Step 5: Register the route** in `app/routes.ts` inside the `app-layout` children array (same place `admin/owners` is registered — the per-route `clientLoader` above is the gate), path e.g. `management/stores/collections`.
 
 - [ ] **Step 6: Run — verify it passes; typecheck; commit**
 ```bash
@@ -336,7 +340,7 @@ i18n:
 
 - [ ] **Step 3: Run — verify it fails.**
 
-- [ ] **Step 4: Implement `reseller-commissions.tsx`** — same `user-list.tsx` shape; `clientLoader = adminFeatureLoader([EFeatures.Stores])` (route is visible to super admin + reseller who both hold the Stores feature; backend scopes the data); table columns period (`String(month).padStart(2,'0')/year`), count, total (`formatCurrency`). Empty-state `BILLING.COMMISSIONS.EMPTY`.
+- [ ] **Step 4: Implement `reseller-commissions.tsx`** — same `user-list.tsx` shape; `export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);` (import from `~/auth/routes/loaders`) — super admin + reseller, mirroring the backend `[HasPermission(StoreRoleFeatures.OwnersAdmin)]`; the backend scopes the rows (reseller sees only their own). Do NOT use `adminFeatureLoader`. Table columns period (`String(month).padStart(2,'0')/year`), count, total (`formatCurrency`). Empty-state `BILLING.COMMISSIONS.EMPTY`.
 
 - [ ] **Step 5: Register the route** in `app/routes.ts` (path e.g. `management/stores/commissions`).
 

@@ -23,6 +23,14 @@
 - **Unit test run:** `dotnet test Application.Tests/Application.Tests.csproj --filter FullyQualifiedName~<Class>`. **E2E:** `dotnet test SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj --filter FullyQualifiedName~<Class>` (needs Postgres `smca_test`).
 - Enum values in use: `StorePaymentStatusType.Paid = 5`. New `SystemConfigurationType.PaymentGraceDays = 3`.
 
+### Authorization & controller placement (verified against code — 2026-07-25) — READ BEFORE Tasks 7–9
+
+The collections / commissions / record-payment endpoints are for **super admin + the store's ReSeller**. Two code facts fix how that must be wired (they override the per-task drafts below):
+
+- **Gate with `[HasPermission(StoreRoleFeatures.OwnersAdmin)]`, NOT `ReSellerAdmin`.** In `StoreRoleFeatures.cs`: `ReSellerAdmin` = `[HasRoles(RoleType.SuperAdmin)] [HasFeature(FeatureType.ReSellers)]` → **SuperAdmin only**; a real ReSeller (RoleType 4) does NOT pass it, so the drafted gate would lock resellers out. `OwnersAdmin` = `[HasRoles(RoleType.SuperAdmin, RoleType.ReSeller)] [HasFeature(FeatureType.Owners)]` → exactly `{SuperAdmin, ReSeller}`, and it is the same gate `OwnersController` already uses; resellers already hold `FeatureType.Owners`. `HasUserPermissionRequirementFilter` bypasses everything for SuperAdmin and, for a ReSeller caller, checks that they hold one of the listed features (`Owners`), which they do.
+- **Put them on a NEW `StorePaymentsController`, NOT `StoresController`.** `StoresController` has a class-level `[HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StoresAdmin)]` (StoresAdmin = OwnerAdmin-with-Stores). Authorization filters **stack (AND)** — a reseller would fail that class gate regardless of any action-level attribute. Create `backend/src/SMCA.WebApi/Controllers/v1/StorePaymentsController.cs` with an **explicit** `[Route("api/v1/stores")]` (so paths stay `api/v1/stores/...` — the frontend calls `/v1/stores/...`) and a class-level `[HasPermission(StoreRoleFeatures.OwnersAdmin)]`. Host all three endpoints (`POST {storeId}/payments`, `GET to-collect`, `GET reseller-commissions`) there. The literal segments `to-collect`/`reseller-commissions` take routing precedence over `StoresController`'s `GET {id}`, so there is no collision.
+- **Serialization is camelCase** (ASP.NET Core MVC default) — the client consumes `paymentDueDate`/`isInTrial`/`paymentStatus` and the DTO camelCase keys directly; keep DTO property names as drafted.
+
 ---
 
 ### Task 1: `PaymentGraceDays` system config
@@ -657,7 +665,7 @@ git commit -m "feat(backend): enforce overdue→free entitlement + expose paymen
 **Files:**
 - Create: `backend/src/Application/Features/StoreManagement/StorePayments/Commands/RegisterStorePayment/RegisterStorePaymentCommand.cs`
 - Modify: repos — `IStoreRepository`/`StoreRepository` (`GetStoreWithModulesAndReSellerOwnerAsync`, `IsStoreOwnedByReSellerUserAsync`), `IStorePaymentRepository`/`StorePaymentRepository` (`AddAsync` inherited).
-- Modify: `backend/src/SMCA.WebApi/Controllers/v1/StoresController.cs` (add the endpoint).
+- Create: `backend/src/SMCA.WebApi/Controllers/v1/StorePaymentsController.cs` (new controller — see "Authorization & controller placement" above; do NOT add to `StoresController`).
 - Test: `Application.Tests/.../RegisterStorePaymentCommandTests.cs` + E2E `SMCA.WebApi.E2ETests/Billing/RegisterStorePaymentTests.cs`.
 
 **Interfaces:**
@@ -758,23 +766,28 @@ public class RegisterStorePaymentCommandHandler : ICommandHandler<RegisterStoreP
 }
 ```
 
-- [ ] **Step 5: Add controller endpoint**
+- [ ] **Step 5: Create `StorePaymentsController` + add the endpoint**
 
-In `StoresController.cs`:
+Create `StorePaymentsController.cs` with an explicit route + the `{SuperAdmin, ReSeller}` gate (see "Authorization & controller placement"). This same controller hosts Task 8 and Task 9's endpoints:
 ```csharp
+[ApiVersion("1.0")]
+[Route("api/v1/stores")]
+[HasPermission(StoreRoleFeatures.OwnersAdmin)]
+public class StorePaymentsController : BaseApiController
+{
         [HttpPost("{storeId}/payments")]
-        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.ReSellerAdmin)]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
         public async Task<IActionResult> RegisterStorePaymentAsync(Guid storeId)
             => Ok(await Sender.Send(new RegisterStorePaymentCommand(storeId)));
+}
 ```
-(Confirm `StoresController`'s class-level `[HasPermission]`; if it restricts to SuperAdmin only, put the ReSeller-inclusive attribute at the action level as above.)
+Do NOT add this to `StoresController` — its class-level `[HasPermission(SuperAdmin, StoresAdmin)]` stacks (AND) and would forbid resellers. The handler still keeps its own `if (!(isSuperAdmin || _http.IsReSeller))` guard as defense-in-depth.
 
 - [ ] **Step 6: Run unit + write/run E2E** (`RegisterStorePaymentTests`: seed reseller+owner+store+paid module; POST as reseller; assert 200 + a `StorePayment` row exists with `ByReSeller=true`, `ReSellerAmount>0`; POST as reseller for a store it doesn't own → 400/403).
 
 - [ ] **Step 7: Commit**
 ```bash
-git add backend/src/Application/Features/StoreManagement/StorePayments/ backend/src/Domain/Interfaces/Repositories/IStoreRepository.cs backend/src/Infrastructure/Persistence/Repositories/StoreRepository.cs backend/src/SMCA.WebApi/Controllers/v1/StoresController.cs backend/src/Application.Tests/ backend/src/SMCA.WebApi.E2ETests/Billing/
+git add backend/src/Application/Features/StoreManagement/StorePayments/ backend/src/Domain/Interfaces/Repositories/IStoreRepository.cs backend/src/Infrastructure/Persistence/Repositories/StoreRepository.cs backend/src/SMCA.WebApi/Controllers/v1/StorePaymentsController.cs backend/src/Application.Tests/ backend/src/SMCA.WebApi.E2ETests/Billing/
 git commit -m "feat(backend): RegisterStorePaymentCommand (super admin + reseller-scoped) with commission"
 ```
 
@@ -786,7 +799,7 @@ git commit -m "feat(backend): RegisterStorePaymentCommand (super admin + reselle
 - Create: `backend/src/Application/Dtos/StoreManagement/StoreToCollectDto.cs`
 - Create: `backend/src/Application/Features/StoreManagement/StorePayments/Queries/GetStoresToCollect/GetStoresToCollectQuery.cs`
 - Modify: `IStoreRepository`/`StoreRepository` (`GetPaidStoresAsync(bool allTenants)`, `GetPaidStoresByReSellerUserAsync(Guid reSellerUserId)` — stores with `PaymentStartDate != null` incl. owner + modules).
-- Modify: `StoresController.cs` (add `GET stores/to-collect`).
+- Modify: `backend/src/SMCA.WebApi/Controllers/v1/StorePaymentsController.cs` (add `GET to-collect` to the Task 7 controller — NOT `StoresController`).
 - Test: unit + E2E.
 
 **Interfaces:**
@@ -823,10 +836,9 @@ public sealed record GetStoresToCollectQuery() : IQuery<IEnumerable<StoreToColle
 // return ResponseResult.Success(list.OrderBy(x => x.NextDueDate));
 ```
 
-- [ ] **Step 5: Controller**
+- [ ] **Step 5: Controller** — add to `StorePaymentsController` (class-level `[HasPermission(StoreRoleFeatures.OwnersAdmin)]` already gates it; no per-action attribute needed):
 ```csharp
         [HttpGet("to-collect")]
-        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.ReSellerAdmin)]
         [ProducesResponseType(typeof(ResponseResult<List<StoreToCollectDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetStoresToCollectAsync()
             => Ok(await Sender.Send(new GetStoresToCollectQuery()));
@@ -834,7 +846,7 @@ public sealed record GetStoresToCollectQuery() : IQuery<IEnumerable<StoreToColle
 
 - [ ] **Step 6: Run unit + E2E; commit**
 ```bash
-git add backend/src/Application/Dtos/StoreManagement/StoreToCollectDto.cs backend/src/Application/Features/StoreManagement/StorePayments/Queries/GetStoresToCollect/ backend/src/Domain/Interfaces/Repositories/IStoreRepository.cs backend/src/Infrastructure/Persistence/Repositories/StoreRepository.cs backend/src/SMCA.WebApi/Controllers/v1/StoresController.cs backend/src/Application.Tests/ backend/src/SMCA.WebApi.E2ETests/Billing/
+git add backend/src/Application/Dtos/StoreManagement/StoreToCollectDto.cs backend/src/Application/Features/StoreManagement/StorePayments/Queries/GetStoresToCollect/ backend/src/Domain/Interfaces/Repositories/IStoreRepository.cs backend/src/Infrastructure/Persistence/Repositories/StoreRepository.cs backend/src/SMCA.WebApi/Controllers/v1/StorePaymentsController.cs backend/src/Application.Tests/ backend/src/SMCA.WebApi.E2ETests/Billing/
 git commit -m "feat(backend): GetStoresToCollect query (due-soon/grace, scoped)"
 ```
 
@@ -846,7 +858,7 @@ git commit -m "feat(backend): GetStoresToCollect query (due-soon/grace, scoped)"
 - Create: `backend/src/Application/Dtos/StoreManagement/ReSellerCommissionDto.cs`
 - Create: `backend/src/Application/Features/StoreManagement/StorePayments/Queries/GetReSellerCommissions/GetReSellerCommissionsQuery.cs`
 - Modify: `IStorePaymentRepository`/`StorePaymentRepository` (`GetPaidWithReSellerByReSellerUserAsync(Guid reSellerUserId)`, `GetAllPaidWithReSellerAsync()`).
-- Modify: `StoresController.cs` or a new `StorePaymentsController` (add `GET reseller-commissions`).
+- Modify: `backend/src/SMCA.WebApi/Controllers/v1/StorePaymentsController.cs` (add `GET reseller-commissions` to the Task 7 controller).
 - Test: unit + E2E.
 
 **Interfaces:**
@@ -875,11 +887,11 @@ public sealed record GetReSellerCommissionsQuery() : IQuery<IEnumerable<ReSeller
 //   TotalCommission = g.Sum(p => p.ReSellerAmount) }; order by Year desc, Month desc.
 ```
 
-- [ ] **Step 5: Controller endpoint** (mirror Task 8's attribute).
+- [ ] **Step 5: Controller endpoint** — add `[HttpGet("reseller-commissions")]` to `StorePaymentsController` (the class-level `[HasPermission(StoreRoleFeatures.OwnersAdmin)]` gates it; no per-action attribute).
 
 - [ ] **Step 6: Run unit + E2E; commit**
 ```bash
-git add backend/src/Application/Dtos/StoreManagement/ReSellerCommissionDto.cs backend/src/Application/Features/StoreManagement/StorePayments/Queries/GetReSellerCommissions/ backend/src/Domain/Interfaces/Repositories/IStorePaymentRepository.cs backend/src/Infrastructure/Persistence/Repositories/StorePaymentRepository.cs backend/src/SMCA.WebApi/Controllers/ backend/src/Application.Tests/ backend/src/SMCA.WebApi.E2ETests/Billing/
+git add backend/src/Application/Dtos/StoreManagement/ReSellerCommissionDto.cs backend/src/Application/Features/StoreManagement/StorePayments/Queries/GetReSellerCommissions/ backend/src/Domain/Interfaces/Repositories/IStorePaymentRepository.cs backend/src/Infrastructure/Persistence/Repositories/StorePaymentRepository.cs backend/src/SMCA.WebApi/Controllers/v1/StorePaymentsController.cs backend/src/Application.Tests/ backend/src/SMCA.WebApi.E2ETests/Billing/
 git commit -m "feat(backend): GetReSellerCommissions query (grouped by period, scoped)"
 ```
 
@@ -894,4 +906,4 @@ git commit -m "feat(backend): GetReSellerCommissions query (grouped by period, s
 
 ## Notes for the frontend plan (separate)
 
-The client consumes these NEW `GetMe` fields: `paymentDueDate` (ISO date | null), `isInTrial` (bool), `paymentStatus` (`"NoAplica"|"AlDia"|"PorVencer"|"EnGracia"|"Vencido"`). New endpoints: `POST /api/v1/stores/{storeId}/payments`, `GET /api/v1/stores/to-collect`, `GET /api/v1/stores/reseller-commissions`. `storeModuleIds` already reflects the effective (downgraded) plan.
+The client consumes these NEW `GetMe` fields: `paymentDueDate` (ISO date | null), `isInTrial` (bool), `paymentStatus` (`"NoAplica"|"AlDia"|"PorVencer"|"EnGracia"|"Vencido"`) — camelCase (ASP.NET default). The `CurrentUserDto` **always** serializes all three (value/nullable types + `PaymentStatus` default `"NoAplica"`), so the frontend `getMe` passthrough carries them with no defaulting needed. New endpoints live on `StorePaymentsController` but keep the paths `POST /api/v1/stores/{storeId}/payments`, `GET /api/v1/stores/to-collect`, `GET /api/v1/stores/reseller-commissions` (frontend calls `/v1/stores/...`), gated `[HasPermission(StoreRoleFeatures.OwnersAdmin)]` = super admin + reseller (frontend mirror: `resellerFeatureLoader([EFeatures.Owners])`). `storeModuleIds` already reflects the effective (downgraded) plan.
