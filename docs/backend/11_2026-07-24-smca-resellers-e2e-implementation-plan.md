@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development / executing-plans.
 > Steps use `- [ ]`. Materializes the `11` test-plan: the 5 `ReSellersController` endpoints, exhaustively,
-> including every `11c` gap scenario (`L*`/`G*`/`C*`/`U*`/`D*`) and the delete-orphan bug-pin.
+> including every gap scenario (`L*`/`G*`/`C*`/`U*`/`D*`) and the delete-orphan bug-pin.
 
 **Goal:** Implement, against real Postgres via `dotnet test`, the full ReSellers CRUD behavior, all
 validators, the per-endpoint SuperAdmin-only auth, and the documented edge/error/integration surface.
@@ -907,7 +907,7 @@ public sealed class ReSellersDeleteAuthTests
 
 - **Coverage — 45 tests across 12 classes, nothing dropped:** List 7 + ListAuth 5; GetById 5 + GetByIdAuth 4;
   Create 5 + CreateValidation 6 + CreateAuth 4; Update 6 + UpdateValidation 8 + UpdateAuth 4; Delete 5 +
-  DeleteAuth 4. All `11c` gap ids (`L1-L4, G1-G2, C1-C4, U1-U7, D1-D3`) folded in.
+  DeleteAuth 4. All gap ids (`L1-L4, G1-G2, C1-C4, U1-U7, D1-D3`) folded in.
 - **Bug-pin:** `Delete_orphans_user_and_userrole` (D1) — update if the handler is later made to cascade.
 - **VERIFY&PIN:** `List_includeInactive_nonbool_returns_400_or_404` (L1), `Get_malformed_guid_returns_400_or_404`
   (G1) — `BeOneOf(400,404)`; pin the actual pipeline status.

@@ -3,7 +3,7 @@
 **Date:** 2026-07-24
 **Scope:** the 5 endpoints of `ReSellersController` (`api/v1/reSellers`), **exhaustive CRUD** (mirrors the
 Owners `08` shape) — every reachable behavior, edge, error and auth path is implemented as a test. Includes
-the `11c` QA-gap scenarios, merged in (scenario ids `L*`/`G*`/`C*`/`U*`/`D*`); nothing discarded.
+the full QA-gap scenarios, merged in (scenario ids `L*`/`G*`/`C*`/`U*`/`D*`); nothing discarded.
 **Depends on / reuses:** the on-disk harness (`AppTestFactory`, `WebAppFixture`, `[Collection("e2e")]`,
 `ApiResponse<T>`, `DbTestHelpers`) against real Postgres `smca_test`. Adds one new infra helper
 `ReSellerSeed` (no `SeedReSeller*` exists yet).
