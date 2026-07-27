@@ -89,11 +89,11 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 8 (WU-H): Final Gate
 
-- [ ] 8.1 `pnpm test` — full suite green across domain + web-common + web-store-pos.
-- [ ] 8.2 `pnpm -C frontend-react/apps/web-store-pos exec tsc --noEmit` clean.
-- [ ] 8.3 `pnpm -C frontend-react/apps/web-store-pos build` succeeds.
-- [ ] 8.4 Grep all new `BILLING.*` copy for voseo markers (`tenés`, `pagás`, `vos`) — must be zero matches.
-- [ ] 8.5 Mark manual/e2e validation against a live backend as DEFERRED (`StorePaymentsController` unbuilt) — no task depends on it.
+- [x] 8.1 `pnpm test` — full suite green across domain + web-common + web-store-pos.
+- [x] 8.2 `pnpm -C frontend-react/apps/web-store-pos exec tsc --noEmit` clean.
+- [x] 8.3 `pnpm -C frontend-react/apps/web-store-pos build` succeeds.
+- [x] 8.4 Grep all new `BILLING.*` copy for voseo markers (`tenés`, `pagás`, `vos`) — must be zero matches.
+- [x] 8.5 Mark manual/e2e validation against a live backend as DEFERRED (`StorePaymentsController` unbuilt) — no task depends on it.
 
 ## Not mapped to a dedicated task
 
