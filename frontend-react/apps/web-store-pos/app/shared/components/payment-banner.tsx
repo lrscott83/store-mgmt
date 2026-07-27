@@ -1,5 +1,6 @@
 import { useIntl } from 'react-intl';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { formatDateOnly } from '~/shared/lib/date-utils';
 
 type BannerTone = 'blue' | 'amber' | 'red';
 
@@ -8,11 +9,6 @@ const TONE_CLASSES: Record<BannerTone, string> = {
   amber: 'border-amber-200 bg-amber-50 text-amber-800',
   red: 'border-red-200 bg-red-50 text-red-800',
 };
-
-function formatDueDate(intl: ReturnType<typeof useIntl>, dueDate: string | null | undefined): string {
-  if (!dueDate) return '';
-  return intl.formatDate(new Date(dueDate), { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
-}
 
 /**
  * Read-only projection of backend-computed billing state (design.md — the
@@ -40,13 +36,13 @@ export function PaymentBanner() {
     tone = 'blue';
     message = intl.formatMessage(
       { id: 'BILLING.TRIAL_NOTICE' },
-      { date: formatDueDate(intl, user?.paymentDueDate) },
+      { date: formatDateOnly(user?.paymentDueDate) },
     );
   } else {
     tone = 'amber';
     message = intl.formatMessage(
       { id: 'BILLING.DUE_NOTICE' },
-      { date: formatDueDate(intl, user?.paymentDueDate) },
+      { date: formatDateOnly(user?.paymentDueDate) },
     );
   }
 

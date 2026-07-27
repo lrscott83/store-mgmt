@@ -4,6 +4,7 @@ import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatDateOnly } from '~/shared/lib/date-utils';
 import { Button } from '~/shared/components/ui/button';
 import type { StoreToCollect } from '@store-mgmt/domain';
 
@@ -11,16 +12,6 @@ import type { StoreToCollect } from '@store-mgmt/domain';
 // backend [HasPermission(StoreRoleFeatures.OwnersAdmin)] (roles {SuperAdmin, ReSeller}
 // + FeatureType.Owners = 11). Same gate as admin/owners/routes/owner-list.tsx.
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
-
-function formatDueDate(intl: ReturnType<typeof useIntl>, dueDate: string | null): string {
-  if (!dueDate) return '';
-  return intl.formatDate(new Date(dueDate), {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
 
 /**
  * Read-only projection of backend-computed collections state (design.md — the
@@ -108,7 +99,7 @@ export function CollectionsPage() {
                   <td className="px-4 py-3 text-right text-text">
                     {formatCurrency(row.amount)}
                   </td>
-                  <td className="px-4 py-3 text-text">{formatDueDate(intl, row.nextDueDate)}</td>
+                  <td className="px-4 py-3 text-text">{formatDateOnly(row.nextDueDate)}</td>
                   <td className="px-4 py-3 text-text">
                     {intl.formatMessage({ id: `BILLING.STATUS.${row.status}` })}
                   </td>
