@@ -53,6 +53,9 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
     isOwnerAdmin: false,
     isReSeller: false,
     selectedStoreId: storeId,
+    paymentDueDate: null,
+    isInTrial: false,
+    paymentStatus: 'NoAplica',
     ...overrides,
   };
 }

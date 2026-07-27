@@ -29,9 +29,30 @@ export interface Store {
   address: string;
   description: string;
   approved: boolean;
-  paymentStartDate: Date;
+  // Nullable ISO date string (backend `DateOnly?`, raw passthrough — no mapping
+  // layer produces a `Date`). `null` means the store never activated the paid
+  // plan. Cross-boundary assumption (DG-6): the backend MUST serialize JSON
+  // `null` here (never `""`) for a never-activated store; not enforceable
+  // client-side.
+  paymentStartDate: string | null;
   modules: Module[];
   isActive: boolean;
+}
+
+export interface StoreToCollect {
+  storeId: string;
+  storeName: string;
+  ownerName: string;
+  amount: number;
+  nextDueDate: string | null;
+  status: 'PorVencer' | 'EnGracia';
+}
+
+export interface ReSellerCommission {
+  year: number;
+  month: number;
+  paymentCount: number;
+  totalCommission: number;
 }
 
 export interface OwnerStoreModule {

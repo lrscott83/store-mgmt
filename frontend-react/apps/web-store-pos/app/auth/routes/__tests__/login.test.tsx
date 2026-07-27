@@ -43,6 +43,9 @@ function makeUser(): UserModel {
     isOwnerAdmin: false,
     isReSeller: false,
     selectedStoreId: '',
+    paymentDueDate: null,
+    isInTrial: false,
+    paymentStatus: 'NoAplica',
   };
 }
 

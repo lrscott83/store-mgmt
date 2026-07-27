@@ -33,13 +33,13 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 1 (WU-A): Domain Foundation — blocks everything
 
-- [ ] 1.1 `packages/domain/src/models/auth.ts`: add `export type PaymentStatus = 'NoAplica'|'AlDia'|'PorVencer'|'EnGracia'|'Vencido'`; add `paymentDueDate: string | null`, `isInTrial: boolean`, `paymentStatus: PaymentStatus` to `UserModel`. *(Req: auth/Payment Billing Fields; DG-1, DG-3)*
-- [ ] 1.2 `packages/domain/src/models/store.ts`: retype `paymentStartDate: Date` → `string | null`; add `StoreToCollect` and `ReSellerCommission` interfaces per design contracts. *(Req: management-stores/nullable ISO string; DG-5, DG-6, DG-8)*
-- [ ] 1.3 Comment on `Store.paymentStartDate` documenting DG-6: backend MUST serialize JSON `null` (never `""`) for a never-activated store — cross-boundary assumption, not runtime-enforceable here.
-- [ ] 1.4 Run `pnpm -C frontend-react/packages/domain build` (apps typecheck against `dist/`).
-- [ ] 1.5 RED: update the 4 confirmed fixtures' `paymentStartDate: new Date()` → `'2024-01-01'` in the SAME commit as 1.1-1.4 (retype breaks them otherwise): `frontend-react/apps/web-store-pos/app/management/stores/routes/__tests__/store-routes.test.tsx:19`, `frontend-react/apps/web-store-pos/app/admin/stores/routes/__tests__/store-list.test.tsx:51`, `frontend-react/apps/web-store-pos/app/admin/stores/components/__tests__/store-card-list.test.tsx:17`, `frontend-react/apps/web-store-pos/app/admin/owners/routes/__tests__/owner-edit.test.tsx:77`.
-- [ ] 1.6 Add a case to `store-http-service.test.ts` (getStore describe block) asserting `paymentStartDate` passes through unchanged for both a string and `null` mock response (RED→GREEN; no new code needed, passthrough already raw). *(Scenarios: Activated store ISO string / Never-activated null)*
-- [ ] 1.7 Verify: `pnpm -C frontend-react/apps/web-store-pos exec tsc --noEmit` clean; `pnpm test` green.
+- [x] 1.1 `packages/domain/src/models/auth.ts`: add `export type PaymentStatus = 'NoAplica'|'AlDia'|'PorVencer'|'EnGracia'|'Vencido'`; add `paymentDueDate: string | null`, `isInTrial: boolean`, `paymentStatus: PaymentStatus` to `UserModel`. *(Req: auth/Payment Billing Fields; DG-1, DG-3)*
+- [x] 1.2 `packages/domain/src/models/store.ts`: retype `paymentStartDate: Date` → `string | null`; add `StoreToCollect` and `ReSellerCommission` interfaces per design contracts. *(Req: management-stores/nullable ISO string; DG-5, DG-6, DG-8)*
+- [x] 1.3 Comment on `Store.paymentStartDate` documenting DG-6: backend MUST serialize JSON `null` (never `""`) for a never-activated store — cross-boundary assumption, not runtime-enforceable here.
+- [x] 1.4 Run `pnpm -C frontend-react/packages/domain build` (apps typecheck against `dist/`).
+- [x] 1.5 RED: update the 4 confirmed fixtures' `paymentStartDate: new Date()` → `'2024-01-01'` in the SAME commit as 1.1-1.4 (retype breaks them otherwise): `frontend-react/apps/web-store-pos/app/management/stores/routes/__tests__/store-routes.test.tsx:19`, `frontend-react/apps/web-store-pos/app/admin/stores/routes/__tests__/store-list.test.tsx:51`, `frontend-react/apps/web-store-pos/app/admin/stores/components/__tests__/store-card-list.test.tsx:17`, `frontend-react/apps/web-store-pos/app/admin/owners/routes/__tests__/owner-edit.test.tsx:77`. ALSO: retyping `UserModel` (task 1.1) broke 21 additional fixtures across the app (local `makeUser`/`makeStoreUser`/`makeSuperAdmin` factories missing the 3 new required fields) — not anticipated by this task list; fixed in the same commit (see apply-progress for full file list).
+- [x] 1.6 Add a case to `store-http-service.test.ts` (getStore describe block) asserting `paymentStartDate` passes through unchanged for both a string and `null` mock response (RED→GREEN; no new code needed, passthrough already raw). *(Scenarios: Activated store ISO string / Never-activated null)*
+- [x] 1.7 Verify: `pnpm -C frontend-react/apps/web-store-pos exec tsc --noEmit` clean; `pnpm test` green.
 
 ## Phase 2 (WU-B): getMe Transport (type-only, parallel with 3/4)
 

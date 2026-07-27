@@ -16,7 +16,7 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     address: '123 Main St',
     description: 'A store',
     approved: true,
-    paymentStartDate: new Date(),
+    paymentStartDate: '2024-01-01',
     modules: [],
     isActive: true,
     ...overrides,
@@ -78,6 +78,9 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
     isOwnerAdmin: false,
     isReSeller: false,
     selectedStoreId: 's1',
+    paymentDueDate: null,
+    isInTrial: false,
+    paymentStatus: 'NoAplica',
     ...overrides,
   };
 }

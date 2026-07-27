@@ -74,7 +74,7 @@ function makeStore(overrides: Partial<import('@store-mgmt/domain').Store> = {}) 
     address: '123 Main St',
     description: 'A store',
     approved: true,
-    paymentStartDate: new Date(),
+    paymentStartDate: '2024-01-01',
     modules: [],
     isActive: true,
     ...overrides,

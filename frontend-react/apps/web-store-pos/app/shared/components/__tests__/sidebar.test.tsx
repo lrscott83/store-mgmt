@@ -33,6 +33,9 @@ const makeSuperAdmin = (): UserModel => ({
   isOwnerAdmin: false,
   isReSeller: false,
   selectedStoreId: 's1',
+  paymentDueDate: null,
+  isInTrial: false,
+  paymentStatus: 'NoAplica',
 });
 
 const makeStoreUser = (featureIds: number[], storeId = 's1'): UserModel => ({
@@ -53,6 +56,9 @@ const makeStoreUser = (featureIds: number[], storeId = 's1'): UserModel => ({
   isOwnerAdmin: false,
   isReSeller: false,
   selectedStoreId: storeId,
+  paymentDueDate: null,
+  isInTrial: false,
+  paymentStatus: 'NoAplica',
 });
 
 function renderSidebar(user: UserModel, isOpen = true, onClose = () => {}) {

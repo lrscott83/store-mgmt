@@ -64,6 +64,26 @@ describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {
     const result = await storeHttpService.getStore('s1');
     expect(result.data.name).toBe('Store One');
   });
+
+  it('passes paymentStartDate through unchanged when it is an ISO string', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { data: { id: 's1', name: 'Store One', paymentStartDate: '2026-03-10' } },
+    });
+    const result = await storeHttpService.getStore('s1');
+    expect(result.data.paymentStartDate).toBe('2026-03-10');
+  });
+
+  it('passes paymentStartDate through unchanged when it is null', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { data: { id: 's1', name: 'Store One', paymentStartDate: null } },
+    });
+    const result = await storeHttpService.getStore('s1');
+    expect(result.data.paymentStartDate).toBeNull();
+  });
 });
 
 describe('storeHttpService.createStore — HTTP-4: POST /v1/stores', () => {

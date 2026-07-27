@@ -18,6 +18,8 @@ export interface StoreModuleFeatures {
   featureIds: number[];
 }
 
+export type PaymentStatus = 'NoAplica' | 'AlDia' | 'PorVencer' | 'EnGracia' | 'Vencido';
+
 export interface UserModel extends AuthModel {
   id: string;
   fullName: string;
@@ -32,6 +34,9 @@ export interface UserModel extends AuthModel {
   isOwnerAdmin: boolean;
   isReSeller: boolean;
   selectedStoreId: string;
+  paymentDueDate: string | null;
+  isInTrial: boolean;
+  paymentStatus: PaymentStatus;
 }
 
 export interface LoginRequest {
