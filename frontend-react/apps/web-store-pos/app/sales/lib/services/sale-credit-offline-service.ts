@@ -2,21 +2,10 @@ import type { BaseResponseModel, SaleCredit } from '@store-mgmt/domain';
 import { DataResult, PaymentType, Result, SaleCreditErrors, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
+import { startOfDay, addDays } from '~/shared/lib/date-utils';
 
 function generateId(): string {
   return crypto.randomUUID();
-}
-
-function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
 }
 
 /**
