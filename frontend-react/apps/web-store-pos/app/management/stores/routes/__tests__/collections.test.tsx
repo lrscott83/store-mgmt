@@ -67,13 +67,38 @@ describe('CollectionsPage — exports', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('CollectionsPage — route gating wiring', () => {
-  it('builds clientLoader via resellerFeatureLoader([EFeatures.Owners])', async () => {
-    // Module cache: re-imports of '../collections' by earlier tests in this file
-    // do not re-execute its top-level code, so resellerFeatureLoader() would show
-    // 0 calls without a fresh module instance.
+  it('builds clientLoader via resellerFeatureLoader([EFeatures.Owners]), verified against a genuinely fresh module instance', async () => {
+    // Baseline: earlier "exports" tests in this file already imported and
+    // cached '../collections'. This import returns that SAME cached instance
+    // (no top-level re-execution).
+    const before = await import('../collections');
+
+    // Module cache: re-imports of '../collections' do not re-execute its
+    // top-level code, so resellerFeatureLoader() would show 0 calls without
+    // a fresh module instance.
     vi.resetModules();
-    await import('../collections');
+    const after = await import('../collections');
+
+    // Prove vi.resetModules() genuinely produced a NEW module instance. This
+    // is checked BEFORE anything else and does not depend on mock call-count
+    // bookkeeping: if resetModules silently no-ops (removed, misplaced, or
+    // otherwise disturbed), `after` is the exact same object as `before` and
+    // this fails loudly on its own — even if a stale call to
+    // mockResellerFeatureLoader from the earlier "exports" import would
+    // otherwise make a call-count-only assertion pass by coincidence.
+    expect(after).not.toBe(before);
+
+    // Fail loudly — never silently pass — if the loader was never actually
+    // invoked as part of THIS fresh import: assert "was it called" before
+    // "was it called with what".
+    expect(mockResellerFeatureLoader).toHaveBeenCalled();
     expect(mockResellerFeatureLoader).toHaveBeenCalledWith([11]);
+
+    // Tie the fresh export directly to the loader instance the POST-RESET
+    // call produced — not merely "some function is exported" and "the mock
+    // was called with [11] at some point in this file's run".
+    const lastCallResult = mockResellerFeatureLoader.mock.results.at(-1)?.value;
+    expect(after.clientLoader).toBe(lastCallResult);
   });
 });
 
