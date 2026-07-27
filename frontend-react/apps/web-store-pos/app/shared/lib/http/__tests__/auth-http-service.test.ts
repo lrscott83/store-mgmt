@@ -126,3 +126,57 @@ describe('authHttpService.register — POST /v1/auth/register (registerOwner par
     expect(typeof result.data).toBe('boolean');
   });
 });
+
+describe('authHttpService.getMe — GET /v1/auth/me (billing fields passthrough)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('carries paymentDueDate/isInTrial/paymentStatus through unchanged', async () => {
+    const { authHttpService } = await import('../auth-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        data: {
+          id: 'user-1',
+          login: 'janedoe',
+          paymentDueDate: '2026-08-15',
+          isInTrial: true,
+          paymentStatus: 'PorVencer',
+        },
+      },
+    });
+
+    const result = await authHttpService.getMe();
+
+    expect(result).toMatchObject({
+      paymentDueDate: '2026-08-15',
+      isInTrial: true,
+      paymentStatus: 'PorVencer',
+    });
+  });
+
+  it('carries a null paymentDueDate and a different paymentStatus through unchanged (triangulation)', async () => {
+    const { authHttpService } = await import('../auth-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        data: {
+          id: 'user-2',
+          login: 'johndoe',
+          paymentDueDate: null,
+          isInTrial: false,
+          paymentStatus: 'AlDia',
+        },
+      },
+    });
+
+    const result = await authHttpService.getMe();
+
+    expect(result).toMatchObject({
+      paymentDueDate: null,
+      isInTrial: false,
+      paymentStatus: 'AlDia',
+    });
+  });
+});

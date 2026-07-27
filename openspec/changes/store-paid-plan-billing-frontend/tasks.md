@@ -43,9 +43,9 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 2 (WU-B): getMe Transport (type-only, parallel with 3/4)
 
-- [ ] 2.1 RED in `frontend-react/apps/web-store-pos/app/shared/lib/http/__tests__/auth-http-service.test.ts`: mock `apiClient.get` → `{ data: { data: { paymentDueDate, isInTrial, paymentStatus, ... } } }`; assert `getMe()` returns the 3 fields unchanged. *(Req: auth/Fields present in response; DG-1, DG-2)*
-- [ ] 2.2 GREEN: no source change needed (`auth-http-service.ts` body stays a raw passthrough) — confirms DG-1/DG-2 by construction.
-- [ ] 2.3 Verify: `pnpm test -- auth-http-service`.
+- [x] 2.1 RED in `frontend-react/apps/web-store-pos/app/shared/lib/http/__tests__/auth-http-service.test.ts`: mock `apiClient.get` → `{ data: { data: { paymentDueDate, isInTrial, paymentStatus, ... } } }`; assert `getMe()` returns the 3 fields unchanged. *(Req: auth/Fields present in response; DG-1, DG-2)*
+- [x] 2.2 GREEN: no source change needed (`auth-http-service.ts` body stays a raw passthrough) — confirms DG-1/DG-2 by construction.
+- [x] 2.3 Verify: `pnpm test -- auth-http-service`.
 
 ## Phase 3 (WU-C): PaymentBanner (parallel with 2/4)
 
