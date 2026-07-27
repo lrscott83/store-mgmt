@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- **The existing online auth endpoints are UNTOUCHED.** `POST /login`, `/me`, the 35-day session — none of them change in any way. This plan only ADDS an export endpoint. The device decides its authentication mode client-side by asking whether the roster file was imported (see `2026-07-25-offline-auth-frontend-plan.md` §"Authentication mode"): file present → offline auth against the file; file absent → the online endpoints exactly as they behave today. A device that never calls this export must be indistinguishable from today's behavior, and the backend must keep serving it normally forever — there is no server-side flag, migration or opt-in that could break it.
 - **Target framework:** `net8.0` (all csproj). Use `Rfc2898DeriveBytes.Pbkdf2(...)` (static, .NET 8+).
 - **Verifier algorithm (MUST match the frontend byte-for-byte):** PBKDF2-HMAC-**SHA256**; **iterations = 210000**; **salt = 16 random bytes, Base64**; **derived key length = 32 bytes, Base64**; **PBKDF2 password input = the UTF-8 bytes of the stored `Base64(SHA256(utf8(password)))` string** (i.e. the value already in `User.Password`).
 - **Bundle metadata:** `bundleId` = new GUID (string) per export; `issuedAt`/`expiresAt` = **Unix epoch milliseconds** (Int64); `expiresAt = issuedAt + 35 days`; `formatVersion = 1`.

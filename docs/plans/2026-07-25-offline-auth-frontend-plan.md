@@ -2,6 +2,29 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Authentication mode — READ THIS FIRST
+
+**The presence of the imported roster file decides how the device authenticates. Nothing else does.** This check happens BEFORE any credential is evaluated:
+
+```
+isRosterProvisioned()  →  OFFLINE authentication, against the roster file
+                          (regardless of whether there is internet)
+
+otherwise              →  ONLINE authentication, EXACTLY as it works today:
+                          POST /login, 35-day session, /me hydration,
+                          the existing AUTH.OFFLINE_LOGIN banner when there is
+                          no connectivity, no unlock gate, no idle lock
+```
+
+Consequences that every task below MUST respect:
+
+1. **This is a mode switch, not a fallback.** A provisioned device with perfect internet still authenticates offline. Do not branch on `ConnectivityService.isOnline()` to pick the mode — connectivity only matters *inside* the online branch, where it already does today.
+2. **A device that never imported the file is untouched.** Not "mostly untouched" — byte-for-byte the current behavior. The feature is purely additive; if a user never provisions, they must be unable to tell this plan was ever implemented.
+3. **An EXPIRED bundle is not a provisioned device.** `isRosterProvisioned()` is false once `expiresAt` passes, so the device falls back to online auth instead of locking the user out. (The at-rest encryption layer deliberately uses a *different*, expiry-independent predicate — see that plan; data already written as ciphertext stays ciphertext no matter what the bundle's clock says.)
+4. **A user who is not in the roster cannot log in on a provisioned device.** That is not an edge case to work around — offline auth rejects them exactly like a wrong password (`AUTH.INVALID_CREDENTIALS`). Remedy is operational: re-export the roster and re-import it.
+
+The at-rest encryption plan builds directly on this rule — see its §"Authentication mode decides everything".
+
 **Goal:** Let a device authenticate store users **offline** by (1) an admin exporting an encrypted roster bundle, (2) provisioning a device by importing it with the master password, and (3) logging in offline: the typed password is verified against a per-user PBKDF2 verifier, then the same `UserModel` an online login produces is hydrated so existing loaders/guards work unchanged. Two timers: 1h inactivity locks the user; 35 days expires the bundle.
 
 **Architecture:** New modules under `app/shared/lib/offline/` (crypto, bundle serializer, roster storage + anti-replay, offline-auth service, idle timer). The auth store gains a `loginOffline` action that hydrates via the existing `setUser` seam. `login.tsx` gets an offline branch (currently it only warns). A `auth/provision` route imports bundles; the existing `management/users` list gets an "Export offline roster" action that calls the new backend endpoint and downloads the encrypted file.
@@ -713,15 +736,27 @@ git commit -m "feat(offline): add loginOffline action hydrating via setUser"
 - Test: `app/auth/routes/__tests__/login.offline.test.tsx`
 
 **Interfaces:**
-- Consumes: `useAuthStore().loginOffline` (Task 5), `ConnectivityService.isOnline` (existing), `getRoster` (Task 3).
+- Consumes: `useAuthStore().loginOffline` (Task 5), `isRosterProvisioned` (Task 3), `ConnectivityService.isOnline` (existing).
+
+> **THE AUTHENTICATION MODE IS DECIDED BY THE FILE, NOT BY CONNECTIVITY.** See "Authentication mode" at the top of this plan. The first thing `handleSubmit` asks is *"does this device have a valid roster?"* — if yes, offline auth, whether or not there is internet. If no, the function must behave EXACTLY as it does today, connectivity check included.
 
 - [ ] **Step 1: Write the failing test**
 
 ```tsx
-// Render <Login/> with ConnectivityService.isOnline mocked to false and a roster
-// provisioned in localStorage. Type login+password, submit, assert:
-//  - loginOffline was called (spy on useAuthStore.getState().loginOffline) and
-//  - navigate was called with the resolved home path.
+// Suite A — PROVISIONED device (valid roster in localStorage):
+//  A1. isOnline = false → submit → loginOffline called, navigate(home).
+//  A2. isOnline = TRUE  → submit → loginOffline called ANYWAY; the online
+//      `login` action is NEVER called (spy on it and assert not.toHaveBeenCalled).
+//      This is the test that pins "the file decides, not the network".
+//  A3. wrong password → setErrors({ form: AUTH.INVALID_CREDENTIALS }), no navigate.
+//
+// Suite B — UNPROVISIONED device (localStorage cleared). These assert TODAY's
+// behavior is byte-for-byte intact:
+//  B1. isOnline = true  → submit → the online `login` action is called;
+//      loginOffline is NEVER called.
+//  B2. isOnline = false → submit → the AUTH.OFFLINE_LOGIN banner renders and
+//      neither login nor loginOffline is called (the existing early return).
+//
 // Mirror app/auth/routes/__tests__/login.test.tsx setup (react-router test render,
 // vi.mock for ConnectivityService and resolveUserHomePath).
 ```
@@ -735,24 +770,47 @@ Expected: FAIL — offline submit currently only sets an `isOffline` flag (login
 
 VERIFIED against `login.tsx` (206 lines): the offline early-return is **lines 65-68** (`if (!ConnectivityService.isOnline()) { setIsOffline(true); return; }`). The component uses `form.email`/`form.password` state (not bare vars), the error setter is **`setErrors({ form: ... })`** (there is NO `setError`), messages come from `intl.formatMessage({ id })`, and the online success path wraps in `setIsSubmitting(true)` (line 71) + calls `armTracking()`, `preloadHeavyChunks()`, `navigate(await resolveUserHomePath(user))` (lines 77-81). Mirror that exactly:
 
+Replace the `if (!ConnectivityService.isOnline()) { setIsOffline(true); return; }` early return (lines 65-68) with the **mode fork**. Note the order: the roster question comes FIRST, and the connectivity check survives untouched inside the unprovisioned branch.
+
 ```ts
-if (!ConnectivityService.isOnline()) {
-  const { getRoster } = await import('~/shared/lib/offline/roster-store');
-  if (!getRoster()) {
-    setIsOffline(true); // no roster provisioned on this device — keep the existing banner
-    return;
-  }
-  try {
-    setIsSubmitting(true);
-    const user = await useAuthStore.getState().loginOffline(form.email, form.password);
-    armTracking();
-    preloadHeavyChunks();
-    navigate(await resolveUserHomePath(user));
-  } catch (err) {
-    setIsSubmitting(false);
-    setErrors({ form: intl.formatMessage({ id: offlineErrorMessageId(err) }) });
-  }
-  return;
+    // ---- AUTHENTICATION MODE FORK (see "Authentication mode" at the top) ----
+    // Provisioned device => offline auth against the roster file, online or not.
+    // Unprovisioned device => everything below is exactly what shipped before.
+    const { isRosterProvisioned } = await import('~/shared/lib/offline/roster-store');
+    if (isRosterProvisioned()) {
+      try {
+        setIsSubmitting(true);
+        const user = await useAuthStore.getState().loginOffline(form.email, form.password);
+        armTracking();
+        preloadHeavyChunks();
+        navigate(await resolveUserHomePath(user));
+      } catch (err) {
+        setIsSubmitting(false);
+        setErrors({ form: intl.formatMessage({ id: offlineErrorMessageId(err) }) });
+      }
+      return;
+    }
+
+    // ---- UNPROVISIONED: original behavior, unchanged ----
+    if (!ConnectivityService.isOnline()) {
+      setIsOffline(true);
+      return;
+    }
+```
+
+Everything after this point (the `try { setIsSubmitting(true); const user = await login(...) ... }` block and its `catch`) stays **exactly as it is today**. Do not restructure it.
+
+`isRosterProvisioned()` is added to `roster-store.ts` in Task 3 alongside `getRoster`:
+
+```ts
+/**
+ * True when this device has a USABLE roster: present, well-formed and not past
+ * expiresAt. Decides the authentication mode (offline vs online) before any
+ * credential is checked. An EXPIRED bundle returns false, so the device falls
+ * back to online auth instead of locking the user out.
+ */
+export function isRosterProvisioned(): boolean {
+  return getRoster() !== null;
 }
 ```
 
@@ -1041,6 +1099,9 @@ Record results in the PR description:
 4. Wrong password offline → same error surface as online invalid login.
 5. Re-import the SAME file → `ReplayBundleError` message.
 6. Leave idle 1h (or set `timeoutMs` low temporarily) → redirected to `/login`; roster still present; re-login with password only.
+7. **Unprovisioned-device regression pass — NO roster imported** (this is the default state of every device): online login works exactly as before; going offline shows the existing `AUTH.OFFLINE_LOGIN` banner and nothing else changes; no idle lock arms (the 1h timer is gated on the `offline-session` sentinel token); no new screen or gate appears anywhere. Offline auth is ADDITIVE — a device that never imports a bundle must be indistinguishable from today's build.
+8. **Mode-switch pass — provisioned device WITH internet**: import the bundle, stay online, log in → the login goes through the roster (offline path), NOT through `POST /login`. Confirm in the Network tab that no login request leaves the device. This is the rule "the file decides, not the network".
+9. **Expiry pass**: let the bundle pass `expiresAt` (or edit it) → the device falls back to online auth and the user can log in normally with internet; it does not lock them out.
 
 - [ ] **Step 3: Commit any doc/checklist file**
 

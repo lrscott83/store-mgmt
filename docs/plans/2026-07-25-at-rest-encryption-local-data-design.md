@@ -135,11 +135,61 @@ needsUnlock(user) = getDek() === null AND the local roster has a formatVersion >
 
 The second condition is essential: gating on `getDek() === null` **alone would deadlock** any store that has no encrypted roster yet (legacy or not-yet-provisioned) — the gate would show login, but login could never produce a DEK (nothing to unwrap), looping forever. Requiring a `formatVersion >= 2` roster entry means the gate only engages once encryption is actually provisioned, and non-provisioned stores keep working unchanged until their first encrypted roster arrives.
 
+`guestOnlyLoader` must use the **same** predicate inverted (`!needsUnlock(user)`) to decide whether to bounce an already-authenticated visitor away from `/login`. Gating that bounce on `getDek() !== null` instead would strand an online-auth-only user on the login screen forever, since their DEK is null by design.
+
+### 5.4.1 The roster file decides the mode — before any credential is checked
+
+**Requirement (2026-07-27, user directive).** The app must work in both worlds, and which world it is in is decided by **one question asked before authentication begins**: *does this device have the roster file imported?*
+
+```
+roster file imported      →  OFFLINE authentication against that file
+                             (regardless of connectivity)
+                          →  DEK unwrapped at every login
+                          →  business entities ENCRYPTED at rest
+
+no roster file imported   →  ONLINE authentication, EXACTLY as today:
+                             POST /login, 35-day session, /me hydration
+                          →  no DEK
+                          →  localStorage PLAINTEXT, as today
+```
+
+This is a **mode switch, not a fallback**. A provisioned device with perfect internet still authenticates against the file. Connectivity is not what selects the mode — it only matters inside the online branch, where it already does today (the `AUTH.OFFLINE_LOGIN` banner).
+
+The unprovisioned case is not a degraded path to be tolerated: it is the default state of every device today and after every fresh install, and it must stay byte-for-byte what shipped before this feature.
+
+**Why this ordering matters for encryption:** because the file decides *before* credentials are evaluated, a provisioned device unwraps the DEK on every single login. The broken intermediate state — *authenticated, store data already ciphertext, no DEK in memory* — cannot be reached through the normal flow. The `MissingDataKeyError` paths are defense-in-depth, not routine branches. And a user who is not in the roster simply cannot log in on that device: offline auth rejects them like a wrong password. Ordinary behavior, no special handling.
+
+Two predicates implement this, and they are **deliberately not the same**:
+
+```
+isRosterProvisioned()     = a VALID (non-expired) bundle exists
+                            → decides the AUTHENTICATION MODE
+
+isEncryptionProvisioned() = a bundle exists IGNORING expiresAt
+                            AND formatVersion >= 2
+                            AND at least one entry carries a wrappedDek
+                            → decides whether DATA ON DISK IS CIPHERTEXT
+```
+
+Bundle expiry is a session concern; it says nothing about the bytes already written to `localStorage`. If encryption honored the expiry gate, the day a bundle expired the app would conclude "plaintext mode" and overwrite ciphertext with plaintext — destroying the data. So an expired bundle means *"authenticate online again"*, never *"your data is plaintext"*; the DEK unwrap and `needsUnlock` both read the roster raw, so an online login after expiry still restores the key.
+
+| | Plaintext mode (`false`) | Encrypted mode (`true`) |
+|---|---|---|
+| Login | online only, unchanged | online or offline, both unwrap the DEK |
+| Writes | plaintext, as today | `enc:v1:` ciphertext |
+| Reads | passthrough | decrypt |
+| Unlock gate | inactive | active |
+| Missing DEK | not an error | `MissingDataKeyError` |
+
+Deriving the flag from memory instead of `localStorage` is **wrong**: after a cold boot the flag would read `false` on a provisioned device and the next write would silently overwrite ciphertext with plaintext.
+
+Corollary for §5.5: `encryptEntity` must NOT throw merely because the DEK is absent. It throws only when the DEK is absent **and** `isEncryptionProvisioned()` is true — a state the unlock gate should already have prevented.
+
 ### 5.5 Entity-crypto helper and the twelve seams
 
 New `app/shared/lib/storage/entity-crypto.ts`:
 
-- `encryptEntity(plaintext: string): string` — `iv = randomBytes(12)`, `ct = aesGcmEncrypt(dek, iv, utf8(plaintext))`, returns a marked envelope string `enc:v1:` + Base64(iv ‖ ct ‖ tag). Synchronous (noble). Throws if no DEK in memory.
+- `encryptEntity(plaintext: string): string` — `iv = randomBytes(12)`, `ct = aesGcmEncrypt(dek, iv, utf8(plaintext))`, returns a marked envelope string `enc:v1:` + Base64(iv ‖ ct ‖ tag). Synchronous (noble). With no DEK in memory: returns the plaintext untouched when `isEncryptionProvisioned()` is false (§5.4.1 plaintext mode), throws `MissingDataKeyError` when it is true.
 - `decryptEntity(stored: string): string` — if the value carries the `enc:v1:` marker, decrypt and return the plaintext JSON; if it does **not** carry the marker, return it unchanged (legacy plaintext — see §5.6 migration).
 - `isEncrypted(stored): boolean` — marker check.
 

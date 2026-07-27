@@ -10,6 +10,7 @@
 
 ## Global Constraints
 
+- **Encryption rides on the roster file; the backend never switches it on.** The device is in the encrypted world only if it imported a `formatVersion: 2` bundle — and in that case it also authenticates offline against that file (see `2026-07-25-offline-auth-frontend-plan.md` §"Authentication mode"). A device that never imports one authenticates online exactly as today and stores plaintext. Consequently: no DB column, no EF migration, no per-store flag, and **no change whatsoever to `POST /login`, `/me` or the 35-day session**. The wrap material below is additive payload on an export that only provisioned devices ever request.
 - **Depends on the offline-auth backend being implemented first** (`docs/plans/2026-07-25-offline-auth-backend-plan.md`). This plan MODIFIES files that plan creates: `OfflineRosterUserDto`, `OfflineRosterDto`, `ExportOfflineRosterQueryHandler`, its handler test, `SMCA.WebApi.E2ETests/.../ExportOfflineRosterTests.cs`, and `SMCA.WebApi.E2ETests/Infrastructure/TestDtos.cs`. Do NOT start until those exist.
 - **Strict TDD:** every task is failing test → run (FAIL) → minimal impl → run (PASS) → commit.
 - **Per-user wrap fields** added to `OfflineRosterUserDto`: `string WrappedDek`, `string WrapSalt`, `string WrapIv` (all Base64). Default camelCase serialization → `wrappedDek`, `wrapSalt`, `wrapIv`.

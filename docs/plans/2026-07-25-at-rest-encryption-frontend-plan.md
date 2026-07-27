@@ -6,6 +6,25 @@
 
 **Architecture:** A synchronous AES-GCM entity codec (`@noble/ciphers`) wraps every stored string with an `enc:v1:` envelope; the twelve persistence seams stay synchronous by transforming only the stored string, never the parsed object (Map/date revival is untouched). The DEK lives in an in-memory singleton (`data-key-store`), never persisted; it is produced by `unwrapDek` (async `crypto.subtle`) at online/offline login from the roster's per-user `wrappedDek`/`wrapSalt`/`wrapIv`. The login screen doubles as the unlock gate: a valid session with no DEK is routed back to login. A one-time migration pass upgrades legacy plaintext keys in place.
 
+## Authentication mode decides everything — READ THIS FIRST
+
+This plan sits on top of the mode rule defined in `2026-07-25-offline-auth-frontend-plan.md` §"Authentication mode". Restated, because every task below depends on it:
+
+```
+roster file imported      →  OFFLINE authentication against that file
+                             →  the DEK is unwrapped at every login
+                             →  the six business entities are ENCRYPTED at rest
+
+no roster file imported   →  ONLINE authentication, EXACTLY as today
+                             (POST /login, 35-day session, /me hydration)
+                             →  no DEK, ever
+                             →  localStorage stays PLAINTEXT, as today
+```
+
+**Encryption is not a separate switch the user can get half-way into.** It rides on the file. Import the file and you are in the encrypted world; don't import it and the app is byte-for-byte what shipped before this plan — no unlock gate, no idle lock, no ciphertext, no new error can ever surface.
+
+Because the mode is decided by the file *before* any credential is checked, the broken intermediate state "authenticated but no DEK on a store whose data is ciphertext" cannot occur through the normal flow. The `MissingDataKeyError` paths below are defense-in-depth, not a routine branch.
+
 **Tech Stack:** React, TypeScript, Zustand, Vitest+jsdom, @noble/ciphers (sync AES-GCM), Web Crypto (crypto.subtle) for the one-time DEK unwrap, @zip.js/zip.js (existing).
 
 ## Global Constraints
@@ -17,7 +36,16 @@
 - **Pinned names (identical everywhere):** `setDek` / `getDek` / `clearDek`; `encryptEntity` / `decryptEntity` / `isEncrypted`; `unwrapDek`; `migrateEntitiesToEncrypted`; errors `MissingDataKeyError`, `DekUnwrapError`.
 - **Roster fields consumed (camelCase JSON):** `wrappedDek: string`, `wrapSalt: string`, `wrapIv: string`, added to `OfflineRosterUser`; encryption requires `formatVersion >= 2`.
 - **Do NOT make the twelve seams async.** Entity encrypt/decrypt is synchronous (noble). Only `unwrapDek` is async (`crypto.subtle`), and it runs only in the async login flow.
-- **`localStorage` stays ALWAYS ciphertext** for the six business keys once a DEK exists: encrypt on every write, decrypt on every read.
+- **TWO PREDICATES, deliberately different, both in `roster-store`:**
+  - `isRosterProvisioned()` (offline-auth plan, Task 3) — a **valid, non-expired** bundle exists. Decides the **authentication mode**. An expired bundle → false → the device falls back to online auth rather than locking the user out.
+  - `isEncryptionProvisioned()` (Task 3 Step 0 here) — a bundle exists **ignoring `expiresAt`**, with `formatVersion >= 2` and at least one entry carrying a `wrappedDek`. Decides whether **data on disk is ciphertext**.
+  - **They must NOT be collapsed into one.** Bundle expiry is an auth-session concern; it says nothing about the bytes already written to `localStorage`. If encryption followed the expiry gate, the day a bundle expired the app would decide "plaintext mode" and overwrite ciphertext with plaintext, destroying the data.
+  - Corollary: `findRosterUser` — as consumed by the DEK unwrap (T4) and by `needsUnlock` (T12) — must read the bundle **raw**, expiry-independent, for exactly the same reason. Expired bundle + online login must still restore the DEK.
+- **TWO MODES, decided by that predicate.**
+  - **Plaintext mode** (`false` — no roster imported, or a `formatVersion 1` roster): the app behaves exactly as before this plan. Writes store plaintext, reads pass through, `authLoader`/`featureGate` do NOT gate, `guestOnlyLoader` bounces an authenticated user to home as it does today, and online login never touches DEK code. **This is the default and it MUST keep working — it is the online-auth-only device.**
+  - **Encrypted mode** (`true`): everything in this plan applies — encrypt on every write, decrypt on every read, unlock gate active, `MissingDataKeyError` when the DEK is absent.
+  - The predicate is derived from `localStorage`, NOT from an in-memory flag, so it survives a reload. An in-memory flag would read `false` after a cold boot and silently downgrade a provisioned store to plaintext writes.
+- **`localStorage` stays ALWAYS ciphertext** for the six business keys **in encrypted mode**: encrypt on every write, decrypt on every read. In plaintext mode nothing is encrypted and no error is ever raised.
 - **Preserve every existing fallback** (`|| '{}'`, `|| '[]'`, `!== '{}'`, nullable, truthy guards): decrypt FIRST, THEN apply the existing fallback.
 - **Raw `getXJson` getters return DECRYPTED plaintext JSON** so the sync export keeps producing plaintext-inside-an-encrypted-zip.
 - **Strict TDD:** failing test → run (FAIL) → minimal impl → run (PASS) → commit. Do NOT run `npm run build`. Do NOT run git.
@@ -31,7 +59,8 @@
 |---|---|---|
 | `package.json` | Modified | Add `@noble/ciphers` dependency (sync AES-GCM). |
 | `app/shared/lib/offline/data-key-store.ts` | Created | In-memory DEK singleton: `setDek` / `getDek` / `clearDek`. Never persisted. |
-| `app/shared/lib/storage/entity-crypto.ts` | Created | `encryptEntity` / `decryptEntity` / `isEncrypted` + `MissingDataKeyError`; the `enc:v1:` envelope codec. |
+| `app/shared/lib/storage/entity-crypto.ts` | Created | `encryptEntity` / `decryptEntity` / `isEncrypted` + `MissingDataKeyError`; the `enc:v1:` envelope codec. Passes plaintext through untouched in plaintext mode. |
+| `app/shared/lib/offline/roster-store.ts` | Modified | Add `isEncryptionProvisioned(): boolean` — the single mode predicate consumed by the codec and the loaders. |
 | `app/shared/lib/offline/offline-crypto.ts` | Modified | Add async `unwrapDek(password, { wrappedDek, wrapSalt, wrapIv })` + `DekUnwrapError`. |
 | `app/shared/lib/offline/roster-types.ts` | Modified | Add `wrappedDek` / `wrapSalt` / `wrapIv` to `OfflineRosterUser`. |
 | `app/shared/lib/offline/entity-migration.ts` | Created | `migrateEntitiesToEncrypted(storeId)` — one-time, idempotent plaintext→ciphertext pass over the six keys. |
@@ -43,7 +72,7 @@
 | `app/sales/lib/services/sale-credit-offline-service.ts` | Modified | Encrypt in `setSaleCreditsLocalStorage`; decrypt in `getSaleCreditsFromLocalStorage`. |
 | `app/shared/lib/stores/auth-store.ts` | Modified | Unwrap+setDek+migrate in `login`; `clearDek()` in `logout`. |
 | `app/shared/lib/offline/offline-auth-service.ts` *(or `loginOffline`)* | Modified | Unwrap+setDek+migrate in the offline login path. |
-| `app/auth/routes/loaders.ts` | Modified | Unlock gate: valid session + `getDek()===null` (encryption provisioned) → redirect to `/login` without logout; `guestOnlyLoader` renders login while DEK absent. |
+| `app/auth/routes/loaders.ts` | Modified | Unlock gate: valid session + `needsUnlock(user)` → redirect to `/login` without logout; `guestOnlyLoader` renders login only while an unlock is actually pending. Both are no-ops in plaintext mode. |
 | `app/auth/routes/login.tsx` | Modified | Map `DekUnwrapError` to the wrong-password message on both branches. |
 
 ---
@@ -178,13 +207,45 @@ git commit -m "feat(web-store-pos): add in-memory DEK store"
 - Create: `app/shared/lib/storage/entity-crypto.ts`
 - Test: `app/shared/lib/storage/__tests__/entity-crypto.test.ts`
 
+**Files:**
+- Modify: `app/shared/lib/offline/roster-store.ts` (add `isEncryptionProvisioned`)
+- Test: `app/shared/lib/offline/__tests__/roster-store.test.ts` (extend the offline-auth suite)
+
 **Interfaces:**
-- Consumes: `getDek` (Task 2), `@noble/ciphers` `gcm`.
+- Consumes: `getDek` (Task 2), `isEncryptionProvisioned` (Step 0), `@noble/ciphers` `gcm`.
 - Produces:
   - `encryptEntity(plaintext: string): string`
   - `decryptEntity(stored: string): string`
   - `isEncrypted(stored: string): boolean`
   - `class MissingDataKeyError extends Error`
+  - `isEncryptionProvisioned(): boolean` (in `roster-store`)
+
+- [ ] **Step 0: Add the mode predicate to `roster-store`**
+
+Read the persisted bundle **without** the expiry/validity gate `getRoster()` applies — an expired bundle still means "this device stores ciphertext", and reporting plaintext mode there would corrupt the stored data on the next write. Add to `app/shared/lib/offline/roster-store.ts`:
+
+```ts
+/**
+ * True when this device has been provisioned for at-rest encryption: a roster
+ * bundle exists with formatVersion >= 2 and per-user wrap material. Derived from
+ * localStorage (NOT an in-memory flag) so it survives a reload — a cold boot must
+ * never conclude "plaintext mode" for a store whose data is already ciphertext.
+ * False on a device that only ever used online auth: the whole encryption layer
+ * then behaves as a no-op passthrough.
+ */
+export function isEncryptionProvisioned(): boolean {
+  const bundle = readStoredBundle();
+  return (
+    !!bundle &&
+    bundle.formatVersion >= 2 &&
+    bundle.users.some((u) => !!u.wrappedDek)
+  );
+}
+```
+
+Tests to add (RED first): returns `false` with no roster in `localStorage`; `false` for a `formatVersion: 1` bundle; `false` for a v2 bundle whose users carry no `wrappedDek`; `true` for a v2 bundle with wrap material; `true` for an EXPIRED v2 bundle (expiry must not flip the mode).
+
+> `readStoredBundle()` is the raw parse helper from the offline-auth plan's Task 3. If that plan named it differently, reuse whatever `getRoster()` calls before applying its `expiresAt` check — do NOT call `getRoster()` itself.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -237,7 +298,8 @@ describe('entity-crypto', () => {
     expect(() => decryptEntity(tampered)).toThrow();
   });
 
-  it('throws MissingDataKeyError when no DEK is set (encrypt)', () => {
+  it('throws MissingDataKeyError when the device IS provisioned but has no DEK (encrypt)', () => {
+    provisionEncryptedRoster();
     clearDek();
     expect(() => encryptEntity('x')).toThrow(MissingDataKeyError);
   });
@@ -247,8 +309,26 @@ describe('entity-crypto', () => {
     clearDek();
     expect(() => decryptEntity(stored)).toThrow(MissingDataKeyError);
   });
+
+  // --- Plaintext mode: device that never imported a roster (online-auth only) ---
+
+  it('writes plaintext unchanged when encryption is NOT provisioned', () => {
+    localStorage.clear(); // no roster bundle at all
+    clearDek();
+    expect(encryptEntity('[]')).toBe('[]');
+    expect(isEncrypted(encryptEntity('[]'))).toBe(false);
+  });
+
+  it('round-trips through the seams in plaintext mode without throwing', () => {
+    localStorage.clear();
+    clearDek();
+    const json = JSON.stringify([['p1', { id: 'p1' }]]);
+    expect(decryptEntity(encryptEntity(json))).toBe(json);
+  });
 });
 ```
+
+> `provisionEncryptedRoster()` is the same helper Task 12 uses: writes a `formatVersion: 2` bundle with a `wrappedDek` entry straight into `localStorage` under the roster key. Hoist it into a shared test helper (`app/shared/lib/offline/__tests__/roster-fixtures.ts`) and import it from both suites instead of duplicating it.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -261,6 +341,7 @@ Expected: FAIL — module not found.
 // app/shared/lib/storage/entity-crypto.ts
 import { gcm } from '@noble/ciphers/aes';
 import { getDek } from '~/shared/lib/offline/data-key-store';
+import { isEncryptionProvisioned } from '~/shared/lib/offline/roster-store';
 
 /**
  * Synchronous per-entity AES-GCM codec. The stored envelope is
@@ -299,7 +380,15 @@ export function isEncrypted(stored: string): boolean {
 
 export function encryptEntity(plaintext: string): string {
   const dek = getDek();
-  if (!dek) throw new MissingDataKeyError();
+  if (!dek) {
+    // Plaintext mode: this device never imported an encrypted roster, so it runs
+    // on online auth alone and stores plaintext exactly as it did before this
+    // feature. Only a PROVISIONED device without a DEK is an error — and the
+    // unlock gate in loaders.ts should have redirected to /login before any
+    // screen could reach a write seam.
+    if (!isEncryptionProvisioned()) return plaintext;
+    throw new MissingDataKeyError();
+  }
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const cipherWithTag = gcm(dek, iv).encrypt(new TextEncoder().encode(plaintext));
   const envelope = new Uint8Array(iv.length + cipherWithTag.length);
@@ -1405,6 +1494,9 @@ In `login`, after `const user = await get().getUserByToken();` and the `if (!use
       // material (formatVersion >= 2). No entry / no wrap fields => encryption not
       // provisioned for this store; skip silently (legacy plaintext mode).
       const { findRosterUser } = await import('../../offline/roster-store');
+      // findRosterUser must read the bundle RAW (expiry-independent) — see Global
+      // Constraints. An expired bundle still describes ciphertext on disk, so an
+      // online login after expiry must still be able to restore the DEK.
       const rosterEntry = findRosterUser(user.login);
       if (rosterEntry && rosterEntry.wrappedDek) {
         const { unwrapDek } = await import('../../offline/offline-crypto');
@@ -1521,6 +1613,18 @@ describe('unlock gate', () => {
     expect(await guestOnlyLoader()).toBeNull();
   });
 
+  it('guestOnlyLoader still bounces to home when encryption is NOT provisioned', async () => {
+    // Online-auth-only device: no roster, DEK null forever. An authenticated user
+    // must NOT be stranded on /login.
+    const res = await guestOnlyLoader();
+    expect((res as Response).status).toBe(302);
+  });
+
+  it('featureGate passes when encryption is NOT provisioned', async () => {
+    useAuthStore.setState({ user: { ...USER, isOwnerAdmin: true }, isAuthenticated: true });
+    expect(await featureLoader([1])({ params: {} } as never)).toBeNull();
+  });
+
   it('guestOnlyLoader redirects to home once the DEK is present', async () => {
     provisionEncryptedRoster();
     setDek(new Uint8Array(32).fill(1));
@@ -1549,6 +1653,8 @@ Add a shared helper (below `denyAccess`):
 // NOT logout here — session + roster stay intact so the re-login can complete offline.
 function needsUnlock(user: UserModel): boolean {
   if (getDek() !== null) return false;
+  // RAW roster read (expiry-independent): an expired bundle still means the six
+  // entity keys hold ciphertext, so the unlock is still required.
   const entry = findRosterUser(user.login);
   return !!(entry && entry.wrappedDek);
 }
@@ -1610,18 +1716,20 @@ export function featureLoader(requiredFeatureIds: number[], storeIdParam?: strin
 }
 ```
 
-Change `guestOnlyLoader` so it only bounces an authenticated user away from `/login` when the DEK is present:
+Change `guestOnlyLoader` so it holds an authenticated user on `/login` **only while an unlock is actually pending** — i.e. gate on `needsUnlock(user)`, NOT on `getDek() !== null`:
 
 ```ts
 export async function guestOnlyLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
-  if (isAuthenticated && user && getDek() !== null) {
+  if (isAuthenticated && user && !needsUnlock(user)) {
     preloadHeavyChunks();
     return redirect(await resolveUserHomePath(user));
   }
   return null;
 }
 ```
+
+> **Do NOT write `getDek() !== null` here.** On a device that never imported a roster the DEK is null forever, so that version would refuse to bounce an authenticated user to home — an online-auth-only user would land on `/login` on every visit and never get out, even though the session is perfectly valid. `needsUnlock` is false in plaintext mode, which restores today's behavior exactly.
 
 > `adminLoader` / `superAdminLoader` / `resellerLoader` guard admin/reseller screens, which do NOT touch the six encrypted entity services, so they are intentionally left ungated to keep the diff minimal. If a future admin screen reads encrypted data, add `needsUnlock` there too.
 
@@ -1679,6 +1787,9 @@ Record in the PR description:
 4. Sync export → produces plaintext-inside-encrypted-zip (unchanged file format), sync import → re-encrypts at rest.
 5. Wrong password on the unlock screen → same error surface as a wrong-password login.
 6. Idle 1h → redirected to `/login`, DEK cleared; re-login restores it.
+7. **Plaintext-mode regression pass — a device that NEVER imported a roster** (clear `localStorage`, reinstall the PWA): online login works; landing on `/login` while already authenticated bounces to home; sell / add a product / register an expense / close a sale-credit all persist without error; `localStorage` holds plaintext (no `enc:v1:` prefix); no unlock redirect; no 1h idle lock. This is the pre-feature behavior and it must be byte-for-byte unchanged.
+8. **Transition pass (the mode switch)** — same device, now import a `formatVersion: 2` roster and log in **while online**: the login must go through the roster (offline path — confirm no `POST /login` in the Network tab), the DEK is set, and the existing plaintext keys migrate to `enc:v1:` in place with no data lost.
+9. **Expired-bundle pass** — provisioned device, push the bundle past `expiresAt`: the device falls back to ONLINE auth (it must not lock the user out), and after that online login the DEK is still restored from the raw roster material, so the ciphertext stays readable. The data must never revert to plaintext.
 
 - [ ] **Step 3: Commit the smoke checklist**
 
@@ -1698,4 +1809,10 @@ git commit -m "docs(web-store-pos): record at-rest encryption smoke checklist"
 - **Storage keys verified against code:** `products`, `product-categories`, `inventory-entries`, `orders`, `expenses`, `saleCredits` (camelCase) — the migration list matches each `getCurrentStorageKey`.
 - **Placeholder scan:** no TODO/TBD; every code step has real TypeScript + real vitest. UI mapping (T12 Step 7) reuses existing message ids and the existing catch structure rather than inventing UX.
 - **Inconsistency resolved during authoring:** the design §5.4 says gate on `getDek() === null` unconditionally, which would DEADLOCK a legitimate session on a store that has no encrypted roster (unwrap can never produce a DEK, so the gate would loop forever). Resolved by gating on `needsUnlock` = `getDek() === null` AND an encrypted roster entry (`wrappedDek` present) exists — faithful to the intent (encryption requires a `formatVersion >= 2` roster per §7) while avoiding the deadlock for non-provisioned stores. Documented in T12 and the Global Constraints.
+- **Two defects found in review and fixed (2026-07-27) — "must also work with online auth and no roster imported":**
+  1. `encryptEntity` threw `MissingDataKeyError` whenever the DEK was absent. On a device that never imported a roster the DEK is null forever, so **every write to the six entity seams would have thrown** — selling, adding products, registering expenses, all broken on an online-only device. Fixed by conditioning the throw on `isEncryptionProvisioned()`; unprovisioned devices get plaintext passthrough (T3).
+  2. `guestOnlyLoader` bounced an authenticated user to home only when `getDek() !== null`, which on an unprovisioned device is never true — the user would have been **stranded on `/login` permanently** with a valid session. Fixed by gating on `!needsUnlock(user)` (T12).
+  Both defects shared one root cause: `getDek() === null` was used as a proxy for "locked", when it actually means "locked OR encryption was never turned on". `isEncryptionProvisioned()` now separates the two, and it is the ONLY predicate either side reads.
+- **Mode rule (user directive, 2026-07-27):** the authentication mode is decided by the presence of the roster file BEFORE any credential is checked — file present → offline auth against it; file absent → online auth exactly as today (35-day session). This is a mode switch, not a fallback, and it is what makes the encryption story closed: on a provisioned device every login goes through the roster, so the DEK is always unwrapped and the state "authenticated with ciphertext on disk but no DEK" never arises. A user who is not in the roster simply cannot log in on that device — offline auth rejects them like a wrong password, which is ordinary behavior, not an edge case to engineer around.
+- **Expiry does not change the encryption mode.** `isRosterProvisioned()` (auth) honors `expiresAt`; `isEncryptionProvisioned()` and `findRosterUser` (encryption) ignore it. An expired bundle means "you must authenticate online again", never "your stored data is plaintext". Collapsing the two predicates would make the app overwrite ciphertext with plaintext the day a bundle expires.
 ```
