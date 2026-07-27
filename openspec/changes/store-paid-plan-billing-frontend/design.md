@@ -1,231 +1,143 @@
 # Design — Store Paid-Plan Billing (Frontend)
 
-Surface the backend paid-plan billing lifecycle in the React `web-store-pos` app: carry
-payment/trial state on `UserModel`, show a trial/due/overdue banner, lock the `PlanPicker`
-after activation, and add super-admin/reseller collections and commission views. All
-presentational — the backend enforces entitlement (`storeModuleIds` is pre-filtered).
+Regenerated from scratch against the corrected sources (commit `176e7e2`) and re-verified
+symbol-by-symbol against `frontend-react/` and `backend/`. **`spec.md` is authoritative**; this
+document only locks HOW.
 
-- **Change:** `store-paid-plan-billing-frontend`
-- **Depends on:** backend plan merged (getMe fields + 3 endpoints). See Risks.
-- **Source of truth:** `docs/superpowers/plans/2026-07-25-store-paid-plan-billing-frontend.md`
-  (file-level plan) + `docs/superpowers/specs/2026-07-25-store-paid-plan-billing-enforcement-design.md`.
-- **This document:** locks architecture + resolves the DECISION GATES the plan implies,
-  verified against the real `frontend-react/` code. **Where plan and code disagree, code wins.**
+- **Change:** `store-paid-plan-billing-frontend` · **App:** `frontend-react/apps/web-store-pos`
+- **Sources:** `docs/superpowers/plans/2026-07-25-store-paid-plan-billing-frontend.md` +
+  `docs/superpowers/specs/2026-07-25-store-paid-plan-billing-enforcement-design.md`
+- **Nature:** NEW feature work. No Angular source exists — this is **not** a parity migration.
 
-## Chosen approach
+## Technical approach
 
-Thin, read-only presentation layer over backend-computed billing state. No client-side
-enforcement, no derived billing math on the client. One unidirectional data flow feeds a
-banner; two new list routes call new `store-http-service` methods. Reuse every existing
-primitive (`useAuthStore`, `adminFeatureLoader`/`resellerFeatureLoader`, `formatCurrency`,
-the `es.ts` flat message map, the `user-list.tsx` page shape).
-
-**Architectural stance:** the client is a *projection* of server state. `paymentStatus` is
-computed on read by the backend; the client only branches on it. This keeps the client
-reversible and correct across trial → due → grace → overdue transitions without any
-client-side clock/date logic beyond formatting the due date.
-
-## Data flow (banner)
+The client is a **read-only projection** of backend-computed billing state. Enforcement is
+backend-side (`storeModuleIds` arrives pre-filtered when `Vencido`); the frontend adds **zero**
+entitlement logic and **zero** billing math — it only branches on `paymentStatus` and formats a
+date. Layering is the app's existing one, untouched:
 
 ```
-GET /v1/auth/me
-  → auth-http-service.getMe()            [map + default the 3 new fields]
-    → auth-store.getUserByToken()/login  [set({ user })]
-      → useAuthStore((s) => s.user)       [PaymentBanner subscribes]
-        → PaymentBanner branches on user.paymentStatus / user.isInTrial
+domain types (packages/domain)
+  └─ http services (raw passthrough, no mapping)
+       ├─ auth-http-service.getMe ──→ auth-store.user ──→ PaymentBanner  (app shell)
+       └─ store-http-service (3 new methods) ──→ collections / reseller-commissions routes
 ```
 
-- **Confirmed:** `auth-store.ts` exposes `user: UserModel | null` on `AuthState`; the banner
-  reads it with `useAuthStore((s) => s.user)`. No store shape change needed.
-- **Confirmed:** `getMe()` result flows through `getUserByToken()` (both cold-boot cache and
-  foreground `/me` paths) and `login()`; whatever `getMe` returns becomes `state.user`.
+Banner flow (verified): `getMe()` → `auth-store.getUserByToken()`/`login()` → `set({ user })` →
+`useAuthStore((s) => s.user)`. `AuthState.user: UserModel | null` already exists — **no store shape
+change**.
 
-## Component & integration map
+## Decision gates (resolved)
 
-| Area | Symbol (real, verified) | File | Action |
-|------|------------------------|------|--------|
-| Domain types | `UserModel`, new `PaymentStatus` | `packages/domain/src/models/auth.ts` | add 3 fields + type |
-| Domain types | `Store.paymentStartDate` | `packages/domain/src/models/store.ts` | `Date` → `Date \| null` |
-| Domain types | `StoreToCollect`, `ReSellerCommission` | `packages/domain/src/models/store.ts` | new interfaces |
-| getMe mapping | `authHttpService.getMe` | `app/shared/lib/http/auth-http-service.ts` | **rewrite pass-through → explicit map** |
-| Banner | `PaymentBanner` (new) | `app/shared/components/payment-banner.tsx` | new component |
-| Shell mount | `AppLayout` | `app/shared/components/app-layout.tsx` | mount between `<Navbar/>` and `<Breadcrumbs/>` |
-| Plan lock | `PlanPicker`, `StoreForm` | `app/management/stores/components/{plan-picker,store-form}.tsx` | add `readOnly` prop + pass gate |
-| Http methods | `storeHttpService` | `app/management/stores/lib/services/store-http-service.ts` | +3 methods |
-| Collections | `CollectionsPage` (new) | `app/management/stores/routes/collections.tsx` | new route |
-| Commissions | `ReSellerCommissionsPage` (new) | `app/management/stores/routes/reseller-commissions.tsx` | new route |
-| Routing | route table | `app/routes.ts` | register 2 routes under `app-layout` |
-| i18n | `esMessages` | `app/shared/lib/i18n/es.ts` | `BILLING.*` keys (neutral LatAm, NO voseo) |
+| # | Gate | Resolution | Rationale |
+|---|---|---|---|
+| DG-1 | `getMe` and the new fields | **Keep the raw passthrough** `return response.data.data` (`auth-http-service.ts:38-41`). Change is **type-only**. | Adding a map would be the project's only mapping layer, contradicting the verified passthrough contract. Backend `CurrentUserDto` always serializes the three fields. |
+| DG-2 | Defaulting for a stale/pre-backend payload | Lives at the **consumer**: `user?.paymentStatus ?? 'NoAplica'` inside `PaymentBanner`. | One guard where it is actually needed; keeps the transport dumb. Rejected: defaulting in `getMe` (see DG-1). |
+| DG-3 | `isInTrial` vs `isTrial` | **`isInTrial`** everywhere. | Corrected plan + backend `StoreBillingUtils.IsInTrial` (to be built by the backend companion plan). The enforcement design spec's `isTrial` is stale. |
+| DG-4 | Route gate for the two new views | **`resellerFeatureLoader([EFeatures.Owners])`** (`loaders.ts:106`; `EFeatures.Owners = 11`). | Mirrors backend `[HasPermission(StoreRoleFeatures.OwnersAdmin)]` = roles `{SuperAdmin, ReSeller}` + `FeatureType.Owners = 11`. Live precedent: `admin/owners/routes/owner-list.tsx:10` uses the identical gate, so reseller `featureIds` seeding is already proven — no open assumption. Rejected: `adminFeatureLoader` (`{SuperAdmin, OwnerAdmin}` — locks resellers out, admits owner-admins) and bare `resellerLoader` (drops the feature check the backend enforces). |
+| DG-5 | `Store.paymentStartDate` type | **`string \| null`** (`store.ts:32`, currently `Date`). | Backend `DateOnly?` over camelCase JSON through a raw passthrough — no code ever produced a `Date`. `store-form.tsx:58-62` already does `initialValues?.paymentStartDate ? new Date(...) : ''`, which is correct for a string and yields `''` for `null`. |
+| DG-6 | Never-activated store contract | Backend MUST send JSON `null` (not `""`). Gate is `!= null`. | `'' != null` would lock the picker wrongly. Backend plan makes the column nullable — record as a cross-boundary assumption to assert in tasks. |
+| DG-7 | `readOnly` semantics | `readOnly?: boolean` (default `false`); tabs still render; the "Activar este plan" button is not rendered when `readOnly`. | `onChange` is reachable **only** via `choosePlan`, wired solely to that button (`plan-picker.tsx:90-97`); removing the button structurally satisfies "no `onChange` on tab interaction" without disabling the tabs. |
+| DG-8 | `StoreToCollect.status` typing | Narrow union `'PorVencer' \| 'EnGracia'`. | Backend DTO is `string` but the query filters to exactly those two; the union drives the `BILLING.STATUS.*` label lookup. |
+| DG-9 | Page data loading | `user-list.tsx`/`owner-list.tsx` shape: `export const clientLoader = <gate>` + `export default function XxxPage()` + `useState` + `useEffect` fetch. | `clientLoader` is used purely as an auth gate across this codebase; no route ever returns loader data. Reload after mark-paid = re-invoke the same fetch function. |
+| DG-10 | Mount point | `app-layout.tsx` between `<Navbar/>` (:54) and `<Breadcrumbs/>` (:55). | Both symbols verified in place; `role="status"` container for live-region a11y. |
+| DG-11 | Money + copy | `formatCurrency` from `~/shared/lib/format-currency` (`Intl.NumberFormat('en-US')`). `es.ts` is a flat map of quoted dotted keys → add a `BILLING.*` block. | `intl.formatNumber` under `es` renders `US$`/comma decimals. Copy = neutral Latin American Spanish, **no voseo**. |
 
-## Decision gates (verified against code)
+## File changes
 
-### DG-1 — `getMe` has no mapping object to extend (plan-vs-code)
+| File | Action | Description |
+|---|---|---|
+| `packages/domain/src/models/auth.ts` | Modify | `PaymentStatus` type; `UserModel += paymentDueDate/isInTrial/paymentStatus` |
+| `packages/domain/src/models/store.ts` | Modify | `paymentStartDate: string \| null`; new `StoreToCollect`, `ReSellerCommission` |
+| `app/shared/lib/http/auth-http-service.ts` | **Unchanged body** | Test-only touch; passthrough carries the fields |
+| `app/shared/components/payment-banner.tsx` | Create | Named + default export `PaymentBanner` |
+| `app/shared/components/app-layout.tsx` | Modify | Mount `<PaymentBanner />` (DG-10) |
+| `app/management/stores/components/plan-picker.tsx` | Modify | `readOnly?: boolean` (DG-7) |
+| `app/management/stores/components/store-form.tsx` | Modify | `readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null}` |
+| `app/management/stores/lib/services/store-http-service.ts` | Modify | 3 methods, `return response.data`, no mapping |
+| `app/management/stores/routes/collections.tsx` | Create | `CollectionsPage` + `clientLoader` |
+| `app/management/stores/routes/reseller-commissions.tsx` | Create | `ReSellerCommissionsPage` + `clientLoader` |
+| `app/routes.ts` | Modify | `management/stores/collections`, `management/stores/commissions` inside the `app-layout` block (no `id` needed — distinct files) |
+| `app/shared/lib/i18n/es.ts` | Modify | `BILLING.*` keys |
+| 4 test fixtures (see Sequencing) | Modify | `new Date()` → ISO string |
 
-**Plan says:** "In `auth-http-service.ts` `getMe` mapping, add `paymentDueDate: res.data.paymentDueDate ?? null` …"
-**Code reality:** `getMe` is a **raw pass-through** — `return response.data.data;` (cast to
-`UserModel`). There is no object literal to add fields to.
-
-**Decision:** rewrite `getMe` to an explicit spread + default so the `?? null / false / 'NoAplica'`
-contract actually applies (a raw cast would silently pass `undefined` through when the backend
-omits a field):
+## Contracts
 
 ```ts
-async getMe(): Promise<UserModel> {
-  const response = await apiClient.get<{ data: UserModel }>('/v1/auth/me');
-  const data = response.data.data;
-  return {
-    ...data,
-    paymentDueDate: data.paymentDueDate ?? null,
-    isInTrial: data.isInTrial ?? false,
-    paymentStatus: data.paymentStatus ?? 'NoAplica',
-  };
+// packages/domain/src/models/auth.ts
+export type PaymentStatus = 'NoAplica' | 'AlDia' | 'PorVencer' | 'EnGracia' | 'Vencido';
+// UserModel += paymentDueDate: string | null; isInTrial: boolean; paymentStatus: PaymentStatus;
+
+// packages/domain/src/models/store.ts
+// Store.paymentStartDate: string | null            // was: Date
+export interface StoreToCollect {
+  storeId: string; storeName: string; ownerName: string;
+  amount: number; nextDueDate: string | null; status: 'PorVencer' | 'EnGracia';
 }
+export interface ReSellerCommission {
+  year: number; month: number; paymentCount: number; totalCommission: number;
+}
+
+// store-http-service — same shape as every sibling method
+getStoresToCollect(): Promise<BaseResponseModel<StoreToCollect[]>>          // GET  /v1/stores/to-collect
+registerStorePayment(id: string): Promise<BaseResponseModel<boolean>>       // POST /v1/stores/{id}/payments
+getReSellerCommissions(): Promise<BaseResponseModel<ReSellerCommission[]>>  // GET  /v1/stores/reseller-commissions
 ```
 
-**Rejected:** keep the raw cast and rely on the backend always sending the fields — rejected
-because the defaults are the plan's stated safety contract and the frontend must build/test
-without a live backend (mocked responses may omit fields).
-
-### DG-2 — Field name is `isInTrial`, NOT `isTrial` (spec-vs-plan)
-
-The **design spec** names the field `isTrial`; the **plan** and **proposal** name it
-`isInTrial`. **Canonical = `isInTrial`** (plan is the later, file-level authority; proposal
-already locked it). Tasks/apply must use `isInTrial` everywhere (type, mapping, banner).
-
-### DG-3 — Collections/commissions loader: `adminFeatureLoader` LOCKS RESELLERS OUT (plan-vs-code) ⚠️
-
-**Plan says:** both new routes use `clientLoader = adminFeatureLoader([EFeatures.Stores])`.
-**Code reality:** `adminFeatureLoader` runs `adminLoader()` first, which denies anyone who is
-not `isSuperAdmin || isOwnerAdmin`. A **ReSeller is neither** → the plan's loader would deny
-resellers access to the very views built for them (design spec: "Super admin — all; ReSeller —
-their own").
-
-**Precedent in code:** the reseller-facing management pages (`admin/owners/*`) use
-`resellerFeatureLoader([EFeatures.Owners])`, which runs `resellerLoader()` (allows
-`isSuperAdmin || isReSeller`) then `featureGate([...])`. `superAdminLoader` is used only for
-super-admin-only pages (`admin/stores`, `admin/resellers`).
-
-**Decision:** use **`resellerFeatureLoader([EFeatures.Stores])`** for BOTH `collections.tsx`
-and `reseller-commissions.tsx`, mirroring the owners precedent. Backend scopes the data by role.
-
-**Open assumption (resolve in tasks):** `featureGate` also requires the user's `featureIds` to
-include `EFeatures.Stores` (= 73). If resellers are NOT seeded that feature, `resellerFeatureLoader`
-will still deny them at the feature step. **Fallback:** bare `resellerLoader` (role-only, no
-feature gate) guarantees access by role and matches the design intent ("data scoping is backend").
-Verify reseller `featureIds` seeding before committing to `resellerFeatureLoader`; if unseeded,
-downgrade to `resellerLoader`.
-
-**Symbol confirmations:** `EFeatures` is exported from `@store-mgmt/domain`
-(`packages/domain/src/enums/index.ts`); `EFeatures.Stores = 73`, `EFeatures.Users = 72`.
-`adminFeatureLoader`, `resellerFeatureLoader`, `resellerLoader`, `superAdminLoader` all exist in
-`app/auth/routes/loaders.ts`.
-
-### DG-4 — `Store.paymentStartDate` → `Date | null` is safe (nullability gate)
-
-Every reader of the **domain** `Store.paymentStartDate` in `frontend-react/` app code was
-grepped. None break under `Date | null`:
-
-| Call-site | Reads it how | Null-safe? |
-|-----------|-------------|------------|
-| `management/stores/components/store-form.tsx:58-60` | `initialValues?.paymentStartDate ? new Date(...) : ''` | ✅ optional-chain + truthy ternary → null falls to `''` |
-| `management/stores/routes/edit-store.tsx:103,119` | local `StoreFormValues.paymentStartDate: string` (form value, `values.paymentStartDate`) — NOT the domain field | ✅ separate type |
-| `management/stores/lib/services/store-http-service.ts:19` | `UpdateStorePayload.paymentStartDate: string` (request payload) — NOT the domain field | ✅ separate type |
-| tests (`store-list`, `store-card-list`, `owner-edit`, `store-routes`, `store-http-service`) | fixtures set `new Date()` / `'2024-01-01'` | ✅ `Date`/`string` assignable to `Date \| null` |
-
-**Note on the http service (plan-vs-code):** the plan's Task 3 Step 1 says "update
-`store-http-service.ts` mapping to `res.paymentStartDate ? new Date(...) : null`". **There is
-no such mapping** — `getStore`/`listStores` return `response.data` via a raw cast; the runtime
-value is actually a string, and `store-form` does the `new Date()` itself. So the nullable
-change is a **type-only change** on the domain model plus the `StoreToCollect`/`ReSellerCommission`
-additions. No runtime Date-conversion code exists to modify in the service. (Adding an explicit
-null-normalizing map to `getStore` is OPTIONAL hardening, not required for correctness.)
-
-### DG-5 — `readOnly` activation gate depends on backend sending `null` (not `''`) ⚠️
-
-The plan's gate is `readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null}`.
-Because `store-http-service` raw-casts, `paymentStartDate` arrives at runtime as whatever the
-backend serializes. If the backend sends **empty string** for a never-activated store,
-`'' != null` is `true` → the picker locks incorrectly. The design spec mandates the backend
-column becomes **nullable** and returns `null` when never activated, so `null != null` → `false`
-→ interactive. **Contract:** backend MUST return `paymentStartDate: null` (JSON null) for
-non-activated stores. Record as a cross-boundary assumption.
-
-### DG-6 — Mount point confirmed
-
-`app-layout.tsx` renders `<Navbar … />` (line 54) then `<Breadcrumbs />` (line 55) inside the
-main column. `PaymentBanner` mounts **between** them. Both symbols exist and are imported there.
-
-### DG-7 — Currency + i18n confirmed
-
-- `formatCurrency(amount: number): string` at `~/shared/lib/format-currency` — uses
-  `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })`. Do NOT use
-  `intl.formatNumber` for money (the `es` locale renders `US$` / comma decimals). Amounts in
-  collections/commissions use `formatCurrency`.
-- `es.ts` is a **flat object of quoted dotted keys** (e.g. `'STORES.PLAN.BILLING_NOTICE': '…'`).
-  New keys follow the `BILLING.*` namespace. UI copy = neutral Latin American Spanish, NO voseo
-  (no "tenés/pagás/registrá/vos"); impersonal/tuteo only.
+Paths carry **no** `/api` prefix — it lives in the `API_URL` env value consumed by `apiClient`.
 
 ## Banner state machine
 
-`PaymentBanner` reads `status = user?.paymentStatus ?? 'NoAplica'` and renders:
-
-| status | isInTrial | Rendered | Tone |
-|--------|-----------|----------|------|
-| `NoAplica` | — | nothing (`null`) | — |
-| `AlDia` | — | nothing (`null`) | — |
-| `PorVencer` / `EnGracia` | `true` | `BILLING.TRIAL_NOTICE` ({date}) | blue |
-| `PorVencer` / `EnGracia` | `false` | `BILLING.DUE_NOTICE` ({date}) | amber |
+| `paymentStatus` | `isInTrial` | Render | Tone |
+|---|---|---|---|
+| `NoAplica` / missing | any | `null` | — |
+| `AlDia` | any | `null` | — |
+| `PorVencer` / `EnGracia` | `true` | `BILLING.TRIAL_NOTICE` `{date}` | blue |
+| `PorVencer` / `EnGracia` | `false` | `BILLING.DUE_NOTICE` `{date}` | amber |
 | `Vencido` | any | `BILLING.OVERDUE_NOTICE` | red |
 
-Due date formatted via `intl.formatDate(new Date(paymentDueDate), { day:'2-digit', month:'2-digit', year:'numeric' })`.
-`role="status"` on the container (live-region a11y). Priority: `Vencido` wins over trial.
+`Vencido` is evaluated first (overdue outranks trial). Date via
+`intl.formatDate(new Date(paymentDueDate), { day:'2-digit', month:'2-digit', year:'numeric' })`.
 
-## Routing decisions
+## Testing strategy (strict TDD, no live backend)
 
-- Register both routes inside the existing authenticated `layout('shared/components/app-layout.tsx', { id: 'app-layout' }, [...])` block in `app/routes.ts`, alongside the `management/stores*` entries.
-- Paths (deep-link only; no sidebar entry per scope): `management/stores/collections`,
-  `management/stores/commissions`.
-- The three existing `management/stores*` routes reuse one file with distinct `id`s; the two
-  new routes are distinct files, so no `id` collision. Follow the `user-list.tsx` page shape:
-  `export default function XxxPage()` + `export const clientLoader = <loader>` + `useState` list
-  + `useEffect` load.
+| Layer | What | How |
+|---|---|---|
+| Transport | `getMe` carries the 3 fields unchanged | Mock `apiClient.get` → `{ data: { data: {...} } }` (double nesting) |
+| Component | 5 banner variants | `vi.mock('~/shared/lib/stores/auth-store')` with a selector-aware `useAuthStore` (precedent: `inventory-components.test.tsx:507-514`) |
+| Component | `PlanPicker` readOnly: no "Activar este plan", no `onChange` | RTL + `<IntlProvider locale="es" messages={esMessages}>` |
+| Route | Collections rows, `formatCurrency`, mark-paid → reload, empty state | Mock `store-http-service` methods |
+| Route | Commissions `MM/YYYY`, count, total, empty state | Mock `getReSellerCommissions` |
+| Gate | 4 loader scenarios (super admin / reseller+feature / reseller−feature / owner-admin) | Drive `useAuthStore.getState()` |
 
-## Testing strategy
+Automated gate: `vitest run` + `pnpm -C frontend-react/apps/web-store-pos exec tsc --noEmit`.
+**Manual validation is DEFERRED** — the backend endpoints do not exist yet.
 
-Strict TDD (failing test first). Vitest + `@testing-library/react` wrapped in
-`<IntlProvider locale="es" messages={esMessages}>`. Mock `useAuthStore` (banner) and the
-`store-http-service`/`auth-http-service` methods (routes/mapping). Coverage per the plan:
-mapping defaults; 5 banner variants; PlanPicker readOnly (no Activar button, no `onChange`);
-collections rows + mark-paid reload; commissions period/total formatting. Automated gate =
-`vitest run` + `tsc --noEmit` + `pnpm -C packages/domain build` after each domain export change.
-**Manual validation is DEFERRED** — it cannot pass until the backend ships the getMe fields and
-3 endpoints.
+## Sequencing (for `sdd-tasks`)
+
+1. **Every domain export change is followed by `pnpm -C frontend-react/packages/domain build`** — apps
+   typecheck against `dist/`. Skipping it makes `tsc --noEmit` fail on a change that is actually correct.
+2. **The `paymentStartDate` retype MUST land in the SAME work unit as these 4 fixtures**, or
+   `tsc --noEmit` breaks:
+   - `app/management/stores/routes/__tests__/store-routes.test.tsx:19`
+   - `app/admin/stores/routes/__tests__/store-list.test.tsx:51`
+   - `app/admin/stores/components/__tests__/store-card-list.test.tsx:17`
+   - `app/admin/owners/routes/__tests__/owner-edit.test.tsx:77`
+   All four set `paymentStartDate: new Date()` → replace with an ISO string (e.g. `'2024-01-01'`).
+3. Task order = plan order (domain types → banner → plan lock → collections → commissions). Tasks 4
+   and 5 both add domain types + an http method + i18n + a route; they are independent of each other
+   and of tasks 1–3 after step 1.
+4. One work-unit commit per task; each independently revertible.
 
 ## Rejected alternatives
 
-- **Client-side entitlement/enforcement** (hide paid modules on the client when `Vencido`) —
-  rejected. Backend already pre-filters `storeModuleIds`; duplicating it on the client would
-  create a second source of truth and drift. Client stays a pure projection.
-- **Deriving `paymentStatus`/due-date on the client** from `paymentStartDate` + config —
-  rejected. The design spec computes status server-side on read (grace-day boundaries, trial
-  window); re-deriving on the client risks off-by-one/clock-skew divergence.
-- **New Zustand slice for billing** — rejected. Billing state is per-user and already arrives on
-  `UserModel`; a separate store adds sync burden for zero benefit.
-- **`adminFeatureLoader` for collections/commissions** (per plan) — rejected (DG-3): it denies
-  resellers.
+- **Client-side entitlement/enforcement** — backend already pre-filters `storeModuleIds`; a second
+  source of truth would drift.
+- **Deriving `paymentStatus`/due date client-side** from `paymentStartDate` + config — grace/trial
+  boundaries are computed server-side on read; re-deriving risks clock-skew and off-by-one.
+- **A dedicated Zustand billing slice** — the state is per-user and already rides on `UserModel`.
+- **Sidebar/menu entries** — out of scope; deep links suffice (`menu-config.ts` untouched).
 
-## Checklist (for tasks/apply)
+## Open questions
 
-- [ ] `UserModel` gains `paymentDueDate: string | null`, `isInTrial: boolean`, `paymentStatus: PaymentStatus`; `PaymentStatus` type added — rebuild domain.
-- [ ] `getMe` rewritten to explicit map with `?? null / false / 'NoAplica'` (DG-1).
-- [ ] Field is `isInTrial` everywhere (DG-2).
-- [ ] `Store.paymentStartDate` → `Date | null`; `StoreToCollect`, `ReSellerCommission` added — rebuild domain (DG-4).
-- [ ] `PaymentBanner` mounted between `<Navbar/>` and `<Breadcrumbs/>` (DG-6).
-- [ ] `PlanPicker` gets `readOnly?: boolean`; `store-form` passes `!isSuperAdmin && initialValues?.paymentStartDate != null` (DG-5 backend-null contract noted).
-- [ ] Collections + commissions use `resellerFeatureLoader([EFeatures.Stores])` (verify reseller feature seeding; else `resellerLoader`) (DG-3).
-- [ ] `formatCurrency` for money; `BILLING.*` keys in `es.ts`, neutral LatAm, NO voseo (DG-7).
-
-## Next step
-
-`sdd-tasks` (after spec is ready) — mechanical breakdown mirroring the plan's 5 tasks, carrying
-DG-1..DG-7 as explicit resolutions so apply doesn't chase the plan's ghost symbols.
+- [ ] Confirm the backend serializes `paymentStartDate: null` (JSON null) for never-activated stores (DG-6).
