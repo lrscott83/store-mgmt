@@ -14,5 +14,11 @@ namespace Domain.Interfaces.Repositories
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAsync(Guid userId);
         Task<IEnumerable<Store>> GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(Guid userId);
         Task<int> GetActiveStoreCountAsync();
+
+        Task<Store?> GetStoreWithModulesAndReSellerOwnerAsync(Guid storeId);
+        Task<bool> IsStoreOwnedByReSellerUserAsync(Guid storeId, Guid reSellerUserId);
+
+        Task<IEnumerable<Store>> GetPaidStoresAsync();
+        Task<IEnumerable<Store>> GetPaidStoresByReSellerUserAsync(Guid reSellerUserId);
     }
 }

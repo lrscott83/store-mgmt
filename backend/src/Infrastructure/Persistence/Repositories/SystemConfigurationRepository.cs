@@ -30,5 +30,11 @@ namespace Infrastructure.Persistence.Repositories
             SystemConfiguration? systemConfiguration = await _systemConfigurations.FirstOrDefaultAsync(conf => conf.Id == (int)SystemConfigurationType.TestingPeriodInMonths);
             return systemConfiguration != null ? int.Parse(systemConfiguration.Value) : 1;
         }
+
+        public async Task<int> GetPaymentGraceDaysAsync()
+        {
+            SystemConfiguration? systemConfiguration = await _systemConfigurations.FirstOrDefaultAsync(conf => conf.Id == (int)SystemConfigurationType.PaymentGraceDays);
+            return systemConfiguration != null ? int.Parse(systemConfiguration.Value) : 5;
+        }
     }
 }

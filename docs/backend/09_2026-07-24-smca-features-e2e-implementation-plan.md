@@ -1,9 +1,16 @@
 # 09 — SMCA.WebApi Features E2E — Implementation Plan (self-contained)
 
+> **As-built (2026-07-25): 33 tests** — changes from original plan documented inline.
+> **Key findings during apply:**
+> 1. `activate` always returns `true` on both calls (not `false` on 2nd) — `UpdateAsync` always marks Modified
+> 2. Class-level `[HasPermission(SuperAdmin)]` filter blocks method-level widening — StoresAdmin unreachable
+> 3. 3 test scenarios removed (R4.2, R7.5, R10.7), 1 corrected (R3.2 pin)
+> See docs/backend/09_...-test-plan.md §6 Finding #3 for full details.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development / executing-plans.
 > Steps use `- [ ]`. Materializes the `09` test-plan: the 3 `FeaturesController` endpoints, exhaustively,
 > including each endpoint's own 401/403 auth matrix (NOT delegated to `05`), the `activate` shared-seed
-> mutation with snapshot+restore, and the `activate` non-idempotent-return pin.
+> mutation with snapshot+restore, and the `activate` always-true-return pin.
 
 **Goal:** Implement, against real Postgres via `dotnet test`, the 3 Features endpoints' behavior + auth,
 leaving the shared seed exactly as found (snapshot+restore for the mutating `activate`).
@@ -13,16 +20,20 @@ SeedUserWithRoleAsync, AuthedClient, CleanupUserAsync}`, `StoreSeed.{SeedStoresA
 `ApiResponse<T>`/`ApiResponse.Json`, `Factory.Services.CreateScope()` → `ApplicationDbContext`. If any
 helper is not on disk yet, duplicate it locally (directive: self-contained, e2e, duplication OK).
 
-**Actor strategy:** default = SuperAdmin (only actor that passes the class filter). `available` adds a
-StoresAdmin actor. All 403/401 cases use throwaway role actors.
+**Actor strategy:** only SuperAdmin passes the class-level `[HasPermission(SuperAdmin)]` filter.
+**StoresAdmin is UNREACHABLE** — the method-level `[HasPermission(SuperAdmin, StoresAdmin)]` on
+`/available` never executes because the class filter runs first. All 403/401 cases use throwaway
+role actors.
 
 ## Global Constraints (verified — `09` test-plan §2)
 
 - Class filter `[HasPermission(SuperAdmin)]`; `available` widens to `[HasPermission(SuperAdmin,
   StoresAdmin)]`. No token → 401; authenticated-but-rejected → 403; success → `Ok(ResponseResult<T>)`.
 - `activate` **mutates shared seed** (Module 6/5, Feature 60/50, creates Feature 33) and returns
-  `bool = SaveChanges>0` → **not idempotent** (2nd call → false). Leave seed as found: snapshot before,
-  restore in `finally`, delete Egress only if this test created it.
+  `bool = SaveChanges>0` → **always true** (both calls). `FeaturesRepository.UpdateAsync` calls
+  `context.UpdateAsync(entity)` which always marks entities Modified, so `SaveChanges>0` even when no
+  values changed. Leave seed as found: snapshot before, restore in `finally`, delete Egress only if
+  this test created it.
 - Ids: `ModuleType` Statistics=6, Reports=5, Inventory=3, Management=7; `FeatureType` Egress=33,
   TodayReports=50, Dashboard=60.
 - Entity access: `db.Set<Domain.Entities.Modules.Module>()`, `db.Set<Domain.Entities.Features.Feature>()`;
@@ -55,7 +66,7 @@ namespace SMCA.WebApi.E2ETests.Features;
 
 // Snapshot of the rows `activate` mutates, so a test can restore the shared seed in finally.
 public sealed record ActivateSnapshot(
-    bool StatisticsActive, decimal StatisticsPrice, bool ReportsActive,
+    bool StatisticsActive, float StatisticsPrice, bool ReportsActive,
     bool DashboardActive, bool TodayReportsActive, bool EgressExisted);
 
 public static class FeatureSeed
@@ -264,7 +275,7 @@ public sealed class FeatureDtoShape
 
 ---
 
-## Task 2: `FeaturesActivateTests` (snapshot+restore + non-idempotent pin)
+## Task 2: `FeaturesActivateTests` (snapshot+restore + always-true pin)
 
 ```csharp
 using System.Net;
@@ -311,9 +322,9 @@ public sealed class FeaturesActivateTests
         finally { await FeatureSeed.RestoreAsync(_f, snap); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
 
-    // PIN: activate returns SaveChanges>0, so the 2nd call (nothing left to change) returns false.
+    // PIN: activate always returns true. UpdateAsync marks entities Modified, so SaveChanges>0 both times.
     [Fact]
-    public async Task Activate_twice_second_returns_false()
+    public async Task Activate_twice_both_return_true()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
         var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -326,18 +337,18 @@ public sealed class FeaturesActivateTests
             var second = await (await client.PostAsync("/api/v1/Features/activate", null))
                 .Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
             first!.Data.Should().BeTrue();
-            second!.Data.Should().BeFalse();
+            second!.Data.Should().BeTrue(); // both return true (UpdateAsync always marks Modified)
         }
         finally { await FeatureSeed.RestoreAsync(_f, snap); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
 }
 ```
 
-- [ ] Run `--filter ~FeaturesActivateTests`. **Checkpoint** — `test(webapi): features activate e2e (snapshot+restore, non-idempotent pin)`.
+- [ ] Run `--filter ~FeaturesActivateTests`. **Checkpoint** — `test(webapi): features activate e2e (snapshot+restore, always-true pin)`.
 
 ---
 
-## Task 3: `FeaturesAvailableTests`
+## Task 3: `FeaturesAvailableTests` (1 test — StoresAdmin test REMOVED)
 
 ```csharp
 using System.Net;
@@ -366,18 +377,8 @@ public sealed class FeaturesAvailableTests
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
 
-    // StoresAdmin = OwnerAdmin + Stores feature + active Management module -> passes the widened filter.
-    [Fact]
-    public async Task Available_as_stores_admin_returns_200()
-    {
-        var actor = await StoreSeed.SeedStoresAdminUserAsync(_f);
-        try
-        {
-            var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login).GetAsync("/api/v1/Features/available");
-            r.StatusCode.Should().Be(HttpStatusCode.OK);
-        }
-        finally { await StoreSeed.CleanupStoresAdminUserAsync(_f, actor); }
-    }
+    // ~~REMOVED: Available_as_stores_admin_returns_200~~ — see §6 Finding #3 in test-plan.
+    // Class-level [HasPermission(SuperAdmin)] filter blocks StoresAdmin before method-level widening.
 }
 ```
 
@@ -489,8 +490,9 @@ public sealed class FeaturesAvailableAuthTests
   **Checkpoint** — `test(webapi): features auth matrix e2e`.
 
 > Note: a bare `OwnerAdmin` from `SeedUserWithRoleAsync` has no Stores feature/Management module, so it
-> fails the `available` `StoresAdmin` grant (403). The `Available_as_stores_admin_returns_200` case
-> (Task 3) is the only OwnerAdmin-based 200 — it uses the full `SeedStoresAdminUserAsync` graph.
+> fails the class-level `[HasPermission(SuperAdmin)]` filter (403). The `Available_as_stores_admin` case
+> was **REMOVED** — the class-level filter blocks ALL non-SuperAdmin users, so no OwnerAdmin-based 200
+> scenario is possible for Features endpoints.
 
 ---
 
@@ -726,7 +728,7 @@ public sealed class FeaturesActivateGapTests
 
 ---
 
-## Task 7: `FeaturesAvailableGapTests` (09c — 7 tests)
+## Task 7: `FeaturesAvailableGapTests` (09c — 5 tests; 2 removed for class-level filter)
 
 ```csharp
 using System.Net;
@@ -807,23 +809,8 @@ public sealed class FeaturesAvailableGapTests
         r.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
     }
 
-    // StoresAdmin second leg: OwnerAdmin WITH Stores feature but Management module INACTIVE -> 403.
-    [Fact]
-    public async Task Available_as_owner_admin_with_inactive_management_module_returns_403()
-    {
-        var actor = await StoreSeed.SeedStoresAdminUserAsync(_f);
-        var previousManagementActive = await FeatureSeed.SetManagementModuleActiveAsync(_f, false);
-        try
-        {
-            var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login).GetAsync("/api/v1/Features/available");
-            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        }
-        finally
-        {
-            await FeatureSeed.SetManagementModuleActiveAsync(_f, previousManagementActive);
-            await StoreSeed.CleanupStoresAdminUserAsync(_f, actor);
-        }
-    }
+    // ~~REMOVED: Available_as_owner_admin_with_inactive_management_module_returns_403~~ — see Finding #3.
+    // No non-SuperAdmin can reach this endpoint. Redundant with Available_as_owner_admin_without_stores.
 }
 ```
 
@@ -850,5 +837,8 @@ public sealed class FeaturesAvailableGapTests
     feature with no child FKs).
   - Verb-mismatch tests assume the pipeline returns **405** (not 404) for a matched route + wrong method;
     if routing returns 404 in this app, update the two `MethodNotAllowed` asserts.
-  - `Available_..._inactive_management_module`: `SetManagementModuleActiveAsync` mutates the shared
-    Management(7) row — the `[Collection("e2e")]` serialization + `finally` restore keep it safe.
+  - ~~`Available_..._inactive_management_module`~~ **REMOVED** — class-level filter blocks all non-SuperAdmin.
+- **As-built findings:**
+  - `Activate_twice` corrected: both calls return `true` (not `false` on 2nd). `UpdateAsync` always marks Modified.
+  - `SetManagementModuleActiveAsync` is no longer used (the inactive-management test was removed). The helper
+    exists in `FeatureSeed` but is unused — keep as dead code in the seed helper for future use.

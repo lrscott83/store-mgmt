@@ -294,6 +294,15 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      true,
                      true
                  ),
+                Feature.Create(
+                     (int)FeatureType.StorePayment,
+                     FeatureType.StorePayment.GetDescription(),
+                     "Funcionalidad para registrar pagos de tiendas",
+                     (int)ModuleType.Billing,
+                     191,
+                     true,
+                     true
+                 ),
 
                 //Histories
                 Feature.Create(

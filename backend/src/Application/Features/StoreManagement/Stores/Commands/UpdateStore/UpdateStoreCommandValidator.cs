@@ -27,10 +27,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
               .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
 
-            //RuleFor(x => x.PaymentStartDate)
-            //  .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-            //  .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
-
             RuleFor(x => x.ModuleIds)
                 .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
                 .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])

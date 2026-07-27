@@ -101,6 +101,10 @@ namespace Domain.Common.Enums
         [HasModule(ModuleType.Billing)]
         BillingAdmin,
 
+        [HasRoles(RoleType.SuperAdmin, RoleType.ReSeller)]
+        [HasFeature(FeatureType.StorePayment)]
+        StorePaymentAdmin,
+
         #endregion
 
         #region Histories features

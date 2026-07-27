@@ -16,12 +16,10 @@ namespace Application.Services.Stores
         private readonly IOwnerRepository _ownerRepository;
         private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
         private readonly IStoreRoleFeatureGenerator _storeRoleFeaturesGenerator;
-        private readonly ISystemConfigurationRepository _systemConfigurationRepository;
-
         public CreateStoreService(IStoreRepository storeRepository, IModuleRepository moduleRepository, 
             IStoreModuleRepository storeModuleRepository, IOwnerRepository ownerRepository,
             IStoreRoleFeatureRepository storeRoleFeatureRepository, IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
-            ISystemConfigurationRepository systemConfigurationRepository, IFeatureRepository featureRepository)
+            IFeatureRepository featureRepository)
         {
             _storeRepository = storeRepository;
             _moduleRepository = moduleRepository;
@@ -29,17 +27,13 @@ namespace Application.Services.Stores
             _ownerRepository = ownerRepository;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
-            _systemConfigurationRepository = systemConfigurationRepository;
             _featureRepository = featureRepository;
         }
 
         public async Task<Store> CreateStoreAsync(Guid ownerId, Guid tenantId, string name, string? address, string? description, 
             bool approved, List<int> moduleIds)
         {
-            DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
-            int testingPeriodInMonths = await _systemConfigurationRepository.GetTestingPeriodInMonthsAsync();
-            DateOnly paymentStartDate = today.AddMonths(testingPeriodInMonths);
-            var store = Store.Create(name, ownerId, approved, tenantId, paymentStartDate, address, description);
+            var store = Store.Create(name, ownerId, approved, tenantId, null, address, description);
             await _storeRepository.AddAsync(store);
 
             for (int i = 0; i < moduleIds.Count; i++)

@@ -60,6 +60,18 @@ public static class DbTestHelpers
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
+        // Must delete Owner first (FK_Owner_User_UserId) before User
+        var owners = await db.Set<Owner>().IgnoreQueryFilters().Where(x => x.UserId == userId).ToListAsync();
+        if (owners.Count > 0)
+        {
+            // Also clean up ReSellerOwner if present
+            var ownerIds = owners.Select(o => o.Id).ToList();
+            var reSellerOwners = await db.Set<Domain.Entities.ReSellerOwners.ReSellerOwner>()
+                .IgnoreQueryFilters().Where(rso => ownerIds.Contains(rso.OwnerId)).ToListAsync();
+            db.Set<Domain.Entities.ReSellerOwners.ReSellerOwner>().RemoveRange(reSellerOwners);
+        }
+        db.Set<Owner>().RemoveRange(owners);
+
         var roles = await db.Set<UserRole>().IgnoreQueryFilters().Where(x => x.UserId == userId).ToListAsync();
         db.Set<UserRole>().RemoveRange(roles);
         var users = await db.Set<User>().IgnoreQueryFilters().Where(x => x.Id == userId).ToListAsync();

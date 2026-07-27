@@ -8,5 +8,6 @@ namespace Domain.Interfaces.Repositories
         Task<SystemConfiguration> GetSystemConfigurationByIdAsync(int id);
         Task<int> GetTestingPeriodInMonthsAsync();
         Task<float> GetReSellerPercentDiscountPriceAsync();
+        Task<int> GetPaymentGraceDaysAsync();
     }
 }

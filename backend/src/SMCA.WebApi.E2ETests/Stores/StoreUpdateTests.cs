@@ -12,10 +12,10 @@ public sealed class StoreUpdateTests
     private readonly AppTestFactory _f;
     public StoreUpdateTests(WebAppFixture fixture) => _f = fixture.Factory;
 
-    private static object Body(Guid bodyId, string name, IEnumerable<int> moduleIds, bool withPaymentDate = true) => new
+    private static object Body(Guid bodyId, string name, IEnumerable<int> moduleIds) => new
     {
         Id = bodyId, Name = name, Address = "a", Description = "d", Approved = false,
-        PaymentStartDate = withPaymentDate ? DateTime.UtcNow : (DateTime?)null, ModuleIds = moduleIds, IsActive = true
+        ModuleIds = moduleIds, IsActive = true
     };
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class StoreUpdateTests
     }
 
     [Fact]
-    public async Task Update_as_superadmin_without_payment_date_returns_400_KNOWN_QUIRK()
+    public async Task Update_as_superadmin_succeeds_without_payment_date()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -46,10 +46,48 @@ public sealed class StoreUpdateTests
         try
         {
             var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
-                .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}", Body(Guid.Empty, $"n-{Guid.NewGuid():N}", new[] { StoreSeed.ManagementModuleId }, withPaymentDate: false));
-            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+                .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}", Body(Guid.Empty, $"n-{Guid.NewGuid():N}", new[] { StoreSeed.ManagementModuleId }));
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
         }
         finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task SuperAdmin_sets_payment_date_returns_200()
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await StoreSeed.SeedStoreAsync(_f, $"Store-{Guid.NewGuid():N}", approved: false);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}/payment-date", new { PaymentStartDate = "2026-07-01" });
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            b!.Succeeded.Should().BeTrue();
+        }
+        finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_cannot_set_payment_date_returns_403()
+    {
+        var sa = await StoreSeed.SeedStoresAdminUserAsync(_f);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login)
+                .PutAsJsonAsync($"/api/v1/stores/{sa.StoreId}/payment-date", new { PaymentStartDate = "2026-07-01" });
+            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        finally { await StoreSeed.CleanupStoresAdminAsync(_f, sa); }
+    }
+
+    [Fact]
+    public async Task Unauthenticated_cannot_set_payment_date_returns_401()
+    {
+        var r = await _f.CreateClient()
+            .PutAsJsonAsync($"/api/v1/stores/{Guid.NewGuid()}/payment-date", new { PaymentStartDate = "2026-07-01" });
+        r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]

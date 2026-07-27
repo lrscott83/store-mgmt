@@ -20,6 +20,13 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasIndex(x => x.StoreId);
 
             builder.HasKey(x => x.Id);
+
+            builder.HasOne<Domain.Entities.ReSellers.ReSeller>()
+                .WithMany()
+                .HasForeignKey(x => x.ReSellerId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            builder.HasIndex(x => x.ReSellerId);
         }
     }
 }

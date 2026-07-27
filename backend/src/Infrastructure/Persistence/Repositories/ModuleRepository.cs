@@ -22,5 +22,8 @@ namespace Infrastructure.Persistence.Repositories
                 .OrderByDescending(f => f.PriceIncluded).ThenBy(f => f.Order)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Module>> GetModulesByIdsAsync(IEnumerable<int> ids)
+            => await _modules.Where(m => ids.Contains(m.Id)).ToListAsync();
     }
 }

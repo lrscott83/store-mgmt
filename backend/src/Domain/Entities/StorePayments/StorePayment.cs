@@ -18,6 +18,11 @@ namespace Domain.Entities.StorePayments
         public float Price { get; set; }
         public int Year { get; set; }
         public int Month { get; set; }
+        public Guid? ReSellerId { get; set; }
+        public float ReSellerPercentDiscountPrice { get; set; }
+        public float ReSellerDiscountPrice { get; set; }
+        public float ReSellerAmount { get; set; }
+        public bool ByReSeller { get; set; }
         public Guid TenantId { get; private set; }
         private StorePayment(Guid id, Guid storeId, int storePaymentStatusId, float price, DateTimeOffset paymentBeforeDate,
             int year, int month, Guid tenantId) : base(id)
@@ -32,10 +37,17 @@ namespace Domain.Entities.StorePayments
         }
 
         public static StorePayment Create(Guid storeId, int storePaymentStatusId, float price, DateTimeOffset paymentBeforeDate,
-            int year, int month, Guid tenantId)
+            int year, int month, Guid tenantId,
+            Guid? reSellerId, float reSellerPercentDiscountPrice, float reSellerDiscountPrice, float reSellerAmount, bool byReSeller)
         {
             var storePayment = new StorePayment(Guid.NewGuid(), storeId, storePaymentStatusId, price, paymentBeforeDate,
                 year, month, tenantId);
+            storePayment.ReSellerId = reSellerId;
+            storePayment.ReSellerPercentDiscountPrice = reSellerPercentDiscountPrice;
+            storePayment.ReSellerDiscountPrice = reSellerDiscountPrice;
+            storePayment.ReSellerAmount = reSellerAmount;
+            storePayment.ByReSeller = byReSeller;
+            storePayment.PaidDate = DateTimeOffset.UtcNow;
             storePayment.Raise(new StorePaymentCreatedEvent(storePayment.Id));
             return storePayment;
         }

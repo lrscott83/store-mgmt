@@ -1,6 +1,10 @@
 ﻿using Application.Dtos.ApplicationManagement.Tenants;
 using Application.Dtos.StoreManagement;
 using Application.Features.ApplicationManagement.Tenants.Queries.GetTenantById;
+using Application.Features.StoreManagement.Stores.Commands.SetStorePaymentDate;
+using Application.Features.StoreManagement.StorePayments.Commands.RegisterStorePayment;
+using Application.Features.StoreManagement.StorePayments.Queries.GetReSellerCommissions;
+using Application.Features.StoreManagement.StorePayments.Queries.GetStoresToCollect;
 using Application.Features.StoreManagement.Stores.Commands.ApproveStore;
 using Application.Features.StoreManagement.Stores.Commands.CreateStore;
 using Application.Features.StoreManagement.Stores.Commands.DeleteStore;
@@ -67,7 +71,20 @@ namespace SMCA.WebApi.Controllers.v1
         {
             return Ok(await Sender.Send(
                 new UpdateStoreCommand(id, command.Name, command.Address, command.Description,
-                command.Approved, command.PaymentStartDate, command.ModuleIds, command.IsActive)));
+                command.Approved, command.ModuleIds, command.IsActive)));
+        }
+
+        /// <summary>
+        /// Set store PaymentStartDate (SuperAdmin only).
+        /// Use a separate endpoint instead of including PaymentStartDate in the update command,
+        /// since only SuperAdmin can set this date and it has distinct semantics from general store updates.
+        /// </summary>
+        [HttpPut("{storeId}/payment-date")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> SetStorePaymentDateAsync(Guid storeId, [FromBody] SetStorePaymentDateCommand command)
+        {
+            return Ok(await Sender.Send(new SetStorePaymentDateCommand(storeId, command.PaymentStartDate)));
         }
 
         /// <summary>
@@ -96,5 +113,23 @@ namespace SMCA.WebApi.Controllers.v1
         {
             return Ok(await Sender.Send(command));
         }
+
+        [HttpPost("{storeId}/payments")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> RegisterStorePaymentAsync(Guid storeId)
+            => Ok(await Sender.Send(new RegisterStorePaymentCommand(storeId)));
+
+        [HttpGet("to-collect")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<IEnumerable<StoreToCollectDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetStoresToCollectAsync()
+            => Ok(await Sender.Send(new GetStoresToCollectQuery()));
+
+        [HttpGet("reseller-commissions")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<IEnumerable<ReSellerCommissionDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetReSellerCommissionsAsync()
+            => Ok(await Sender.Send(new GetReSellerCommissionsQuery()));
     }
 }

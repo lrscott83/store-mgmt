@@ -53,19 +53,14 @@ namespace SMCA.WebApi.Extensions
                         {
                             Console.WriteLine("Printing in the delegate OnChallenge");
 
-                            // this is a default method
-                            // the response statusCode and headers are set here
+                            context.Response.StatusCode = 401;
+
+                            await context.HttpContext.Response.WriteAsync(
+                                context.AuthenticateFailure != null
+                                    ? "Token Validation Has Failed. Request Access Denied"
+                                    : "Authentication required. No token provided.");
+
                             context.HandleResponse();
-
-                            // AuthenticateFailure property contains 
-                            // the details about why the authentication has failed
-                            if (context.AuthenticateFailure != null)
-                            {
-                                context.Response.StatusCode = 401;
-
-                                // we can write our own custom response content here
-                                await context.HttpContext.Response.WriteAsync("Token Validation Has Failed. Request Access Denied");
-                            }
                         }
                     };
                 });

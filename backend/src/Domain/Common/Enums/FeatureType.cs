@@ -98,6 +98,9 @@ namespace Domain.Common.Enums
         [Description("Facturación")]
         Billing = 90,
 
+        [Description("Pago de tienda")]
+        StorePayment = 91,
+
         //Histories
         [Description("Historial de ventas")]
         SalesHistory = 100,

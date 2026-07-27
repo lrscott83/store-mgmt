@@ -28,6 +28,9 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasData(
                 SystemConfiguration.Create((int)SystemConfigurationType.ReSellerPercentDiscountPrice,
                 SystemConfigurationType.ReSellerPercentDiscountPrice.GetDisplayName(), "20"));
-        }
+            builder.HasData(
+                SystemConfiguration.Create((int)SystemConfigurationType.PaymentGraceDays,
+                SystemConfigurationType.PaymentGraceDays.GetDisplayName(), "5"));
+    }
     }
 }

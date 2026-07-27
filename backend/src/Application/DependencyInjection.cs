@@ -3,12 +3,14 @@ using Application.Abstractions.Features;
 using Application.Abstractions.Roles;
 using Application.Behaviours;
 using Application.Services.Authentication;
+using Application.Services.Billing;
 using Application.Services.Features;
 using Application.Services.Owners;
 using Application.Services.Roles;
 using Application.Services.Stores;
 using Domain.Entities.Stores;
 using Domain.Entities.Tenants;
+using Domain.Interfaces.Services.Billing;
 using Domain.Interfaces.Services.Owners;
 using Domain.Interfaces.Services.Stores;
 using Domain.Interfaces.Services.Tenants;
@@ -50,6 +52,9 @@ namespace Application
             services.AddScoped<IAllowedFeaturesService, AllowedFeaturesService>();
 
             services.AddScoped<ICreateOwnerService, CreateOwnerService>();
+
+            services.AddScoped<IBillingService, BillingService>();
+            services.AddScoped<IStoreBillingService, StoreBillingService>();
 
             return services;
         }

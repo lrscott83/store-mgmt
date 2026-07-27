@@ -28,8 +28,6 @@ public class CreateStoreServiceTests
     private readonly Mock<IOwnerRepository> _mockOwnerRepository;
     private readonly Mock<IStoreRoleFeatureRepository> _mockStoreRoleFeatureRepository;
     private readonly Mock<IStoreRoleFeatureGenerator> _mockStoreRoleFeatureGenerator;
-    private readonly Mock<ISystemConfigurationRepository> _mockSystemConfigurationRepository;
-
     // Test data
     private readonly Guid _testOwnerId = Guid.NewGuid();
     private readonly Guid _testTenantId = Guid.NewGuid();
@@ -44,8 +42,6 @@ public class CreateStoreServiceTests
         _mockOwnerRepository = new Mock<IOwnerRepository>();
         _mockStoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>();
         _mockStoreRoleFeatureGenerator = new Mock<IStoreRoleFeatureGenerator>();
-        _mockSystemConfigurationRepository = new Mock<ISystemConfigurationRepository>();
-
         // Default successful setups
         SetupDefaultSuccessfulScenarios();
     }
@@ -59,17 +55,11 @@ public class CreateStoreServiceTests
             _mockOwnerRepository.Object,
             _mockStoreFeatureRepository.Object,
             _mockStoreRoleFeatureGenerator.Object,
-            _mockSystemConfigurationRepository.Object,
             _mockFeatureRepository.Object);
     }
 
     private void SetupDefaultSuccessfulScenarios()
     {
-        // System configuration for testing period
-        _mockSystemConfigurationRepository
-            .Setup(x => x.GetTestingPeriodInMonthsAsync())
-            .ReturnsAsync(1);
-
         // Store repository setup
         _mockStoreRepository
             .Setup(x => x.AddAsync(It.IsAny<Store>()))
@@ -150,18 +140,10 @@ public class CreateStoreServiceTests
     }
 
     [Fact]
-    public async Task CreateStoreAsync_ShouldSetPaymentStartDate_BasedOnTestingPeriod()
+    public async Task CreateStoreAsync_ShouldSetPaymentStartDate_NullInitially()
     {
         // Arrange
         var service = CreateService();
-        var testingPeriod = 3; // months
-
-        _mockSystemConfigurationRepository
-            .Setup(x => x.GetTestingPeriodInMonthsAsync())
-            .ReturnsAsync(testingPeriod);
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var expectedStartDate = today.AddMonths(testingPeriod);
 
         // Act
         var result = await service.CreateStoreAsync(
@@ -174,7 +156,7 @@ public class CreateStoreServiceTests
             new List<int> { 1 });
 
         // Assert
-        result.PaymentStartDate.Should().Be(expectedStartDate);
+        result.PaymentStartDate.Should().BeNull();
     }
 
     [Fact]
@@ -378,60 +360,9 @@ public class CreateStoreServiceTests
         result.Name.Should().Be(storeName);
     }
 
-    [Fact]
-    public async Task CreateStoreAsync_ShouldUseZeroTestingPeriod_WhenConfigured()
-    {
-        // Arrange
-        var service = CreateService();
-
-        _mockSystemConfigurationRepository
-            .Setup(x => x.GetTestingPeriodInMonthsAsync())
-            .ReturnsAsync(0);
-
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        // Act
-        var result = await service.CreateStoreAsync(
-            _testOwnerId,
-            _testTenantId,
-            "Store",
-            null,
-            null,
-            false,
-            new List<int> { 1 });
-
-        // Assert
-        result.PaymentStartDate.Should().Be(today);
-    }
-
     #endregion
 
     #region Error Management Tests
-
-    [Fact]
-    public async Task CreateStoreAsync_ShouldThrow_WhenSystemConfigurationRepositoryFails()
-    {
-        // Arrange
-        _mockSystemConfigurationRepository
-            .Setup(x => x.GetTestingPeriodInMonthsAsync())
-            .ThrowsAsync(new InvalidOperationException("Database error"));
-
-        var service = CreateService();
-
-        // Act
-        Func<Task> act = async () => await service.CreateStoreAsync(
-            _testOwnerId,
-            _testTenantId,
-            "Store",
-            null,
-            null,
-            false,
-            new List<int> { 1 });
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Database error");
-    }
 
     [Fact]
     public async Task CreateStoreAsync_ShouldThrow_WhenStoreRepositoryFails()
@@ -680,27 +611,6 @@ public class CreateStoreServiceTests
                 s.Name == storeName && 
                 s.OwnerId == _testOwnerId &&
                 s.TenantId == _testTenantId)),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task CreateStoreAsync_ShouldCallSystemConfigurationRepository()
-    {
-        // Arrange
-        var service = CreateService();
-
-        // Act
-        await service.CreateStoreAsync(
-            _testOwnerId,
-            _testTenantId,
-            "Store",
-            null,
-            null,
-            false,
-            new List<int> { 1 });
-
-        // Assert
-        _mockSystemConfigurationRepository.Verify(x => x.GetTestingPeriodInMonthsAsync(),
             Times.Once);
     }
 

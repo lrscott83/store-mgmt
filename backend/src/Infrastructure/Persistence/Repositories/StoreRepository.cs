@@ -76,5 +76,46 @@ namespace Infrastructure.Persistence.Repositories
         {
             return await _stores.Where(store => store.IsActive).CountAsync();
         }
+
+        public async Task<Store?> GetStoreWithModulesAndReSellerOwnerAsync(Guid storeId)
+            => await _stores
+                .Include(s => s.StoreModules)
+                    .ThenInclude(sm => sm.Module)
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.ReSellerOwner)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(s => s.Id == storeId);
+
+        public async Task<bool> IsStoreOwnedByReSellerUserAsync(Guid storeId, Guid reSellerUserId)
+            => await _stores
+                .IgnoreQueryFilters()
+                .AnyAsync(s => s.Id == storeId
+                    && s.Owner.ReSellerOwner != null
+                    && s.Owner.ReSellerOwner.ReSeller.UserId == reSellerUserId);
+
+        public async Task<IEnumerable<Store>> GetPaidStoresAsync()
+            => await _stores
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
+                .Include(s => s.StoreModules)
+                    .ThenInclude(sm => sm.Module)
+                .Where(s => s.PaymentStartDate != null)
+                .IgnoreQueryFilters()
+                .ToListAsync();
+
+        public async Task<IEnumerable<Store>> GetPaidStoresByReSellerUserAsync(Guid reSellerUserId)
+            => await _stores
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
+                .Include(s => s.StoreModules)
+                    .ThenInclude(sm => sm.Module)
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.ReSellerOwner)
+                        .ThenInclude(rso => rso.ReSeller)
+                .Where(s => s.PaymentStartDate != null
+                    && s.Owner.ReSellerOwner != null
+                    && s.Owner.ReSellerOwner.ReSeller.UserId == reSellerUserId)
+                .IgnoreQueryFilters()
+                .ToListAsync();
     }
 }

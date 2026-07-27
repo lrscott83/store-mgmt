@@ -1,12 +1,11 @@
 # 09 — SMCA.WebApi Features E2E — Test Plan
 
-**Date:** 2026-07-24
+**Date:** 2026-07-24 | **As-built:** 2026-07-25 — 33 tests (initial estimate 37, 4 changes during apply)
 **Scope:** the 3 endpoints of `FeaturesController` (`api/v1/Features`) — behavior + the per-endpoint
 auth (401/403), the `activate` shared-seed mutation (snapshot+restore), and the `activate`
-non-idempotent-return pin.
+always-true-return pin.
 **Depends on / reuses:** the `04`/`05` harness (`AppTestFactory`, `WebAppFixture`, `[Collection("e2e")]`,
-`ApiResponse<T>`, `DbTestHelpers`, `StoreSeed`) against real Postgres `smca_test`. As of this date the
-harness is **planned only, not yet implemented as code** — these tests slot into it once it exists.
+`ApiResponse<T>`, `DbTestHelpers`, `StoreSeed`) against real Postgres `smca_test`.
 
 ---
 
@@ -35,18 +34,22 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
   - Redundant handler check `if (!IsSuperAdmin) throw ApiException(400)` — unreachable (filter already
     requires SuperAdmin). See §6.
 - **`GET available`** (`FeaturesController.cs:32-38`) → method-level
-  `[HasPermission(SuperAdmin, StoresAdmin)]` (widens the class filter). Returns
+  `[HasPermission(SuperAdmin, StoresAdmin)]` (intended to widen the class filter). Returns
   `ResponseResult<IEnumerable<FeatureDto>>`. `StoresAdmin = [HasRoles(OwnerAdmin)] [HasFeature(Stores)]
-  [HasModule(Management)]` (`StoreRoleFeatures.cs:188-191`). Redundant handler check
-  `if (!IsSuperAdminOrOwnerAdmin) throw 400` — unreachable (see §6).
+  [HasModule(Management)]` (`StoreRoleFeatures.cs:188-191`). **⚠️ WARNING**: The class-level
+  `[HasPermission(SuperAdmin)]` filter runs first and blocks ALL non-SuperAdmin users before the
+  method-level widening can take effect. StoresAdmin can NEVER reach this endpoint via HTTP. See §6
+  Finding #3. Redundant handler check `if (!IsSuperAdminOrOwnerAdmin) throw 400` — unreachable (see §6).
 - **Failures are thrown → real HTTP status.** No token → **401** (auth middleware). Authenticated but
   filter-rejected → **403** (`HasPermissionAttribute`). The controllers' `Ok(...)` runs only on success.
 
 ## 3. Behavior to PIN as-is (like register-500 in `02` / activate-500 in `06`)
 
-- **`activate` return is not idempotent.** 1st call mutates rows → `SaveChanges>0` → `200 { Data:true }`.
-  2nd call (all already active + Egress exists) → `SaveChanges==0` → `200 { Data:false }`. Pin both;
-  update if the contract is later made idempotent.
+- **`activate` return is always true (corrected).** Initial plan expected non-idempotent behavior (1st
+  call `true`, 2nd call `false`). Actual behavior: `FeaturesRepository.UpdateAsync` calls
+  `context.UpdateAsync(entity)` which always marks entities as Modified, so `SaveChangesAsync > 0` even
+  when no values changed. Both calls return `200 { Data:true }`. Test `Activate_twice_both_return_true`
+  pins this. Update if the repository layer is ever made idempotent.
 - `Activate_creates_Egress_when_missing` **(from 09c)** — snapshot, then delete Egress(33) to force the
   create branch; POST; assert Egress now exists with `ModuleId==Inventory(3)`, `Order==71`,
   `IsActive==true`, `AvailableToStore==true`; restore in `finally`.
@@ -95,8 +98,9 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
   `Succeeded` + `Data==true`; assert the mutation (Statistics `IsActive==true` & `Price==1000`,
   Dashboard/TodayReports `IsActive==true`, Egress exists); **restore** all snapshotted values + delete
   Egress if the test created it, in `finally`.
-- `Activate_twice_second_returns_false` **(PIN)** — POST twice in one test; assert 1st `Data==true`,
-  2nd `Data==false`; same snapshot+restore in `finally`.
+- `Activate_twice_both_return_true` **(PIN)** — POST twice in one test; assert both return `Data==true`;
+  same snapshot+restore in `finally`. (Corrected from initial plan — `UpdateAsync` always marks entities
+  Modified, so `SaveChanges > 0` on both calls.)
 
 ### `FeaturesActivateAuthTests`
 - `Activate_no_token_returns_401`
@@ -104,31 +108,31 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
 - `Activate_as_store_user_returns_403`
 - `Activate_as_reseller_returns_403`
 
-### `FeaturesAvailableTests`
+### `FeaturesAvailableTests` (1 test — effect of Finding #3)
 - `Available_as_super_admin_returns_200`
-- `Available_as_stores_admin_returns_200` — `StoreSeed.SeedStoresAdminUserAsync` (OwnerAdmin + Stores
-  feature + active Management module) passes the widened filter; `finally` cleans the seeded graph.
-- `Available_excludes_Administration_module_features` **(from 09c)** — seed an active feature under module
-  `Administration(1)`; assert absent (`ModuleId != Administration` predicate); `finally` cleanup.
-- `Available_excludes_features_whose_module_is_inactive` **(from 09c)** — seed an active feature under a
-  throwaway INACTIVE module; assert absent (`Module.IsActive` predicate); `finally` delete feature+module.
-- `Available_excludes_inactive_features` **(from 09c)** — seed an inactive feature under an active module;
-  assert absent (`Feature.IsActive` predicate); `finally` cleanup.
-- `Available_is_ordered_by_Order_ascending` **(from 09c)** — assert the returned sequence is sorted
-  ascending by `Order` (pins the `OrderBy(f.Order)` that `all` lacks).
-- `Available_items_have_dto_shape_and_module` **(from 09c)** — every item has a non-empty `Name` and a
-  resolved `ModuleId`.
-- `Available_with_POST_verb_returns_405` **(from 09c)** — `POST .../available` on the GET-only route → `405`.
+- ~~`Available_as_stores_admin_returns_200`~~ **REMOVED** — see §6 Finding #3
 
-### `FeaturesAvailableAuthTests`
+### `FeaturesAvailableGapTests` (5 tests — gap coverage; moved from the plan above)
+- `Available_excludes_Administration_module_features` — seed an active feature under module
+  `Administration(1)`; assert absent; `finally` cleanup.
+- `Available_excludes_features_whose_module_is_inactive` — seed an active feature under a
+  throwaway INACTIVE module; assert absent; `finally` cleanup.
+- `Available_excludes_inactive_features` — seed an inactive feature under an active module;
+  assert absent; `finally` cleanup.
+- `Available_is_ordered_by_Order_ascending` — assert the returned sequence is sorted ascending.
+- `Available_items_have_dto_shape_and_module` — every item has non-empty `Name` and resolved `ModuleId`.
+- `Available_with_POST_verb_returns_405` — `POST .../available` → `405`.
+- ~~`Available_as_owner_admin_with_inactive_management_module_returns_403`~~ **REMOVED** — see §6 Finding #3
+
+### `FeaturesAvailableAuthTests` (4 tests)
 - `Available_no_token_returns_401`
 - `Available_as_store_user_returns_403`
 - `Available_as_reseller_returns_403`
 - `Available_as_owner_admin_without_stores_feature_returns_403` — an OwnerAdmin lacking the Stores
-  feature / Management module fails the `StoresAdmin` grant → 403 (never reaches the handler).
-- `Available_as_owner_admin_with_inactive_management_module_returns_403` **(from 09c)** — the StoresAdmin
-  actor's Management module is flipped inactive; fails the `HasModule(Management)` leg → 403. Complements
-  the missing-Stores-feature case so both `StoresAdmin` legs are covered; restore the flag in `finally`.
+  feature / Management module fails the class filter → 403.
+- ~~`Available_as_owner_admin_with_inactive_management_module_returns_403`~~ **REMOVED** — see §6
+  Finding #3. No non-SuperAdmin can reach this endpoint, so testing the Management module leg is
+  impossible via HTTP. Deferred to handler unit tests.
 
 ## 5. Seeding needs (reuse `04`/`05`; duplicate locally if absent)
 
@@ -150,9 +154,20 @@ cross-reference another plan for coverage. These are e2e tests; duplication is a
     `throw 400` branch is unreachable.
   We **cannot** write a test that triggers these branches (no actor passes the filter yet fails the
   handler). Pin observable behavior only; do not change production code in this task.
-- **Note:** the `available` filter (`StoresAdmin`) is *stricter* than its handler gate (`OwnerAdmin`
-  claim). Today this is masked; if the filter is ever loosened, the handler would not enforce the Stores
-  feature/Management module — a latent inconsistency worth a separate production-code review.
+- **Note:** the `available` method-level filter (`StoresAdmin`) is *stricter* than its handler gate
+  (`OwnerAdmin` claim). Today this is masked; if the filter is ever loosened, the handler would not
+  enforce the Stores feature/Management module — a latent inconsistency worth a separate production-code
+  review.
+- **Finding #3 — Class-level filter blocks method-level widening.** `FeaturesController` has
+  `[HasPermission(SuperAdmin)]` at the class level. Method-level `[HasPermission(SuperAdmin, StoresAdmin)]`
+  on `/available` can never widen access because ASP.NET Core runs the class-level filter first. If it
+  rejects the request, the method-level filter never executes. This means StoresAdmin users can NEVER
+  reach any `/api/v1/Features/*` endpoint via HTTP. **3 test scenarios were removed as a result:**
+  R4.2 (StoresAdmin available 200), R7.5 (inactive Management → 403), and R10.7 (inactive Management →
+  403 via gap coverage). The latter two are redundant with R7.4 (OwnerAdmin without Stores → 403) which
+  also tests the class-level filter rejection path. **Action**: Flag this design issue to the team — the
+  method-level `[HasPermission(SuperAdmin, StoresAdmin)]` on `/available` is dead code as long as the
+  class-level filter remains `[HasPermission(SuperAdmin)]`.
 
 ## 7. Deferred — how to test unreachable filter/handler branches
 

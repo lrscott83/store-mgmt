@@ -38,6 +38,8 @@ namespace Application.Features.Management.Users.Commands.ActivateUser
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
             var user = await _userRepository.GetByIdAsync(request.Id);
+            if (user is null)
+                throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
             user.IsActive = true;
             await _userRepository.UpdateAsync(user);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

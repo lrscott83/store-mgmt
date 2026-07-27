@@ -30,9 +30,9 @@ namespace Domain.Entities.Stores
         public ICollection<StoreUsage> StoreUsages { get; set; } = new List<StoreUsage>();
 
         public Guid OwnerId { get; private set; }
-        public DateOnly PaymentStartDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
+        public DateOnly? PaymentStartDate { get; set; } = null;
 
-        private Store(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly paymentStartDate,
+        private Store(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly? paymentStartDate = null,
             string? address = null, string? description = null) 
             : base (id)
         {
@@ -52,14 +52,14 @@ namespace Domain.Entities.Stores
             Orders = new List<Order> ();
         }
 
-        private static Store Create(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly paymentStartDate, 
+        private static Store Create(Guid id, Guid ownerId, string name, bool approved, Guid tenantId, DateOnly? paymentStartDate = null, 
             string? address = null, string? description = null)
         {
             var store = new Store(id, ownerId, name, approved, tenantId, paymentStartDate, address, description);
             store.Raise(new StoreCreatedDomainEvent(store.Id, ownerId));
             return store;
         }
-        public static Store Create(string name, Guid ownerId, bool approved, Guid tenantId, DateOnly paymentStartDate, 
+        public static Store Create(string name, Guid ownerId, bool approved, Guid tenantId, DateOnly? paymentStartDate = null, 
             string? address = null, string? description = null)
         {
             return Create(Guid.NewGuid(), ownerId, name, approved, tenantId, paymentStartDate, address, description);

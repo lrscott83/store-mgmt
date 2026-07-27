@@ -9,5 +9,8 @@ namespace Domain.Common.Enums
 
         [Description("ReSellerPercentDiscountPrice")]
         ReSellerPercentDiscountPrice = 2,
+
+        [Description("PaymentGraceDays")]
+        PaymentGraceDays = 3,
     }
 }

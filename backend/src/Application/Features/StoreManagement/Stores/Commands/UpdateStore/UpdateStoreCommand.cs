@@ -22,7 +22,7 @@ using static System.Formats.Asn1.AsnWriter;
 namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
 {
     public sealed record UpdateStoreCommand(Guid Id, string Name, string? Address, string? Description, 
-        bool Approved, DateTime? PaymentStartDate, List<int> ModuleIds, bool IsActive)
+        bool Approved, List<int> ModuleIds, bool IsActive)
         : ICommand<bool> { }
 
     public class UpdateStoreCommandHandler : ICommandHandler<UpdateStoreCommand, bool>
@@ -67,9 +67,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
-            if (_httpContextService.IsSuperAdmin && !request.PaymentStartDate.HasValue)
-                throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
-
             var store = await _storeByIdService.GetStoreByIdIncludingModulesAsync(request.Id);
             if (_storeRepository.Where(s => s.Id != request.Id).Any(s => s.Name == request.Name))
                 throw new ValidationException(_localizer["StoreAlreadyExists"]);
@@ -77,14 +74,21 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             store.Name = request.Name;
             store.Address = request.Address;
             
-            if (_httpContextService.IsSuperAdmin && request.PaymentStartDate.HasValue)
-                store.PaymentStartDate = DateOnly.FromDateTime(request.PaymentStartDate.Value);
             if (_httpContextService.IsSuperAdmin)
             {
                 store.Description = request.Description;
                 store.Approved = request.Approved;
                 store.IsActive = request.IsActive;
             }
+
+            // Activation-on-first-paid: if a paid module is requested on a store
+            // without PaymentStartDate, auto-set to now.
+            bool hasPaidModuleRequested = (await _moduleRepository.GetModulesByIdsAsync(request.ModuleIds))
+                .Any(m => !m.PriceIncluded);
+
+            if (store.PaymentStartDate is null && hasPaidModuleRequested)
+                store.PaymentStartDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
             await _storeRepository.UpdateAsync(store);
             await UpdateStoreModules(store.Id, store.TenantId, request.ModuleIds);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

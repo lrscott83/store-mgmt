@@ -1,5 +1,4 @@
-﻿using Application.Features.UserManagement.Users.Commands.DeleteUser;
-using Domain.Interfaces.Repositories;
+﻿using Domain.Interfaces.Repositories;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -11,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Application.Features.Management.Users.Commands.ActivateUser
 {
-    public class ActivateUserCommandValidator : AbstractValidator<DeleteUserCommand>
+    public class ActivateUserCommandValidator : AbstractValidator<ActivateUserCommand>
     {
         private readonly IUserRepository _userRepository;
         private readonly IStringLocalizer<I18n> _localizer;

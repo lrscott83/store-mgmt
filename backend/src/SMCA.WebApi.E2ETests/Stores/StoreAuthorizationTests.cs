@@ -61,7 +61,7 @@ public sealed class StoreAuthorizationTests
             var r = await DbTestHelpers.AuthedClient(_f, sa.UserId, sa.Login).PutAsJsonAsync($"/api/v1/stores/{sa.StoreId}", new
             {
                 Id = Guid.Empty, Name = newName, Address = "owner-addr", Description = "SHOULD-BE-IGNORED",
-                Approved = true, PaymentStartDate = (DateTime?)null, ModuleIds = new[] { StoreSeed.ManagementModuleId }, IsActive = false
+                Approved = true, ModuleIds = new[] { StoreSeed.ManagementModuleId }, IsActive = false
             });
             r.StatusCode.Should().Be(HttpStatusCode.OK);
             var row = await StoreSeed.GetStoreRowAsync(_f, sa.StoreId);

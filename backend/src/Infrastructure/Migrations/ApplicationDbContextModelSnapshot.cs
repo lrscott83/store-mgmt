@@ -1180,6 +1180,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("ByReSeller")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uuid");
 
@@ -1204,6 +1207,18 @@ namespace Infrastructure.Migrations
                     b.Property<float>("Price")
                         .HasColumnType("real");
 
+                    b.Property<float>("ReSellerAmount")
+                        .HasColumnType("real");
+
+                    b.Property<float>("ReSellerDiscountPrice")
+                        .HasColumnType("real");
+
+                    b.Property<Guid?>("ReSellerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<float>("ReSellerPercentDiscountPrice")
+                        .HasColumnType("real");
+
                     b.Property<Guid>("StoreId")
                         .HasColumnType("uuid");
 
@@ -1223,6 +1238,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ReSellerId");
 
                     b.HasIndex("StoreId");
 
@@ -1382,7 +1399,7 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateOnly>("PaymentStartDate")
+                    b.Property<DateOnly?>("PaymentStartDate")
                         .HasColumnType("date");
 
                     b.Property<Guid>("TenantId")
@@ -1436,6 +1453,12 @@ namespace Infrastructure.Migrations
                             Id = 2,
                             Name = "ReSellerPercentDiscountPrice",
                             Value = "20"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "PaymentGraceDays",
+                            Value = "5"
                         });
                 });
 
@@ -1799,6 +1822,11 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Entities.StorePayments.StorePayment", b =>
                 {
+                    b.HasOne("Domain.Entities.ReSellers.ReSeller", null)
+                        .WithMany()
+                        .HasForeignKey("ReSellerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Entities.Stores.Store", "Store")
                         .WithMany("StorePayments")
                         .HasForeignKey("StoreId")

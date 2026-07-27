@@ -2,6 +2,7 @@ using Application.Abstractions.Features;
 using Application.Abstractions.HttpContext;
 using Application.Features.Authentication.Queries.GetMe;
 using Domain.Interfaces.Repositories;
+using Domain.Interfaces.Services.Billing;
 using FluentAssertions;
 using Moq;
 
@@ -43,7 +44,8 @@ public class GetMeQueryHandlerTests
             mocks.UserRepository.Object,
             mocks.StoreRoleFeatureRepository.Object,
             mocks.AllowedFeaturesService.Object,
-            mocks.StoreModuleRepository.Object);
+            mocks.StoreModuleRepository.Object,
+            mocks.BillingService.Object);
 
         var query = new GetMeQuery();
 
@@ -76,7 +78,8 @@ public class GetMeQueryHandlerTests
             mocks.UserRepository.Object,
             mocks.StoreRoleFeatureRepository.Object,
             mocks.AllowedFeaturesService.Object,
-            mocks.StoreModuleRepository.Object);
+            mocks.StoreModuleRepository.Object,
+            mocks.BillingService.Object);
 
         var query = new GetMeQuery();
 
@@ -101,7 +104,8 @@ public class GetMeQueryHandlerTests
             UserRepository = new Mock<IUserRepository>(),
             StoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>(),
             AllowedFeaturesService = new Mock<IAllowedFeaturesService>(),
-            StoreModuleRepository = new Mock<IStoreModuleRepository>()
+            StoreModuleRepository = new Mock<IStoreModuleRepository>(),
+            BillingService = new Mock<IBillingService>()
         };
     }
 
@@ -112,6 +116,7 @@ public class GetMeQueryHandlerTests
         public Mock<IStoreRoleFeatureRepository> StoreRoleFeatureRepository { get; set; } = null!;
         public Mock<IAllowedFeaturesService> AllowedFeaturesService { get; set; } = null!;
         public Mock<IStoreModuleRepository> StoreModuleRepository { get; set; } = null!;
+        public Mock<IBillingService> BillingService { get; set; } = null!;
     }
 
     #endregion

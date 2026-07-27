@@ -33,8 +33,10 @@ namespace Infrastructure.Persistence.Contexts
         private const string DefaultConnectionString 
             = "Host=127.0.0.1;Database=smca;Username=postgres;Password=postgres;Persist Security Info=True;Include Error Detail=True";
         private readonly TenantIdProvider _tenantProvider;
-        private readonly Guid? _tenantId;
         private readonly IHttpContextService _httpContextService;
+        private Guid? _tenantIdOverride;
+        private bool? _isSuperAdminOverride;
+        private bool? _isReSellerOverride;
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, TenantIdProvider tenantProvider, IHttpContextService httpContextService)
             : base(options)
@@ -45,12 +47,25 @@ namespace Infrastructure.Persistence.Contexts
             //_tenantId = _tenantProvider.GetTenantId();
         }
 
-        internal Guid? TenantId => !string.IsNullOrEmpty(_httpContextService.TenantId) 
-            ? _httpContextService.TenantId.ToGuid()
-            : null;
+        /// <summary>
+        /// Permite setear manualmente el contexto multi-tenant para scopes
+        /// sin HTTP request (ej: E2E tests, jobs, seeders).
+        /// Solo afecta esta instancia del DbContext.
+        /// </summary>
+        public void SetTenantContext(Guid? tenantId = null, bool? isSuperAdmin = null, bool? isReSeller = null)
+        {
+            _tenantIdOverride = tenantId;
+            _isSuperAdminOverride = isSuperAdmin;
+            _isReSellerOverride = isReSeller;
+        }
 
-        internal bool IsSuperAdmin => _httpContextService.IsSuperAdmin;
-        internal bool IsReSeller => _httpContextService.IsReSeller;
+        internal Guid? TenantId => _tenantIdOverride 
+            ?? (!string.IsNullOrEmpty(_httpContextService.TenantId) 
+                ? _httpContextService.TenantId.ToGuid() 
+                : null);
+
+        internal bool IsSuperAdmin => _isSuperAdminOverride ?? _httpContextService.IsSuperAdmin;
+        internal bool IsReSeller => _isReSellerOverride ?? _httpContextService.IsReSeller;
         internal Guid CurrentUserId => _httpContextService.UserExternalId.ToGuid();
 
         //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -86,7 +101,7 @@ namespace Infrastructure.Persistence.Contexts
 
         private string GetTenantConnectionString()
         {
-            var tenant = Tenant.FindAsync(_tenantId).GetAwaiter().GetResult();
+            var tenant = Tenant.FindAsync(TenantId).GetAwaiter().GetResult();
             return tenant is not null ? tenant.ConnectionString : string.Empty;
         }
 
