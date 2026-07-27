@@ -7,6 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { formatLocalDate } from '~/shared/lib/date-utils';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
 
@@ -38,14 +39,6 @@ function groupSaleCredits(saleCredits: SaleCredit[]): DateSaleCredit[] {
   }));
 
   return dateSaleCredits.sort((c1, c2) => new Date(c1.date).getTime() - new Date(c2.date).getTime());
-}
-
-function formatDateOnly(date: Date): string {
-  const d = new Date(date);
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const year = d.getUTCFullYear();
-  return `${day}/${month}/${year}`;
 }
 
 /**
@@ -126,7 +119,7 @@ export function SaleCreditsPage() {
                 aria-expanded={isExpanded}
               >
                 <span className="text-sm font-medium text-text">
-                  {formatDateOnly(dateSaleCredit.date)} ({dateSaleCredit.creditsCount})
+                  {formatLocalDate(dateSaleCredit.date)} ({dateSaleCredit.creditsCount})
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-danger">

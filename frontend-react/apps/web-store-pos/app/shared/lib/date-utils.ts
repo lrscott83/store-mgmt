@@ -46,3 +46,29 @@ export function formatDateOnly(dateOnly: string | null | undefined): string {
   const [, year, month, day] = match;
   return `${day}/${month}/${year}`;
 }
+
+/**
+ * Formats a `Date` INSTANT (already-parsed, e.g. `Order.date`, `InventoryEntry.date`,
+ * `Expense.date`, `SaleCredit.date`/`paidDate`) as `dd/mm/yyyy` using LOCAL calendar-day
+ * parts (`getDate`/`getMonth`/`getFullYear`) — NOT UTC (`getUTCDate`/...).
+ *
+ * Do not confuse this with `formatDateOnly` above: that one formats a `DateOnly`
+ * (`YYYY-MM-DD`) STRING with no time component. This one formats a genuine instant that
+ * already carries a time-of-day and must be projected onto a calendar day using the
+ * VIEWER's local timezone.
+ *
+ * Local parts are used deliberately, for consistency with `startOfDay` (above), which the
+ * app already uses to filter "today" by LOCAL midnight (`setHours(0,0,0,0)`). Reading UTC
+ * parts here would disagree with that filtering criterion: an evening transaction (e.g.
+ * 20:00 local) passes the "today" filter (its LOCAL day) but, formatted with UTC getters,
+ * would render as tomorrow's date for any timezone west of UTC — this genuinely happened
+ * for every user at a negative UTC offset (all of Latin America, e.g. America/Bogota).
+ * Do NOT "fix" this back to UTC getters; that reintroduces the bug.
+ */
+export function formatLocalDate(date: Date): string {
+  const d = new Date(date);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}

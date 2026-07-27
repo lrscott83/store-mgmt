@@ -8,6 +8,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
 import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import { formatLocalDate } from '~/shared/lib/date-utils';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
 
@@ -47,14 +48,6 @@ function groupExpensesByDay(expenses: Expense[]): DayExpenseGroup[] {
   }));
 
   return dayGroups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
-
-function formatDateOnly(date: Date): string {
-  const d = new Date(date);
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const year = d.getUTCFullYear();
-  return `${day}/${month}/${year}`;
 }
 
 const PAYMENT_TYPE_OPTIONS: { value: PaymentType | null; labelKey: string }[] = [
@@ -182,7 +175,7 @@ export function ExpensesHistoryPage() {
                   aria-expanded={isExpanded}
                 >
                   <span className="text-sm font-medium text-text">
-                    {formatDateOnly(dayGroup.date)} ({dayGroup.count})
+                    {formatLocalDate(dayGroup.date)} ({dayGroup.count})
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-danger">

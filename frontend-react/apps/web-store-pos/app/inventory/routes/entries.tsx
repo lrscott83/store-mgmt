@@ -11,6 +11,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { formatLocalDate } from '~/shared/lib/date-utils';
 import { EntryList } from '../components/entry-list';
 
 export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
@@ -47,14 +48,6 @@ function groupEntriesByDay(entries: InventoryEntryView[]): DayEntryGroup[] {
   }));
 
   return dayGroups.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-}
-
-function formatDateOnly(date: Date): string {
-  const d = new Date(date);
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const year = d.getUTCFullYear();
-  return `${day}/${month}/${year}`;
 }
 
 /**
@@ -156,7 +149,7 @@ export function EntriesPage() {
                   aria-expanded={isExpanded}
                 >
                   <span className="text-sm font-medium text-text">
-                    {formatDateOnly(dayGroup.date)}
+                    {formatLocalDate(dayGroup.date)}
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary">

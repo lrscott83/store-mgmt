@@ -4,6 +4,7 @@ import type { SaleCredit } from '@store-mgmt/domain';
 import type { PaymentType } from '@store-mgmt/domain';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatLocalDate } from '~/shared/lib/date-utils';
 import { EditSaleCreditModal } from './edit-sale-credit-modal';
 import { SaleCreditPaymentModal } from './sale-credit-payment-modal';
 
@@ -15,14 +16,6 @@ interface SaleCreditListProps {
   onSave?: (creditId: string, client: string, note: string) => boolean;
   /** Returns `true` on success, `false` on failure. */
   onPay?: (creditId: string, paidType: PaymentType, note: string) => boolean;
-}
-
-function formatDateOnly(date: Date): string {
-  const d = new Date(date);
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const year = d.getUTCFullYear();
-  return `${day}/${month}/${year}`;
 }
 
 /**
@@ -70,7 +63,7 @@ export function SaleCreditList({ saleCredits, readOnly = true, onSave, onPay }: 
               <td className="p-1 text-right">
                 {saleCredit.isPaid && (
                   <span className="text-xs font-semibold text-success">
-                    {formatDateOnly(saleCredit.paidDate)}
+                    {formatLocalDate(saleCredit.paidDate)}
                   </span>
                 )}
               </td>

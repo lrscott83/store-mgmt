@@ -8,6 +8,7 @@ import { hasCreditsModuleAvailable, hasExpensesModuleAvailable } from '~/shared/
 import { Card } from '~/shared/components/ui/card';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { formatLocalDate } from '~/shared/lib/date-utils';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
@@ -299,14 +300,6 @@ export function TodayStatsPage() {
  * `sale-credit-list.component.html` bare-table layout.
  */
 function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
-  function formatDateOnly(date: Date): string {
-    const d = new Date(date);
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const year = d.getUTCFullYear();
-    return `${day}/${month}/${year}`;
-  }
-
   return (
     <table className="w-full text-sm">
       <tbody>
@@ -323,7 +316,7 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
             <td className="p-1 text-right">
               {saleCredit.isPaid && (
                 <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                  {formatDateOnly(saleCredit.paidDate)}
+                  {formatLocalDate(saleCredit.paidDate)}
                 </span>
               )}
             </td>

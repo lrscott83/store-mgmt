@@ -7,6 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { formatLocalDate } from '~/shared/lib/date-utils';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { OrderList } from '../components/order-list';
 
@@ -42,14 +43,6 @@ function groupOrders(orders: Order[]): DateOrder[] {
   }));
 
   return dateOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
-
-function formatDateOnly(date: Date): string {
-  const d = new Date(date);
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${day}/${month}/${year}`;
 }
 
 /**
@@ -189,7 +182,7 @@ export function OrdersPage() {
                 aria-expanded={isExpanded}
               >
                 <span className="text-sm font-medium text-text">
-                  {formatDateOnly(dateOrder.date)} ({dateOrder.count})
+                  {formatLocalDate(dateOrder.date)} ({dateOrder.count})
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
