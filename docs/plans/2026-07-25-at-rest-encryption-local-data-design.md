@@ -52,11 +52,16 @@ Because the backend must be able to wrap the DEK for every user, the backend mus
 
 All additions follow the existing conventions verified in code: MediatR `IQuery`/`IQueryHandler` returning `ResponseResult<T>`, thin controllers, DTOs as `sealed class` with settable props (small value shapes as positional `records`), default camelCase JSON (no custom policy), crypto via the built-in static `Rfc2898DeriveBytes.Pbkdf2` / `AesGcm` / `RandomNumberGenerator` (net8, no new package).
 
-### 4.1 Per-store DEK storage
+### 4.1 Per-store DEK (derived, no schema change)
 
-- Introduce a per-store DEK: 32 random bytes, generated once per store on first roster export (lazily) and persisted.
-- Storage: a new nullable column on the store (e.g. `Store.DataEncryptionKey` as Base64 `string`) or a dedicated `StoreDataKey` table if a column on `Store` is undesirable. **Decision: a single Base64 column is sufficient** — one DEK per store, no rotation in v1.
-- Generation: `RandomNumberGenerator.GetBytes(32)`, stored Base64. If the column is already set, reuse it (so the DEK is stable and previously-encrypted device data stays readable across re-provisions).
+**Decision (refined during planning): the DEK is DERIVED, not stored.** This avoids an EF migration and keeps the backend stateless for this feature, while still being cryptographically sound (KMS-style derivation from a high-entropy server secret).
+
+- A single high-entropy server secret lives in configuration under `StoreEncryption:MasterSecret`, following the existing secret-config pattern (`Jwt:SecretKey`, read via `IConfiguration`).
+- Per store: `dek = HKDF-SHA256(ikm = utf8(masterSecret), salt = null, info = utf8(storeId), length = 32)` via the net8 built-in `HKDF`.
+- Derivation is deterministic, so the DEK is **stable per store by construction** — previously-encrypted device data stays readable across re-provisions, with no persisted state and no `Store` column.
+- No DEK rotation in v1 (rotating the master secret would invalidate all device ciphertext for every store; out of scope).
+
+Alternative considered and rejected: a stored random DEK in a new `Store.DataEncryptionKey` Base64 column — sound, but requires an EF migration and mutable state for no security gain over derivation.
 
 ### 4.2 DEK-wrap crypto service
 
@@ -120,9 +125,15 @@ Wire points (both funnel through `auth-store.setUser`, which is the shared hydra
 
 The DEK lives only in memory, so it is absent whenever memory was cleared: after **1h idle** (offline-auth idle-lock) **and** after a **full app close/kill/reboot**. Today the cold-boot path (`auth-store.ts:69-83`) restores a valid session **without** asking for a password — which would leave a valid session with no DEK and undecryptable data.
 
-**Decision (approved):** reuse the **existing login screen** as the single unlock gate. On startup, if there is a valid session but **no DEK in memory**, route to the normal login screen and require the user to authenticate again with their **own** password. Re-authenticating runs the §5.3 unwrap and restores the DEK. Same screen, same user password — the only change is that a valid-session cold boot now requires this re-auth instead of silently restoring. No new password, no new screen, no "master".
+**Decision (approved):** reuse the **existing login screen** as the single unlock gate. On startup, if there is a valid session that **needs unlocking**, route to the normal login screen and require the user to authenticate again with their **own** password. Re-authenticating runs the §5.3 unwrap and restores the DEK. Same screen, same user password — the only change is that a valid-session cold boot now requires this re-auth instead of silently restoring. No new password, no new screen, no "master".
 
-Concretely: the auth gate/loader treats "session valid AND `getDek() === null`" the same as "not authenticated" for the purpose of showing login, while keeping the roster and session intact so the login can complete offline.
+Concretely, the auth gate/loader treats a session as needing unlock — showing login while keeping the roster and session intact so login can complete offline — when:
+
+```
+needsUnlock(user) = getDek() === null AND the local roster has a formatVersion >= 2 entry with a wrappedDek for this user
+```
+
+The second condition is essential: gating on `getDek() === null` **alone would deadlock** any store that has no encrypted roster yet (legacy or not-yet-provisioned) — the gate would show login, but login could never produce a DEK (nothing to unwrap), looping forever. Requiring a `formatVersion >= 2` roster entry means the gate only engages once encryption is actually provisioned, and non-provisioned stores keep working unchanged until their first encrypted roster arrives.
 
 ### 5.5 Entity-crypto helper and the twelve seams
 
