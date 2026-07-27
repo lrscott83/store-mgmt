@@ -71,12 +71,12 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 6 (WU-F): Collections Route (parallel with 7)
 
-- [ ] 6.1 Add `BILLING.COLLECTIONS.*` i18n keys (title, columns, "Registrar pago" action, `BILLING.STATUS.PorVencer`/`EnGracia`, empty-state) to `es.ts`.
-- [ ] 6.2 RED: create `frontend-react/apps/web-store-pos/app/management/stores/routes/__tests__/collections.test.tsx` (owner-list.test.tsx shape: mock `resellerFeatureLoader`, mock `store-http-service`) covering rows-with-`formatCurrency`, mark-paid → `registerStorePayment` → reload, empty state. *(Req: Collections View — 3 scenarios)*
-- [ ] 6.3 RED (same file): assert `clientLoader` was built by calling the mocked `resellerFeatureLoader` with `[EFeatures.Owners]` — wiring-only; the 4 gate-logic scenarios (super admin / reseller+feature / reseller−feature / owner-admin) are already covered by the pre-existing `resellerFeatureLoader — ADMIN-OWNERS-ACCESS` block in `loaders.test.ts:289-336`, not re-tested here. *(Req: Route Gating)*
-- [ ] 6.4 GREEN: create `collections.tsx` — `export const clientLoader = resellerFeatureLoader([EFeatures.Owners]); export default function CollectionsPage()` (DG-9 shape), `useEffect` fetch via `getStoresToCollect`, "Registrar pago" → `registerStorePayment(id)` → refetch, empty-state message.
-- [ ] 6.5 Register route in `frontend-react/apps/web-store-pos/app/routes.ts` under `app-layout`: `route('management/stores/collections', 'management/stores/routes/collections.tsx')`.
-- [ ] 6.6 Verify: `pnpm test -- collections`.
+- [x] 6.1 Add `BILLING.COLLECTIONS.*` i18n keys (title, columns, "Registrar pago" action, `BILLING.STATUS.PorVencer`/`EnGracia`, empty-state) to `es.ts`.
+- [x] 6.2 RED: create `frontend-react/apps/web-store-pos/app/management/stores/routes/__tests__/collections.test.tsx` (owner-list.test.tsx shape: mock `resellerFeatureLoader`, mock `store-http-service`) covering rows-with-`formatCurrency`, mark-paid → `registerStorePayment` → reload, empty state. *(Req: Collections View — 3 scenarios)*
+- [x] 6.3 RED (same file): assert `clientLoader` was built by calling the mocked `resellerFeatureLoader` with `[EFeatures.Owners]` — wiring-only; the 4 gate-logic scenarios (super admin / reseller+feature / reseller−feature / owner-admin) are already covered by the pre-existing `resellerFeatureLoader — ADMIN-OWNERS-ACCESS` block in `loaders.test.ts:289-336`, not re-tested here. *(Req: Route Gating)*
+- [x] 6.4 GREEN: create `collections.tsx` — `export const clientLoader = resellerFeatureLoader([EFeatures.Owners]); export default function CollectionsPage()` (DG-9 shape), `useEffect` fetch via `getStoresToCollect`, "Registrar pago" → `registerStorePayment(id)` → refetch, empty-state message.
+- [x] 6.5 Register route in `frontend-react/apps/web-store-pos/app/routes.ts` under `app-layout`: `route('management/stores/collections', 'management/stores/routes/collections.tsx')`.
+- [x] 6.6 Verify: `pnpm test -- collections`.
 
 ## Phase 7 (WU-G): Reseller-Commissions Route (parallel with 6)
 

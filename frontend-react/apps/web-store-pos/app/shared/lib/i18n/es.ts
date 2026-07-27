@@ -639,6 +639,29 @@ const messages: Record<string, string> = {
   'BILLING.DUE_NOTICE': 'El pago del plan vence el {date}. Realice el pago para evitar interrupciones en el servicio.',
   'BILLING.OVERDUE_NOTICE': 'El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.',
 
+  // Billing — status labels (StoreToCollect.status, DG-8 narrow union)
+  'BILLING.STATUS.PorVencer': 'Por vencer',
+  'BILLING.STATUS.EnGracia': 'En gracia',
+
+  // Billing — collections view
+  'BILLING.COLLECTIONS.TITLE': 'Cobros pendientes',
+  'BILLING.COLLECTIONS.STORE': 'Tienda',
+  'BILLING.COLLECTIONS.OWNER': 'Propietario',
+  'BILLING.COLLECTIONS.AMOUNT': 'Monto',
+  'BILLING.COLLECTIONS.DUE_DATE': 'Fecha de vencimiento',
+  'BILLING.COLLECTIONS.STATUS': 'Estado',
+  'BILLING.COLLECTIONS.REGISTER_PAYMENT': 'Registrar pago',
+  'BILLING.COLLECTIONS.EMPTY_STATE': 'No hay cobros pendientes.',
+  'BILLING.COLLECTIONS.ERROR': 'Ocurrió un error. Intente de nuevo.',
+
+  // Billing — reseller commissions view
+  'BILLING.COMMISSIONS.TITLE': 'Comisiones',
+  'BILLING.COMMISSIONS.PERIOD': 'Período',
+  'BILLING.COMMISSIONS.PAYMENT_COUNT': 'Cantidad de pagos',
+  'BILLING.COMMISSIONS.TOTAL': 'Total',
+  'BILLING.COMMISSIONS.EMPTY_STATE': 'No hay comisiones registradas.',
+  'BILLING.COMMISSIONS.ERROR': 'Ocurrió un error. Intente de nuevo.',
+
   // Management — Users
   'USERS.LIST_TITLE': 'Empleados',
   'USERS.CREATE_TITLE': 'Adicionar Empleado',

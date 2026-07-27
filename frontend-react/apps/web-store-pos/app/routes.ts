@@ -68,6 +68,9 @@ export default [
     route('management/stores/create', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-create' }),
     route('management/stores/edit/:id', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-edit' }),
 
+    // Management — Stores — Billing (Req: billing-collections; DG-4 resellerFeatureLoader)
+    route('management/stores/collections', 'management/stores/routes/collections.tsx'),
+
     // Management — Users
     route('management/users', 'management/users/routes/user-list.tsx'),
     // storeId is optional: matches both /create (from user list) and /create/:storeId
