@@ -6,6 +6,13 @@ import { formatCurrency } from '~/shared/lib/format-currency';
 interface PlanPickerProps {
   modules: Module[];
   onChange: (selectedIds: number[]) => void;
+  /**
+   * DG-7: when true, the "Activar este plan" button does not render. Tabs
+   * still render (browsing the catalog stays available) — `onChange` is
+   * wired ONLY to that button (`choosePlan`), so removing it structurally
+   * prevents `onChange` from firing on tab interaction. Defaults to false.
+   */
+  readOnly?: boolean;
 }
 
 type Plan = 'free' | 'paid';
@@ -19,7 +26,7 @@ const getActivePlan = (modules: Module[]): Plan =>
 const getPlanModuleIds = (modules: Module[], plan: Plan) =>
   (plan === 'paid' ? modules : getFreeModules(modules)).map((m) => m.id);
 
-export function PlanPicker({ modules, onChange }: PlanPickerProps) {
+export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerProps) {
   const intl = useIntl();
   const t = (id: string) => intl.formatMessage({ id });
   const active = getActivePlan(modules);
@@ -90,10 +97,12 @@ export function PlanPicker({ modules, onChange }: PlanPickerProps) {
         {selected === tab ? (
           <p className="text-sm font-medium text-primary">{t('STORES.PLAN.SELECTED')}</p>
         ) : (
-          <button type="button" onClick={() => choosePlan(tab)}
-            className="rounded bg-primary px-4 py-2 text-sm font-medium text-white">
-            {t('STORES.PLAN.ACTIVATE')}
-          </button>
+          !readOnly && (
+            <button type="button" onClick={() => choosePlan(tab)}
+              className="rounded bg-primary px-4 py-2 text-sm font-medium text-white">
+              {t('STORES.PLAN.ACTIVATE')}
+            </button>
+          )
         )}
 
         {selected === tab && selected !== active && (

@@ -233,7 +233,11 @@ export function StoreForm({
             </div>
           )}
 
-          <PlanPicker modules={modules} onChange={setModuleIds} />
+          <PlanPicker
+            modules={modules}
+            onChange={setModuleIds}
+            readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null}
+          />
         </div>
       </Card>
     </form>

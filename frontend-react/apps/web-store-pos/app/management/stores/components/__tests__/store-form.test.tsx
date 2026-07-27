@@ -378,3 +378,57 @@ describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edi
     });
   });
 });
+
+// ─── DG-7: readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null} ─
+
+describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
+  it('locks the picker for an activated store viewed by a non-super-admin (owner)', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isOwnerAdmin={true}
+          isEditMode={true}
+          owners={[makeOwner({ id: 'o1' })]}
+          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
+        />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    expect(screen.queryByRole('button', { name: 'Activar este plan' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the picker interactive for a super admin even on an activated store', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isSuperAdmin={true}
+          isEditMode={true}
+          owners={[makeOwner({ id: 'o1' })]}
+          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
+        />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
+  });
+
+  it('keeps the picker interactive in create mode (no paymentStartDate yet)', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          isOwnerAdmin={true}
+          isEditMode={false}
+          owners={[makeOwner({ id: 'o1' })]}
+        />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
+  });
+});

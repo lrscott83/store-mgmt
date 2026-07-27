@@ -57,11 +57,11 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 4 (WU-D): PlanPicker Read-Only Lock (parallel with 2/3)
 
-- [ ] 4.1 RED: extend `plan-picker.test.tsx` — `readOnly=true` hides "Activar este plan" and tab click does not call `onChange`; `readOnly=false`/default unaffected. *(Req: PlanPicker Read-Only Lock — 3 scenarios)*
-- [ ] 4.2 GREEN: `plan-picker.tsx` — add `readOnly?: boolean` prop; conditionally render the activate button per DG-7 (tabs always render).
-- [ ] 4.3 RED: extend `store-form.test.tsx` — asserts `PlanPicker` receives `readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null}` for activated/non-super-admin, super-admin, and create-mode (`initialValues` undefined) cases.
-- [ ] 4.4 GREEN: `store-form.tsx` — pass the computed `readOnly` prop to `<PlanPicker>`.
-- [ ] 4.5 Verify: `pnpm test -- plan-picker store-form`; `tsc --noEmit`.
+- [x] 4.1 RED: extend `plan-picker.test.tsx` — `readOnly=true` hides "Activar este plan" and tab click does not call `onChange`; `readOnly=false`/default unaffected. *(Req: PlanPicker Read-Only Lock — 3 scenarios)*
+- [x] 4.2 GREEN: `plan-picker.tsx` — add `readOnly?: boolean` prop; conditionally render the activate button per DG-7 (tabs always render).
+- [x] 4.3 RED: extend `store-form.test.tsx` — asserts `PlanPicker` receives `readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null}` for activated/non-super-admin, super-admin, and create-mode (`initialValues` undefined) cases.
+- [x] 4.4 GREEN: `store-form.tsx` — pass the computed `readOnly` prop to `<PlanPicker>`.
+- [x] 4.5 Verify: `pnpm test -- plan-picker store-form`; `tsc --noEmit`.
 
 ## Phase 5 (WU-E): store-http-service New Methods — blocks 6/7
 

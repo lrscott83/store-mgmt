@@ -133,3 +133,32 @@ describe('PlanPicker — PLAN-9: re-syncs to active plan when modules arrive asy
     expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('Activo');
   });
 });
+
+// DG-7: readOnly hides ONLY "Activar este plan" — tabs still render, and since
+// onChange is wired solely to that button (choosePlan), removing it structurally
+// prevents onChange from firing on tab interaction without disabling the tabs.
+describe('PlanPicker — Read-Only Lock (DG-7)', () => {
+  it('readOnly=true hides "Activar este plan" and tab clicks never call onChange', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    const onChange = vi.fn();
+    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} readOnly /></Wrapper>);
+
+    // Tabs still render (readOnly does not disable browsing the plan catalog).
+    expect(screen.getByRole('tab', { name: /Gratis/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Pago/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    expect(screen.getByText('Reportes')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Activar este plan' })).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('readOnly=false (default) still shows "Activar este plan" and onChange fires normally', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    const onChange = vi.fn();
+    render(<Wrapper><PlanPicker modules={CATALOG} onChange={onChange} /></Wrapper>);
+    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Activar este plan' }));
+    expect(onChange).toHaveBeenCalledWith([1, 2, 3]);
+  });
+});
