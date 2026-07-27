@@ -4,26 +4,30 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 
+const mockUser = vi.hoisted(() => ({
+  id: 'u1',
+  fullName: 'Juan Pérez',
+  email: 'juan@test.com',
+  cellPhone: '+54911',
+  isActive: true,
+  password: '',
+  login: 'juan@test.com',
+  authToken: 'tok',
+  refreshToken: 'ref',
+  expiresIn: Date.now() + 35 * 24 * 60 * 60 * 1000,
+  roles: [],
+  featureIds: [70],
+  storeModuleIds: [],
+  isSuperAdmin: true,
+  isOwnerAdmin: false,
+  isReSeller: false,
+  selectedStoreId: 's1',
+  paymentDueDate: null as string | null,
+  isInTrial: false,
+  paymentStatus: 'NoAplica' as string,
+}));
+
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const mockUser = {
-    id: 'u1',
-    fullName: 'Juan Pérez',
-    email: 'juan@test.com',
-    cellPhone: '+54911',
-    isActive: true,
-    password: '',
-    login: 'juan@test.com',
-    authToken: 'tok',
-    refreshToken: 'ref',
-    expiresIn: Date.now() + 35 * 24 * 60 * 60 * 1000,
-    roles: [],
-    featureIds: [70],
-    storeModuleIds: [],
-    isSuperAdmin: true,
-    isOwnerAdmin: false,
-    isReSeller: false,
-    selectedStoreId: 's1',
-  };
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
     const state = { user: mockUser, isAuthenticated: true, logout: vi.fn() };
     if (typeof selector === 'function') return selector(state);
@@ -161,5 +165,25 @@ describe('AppLayout — <main> responsive padding (Angular 3-breakpoint parity)'
     renderLayout();
     const main = screen.getByRole('main');
     expect(main.className).toContain('px-2 pt-4 md:px-12 md:pt-6');
+  });
+});
+
+// DG-10: PaymentBanner mounts between <Navbar/> and <Breadcrumbs/>.
+describe('AppLayout — mounts PaymentBanner (DG-10)', () => {
+  afterEach(() => {
+    mockUser.paymentStatus = 'NoAplica';
+    mockUser.isInTrial = false;
+    mockUser.paymentDueDate = null;
+  });
+
+  it('does not render a billing notice when paymentStatus is NoAplica', () => {
+    renderLayout();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('renders the overdue billing notice when paymentStatus is Vencido', () => {
+    mockUser.paymentStatus = 'Vencido';
+    renderLayout();
+    expect(screen.getByRole('status')).toHaveTextContent('El pago del plan está vencido.');
   });
 });

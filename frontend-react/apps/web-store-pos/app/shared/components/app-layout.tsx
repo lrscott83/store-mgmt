@@ -4,6 +4,7 @@ import { Sidebar } from './sidebar';
 import { Navbar } from './navbar';
 import { Breadcrumbs } from './breadcrumbs';
 import { Footer } from './footer';
+import { PaymentBanner } from './payment-banner';
 import { authLoader } from '~/auth/routes/loaders';
 
 export const clientLoader = authLoader;
@@ -52,6 +53,7 @@ export function AppLayout() {
       {/* Main area — keeps full width regardless of sidebar state */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar isSidebarOpen={isSidebarOpen} onSidebarToggle={() => setIsSidebarOpen((v) => !v)} />
+        <PaymentBanner />
         <Breadcrumbs />
         {/* Angular .coded-content (pc-common.scss): top 16px->24px@md, sides 8px->48px@md,
             and NO bottom padding — so the vertical padding is top-only (pt-*), not py-*. */}

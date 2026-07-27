@@ -49,11 +49,11 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 3 (WU-C): PaymentBanner (parallel with 2/4)
 
-- [ ] 3.1 Add `BILLING.TRIAL_NOTICE`/`BILLING.DUE_NOTICE`/`BILLING.OVERDUE_NOTICE` (with `{date}` placeholder) to `frontend-react/apps/web-store-pos/app/shared/lib/i18n/es.ts` — neutral LatAm Spanish, no voseo. *(DG-11)*
-- [ ] 3.2 RED: create `frontend-react/apps/web-store-pos/app/shared/components/__tests__/payment-banner.test.tsx` with `vi.mock('~/shared/lib/stores/auth-store')` (selector-aware, per `inventory-components.test.tsx:507-514` precedent) covering: hidden for `NoAplica`/`AlDia`/missing, trial notice (`isInTrial:true`), due notice (`isInTrial:false`), overdue notice (`Vencido` outranks trial). *(Req: billing-notification/Visibility Matrix — 4 scenarios)*
-- [ ] 3.3 GREEN: create `frontend-react/apps/web-store-pos/app/shared/components/payment-banner.tsx` — named + default export, reads `useAuthStore((s) => s.user)`, `user?.paymentStatus ?? 'NoAplica'` default (DG-2), date via `intl.formatDate`.
-- [ ] 3.4 Mount `<PaymentBanner />` in `frontend-react/apps/web-store-pos/app/shared/components/app-layout.tsx` between `<Navbar/>` and `<Breadcrumbs/>` (DG-10); add assertion to `app-layout.test.tsx`.
-- [ ] 3.5 Verify: `pnpm test -- payment-banner app-layout`.
+- [x] 3.1 Add `BILLING.TRIAL_NOTICE`/`BILLING.DUE_NOTICE`/`BILLING.OVERDUE_NOTICE` (with `{date}` placeholder) to `frontend-react/apps/web-store-pos/app/shared/lib/i18n/es.ts` — neutral LatAm Spanish, no voseo. *(DG-11)*
+- [x] 3.2 RED: create `frontend-react/apps/web-store-pos/app/shared/components/__tests__/payment-banner.test.tsx` with `vi.mock('~/shared/lib/stores/auth-store')` (selector-aware, per `inventory-components.test.tsx:507-514` precedent) covering: hidden for `NoAplica`/`AlDia`/missing, trial notice (`isInTrial:true`), due notice (`isInTrial:false`), overdue notice (`Vencido` outranks trial). *(Req: billing-notification/Visibility Matrix — 4 scenarios)*
+- [x] 3.3 GREEN: create `frontend-react/apps/web-store-pos/app/shared/components/payment-banner.tsx` — named + default export, reads `useAuthStore((s) => s.user)`, `user?.paymentStatus ?? 'NoAplica'` default (DG-2), date via `intl.formatDate`.
+- [x] 3.4 Mount `<PaymentBanner />` in `frontend-react/apps/web-store-pos/app/shared/components/app-layout.tsx` between `<Navbar/>` and `<Breadcrumbs/>` (DG-10); add assertion to `app-layout.test.tsx`.
+- [x] 3.5 Verify: `pnpm test -- payment-banner app-layout`.
 
 ## Phase 4 (WU-D): PlanPicker Read-Only Lock (parallel with 2/3)
 
