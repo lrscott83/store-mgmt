@@ -21,6 +21,10 @@ Define the HTTP contract for user registration in the auth-http service layer. T
 - **Envelope handling**: Response branching on `succeeded` field; surface `errors[0].description` on failure; navigate to `/login` on success.
 - **Form integration**: Register form supplies `login` and `storeName` required inputs; reads `?code` query parameter; client-only validation of `passwordConfirmation` match.
 
+- **getMe() billing fields passthrough** (added by `store-paid-plan-billing-frontend`, archived
+  2026-07-27): `UserModel` billing fields (`paymentDueDate`, `isInTrial`, `paymentStatus`) MUST
+  flow through `getMe()` unchanged, with zero mapping/defaulting added to the transport layer.
+
 ### Out of Scope (deferred to subsequent slices)
 - Accept/terms toggle and `/terminos-condiciones` route (product decision-gate a).
 - Email validation relaxation (product decision-gate b).
@@ -159,9 +163,48 @@ interface RegisterRequest {
 
 ---
 
+### S6: getMe() Billing Fields Raw Passthrough
+
+**Requirement**: `UserModel` MUST declare `paymentDueDate: string | null`, `isInTrial: boolean`,
+`paymentStatus: PaymentStatus`. `authHttpService.getMe()` MUST remain a raw passthrough
+(`return response.data.data`) — it MUST NOT gain a mapping/defaulting step for these fields. The
+backend (`CurrentUserDto`) always serializes non-null defaults (`'NoAplica'`/`false`/`null`); any
+defaulting for a stale/offline payload missing these fields is the CONSUMER's responsibility
+(e.g. `PaymentBanner` reading `user?.paymentStatus ?? 'NoAplica'`), not `getMe`'s.
+
+**Shape**:
+```typescript
+export type PaymentStatus = 'NoAplica' | 'AlDia' | 'PorVencer' | 'EnGracia' | 'Vencido';
+// UserModel += paymentDueDate: string | null; isInTrial: boolean; paymentStatus: PaymentStatus;
+```
+
+**Constraints**:
+- `getMe()` MUST NOT transform, default, or drop these three fields.
+- A stale/offline payload missing the fields yields `undefined` on the returned object; `getMe`
+  does not default them — defaulting is consumer-side.
+
+**Rationale**: Added by SDD change `store-paid-plan-billing-frontend` (archived 2026-07-27). NEW
+feature work — no Angular source exists for this contract (the paid-plan billing lifecycle is
+backend-new). This requirement locks `getMe()` as the project's one remaining pure passthrough,
+consistent with S2/S3 above which already forbid envelope flattening or transformation at this
+layer.
+
+#### Scenario: Fields present in response
+- GIVEN `getMe` resolves with `paymentDueDate: '2026-03-10'`, `isInTrial: true`, `paymentStatus: 'PorVencer'`
+- WHEN `authHttpService.getMe()` returns
+- THEN `UserModel.paymentDueDate/isInTrial/paymentStatus` carry the same values unchanged, with no transform applied
+
+#### Scenario: Fields absent from a stale payload
+- GIVEN a payload lacking the three fields (pre-backend-merge or stale offline cache)
+- WHEN `authHttpService.getMe()` returns
+- THEN the fields are `undefined` on the returned object (getMe does not default them); a consumer reading `user?.paymentStatus ?? 'NoAplica'` treats it as `NoAplica`
+
+---
+
 ## Verification Criteria
 
 - [x] All 5 spec requirements are implemented and test-covered.
+- [x] S6: `getMe()` billing fields passthrough — `UserModel` carries `paymentDueDate`/`isInTrial`/`paymentStatus` unchanged; no mapping added.
 - [x] Service tests verify: body includes login/storeName, excludes passwordConfirmation, includes code only when non-empty (trim), returns BaseResponseModel<boolean>.
 - [x] Component tests verify: form renders login/storeName, code flows from query param without visible input, passwordConfirmation blocks submit locally and is never sent, envelope branch succeeds on true/false, navigate only on success.
 - [x] Full regression gate: typecheck 5/5 packages, 1567/1567 tests passing, zero build warnings.
@@ -184,6 +227,9 @@ interface RegisterRequest {
 - **register.tsx call-site**: ✓ Done (app/auth/routes/register.tsx)
 - **Tests**: ✓ Done (auth-http-service.test.ts, register.test.tsx)
 - **PRD documentation**: ✓ Done (docs/prd/auth.md corrected)
+- **S6 getMe() billing fields passthrough**: ✓ Done (`packages/domain/src/models/auth.ts`,
+  `app/shared/lib/http/auth-http-service.ts` — body unchanged, test-only touch; SDD change
+  `store-paid-plan-billing-frontend`, archived 2026-07-27)
 
 ---
 
@@ -192,3 +238,10 @@ interface RegisterRequest {
 - This specification captures Slice 2 of a 5-slice auth cluster (Fase 1). Slices 3–5 will define login, authorization, and usage-tracker.
 - Decision-gates (a), (b), (c) above remain open; they do not block this slice's completion.
 - Backend contract is specified from Angular source only (rule 1); no live API validation is performed.
+- S6 (`getMe()` billing fields) was added later by SDD change `store-paid-plan-billing-frontend`
+  (archived 2026-07-27) — NEW feature work, no Angular source. It was merged into this capability
+  rather than `auth-session` or `auth-authorization` because it is purely a transport/passthrough
+  contract on `authHttpService`, matching this capability's scope (S1-S3 already govern
+  `getMe`'s sibling `register()` transport contract on the same service file); `auth-session`
+  governs store-lifecycle behavior (logout/getUserByToken) and `auth-authorization` governs
+  `isUserAuthorized` checks — neither is about HTTP transport shape.

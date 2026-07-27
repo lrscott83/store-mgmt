@@ -115,3 +115,44 @@ of this name or purpose to mirror).
 - WHEN the removal lands
 - THEN its dedicated test case is removed from `store-http-service.test.ts`
 - AND the full test suite and typecheck still pass
+
+### Requirement: Store.paymentStartDate is a nullable ISO date string, not a Date
+(Added by SDD change `store-paid-plan-billing-frontend`, archived 2026-07-27. NEW feature work,
+no Angular source — the store paid-plan lifecycle has no Angular equivalent.)
+
+`Store.paymentStartDate` MUST be typed `string | null` (backend `DateOnly?`, camelCase JSON,
+raw passthrough — `store-http-service` performs no field mapping). `null` means the store never
+activated the paid plan.
+
+#### Scenario: Activated store carries an ISO string
+- GIVEN a store with `paymentStartDate: '2026-03-10'` in the raw JSON response
+- WHEN `storeHttpService.getStore()` resolves
+- THEN `Store.paymentStartDate` is the string `'2026-03-10'`, and `store-form` coerces it via `new Date(...)` only at the point of use (date input)
+
+#### Scenario: Never-activated store is null
+- GIVEN a store with `paymentStartDate: null`
+- WHEN `storeHttpService.getStore()` resolves
+- THEN `Store.paymentStartDate` is `null` and the read-only lock (below) does not engage
+
+### Requirement: PlanPicker Read-Only Lock After Plan Activation
+(Added by SDD change `store-paid-plan-billing-frontend`, archived 2026-07-27. NEW feature work,
+no Angular source.)
+
+`PlanPicker` MUST accept a `readOnly` prop. When `true`, plan tabs MUST still render, but the
+"Activar este plan" button MUST NOT render and `onChange` MUST NOT fire on tab interaction.
+`store-form` MUST compute `readOnly={!isSuperAdmin && paymentStartDate != null}`.
+
+#### Scenario: Activated owner sees a locked picker
+- GIVEN a store with `paymentStartDate` set and the current user is not super admin
+- WHEN the edit form renders `PlanPicker`
+- THEN `readOnly` is `true`: no "Activar este plan" button renders and clicking a tab does not call `onChange`
+
+#### Scenario: Super admin keeps full control
+- GIVEN a store with `paymentStartDate` set and the current user is super admin
+- WHEN the edit form renders `PlanPicker`
+- THEN `readOnly` is `false`: the "Activar este plan" button renders and tab clicks call `onChange`
+
+#### Scenario: Create mode is always interactive
+- GIVEN a new store with no `paymentStartDate` (create mode)
+- WHEN the create form renders `PlanPicker`
+- THEN `readOnly` is `false` regardless of the current user's role
