@@ -80,12 +80,12 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 7 (WU-G): Reseller-Commissions Route (parallel with 6)
 
-- [ ] 7.1 Add `BILLING.COMMISSIONS.*` i18n keys (title, columns, empty-state) to `es.ts`.
-- [ ] 7.2 RED: create `reseller-commissions.test.tsx` covering period rows `MM/YYYY` + count + `formatCurrency` total, empty state. *(Req: Commission View — 2 scenarios)*
-- [ ] 7.3 RED (same file): wiring-only assertion that `clientLoader` calls `resellerFeatureLoader([EFeatures.Owners])`, same rationale as 6.3.
-- [ ] 7.4 GREEN: create `reseller-commissions.tsx` (same shape as 6.4) using `getReSellerCommissions`.
-- [ ] 7.5 Register route in `routes.ts`: `route('management/stores/commissions', 'management/stores/routes/reseller-commissions.tsx')`.
-- [ ] 7.6 Verify: `pnpm test -- reseller-commissions`.
+- [x] 7.1 Add `BILLING.COMMISSIONS.*` i18n keys (title, columns, empty-state) to `es.ts`.
+- [x] 7.2 RED: create `reseller-commissions.test.tsx` covering period rows `MM/YYYY` + count + `formatCurrency` total, empty state. *(Req: Commission View — 2 scenarios)*
+- [x] 7.3 RED (same file): wiring-only assertion that `clientLoader` calls `resellerFeatureLoader([EFeatures.Owners])`, same rationale as 6.3.
+- [x] 7.4 GREEN: create `reseller-commissions.tsx` (same shape as 6.4) using `getReSellerCommissions`.
+- [x] 7.5 Register route in `routes.ts`: `route('management/stores/commissions', 'management/stores/routes/reseller-commissions.tsx')`.
+- [x] 7.6 Verify: `pnpm test -- reseller-commissions`.
 
 ## Phase 8 (WU-H): Final Gate
 

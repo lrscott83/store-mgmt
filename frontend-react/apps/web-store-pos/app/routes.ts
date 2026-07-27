@@ -70,6 +70,7 @@ export default [
 
     // Management — Stores — Billing (Req: billing-collections; DG-4 resellerFeatureLoader)
     route('management/stores/collections', 'management/stores/routes/collections.tsx'),
+    route('management/stores/commissions', 'management/stores/routes/reseller-commissions.tsx'),
 
     // Management — Users
     route('management/users', 'management/users/routes/user-list.tsx'),
