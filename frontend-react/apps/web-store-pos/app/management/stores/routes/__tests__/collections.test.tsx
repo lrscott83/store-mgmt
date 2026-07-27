@@ -67,7 +67,7 @@ describe('CollectionsPage — exports', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('CollectionsPage — route gating wiring', () => {
-  it('builds clientLoader via resellerFeatureLoader([EFeatures.Owners]), verified against a genuinely fresh module instance', async () => {
+  it('builds clientLoader via resellerFeatureLoader([EFeatures.StorePayment]), verified against a genuinely fresh module instance', async () => {
     // Baseline: earlier "exports" tests in this file already imported and
     // cached '../collections'. This import returns that SAME cached instance
     // (no top-level re-execution).
@@ -92,7 +92,7 @@ describe('CollectionsPage — route gating wiring', () => {
     // invoked as part of THIS fresh import: assert "was it called" before
     // "was it called with what".
     expect(mockResellerFeatureLoader).toHaveBeenCalled();
-    expect(mockResellerFeatureLoader).toHaveBeenCalledWith([11]);
+    expect(mockResellerFeatureLoader).toHaveBeenCalledWith([91]);
 
     // Tie the fresh export directly to the loader instance the POST-RESET
     // call produced — not merely "some function is exported" and "the mock

@@ -7,9 +7,10 @@ import { formatCurrency } from '~/shared/lib/format-currency';
 import type { ReSellerCommission } from '@store-mgmt/domain';
 
 // Req: Route Gating is Reseller Feature Loader, Not Admin Feature Loader — mirrors
-// backend [HasPermission(StoreRoleFeatures.OwnersAdmin)] (roles {SuperAdmin, ReSeller}
-// + FeatureType.Owners = 11). Same gate as collections.tsx / admin/owners/routes/owner-list.tsx.
-export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
+// backend [HasPermission(StoreRoleFeatures.StorePaymentAdmin)] (roles {SuperAdmin,
+// ReSeller} + FeatureType.StorePayment = 91). Same gate as collections.tsx; a
+// DIFFERENT feature id than admin/owners/routes/owner-list.tsx (EFeatures.Owners).
+export const clientLoader = resellerFeatureLoader([EFeatures.StorePayment]);
 
 function formatPeriod(month: number, year: number): string {
   return `${String(month).padStart(2, '0')}/${year}`;

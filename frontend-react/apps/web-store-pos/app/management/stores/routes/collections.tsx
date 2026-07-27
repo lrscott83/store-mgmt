@@ -9,9 +9,10 @@ import { Button } from '~/shared/components/ui/button';
 import type { StoreToCollect } from '@store-mgmt/domain';
 
 // Req: Route Gating is Reseller Feature Loader, Not Admin Feature Loader — mirrors
-// backend [HasPermission(StoreRoleFeatures.OwnersAdmin)] (roles {SuperAdmin, ReSeller}
-// + FeatureType.Owners = 11). Same gate as admin/owners/routes/owner-list.tsx.
-export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
+// backend [HasPermission(StoreRoleFeatures.StorePaymentAdmin)] (roles {SuperAdmin,
+// ReSeller} + FeatureType.StorePayment = 91). Same role set as owner-list.tsx, but a
+// DIFFERENT feature id — do not conflate with EFeatures.Owners.
+export const clientLoader = resellerFeatureLoader([EFeatures.StorePayment]);
 
 /**
  * Read-only projection of backend-computed collections state (design.md — the

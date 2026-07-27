@@ -33,6 +33,7 @@ export enum EFeatures {
   Configurations = 74,
   TodayExpenses = 80,
   Billing = 90,
+  StorePayment = 91,
   SalesHistory = 100,
   EntriesHistory = 101,
   ExpensesHistory = 102,
