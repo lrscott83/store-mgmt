@@ -1,4 +1,11 @@
-import type { BaseResponseModel, Store, Module, Owner } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  Store,
+  Module,
+  Owner,
+  StoreToCollect,
+  ReSellerCommission,
+} from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
 
 interface CreateStorePayload {
@@ -86,6 +93,27 @@ export const storeHttpService = {
   async listOwners(): Promise<BaseResponseModel<Owner[]>> {
     const response = await apiClient.get<BaseResponseModel<Owner[]>>(
       '/v1/owners/all/true'
+    );
+    return response.data;
+  },
+
+  async getStoresToCollect(): Promise<BaseResponseModel<StoreToCollect[]>> {
+    const response = await apiClient.get<BaseResponseModel<StoreToCollect[]>>(
+      '/v1/stores/to-collect'
+    );
+    return response.data;
+  },
+
+  async registerStorePayment(id: string): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.post<BaseResponseModel<boolean>>(
+      `/v1/stores/${id}/payments`
+    );
+    return response.data;
+  },
+
+  async getReSellerCommissions(): Promise<BaseResponseModel<ReSellerCommission[]>> {
+    const response = await apiClient.get<BaseResponseModel<ReSellerCommission[]>>(
+      '/v1/stores/reseller-commissions'
     );
     return response.data;
   },

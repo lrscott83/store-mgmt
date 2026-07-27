@@ -211,6 +211,93 @@ describe('storeHttpService.disapproveStore — HTTP-8: POST /v1/stores/disapprov
   });
 });
 
+describe('storeHttpService.getStoresToCollect — HTTP-12: GET /v1/stores/to-collect', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        data: [
+          {
+            storeId: 's1',
+            storeName: 'Store One',
+            ownerName: 'Owner One',
+            amount: 25,
+            nextDueDate: '2026-08-15',
+            status: 'PorVencer',
+          },
+        ],
+      },
+    });
+  });
+
+  it('calls GET /v1/stores/to-collect', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.getStoresToCollect();
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/stores/to-collect');
+  });
+
+  it('returns the raw response.data (no mapping)', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.getStoresToCollect();
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]).toEqual({
+      storeId: 's1',
+      storeName: 'Store One',
+      ownerName: 'Owner One',
+      amount: 25,
+      nextDueDate: '2026-08-15',
+      status: 'PorVencer',
+    });
+  });
+});
+
+describe('storeHttpService.registerStorePayment — HTTP-13: POST /v1/stores/:id/payments', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: true } });
+  });
+
+  it('calls POST /v1/stores/:id/payments with no body', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.registerStorePayment('s1');
+    expect(apiClient.post).toHaveBeenCalledWith('/v1/stores/s1/payments');
+  });
+
+  it('returns the raw boolean response.data', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.registerStorePayment('s1');
+    expect(result.data).toBe(true);
+  });
+});
+
+describe('storeHttpService.getReSellerCommissions — HTTP-14: GET /v1/stores/reseller-commissions', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { data: [{ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 }] },
+    });
+  });
+
+  it('calls GET /v1/stores/reseller-commissions', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    await storeHttpService.getReSellerCommissions();
+    expect(apiClient.get).toHaveBeenCalledWith('/v1/stores/reseller-commissions');
+  });
+
+  it('returns the raw response.data (no mapping)', async () => {
+    const { storeHttpService } = await import('../store-http-service');
+    const result = await storeHttpService.getReSellerCommissions();
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]).toEqual({ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 });
+  });
+});
+
 describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStore', () => {
   beforeEach(async () => {
     vi.clearAllMocks();

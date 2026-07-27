@@ -65,9 +65,9 @@ Each unit = one work-unit commit, independently revertible, per proposal's Rollb
 
 ## Phase 5 (WU-E): store-http-service New Methods — blocks 6/7
 
-- [ ] 5.1 RED in `store-http-service.test.ts`: 3 new describe blocks mocking `apiClient.get`/`post`, asserting URLs `GET /v1/stores/to-collect`, `POST /v1/stores/{id}/payments`, `GET /v1/stores/reseller-commissions`, and raw `response.data` return (no mapping).
-- [ ] 5.2 GREEN: add `getStoresToCollect`, `registerStorePayment(id)`, `getReSellerCommissions` to `store-http-service.ts` per design contracts.
-- [ ] 5.3 Verify: `pnpm test -- store-http-service`.
+- [x] 5.1 RED in `store-http-service.test.ts`: 3 new describe blocks mocking `apiClient.get`/`post`, asserting URLs `GET /v1/stores/to-collect`, `POST /v1/stores/{id}/payments`, `GET /v1/stores/reseller-commissions`, and raw `response.data` return (no mapping).
+- [x] 5.2 GREEN: add `getStoresToCollect`, `registerStorePayment(id)`, `getReSellerCommissions` to `store-http-service.ts` per design contracts.
+- [x] 5.3 Verify: `pnpm test -- store-http-service`.
 
 ## Phase 6 (WU-F): Collections Route (parallel with 7)
 
