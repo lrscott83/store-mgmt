@@ -37,14 +37,6 @@ function useAutoCollapseSidebar(): [boolean, React.Dispatch<React.SetStateAction
 export function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useAutoCollapseSidebar();
 
-  useEffect(() => {
-    // PWA-02: post-auth precaching of remaining route chunks
-    // Trigger service worker to precache all app chunks after auth
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'PRECACHE_APP_CHUNKS' });
-    }
-  }, []);
-
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Sidebar — overlays content when open (fixed positioning), never pushes it */}
