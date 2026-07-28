@@ -1,7 +1,7 @@
 # Apply Progress: PWA Offline Shell
 
 **Change**: `pwa-offline-shell` · **Mode**: Strict TDD · **Branch**: `feat/pwa-offline-shell`
-**Batch**: 1 (first batch — no prior progress to merge)
+**Batch**: 2 (fix-up of verify-report SUGGESTION findings; Batch 1 below is unchanged, merged not overwritten)
 **Delivery**: commits-only, one commit per work unit, no PRs/chaining/size:exception
 
 ## Status
@@ -216,3 +216,95 @@ unmodified (verified via `git status --short` before every commit in this
 batch). A third untracked file appeared mid-session from an unrelated
 process, `docs/plans/2026-07-28-billing-new-endpoints-test-suites.md` — also
 left untouched, not staged, not committed.
+
+---
+
+## Batch 2 — Verify-report SUGGESTION fix-up (2026-07-28)
+
+**Trigger**: `openspec/changes/pwa-offline-shell/verify-report.md`, verdict
+"PASS WITH WARNINGS". Fixed the 3 SUGGESTION findings only. The CRITICAL
+finding (Phase 8 manual walkthrough not run) and the WARNING findings
+(zero SW runtime test coverage — by design D9; debug logs still present —
+intentionally deferred per `decision/pwa-temp-logs-removal-timing`; branch
+already on `main` without its acceptance gate) are **not fixable in code**
+and were left untouched, exactly as instructed.
+
+### Commits (on top of `af27018`, in order)
+
+| # | Hash | Subject |
+|---|------|---------|
+| 1 | `839a859` | `fix(pwa): correct stale icon-count comment in precache patterns` |
+| 2 | `5112594` | `fix(pwa): catch fire-and-forget cache.put rejection in fetch handler` |
+| 3 | `007e100` | `test(pwa): regression-test the Phase 2.2 RED precache-diff scenario` |
+
+### Findings fixed
+
+1. **SUGGESTION 1 — stale comment** (`precache-patterns.mjs:8`, "9 PWA
+   install icons"). Verified `public/icons/` has 8 files on disk; corrected
+   the comment to "8". No test needed — cosmetic drift, the verifier never
+   reads this hardcoded count.
+2. **SUGGESTION 2 — unhandled promise rejection** (`service-worker.ts:117-119`).
+   The fire-and-forget `caches.open(...).then((cache) => cache.put(...))`
+   inside the cache-first fetch branch had no `.catch`; added
+   `.catch(() => {})` with a comment explaining the best-effort intent
+   (matches the silent-catch philosophy the removed dead
+   `PRECACHE_APP_CHUNKS` handler used to have). Did not restructure the
+   fetch handler or touch `resolveStrategy`'s contract.
+3. **SUGGESTION 3 — no regression test for the Phase 2.2 RED scenario.**
+   TDD'd (RED confirmed: `Failed to resolve import "../precache-diff.mjs"`,
+   then GREEN: 5/5). Extracted the pure disk-vs-manifest comparison out of
+   `verify-sw-precache.mjs` into `scripts/precache-diff.mjs`
+   (`computePrecacheDiff(onDiskUrls, injectedUrls)` — no I/O, no
+   workbox-build import); the script now imports and calls it, with
+   identical error messages/exit codes (confirmed via a real `pnpm build`
+   after the change: `verify-sw-precache: OK — 129 precached entries`, same
+   count as before). Added `scripts/__tests__/precache-diff.test.mjs`
+   covering: the actual 10-path Phase 2.2 RED scenario (from this file's
+   own "Regression Evidence" section above), the complete-manifest GREEN
+   case, the `service-worker.js` ignore-list case (must NOT false-fail),
+   zero `index.html` entries (fails), and 2x `assets/manifest-*.js`
+   entries (fails).
+   - `vitest.config.ts`'s `include` extended with one narrow pattern,
+     `'scripts/**/*.test.mjs'`, alongside the existing
+     `'app/**/*.test.{ts,tsx}'`. Verified before/after test-FILE counts via
+     `vitest list`: **141 -> 142**, and confirmed the only new match under
+     the new pattern is `scripts/__tests__/precache-diff.test.mjs` — no
+     other unintended files got swept in.
+   - This does **not** reopen design.md's Testing Strategy rejection ("Unit:
+     build scripts: NONE... relocating them under `app/` would drag them
+     into the client module graph and DOM-lib typechecking"). The new
+     module/test stay in `scripts/`, plain `.mjs`, outside `tsconfig.json`'s
+     typechecked surface and outside the client bundle — only Vitest's test
+     collection changed, narrowly.
+
+### Gates (final run, this batch)
+
+- `pnpm test`: **142 test files, 2096 tests, all passed** (was 141/2091 —
+  +1 file / +5 tests, exactly the new `precache-diff.test.mjs`).
+- `pnpm -C apps/web-store-pos exec tsc --noEmit` (after `rm -rf
+  .react-router` + `react-router typegen`, same as Batch 1's noted
+  gotcha): **clean, 0 errors.**
+- `pnpm -C apps/web-store-pos build` (clean `build/` dir): **exit 0.**
+  `verify-sw-precache: OK — 129 precached entries; shell and route manifest
+  each present exactly once.` — same 129-entry count as Batch 1's build,
+  confirming the refactor is behavior-preserving.
+
+### Confirmed untouched (per fix scope)
+
+- `[SW]`/`[PWA]` debug logs — still present, unchanged (`rg -c` count
+  identical to Batch 1: 7 in `service-worker.ts` incl. import line, 7+1 in
+  `service-worker-registration.ts`). Deferred to the last commit per
+  `decision/pwa-temp-logs-removal-timing`, gated on Phase 8 sign-off.
+- Dev/preview port separation + the stale comment at
+  `service-worker-registration.ts:74-79` — zero diff (verified via `git
+  diff af27018 HEAD -- .../service-worker-registration.ts`), per
+  `todo/dev-preview-port-separation`.
+- nginx gzip/MIME — untouched, still blocked (no Docker socket).
+- The CRITICAL finding (Phase 8 manual offline walkthrough) — not
+  attempted, not faked, not marked resolved. Still requires a human.
+
+### Remaining Tasks (unchanged from Batch 1)
+
+Same as Batch 1's "Remaining Tasks" section above: 8.1-8.6 (manual
+walkthrough) and 9.1 (debug-log removal, BLOCKED on 8's sign-off). Nothing
+in Batch 2 changes their status.
