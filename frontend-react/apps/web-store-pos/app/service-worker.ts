@@ -114,9 +114,13 @@ self.addEventListener('fetch', (event) => {
           // caches.open().then() ran after the returned response had already
           // started being consumed ("Response body is already used").
           const responseToCache = response.clone();
-          caches.open(PRECACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
+          // Best-effort: this write is not awaited by `respondWith` (the
+          // response above is already on its way to the caller), so a
+          // rejection here (e.g. `QuotaExceededError`) must never surface as
+          // an unhandled promise rejection in the worker's global scope —
+          // same silent-failure intent as the removed dead precache-refresh
+          // handler this file used to have.
+          caches.open(PRECACHE_NAME).then((cache) => cache.put(request, responseToCache)).catch(() => {});
         }
         return response;
       });
