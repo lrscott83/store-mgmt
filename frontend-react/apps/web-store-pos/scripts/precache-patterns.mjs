@@ -5,7 +5,7 @@
 // patterns").
 export const PRECACHE_GLOB_PATTERNS = [
   '**/*.{js,css,html,woff2,webmanifest}', // shell + route chunks + 5 woff2 + manifest.webmanifest
-  'icons/*.png', // 9 PWA install icons
+  'icons/*.png', // 8 PWA install icons
   'images/**/*.png', // 6 /help/tutorial screenshots
   'favicon.png',
 ];
