@@ -16,7 +16,13 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['app/**/*.test.{ts,tsx}'],
+    // NARROW addition: only `scripts/**/*.test.mjs` (plain JS, build-script
+    // helpers, never part of the app's client module graph or DOM-lib
+    // typecheck — design.md's "Unit: build scripts: NONE" rejection was about
+    // moving these files under `app/`, not about testing them at all). Used
+    // to regression-test the extracted pure precache-diff comparison
+    // (verify-report SUGGESTION #3, pwa-offline-shell).
+    include: ['app/**/*.test.{ts,tsx}', 'scripts/**/*.test.mjs'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json'],

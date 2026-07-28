@@ -15,6 +15,7 @@ import {
   PRECACHE_GLOB_IGNORES,
   MAX_FILE_SIZE_BYTES,
 } from './precache-patterns.mjs';
+import { computePrecacheDiff } from './precache-diff.mjs';
 
 const BUILD_CLIENT_DIR = resolve(process.cwd(), 'build/client');
 const SW_PATH = resolve(BUILD_CLIENT_DIR, 'service-worker.js');
@@ -81,7 +82,7 @@ async function main() {
   }
 
   const injectedEntries = extractInjectedManifest(swSource);
-  const injectedUrls = new Set(injectedEntries.map((entry) => entry.url));
+  const injectedUrls = injectedEntries.map((entry) => entry.url);
 
   const { manifestEntries } = await getManifest({
     globDirectory: BUILD_CLIENT_DIR,
@@ -89,16 +90,9 @@ async function main() {
     globIgnores: PRECACHE_GLOB_IGNORES,
     maximumFileSizeToCacheInBytes: MAX_FILE_SIZE_BYTES,
   });
+  const onDiskUrls = manifestEntries.map((entry) => entry.url);
 
-  const missing = manifestEntries
-    .map((entry) => entry.url)
-    .filter((url) => !injectedUrls.has(url))
-    .sort();
-
-  const shellCount = injectedEntries.filter((entry) => entry.url === 'index.html').length;
-  const routeManifestCount = injectedEntries.filter((entry) =>
-    /^assets\/manifest-.*\.js$/.test(entry.url)
-  ).length;
+  const { missing, shellCount, routeManifestCount } = computePrecacheDiff(onDiskUrls, injectedUrls);
 
   const errors = [];
   if (missing.length > 0) {
