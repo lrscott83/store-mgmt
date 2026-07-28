@@ -154,6 +154,29 @@ roster file imported on this device? If it is, authentication goes offline again
 file regardless of connectivity; if it is not, the app must run online-auth normally and
 must not break.
 
+### 7a. The roster export endpoint blocks one frontend task
+
+`GET /v1/storeusers/{storeId}/offline-roster` does not exist. The frontend can build and
+unit-test the offline auth service and the device-provisioning route against
+self-serialized bundles, but the admin "Export offline roster" action cannot be verified
+end-to-end until this endpoint ships. Tracked as a dependency, not as frontend work.
+
+### 7b. The roster DTO carries no billing fields — decision needed
+
+`UserModel` on the frontend gained three REQUIRED fields from the billing feature
+(commit `b57fc3e`, 2026-07-27): `paymentDueDate`, `isInTrial`, `paymentStatus`. The
+planned `OfflineRosterUserDto` carries none of them.
+
+Consequence today: a user hydrated from the roster gets the codebase's established
+"no billing data" defaults (`paymentStatus: 'NoAplica'`, `isInTrial: false`,
+`paymentDueDate: null`), which means the payment banner stays silent. **A store whose
+plan is actually expired would show no payment warning while operating offline.**
+
+The decision belongs here, on the backend side: either the roster export includes the
+billing snapshot (add the three fields to `OfflineRosterUserDto`, accepting that the
+values are as stale as the bundle), or offline sessions deliberately carry no billing
+signal. Until this is decided, the frontend proceeds with the silent-banner defaults.
+
 ---
 
 ## 8. At-rest encryption — backend side
