@@ -85,6 +85,20 @@ const messages: Record<string, string> = {
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
   'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',
 
+  // Offline device provisioning (offline-auth-frontend) — own PROVISION.*
+  // namespace, not reused from SYNC.*: its copy is domain-specific (design
+  // correction #5, no plan task covered this).
+  'PROVISION.TITLE': 'Activar dispositivo sin conexión',
+  'PROVISION.SUCCESS': 'Dispositivo activado. Ya podés iniciar sesión sin conexión.',
+  'PROVISION.STORE_ID_LABEL': 'Identificador de tienda',
+  'PROVISION.MASTER_PASSWORD_LABEL': 'Contraseña maestra',
+  'PROVISION.FILE_LABEL': 'Archivo de roster (.smcabundle)',
+  'PROVISION.SUBMIT': 'Activar',
+  'PROVISION.ERROR_WRONG_PASSWORD': 'La contraseña maestra es incorrecta.',
+  'PROVISION.ERROR_CORRUPT_FILE': 'El archivo está dañado o no tiene un formato válido.',
+  'PROVISION.ERROR_EXPIRED': 'Este archivo de roster ya venció. Solicitá uno nuevo.',
+  'PROVISION.ERROR_REPLAY': 'Este archivo de roster ya fue importado en este dispositivo.',
+
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)
   'REGISTRATION.WELCOME': 'Creación de cuenta',
@@ -689,6 +703,10 @@ const messages: Record<string, string> = {
   'USERS.EDIT': 'Editar',
   'USERS.CREATE': 'Adicionar',
   'USERS.LIFECYCLE_ERROR': 'No se pudo realizar la acción. Intente de nuevo.',
+  // Admin export of the encrypted offline roster bundle (offline-auth-frontend,
+  // design correction #5). BLOCKED-for-verification: the backend endpoint
+  // (GET /v1/storeusers/{storeId}/offline-roster) does not exist yet (§7a).
+  'USERS.EXPORT_ROSTER': 'Exportar roster sin conexión',
 
   // Admin — Dashboard
   'ADMIN_DASHBOARD.HEADER': 'Panel de Control',
