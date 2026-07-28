@@ -1,18 +1,26 @@
 /// <reference lib="webworker" />
 /* eslint-disable no-restricted-globals */
+import { resolveStrategy } from './shared/lib/pwa/sw-strategy';
 
 declare let self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
 };
 
 // Bump this version whenever precached shell assets (icons, favicon, etc.)
-// change. The `activate` handler deletes every cache NOT in `currentCaches`,
-// so bumping the suffix purges the previous `app-shell-*` cache — otherwise the
-// cache-first `/icons/` handler below serves stale (e.g. old blank) icons
-// forever, since it never revalidates and the old cache is never evicted.
-const PRECACHE_NAME = 'app-shell-v2';
-const APP_CHUNKS_CACHE = 'app-chunks-v1';
-const FONTS_CACHE = 'fonts-v1';
+// change. The `activate` handler deletes every cache NOT matching this name,
+// so bumping the suffix purges every previous `app-shell-*` cache. v3 also
+// collapses the three previously separate caches (`app-shell-v2`,
+// `app-chunks-v1`, `fonts-v1`) into this single named cache
+// (pwa-offline-shell spec: "Precache is consolidated into a single named
+// cache").
+const PRECACHE_NAME = 'app-shell-v3';
+const SHELL_URL = '/index.html';
+
+// Read the injected manifest exactly ONCE at module scope. Referencing
+// `self.__WB_MANIFEST` at more than one call site would leave two occurrences
+// of the injection-point placeholder in the pre-injection bundle, tripping
+// workbox-build's `multiple-injection-points` assert (design.md D3/D4).
+const PRECACHE_MANIFEST = self.__WB_MANIFEST ?? [];
 
 // Precache the manifest entries on install.
 //
@@ -29,131 +37,100 @@ const FONTS_CACHE = 'fonts-v1';
 // FIRST install (no existing controller) there is no `waiting` phase: the worker
 // activates directly and `activate`'s `clients.claim()` takes control.
 self.addEventListener('install', (event) => {
-  // TEMP (debugging the update flow): [SW]-prefixed console logs. Remove before commit.
+  // TEMP (debugging the update flow): [SW]-prefixed console logs. Remove once
+  // the manual DevTools offline-acceptance walkthrough has been run and
+  // signed off (see openspec/changes/pwa-offline-shell/tasks.md Phase 9).
   console.info('[SW] install: precaching shell — NOT calling skipWaiting (stays waiting until user confirms)');
   event.waitUntil(
     caches.open(PRECACHE_NAME).then(async (cache) => {
-      // self.__WB_MANIFEST is injected by vite-plugin-pwa (workbox) at build time
-      const manifest = self.__WB_MANIFEST ?? [];
-      const urls = manifest.map((entry) => entry.url);
+      const urls = PRECACHE_MANIFEST.map((entry) => entry.url);
       console.info(`[SW] install: ${urls.length} manifest entries to precache`);
       if (urls.length > 0) {
-        await cache.addAll(urls);
+        // `cache: 'reload'` bypasses the HTTP cache — without it, a
+        // stable-filename asset (index.html, fonts, images) can precache the
+        // PREVIOUS deploy's response instead of the one this manifest
+        // describes (design.md D8). `addAll` atomicity is kept deliberately:
+        // a partial precache is a lie the device only discovers once there
+        // is no network left to recover with.
+        await cache.addAll(urls.map((url) => new Request(url, { cache: 'reload' })));
       }
     })
   );
 });
 
-// Activate: clean old caches and claim clients
+// Activate: prune every cache that is not this version's single named cache,
+// then claim clients (pwa-offline-shell spec: "Activation prunes stale
+// caches").
 self.addEventListener('activate', (event) => {
   console.info('[SW] activate: cleaning old caches + clients.claim() (new version is now controlling)');
-  const currentCaches = [PRECACHE_NAME, APP_CHUNKS_CACHE, FONTS_CACHE];
-
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(
-        cacheNames
-          .filter((name) => !currentCaches.includes(name))
-          .map((name) => caches.delete(name))
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(cacheNames.filter((name) => name !== PRECACHE_NAME).map((name) => caches.delete(name)))
       )
-    ).then(() => self.clients.claim())
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch handler: network-first for navigation, cache-first for assets
+// Fetch handler: delegates the routing decision to the pure, typechecked
+// `resolveStrategy` (app/shared/lib/pwa/sw-strategy.ts). This app is SPA mode
+// (`ssr:false`), so the build emits ONE shell — `build/client/index.html` —
+// and every route is resolved client-side by React Router. Serving that
+// precached shell for every same-origin navigation, online OR offline, lets
+// the client router + auth-store pick the view: a valid 35-day session in
+// localStorage hydrates with no network, so an authenticated user offline
+// lands in the app normally instead of a dead "Offline" page.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET and non-same-origin requests
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
+  const strategy = resolveStrategy({
+    url,
+    method: request.method,
+    mode: request.mode,
+    selfOrigin: self.location.origin,
+  });
+
+  if (strategy === 'passthrough') {
     return;
   }
 
-  // App-shell navigation (cache-first). This app is SPA mode (`ssr:false`), so
-  // the build emits ONE shell — `build/client/index.html` — and every route is
-  // resolved client-side by React Router. Serve that precached shell for every
-  // navigation, online OR offline, then let the client router + auth-store pick
-  // the view. A valid 35-day session in localStorage hydrates with no network,
-  // so an authenticated user offline lands in the app normally instead of a
-  // dead "Offline" page. Matching the OLD `/login` here was a bug: no `/login`
-  // HTML file exists in an SPA build, so `caches.match('/login')` always missed
-  // and fell through to the bare `Response('Offline', 503)` white screen.
-  // New shell HTML ships via the SW update-prompt flow, not a per-nav network hit.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('/index.html').then((cached) => cached ?? fetch(request))
-    );
+  if (strategy === 'shell') {
+    event.respondWith(caches.match(SHELL_URL).then((cached) => cached ?? fetch(request)));
     return;
   }
 
-  // Cache-first for fonts
-  if (url.pathname.startsWith('/fonts/')) {
-    event.respondWith(
-      caches.open(FONTS_CACHE).then(async (cache) => {
-        const cached = await cache.match(request);
-        if (cached) return cached;
-        const response = await fetch(request);
+  // cache-first: a miss falls through to a network fetch attempt (which
+  // fails offline) rather than crashing — pwa-offline-shell spec, "Cache
+  // miss on a static asset does not crash the worker".
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
         if (response.ok) {
-          cache.put(request, response.clone());
+          // Clone synchronously here, BEFORE `return response` below. A Response
+          // body can be read only once; cloning inside the async
+          // caches.open().then() ran after the returned response had already
+          // started being consumed ("Response body is already used").
+          const responseToCache = response.clone();
+          caches.open(PRECACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
         }
         return response;
-      })
-    );
-    return;
-  }
-
-  // Cache-first for static JS/CSS/images (precached assets)
-  if (
-    url.pathname.startsWith('/assets/') ||
-    url.pathname.endsWith('.js') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.startsWith('/icons/')
-  ) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          if (response.ok) {
-            // Clone synchronously here, BEFORE `return response` below. A Response
-            // body can be read only once; cloning inside the async
-            // caches.open().then() ran after the returned response had already
-            // started being consumed ("Response body is already used").
-            const responseToCache = response.clone();
-            caches.open(PRECACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return response;
-        });
-      })
-    );
-    return;
-  }
+      });
+    })
+  );
 });
 
-// Message handler: post-auth chunk precaching (PWA-02, PWA-03)
+// Message handler: user-confirmed update activation only. The previous
+// post-auth "precache the remaining app chunks" message handler (which
+// fetched a runtime-generated asset-list JSON file) is removed — the
+// build-time precache manifest is now complete, so there is nothing left for
+// it to refresh (pwa-offline-shell spec: "Dead precache-refresh message
+// handler is removed").
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'PRECACHE_APP_CHUNKS') {
-    event.waitUntil(
-      caches.open(APP_CHUNKS_CACHE).then(async (cache) => {
-        try {
-          const response = await fetch('/assets-manifest.json');
-          if (response.ok) {
-            const manifest = await response.json() as Record<string, string>;
-            const urls = Object.values(manifest).filter(
-              (url): url is string =>
-                typeof url === 'string' && (url.endsWith('.js') || url.endsWith('.css'))
-            );
-            await cache.addAll(urls);
-          }
-        } catch {
-          // Silently fail — post-auth precaching is best-effort
-        }
-      })
-    );
-  }
-
   if (event.data?.type === 'SKIP_WAITING') {
     console.info('[SW] SKIP_WAITING received → skipWaiting() (user confirmed the update)');
     self.skipWaiting();
