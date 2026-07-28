@@ -194,16 +194,23 @@ describe('AppLayout — mounts PaymentBanner (DG-10)', () => {
 // mutating it — a second mock state variant is swapped in via
 // `mockImplementation` for just this describe block, and restored afterward.
 describe('AppLayout — useOfflineIdleLock (D5, offline sessions only)', () => {
+  type MockSelectorFn = (selector?: (s: unknown) => unknown) => unknown;
+  const mockedUseAuthStore = useAuthStore as unknown as {
+    mockImplementation: (fn: MockSelectorFn) => void;
+    getMockImplementation: () => MockSelectorFn | undefined;
+    getState: () => unknown;
+  };
+
   const logoutMock = vi.fn();
-  const defaultImpl = vi.mocked(useAuthStore).getMockImplementation();
+  const defaultImpl = mockedUseAuthStore.getMockImplementation();
 
   function setAuthToken(authToken: string) {
     const state = { user: { ...mockUser, authToken }, isAuthenticated: true, logout: logoutMock };
-    vi.mocked(useAuthStore).mockImplementation((selector?: (s: unknown) => unknown) => {
+    mockedUseAuthStore.mockImplementation((selector?: (s: unknown) => unknown) => {
       if (typeof selector === 'function') return selector(state);
       return state;
     });
-    (useAuthStore as unknown as { getState: () => unknown }).getState = () => state;
+    mockedUseAuthStore.getState = () => state;
   }
 
   beforeEach(() => {
@@ -215,9 +222,9 @@ describe('AppLayout — useOfflineIdleLock (D5, offline sessions only)', () => {
   afterEach(() => {
     vi.useRealTimers();
     if (defaultImpl) {
-      vi.mocked(useAuthStore).mockImplementation(defaultImpl);
+      mockedUseAuthStore.mockImplementation(defaultImpl);
     }
-    (useAuthStore as unknown as { getState: () => unknown }).getState = () => ({
+    mockedUseAuthStore.getState = () => ({
       user: mockUser,
       isAuthenticated: true,
       logout: vi.fn(),

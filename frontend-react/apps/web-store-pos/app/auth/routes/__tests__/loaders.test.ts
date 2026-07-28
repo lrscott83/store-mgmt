@@ -61,6 +61,7 @@ function setAuthState(user: UserModel | null) {
     setUser: vi.fn(),
     updateUser: vi.fn(),
     login: vi.fn(),
+    loginOffline: vi.fn(),
     logout: vi.fn(),
   });
 }

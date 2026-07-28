@@ -88,21 +88,29 @@ export async function deserializeRoster(
     throw new CorruptFileError('ZIP extraction failed');
   }
 
-  const entry = entries.find((e) => e.filename === ROSTER_ENTRY_NAME && !e.directory && e.getData);
-  if (!entry || !entry.getData) {
-    await zipReader.close();
-    throw new CorruptFileError(`Missing ${ROSTER_ENTRY_NAME} entry`);
+  // Mirrors `data-serializer-service.ts:219`'s narrowing idiom: within the
+  // `||`, evaluating `!entry.getData` narrows `entry` to `FileEntry` (the
+  // only union member whose `directory` literal is `false`), so this loop —
+  // unlike an `Array.prototype.find` predicate, whose narrowing doesn't
+  // propagate to the returned value — keeps `entry.getData` well-typed.
+  let text: string | undefined;
+  for (const entry of entries) {
+    if (entry.directory || entry.filename !== ROSTER_ENTRY_NAME || !entry.getData) continue;
+    try {
+      text = await entry.getData(new TextWriter());
+    } catch (err) {
+      await zipReader.close();
+      if (err instanceof Error && err.message === 'Invalid password') {
+        throw new WrongPasswordError();
+      }
+      throw new WrongPasswordError('Decryption failed');
+    }
+    break;
   }
 
-  let text: string;
-  try {
-    text = await entry.getData(new TextWriter());
-  } catch (err) {
+  if (text === undefined) {
     await zipReader.close();
-    if (err instanceof Error && err.message === 'Invalid password') {
-      throw new WrongPasswordError();
-    }
-    throw new WrongPasswordError('Decryption failed');
+    throw new CorruptFileError(`Missing ${ROSTER_ENTRY_NAME} entry`);
   }
   await zipReader.close();
 

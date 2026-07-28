@@ -19,9 +19,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe('roster-store — purity guard (D1)', () => {
-  let getItemSpy: ReturnType<typeof vi.spyOn>;
-  let setItemSpy: ReturnType<typeof vi.spyOn>;
-  let removeItemSpy: ReturnType<typeof vi.spyOn>;
+  let getItemSpy: ReturnType<typeof vi.spyOn<Storage, 'getItem'>>;
+  let setItemSpy: ReturnType<typeof vi.spyOn<Storage, 'setItem'>>;
+  let removeItemSpy: ReturnType<typeof vi.spyOn<Storage, 'removeItem'>>;
 
   beforeEach(() => {
     getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
