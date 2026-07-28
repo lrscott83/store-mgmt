@@ -34,42 +34,42 @@ work-unit commits per the order below.
 
 ## Phase 0: Prerequisite Dependency (sequential, blocks everything)
 
-- [ ] 0.1 Add `workbox-build@7.4.1` and `esbuild@0.25.12` as explicit `devDependencies` in `apps/web-store-pos/package.json`; run `pnpm install`. [spec: pwa-precache-build "Manifest injection runs after the client build"]
+- [x] 0.1 Add `workbox-build@7.4.1` and `esbuild@0.25.12` as explicit `devDependencies` in `apps/web-store-pos/package.json`; run `pnpm install`. [spec: pwa-precache-build "Manifest injection runs after the client build"]
 
 ## Phase 1: Shared Precache Contract (sequential, depends on 0.1)
 
-- [ ] 1.1 Create `apps/web-store-pos/scripts/precache-patterns.mjs` exporting `PRECACHE_GLOB_PATTERNS`, `PRECACHE_GLOB_IGNORES` (MUST include `'service-worker.js'` and `'assets/server-build-*'`), `MAX_FILE_SIZE_BYTES`. [spec: pwa-precache-build "Manifest covers every file matching precache patterns" + "service worker never precaches itself"]
+- [x] 1.1 Create `apps/web-store-pos/scripts/precache-patterns.mjs` exporting `PRECACHE_GLOB_PATTERNS`, `PRECACHE_GLOB_IGNORES` (MUST include `'service-worker.js'` and `'assets/server-build-*'`), `MAX_FILE_SIZE_BYTES`. [spec: pwa-precache-build "Manifest covers every file matching precache patterns" + "service worker never precaches itself"]
 
 ## Phase 2: Verifier — RED before the fix lands (sequential)
 
-- [ ] 2.1 Create `apps/web-store-pos/scripts/verify-sw-precache.mjs`: `getManifest()` with shared patterns, diff vs on-disk `build/client`, assert `index.html` present exactly once and exactly one `assets/manifest-*.js`, exit non-zero listing missing paths. [spec: pwa-precache-build "Precache manifest contains the app shell", "On-disk asset absent from manifest fails the build"]
-- [ ] 2.2 RED proof: rebuild with the CURRENT (unfixed) `vite-plugin-pwa closeBundle` injection, run `node scripts/verify-sw-precache.mjs` against that `build/client`, confirm exit 1 listing `index.html`, `assets/manifest-*.js`, `manifest.webmanifest`, `favicon.png`, the 6 `images/help/*.png`. Capture this output as regression evidence. [spec: pwa-precache-build "Missing shell fails the build"]
+- [x] 2.1 Create `apps/web-store-pos/scripts/verify-sw-precache.mjs`: `getManifest()` with shared patterns, diff vs on-disk `build/client`, assert `index.html` present exactly once and exactly one `assets/manifest-*.js`, exit non-zero listing missing paths. [spec: pwa-precache-build "Precache manifest contains the app shell", "On-disk asset absent from manifest fails the build"]
+- [x] 2.2 RED proof: rebuild with the CURRENT (unfixed) `vite-plugin-pwa closeBundle` injection, run `node scripts/verify-sw-precache.mjs` against that `build/client`, confirm exit 1 listing `index.html`, `assets/manifest-*.js`, `manifest.webmanifest`, `favicon.png`, the 6 `images/help/*.png`. Capture this output as regression evidence. [spec: pwa-precache-build "Missing shell fails the build"]
 
 ## Phase 3: `sw-strategy.ts` TDD (sequential, independent of Phase 2)
 
-- [ ] 3.1 RED: write `apps/web-store-pos/app/shared/lib/pwa/__tests__/sw-strategy.test.ts` — table-driven: navigate→`shell`; `/api` + `/api/products`→`passthrough`; `/apiary/report.js`→`cache-first`; non-GET→`passthrough`; cross-origin→`passthrough`; JS/CSS/font/icon→`cache-first`. Run `pnpm test`, confirm fails (module missing). [spec: pwa-offline-shell "API and cross-origin requests bypass the cache", "Non-API path prefix is not falsely excluded"]
-- [ ] 3.2 GREEN: create `apps/web-store-pos/app/shared/lib/pwa/sw-strategy.ts` — `resolveStrategy({url, method, mode, selfOrigin})`, order: non-GET → cross-origin → `/api` (exact or `/api/` prefix) → navigate → cache-first. Run `pnpm test`, confirm green. [spec: pwa-offline-shell "Static asset requests served cache-first"]
+- [x] 3.1 RED: write `apps/web-store-pos/app/shared/lib/pwa/__tests__/sw-strategy.test.ts` — table-driven: navigate→`shell`; `/api` + `/api/products`→`passthrough`; `/apiary/report.js`→`cache-first`; non-GET→`passthrough`; cross-origin→`passthrough`; JS/CSS/font/icon→`cache-first`. Run `pnpm test`, confirm fails (module missing). [spec: pwa-offline-shell "API and cross-origin requests bypass the cache", "Non-API path prefix is not falsely excluded"]
+- [x] 3.2 GREEN: create `apps/web-store-pos/app/shared/lib/pwa/sw-strategy.ts` — `resolveStrategy({url, method, mode, selfOrigin})`, order: non-GET → cross-origin → `/api` (exact or `/api/` prefix) → navigate → cache-first. Run `pnpm test`, confirm green. [spec: pwa-offline-shell "Static asset requests served cache-first"]
 
 ## Phase 4: `service-worker.ts` whole-file rewrite (sequential, depends on 3.2)
 
-- [ ] 4.1 Rewrite `apps/web-store-pos/app/service-worker.ts` in ONE edit: `PRECACHE_NAME='app-shell-v3'`; `const PRECACHE_MANIFEST = self.__WB_MANIFEST ?? []` read once; install with `cache:'reload'` + atomic `addAll`; activate prunes every cache != `PRECACHE_NAME` (delete ALL `APP_CHUNKS_CACHE`/fonts-cache references, including the `message` handler at old L139); fetch delegates to `resolveStrategy`; remove the dead `PRECACHE_APP_CHUNKS` message handler; remove the stale old-L63 "network-first for navigation" comment. Confirm `grep -n APP_CHUNKS_CACHE app/service-worker.ts` is empty. [spec: pwa-offline-shell "New worker version replaces a stale shell", "Precache is consolidated into a single named cache", "Dead precache-refresh message handler is removed"]
+- [x] 4.1 Rewrite `apps/web-store-pos/app/service-worker.ts` in ONE edit: `PRECACHE_NAME='app-shell-v3'`; `const PRECACHE_MANIFEST = self.__WB_MANIFEST ?? []` read once; install with `cache:'reload'` + atomic `addAll`; activate prunes every cache != `PRECACHE_NAME` (delete ALL `APP_CHUNKS_CACHE`/fonts-cache references, including the `message` handler at old L139); fetch delegates to `resolveStrategy`; remove the dead `PRECACHE_APP_CHUNKS` message handler; remove the stale old-L63 "network-first for navigation" comment. Confirm `grep -n APP_CHUNKS_CACHE app/service-worker.ts` is empty. [spec: pwa-offline-shell "New worker version replaces a stale shell", "Precache is consolidated into a single named cache", "Dead precache-refresh message handler is removed"]
 
 ## Phase 5: Build script + chain wiring (sequential, depends on 4.1 + 1.1)
 
-- [ ] 5.1 Create `apps/web-store-pos/scripts/build-sw.mjs`: esbuild-bundle `app/service-worker.ts` (`iife`, `es2020`, `browser`, `minify:true`, `sourcemap:false`) → `build/.sw-bundle.js`; assert `self.__WB_MANIFEST` occurs exactly once pre-inject (throw a named error otherwise); `injectManifest` (shared patterns) → `build/client/service-worker.js`; `rm` the temp bundle. [spec: pwa-precache-build "Exactly one injection point in the worker bundle"]
-- [ ] 5.2 Update `apps/web-store-pos/package.json` `build` script to `react-router build && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs`. [spec: pwa-precache-build "Verification step is a mandatory build gate"]
-- [ ] 5.3 (parallelizable with 5.1) Update `apps/web-store-pos/vite.config.ts`: `injectManifest.globPatterns: []` + comment marking it non-authoritative (real patterns live in `precache-patterns.mjs`). [design D10]
+- [x] 5.1 Create `apps/web-store-pos/scripts/build-sw.mjs`: esbuild-bundle `app/service-worker.ts` (`iife`, `es2020`, `browser`, `minify:true`, `sourcemap:false`) → `build/.sw-bundle.js`; assert `self.__WB_MANIFEST` occurs exactly once pre-inject (throw a named error otherwise); `injectManifest` (shared patterns) → `build/client/service-worker.js`; `rm` the temp bundle. [spec: pwa-precache-build "Exactly one injection point in the worker bundle"]
+- [x] 5.2 Update `apps/web-store-pos/package.json` `build` script to `react-router build && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs`. [spec: pwa-precache-build "Verification step is a mandatory build gate"]
+- [x] 5.3 (parallelizable with 5.1) Update `apps/web-store-pos/vite.config.ts`: `injectManifest.globPatterns: []` + comment marking it non-authoritative (real patterns live in `precache-patterns.mjs`). [design D10]
 
 ## Phase 6: Dead-code cleanup (parallelizable, any point after 0.1)
 
-- [ ] 6.1 In `apps/web-store-pos/app/shared/components/app-layout.tsx`, delete only the dead `PRECACHE_APP_CHUNKS` sender block; KEEP the `useEffect` import — still used by `useAutoCollapseSidebar`. [spec: pwa-offline-shell "No dead handler or sender remains"]
+- [x] 6.1 In `apps/web-store-pos/app/shared/components/app-layout.tsx`, delete only the dead `PRECACHE_APP_CHUNKS` sender block; KEEP the `useEffect` import — still used by `useAutoCollapseSidebar`. [spec: pwa-offline-shell "No dead handler or sender remains"]
 
 ## Phase 7: Full gate verification (sequential, depends on Phase 5 + 6)
 
-- [ ] 7.1 Run `pnpm build` end-to-end — confirm `verify-sw-precache.mjs` now exits 0 (GREEN).
-- [ ] 7.2 Inspect `build/client/service-worker.js`: exactly one `"url":"index.html"`, exactly one `assets/manifest-*.js` entry.
-- [ ] 7.3 Run `pnpm test` (full suite) and `pnpm -C apps/web-store-pos exec tsc --noEmit` — both green.
-- [ ] 7.4 `grep -rn 'PRECACHE_APP_CHUNKS\|assets-manifest' app/` returns nothing.
+- [x] 7.1 Run `pnpm build` end-to-end — confirm `verify-sw-precache.mjs` now exits 0 (GREEN).
+- [x] 7.2 Inspect `build/client/service-worker.js`: exactly one `"url":"index.html"`, exactly one `assets/manifest-*.js` entry.
+- [x] 7.3 Run `pnpm test` (full suite) and `pnpm -C apps/web-store-pos exec tsc --noEmit` — both green.
+- [x] 7.4 `grep -rn 'PRECACHE_APP_CHUNKS\|assets-manifest' app/` returns nothing.
 
 ## Phase 8: Manual offline acceptance walkthrough (sequential, final, real acceptance gate)
 
