@@ -24,6 +24,7 @@ interface AuthState {
   setUser: (user: UserModel, token: string) => void;
   updateUser: (user: UserModel) => void;
   login: (email: string, password: string) => Promise<UserModel>;
+  loginOffline: (login: string, password: string) => Promise<UserModel>;
   logout: () => void;
 }
 
@@ -179,6 +180,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       set({ isLoading: false });
       return user;
+    } catch (err) {
+      set({ isLoading: false });
+      throw err;
+    }
+  },
+
+  // Design D6 (offline-auth-frontend): dynamic import keeps this file at
+  // ZERO static `offline/` imports — auth-store.ts is evaluated at module
+  // load by everything (see the cold-boot note at the bottom of this file),
+  // so a static import here would drag crypto + localStorage offline
+  // modules into every page load, authenticated or not.
+  loginOffline: async (login: string, password: string): Promise<UserModel> => {
+    set({ isLoading: true, error: null });
+    try {
+      const { authenticateOffline } = await import('../offline/offline-auth-service');
+      const user = await authenticateOffline(login, password);
+      // The ONE hydration seam (auth-session spec: "loginOffline hydrates
+      // through the existing setUser seam") — writes TOKEN/CURRENT_USER/
+      // AUTH_MODEL exactly like online login().
+      get().setUser(user, user.authToken);
+      set({ isLoading: false });
+      // Return the hydrated `get().user`, not the raw `user` — setUser()
+      // stamps a fresh `expiresIn` and blanks `password`, so the returned
+      // shape matches what online login() returns.
+      return get().user as UserModel;
     } catch (err) {
       set({ isLoading: false });
       throw err;
