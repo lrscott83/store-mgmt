@@ -24,10 +24,33 @@ interface FormErrors {
   form?: string;
 }
 
+// Design D4 — dispatches by `err.name`, never `instanceof`, so this module
+// stays free of a static import of `offline-auth-service` (D1's dependency
+// graph: a static import here would drag crypto + roster-store into the
+// login chunk and evaluate them for every unprovisioned user). No new
+// message ids on this path (offline-auth-mode: "Offline error mapping onto
+// existing message ids").
+function offlineErrorMessageId(err: unknown): string {
+  const name = (err as { name?: string } | null)?.name;
+  if (name === 'OfflineInvalidPasswordError' || name === 'OfflineUserNotFoundError') {
+    return 'AUTH.INVALID_CREDENTIALS';
+  }
+  if (name === 'OfflineUserInactiveError') {
+    return 'AUTH.ACCOUNT_INACTIVE';
+  }
+  // Includes NoRosterError, OfflineVerifierError, and anything unexpected.
+  return 'AUTH.SERVER_ERROR';
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const intl = useIntl();
-  const { login, isLoading } = useAuthStore();
+  // `loginOffline` is destructured from the hook — NOT
+  // `useAuthStore.getState()` — per design correction #3:
+  // `login.test.tsx`'s existing mock is a bare `vi.fn()` with no `getState`,
+  // so any `getState()` call reachable on the unprovisioned path would
+  // crash that suite.
+  const { login, loginOffline, isLoading } = useAuthStore();
 
   const [form, setForm] = useState<FormState>({ email: '', password: '' });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -62,6 +85,30 @@ export default function LoginPage() {
       return;
     }
 
+    // offline-auth-mode: "Mode switch, not a fallback" — the roster FILE
+    // decides, never connectivity. This dynamic import runs on EVERY
+    // submit, including from a device that never provisioned a roster;
+    // `roster-store` is a pure module (Task 2/4's purity guard), so this
+    // can only ever evaluate 2 string consts + a few declarations.
+    const { isRosterProvisioned } = await import('~/shared/lib/offline/roster-store');
+    if (isRosterProvisioned()) {
+      setIsSubmitting(true);
+      try {
+        const user = await loginOffline(form.email, form.password);
+        armTracking();
+        preloadHeavyChunks();
+        navigate(await resolveUserHomePath(user));
+      } catch (err: unknown) {
+        setIsSubmitting(false);
+        setErrors({
+          form: intl.formatMessage({ id: offlineErrorMessageId(err) }),
+        });
+      }
+      return;
+    }
+
+    // UNPROVISIONED — verbatim today's behavior (headline invariant: a
+    // device that never imported the roster is byte-for-byte unchanged).
     if (!ConnectivityService.isOnline()) {
       setIsOffline(true);
       return;
