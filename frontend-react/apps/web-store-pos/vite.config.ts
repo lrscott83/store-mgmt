@@ -18,12 +18,18 @@ export default defineConfig({
       injectRegister: false,
       manifest: false, // We use our own public/manifest.webmanifest
       injectManifest: {
-        globDirectory: 'build/client',
-        globPatterns: [
-          '**/*.{js,css,html,woff2}',
-          'icons/*.png',
-        ],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // NOT authoritative. The real precache manifest is injected by
+        // scripts/build-sw.mjs (via workbox-build's injectManifest) as a
+        // dedicated post-build step, reading patterns from
+        // scripts/precache-patterns.mjs — the single source of truth shared
+        // with scripts/verify-sw-precache.mjs. This plugin's own
+        // `closeBundle` injection runs too early (before react-router build
+        // has finished writing build/client/index.html and the hashed
+        // route-manifest chunk), so it must never be relied on to produce a
+        // complete manifest. Left empty rather than removed because
+        // vite-plugin-pwa still resolves `virtual:pwa-register` and serves
+        // the worker in dev (design.md D10).
+        globPatterns: [],
       },
       devOptions: {
         // Serve the service worker in `pnpm dev` too, so the PWA install flow
