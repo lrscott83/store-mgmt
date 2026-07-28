@@ -23,6 +23,11 @@ export default [
   layout('auth/components/auth-layout.tsx', [
     route('login', 'auth/routes/login.tsx'),
     route('register', 'auth/routes/register.tsx'),
+    // Device provisioning (offline-auth-frontend): imports a roster bundle so
+    // this device can authenticate offline. No `clientLoader` — a
+    // `guestOnlyLoader` would redirect an authenticated admin away, but
+    // provisioning must work regardless of this device's current auth state.
+    route('auth/provision', 'auth/routes/provision.tsx'),
   ]),
 
   // Authenticated routes (require auth via authLoader)
