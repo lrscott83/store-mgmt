@@ -6,6 +6,7 @@ import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserCardList } from '~/management/users/components/user-card-list';
+import { RosterExportPanel } from '~/management/users/components/roster-export-panel';
 import type { User } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Users]);
@@ -55,6 +56,7 @@ export function UserListPage() {
         <h1 className="text-xl font-semibold">
           {intl.formatMessage({ id: 'USERS.LIST_TITLE' })}
         </h1>
+        <RosterExportPanel />
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
