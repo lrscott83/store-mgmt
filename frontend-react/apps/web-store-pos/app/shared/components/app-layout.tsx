@@ -6,6 +6,13 @@ import { Breadcrumbs } from './breadcrumbs';
 import { Footer } from './footer';
 import { PaymentBanner } from './payment-banner';
 import { authLoader } from '~/auth/routes/loaders';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { OFFLINE_SESSION_TOKEN } from '~/shared/lib/offline/offline-session';
+// Static import (design D5): a dynamic import inside the effect below would
+// race cleanup — a timer could arm after unmount. For a guard that must
+// NEVER fire on an online session, a static import of this zero-import,
+// side-effect-free 15-line module is the safer trade.
+import { createIdleTimer } from '~/shared/lib/offline/idle-timeout';
 
 export const clientLoader = authLoader;
 
@@ -34,7 +41,38 @@ function useAutoCollapseSidebar(): [boolean, React.Dispatch<React.SetStateAction
   return [isOpen, setIsOpen];
 }
 
+/**
+ * auth-session spec: "Idle lock scoped strictly to offline sessions" (design
+ * D5). Arms a 1-hour inactivity timer ONLY when the session's `authToken`
+ * is the offline sentinel — every online session (`authToken !== 'offline-
+ * session'`) never starts a timer or attaches listeners at all.
+ */
+function useOfflineIdleLock(): void {
+  const authToken = useAuthStore((s) => s.user?.authToken); // selector — matches payment-banner.tsx:21
+
+  useEffect(() => {
+    if (authToken !== OFFLINE_SESSION_TOKEN) return; // online sessions: no timer, no listeners
+
+    // Read via getState() inside the callback only (loaders.ts:9 convention)
+    // — no stale closure, no extra effect dependency.
+    const timer = createIdleTimer(() => useAuthStore.getState().logout());
+    timer.start();
+
+    const notify = () => timer.notifyActivity();
+    const events = ['mousedown', 'keydown', 'touchstart'] as const;
+    events.forEach((e) => window.addEventListener(e, notify));
+    document.addEventListener('visibilitychange', notify);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, notify));
+      document.removeEventListener('visibilitychange', notify);
+      timer.stop();
+    };
+  }, [authToken]);
+}
+
 export function AppLayout() {
+  useOfflineIdleLock();
   const [isSidebarOpen, setIsSidebarOpen] = useAutoCollapseSidebar();
 
   return (

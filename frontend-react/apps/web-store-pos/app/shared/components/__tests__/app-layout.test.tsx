@@ -42,6 +42,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 });
 
 import { AppLayout } from '../app-layout';
+import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 function renderLayout() {
   const router = createMemoryRouter(
@@ -185,5 +186,59 @@ describe('AppLayout — mounts PaymentBanner (DG-10)', () => {
     mockUser.paymentStatus = 'Vencido';
     renderLayout();
     expect(screen.getByRole('status')).toHaveTextContent('El pago del plan está vencido.');
+  });
+});
+
+// auth-session spec: "Idle lock scoped strictly to offline sessions" (design D5).
+// Reuses the existing mock shape (selector-callable + getState) rather than
+// mutating it — a second mock state variant is swapped in via
+// `mockImplementation` for just this describe block, and restored afterward.
+describe('AppLayout — useOfflineIdleLock (D5, offline sessions only)', () => {
+  const logoutMock = vi.fn();
+  const defaultImpl = vi.mocked(useAuthStore).getMockImplementation();
+
+  function setAuthToken(authToken: string) {
+    const state = { user: { ...mockUser, authToken }, isAuthenticated: true, logout: logoutMock };
+    vi.mocked(useAuthStore).mockImplementation((selector?: (s: unknown) => unknown) => {
+      if (typeof selector === 'function') return selector(state);
+      return state;
+    });
+    (useAuthStore as unknown as { getState: () => unknown }).getState = () => state;
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+    logoutMock.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    if (defaultImpl) {
+      vi.mocked(useAuthStore).mockImplementation(defaultImpl);
+    }
+    (useAuthStore as unknown as { getState: () => unknown }).getState = () => ({
+      user: mockUser,
+      isAuthenticated: true,
+      logout: vi.fn(),
+    });
+  });
+
+  it('arms the idle timer for an offline session and invokes logout() after 1 hour of inactivity', () => {
+    setAuthToken('offline-session');
+    renderLayout();
+
+    vi.advanceTimersByTime(3_600_000);
+
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never arms a timer for an online session (authToken !== "offline-session")', () => {
+    setAuthToken('tok');
+    renderLayout();
+
+    vi.advanceTimersByTime(3_600_000 * 2);
+
+    expect(logoutMock).not.toHaveBeenCalled();
   });
 });
