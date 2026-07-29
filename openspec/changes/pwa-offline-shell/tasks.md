@@ -73,7 +73,7 @@ work-unit commits per the order below.
 
 ## Phase 8: Manual offline acceptance walkthrough (sequential, final, real acceptance gate)
 
-- [ ] 8.1 `pnpm build`, serve `build/client` (e.g. `npx serve build/client -l 3333`); unregister existing SW + clear site data; reload; wait for `activated`.
+- [ ] 8.1 `pnpm build`, serve `build/client` on a port that is NOT the dev server's 3333 (e.g. `npx serve build/client -l 4173`, matching `preview.port`) — serving the production build on the dev origin makes both share one service-worker scope, which is the collision `vite.config.ts` now avoids; unregister existing SW + clear site data; reload; wait for `activated`.
 - [ ] 8.2 Cache Storage: only `app-shell-v3` exists (no `app-chunks-v1`/`fonts-v1`), containing `index.html`, one `assets/manifest-*.js`, `manifest.webmanifest`, `favicon.png`, 6 `images/help/*.png`, 5 `fonts/inter/*.woff2`.
 - [ ] 8.3 DevTools Network → Offline. Type-load directly: `/login`, `/`, `/help/tutorial` (all 6 images render), `/sales/new`, `/inventory/available` — each renders the app shell, never a browser error page.
 - [ ] 8.4 Type-load directly: `/admin/dashboard`, `/management/users`, `/profile/edit` — view renders; in-app API calls MAY fail (expected, out of scope).
