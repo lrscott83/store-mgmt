@@ -154,12 +154,44 @@ roster file imported on this device? If it is, authentication goes offline again
 file regardless of connectivity; if it is not, the app must run online-auth normally and
 must not break.
 
-### 7a. The roster export endpoint blocks one frontend task
+### 7a. The roster export endpoint blocks frontend Task 10
 
 `GET /v1/storeusers/{storeId}/offline-roster` does not exist. The frontend can build and
 unit-test the offline auth service and the device-provisioning route against
 self-serialized bundles, but the admin "Export offline roster" action cannot be verified
 end-to-end until this endpoint ships. Tracked as a dependency, not as frontend work.
+
+**Status on the frontend side.** Task 10 of change `offline-auth-frontend` is implemented
+and committed on branch `feat/offline-auth-frontend`
+(`frontend-react/apps/web-store-pos/app/shared/lib/http/roster-http-service.ts` plus
+`app/management/users/components/roster-export-panel.tsx`), and its `sdd-verify` pass
+recorded it as **BLOCKED-for-verification**, not as done. The unit tests prove only URL
+construction and `response.data.data` unwrapping against a hand-built mock. Both the
+source file and its test carry an explicit `BLOCKED-for-verification` comment so the gap
+stays visible through archive.
+
+**The contract the frontend already assumes.** These are the assumptions the mock
+encodes. Each one is unverified against a real payload, and each is a place where the
+backend can either match the assumption or force a frontend change:
+
+| Assumption | Source of truth on the frontend |
+| --- | --- |
+| Route prefix is `/v1`, not `/api/v1` | matches `auth-http-service.ts:12`, `user-http-service.ts:39` |
+| Response is enveloped — the bundle lives at `response.data.data` | `roster-http-service.ts` |
+| Field casing is camelCase | `roster-types.ts` |
+| `issuedAt` / `expiresAt` are **epoch milliseconds**, not ISO strings | `OfflineRosterBundle` in `roster-types.ts` |
+| Every user carries `verifier: { hash, salt, iterations }` | `OfflineVerifier` in `roster-types.ts` |
+| Bundle carries `bundleId`, `formatVersion`, `storeId`, `users[]` | `OfflineRosterBundle` |
+| Each user carries `id`, `login`, `fullName`, `isActive`, `roles`, `featureIds`, `storeModuleIds`, `isSuperAdmin`, `isOwnerAdmin`, `isReSeller`, `selectedStoreId` | `OfflineRosterUser` |
+
+`bundleId` and `formatVersion` are not decoration: the frontend enforces anti-replay by
+rejecting a re-imported `bundleId`, and gates on `formatVersion`. A bundle missing either
+one is rejected at import.
+
+Note that `verifier` is the item with no frontend fallback. If the real export cannot
+carry a password verifier per user, offline authentication has no way to check a
+credential and the whole change needs rethinking — this is the assumption worth
+confirming first.
 
 ### 7b. The roster DTO carries no billing fields — decision needed
 
@@ -176,6 +208,32 @@ The decision belongs here, on the backend side: either the roster export include
 billing snapshot (add the three fields to `OfflineRosterUserDto`, accepting that the
 values are as stale as the bundle), or offline sessions deliberately carry no billing
 signal. Until this is decided, the frontend proceeds with the silent-banner defaults.
+
+### 7c. The same endpoint blocks frontend Task 13 (manual acceptance)
+
+Task 13 of `offline-auth-frontend` is the human smoke walkthrough. It has nine steps,
+documented with exact instructions in
+`docs/plans/2026-07-28-offline-auth-frontend-smoke-checklist.md`. **None has been
+executed**, and three cannot be, today:
+
+- **13.1** — as OwnerAdmin, online, click "Export offline roster" and get a real file.
+  Blocked directly on §7a: the endpoint does not exist.
+- **13.2** — on a second device, import that file at `/auth/provision`. Blocked on 13.1;
+  a hand-crafted bundle would only re-test the frontend's own serializer, which is
+  already unit-tested, so it would prove nothing new.
+- **13.3** — go offline and log in against the roster. Blocked on 13.1 and additionally
+  on `pwa-offline-shell`'s own pending manual DevTools walkthrough (that change is merged
+  to `main` at 28/30 but not archived).
+
+Steps 13.4 through 13.9 — wrong password offline, replay rejection, idle lock, the
+unprovisioned-device regression pass, the mode-switch pass, and bundle expiry — are
+executable today against a hand-crafted bundle and are simply not run yet. They are
+frontend/QA work, not backend work; they are listed here only so the blocking
+relationship is readable from one place.
+
+**What shipping §7a unblocks.** One backend endpoint closes both frontend Task 10's
+end-to-end verification and smoke steps 13.1–13.3. Until then the change is honestly
+described as code-complete and automated-tests-green, not manually verified.
 
 ---
 
@@ -224,4 +282,11 @@ Frontend work is tracked separately and is NOT part of this backlog:
   `openspec/changes/pwa-offline-shell/`.
 - Dev/preview port separation in `frontend-react/apps/web-store-pos/vite.config.ts`.
 - `docs/plans/2026-07-25-offline-auth-frontend-plan.md`.
+- `offline-auth-frontend` — code-complete on branch `feat/offline-auth-frontend`, 12 of 13
+  tasks done, `sdd-verify` PASS WITH WARNINGS. Pending archive, plus smoke steps 13.4–13.9
+  which need no backend. Its two blocked items are §7a and §7c above. See
+  `openspec/changes/offline-auth-frontend/`.
+- `frontend-react/apps/web-store-pos` has no `eslint.config.js`, so its `lint` script
+  cannot run even though the app already depends on `@store-mgmt/eslint-config`. Its
+  enforced gate is `tsc --noEmit`. Enabling lint needs its own change.
 - `docs/plans/2026-07-25-at-rest-encryption-frontend-plan.md`.
