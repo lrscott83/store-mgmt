@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAuthStore } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
-import { importRoster } from '../../offline/roster-store';
+import { importRoster, isRosterProvisioned } from '../../offline/roster-store';
 import { sha256Base64, pbkdf2Base64 } from '../../offline/offline-crypto';
 import type { OfflineRosterBundle } from '../../offline/roster-types';
 
@@ -68,5 +68,32 @@ describe('useAuthStore.loginOffline (D6)', () => {
     const state = useAuthStore.getState();
     expect(state.isAuthenticated).toBe(false);
     expect(state.isLoading).toBe(false);
+  });
+});
+
+// auth-session spec (MODIFIED requirement "Logout Storage-Clear Scope"):
+// "Offline idle-lock logout preserves the roster" — verify-report WARNING #1
+// flagged this as true only by static inspection (no test combined a REAL
+// provisioned roster with a REAL, non-mocked `logout()` call). This suite
+// closes that gap: nothing here is mocked — `importRoster`/`loginOffline`/
+// `logout`/`isRosterProvisioned` are all the real production functions.
+describe('useAuthStore.logout() — preserves the offline roster (auth-session MODIFIED)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+  });
+
+  it('keeps isRosterProvisioned() true after a real logout() call following a real offline login', async () => {
+    await seedRoster();
+    await useAuthStore.getState().loginOffline('ana', 'secret');
+    expect(isRosterProvisioned()).toBe(true);
+
+    // This is the exact call the idle-lock timer makes
+    // (app-layout.tsx: `useAuthStore.getState().logout()`), invoked here
+    // directly against the REAL store action, not a `vi.fn()` stand-in.
+    useAuthStore.getState().logout();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(isRosterProvisioned()).toBe(true);
   });
 });
