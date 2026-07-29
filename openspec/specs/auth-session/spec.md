@@ -1,12 +1,12 @@
 # auth-session Capability Specification
 
-**Capability**: auth-session — session lifecycle (logout, getUserByToken) in `useAuthStore`
-**Origin**: SDD change `auth-service-parity` (Slice 3, Fase 1 — auth cluster)
+**Capability**: auth-session — session lifecycle (logout, getUserByToken, offline session hydration/lock) in `useAuthStore`
+**Origin**: SDD change `auth-service-parity` (Slice 3, Fase 1 — auth cluster); extended by `offline-auth-frontend`
 **Status**: Active
-**Last Updated**: 2026-07-13
+**Last Updated**: 2026-07-29
 
 ## Purpose
-Define React `useAuthStore` session-lifecycle behavior so it mirrors Angular `AuthService` exactly: `logout()` storage-clear scope and conditional redirect, and a single consolidated `getUserByToken()` used by `initialize`, `login`, and `edit-store`, including expiry-preserve semantics on background revalidation.
+Define React `useAuthStore` session-lifecycle behavior so it mirrors Angular `AuthService` exactly: `logout()` storage-clear scope and conditional redirect, and a single consolidated `getUserByToken()` used by `initialize`, `login`, and `edit-store`, including expiry-preserve semantics on background revalidation. Extended by `offline-auth-frontend` to cover `loginOffline` hydration and the offline-only idle-lock, while preserving the roster on logout.
 
 ## Capability Scope
 ### In Scope
@@ -26,7 +26,8 @@ Define React `useAuthStore` session-lifecycle behavior so it mirrors Angular `Au
 ## Requirements
 
 ### Requirement: Logout Storage-Clear Scope
-`logout()` MUST remove ONLY the `AUTH_MODEL` key (`${appVersion}-USERDATA_KEY`) from storage. It MUST NOT remove the `token` or `currentUser` keys.
+`logout()` MUST remove ONLY the `AUTH_MODEL` key (`${appVersion}-USERDATA_KEY`) from storage. It MUST NOT remove the `token` or `currentUser` keys. It MUST NOT clear the offline roster (`lizoft.offline-roster`) or its anti-replay marker under any circumstance, including when triggered by the offline idle lock.
+(Previously: scope was AUTH_MODEL-only with no statement about the roster, which did not exist as a concept yet. Extended by `offline-auth-frontend`.)
 
 #### Scenario: Logout removes AUTH_MODEL only
 - GIVEN an authenticated session with `token`, `currentUser`, and `AUTH_MODEL` present in storage
@@ -34,6 +35,46 @@ Define React `useAuthStore` session-lifecycle behavior so it mirrors Angular `Au
 - THEN the `AUTH_MODEL` key is removed from storage
 - AND the `token` key remains present (stale)
 - AND the `currentUser` key remains present (stale)
+
+#### Scenario: Offline idle-lock logout preserves the roster
+- GIVEN an offline session (`authToken === 'offline-session'`) with a provisioned roster in storage
+- WHEN the idle timer invokes `logout()`
+- THEN the roster remains present in storage
+- AND `isRosterProvisioned()` still returns true after logout
+
+### Requirement: loginOffline hydrates through the existing setUser seam
+`useAuthStore` MUST expose `loginOffline(login, password)`, which on
+success calls the same `setUser` hydration path already used by online
+`login` — writing `TOKEN`/`CURRENT_USER`/`AUTH_MODEL` and setting
+`{ user, isAuthenticated: true }` — so `authLoader`/`featureLoader`/
+`adminLoader` pass unchanged with no loader modification. The cold-boot
+invariant (state is set synchronously before any `await` on module load)
+MUST be preserved; `loginOffline` adds an action only, no new module-load
+hydration.
+
+#### Scenario: Offline login hydrates identically to online login
+- GIVEN a provisioned device with valid roster credentials
+- WHEN `loginOffline(login, password)` resolves
+- THEN `useAuthStore.getState().isAuthenticated` is true
+- AND the same storage keys (`TOKEN`, `CURRENT_USER`, `AUTH_MODEL`) are written as an online login would write
+- AND existing route loaders/guards pass without modification
+
+### Requirement: Idle lock scoped strictly to offline sessions
+A 1-hour inactivity lock MUST arm only when the current session's
+`authToken` equals the `offline-session` sentinel. It MUST NOT arm for any
+session whose `authToken` is not that sentinel (i.e., every online
+session). On idle timeout, the lock MUST invoke the existing `logout()`
+action, requiring only the password to resume (the roster is not cleared).
+
+#### Scenario: Offline session locks after 1 hour of inactivity
+- GIVEN an authenticated session with `authToken === 'offline-session'`
+- WHEN 1 hour elapses with no recorded activity
+- THEN `logout()` is invoked and the user is redirected to `/login`
+
+#### Scenario: Online session never arms the idle timer
+- GIVEN an authenticated session with `authToken !== 'offline-session'`
+- WHEN the authenticated layout mounts and time passes
+- THEN no idle timer is started for this session
 
 ### Requirement: Logout Conditional Redirect
 `logout()` MUST trigger a redirect to `/login` UNLESS the current route is already `/login` or `/`.
@@ -99,12 +140,16 @@ Background revalidation via `getUserByToken()` MUST preserve the session's exist
 - [x] Background revalidation does not mutate `expiresIn`.
 - [x] `expiresIn <= now` treated as expired; `expiresIn > now` treated as valid.
 - [x] `navbar`, `change-password`, `denyAccess` loader call store `logout()`.
+- [x] `logout()` never clears the offline roster or its anti-replay marker.
+- [x] `loginOffline` hydrates via the same `setUser` seam as online `login`.
+- [x] Idle lock arms only for `authToken === 'offline-session'`, never for online sessions.
 
 ## Related Specifications
 
 - **auth-http** (Slice 2 — HTTP registration and login contract; completed)
 - **auth-authorization** (Slice 4 — deferred; covers authorization service and 401 interceptor reuse)
 - **usage-tracker** (Slice 5 — deferred; store-usage-tracker lifecycle)
+- **offline-auth-mode**, **offline-roster-bundle**, **offline-device-provisioning** (sibling capabilities from `offline-auth-frontend`; this spec covers only the session-lifecycle slice of that change — `loginOffline` hydration and the offline idle lock)
 
 ## Implementation Status
 
@@ -114,6 +159,7 @@ Background revalidation via `getUserByToken()` MUST preserve the session's exist
 - **edit-store consumer**: ✓ Done (commit 72c99e2)
 - **Tests**: ✓ Done (all 1581 tests passing, tsc clean, build successful)
 - **Call-site contracts**: ✓ Done (navbar, change-password, denyAccess use store logout(); initialize, login, edit-store use consolidated getUserByToken())
+- **loginOffline action + offline idle lock** (`offline-auth-frontend`): ✓ Done (Tasks 6, 11) — 155 files / 2161 tests green, `tsc --noEmit` clean, build 136 SW precache entries. **Open at archive — NOT closed by this change**: the "Offline idle-lock logout preserves the roster" scenario has no dedicated automated test combining a real provisioned roster + real (non-mocked) `logout()` + post-logout `isRosterProvisioned()` check — true by static inspection only (verify report WARNING #1). Manual smoke of the full offline session lifecycle (Task 13 of `offline-auth-frontend`, steps 13.4–13.9) is unexecuted.
 
 ## Notes
 

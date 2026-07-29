@@ -176,3 +176,29 @@ Scanned all 13 offline-related test files for tautologies, ghost loops, empty-co
 **PASS WITH WARNINGS**
 
 All 154 test files / 2158 tests pass, `tsc --noEmit` is clean, and the production build succeeds with 136 precache entries — all independently re-executed by this verify pass, not copied from the apply-progress report. The headline invariant (unprovisioned device byte-for-byte unchanged, zero static `offline/` imports reachable from an unprovisioned device's code path) holds under direct source inspection. Assertion quality across all 13 new offline-auth test files is clean — no tautologies, ghost loops, or trivial checks found. The two honesty flags carried forward from apply-progress (Task 10 backend-blocked, Task 13 unexecuted manual smoke) are both still accurate and are NOT resolved by this verify — they remain open findings, correctly out of this change's power to close since they depend on backend work tracked separately in `docs/plans/2026-07-28-backend-pending-work.md`. Three WARNING-level gaps (one untested spec scenario proven only by inspection, two scenarios proven only by unit composition rather than end-to-end integration test) do not block correctness today but should be tracked. No CRITICAL issues found. This change is code-complete and automated-tests-green; it is NOT yet fully manually verified, exactly as tasks.md's own "Acceptance reality" note states.
+
+---
+
+## Addendum — 2026-07-29 (post-verify fix-up, added at archive)
+
+This report is a point-in-time artifact and was NOT rewritten. Two of its findings were
+closed after it was written:
+
+- **WARNING #1** (idle-lock logout preserves the roster) — closed by commit `6d2404a`,
+  which adds a regression test combining a real provisioned roster with a real, non-mocked
+  `logout()`.
+- **WARNING #2** (two `offline-auth-mode` scenarios proven only by unit composition) —
+  closed by commit `27403cf`, which drives an actually-expired bundle and an
+  actually-inactive user end-to-end through the rendered login form.
+- **SUGGESTION #1** (linter never run) — investigated: `pnpm lint` cannot run because
+  `apps/web-store-pos` has never had an `eslint.config.js`. A pre-existing project gap,
+  not a gap in this change. No config was invented.
+
+Each new test was proven to have teeth by mutation: the production code was deliberately
+broken, the test was confirmed to fail, and the mutation was reverted. Details in
+`apply-progress.md` (Batch 2).
+
+Gate numbers above (154 files / 2158 tests) are therefore superseded: the final state is
+**155 files / 2161 tests**, `tsc --noEmit` clean, build with 136 SW precache entries.
+
+**WARNING #3 (Task 10) and WARNING #4 (Task 13) remain open** — see `archive-report.md`.
