@@ -1,6 +1,7 @@
 // @ts-check
 import globals from 'globals';
 import { config as baseConfig } from './base.config.js';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   ...baseConfig,
@@ -15,8 +16,11 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       }
     },
+    plugins: { 'react-hooks': reactHooks },
     rules: {
-      'turbo/no-undeclared-env-vars': ['warn', { allowList: ['DEV'] }]
+      'turbo/no-undeclared-env-vars': ['warn', { allowList: ['DEV'] }],
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn'
     }
   },
   { ignores: ['eslint.config.mjs', 'build/**', '.react-router/**'] }
