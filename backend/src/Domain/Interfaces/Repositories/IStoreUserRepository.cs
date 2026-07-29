@@ -12,5 +12,6 @@ namespace Domain.Interfaces.Repositories
         Task<StoreUser> GetStoreUserByUserIdAndIgnoreQueryFiltersAsync(Guid userId);
         Task<IEnumerable<StoreUser>> GetStoreUsersAsync(bool includeInactive);
         Task<IEnumerable<StoreUser>> GetStoreUsersIgnoreQueryFiltersAsync(bool includeInactive);
+        Task<IEnumerable<StoreUser>> GetStoreUsersByStoreIdAsync(Guid storeId, bool includeInactive);
     }
 }

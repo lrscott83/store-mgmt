@@ -88,7 +88,7 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
         DateOnly? lastPaidBeforeDate = lastPayment is null
             ? null
             : DateOnly.FromDateTime(lastPayment.PaymentBeforeDate.UtcDateTime);
-        DateOnly currentDue = StoreBillingUtils.GetNextDueDate(store.PaymentStartDate.Value, trialMonths, lastPaidBeforeDate);
+        DateOnly currentDue = StoreBillingUtils.GetNextDueDate(store.PaymentStartDate.Value, trialMonths, lastPaidBeforeDate) ?? store.PaymentStartDate.Value;
         DateOnly newDue = currentDue.AddMonths(1);
 
         // Create StorePayment with status Paid

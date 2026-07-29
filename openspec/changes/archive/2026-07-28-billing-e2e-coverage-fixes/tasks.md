@@ -1,0 +1,24 @@
+# Tasks: billing-e2e-coverage-fixes
+
+15 tasks across 2 PRs. Null is the domain model for "billing clock never started" — every fix pushes magic dates toward `null`.
+
+## PR1: Fixes, Clock, Migration (Tasks 1–7)
+
+- [ ] **1.1 Make StoreBillingUtils nullable-aware** — `Domain/Common/Utils/StoreBillingUtils.cs`: `GetNextDueDate → DateOnly?`, `GetStatus → DateOnly?` params. ALSO change `IsPaidPlanActive(DateOnly? paymentStartDate, DateOnly? nextDueDate, ...)` — both `nextDueDate` params become nullable. Not used in production, only in 3 tests. Verify: build succeeds.
+- [ ] **1.2 Add 3 StoreBillingUtilsTests + fix existing IsPaidPlanActive tests** — `Application.Tests/DomainUtils/StoreBillingUtilsTests.cs`: add null start → null, null due → NoAplica, Jan-31+1mo → Feb-28. ALSO update the 3 existing `IsPaidPlanActive` calls to pass `DateOnly?` for `nextDueDate` (signature changed in 1.1). Dep: 1.1. Verify: `dotnet test --filter StoreBillingUtilsTests` passes.
+- [ ] **1.3 Create BillingServiceTests (6+ cases)** — New file `Application.Tests/Services/Billing/BillingServiceTests.cs`: free store NoAplica (no throw), unknown store, paid store amounts, last payment price, reseller commission, months-active non-negative. Dep: 1.1. Verify: red test confirms F2 (ArgumentOutOfRangeException) before fix.
+- [ ] **1.4 StoreBillingSummary.NextDueDate → DateOnly?** — `Domain/Entities/Billing/StoreBillingSummary.cs`: change property. Dep: 1.1. Verify: build succeeds.
+- [ ] **1.5 Remove ?? DateOnly.MaxValue** — `Application/Services/Billing/BillingService.cs`, `Application/Features/.../GetStoresToCollectQuery.cs`: drop substitutions, pass nullable through. Dep: 1.1, 1.4. Verify: `dotnet test Application.Tests` passes.
+- [ ] **1.6 Move IDateTimeProvider to Application/Abstractions/Time/** — Create interface, delete from `Infrastructure/Interfaces/Services/`, update usings in `DateTimeProvider.cs`, `Program.cs`, interceptor. Dep: none. Verify: `dotnet build SMCA.sln`.
+- [ ] **1.7 Inject clock into 4 call sites** — `BillingService`, `GetMeQueryHandler`, `GetStoresToCollectQueryHandler`, `UpdateStoreCommandHandler`: add `IDateTimeProvider` param, replace `DateTime.UtcNow`. Dep: 1.6. Verify: `dotnet test Application.Tests` passes.
+
+## PR2: Test Infrastructure & E2E Coverage (Tasks 8–15)
+
+- [ ] **2.1 Create MutableDateTimeProvider** — `SMCA.WebApi.E2ETests/Infrastructure/MutableDateTimeProvider.cs`: test clock with `Pin(DateTimeOffset)` + `IDisposable` scope. Dep: 1.6. Verify: compiles.
+- [ ] **2.2 Register test clock in AppTestFactory** — Add `MutableDateTimeProvider` property + override `IDateTimeProvider` via `ConfigureTestServices` in `AppTestFactory.cs` (currently only has `ConfigureAppConfiguration` — must add `ConfigureTestServices` from scratch); expose `Clock` on `WebAppFixture.cs`. Dep: 2.1. Verify: TestClockTests proves wiring.
+- [ ] **2.3 Create BillingSeed helper** — `SMCA.WebApi.E2ETests/Infrastructure/BillingSeed.cs`: `SeedFreeStoreAsync`, `SeedPaidStoreAsync`, `SeedPaidStoreWithReSellerAsync`, `CleanupAsync`. Cleanup order: payments → storeModules → stores → reSellerOwners → owners → reSellers → userRoles → users. Dep: none. Verify: compiles.
+- [ ] **2.4 BackfillMigrationTests + PaymentStartDateBackfill constant** — Create `Infrastructure/Migrations/PaymentStartDateBackfill.cs` with shared SQL constant; create `BackfillMigrationTests.cs`. Dep: none. Verify: test seeds sentinel, runs SQL, asserts null.
+- [ ] **2.5 Generate backfill migration + deploy SQL** — Run `dotnet ef migrations add`, wire `Up()` to shared constant; write `backend/scripts/06-20260728-Backfill-PaymentStartDate.sql`. Dep: 2.4. Verify: migration test passes.
+- [ ] **2.6 RegisterStorePaymentCommandValidator + tests** — Create validator (`StoreId.NotEmpty`) in `Application/Features/.../StorePayments/Commands/`; E2E validation test. Dep: none. Verify: POST `Guid.Empty` returns 400 code `StoreId`.
+- [ ] **2.7 Delete dead StoreBillingService** — Remove `Application/Services/Billing/StoreBillingService.cs`, `Domain/Interfaces/Services/Billing/IStoreBillingService.cs`, DI registration. Dep: none. Verify: `dotnet build SMCA.sln` + tests pass.
+- [ ] **2.8 E2E coverage: 4 endpoint suites × 4 categories** — 12+ test files: `/auth/me` (PorVencer/EnGracia/trial), `PUT payment-date` (ReSeller 403, unknown store 400, empty StoreId 400, missing PaymentStartDate 400), `POST payments` (SuperAdmin 200, unauthenticated 401, OwnerAdmin 403, null start 400, amount check, commission, due advance), `GET to-collect` (ReSeller scoping, AlDia/Vencido excluded, PorVencer/EnGracia included, role rejection), `GET reseller-commissions` (SuperAdmin sees all, 401, role rejection, grouping), `PUT /stores/{id}` activation (paid sets start, free leaves null, existing unchanged), `POST features/activate` (Statistics price = 1000). Dep: 2.1, 2.2, 2.3. Verify: full E2E suite green.

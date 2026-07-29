@@ -1,5 +1,6 @@
 using Application.Abstractions.Features;
 using Application.Abstractions.HttpContext;
+using Application.Abstractions.Time;
 using Application.Features.Authentication.Queries.GetMe;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Billing;
@@ -45,7 +46,8 @@ public class GetMeQueryHandlerTests
             mocks.StoreRoleFeatureRepository.Object,
             mocks.AllowedFeaturesService.Object,
             mocks.StoreModuleRepository.Object,
-            mocks.BillingService.Object);
+            mocks.BillingService.Object,
+            mocks.DateTimeProvider.Object);
 
         var query = new GetMeQuery();
 
@@ -79,7 +81,8 @@ public class GetMeQueryHandlerTests
             mocks.StoreRoleFeatureRepository.Object,
             mocks.AllowedFeaturesService.Object,
             mocks.StoreModuleRepository.Object,
-            mocks.BillingService.Object);
+            mocks.BillingService.Object,
+            mocks.DateTimeProvider.Object);
 
         var query = new GetMeQuery();
 
@@ -98,15 +101,20 @@ public class GetMeQueryHandlerTests
 
     private TestMocks CreateMocks()
     {
-        return new TestMocks
+        var mocks = new TestMocks
         {
             HttpContextService = new Mock<IHttpContextService>(),
             UserRepository = new Mock<IUserRepository>(),
             StoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>(),
             AllowedFeaturesService = new Mock<IAllowedFeaturesService>(),
             StoreModuleRepository = new Mock<IStoreModuleRepository>(),
-            BillingService = new Mock<IBillingService>()
+            BillingService = new Mock<IBillingService>(),
+            DateTimeProvider = new Mock<IDateTimeProvider>()
         };
+
+        mocks.DateTimeProvider.Setup(c => c.UtcNow).Returns(new DateTimeOffset(DateTime.UtcNow, TimeSpan.Zero));
+
+        return mocks;
     }
 
     private class TestMocks
@@ -117,6 +125,7 @@ public class GetMeQueryHandlerTests
         public Mock<IAllowedFeaturesService> AllowedFeaturesService { get; set; } = null!;
         public Mock<IStoreModuleRepository> StoreModuleRepository { get; set; } = null!;
         public Mock<IBillingService> BillingService { get; set; } = null!;
+        public Mock<IDateTimeProvider> DateTimeProvider { get; set; } = new();
     }
 
     #endregion

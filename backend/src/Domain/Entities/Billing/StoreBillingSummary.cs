@@ -8,7 +8,7 @@ public class StoreBillingSummary
     public string StoreName { get; init; } = string.Empty;
     public string PlanType { get; init; } = string.Empty; // "Free" or "Paid"
     public DateOnly? PaymentStartDate { get; init; }
-    public DateOnly NextDueDate { get; init; }
+    public DateOnly? NextDueDate { get; init; }
     public DateOnly? LastPaidDate { get; init; }
     public StoreBillingStatusType Status { get; init; }
     public float CurrentMonthAmount { get; init; }

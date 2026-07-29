@@ -101,5 +101,27 @@ namespace Application.Tests.DomainUtils
         {
             StoreBillingUtils.IsInTrial(new DateOnly(2026, 1, 10), 1, new DateOnly(2026, 2, 20)).Should().BeFalse();
         }
+
+        // ── GetNextDueDate / GetStatus edge cases ────────────────────────────────────
+        [Fact]
+        public void GetNextDueDate_noStartDate_isNull()
+        {
+            StoreBillingUtils.GetNextDueDate(null, 1, null).Should().BeNull();
+        }
+
+        [Fact]
+        public void GetStatus_noDueDate_isNoAplica()
+        {
+            StoreBillingUtils.GetStatus(null, null, new DateOnly(2026, 3, 20), 5, 5)
+                .Should().Be(StoreBillingStatusType.NoAplica);
+        }
+
+        [Fact]
+        public void GetNextDueDate_monthEndStart_clampsToShorterMonth()
+        {
+            // 31 January + (trial 0 + 1) month → February has no 31st
+            StoreBillingUtils.GetNextDueDate(new DateOnly(2026, 1, 31), 0, null)
+                .Should().Be(new DateOnly(2026, 2, 28));
+        }
     }
 }

@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Time;
 using Application.Dtos.StoreManagement;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -22,19 +23,22 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
     private readonly ISystemConfigurationRepository _systemConfigurationRepository;
     private readonly IHttpContextService _httpContextService;
     private readonly IStringLocalizer<I18n> _localizer;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
     public GetStoresToCollectQueryHandler(
         IStoreRepository storeRepository,
         IStorePaymentRepository storePaymentRepository,
         ISystemConfigurationRepository systemConfigurationRepository,
         IHttpContextService httpContextService,
-        IStringLocalizer<I18n> localizer)
+        IStringLocalizer<I18n> localizer,
+        IDateTimeProvider dateTimeProvider)
     {
         _storeRepository = storeRepository;
         _storePaymentRepository = storePaymentRepository;
         _systemConfigurationRepository = systemConfigurationRepository;
         _httpContextService = httpContextService;
         _localizer = localizer;
+        _dateTimeProvider = dateTimeProvider;
     }
 
     public async Task<ResponseResult<IEnumerable<StoreToCollectDto>>> Handle(
@@ -53,7 +57,7 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
             : await _storeRepository.GetPaidStoresByReSellerUserAsync(_httpContextService.UserExternalId.ToGuid());
 
         // Compute billing status for each store
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
         int trialMonths = await _systemConfigurationRepository.GetTestingPeriodInMonthsAsync();
         int graceDays = await _systemConfigurationRepository.GetPaymentGraceDaysAsync();
         const int dueSoonDays = 5;
@@ -69,7 +73,7 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
                 : DateOnly.FromDateTime(lastPayment.PaymentBeforeDate.UtcDateTime);
 
             var nextDueDate = StoreBillingUtils.GetNextDueDate(
-                store.PaymentStartDate ?? DateOnly.MaxValue,
+                store.PaymentStartDate,
                 trialMonths,
                 lastPaidBeforeDate);
 

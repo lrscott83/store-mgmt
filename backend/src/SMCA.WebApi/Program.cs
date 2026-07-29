@@ -1,6 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Services.Tenants;
-using Infrastructure.Interfaces.Services;
+using Application.Abstractions.Time;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +9,7 @@ using SMCA.WebApi.Services;
 using Application;
 using Infrastructure;
 using Application.Abstractions.Authentication;
+using Application.Services.Authentication;
 using Infrastructure.Persistence.Contexts;
 using SMCA.WebApi.Authentication;
 using Microsoft.AspNetCore.Http.Features;
@@ -55,6 +56,7 @@ builder.Services
     .AddInfrastructure(builder.Configuration);
 
 builder.Services.AddScoped<IHashPasswordService, HashPasswordService>();
+builder.Services.AddScoped<IOfflineVerifierService, OfflineVerifierService>();
 
 builder.Services.Configure<TenantConnectionSettings>(options =>
     builder.Configuration.GetSection(nameof(TenantConnectionSettings)).Bind(options));

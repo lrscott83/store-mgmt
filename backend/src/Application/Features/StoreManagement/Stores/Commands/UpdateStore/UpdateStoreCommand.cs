@@ -1,5 +1,6 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Time;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
@@ -37,6 +38,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
         private readonly IStoreRoleFeatureGenerator _storeRoleFeaturesGenerator;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IDateTimeProvider _dateTimeProvider;
 
         public UpdateStoreCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -48,7 +50,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             IGetStoreByIdService storeByIdService,
             IFeatureRepository featureRepository,
             IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
-            IStoreRoleFeatureRepository storeRoleFeatureRepository)
+            IStoreRoleFeatureRepository storeRoleFeatureRepository,
+            IDateTimeProvider dateTimeProvider)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -60,6 +63,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             _featureRepository = featureRepository;
             _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
+            _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<ResponseResult<bool>> Handle(UpdateStoreCommand request, CancellationToken cancellationToken)
@@ -87,7 +91,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
                 .Any(m => !m.PriceIncluded);
 
             if (store.PaymentStartDate is null && hasPaidModuleRequested)
-                store.PaymentStartDate = DateOnly.FromDateTime(DateTime.UtcNow);
+                store.PaymentStartDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
 
             await _storeRepository.UpdateAsync(store);
             await UpdateStoreModules(store.Id, store.TenantId, request.ModuleIds);

@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Domain.Common.Extensions;
-using Infrastructure.Interfaces.Services;
+using Application.Abstractions.Time;
 using Application.Abstractions.HttpContext;
 
 namespace Infrastructure.Persistence.Interceptors

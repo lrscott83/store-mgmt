@@ -8,7 +8,8 @@ Scope: `backend` — billing endpoints, their tests, and the defects the tests e
 
 The backend recently gained a store billing subsystem: four new endpoints plus billing
 enforcement wired into `GET /auth/me`. The existing end-to-end suite covers 8 billing
-cases, all of them on stores seeded with `PaymentStartDate = today`. The most common
+cases, the majority on stores seeded with `PaymentStartDate = today` (via direct
+`DateOnly.FromDateTime(DateTime.UtcNow)` or shared helpers). The most common
 production shape — a free store that never activated a paid plan, i.e.
 `PaymentStartDate = null` — has no test at all.
 

@@ -79,19 +79,30 @@ The system MUST provide pure static methods in `StoreBillingUtils`.
 - GIVEN `amount = 1000`, `percent = 0`, `flat = 0`
 - WHEN computing commission THEN result SHALL be `0`
 
-#### R2.2: Next due date
+#### R2.2: Next due date (nullable)
 
-`GetNextDueDate(paymentStartDate, trialMonths, lastPaidBeforeDate)`.
+`GetNextDueDate(paymentStartDate, trialMonths, lastPaidBeforeDate)` accepts `DateOnly? paymentStartDate` and returns `DateOnly?`.
 
-| Payment state | Formula |
-|---------------|---------|
-| No payments yet | `paymentStartDate + trialMonths + 1 month` |
-| Has paid payment | `latestPaid.PaymentBeforeDate` |
+| Condition | Result |
+|-----------|--------|
+| `paymentStartDate is null` | `null` |
+| `lastPaidBeforeDate` is set | `lastPaidBeforeDate` |
+| Has start, no lastPaid | `paymentStartDate.AddMonths(trialMonths + 1)` |
 
 #### Scenario: No payments
 
 - GIVEN `paymentStartDate = 2026-01-10`, `trialMonths = 1`, `lastPaidBeforeDate = null`
 - WHEN computing next due THEN result SHALL be `2026-03-10`
+
+#### Scenario: Null start returns null
+
+- GIVEN `paymentStartDate = null`, `trialMonths = 1`, `lastPaidBeforeDate = null`
+- THEN result SHALL be `null`
+
+#### Scenario: Month-end clamping
+
+- GIVEN `paymentStartDate = 2026-01-31`, `trialMonths = 0`, `lastPaidBeforeDate = null`
+- THEN result SHALL be `2026-02-28` (clamped to shorter month)
 
 #### R2.3: Paid plan active check
 
@@ -116,26 +127,7 @@ The system MUST provide pure static methods in `StoreBillingUtils`.
 - GIVEN `startDate = 2026-01-10`, `trialMonths = 1`, `today = 2026-02-05`
 - THEN `IsInTrial` SHALL be `true`
 
-### R3: StoreBillingService — Orchestration
-
-The system MUST provide `IStoreBillingService` that produces `StoreBillingStatus` from repos + utils.
-
-| Method | Returns | Logic |
-|--------|---------|-------|
-| `GetStatusAsync(storeId)` | `StoreBillingStatus` | Load config, latest paid payment, delegate to utils |
-| `IsPaidPlanActiveAsync(storeId)` | `bool` | Delegates to `GetStatusAsync().IsPaidPlanActive` |
-
-#### Scenario: Orchestration
-
-- GIVEN store with `PaymentStartDate = null`
-- WHEN `GetStatusAsync` is called
-- THEN `Status` SHALL be `NoAplica`, `IsPaidPlanActive` SHALL be `false`
-
-#### Scenario: Overdue via service
-
-- GIVEN store activated long ago, no payments, trial expired
-- WHEN `IsPaidPlanActiveAsync` is called
-- THEN result SHALL be `false`
+<!-- R3 removed: StoreBillingService/IStoreBillingService dead code deleted -->
 
 ### R4: Enforcement — Overdue Downgrade
 
@@ -234,3 +226,39 @@ The system MUST provide `GET /stores/reseller-commissions` returning commissions
 - GIVEN 3 paid rows: 2 in 2026-05 (commissions 500, 300), 1 in 2026-06 (commission 200)
 - WHEN querying commissions
 - THEN results SHALL be `{2026,5, count 2, total 800}` and `{2026,6, count 1, total 200}`
+
+### R8: PaymentStartDate Backfill
+
+The system MUST backfill sentinel `0001-01-01` values on `Store.PaymentStartDate` to `NULL` via an EF Core migration. The SQL MUST be defined as a shared constant (`PaymentStartDateBackfill.Sql`), referenced by both the migration `Up()` and its verification test. `Down()` MUST be empty (reverting would reintroduce the sentinel).
+
+#### Scenario: Sentinel converted to null
+
+- GIVEN a Store row with `PaymentStartDate = DATE '0001-01-01'`
+- WHEN the backfill SQL executes
+- THEN `PaymentStartDate` SHALL be `NULL`
+
+### R9: IDateTimeProvider Clock Injection
+
+The system MUST read the current date through `IDateTimeProvider` in 4 call sites: `BillingService.GetStoreBillingSummaryAsync`, `GetMeQueryHandler`, `GetStoresToCollectQueryHandler`, `UpdateStoreCommandHandler`. (Previously: `DateTime.UtcNow`.)
+
+The interface SHALL reside in `Application.Abstractions.Time`. The `Infrastructure.Interfaces.Services` copy SHALL be deleted.
+
+#### Scenario: BillingService clock-aware status
+
+- GIVEN `BillingService` constructed with clock returning 2026-03-16
+- AND a store with `PaymentStartDate = 2026-01-10`, due 2026-03-10, grace 5 days
+- WHEN `GetStoreBillingSummaryAsync` is called
+- THEN status SHALL be `Vencido`
+
+### R10: RegisterStorePaymentValidator
+
+`POST /stores/{storeId}/payments` MUST validate `StoreId` is not empty via FluentValidation.
+
+#### Scenario: Empty store id
+
+- GIVEN POST to `/stores/{Guid.Empty}/payments`
+- THEN response SHALL be 400 with error code `StoreId`
+
+### R11: BillingService Unit Coverage
+
+`BillingService` MUST have unit tests covering: free store (`NoAplica`, no throw), unknown store (`NoAplica`), paid store without payments (amount = sum of module prices), paid store with payment (uses last payment price), reseller commission computation, months-active never negative.

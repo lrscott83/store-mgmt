@@ -10,11 +10,14 @@ namespace Application.Services.Features
     {
         private readonly IHttpContextService _httpContextService;
         private readonly IFeatureRepository _featureRepository;
+        private readonly IUserRoleRepository _userRoleRepository;
 
-        public AllowedFeaturesService(IHttpContextService httpContextService, IFeatureRepository featureRepository)
+        public AllowedFeaturesService(IHttpContextService httpContextService, IFeatureRepository featureRepository,
+            IUserRoleRepository userRoleRepository)
         {
             _httpContextService = httpContextService;
             _featureRepository = featureRepository;
+            _userRoleRepository = userRoleRepository;
         }
 
         public async Task<List<int>> GetAllowedFeatureIdsForCurrentUserAsync(List<int> storeModuleIds)
@@ -22,6 +25,15 @@ namespace Application.Services.Features
             if (_httpContextService.IsReSeller)
                 return await GetReSellerAllowedFeatureIdsByRoleAsync();
             if (_httpContextService.IsOwnerAdmin)
+                return await GetAllowedFeatureIdsByRoleAsync(RoleType.OwnerAdmin, storeModuleIds);
+            return [];
+        }
+
+        public async Task<List<int>> GetAllowedFeatureIdsForUserAsync(Guid userId, List<int> storeModuleIds)
+        {
+            if (await _userRoleRepository.IsReSeller(userId))
+                return await GetReSellerAllowedFeatureIdsByRoleAsync();
+            if (await _userRoleRepository.IsStoreAdmin(userId))
                 return await GetAllowedFeatureIdsByRoleAsync(RoleType.OwnerAdmin, storeModuleIds);
             return [];
         }

@@ -9,6 +9,8 @@ public sealed class WebAppFixture : IAsyncLifetime
 {
     public AppTestFactory Factory { get; private set; } = default!;
 
+    public MutableDateTimeProvider Clock => Factory.Clock;
+
     public async Task InitializeAsync()
     {
         // Set the connection string override BEFORE creating the factory.

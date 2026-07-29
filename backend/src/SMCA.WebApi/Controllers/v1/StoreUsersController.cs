@@ -1,6 +1,7 @@
 ﻿using Application.Dtos.Management.StoreUsers;
 using Application.Features.Management.StoreUsers.Queries.GetStoreUserById;
 using Application.Features.Management.Users.Commands.CreateStoreUser;
+using Application.Features.Management.Users.Queries.ExportOfflineRoster;
 using Application.Features.Management.Users.Queries.GetStoreUsers;
 using Application.ResponseModels;
 using Asp.Versioning;
@@ -35,6 +36,13 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> CreateStoreUserAsync(CreateStoreUserCommand command)
         {
             return Ok(await Sender.Send(command));
+        }
+
+        [HttpGet("{storeId}/offline-roster")]
+        [ProducesResponseType(typeof(ResponseResult<OfflineRosterDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ExportOfflineRosterAsync(Guid storeId)
+        {
+            return Ok(await Sender.Send(new ExportOfflineRosterQuery(storeId)));
         }
     }
 }

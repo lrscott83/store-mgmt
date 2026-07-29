@@ -41,6 +41,8 @@ namespace Application.Features.StoreManagement.Stores.Commands.SetStorePaymentDa
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
             var store = await _storeByIdService.GetStoreByIdIncludingModulesAsync(request.StoreId);
+            if (store is null)
+                throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
             store.PaymentStartDate = request.PaymentStartDate;
 
             await _storeRepository.UpdateAsync(store);

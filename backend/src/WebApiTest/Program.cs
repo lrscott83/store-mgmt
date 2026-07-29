@@ -3,7 +3,7 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.HttpContext;
 using Application.Services.Tenant;
 using Infrastructure;
-using Infrastructure.Interfaces.Services;
+using Application.Abstractions.Time;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;

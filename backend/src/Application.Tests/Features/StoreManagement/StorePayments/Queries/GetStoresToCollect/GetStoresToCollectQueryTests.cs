@@ -1,4 +1,5 @@
 using Application.Abstractions.HttpContext;
+using Application.Abstractions.Time;
 using Application.Dtos.StoreManagement;
 using Application.Exceptions;
 using Application.Features.StoreManagement.StorePayments.Queries.GetStoresToCollect;
@@ -25,6 +26,7 @@ public class GetStoresToCollectQueryHandlerTests
     private readonly Mock<ISystemConfigurationRepository> _mockConfigRepository;
     private readonly Mock<IHttpContextService> _mockHttpContextService;
     private readonly Mock<IStringLocalizer<I18n>> _mockLocalizer;
+    private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     private readonly GetStoresToCollectQueryHandler _handler;
 
     private readonly Guid _reSellerUserId = Guid.NewGuid();
@@ -43,6 +45,7 @@ public class GetStoresToCollectQueryHandlerTests
         _mockConfigRepository = new Mock<ISystemConfigurationRepository>();
         _mockHttpContextService = new Mock<IHttpContextService>();
         _mockLocalizer = new Mock<IStringLocalizer<I18n>>();
+        _mockDateTimeProvider = new Mock<IDateTimeProvider>();
 
         _mockLocalizer.Setup(x => x["UserNotFound"]).Returns(new LocalizedString("UserNotFound", "User not found"));
         _mockLocalizer.Setup(x => x["StoreNotFound"]).Returns(new LocalizedString("StoreNotFound", "Store not found"));
@@ -54,12 +57,15 @@ public class GetStoresToCollectQueryHandlerTests
             .Setup(x => x.GetPaymentGraceDaysAsync())
             .ReturnsAsync(GraceDays);
 
+        _mockDateTimeProvider.Setup(c => c.UtcNow).Returns(new DateTimeOffset(DateTime.UtcNow, TimeSpan.Zero));
+
         _handler = new GetStoresToCollectQueryHandler(
             _mockStoreRepository.Object,
             _mockStorePaymentRepository.Object,
             _mockConfigRepository.Object,
             _mockHttpContextService.Object,
-            _mockLocalizer.Object);
+            _mockLocalizer.Object,
+            _mockDateTimeProvider.Object);
     }
 
     /// <summary>

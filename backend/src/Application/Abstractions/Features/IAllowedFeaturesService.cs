@@ -9,5 +9,6 @@ namespace Application.Abstractions.Features
     public interface IAllowedFeaturesService
     {
         public Task<List<int>> GetAllowedFeatureIdsForCurrentUserAsync(List<int> storeModuleIds);
+        public Task<List<int>> GetAllowedFeatureIdsForUserAsync(Guid userId, List<int> storeModuleIds);
     }
 }

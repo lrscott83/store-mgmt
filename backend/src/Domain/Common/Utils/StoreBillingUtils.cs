@@ -18,20 +18,26 @@ namespace Domain.Common.Utils
             => amount - CurrentPriceServiceUtils.GetCurrentPrice(amount, percentDiscountPrice, discountPrice);
 
         /// First due ≈ activation + trial + 1 post-paid month; afterwards the latest paid PaymentBeforeDate.
-        public static DateOnly GetNextDueDate(DateOnly paymentStartDate, int trialMonths, DateOnly? lastPaidBeforeDate)
-            => lastPaidBeforeDate ?? paymentStartDate.AddMonths(trialMonths + 1);
-
-        public static StoreBillingStatusType GetStatus(DateOnly? paymentStartDate, DateOnly nextDueDate, DateOnly today, int dueSoonDays, int graceDays)
+        /// Returns null when paymentStartDate is null — no billing clock has started.
+        public static DateOnly? GetNextDueDate(DateOnly? paymentStartDate, int trialMonths, DateOnly? lastPaidBeforeDate)
         {
-            if (paymentStartDate is null) return StoreBillingStatusType.NoAplica;
-            if (today > nextDueDate.AddDays(graceDays)) return StoreBillingStatusType.Vencido;
-            if (today > nextDueDate) return StoreBillingStatusType.EnGracia;
-            if (today >= nextDueDate.AddDays(-dueSoonDays)) return StoreBillingStatusType.PorVencer;
+            if (lastPaidBeforeDate is not null) return lastPaidBeforeDate;
+            if (paymentStartDate is null) return null;
+            return paymentStartDate.Value.AddMonths(trialMonths + 1);
+        }
+
+        public static StoreBillingStatusType GetStatus(DateOnly? paymentStartDate, DateOnly? nextDueDate, DateOnly today, int dueSoonDays, int graceDays)
+        {
+            if (paymentStartDate is null || nextDueDate is null) return StoreBillingStatusType.NoAplica;
+            var due = nextDueDate.Value;
+            if (today > due.AddDays(graceDays)) return StoreBillingStatusType.Vencido;
+            if (today > due) return StoreBillingStatusType.EnGracia;
+            if (today >= due.AddDays(-dueSoonDays)) return StoreBillingStatusType.PorVencer;
             return StoreBillingStatusType.AlDia;
         }
 
-        public static bool IsPaidPlanActive(DateOnly? paymentStartDate, DateOnly nextDueDate, DateOnly today, int graceDays)
-            => paymentStartDate is not null && today <= nextDueDate.AddDays(graceDays);
+        public static bool IsPaidPlanActive(DateOnly? paymentStartDate, DateOnly? nextDueDate, DateOnly today, int graceDays)
+            => paymentStartDate is not null && nextDueDate is not null && today <= nextDueDate.Value.AddDays(graceDays);
 
         public static bool IsInTrial(DateOnly? paymentStartDate, int trialMonths, DateOnly today)
             => paymentStartDate is not null && today <= paymentStartDate.Value.AddMonths(trialMonths);

@@ -60,5 +60,16 @@ namespace Infrastructure.Persistence.Repositories
                 .OrderBy(u => u.Store.Name).ThenBy(u => u.User.FullName)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<StoreUser>> GetStoreUsersByStoreIdAsync(Guid storeId, bool includeInactive)
+        {
+            return await _storeUsers
+                .Where(su => su.StoreId == storeId && (includeInactive || su.IsActive))
+                .Include(su => su.Store)
+                .Include(su => su.User)
+                .IgnoreQueryFilters()
+                .OrderBy(su => su.User.FullName)
+                .ToListAsync();
+        }
     }
 }

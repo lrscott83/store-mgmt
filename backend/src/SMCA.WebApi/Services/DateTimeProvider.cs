@@ -1,4 +1,4 @@
-﻿using Infrastructure.Interfaces.Services;
+﻿using Application.Abstractions.Time;
 
 namespace SMCA.WebApi.Services
 {

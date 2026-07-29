@@ -1,3 +1,4 @@
+using Application.Abstractions.Time;
 using Domain.Common.Utils;
 using Domain.Entities.Billing;
 using Domain.Entities.Modules;
@@ -12,17 +13,20 @@ public class BillingService : IBillingService
     private readonly IStorePaymentRepository _paymentRepository;
     private readonly IModuleRepository _moduleRepository;
     private readonly ISystemConfigurationRepository _configRepository;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
     public BillingService(
         IStoreRepository storeRepository,
         IStorePaymentRepository paymentRepository,
         IModuleRepository moduleRepository,
-        ISystemConfigurationRepository configRepository)
+        ISystemConfigurationRepository configRepository,
+        IDateTimeProvider dateTimeProvider)
     {
         _storeRepository = storeRepository;
         _paymentRepository = paymentRepository;
         _moduleRepository = moduleRepository;
         _configRepository = configRepository;
+        _dateTimeProvider = dateTimeProvider;
     }
 
     public async Task<StoreBillingSummary> GetStoreBillingSummaryAsync(Guid storeId)
@@ -45,11 +49,11 @@ public class BillingService : IBillingService
         var trialMonths = Math.Max(1, trialDays); // trial is already in months
 
         var nextDueDate = StoreBillingUtils.GetNextDueDate(
-            store.PaymentStartDate ?? DateOnly.MaxValue,
+            store.PaymentStartDate,
             trialMonths,
             lastPayment?.PaymentBeforeDate is DateTimeOffset pbd ? DateOnly.FromDateTime(pbd.UtcDateTime) : null);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
         var status = StoreBillingUtils.GetStatus(
             store.PaymentStartDate,
             nextDueDate,

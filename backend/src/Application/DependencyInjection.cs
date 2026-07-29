@@ -54,7 +54,6 @@ namespace Application
             services.AddScoped<ICreateOwnerService, CreateOwnerService>();
 
             services.AddScoped<IBillingService, BillingService>();
-            services.AddScoped<IStoreBillingService, StoreBillingService>();
 
             return services;
         }

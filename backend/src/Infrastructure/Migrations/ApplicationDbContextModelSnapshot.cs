@@ -339,6 +339,16 @@ namespace Infrastructure.Migrations
                         },
                         new
                         {
+                            Id = 91,
+                            AvailableToStore = true,
+                            Description = "Funcionalidad para registrar pagos de tiendas",
+                            IsActive = true,
+                            ModuleId = 9,
+                            Name = "Pago de tienda",
+                            Order = 191
+                        },
+                        new
+                        {
                             Id = 100,
                             AvailableToStore = true,
                             Description = "Funcionalidad para listar el historial de las ventas",

@@ -1,5 +1,7 @@
-﻿using Application.Abstractions.HttpContext;
+﻿using Application.Abstractions.Features;
+using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Time;
 using Application.Dtos.Authentication;
 using Application.ResponseModels;
 using Domain.Entities.Billing;
@@ -25,10 +27,12 @@ namespace Application.Features.Authentication.Queries.GetMe
         private readonly IAllowedFeaturesService _allowedFeaturesService;
         private readonly IStoreModuleRepository _storeModuleRepositorytory;
         private readonly IBillingService _billingService;
+        private readonly IDateTimeProvider _dateTimeProvider;
 
         public GetMeQueryHandler(IHttpContextService httpContextService, IUserRepository userRepository, IStoreRoleFeatureRepository storeRoleFeatureRepository,
             IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepositorytory,
-            IBillingService billingService)
+            IBillingService billingService,
+            IDateTimeProvider dateTimeProvider)
         {
             _httpContextService = httpContextService;
             _userRepository = userRepository;
@@ -36,6 +40,7 @@ namespace Application.Features.Authentication.Queries.GetMe
             _allowedFeaturesService = allowedFeaturesService;
             _storeModuleRepositorytory = storeModuleRepositorytory;
             _billingService = billingService;
+            _dateTimeProvider = dateTimeProvider;
         }
 
         public async Task<ResponseResult<CurrentUserDto>> Handle(GetMeQuery request, CancellationToken cancellationToken)
@@ -74,7 +79,7 @@ namespace Application.Features.Authentication.Queries.GetMe
             var featureIds = await _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync(storeModuleIds);
             
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
 
             return ResponseResult.Success(new CurrentUserDto { 
                 Id = user.Id, 
