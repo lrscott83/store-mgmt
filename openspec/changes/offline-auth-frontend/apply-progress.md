@@ -108,6 +108,103 @@ Modified:
 1. **Task 10 (admin export) is unit-verified only.** `GET /v1/storeusers/{storeId}/offline-roster` does not exist server-side (§7a, 0%). `roster-http-service.test.ts` and `roster-export-panel.test.tsx` prove only the URL called and `response.data.data` unwrapping against a mocked transport. The real response envelope, DTO field casing, whether `issuedAt`/`expiresAt` are epoch-ms or ISO strings, and whether `users[].verifier` exists at all remain **unproven** until the backend ships.
 2. **Task 13's manual smoke checklist requires a human** and has not been executed. `docs/plans/2026-07-28-offline-auth-frontend-smoke-checklist.md` records the exact pending steps. `pwa-offline-shell` is merged but not archived, and its own manual offline walkthrough is still pending — the true-offline `/login` steps (13.3) may not be honestly executable yet.
 
-## Next recommended phase
+## Next recommended phase (Batch 1)
 
 `sdd-verify` — validate the implementation against the 4 specs (`offline-roster-bundle`, `offline-auth-mode`, `offline-device-provisioning`, `auth-session`) and carry forward the Task 10 / Task 13 honesty flags into the verify-report rather than letting them read as fully "done".
+
+---
+
+# Batch 2 — verify-report fix-up (2026-07-29)
+
+**Trigger**: `openspec/changes/offline-auth-frontend/verify-report.md` (PASS WITH WARNINGS) — closes WARNING #1/#2 and SUGGESTION #1/#2. WARNING #3 (Task 10 backend gap) and WARNING #4 (Task 13 manual smoke) are explicitly OUT OF SCOPE — backend-blocked / human-only, left exactly as-is (tasks.md item 13 stays unchecked; `roster-http-service.ts`'s BLOCKED-for-verification comments untouched).
+**Branch**: `feat/offline-auth-frontend` (same branch, no new branch, no PR).
+**Strict TDD**: each new test proven with a real mutation → confirmed FAIL → reverted → confirmed PASS, before being counted as done.
+
+## WU1 — WARNING #1 / SUGGESTION #2: idle-lock logout must preserve the roster — DONE
+
+Commit `6d2404a` — `test(offline): prove idle-lock logout preserves the roster`.
+
+- File: `frontend-react/apps/web-store-pos/app/shared/lib/stores/__tests__/auth-store.offline.test.ts` — new `describe('useAuthStore.logout() — preserves the offline roster (auth-session MODIFIED)')` block.
+- The test combines a REAL provisioned roster (`importRoster`, real), a REAL `loginOffline('ana','secret')` call (real, not mocked — this test file never mocks `auth-store`), and a REAL `logout()` call (real store action, not `vi.fn()`), then asserts `isRosterProvisioned()` (real) is still `true`.
+- **Mutation proof**: temporarily added `import { clearRoster } from '../offline/roster-store';` to `auth-store.ts` and called `clearRoster();` as the first line of `logout()`. Re-ran the test: `AssertionError: expected false to be true` at the post-logout `isRosterProvisioned()` assertion (1 failed / 2 passed in the file). Reverted both the import and the call; re-ran — 3/3 passed again. `git status` confirmed `auth-store.ts` was back to its committed state before moving on (no accidental diff left behind).
+
+## WU2 — WARNING #2: end-to-end coverage for two offline-auth-mode scenarios — DONE
+
+Commit `27403cf` — `test(offline): add end-to-end coverage for expired-bundle and inactive-user login`.
+
+- New file: `frontend-react/apps/web-store-pos/app/auth/routes/__tests__/login.offline.e2e.test.tsx` (2 tests). Does **not** mock `~/shared/lib/offline/roster-store` or `~/shared/lib/offline/offline-auth-service` — both run as real production code against real jsdom `localStorage` + real Web Crypto, driven through the rendered `LoginPage` form exactly like the spec's Given/When/Then.
+- `login.offline.test.tsx` (existing file, Suite A/B, the bare `vi.fn()` headline-invariant mock) was **not touched** — kept passing unmodified (verified below).
+
+**Test 1 — "An expired bundle falls back to online auth"**:
+- Writes an already-expired `OfflineRosterBundle` directly into `localStorage['lizoft.offline-roster']` (bypassing `importRoster`'s own at-import expiry guard, exactly like `roster-store.test.ts`'s D3 shape-guard test does — this simulates a bundle that expired *after* being imported, matching the spec's GIVEN clause).
+- Submits the rendered login form; asserts the real (unmocked) `isRosterProvisioned()` returns `false`, routing to the online `login` mock (`toHaveBeenCalledWith('ana','secret')`), and that `loginOffline` is never called.
+- **Mutation proof**: in `roster-store.ts`'s `getRoster()`, replaced `if (parsed.expiresAt <= now) return null;` with `if (false) return null;` (expiry check always false). Re-ran: `AssertionError: expected "spy" to be called with arguments: [ 'ana', 'secret' ] — Number of calls: 0` (1 failed / 1 passed). Reverted the line exactly; re-ran — 2/2 passed.
+
+**Test 2 — "Inactive roster user is rejected distinctly"**:
+- Real `importRoster()` seeds a non-expired bundle whose one user has `isActive: false` and a real PBKDF2 verifier (via real `sha256Base64`/`pbkdf2Base64`, matching `offline-auth-service.test.ts`'s fixture convention).
+- The store's `loginOffline` mock delegates to the REAL `authenticateOffline()` (imported directly, not mocked), so `login.tsx`'s `offlineErrorMessageId` dispatch receives a genuine `OfflineUserInactiveError` instance thrown by production code against a real inactive user — not a hand-built `Object.assign` stand-in as in `login.offline.test.tsx`'s A3 test.
+- Asserts the rendered form shows the catalog string for `AUTH.ACCOUNT_INACTIVE` (`'Tu cuenta está inactiva. Contactá soporte.'`), and that the online `login` mock is never called.
+- **Mutation proof**: in `login.tsx`'s `offlineErrorMessageId()`, folded the `name === 'OfflineUserInactiveError'` branch into the generic `AUTH.INVALID_CREDENTIALS` bucket (collapsing the distinct error name). Re-ran: `waitFor` timed out — `screen.getByText('Tu cuenta está inactiva...')` never appeared (1 failed / 1 passed). Reverted `login.tsx` to the original two-branch dispatch; re-ran — 2/2 passed.
+- After both mutations were reverted, `git status --short` showed only the new test file as untracked — `login.tsx` and `roster-store.ts` were confirmed byte-identical to their committed state.
+
+Full regression check after WU1+WU2 (`login.offline.e2e.test.tsx` + `login.offline.test.tsx` + `login.test.tsx` + `auth-store.offline.test.ts` together): **24/24 passed**, including the pre-existing `login.test.tsx` (14 tests, unmodified) and `login.offline.test.tsx`'s Suite B against its bare `vi.fn()` mock (unmodified).
+
+## WU3 — SUGGESTION #1: run the linter — INVESTIGATED, NOT FIXABLE IN SCOPE
+
+`pnpm -C apps/web-store-pos lint` (`eslint . --ext .ts,.tsx`) fails immediately with:
+```
+ESLint: 9.39.4
+ESLint couldn't find an eslint.config.(js|mjs|cjs) file.
+```
+Root cause: `apps/web-store-pos/package.json` already depends on `@store-mgmt/eslint-config` (`workspace:*`, exporting `./base` and `./react-router` flat configs from `packages/eslint-config/`), but **no `eslint.config.js` file has ever existed in `apps/web-store-pos`** (confirmed via `git log --oneline --all -- "apps/web-store-pos/eslint.config.*"` → no results). This is a **pre-existing, project-wide gap** — not specific to the ~15 offline-auth files in this change, and not something introduced by this fix-up batch or by the original `offline-auth-frontend` apply run.
+Per instructions: did **not** invent an `eslint.config.js` (that is a project-wide wiring decision, out of scope for a spec-driven fix-up batch touching only offline-auth files). No code changes for WU3; no commit. Flagging as an open, separately-trackable gap (distinct from the Task 10/13 backend-blocked items — this one is purely a frontend tooling gap and could be picked up as its own small change).
+
+## Gate Results — Batch 2 (actual output, run from `frontend-react/`)
+
+```
+$ pnpm test
+ Test Files  155 passed (155)
+      Tests  2161 passed (2161)
+
+$ pnpm -C apps/web-store-pos exec tsc --noEmit
+  (no output — zero type errors)
+
+$ pnpm -C apps/web-store-pos build
+  ✓ built in 273ms (SSR/manifest)
+  verify-sw-precache: OK — 136 precached entries; shell and route manifest each present exactly once.
+
+$ pnpm -C apps/web-store-pos lint
+  ESLint couldn't find an eslint.config.(js|mjs|cjs) file. (pre-existing gap — see WU3, not fixed here)
+```
+
+Delta from the Batch 1 / verify-report baseline (154 files / 2158 tests): **+1 test file, +3 tests** (both new tests in WU2's file, plus WU1's addition inside an already-counted file — net: `login.offline.e2e.test.tsx` is the only new file, contributing 2 tests; WU1 added 1 test to an existing file). 136 precache entries unchanged (no production bundle impact — these are test-only additions).
+
+## Commits (Batch 2, in order)
+
+```
+6d2404a test(offline): prove idle-lock logout preserves the roster
+27403cf test(offline): add end-to-end coverage for expired-bundle and inactive-user login
+```
+
+## Files changed (Batch 2)
+
+Modified:
+- `frontend-react/apps/web-store-pos/app/shared/lib/stores/__tests__/auth-store.offline.test.ts` (+1 test, new describe block)
+
+New:
+- `frontend-react/apps/web-store-pos/app/auth/routes/__tests__/login.offline.e2e.test.tsx` (2 tests)
+
+Untouched (mutated temporarily for TDD proof, reverted, confirmed clean via `git status`):
+- `frontend-react/apps/web-store-pos/app/shared/lib/stores/auth-store.ts`
+- `frontend-react/apps/web-store-pos/app/shared/lib/offline/roster-store.ts`
+- `frontend-react/apps/web-store-pos/app/auth/routes/login.tsx`
+
+## Honesty carried forward (unchanged from Batch 1 — still open, still out of this batch's scope)
+
+1. **Task 10 (admin export) is unit-verified only** — backend endpoint `GET /v1/storeusers/{storeId}/offline-roster` still does not exist (§7a). `roster-http-service.ts`'s BLOCKED-for-verification comments left exactly where they are.
+2. **Task 13's manual smoke checklist still requires a human** — tasks.md items 13.1-13.9 left unchecked, wording unchanged.
+3. **NEW (Batch 2, WU3): `apps/web-store-pos` has no `eslint.config.js`** despite already depending on `@store-mgmt/eslint-config` — pre-existing project-wide gap, not fixed here, not offline-auth-specific.
+
+## Next recommended phase (Batch 2)
+
+`sdd-verify` — re-run verify to confirm WARNING #1 and WARNING #2 are now closed by real, mutation-proven tests; WARNING #3/#4 remain open (backend/human-blocked, unchanged); SUGGESTION #1 is now investigated and documented as a separate pre-existing tooling gap rather than an unknown blind spot.
