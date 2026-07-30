@@ -771,6 +771,6 @@ git commit -m "chore(pwa): remove temporary service worker debug logging"
 
 ## Out of scope
 
-- **Offline authentication.** Separate plan: `docs/plans/2026-07-25-offline-auth-frontend-plan.md`. It depends on this one — no application code runs offline until the shell is precached.
+- **Offline authentication.** Shipped and archived at `openspec/changes/archive/2026-07-29-offline-auth-frontend/` (its plan was deleted 2026-07-30). It depends on this one — no application code runs offline until the shell is precached.
 - **An offline data layer for `admin/*`, `management/*`, `profile/*` and usage telemetry.** Those views must *load* offline; their API calls are expected to fail.
 - **Store paid-plan billing.** Unrelated work on a separate branch, sharing only `app-layout.tsx`.

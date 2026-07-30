@@ -204,9 +204,9 @@ place. §7b below is the one part of this item still open, and it is a decision,
 **Solution.** Delivered as planned.
 
 **Plan**: deleted 2026-07-30, recoverable from git history. The PBKDF2 verifier contract it
-specified survives in `docs/plans/2026-07-25-offline-auth-frontend-plan.md`, in
-`app/shared/lib/offline/offline-crypto.ts`, and in the tests on both sides — the frontend has
-to match it byte-for-byte, so it was never single-sourced here.
+specified survives in `app/shared/lib/offline/offline-crypto.ts`, in
+`docs/plans/2026-07-25-at-rest-encryption-frontend-plan.md`, and in the tests on both sides —
+the frontend has to match it byte-for-byte, so it was never single-sourced here.
 
 **Constraint carried from the frontend side**: offline authentication must be OPTIONAL.
 The mode is decided by ONE question asked before any credential is evaluated — is the
@@ -382,7 +382,9 @@ Frontend work is tracked separately and is NOT part of this backlog:
   acceptance walkthrough, the debug-log removal commit, re-verify and archive. See
   `openspec/changes/pwa-offline-shell/`.
 - Dev/preview port separation in `frontend-react/apps/web-store-pos/vite.config.ts`.
-- `docs/plans/2026-07-25-offline-auth-frontend-plan.md`.
+- Offline auth frontend — shipped and archived at
+  `openspec/changes/archive/2026-07-29-offline-auth-frontend/`; its plan was deleted 2026-07-30.
+  Only the manual smoke checklist remains unrun.
 - ~~`offline-auth-frontend` — code-complete, pending archive.~~ **Archived** at
   `openspec/changes/archive/2026-07-29-offline-auth-frontend/`. Smoke steps 13.1–13.9 are
   still unrun; §7a shipping unblocked the first three.

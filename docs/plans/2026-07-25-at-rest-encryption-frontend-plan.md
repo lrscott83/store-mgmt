@@ -8,7 +8,10 @@
 
 ## Authentication mode decides everything — READ THIS FIRST
 
-This plan sits on top of the mode rule defined in `2026-07-25-offline-auth-frontend-plan.md` §"Authentication mode". Restated, because every task below depends on it:
+This plan sits on top of the offline-auth mode rule. That plan was deleted on 2026-07-30 once
+its change shipped, so the rule is **inlined here in full** — it is a live constraint this plan
+depends on, and it was not duplicated anywhere else. Restated, because every task below
+depends on it:
 
 ```
 roster file imported      →  OFFLINE authentication against that file
@@ -25,11 +28,18 @@ no roster file imported   →  ONLINE authentication, EXACTLY as today
 
 Because the mode is decided by the file *before* any credential is checked, the broken intermediate state "authenticated but no DEK on a store whose data is ciphertext" cannot occur through the normal flow. The `MissingDataKeyError` paths below are defense-in-depth, not a routine branch.
 
+### The four consequences of the mode rule — lifted verbatim from the deleted offline-auth plan
+
+1. **This is a mode switch, not a fallback.** A provisioned device with perfect internet still authenticates offline. Do not branch on `ConnectivityService.isOnline()` to pick the mode — connectivity only matters *inside* the online branch, where it already does today.
+2. **A device that never imported the file is untouched.** Not "mostly untouched" — byte-for-byte the current behavior. The feature is purely additive; if a user never provisions, they must be unable to tell this plan was ever implemented.
+3. **An EXPIRED bundle is not a provisioned device.** `isRosterProvisioned()` is false once `expiresAt` passes, so the device falls back to online auth instead of locking the user out. At-rest encryption deliberately uses a *different*, expiry-independent predicate: data already written as ciphertext stays ciphertext no matter what the bundle's clock says.
+4. **A user who is not in the roster cannot log in on a provisioned device.** That is not an edge case to work around — offline auth rejects them exactly like a wrong password (`AUTH.INVALID_CREDENTIALS`). Remedy is operational: re-export the roster and re-import it.
+
 **Tech Stack:** React, TypeScript, Zustand, Vitest+jsdom, @noble/ciphers (sync AES-GCM), Web Crypto (crypto.subtle) for the one-time DEK unwrap, @zip.js/zip.js (existing).
 
 ## Global Constraints
 
-- **Depends on the offline-auth frontend plan being implemented first** — this plan EXTENDS `roster-types.ts`, `roster-store.ts`, `offline-crypto.ts`, and the `loginOffline` action from `2026-07-25-offline-auth-frontend-plan.md`.
+- **The offline-auth frontend work is DONE and shipped** (change archived at `openspec/changes/archive/2026-07-29-offline-auth-frontend/`; its plan was deleted 2026-07-30). This plan EXTENDS what it built: `roster-types.ts`, `roster-store.ts`, `offline-crypto.ts`, and the `loginOffline` action. Read those files, not a plan.
 - **KEK derivation (MUST match backend byte-for-byte):** `kek = PBKDF2( input = utf8( Base64(SHA256(utf8(password))) ), salt = base64Decode(wrapSalt), iterations = 210000, hash = SHA-256, dkLen = 32 )`. Reuse the offline-auth `sha256Base64` + `pbkdf2Base64` helpers.
 - **Wrapped DEK on-the-wire:** `wrappedDek` = Base64(AES-GCM-ciphertext ‖ 16-byte tag); the GCM tag is CONCATENATED to the ciphertext. `crypto.subtle` AES-GCM expects the tag appended, so pass the whole buffer.
 - **Entity envelope:** stored string = `'enc:v1:'` + Base64( iv(12) ‖ ciphertext ‖ tag(16) ), synchronous AES-GCM via `@noble/ciphers` `gcm`, fresh 12-byte iv per write.
