@@ -122,7 +122,6 @@ export function DashboardPage() {
       setUnpaidSaleCreditsToday(0);
       setUnpaidSaleCreditsYesterday(0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, hasExpensesModule, hasCreditsModule]);
 
   const divisor = currency === 'USD' ? rate : 1;

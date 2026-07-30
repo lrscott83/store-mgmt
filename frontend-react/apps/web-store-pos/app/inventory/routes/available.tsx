@@ -30,7 +30,6 @@ export function InventoryAvailablePage() {
     // ProductRepository / ProductRepository.getCategoryRepository()), so the category/product
     // fetching this page used to do purely to build the `enriched` array is no longer needed.
     setCategories(inventorySvc.getInventoryCategoriesView().data);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
   // Header total inventory value — Angular's InventoryAvailableComponent.getInventoryCostTotal()

@@ -137,7 +137,6 @@ export function TodayStatsPage() {
         .getPaidSaleCreditsInDayObservable(new Date())
         .then((response) => setPaidSaleCredits(response.data));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, hasExpensesModule, hasCreditsModule]);
 
   const expensesCashTotal = expenses

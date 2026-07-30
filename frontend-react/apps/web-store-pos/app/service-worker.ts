@@ -1,5 +1,4 @@
 /// <reference lib="webworker" />
-/* eslint-disable no-restricted-globals */
 import { resolveStrategy } from './shared/lib/pwa/sw-strategy';
 
 declare let self: ServiceWorkerGlobalScope & {
