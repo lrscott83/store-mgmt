@@ -174,7 +174,7 @@ export function OwnerEditPage() {
   useEffect(() => {
     if (!isSuperAdmin || activeTab !== 'stores') return;
     loadStores();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadStores reads no reactive value
   }, [isSuperAdmin, activeTab]);
 
   async function handleSubmit(e: React.FormEvent) {

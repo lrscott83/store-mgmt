@@ -63,7 +63,7 @@ export function ProductsPage() {
 
   useEffect(() => {
     loadData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId
   }, [storeId]);
 
   function togglePanel(categoryId: string) {
