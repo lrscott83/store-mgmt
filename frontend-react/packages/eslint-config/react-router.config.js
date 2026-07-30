@@ -18,9 +18,9 @@ export default [
     },
     plugins: { 'react-hooks': reactHooks },
     rules: {
-      'turbo/no-undeclared-env-vars': ['warn', { allowList: ['DEV'] }],
+      'turbo/no-undeclared-env-vars': ['error', { allowList: ['DEV'] }],
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn'
+      'react-hooks/exhaustive-deps': 'error'
     }
   },
   { ignores: ['eslint.config.mjs', 'build/**', '.react-router/**'] }
