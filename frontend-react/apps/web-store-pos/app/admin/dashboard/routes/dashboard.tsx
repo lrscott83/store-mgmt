@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { usageHttpService } from '~/admin/dashboard/lib/services/usage-http-service';
@@ -28,26 +28,29 @@ export function AdminDashboardPage() {
   const [data, setData] = useState<number[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  async function loadData(view: '7days' | '30days') {
-    setCategories(view === '7days' ? getDiasSemana() : getDias30());
-    setData([]);
-    setError(undefined);
-    try {
-      const res =
-        view === '7days'
-          ? await usageHttpService.getStoresLastWeek()
-          : await usageHttpService.getStoresLastMonth();
-      if (res.succeeded && res.data) {
-        setData(res.data.storeUsagesCountDays);
+  const loadData = useCallback(
+    async (view: '7days' | '30days') => {
+      setCategories(view === '7days' ? getDiasSemana() : getDias30());
+      setData([]);
+      setError(undefined);
+      try {
+        const res =
+          view === '7days'
+            ? await usageHttpService.getStoresLastWeek()
+            : await usageHttpService.getStoresLastMonth();
+        if (res.succeeded && res.data) {
+          setData(res.data.storeUsagesCountDays);
+        }
+      } catch {
+        setError(formatMessage({ id: 'ADMIN_DASHBOARD.ERROR' }));
       }
-    } catch {
-      setError(formatMessage({ id: 'ADMIN_DASHBOARD.ERROR' }));
-    }
-  }
+    },
+    [formatMessage],
+  );
 
   useEffect(() => {
     loadData('7days');
-  }, []);
+  }, [loadData]);
 
   return (
     <div>

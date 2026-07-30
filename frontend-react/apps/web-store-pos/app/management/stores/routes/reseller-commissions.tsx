@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
@@ -25,7 +25,7 @@ export function ReSellerCommissionsPage() {
   const [rows, setRows] = useState<ReSellerCommission[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  async function loadRows() {
+  const loadRows = useCallback(async () => {
     try {
       const res = await storeHttpService.getReSellerCommissions();
       setRows(res.data);
@@ -33,11 +33,11 @@ export function ReSellerCommissionsPage() {
     } catch {
       setError(intl.formatMessage({ id: 'BILLING.COMMISSIONS.ERROR' }));
     }
-  }
+  }, [intl]);
 
   useEffect(() => {
     loadRows();
-  }, []);
+  }, [loadRows]);
 
   return (
     <div className="space-y-4 p-4">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
@@ -14,7 +14,7 @@ export function ResellerListPage() {
   const [resellers, setResellers] = useState<ReSeller[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  async function loadResellers() {
+  const loadResellers = useCallback(async () => {
     try {
       const res = await resellerHttpService.listResellers();
       setResellers(res.data);
@@ -22,11 +22,11 @@ export function ResellerListPage() {
     } catch {
       setError(formatMessage({ id: 'RESELLERS.ERROR' }));
     }
-  }
+  }, [formatMessage]);
 
   useEffect(() => {
     loadResellers();
-  }, []);
+  }, [loadResellers]);
 
   return (
     <div className="space-y-4 p-4">
