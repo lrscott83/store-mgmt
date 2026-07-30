@@ -1,3 +1,4 @@
+import globals from 'globals';
 import reactRouterConfig from '@store-mgmt/eslint-config/react-router';
 
 export default [
@@ -19,6 +20,14 @@ export default [
         projectService: false,
         project: null,
       },
+    },
+  },
+  {
+    // The build scripts run under node, not the browser: the shared config only
+    // declares browser and service-worker globals, so `process` reads as undefined.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: globals.node,
     },
   },
 ];

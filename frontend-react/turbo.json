@@ -16,7 +16,8 @@
     },
     "test": {
       "dependsOn": ["^test"],
-      "outputs": ["coverage/**", "!coverage/lcov.info"]
+      "env": ["TZ"],
+      "outputs": []
     },
     "dev": {
       "dependsOn": ["^build"],
