@@ -36,19 +36,27 @@ namespace Application.Services.Stores
             var store = Store.Create(name, ownerId, approved, tenantId, null, address, description);
             await _storeRepository.AddAsync(store);
 
+            var modules = (await _moduleRepository.GetModulesByIdsAsync(moduleIds)).ToDictionary(m => m.Id);
+            var storeModules = new List<StoreModule>(moduleIds.Count);
             for (int i = 0; i < moduleIds.Count; i++)
             {
                 int moduleId = moduleIds[i];
-                Module module = await _moduleRepository.GetByIdAsync(moduleId);
-                StoreModule storeModule = StoreModule.Create(store.Id, moduleId, module.Price, module.PriceIncluded,
+                if (modules.TryGetValue(moduleId, out var module))
+                {
+                    var storeModule = StoreModule.Create(store.Id, moduleId, module.Price, module.PriceIncluded,
                         module.Price, module.DiscountPrice, module.PercentDiscountPrice, tenantId);
-                await _storeModuleRepository.AddAsync(storeModule);
+                    storeModules.Add(storeModule);
+                }
+            }
+            if (storeModules.Count > 0)
+            {
+                await _storeModuleRepository.AddRangeAsync(storeModules);
             }
 
             List<int> featureIds = await _featureRepository.GetAvailableFeatureIdsByModuleIdsAsync(moduleIds);
             var storeRoleFeatures = await _storeRoleFeaturesGenerator.GenerateStoreRoleFeaturesAsync(store.Id, tenantId, featureIds);
-            await Task.WhenAll(storeRoleFeatures.Select(srf => 
-                _storeRoleFeatureRepository.AddAsync(srf)));
+            if (storeRoleFeatures.Count > 0)
+                await _storeRoleFeatureRepository.AddRangeAsync(storeRoleFeatures);
 
             return store;
         }

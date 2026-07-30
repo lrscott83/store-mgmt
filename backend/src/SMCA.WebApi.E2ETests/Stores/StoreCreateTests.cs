@@ -30,10 +30,12 @@ public sealed class StoreCreateTests
         {
             var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
                 .PostAsJsonAsync("/api/v1/stores", Body(owner.OwnerId, name, new[] { StoreSeed.ManagementModuleId }));
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
             created = body.Data!.Id;
+            response.Headers.Location.Should().NotBeNull();
+            response.Headers.Location!.AbsolutePath.Should().Be($"/api/v1/stores/{created}");
             using var scope = _f.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             (await db.Set<Domain.Entities.Stores.Store>().IgnoreQueryFilters().AnyAsync(s => s.Id == created)).Should().BeTrue();
@@ -67,30 +69,29 @@ public sealed class StoreCreateTests
     public async Task Create_with_unavailable_module_returns_400_code_ModuleIds()
         => await AssertCreate400(owner => Body(owner.OwnerId, $"S-{Guid.NewGuid():N}", new[] { StoreSeed.UnavailableModuleId }), "ModuleIds");
 
-    // KNOWN BUG: IsUniqueName checks User.Login, not Store.Name -> duplicate store names are allowed.
     [Fact]
-    public async Task Create_with_duplicate_name_currently_succeeds_KNOWN_BUG()
+    public async Task Create_with_duplicate_name_returns_400()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var o1 = await StoreSeed.SeedOwnerAsync(_f);
         var o2 = await StoreSeed.SeedOwnerAsync(_f);
         var dup = $"Dup-{Guid.NewGuid():N}";
-        Guid s1 = Guid.Empty, s2 = Guid.Empty;
+        Guid s1 = Guid.Empty;
         try
         {
             var client = DbTestHelpers.AuthedClient(_f, adminId, login);
-            var b1 = await (await client.PostAsJsonAsync("/api/v1/stores", Body(o1.OwnerId, dup, new[] { StoreSeed.ManagementModuleId })))
-                .Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
+            var r1 = await client.PostAsJsonAsync("/api/v1/stores", Body(o1.OwnerId, dup, new[] { StoreSeed.ManagementModuleId }));
+            r1.StatusCode.Should().Be(HttpStatusCode.Created);
+            var b1 = await r1.Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
             b1!.Succeeded.Should().BeTrue(); s1 = b1.Data!.Id;
-            var b2 = await (await client.PostAsJsonAsync("/api/v1/stores", Body(o2.OwnerId, dup, new[] { StoreSeed.ManagementModuleId })))
-                .Content.ReadFromJsonAsync<ApiResponse<StoreData>>(ApiResponse.Json);
-            b2!.Succeeded.Should().BeTrue("duplicate store names are NOT enforced (known bug)"); s2 = b2.Data!.Id;
+
+            var r2 = await client.PostAsJsonAsync("/api/v1/stores", Body(o2.OwnerId, dup, new[] { StoreSeed.ManagementModuleId }));
+            r2.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
         finally
         {
             if (s1 != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, s1);
-            if (s2 != Guid.Empty) await StoreSeed.CleanupStoreAsync(_f, s2);
             await StoreSeed.CleanupOwnerAsync(_f, o1.OwnerId, o1.UserId);
             await StoreSeed.CleanupOwnerAsync(_f, o2.OwnerId, o2.UserId);
             await DbTestHelpers.CleanupUserAsync(_f, adminId);

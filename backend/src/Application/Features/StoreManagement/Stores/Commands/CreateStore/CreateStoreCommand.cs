@@ -48,7 +48,7 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         public async Task<ResponseResult<StoreDto>> Handle(CreateStoreCommand request, CancellationToken cancellationToken)
         {
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
-                throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
+                throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.BadRequest);
 
             var owner = await _ownerRepository.GetOwnerIncludingUserByIdAsync(request.OwnerId);
             var store = await _createStoreService.CreateStoreAsync(request.OwnerId, owner.TenantId, request.Name, request.Address, 

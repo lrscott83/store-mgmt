@@ -59,10 +59,13 @@ namespace SMCA.WebApi.Controllers.v1
         }
 
         [HttpPost()]
-        [ProducesResponseType(typeof(ResponseResult<StoreDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> CreateStoreAsync(CreateStoreCommand command)
+        [ProducesResponseType(typeof(ResponseResult<StoreDto>), StatusCodes.Status201Created)]
+        public async Task<IActionResult> CreateStoreAsync([FromBody] CreateStoreCommand command)
         {
-            return Ok(await Sender.Send(command));
+            var result = await Sender.Send(command);
+            return result.Succeeded
+                ? CreatedAtAction(nameof(GetStoreByIdAsync), new { id = result.Data!.Id }, result)
+                : Ok(result);
         }
 
         [HttpPut("{id}")]
