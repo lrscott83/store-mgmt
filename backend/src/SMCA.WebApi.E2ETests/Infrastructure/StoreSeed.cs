@@ -42,7 +42,7 @@ public static class StoreSeed
         var owner = await SeedOwnerAsync(factory);
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var store = Store.Create(name, owner.OwnerId, approved, DataUtils.DefaultTenant.Id, DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create(name, owner.OwnerId, approved, DataUtils.DefaultTenant.Id);
         db.Set<Store>().Add(store);
         foreach (var moduleId in moduleIds ?? new[] { ManagementModuleId })
             db.Set<StoreModule>().Add(StoreModule.Create(store.Id, moduleId, 0, true, 0, 0, 0, DataUtils.DefaultTenant.Id));
@@ -61,7 +61,7 @@ public static class StoreSeed
         var owner = Owner.Create(user.Id, false, tenantId, "E2E StoresAdmin owner");
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
-        var store = Store.Create($"SA-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create($"SA-Store-{Guid.NewGuid():N}", owner.Id, false, tenantId);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
         db.Set<StoreModule>().Add(StoreModule.Create(store.Id, ManagementModuleId, 0, true, 0, 0, 0, tenantId));
@@ -83,7 +83,7 @@ public static class StoreSeed
         var owner = Owner.Create(user.Id, false, tenant.Id, "t2 owner");
         db.Set<Owner>().Add(owner);
         await db.SaveChangesAsync();
-        var store = Store.Create($"T2-Store-{Guid.NewGuid():N}", owner.Id, false, tenant.Id, DateOnly.FromDateTime(DateTime.UtcNow));
+        var store = Store.Create($"T2-Store-{Guid.NewGuid():N}", owner.Id, false, tenant.Id);
         db.Set<Store>().Add(store);
         await db.SaveChangesAsync();
         db.Set<StoreModule>().Add(StoreModule.Create(store.Id, ManagementModuleId, 0, true, 0, 0, 0, tenant.Id));

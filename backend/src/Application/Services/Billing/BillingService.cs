@@ -4,6 +4,7 @@ using Domain.Entities.Billing;
 using Domain.Entities.Modules;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Billing;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Application.Services.Billing;
 
@@ -14,19 +15,32 @@ public class BillingService : IBillingService
     private readonly IModuleRepository _moduleRepository;
     private readonly ISystemConfigurationRepository _configRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IMemoryCache _cache;
 
     public BillingService(
         IStoreRepository storeRepository,
         IStorePaymentRepository paymentRepository,
         IModuleRepository moduleRepository,
         ISystemConfigurationRepository configRepository,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IMemoryCache cache)
     {
         _storeRepository = storeRepository;
         _paymentRepository = paymentRepository;
         _moduleRepository = moduleRepository;
         _configRepository = configRepository;
         _dateTimeProvider = dateTimeProvider;
+        _cache = cache;
+    }
+
+    private async Task<T> GetCachedConfigAsync<T>(string key, Func<Task<T>> factory, int expirationMinutes = 5)
+    {
+        if (_cache.TryGetValue(key, out T? cached))
+            return cached!;
+
+        var value = await factory();
+        _cache.Set(key, value, TimeSpan.FromMinutes(expirationMinutes));
+        return value;
     }
 
     public async Task<StoreBillingSummary> GetStoreBillingSummaryAsync(Guid storeId)
@@ -43,10 +57,9 @@ public class BillingService : IBillingService
         var lastPayment = await _paymentRepository.GetLastByStoreIdAsync(storeId);
         var paidCount = await _paymentRepository.GetPaidMonthsCountAsync(storeId);
 
-        var graceDays = await _configRepository.GetPaymentGraceDaysAsync();
-        var trialDays = await _configRepository.GetTestingPeriodInMonthsAsync();
-        var dueSoonDays = 5; // fixed due-soon window
-        var trialMonths = Math.Max(1, trialDays); // trial is already in months
+        var graceDays = await GetCachedConfigAsync("PaymentGraceDays", _configRepository.GetPaymentGraceDaysAsync);
+        var dueSoonDays = await GetCachedConfigAsync("DueSoonDays", _configRepository.GetDueSoonDaysAsync);
+        var trialMonths = Math.Max(1, await GetCachedConfigAsync("TestingPeriodInMonths", _configRepository.GetTestingPeriodInMonthsAsync));
 
         var nextDueDate = StoreBillingUtils.GetNextDueDate(
             store.PaymentStartDate,
@@ -54,6 +67,7 @@ public class BillingService : IBillingService
             lastPayment?.PaymentBeforeDate is DateTimeOffset pbd ? DateOnly.FromDateTime(pbd.UtcDateTime) : null);
 
         var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
+        var isInTrial = StoreBillingUtils.IsInTrial(store.PaymentStartDate, trialMonths, today);
         var status = StoreBillingUtils.GetStatus(
             store.PaymentStartDate,
             nextDueDate,
@@ -89,6 +103,7 @@ public class BillingService : IBillingService
             NextDueDate = nextDueDate,
             LastPaidDate = lastPayment?.PaidDate is DateTimeOffset pdo ? DateOnly.FromDateTime(pdo.UtcDateTime) : null,
             Status = status,
+            IsInTrial = isInTrial,
             CurrentMonthAmount = currentAmount,
             ReSellerCommission = commission,
             MonthsActive = Math.Max(0, monthsActive),

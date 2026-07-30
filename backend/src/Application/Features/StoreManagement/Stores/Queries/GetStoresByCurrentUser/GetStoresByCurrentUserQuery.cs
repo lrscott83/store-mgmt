@@ -4,6 +4,7 @@ using Application.Dtos.StoreManagement;
 using Application.ResponseModels;
 using AutoMapper;
 using Domain.Common.Constants;
+using Domain.Common.Extensions;
 using Domain.Interfaces.Repositories;
 using Microsoft.AspNetCore.Http;
 
@@ -29,10 +30,10 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrent
 
         public async Task<ResponseResult<IEnumerable<StoreDto>>> Handle(GetStoresByCurrentUserQuery request, CancellationToken cancellationToken)
         {
+            var userId = _httpContextService.UserExternalId.ToGuid();
             var stores = _httpContextService.IsSuperAdmin
-                ? await _storeRepository.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync()
-                : await _storeRepository.GetStoresAsync(true);
-            stores = stores.Where(s => s.Id != DataUtils.DefaultStore.Id).ToList();
+                ? await _storeRepository.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(excludeStoreId: DataUtils.DefaultStore.Id)
+                : await _storeRepository.GetActiveStoresByUserIdAsync(userId, excludeStoreId: DataUtils.DefaultStore.Id);
             var storeDtos = _mapper.Map<IEnumerable<StoreDto>>(stores);
             return ResponseResult.Success(storeDtos);
         }

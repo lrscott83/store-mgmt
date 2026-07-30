@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SMCA.WebApi.E2ETests.Infrastructure;
 
+using Domain.Entities.StoreRoleFeatures;
+
 namespace SMCA.WebApi.E2ETests.Features;
 
 // Snapshot of the rows `activate` mutates, so a test can restore the shared seed in finally.
@@ -49,10 +51,42 @@ public static class FeatureSeed
             dashboard?.IsActive ?? false, todayReports?.IsActive ?? false, egress is not null);
     }
 
+    /// <summary>
+    /// Remove StoreRoleFeature rows referencing the given feature IDs.
+    /// Needed because DeleteBehavior.Restrict prevents deleting Feature rows that are referenced.
+    /// Tests that seed StoreUser with features (via AuthzSeed.SeedStoreUserAsync) can leave
+    /// StoreRoleFeature rows that block cleanup in RestoreAsync and individual test finally blocks.
+    /// </summary>
+    public static async Task CleanFeatureRefsAsync(AppTestFactory f, params int[] featureIds)
+    {
+        using var scope = f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var refs = await db.Set<StoreRoleFeature>()
+            .IgnoreQueryFilters()
+            .Where(srf => featureIds.Contains(srf.FeatureId))
+            .ToListAsync();
+        db.Set<StoreRoleFeature>().RemoveRange(refs);
+        await db.SaveChangesAsync();
+    }
+
     public static async Task RestoreAsync(AppTestFactory f, ActivateSnapshot s)
     {
         using var scope = f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // 🛡️ Cascade manual: remove StoreRoleFeature refs before touching features that may be referenced
+        var featureIdsToClean = new List<int>();
+        if (!s.EgressExisted) featureIdsToClean.Add(33);
+        featureIdsToClean.Add(50); // TodayReports may also have stale refs
+        if (featureIdsToClean.Count > 0)
+        {
+            var refs = await db.Set<StoreRoleFeature>()
+                .IgnoreQueryFilters()
+                .Where(srf => featureIdsToClean.Contains(srf.FeatureId))
+                .ToListAsync();
+            db.Set<StoreRoleFeature>().RemoveRange(refs);
+        }
+
         var stats = await db.Set<Module>().IgnoreQueryFilters().AsTracking().FirstOrDefaultAsync(m => m.Id == 6);
         if (stats is not null) { stats.IsActive = s.StatisticsActive; stats.Price = s.StatisticsPrice; }
         var reports = await db.Set<Module>().IgnoreQueryFilters().AsTracking().FirstOrDefaultAsync(m => m.Id == 5);
@@ -108,6 +142,12 @@ public static class FeatureSeed
     {
         using var scope = f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        // 🛡️ Remove StoreRoleFeature refs first (FK constraint)
+        var refs = await db.Set<StoreRoleFeature>()
+            .IgnoreQueryFilters()
+            .Where(srf => srf.FeatureId == (int)Domain.Common.Enums.FeatureType.Egress)
+            .ToListAsync();
+        db.Set<StoreRoleFeature>().RemoveRange(refs);
         var egress = await db.Set<Feature>().FindAsync((int)Domain.Common.Enums.FeatureType.Egress);
         if (egress is not null) { db.Set<Feature>().Remove(egress); await db.SaveChangesAsync(); }
     }

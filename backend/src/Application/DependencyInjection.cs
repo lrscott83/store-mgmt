@@ -16,6 +16,7 @@ using Domain.Interfaces.Services.Stores;
 using Domain.Interfaces.Services.Tenants;
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
@@ -23,7 +24,7 @@ namespace Application
 {
     public static class DependencyInjection
     {
-        public static IServiceCollection AddApplication(this IServiceCollection services)
+        public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
         {
             var assembly = typeof(DependencyInjection).Assembly;
             services.AddMediatR(cfg =>
@@ -54,6 +55,11 @@ namespace Application
             services.AddScoped<ICreateOwnerService, CreateOwnerService>();
 
             services.AddScoped<IBillingService, BillingService>();
+
+            // Authentication: bind settings from config
+            services.Configure<AuthenticationSettings>(
+                configuration.GetSection(AuthenticationSettings.SectionName));
+            services.AddScoped<IHashPasswordService, BcryptHashPasswordService>();
 
             return services;
         }

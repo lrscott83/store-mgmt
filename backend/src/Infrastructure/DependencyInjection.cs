@@ -84,6 +84,7 @@ namespace Infrastructure
             services.AddScoped<IInventoryEntryRepository, InventoryEntryRepository>();
             services.AddScoped<IInventoryEntryCostRepository, InventoryEntryCostRepository>();
             services.AddScoped<IStoreUsageRepository, StoreUsageRepository>();
+            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         }
     }
 }

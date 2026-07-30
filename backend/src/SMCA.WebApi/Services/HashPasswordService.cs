@@ -8,15 +8,25 @@ namespace SMCA.WebApi.Services
     {
         private readonly string _pepper = "B1BBA4F5-AB26-4175-96D5-22642F50A2BB";
         private readonly int _iteration = 3;
+
         public string HashPassword(string password)
         {
-            using (var sha256 = SHA256.Create())
-            {
-                var hash = Encoding.UTF8.GetBytes(password);
-                var generatedHash = sha256.ComputeHash(hash);
-                var generatedHashString = Convert.ToBase64String(generatedHash);
-                return generatedHashString;
-            }
+            return ComputeHash(password, salt: "", _pepper, _iteration);
+        }
+
+        public bool VerifyPassword(string password, string storedHash)
+        {
+            // 1. Try new format (pepper + iteration) first
+            string newFormatHash = ComputeHash(password, "", _pepper, _iteration);
+            if (newFormatHash == storedHash)
+                return true;
+
+            // 2. Fall back to legacy format (raw SHA256) for backward compat
+            string legacyHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(password)));
+            if (legacyHash == storedHash)
+                return true;
+
+            return false;
         }
 
         public static string ComputeHash(string password, string salt, string pepper, int iteration)

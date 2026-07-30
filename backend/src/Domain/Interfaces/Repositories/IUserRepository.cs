@@ -12,5 +12,6 @@ namespace Domain.Interfaces.Repositories
         Task<IEnumerable<User>> GetAllUsersIncludingStoreAndRolesAsync(bool includeInactive);
         Task<IEnumerable<User>> GetAllUsersByStoreIdIncludingStoreAndRolesAsync(Guid storeId, bool includeInactive);
         Task<User> GetUserByIdIncludingStoreAndRoles(Guid userId);
+        Task<User?> GetByLoginWithRelatedAsync(string login);
     }
 }

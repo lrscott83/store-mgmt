@@ -29,13 +29,13 @@ namespace SMCA.WebApi.Middlewares
             }
             catch (Exception error)
             {
-                _logger.LogError(new EventId(error.HResult), error,error.Message);
+                _logger.LogError(error, "Unhandled exception: {Message}", error.Message);
 
                 var response = context.Response;
                 response.ContentType = "application/json";
                 var responseModel = ResponseResult.Failure<string>(
-                    new Error("App.Unexpected", error?.Message ?? ""), 
-                    (int)HttpStatusCode.InternalServerError) ;
+                    new Error("App.Unexpected", "An unexpected error occurred. Please try again later."), 
+                    (int)HttpStatusCode.InternalServerError);
 
                 switch (error)
                 {
@@ -43,7 +43,6 @@ namespace SMCA.WebApi.Middlewares
                         // custom application validation error
                         response.StatusCode = (int)e.StatusCode;
                         responseModel.ActionCode = (int)e.StatusCode;
-                        //responseModel.Errors = ResponseResult.Failure<string>(e.Errors, (int)e.StatusCode);
                         responseModel.Errors = e.Errors;
                         break;
                     case ApiException e:

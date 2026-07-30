@@ -65,17 +65,17 @@ public class CreateStoreServiceTests
             .Setup(x => x.AddAsync(It.IsAny<Store>()))
             .ReturnsAsync((Store s) => s);
 
-        // Module repository setup - returns a valid module
+        // Module repository setup - returns valid modules by ids
         _mockModuleRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<int>()))
-            .ReturnsAsync((int id) => Module.Create(
+            .Setup(x => x.GetModulesByIdsAsync(It.IsAny<IEnumerable<int>>()))
+            .ReturnsAsync((IEnumerable<int> ids) => ids.Select(id => Module.Create(
                 id: id,
                 name: "Test Module",
                 order: 1,
                 priceIncluded: true,
                 price: 100f,
                 availableToStore: true,
-                isActive: true));
+                isActive: true)));
 
         // Feature repository setup
         _mockFeatureRepository
@@ -84,8 +84,8 @@ public class CreateStoreServiceTests
 
         // Store module repository setup
         _mockStoreModuleRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreModule>()))
-            .ReturnsAsync((StoreModule sm) => sm);
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Returns(Task.CompletedTask);
 
         // Store role feature generator setup
         _mockStoreRoleFeatureGenerator
@@ -168,8 +168,9 @@ public class CreateStoreServiceTests
         var callCount = 0;
 
         _mockStoreModuleRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreModule>()))
-            .Callback(() => callCount++);
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback<IEnumerable<StoreModule>>(modules => callCount = modules.Count())
+            .Returns(Task.CompletedTask);
 
         // Act
         await service.CreateStoreAsync(
@@ -394,7 +395,7 @@ public class CreateStoreServiceTests
     {
         // Arrange
         _mockModuleRepository
-            .Setup(x => x.GetByIdAsync(It.IsAny<int>()))
+            .Setup(x => x.GetModulesByIdsAsync(It.IsAny<IEnumerable<int>>()))
             .ThrowsAsync(new InvalidOperationException("Module not found"));
 
         var service = CreateService();
@@ -444,7 +445,7 @@ public class CreateStoreServiceTests
     {
         // Arrange
         _mockStoreModuleRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreModule>()))
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
             .ThrowsAsync(new InvalidOperationException("StoreModule creation failed"));
 
         var service = CreateService();
@@ -521,12 +522,15 @@ public class CreateStoreServiceTests
 
         var addCallCount = 0;
         _mockStoreRoleFeatureRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreRoleFeature>()))
-            .Returns((StoreRoleFeature srf) =>
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreRoleFeature>>()))
+            .Callback<IEnumerable<StoreRoleFeature>>(features =>
             {
-                Interlocked.Increment(ref addCallCount);
-                return Task.FromResult(srf);
-            });
+                foreach (var _ in features)
+                {
+                    Interlocked.Increment(ref addCallCount);
+                }
+            })
+            .Returns(Task.CompletedTask);
 
         // Act
         await service.CreateStoreAsync(
@@ -561,12 +565,9 @@ public class CreateStoreServiceTests
             });
 
         _mockStoreRoleFeatureRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreRoleFeature>()))
-            .Returns((StoreRoleFeature _) =>
-            {
-                callOrder.Add("AddAsync");
-                return Task.FromResult<StoreRoleFeature>(null!);
-            });
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreRoleFeature>>()))
+            .Callback(() => callOrder.Add("AddRangeAsync"))
+            .Returns(Task.CompletedTask);
 
         // Act
         await service.CreateStoreAsync(
@@ -580,8 +581,8 @@ public class CreateStoreServiceTests
 
         // Assert
         _mockStoreRoleFeatureRepository.Verify(
-            x => x.AddAsync(It.IsAny<StoreRoleFeature>()), 
-            Times.Exactly(2));
+            x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreRoleFeature>>()), 
+            Times.Once);
     }
 
     #endregion
@@ -632,10 +633,9 @@ public class CreateStoreServiceTests
             moduleIds);
 
         // Assert
-        foreach (var moduleId in moduleIds)
-        {
-            _mockModuleRepository.Verify(x => x.GetByIdAsync(moduleId), Times.Once);
-        }
+        _mockModuleRepository.Verify(
+            x => x.GetModulesByIdsAsync(It.Is<IEnumerable<int>>(ids => ids.SequenceEqual(moduleIds))),
+            Times.Once);
     }
 
     [Fact]
@@ -668,9 +668,9 @@ public class CreateStoreServiceTests
         StoreModule? capturedStoreModule = null;
 
         _mockStoreModuleRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreModule>()))
-            .Callback<StoreModule>(sm => capturedStoreModule = sm)
-            .ReturnsAsync((StoreModule sm) => sm);
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback<IEnumerable<StoreModule>>(modules => capturedStoreModule = modules.First())
+            .Returns(Task.CompletedTask);
 
         // Act
         await service.CreateStoreAsync(
@@ -695,9 +695,9 @@ public class CreateStoreServiceTests
         StoreModule? capturedStoreModule = null;
 
         _mockStoreModuleRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreModule>()))
-            .Callback<StoreModule>(sm => capturedStoreModule = sm)
-            .ReturnsAsync((StoreModule sm) => sm);
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback<IEnumerable<StoreModule>>(modules => capturedStoreModule = modules.First())
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await service.CreateStoreAsync(
@@ -794,8 +794,9 @@ public class CreateStoreServiceTests
             .ReturnsAsync((Store s) => s);
 
         _mockStoreModuleRepository
-            .Setup(x => x.AddAsync(It.IsAny<StoreModule>()))
-            .Callback(() => callOrder.Add("StoreModule"));
+            .Setup(x => x.AddRangeAsync(It.IsAny<IEnumerable<StoreModule>>()))
+            .Callback(() => callOrder.Add("StoreModule"))
+            .Returns(Task.CompletedTask);
 
         // Act
         await service.CreateStoreAsync(

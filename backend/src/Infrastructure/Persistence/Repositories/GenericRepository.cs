@@ -31,6 +31,11 @@ namespace Infrastructure.Persistence.Repositories
             return entity;
         }
 
+        public async Task AddRangeAsync(IEnumerable<TEntity> entities)
+        {
+            await _dbContext.Set<TEntity>().AddRangeAsync(entities);
+        }
+
         public async Task<bool> UpdateAsync(TEntity entity)
         {
             _dbContext.Entry(entity).State = EntityState.Modified;

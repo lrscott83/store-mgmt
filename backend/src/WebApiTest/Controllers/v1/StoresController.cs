@@ -40,9 +40,9 @@ namespace WebApiTest.Controllers.v1
 
         [HttpGet("list/{includeInactive}")]
         [ProducesResponseType(typeof(ResponseResult<List<StoreDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetStoresAsync()
+        public async Task<IActionResult> GetStoresAsync(bool includeInactive)
         {
-            return Ok(await Sender.Send(new GetStoresQuery(false)));
+            return Ok(await Sender.Send(new GetStoresQuery(includeInactive)));
         }
 
         [HttpGet("{id}")]
@@ -68,14 +68,14 @@ namespace WebApiTest.Controllers.v1
         }
 
         /// <summary>
-        /// Delete tenant by id
+        /// Deactivate store by id
         /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
         [HasApplicationRole(StoreRoleFeatures.SuperAdmin)]
         public async Task<IActionResult> DeleteAsync(Guid id)
         {
-            return Ok(await Sender.Send(new DeleteStoreCommand(id)));
+            return Ok(await Sender.Send(new DeactivateStoreCommand(id)));
         }
     }
 }

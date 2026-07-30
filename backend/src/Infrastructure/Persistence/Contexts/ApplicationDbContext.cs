@@ -24,6 +24,7 @@ using Domain.Entities.ProductCategories;
 using Domain.Entities.Products;
 using Domain.Entities.InventoryEntryCosts;
 using Domain.Entities.InventoryEntries;
+using Domain.Entities.Authentication;
 using Domain.Entities.StoreUsages;
 
 namespace Infrastructure.Persistence.Contexts
@@ -131,6 +132,7 @@ namespace Infrastructure.Persistence.Contexts
             builder.ApplyConfiguration(new InventoryEntryEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new InventoryEntryCostEntityTypeConfiguration(this));
             builder.ApplyConfiguration(new StoreUsageEntityTypeConfiguration(this));
+            builder.ApplyConfiguration(new RefreshTokenEntityTypeConfiguration(this));
 
         }
         internal DbSet<Tenant> Tenant { get; set; }
@@ -155,5 +157,6 @@ namespace Infrastructure.Persistence.Contexts
         internal DbSet<InventoryEntry> InventoryEntry { get; set; }
         internal DbSet<InventoryEntryCost> InventoryEntryCost { get; set; }
         internal DbSet<StoreUsage> StoreUsage { get; set; }
+        internal DbSet<RefreshToken> RefreshTokens { get; set; }
     }
 }

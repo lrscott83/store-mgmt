@@ -12,5 +12,8 @@ namespace Domain.Common.Enums
 
         [Description("PaymentGraceDays")]
         PaymentGraceDays = 3,
+
+        [Description("DueSoonDays")]
+        DueSoonDays = 4,
     }
 }

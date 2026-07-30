@@ -48,7 +48,9 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
 
         // Assert
         result.Succeeded.Should().BeTrue();
-        result.Data.Should().BeTrue();
+        result.Data.Login.Should().Be(command.Login);
+        result.Data.AuthToken.Should().NotBeNullOrEmpty();
+        result.Data.ExpiresIn.Should().BeAfter(DateTime.UtcNow);
     }
 
     [Fact]
@@ -72,7 +74,9 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
 
         // Assert
         result.Succeeded.Should().BeTrue();
-        result.Data.Should().BeTrue();
+        result.Data.Login.Should().Be(command.Login);
+        result.Data.AuthToken.Should().NotBeNullOrEmpty();
+        result.Data.ExpiresIn.Should().BeAfter(DateTime.UtcNow);
     }
 
     [Fact]

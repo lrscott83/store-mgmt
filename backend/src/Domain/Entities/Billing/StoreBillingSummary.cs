@@ -15,4 +15,5 @@ public class StoreBillingSummary
     public float ReSellerCommission { get; init; }
     public int MonthsActive { get; init; }
     public int MonthsPaid { get; init; }
+    public bool IsInTrial { get; init; }
 }

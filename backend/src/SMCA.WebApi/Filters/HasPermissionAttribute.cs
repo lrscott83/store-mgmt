@@ -22,19 +22,19 @@ namespace SMCA.WebApi.Filters
         }
     }
 
-    public class HasUserPermissionRequirementFilter : IAuthorizationFilter
+    public class HasUserPermissionRequirementFilter : IAsyncAuthorizationFilter
     {
         private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
         private readonly IReSellerRepository _reSellerRepository;
         private readonly IHttpContextService _httpContextService;
         private readonly List<StoreRoleFeatures> _storeRoleFeatures;
         private readonly IAllowedFeaturesService _allowedFeaturesService;
-        private readonly IStoreModuleRepository _storeModuleRepositorytory;
+        private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IBillingService _billingService;
 
         public HasUserPermissionRequirementFilter(StoreRoleFeatures[] storeRoleFeatures,
             IStoreRoleFeatureRepository storeRoleFeatureRepository, IHttpContextService httpContextService,
-            IReSellerRepository reSellerRepository, IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepositorytory,
+            IReSellerRepository reSellerRepository, IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepository,
             IBillingService billingService)
         {
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
@@ -42,11 +42,11 @@ namespace SMCA.WebApi.Filters
             _reSellerRepository = reSellerRepository;
             _storeRoleFeatures = storeRoleFeatures.ToList();
             _allowedFeaturesService = allowedFeaturesService;
-            _storeModuleRepositorytory = storeModuleRepositorytory;
+            _storeModuleRepository = storeModuleRepository;
             _billingService = billingService;
         }
 
-        public void OnAuthorization(AuthorizationFilterContext context)
+        public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
             // If the action (method) has its own [HasPermission], the class-level filter
             // should skip and let the action-level attribute handle authorization.
@@ -83,12 +83,12 @@ namespace SMCA.WebApi.Filters
                 // if user is not Super Admin, find out if it has any other authorized roles
                 if (!_httpContextService.IsSuperAdmin)
                 {
-                    var storeModules = _storeModuleRepositorytory.GetAvailableModulesByStoreIdAsync(_httpContextService.StoreId.ToGuid()).Result;
-                    var billing = _billingService.GetStoreBillingSummaryAsync(_httpContextService.StoreId.ToGuid()).Result;
-                    List<int> storeModuleIds = FilterForBilling(storeModules, billing);
+                    var storeModules = await _storeModuleRepository.GetAvailableModulesByStoreIdAsync(_httpContextService.StoreId.ToGuid());
+                    var billing = await _billingService.GetStoreBillingSummaryAsync(_httpContextService.StoreId.ToGuid());
+                    List<int> storeModuleIds = StoreBillingUtils.FilterForBilling(storeModules, billing);
                     if (_httpContextService.IsOwnerAdmin || _httpContextService.IsReSeller)
                     {
-                        var featureIds = _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync(storeModuleIds).Result;
+                        var featureIds = await _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync(storeModuleIds);
                         var hasPermission = _storeRoleFeatures.Any(srf => srf.GetFeatureType().HasValue && featureIds.Contains((int)srf.GetFeatureType().Value)); ;
                         if (!hasPermission)
                         {
@@ -97,8 +97,8 @@ namespace SMCA.WebApi.Filters
                     } 
                     else
                     {
-                        var hasUserPermission = _storeRoleFeatureRepository.HasUserAnyFeatureInStoreAsync(
-                            currentUserId.ToGuid(), _httpContextService.StoreId.ToGuid(), _storeRoleFeatures, storeModuleIds).Result;
+                        var hasUserPermission = await _storeRoleFeatureRepository.HasUserAnyFeatureInStoreAsync(
+                            currentUserId.ToGuid(), _httpContextService.StoreId.ToGuid(), _storeRoleFeatures, storeModuleIds);
                         if (!hasUserPermission)
                         {
                             context.Result = new ForbidResult();
@@ -111,23 +111,6 @@ namespace SMCA.WebApi.Filters
             {
                 context.Result = new UnauthorizedResult();
             }
-        }
-
-        /// <summary>
-        /// Filters modules based on the store's billing status.
-        /// Free plan (NoAplica) → all modules accessible.
-        /// Active paid plan (AlDia, PorVencer, EnGracia) → all modules accessible.
-        /// Overdue (Vencido) → only free (PriceIncluded) modules accessible.
-        /// </summary>
-        internal static List<int> FilterForBilling(IEnumerable<Module> modules, StoreBillingSummary billing)
-        {
-            if (billing.Status == StoreBillingStatusType.NoAplica)
-                return modules.Select(m => m.Id).ToList();
-
-            if (billing.Status != StoreBillingStatusType.Vencido)
-                return modules.Select(m => m.Id).ToList();
-
-            return modules.Where(m => m.PriceIncluded).Select(m => m.Id).ToList();
         }
     }
 }

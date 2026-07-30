@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace SMCA.WebApi.Authentication
@@ -20,6 +21,7 @@ namespace SMCA.WebApi.Authentication
             { 
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
                 new Claim(ClaimTypes.Name, userLogin),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
 
             var key = Encoding.ASCII.GetBytes(_jwtOptions.SecretKey);
@@ -41,6 +43,14 @@ namespace SMCA.WebApi.Authentication
 
             string userToken = new JwtSecurityTokenHandler().WriteToken(token);
             return userToken;
+        }
+
+        public string GenerateRefreshToken()
+        {
+            var randomBytes = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+            return Convert.ToBase64String(randomBytes);
         }
     }
 }

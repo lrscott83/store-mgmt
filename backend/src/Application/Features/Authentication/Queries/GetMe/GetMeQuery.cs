@@ -13,7 +13,8 @@ using System.Net;
 using Domain.Common.Extensions;
 using Domain.Common.Utils;
 using Microsoft.EntityFrameworkCore;
-using Application.Abstractions.Features;
+using Application.Abstractions.Authentication;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace Application.Features.Authentication.Queries.GetMe
 {
@@ -25,46 +26,49 @@ namespace Application.Features.Authentication.Queries.GetMe
         private readonly IUserRepository _userRepository;
         private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
         private readonly IAllowedFeaturesService _allowedFeaturesService;
-        private readonly IStoreModuleRepository _storeModuleRepositorytory;
+        private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IBillingService _billingService;
         private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly ITokenBlacklistService _tokenBlacklistService;
 
         public GetMeQueryHandler(IHttpContextService httpContextService, IUserRepository userRepository, IStoreRoleFeatureRepository storeRoleFeatureRepository,
-            IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepositorytory,
+            IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepository,
             IBillingService billingService,
-            IDateTimeProvider dateTimeProvider)
+            IDateTimeProvider dateTimeProvider,
+            ITokenBlacklistService tokenBlacklistService)
         {
             _httpContextService = httpContextService;
             _userRepository = userRepository;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _allowedFeaturesService = allowedFeaturesService;
-            _storeModuleRepositorytory = storeModuleRepositorytory;
+            _storeModuleRepository = storeModuleRepository;
             _billingService = billingService;
             _dateTimeProvider = dateTimeProvider;
+            _tokenBlacklistService = tokenBlacklistService;
         }
 
         public async Task<ResponseResult<CurrentUserDto>> Handle(GetMeQuery request, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(_httpContextService.UserExternalId))
                 return ResponseResult.Failure<CurrentUserDto>(UserErrors.NotFound, (int)HttpStatusCode.NotFound);
-            
+
             var user = await _userRepository
                 .Where(user => user.Id == _httpContextService.UserExternalId.ToGuid())
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync();
-            
+
             if (user is null)
                 return ResponseResult.Failure<CurrentUserDto>(UserErrors.NotFound, (int)HttpStatusCode.NotFound);
 
             if (!user.IsActive)
             {
-                await _httpContextService.SignOutAsync();
-                return ResponseResult.Failure<CurrentUserDto>(UserErrors.Inactive, (int)HttpStatusCode.NotFound);
+                await BlacklistCurrentTokenAsync();
+                return ResponseResult.Failure<CurrentUserDto>(UserErrors.AccountInactive, (int)HttpStatusCode.NotFound);
             }
 
-            var storeModules = await _storeModuleRepositorytory.GetAvailableModulesByStoreIdAsync(user.SelectedStoreId);
+            var storeModules = await _storeModuleRepository.GetAvailableModulesByStoreIdAsync(user.SelectedStoreId);
             var billing = await _billingService.GetStoreBillingSummaryAsync(user.SelectedStoreId);
-            List<int> storeModuleIds = FilterForBilling(storeModules, billing);
+            List<int> storeModuleIds = StoreBillingUtils.FilterForBilling(storeModules, billing);
 
             var storeRoleFeatures = await _storeRoleFeatureRepository.GetStoreRoleFeaturesByUserIdAsync(user.Id, storeModuleIds);
             var storeRoleFeaturesDtos = storeRoleFeatures
@@ -77,12 +81,11 @@ namespace Application.Features.Authentication.Queries.GetMe
             )).ToList();
 
             var featureIds = await _allowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync(storeModuleIds);
-            
 
-            var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
 
-            return ResponseResult.Success(new CurrentUserDto { 
-                Id = user.Id, 
+            return ResponseResult.Success(new CurrentUserDto
+            {
+                Id = user.Id,
                 Login = user.Login,
                 Email = user.Email,
                 FullName = user.FullName,
@@ -96,29 +99,37 @@ namespace Application.Features.Authentication.Queries.GetMe
                 StoreModuleIds = storeModuleIds,
                 IsActive = user.IsActive,
                 PaymentDueDate = billing.NextDueDate,
-                IsInTrial = billing.PaymentStartDate is not null && billing.PaymentStartDate.Value.AddMonths(1) >= today,
+                IsInTrial = billing.IsInTrial,
                 PaymentStatus = billing.Status.ToString(),
             });
         }
 
-        /// <summary>
-        /// Filters modules based on the store's billing status.
-        /// Free plan (NoAplica) → all modules accessible.
-        /// Active paid plan (AlDia, PorVencer, EnGracia) → all modules accessible.
-        /// Overdue (Vencido) → only free (PriceIncluded) modules accessible.
-        /// </summary>
-        internal static List<int> FilterForBilling(IEnumerable<Module> modules, StoreBillingSummary billing)
+        private async Task BlacklistCurrentTokenAsync()
         {
-            // No active billing → no enforcement
-            if (billing.Status == StoreBillingStatusType.NoAplica)
-                return modules.Select(m => m.Id).ToList();
+            var accessToken = _httpContextService.AccessToken;
+            if (string.IsNullOrEmpty(accessToken)) return;
 
-            // Paid plan that is active or in grace → all modules
-            if (billing.Status != StoreBillingStatusType.Vencido)
-                return modules.Select(m => m.Id).ToList();
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var jsonToken = handler.ReadJwtToken(accessToken);
+                var jti = jsonToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti)?.Value;
 
-            // Overdue past grace → only free (PriceIncluded) modules
-            return modules.Where(m => m.PriceIncluded).Select(m => m.Id).ToList();
+                if (!string.IsNullOrEmpty(jti))
+                {
+                    var expClaim = jsonToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Exp)?.Value;
+                    if (!string.IsNullOrEmpty(expClaim) && long.TryParse(expClaim, out var expSeconds))
+                    {
+                        var expDate = DateTimeOffset.FromUnixTimeSeconds(expSeconds);
+                        var remaining = expDate - DateTimeOffset.UtcNow;
+                        await _tokenBlacklistService.BlacklistAsync(jti, remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+                    }
+                }
+            }
+            catch
+            {
+                // Malformed token — skip blacklisting
+            }
         }
     }
 

@@ -15,11 +15,12 @@ public sealed class StoreScopingTests
     [Fact]
     public async Task SetMyStore_changes_selected_store_and_me_recomputes()
     {
-        var f = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        var login = $"super-{Guid.NewGuid():N}@test.com";
+        var userId = await AuthTestHelpers.SeedActiveUserAsync(_f, login);
         var storeB = await StoreSeed.SeedStoreAsync(_f, $"B-{Guid.NewGuid():N}", approved: true);
         try
         {
-            var client = DbTestHelpers.AuthedClient(_f, f.UserId, f.Login);
+            var client = DbTestHelpers.AuthedClient(_f, userId, login);
             var put = await client.PutAsJsonAsync("/api/v1/stores", new { StoreId = storeB.StoreId });
             put.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -30,7 +31,7 @@ public sealed class StoreScopingTests
         finally
         {
             await StoreSeed.CleanupStoreFixtureAsync(_f, storeB);
-            await AuthzSeed.CleanupStoreGraphAsync(_f, f.StoreId, f.UserId);
+            await AuthTestHelpers.CleanupUserAsync(_f, userId);
         }
     }
 }

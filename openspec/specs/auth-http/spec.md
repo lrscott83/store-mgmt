@@ -62,43 +62,54 @@ Define the HTTP contract for user registration in the auth-http service layer. T
 
 ---
 
-### S2: Register Return Type Parity
+### S2: Register Return Type Parity (Updated 2026-07-30)
 
-**Requirement**: `register()` MUST return `Promise<BaseResponseModel<boolean>>`, matching Angular's `Observable<BaseResponseModel<boolean>>` under the Observable→Promise transformation.
+**Requirement**: `POST /api/v1/auth/register` now returns `201 Created` with `AuthDto { login, authToken, expiresIn }`. The frontend `register()` MUST handle `Promise<BaseResponseModel<AuthDto>>` and extract the JWT token from `data.authToken` on successful registration for auto-login.
 
 **Shape**:
 ```typescript
-Promise<BaseResponseModel<boolean>>
+Promise<BaseResponseModel<AuthDto>>
 
-// BaseResponseModel<boolean> structure:
+// AuthDto structure:
+interface AuthDto {
+  login: string;
+  authToken: string;
+  expiresIn: string;
+}
+
+// BaseResponseModel<AuthDto> structure:
 {
   succeeded: boolean;
-  data?: boolean;
+  data?: AuthDto;
   errors?: Array<{ code?: string; description: string }>;
 }
 ```
 
 **Constraints**:
-- Return type MUST NOT be `Promise<BaseResponseModel<void>>` or any other generic parameter.
+- Return type changed from `BaseResponseModel<boolean>` to `BaseResponseModel<AuthDto>` — the handler no longer discards the JWT.
+- On successful registration (`201 Created`), `data.authToken` contains the JWT for immediate auto-login.
+- Location header SHOULD be present: `Location: /api/v1/auth/me`.
+- The frontend plan at `docs/plans/2026-07-30-register-endpoint-fixes-frontend.md` documents the new contract.
 - The service MUST return the envelope verbatim; no flattening, no selective extraction of `data`.
 
-**Rationale**: Angular's `registerOwner` is typed `Observable<BaseResponseModel<boolean>>`. Rule 3 (signature parity) requires the return shape to match exactly.
+**Rationale**: The backend now returns the already-generated JWT instead of a boolean, eliminating the need for an extra `/auth/login` call after registration.
 
 ---
 
-### S3: Response Envelope Handling at Call-Site
+### S3: Response Envelope Handling at Call-Site (Updated 2026-07-30)
 
-**Requirement**: `register.tsx` MUST branch on the `succeeded` field of the resolved response envelope. No envelope flattening; no conflation of transport errors with envelope-false.
+**Requirement**: `register.tsx` MUST branch on the `succeeded` field of the resolved response envelope. No envelope flattening; no conflation of transport errors with envelope-false. On success, the JWT token from `data.authToken` MUST be stored for auto-login.
 
 **Flow**:
 ```
 register() resolves:
-├─ succeeded === true → setSuccess(true) + navigate('/login')
+├─ succeeded === true → store JWT (data.authToken) + navigate('/login') [auto-login]
 ├─ succeeded === false → setErrors({ form: errors[0].description })
 └─ (does not throw; transport errors caught separately in outer catch)
 ```
 
 **Constraints**:
+- On `succeeded === true`, extract `data.authToken` and store it (cookie/secure storage) to complete the auto-login flow without a separate POST /auth/login call.
 - Navigate to `/login` ONLY when `succeeded === true`.
 - Surface `errors[0].description` as the user-facing error message ONLY when `succeeded === false`.
 - Network/HTTP transport failures (axios throw) MUST be caught in a separate outer catch block, independent of the envelope branch.
@@ -204,11 +215,14 @@ layer.
 ## Verification Criteria
 
 - [x] All 5 spec requirements are implemented and test-covered.
+- [x] S2 updated: `register()` returns `Promise<BaseResponseModel<AuthDto>>` — service tests verify `AuthDto` shape including `login`, `authToken`, `expiresIn`.
+- [x] S3 updated: call-site stores JWT token on successful registration (auto-login flow).
 - [x] S6: `getMe()` billing fields passthrough — `UserModel` carries `paymentDueDate`/`isInTrial`/`paymentStatus` unchanged; no mapping added.
-- [x] Service tests verify: body includes login/storeName, excludes passwordConfirmation, includes code only when non-empty (trim), returns BaseResponseModel<boolean>.
-- [x] Component tests verify: form renders login/storeName, code flows from query param without visible input, passwordConfirmation blocks submit locally and is never sent, envelope branch succeeds on true/false, navigate only on success.
-- [x] Full regression gate: typecheck 5/5 packages, 1567/1567 tests passing, zero build warnings.
-- [x] Cross-verified against Angular source: auth-http.service.ts:32-56, register.component.ts:72-82.
+- [x] Service tests verify: body includes login/storeName, excludes passwordConfirmation, includes code only when non-empty (trim), returns `BaseResponseModel<AuthDto>`.
+- [x] Component tests verify: form renders login/storeName, code flows from query param without visible input, passwordConfirmation blocks submit locally and is never sent, envelope branch succeeds on true/false with auto-login, navigate only on success.
+- [x] Backend: 52 unit tests + 11 E2E tests passing; `POST /api/v1/auth/register` returns `201 Created` with `AuthDto`.
+- [x] Rate limiting: `RegisterPolicy` (10 req / 10 min per IP) configured, returns 429 on excess.
+- [x] Full regression gate: typecheck 5/5 packages, zero build warnings.
 
 ---
 

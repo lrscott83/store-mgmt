@@ -96,23 +96,28 @@ Every response MUST include these fields:
 | `bundleId` | string | New `Guid.NewGuid().ToString()` per request |
 | `issuedAt` | Int64 | `DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()` |
 | `expiresAt` | Int64 | `issuedAt + 35 days` in ms |
-| `formatVersion` | int | Always `1` |
+| `formatVersion` | int | Always `2` |
 | `storeId` | Guid | Matches the requested storeId |
 
 #### Scenario: Bundle structure correct
 - GIVEN a successful export
-- THEN `formatVersion == 1`, `bundleId` is a valid non-empty GUID string
+- THEN `formatVersion == 2`, `bundleId` is a valid non-empty GUID string
 - AND `expiresAt - issuedAt == 35 * 86400 * 1000`
 - AND `storeId` matches the request parameter
 
 ### R5: Per-User Data Shape (MUST)
 
-Each `OfflineRosterUserDto` MUST contain: `Id`, `Login`, `FullName`, `IsActive`, `Roles` (list of `StoreModuleFeaturesDto`), `FeatureIds`, `StoreModuleIds`, `IsSuperAdmin`, `IsOwnerAdmin`, `IsReSeller`, `SelectedStoreId`, `Verifier` (Hash, Salt, Iterations).
+Each `OfflineRosterUserDto` MUST contain: `Id`, `Login`, `FullName`, `IsActive`, `Roles` (list of `StoreModuleFeaturesDto`), `FeatureIds`, `StoreModuleIds`, `IsSuperAdmin`, `IsOwnerAdmin`, `IsReSeller`, `SelectedStoreId`, `Verifier` (Hash, Salt, Iterations), `WrappedDek`, `WrapSalt`, `WrapIv`.
 
 #### Scenario: Shape matches /me output
 - GIVEN a store user
 - WHEN the roster is exported
 - THEN the user's `Roles`, `FeatureIds`, `StoreModuleIds`, and role booleans match what `/me` would return for that user in that store
+
+#### Scenario: Wrap fields populated in version 2
+- GIVEN a store with at least one user after encryption backend
+- WHEN the roster is exported with FormatVersion=2
+- THEN every `OfflineRosterUserDto` has non-empty `WrappedDek`, `WrapSalt`, `WrapIv`
 
 ### R6: Inactive Users Included (MUST)
 
@@ -151,6 +156,81 @@ A non-existent storeId called by a SuperAdmin SHOULD return an empty roster (`Us
 
 ## Verification Criteria
 
+### R10: DEK Derivation — HKDF (MUST)
+
+The system MUST derive a deterministic 32-byte DEK per store via `HKDF.DeriveKey(SHA256, UTF8(masterSecret), 32, salt: null, info: UTF8(storeId.D))`. The master secret MUST be configured via `StoreEncryption:MasterSecret` (following `Jwt:SecretKey` pattern). Empty/whitespace secret MUST throw `ArgumentException`.
+
+| Parameter | Value |
+|-----------|-------|
+| Algorithm | `HKDF.DeriveKey` (SHA256) |
+| IKM | UTF-8 bytes of `StoreEncryption:MasterSecret` |
+| Salt | `null` |
+| Info | UTF-8 bytes of `storeId.ToString("D")` |
+| Output | 32 bytes |
+
+#### Scenario: Deterministic per store
+- GIVEN a configured `StoreEncryption:MasterSecret`
+- WHEN `GetDek(storeId)` is called twice with the same storeId
+- THEN both calls return identical 32-byte arrays
+
+#### Scenario: Different per store
+- GIVEN two distinct store IDs
+- WHEN `GetDek` is called for each
+- THEN the two DEKs differ (no collision)
+
+#### Scenario: Known-answer HKDF match
+- GIVEN a known master secret and storeId
+- WHEN `GetDek` is called
+- THEN the result equals an independent `HKDF.DeriveKey(...)` computation
+
+### R11: DEK Wrapping — PBKDF2 KEK + AES-GCM (MUST)
+
+The system MUST wrap a DEK per user using PBKDF2-derived KEK and AES-GCM-128. The WrappedDek layout MUST be `Base64(ciphertext ‖ tag)`.
+
+| Step | Detail |
+|------|--------|
+| KEK | `Rfc2898DeriveBytes.Pbkdf2(UTF8(storedPasswordHash), wrapSalt, 210000, SHA256, 32)` |
+| WrapSalt | 16 random bytes (fresh per call) |
+| WrapIv | 12 random bytes (fresh per call) |
+| AEAD | `AesGcm(kek, 16).Encrypt(iv, dek, ciphertext, tag)` |
+| Output | `WrappedDek=Base64(ciphertext ‖ tag)`, `WrapSalt=Base64(salt)`, `WrapIv=Base64(iv)` |
+
+#### Scenario: Round-trip unwrap
+- GIVEN a known stored password hash and a random 32-byte DEK
+- WHEN `WrapDek(hash, dek)` is called
+- THEN the output fields are valid Base64, salt is 16 bytes, iv is 12 bytes, wrapped is 48 bytes (32+16)
+- AND reconstructing the KEK with the same PBKDF2 params and decrypting returns the original DEK
+
+#### Scenario: Distinct salt/IV per call
+- GIVEN the same stored password hash and same DEK
+- WHEN `WrapDek` is called twice
+- THEN `WrapSalt`, `WrapIv`, and `WrappedDek` all differ between calls
+
+### R12: Handler DEK Integration (MUST)
+
+The handler MUST load the DEK once per export (`IStoreDataKeyProvider.GetDek(storeId)`) and wrap it per user (`IStoreKeyWrapService.WrapDek(user.Password, dek)`) inside the existing user loop.
+
+#### Scenario: DEK loaded once
+- GIVEN a store with N users
+- WHEN the handler processes the export
+- THEN `IStoreDataKeyProvider.GetDek` is called exactly once (not per user)
+
+#### Scenario: Wrap per user
+- GIVEN a store with N users
+- WHEN the handler processes the export
+- THEN `IStoreKeyWrapService.WrapDek` is called exactly N times — once per user with that user's `User.Password` and the shared DEK
+
+### R13: Bundle FormatVersion Bump (MUST)
+
+The system MUST set `OfflineRosterDto.FormatVersion = 2` (up from `1`).
+
+#### Scenario: Version 2 bundle
+- GIVEN a successful export
+- WHEN the handler returns the roster
+- THEN `FormatVersion == 2`
+
+## Verification Criteria
+
 - [x] All 4 E2E scenarios pass (SuperAdmin success, OwnerAdmin own store, OwnerAdmin other store, plain user denied) — E2E tests compile and scenarios verified structurally
 - [x] OfflineVerifierService unit tests pass (reproducibility, fresh salt) — 2/2 passing
 - [x] Handler unit tests pass (4 cases: auth deny, ownership deny, success shape, verifier per user) — 4/4 passing
@@ -158,16 +238,22 @@ A non-existent storeId called by a SuperAdmin SHOULD return an empty roster (`Us
 - [x] `expiresAt - issuedAt` equals exactly 35 days in ms — verified in handler unit test
 - [x] `bundleId` is a new GUID per request — verified in handler unit test
 - [x] `OfflineVerifierService` registered in DI — `AddScoped<IOfflineVerifierService, OfflineVerifierService>()` in Program.cs
+- [x] StoreKeyWrapService unit tests pass (round-trip unwrap, distinct salt/IV) — 2/2 passing
+- [x] StoreDataKeyProvider unit tests pass (determinism, per-store uniqueness, known-answer, missing secret) — 4/4 passing
+- [x] Handler returns `FormatVersion == 2` with non-empty wrap fields per user — verified in handler test
+- [x] DEK loaded exactly once per export (not per user) — verified via mock
+- [x] E2E: export twice → unwrap both → DEKs are identical — round-trip stability verified
 
 ## Related Specifications
 
 - **auth-session** — existing online auth sessions (untouched by this change)
 - **management-users** — existing store user management (extended by new repository method)
+- **at-rest-encryption-backend** — per-user DEK wrapping (delta extending this spec)
 
 ## Implementation Status
 
-- **Spec**: Active (this document)
-- **Design**: Implemented — see `openspec/changes/archive/2026-07-29-offline-auth-backend/design.md`
-- **Implementation**: Complete — 15/15 tasks done, 9 unit tests passing, 251 total tests with zero regressions
-- **Verification**: PASS WITH WARNINGS (R7/R8 lack dedicated test coverage, implementation structurally correct)
-- **Archive**: `openspec/changes/archive/2026-07-29-offline-auth-backend/`
+- **Spec**: Active (this document, includes at-rest-encryption-backend delta)
+- **Design**: See `openspec/changes/archive/2026-07-29-offline-auth-backend/design.md` (base) + `openspec/changes/archive/2026-07-29-at-rest-encryption-backend/design.md` (delta)
+- **Implementation**: Base offline-auth complete (15/15 tasks). At-rest encryption — 12/12 tasks complete.
+- **Verification**: Base — PASS WITH WARNINGS (R7/R8 lack dedicated test coverage). At-rest encryption — PASS (15/15 scenarios compliant, 510/510 tests pass).
+- **Archive**: Base at `openspec/changes/archive/2026-07-29-offline-auth-backend/`. At-rest encryption at `openspec/changes/archive/2026-07-29-at-rest-encryption-backend/`.

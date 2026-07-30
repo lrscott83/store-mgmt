@@ -40,12 +40,12 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 | 4 | CRITICAL | `POST /api/v1/auth/register` | `AuthController.RegisterAsync` | ✅ Done | ✅ Applied | `register-endpoint-fixes` |
 | 5 | CRITICAL | `GET /api/v1/auth/ping` | `AuthController.PingAsync` | ✅ Done | ⬜ N/A (unused endpoint, no fixes applied) | — |
 | 6 | CRITICAL | `POST /api/v1/stores` | `StoresController.CreateStoreAsync` | ✅ Done | ✅ Applied | `create-store-endpoint-fixes` |
-| 7 | CRITICAL | `GET /api/v1/stores/by-current-user` | `StoresController.GetStoresByCurrentUserQueryAsync` | ⬜ Pending | ⬜ N/A | — |
-| 8 | CRITICAL | `GET /api/v1/stores/list/{includeInactive}` | `StoresController.GetStoresAsync` | ⬜ Pending | ⬜ N/A | — |
-| 9 | CRITICAL | `GET /api/v1/stores/{id}` | `StoresController.GetStoreByIdAsync` | ⬜ Pending | ⬜ N/A | — |
-| 10 | CRITICAL | `PUT /api/v1/stores/{id}` | `StoresController.UpdatedStoreAsync` | ⬜ Pending | ⬜ N/A | — |
-| 11 | CRITICAL | `DELETE /api/v1/stores/{id}` | `StoresController.DeleteAsync` | ⬜ Pending | ⬜ N/A | — |
-| 12 | CRITICAL | `PUT /api/v1/stores` | `StoresController.SetMyStoreIdAsync` | ⬜ Pending | ⬜ N/A | — |
+| 7 | CRITICAL | `GET /api/v1/stores/by-current-user` | `StoresController.GetStoresByCurrentUserQueryAsync` | ✅ Done | ✅ Applied | `stores-by-current-user-fixes` |
+| 8 | CRITICAL | `GET /api/v1/stores/list/{includeInactive}` | `StoresController.GetStoresAsync` | ✅ Done | ✅ Applied | `stores-list-endpoint-fixes` |
+| 9 | CRITICAL | `GET /api/v1/stores/{id}` | `StoresController.GetStoreByIdAsync` | ✅ Done | ✅ Applied | `store-getbyid-fixes` |
+| 10 | CRITICAL | `PUT /api/v1/stores/{id}` | `StoresController.UpdatedStoreAsync` | ✅ Done | ✅ Archived | `update-store-endpoint-fixes` |
+| 11 | CRITICAL | `DELETE /api/v1/stores/{id}` | `StoresController.DeleteAsync` | ✅ Done | ✅ Applied | `delete-store-endpoint-fixes` |
+| 12 | CRITICAL | `PUT /api/v1/stores` | `StoresController.SetMyStoreIdAsync` | ✅ Done | ✅ Applied | `set-my-store-endpoint-fixes` |
 | 13 | CRITICAL | `POST /api/v1/stores/approve` | `StoresController.ApproveStoreAsync` | ⬜ Pending | ⬜ N/A | — |
 | 14 | CRITICAL | `POST /api/v1/stores/disapprove` | `StoresController.DisapproveStoreAsync` | ⬜ Pending | ⬜ N/A | — |
 | 15 | CRITICAL | `GET /api/v1/users/all/{includeInactive}` | `UsersController.GetAllUsersAsync` | ⬜ Pending | ⬜ N/A | — |
@@ -148,15 +148,17 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
   - `StoresHarnessSmokeTests.cs` — smoke test for harness setup
   - `StoreRoleAccessTests.cs` (Stores/) — role-based store visibility
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `stores-by-current-user-fixes` — 6 bugs fixed: non-superadmin store filter, OwnerName NRE, DefaultStore in-DB filter, hardcoded `true`, missing ProducesResponseType, missing XML docs)
 
 ### GET `/api/v1/stores/list/{includeInactive}`
 - **Purpose**: List all stores, optionally including inactive ones
 - **Controller**: `StoresController.GetStoresAsync()`
 - **Authorization**: `[HasPermission(SuperAdmin, StoresAdmin)]`
-- **E2E Tests**: **None found**
-- **Coverage**: ❌ **None**
-- **Review**: ⬜ Pending
+- **E2E Tests**:
+  - `StoresListTests.cs` — active only, include inactive, owner name populated, 401, 403
+  - `GetStoresQueryTests.cs` (Application.Tests) — handler unit tests
+- **Coverage**: ✅ **Full** (E2E + unit)
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `stores-list-endpoint-fixes` — Include fix NRE, ProducesResponseType 401/403, XML docs, WebApiTest param fix, unit + E2E tests)
 
 ### GET `/api/v1/stores/{id}`
 - **Purpose**: Get store by ID
@@ -165,7 +167,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **E2E Tests**:
   - `StoreGetByIdTests.cs` — existing store, non-existent ID, empty GUID, unauthenticated
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `store-getbyid-fixes` — 7 bugs fixed: NRE missing Owner include, wrong handler name, Task.FromResult redundant, double DB query in validator, missing ProducesResponseType 401/403/400, missing XML docs, wrong namespace in service, null check race condition)
 
 ### PUT `/api/v1/stores/{id}`
 - **Purpose**: Update store details
@@ -176,7 +178,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
   - `StoreActivationTests.cs` (Billing/) — activation via store update
   - `StoreAuthorizationTests.cs` (Auth/) — authorization check
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `update-store-endpoint-fixes` — fire-and-forget async fix, N+1 batch loading, lightweight store existence check, auth 403 code, missing ProducesResponseType, unused import)
 
 ### DELETE `/api/v1/stores/{id}`
 - **Purpose**: Deactivate (soft-delete) a store
@@ -194,7 +196,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
   - `StoreScopingTests.cs` (Auth/) — sets store, then verifies /auth/me reflects it
   - `UsagesSmokeTests.cs` (Auth/) — sets store as setup for usage test
 - **Coverage**: ⚠️ **Partial** (tested as setup step, not a dedicated test of the endpoint itself)
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `set-my-store-endpoint-fixes` — 6 bugs fixed: NRE null-user, handler rename, validator over-fetch, missing ProducesResponseType, store access validation, redundant .NotNull())
 
 ### POST `/api/v1/stores/approve`
 - **Purpose**: Approve a store for activation
@@ -906,8 +908,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 2. **Tenants**: **0% coverage** — 8 endpoints with zero tests
 3. **ReSellers**: **0% coverage** — 5 endpoints with zero tests
 4. **Stores DELETE**: No E2E test for store deactivation
-5. **Stores LIST**: No E2E test for the `GET /stores/list/{includeInactive}` endpoint
-6. **Modules**: No E2E test for `GET /Modules/ToStore`
+5. **Modules**: No E2E test for `GET /Modules/ToStore`
 7. **Usages**: Two out of three usage endpoints untested (stores-last-week, stores-last-month)
 8. **PingController**: Not tested (only AuthController's ping endpoint is tested)
 
@@ -916,5 +917,4 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 2. **HIGH**: Tenants (multi-tenant management, SuperAdmin only)
 3. **HIGH**: Stores DELETE (data deletion path)
 4. **MEDIUM**: ReSellers (reseller management, SuperAdmin only)
-5. **MEDIUM**: Stores LIST (basic listing endpoint)
-6. **LOW**: Modules, Usages (stores-last-week/month), PingController
+5. **LOW**: Modules, Usages (stores-last-week/month), PingController

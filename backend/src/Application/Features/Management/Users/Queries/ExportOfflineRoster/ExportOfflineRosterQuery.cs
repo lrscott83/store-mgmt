@@ -26,7 +26,11 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
         private readonly IUserRoleRepository _userRoleRepository;
         private readonly IAllowedFeaturesService _allowedFeaturesService;
         private readonly IOfflineVerifierService _offlineVerifierService;
+        private readonly IStoreKeyWrapService _storeKeyWrapService;
+        private readonly IStoreDataKeyProvider _storeDataKeyProvider;
         private readonly IStringLocalizer<I18n> _localizer;
+
+        private const int FormatVersion = 2;
 
         public ExportOfflineRosterQueryHandler(
             IHttpContextService httpContextService,
@@ -37,6 +41,8 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             IUserRoleRepository userRoleRepository,
             IAllowedFeaturesService allowedFeaturesService,
             IOfflineVerifierService offlineVerifierService,
+            IStoreKeyWrapService storeKeyWrapService,
+            IStoreDataKeyProvider storeDataKeyProvider,
             IStringLocalizer<I18n> localizer)
         {
             _httpContextService = httpContextService;
@@ -47,6 +53,8 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             _userRoleRepository = userRoleRepository;
             _allowedFeaturesService = allowedFeaturesService;
             _offlineVerifierService = offlineVerifierService;
+            _storeKeyWrapService = storeKeyWrapService;
+            _storeDataKeyProvider = storeDataKeyProvider;
             _localizer = localizer;
         }
 
@@ -67,6 +75,8 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             var storeModuleIds = storeModules.Select(sm => sm.ModuleId).ToList();
 
             var storeUsers = (await _storeUserRepository.GetStoreUsersByStoreIdAsync(query.StoreId, includeInactive: true)).ToList();
+
+            var dek = _storeDataKeyProvider.GetDek(query.StoreId);
 
             var rosterUsers = new List<OfflineRosterUserDto>(storeUsers.Count);
             foreach (var su in storeUsers)
@@ -89,6 +99,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                 var isReSeller = await _userRoleRepository.IsReSeller(su.UserId);
 
                 var verifier = _offlineVerifierService.CreateVerifier(su.User.Password);
+                var wrapped = _storeKeyWrapService.WrapDek(su.User.Password, dek);
 
                 rosterUsers.Add(new OfflineRosterUserDto
                 {
@@ -108,7 +119,10 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                         Hash = verifier.Hash,
                         Salt = verifier.Salt,
                         Iterations = verifier.Iterations
-                    }
+                    },
+                    WrappedDek = wrapped.WrappedDek,
+                    WrapSalt = wrapped.WrapSalt,
+                    WrapIv = wrapped.WrapIv
                 });
             }
 
@@ -118,7 +132,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                 BundleId = Guid.NewGuid().ToString(),
                 IssuedAt = now.ToUnixTimeMilliseconds(),
                 ExpiresAt = now.AddDays(35).ToUnixTimeMilliseconds(),
-                FormatVersion = 1,
+                FormatVersion = FormatVersion,
                 StoreId = query.StoreId,
                 Users = rosterUsers
             };

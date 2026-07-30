@@ -50,14 +50,13 @@ public sealed class AuthLogoutTests
     }
 
     [Fact]
-    public async Task Logout_with_token_for_unknown_user_returns_200_with_NotFound_body()
+    public async Task Logout_with_token_for_unknown_user_returns_200_true()
     {
         var token = AuthTestHelpers.MintToken(_f, Guid.NewGuid(), $"ghost-{Guid.NewGuid():N}@test.com");
         var r = await AuthTestHelpers.BearerClient(_f, token).GetAsync("/api/v1/auth/logout");
         r.StatusCode.Should().Be(HttpStatusCode.OK);
         var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
-        b!.Succeeded.Should().BeFalse();
-        b.ActionCode.Should().Be(404);
-        b.Errors.Should().Contain(e => e.Code == "User.NotFound");
+        b!.Succeeded.Should().BeTrue();
+        b.Data.Should().BeTrue();
     }
 }

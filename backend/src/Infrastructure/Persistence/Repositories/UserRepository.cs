@@ -72,9 +72,24 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<User?> GetByLoginWithRelatedAsync(string login)
+        {
+            return await _users
+                .Where(u => u.Login == login)
+                .Include(u => u.ReSeller)
+                .Include(u => u.Owner)
+                .Include(u => u.StoreUser)
+                    .ThenInclude(su => su.Store)
+                    .ThenInclude(s => s.Owner)
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<bool> IsUniqueLoginAsync(string login)
         {
-            return await Task.FromResult(_users.IgnoreQueryFilters().All(t => t.Login != login));
+            return !await _users.IgnoreQueryFilters().AnyAsync(u => u.Login == login);
         }
     }
 }

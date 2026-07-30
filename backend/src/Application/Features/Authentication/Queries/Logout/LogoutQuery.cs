@@ -1,13 +1,8 @@
 ﻿using Application.Abstractions.Authentication;
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
-using Application.Dtos.Authentication;
 using Application.ResponseModels;
-using Domain.Common.Extensions;
-using Domain.Entities.Users;
-using Domain.Interfaces.Repositories;
-using Microsoft.EntityFrameworkCore;
-using System.Net;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace Application.Features.Authentication.Queries.Logout
 {
@@ -16,31 +11,49 @@ namespace Application.Features.Authentication.Queries.Logout
     public class LogoutQueryHandler : IQueryHandler<LogoutQuery, bool>
     {
         private readonly IHttpContextService _httpContextService;
-        private readonly IUserRepository _userRepository;
-        private readonly IJwtProvider _jwtProvider;
-        public LogoutQueryHandler(IUserRepository userRepository, IHttpContextService httpContextService, IJwtProvider jwtProvider)
+        private readonly ITokenBlacklistService _tokenBlacklistService;
+
+        public LogoutQueryHandler(
+            IHttpContextService httpContextService,
+            ITokenBlacklistService tokenBlacklistService)
         {
-            _userRepository = userRepository;
             _httpContextService = httpContextService;
-            _jwtProvider = jwtProvider;
+            _tokenBlacklistService = tokenBlacklistService;
         }
 
         public async Task<ResponseResult<bool>> Handle(LogoutQuery request, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(_httpContextService.UserExternalId))
-                return ResponseResult.Success(true);
+            // Blacklist the JWT if present, so it cannot be used again
+            var accessToken = _httpContextService.AccessToken;
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                try
+                {
+                    var handler = new JwtSecurityTokenHandler();
+                    var jsonToken = handler.ReadJwtToken(accessToken);
+                    var jti = jsonToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti)?.Value;
 
-            var userId = _httpContextService.UserExternalId.ToGuid();
-            var user = await _userRepository
-                .Where(user => user.Id == userId)
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync();
+                    if (!string.IsNullOrEmpty(jti))
+                    {
+                        var expClaim = jsonToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Exp)?.Value;
+                        if (!string.IsNullOrEmpty(expClaim) && long.TryParse(expClaim, out var expSeconds))
+                        {
+                            var expDate = DateTimeOffset.FromUnixTimeSeconds(expSeconds);
+                            var remaining = expDate - DateTimeOffset.UtcNow;
+                            if (remaining > TimeSpan.Zero)
+                                await _tokenBlacklistService.BlacklistAsync(jti, remaining);
+                            else
+                                await _tokenBlacklistService.BlacklistAsync(jti, TimeSpan.Zero);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Malformed token — skip blacklisting
+                }
+            }
 
-            if (user is null)
-                return ResponseResult.Failure<bool>(UserErrors.NotFound, (int)HttpStatusCode.NotFound);
-
-            //_jwtProvider.GenerateToken(userId, user.Login);
-
+            // Sign out (remove auth cookies/headers on response)
             await _httpContextService.SignOutAsync();
 
             return ResponseResult.Success(true);

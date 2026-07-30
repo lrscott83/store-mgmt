@@ -31,6 +31,9 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasData(
                 SystemConfiguration.Create((int)SystemConfigurationType.PaymentGraceDays,
                 SystemConfigurationType.PaymentGraceDays.GetDisplayName(), "5"));
+            builder.HasData(
+                SystemConfiguration.Create((int)SystemConfigurationType.DueSoonDays,
+                SystemConfigurationType.DueSoonDays.GetDisplayName(), "5"));
     }
     }
 }

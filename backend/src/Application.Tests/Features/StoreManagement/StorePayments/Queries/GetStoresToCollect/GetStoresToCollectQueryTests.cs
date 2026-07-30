@@ -56,6 +56,9 @@ public class GetStoresToCollectQueryHandlerTests
         _mockConfigRepository
             .Setup(x => x.GetPaymentGraceDaysAsync())
             .ReturnsAsync(GraceDays);
+        _mockConfigRepository
+            .Setup(x => x.GetDueSoonDaysAsync())
+            .ReturnsAsync(5);
 
         _mockDateTimeProvider.Setup(c => c.UtcNow).Returns(new DateTimeOffset(DateTime.UtcNow, TimeSpan.Zero));
 

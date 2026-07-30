@@ -60,7 +60,7 @@ internal sealed class GetStoresToCollectQueryHandler : IQueryHandler<GetStoresTo
         var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
         int trialMonths = await _systemConfigurationRepository.GetTestingPeriodInMonthsAsync();
         int graceDays = await _systemConfigurationRepository.GetPaymentGraceDaysAsync();
-        const int dueSoonDays = 5;
+        int dueSoonDays = await _systemConfigurationRepository.GetDueSoonDaysAsync();
 
         var result = new List<StoreToCollectDto>();
 

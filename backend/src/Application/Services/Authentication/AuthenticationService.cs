@@ -1,10 +1,12 @@
 ﻿using Application.Abstractions.Authentication;
+using Domain.Common.Enums;
 using Domain.Common.Results;
 using Domain.Entities.Owners;
 using Domain.Entities.ReSellers;
 using Domain.Entities.Stores;
 using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Services.Authentication
 {
@@ -12,75 +14,116 @@ namespace Application.Services.Authentication
     {
         private readonly IUserRepository _userRepository;
         private readonly IHashPasswordService _hashPasswordService;
-        private readonly IUserRoleRepository _userRoleRepository;
-        private readonly IStoreRepository _storeRepository;
-        private readonly IStoreUserRepository _storeUserRepository;
-        private readonly IReSellerRepository _resellerRepository;
-        private readonly IOwnerRepository _ownerRepository;
+        private readonly ILogger<AuthenticationService> _logger;
 
-        public AuthenticationService(IUserRepository userRepository,
+        public AuthenticationService(
+            IUserRepository userRepository,
             IHashPasswordService hashPasswordService,
-            IUserRoleRepository userRoleRepository,
-            IStoreRepository storeRepository,
-            IStoreUserRepository storeUserRepository,
-            IReSellerRepository reSellerRepository,
-            IOwnerRepository ownerRepository)
+            ILogger<AuthenticationService> logger)
         {
             _userRepository = userRepository;
             _hashPasswordService = hashPasswordService;
-            _userRoleRepository = userRoleRepository;
-            _storeRepository = storeRepository;
-            _storeUserRepository = storeUserRepository;
-            _resellerRepository = reSellerRepository;
-            _ownerRepository = ownerRepository;
+            _logger = logger;
         }
 
         public async Task<Result<Guid>> IsValidUserAsync(string login, string password)
         {
-            User user = await _userRepository.GetUserByLoginIgnoreQueryFiltersAsync(login);
+            User? user = await _userRepository.GetByLoginWithRelatedAsync(login);
             if (user is null)
-                return Result.Failure<Guid>(UserErrors.LoginNotFound(login));
+            {
+                _logger.LogWarning("Login failed for {Login}: user not found", login);
+                return Result.Failure<Guid>(UserErrors.InvalidCredentials);
+            }
 
             if (!user.IsActive)
-                return Result.Failure<Guid>(UserErrors.Inactive);
+            {
+                _logger.LogWarning("Login failed for {Login}: user is inactive", login);
+                return Result.Failure<Guid>(UserErrors.AccountInactive);
+            }
 
-            string hashedPassword = _hashPasswordService.HashPassword(password);
-            if (user.Password != hashedPassword)
-                return Result.Failure<Guid>(UserErrors.InvalidPassword(login));
+            if (!_hashPasswordService.VerifyPassword(password, user.Password))
+            {
+                _logger.LogWarning("Login failed for {Login}: invalid password", login);
+                return Result.Failure<Guid>(UserErrors.InvalidCredentials);
+            }
 
-            ReSeller reSeller = await _resellerRepository.GetByUserIdIgnoreQueryFiltersAsync(user.Id);
+            // Password upgrade: detect legacy SHA256 hash, re-hash with BCrypt
+            if (!user.Password.StartsWith('$'))
+            {
+                _logger.LogInformation("Upgrading password hash for {Login} from legacy format to BCrypt", login);
+                user.Password = _hashPasswordService.HashPassword(password);
+                await _userRepository.UpdateAsync(user);
+            }
+
+            ReSeller? reSeller = user.ReSeller;
             if (reSeller != null)
-                return reSeller.IsActive ? Result.Success(user.Id) : Result.Failure<Guid>(ReSellerErrors.Inactive);
+            {
+                if (!reSeller.IsActive)
+                {
+                    _logger.LogWarning("Login failed for {Login}: reseller is inactive", login);
+                    return Result.Failure<Guid>(UserErrors.AccountInactive);
+                }
+                return Result.Success(user.Id);
+            }
 
-            Owner owner = await _ownerRepository.GetByUserIdIgnoreQueryFiltersAsync(user.Id);
+            Owner? owner = user.Owner;
             if (owner != null && !owner.IsActive)
-                return Result.Failure<Guid>(OwnerErrors.Inactive);
+            {
+                _logger.LogWarning("Login failed for {Login}: owner is inactive", login);
+                return Result.Failure<Guid>(UserErrors.AccountInactive);
+            }
 
-            Result isStoreActive = await HasActiveStoreAsync(user);
+            Result isStoreActive = HasActiveStore(user);
             if (!isStoreActive.Succeeded)
+            {
+                _logger.LogWarning("Login failed for {Login}: no active store", login);
                 return Result.Failure<Guid>(isStoreActive.Errors);
+            }
 
             return Result.Success(user.Id);
         }
 
-        private async Task<Result> HasActiveStoreAsync(User user)
+        private Result HasActiveStore(User user)
         {
-            var isGlobalAdmin = await _userRoleRepository.IsSuperAdmin(user.Id);
+            bool isGlobalAdmin = user.UserRoles?.Any(ur => ur.Role?.Id == (int)RoleType.SuperAdmin) ?? false;
             if (isGlobalAdmin)
                 return Result.Success();
 
-            var isStoreAdmin = await _userRoleRepository.IsStoreAdmin(user.Id);
+            bool isStoreAdmin = user.UserRoles?.Any(ur => ur.Role?.Id == (int)RoleType.OwnerAdmin) ?? false;
             if (isStoreAdmin)
             {
-                var stores = await _storeRepository.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(user.Id);
-                return stores.Any() ? Result.Success() : StoreErrors.Inactive;
+                // TODO (multi-store): When a store admin can manage multiple stores,
+                // replace the simplified check below with the original multi-store query:
+                // var stores = await _storeRepository.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(user.Id);
+                // return stores.Any() ? Result.Success() : StoreErrors.Inactive;
+                if (user.StoreUser?.Store is not { } store)
+                    return StoreErrors.Inactive;
+
+                bool hasActiveStore = store.IsActive
+                    && store.Owner?.IsActive == true;
+                return hasActiveStore ? Result.Success() : StoreErrors.Inactive;
             }
 
-            var store = await _storeUserRepository.GetStoreUserByUserIdAndIgnoreQueryFiltersAsync(user.Id);
-            return store != null && store.IsActive
-                && store.User != null && store.User.IsActive
-                && store.Store != null && store.Store.IsActive
-                && store.Store.Owner != null && store.Store.Owner.IsActive ? Result.Success() : StoreErrors.Inactive;
+            var storeUser = user.StoreUser;
+            if (storeUser is null)
+                return StoreErrors.Inactive;
+
+            if (!storeUser.IsActive)
+                return StoreErrors.Inactive;
+
+            if (storeUser.Store is not { } activeStore)
+                return StoreErrors.Inactive;
+
+            if (!activeStore.IsActive)
+                return StoreErrors.Inactive;
+
+            if (activeStore.Owner is not { } owner)
+                return StoreErrors.Inactive;
+
+            if (!owner.IsActive)
+                return StoreErrors.Inactive;
+
+            return Result.Success();
         }
     }
 }

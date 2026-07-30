@@ -1,13 +1,17 @@
 using Application.Abstractions.Authentication;
 using Application.Services.Authentication;
+using Domain.Common.Enums;
 using Domain.Common.Results;
 using Domain.Entities.Owners;
 using Domain.Entities.ReSellers;
+using Domain.Entities.Roles;
 using Domain.Entities.Stores;
 using Domain.Entities.StoreUsers;
+using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace Application.Tests.Services.Authentication;
@@ -23,11 +27,7 @@ public class AuthenticationServiceTests
     // Mock dependencies
     private readonly Mock<IUserRepository> _mockUserRepository;
     private readonly Mock<IHashPasswordService> _mockHashPasswordService;
-    private readonly Mock<IUserRoleRepository> _mockUserRoleRepository;
-    private readonly Mock<IStoreRepository> _mockStoreRepository;
-    private readonly Mock<IStoreUserRepository> _mockStoreUserRepository;
-    private readonly Mock<IReSellerRepository> _mockReSellerRepository;
-    private readonly Mock<IOwnerRepository> _mockOwnerRepository;
+    private readonly Mock<ILogger<AuthenticationService>> _mockLogger;
 
     // Test data
     private readonly Guid _testUserId = Guid.NewGuid();
@@ -38,11 +38,7 @@ public class AuthenticationServiceTests
     {
         _mockUserRepository = new Mock<IUserRepository>();
         _mockHashPasswordService = new Mock<IHashPasswordService>();
-        _mockUserRoleRepository = new Mock<IUserRoleRepository>();
-        _mockStoreRepository = new Mock<IStoreRepository>();
-        _mockStoreUserRepository = new Mock<IStoreUserRepository>();
-        _mockReSellerRepository = new Mock<IReSellerRepository>();
-        _mockOwnerRepository = new Mock<IOwnerRepository>();
+        _mockLogger = new Mock<ILogger<AuthenticationService>>();
 
         // Default successful setups
         SetupDefaultSuccessfulScenarios();
@@ -53,52 +49,45 @@ public class AuthenticationServiceTests
         return new AuthenticationService(
             _mockUserRepository.Object,
             _mockHashPasswordService.Object,
-            _mockUserRoleRepository.Object,
-            _mockStoreRepository.Object,
-            _mockStoreUserRepository.Object,
-            _mockReSellerRepository.Object,
-            _mockOwnerRepository.Object);
+            _mockLogger.Object);
     }
 
     private void SetupDefaultSuccessfulScenarios()
     {
-        // Setup a valid active user
-        var activeUser = CreateActiveUser();
-        var activeOwner = CreateActiveOwner(activeUser);
-        var activeStore = CreateActiveStore(activeOwner);
+        // Setup a valid active user with populated nav properties
+        var activeUser = CreateActiveUserWithNavProps();
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(It.IsAny<string>()))
-            .ReturnsAsync(activeUser);
+            .Setup(x => x.GetByLoginWithRelatedAsync(It.IsAny<string>()))
+            .ReturnsAsync((string login) => CreateActiveUserWithNavProps(login));
+
+        _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(true);
 
         _mockHashPasswordService
             .Setup(x => x.HashPassword(It.IsAny<string>()))
-            .Returns("hashed_password");
+            .Returns("hashed_password_new_format");
+    }
 
-        _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(It.IsAny<string>()))
-            .ReturnsAsync((string login) => CreateActiveUser(login));
+    private User CreateActiveUserWithNavProps(string login = "testuser")
+    {
+        var user = CreateActiveUser(login);
+        // Use a BCrypt-like prefix to avoid triggering unnecessary upgrade in default setup
+        user.Password = "$2a$11$hashed_password_new_format";
 
-        // Default: not a reseller, not a super admin, not a store admin, has active store
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((ReSeller?)null);
+        // Populate nav properties with default active values
+        user.ReSeller = null;
+        user.Owner = CreateActiveOwner(user);
 
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((Guid userId) => CreateActiveOwner(CreateActiveUser()));
+        var store = CreateActiveStore((Owner)user.Owner);
+        user.StoreUser = CreateActiveStoreUser(user, store);
 
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
+        var superAdminRole = Role.Create((int)RoleType.SuperAdmin, "SuperAdmin", "", DateTimeOffset.UtcNow);
+        // Default user is not super admin or store admin
+        user.UserRoles = new List<UserRole>();
 
-        _mockUserRoleRepository
-            .Setup(x => x.IsStoreAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockStoreUserRepository
-            .Setup(x => x.GetStoreUserByUserIdAndIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((Guid userId) => CreateActiveStoreUser(CreateActiveUser(), CreateActiveStore(CreateActiveOwner(CreateActiveUser()))));
+        return user;
     }
 
     #region Constructor Tests
@@ -125,36 +114,25 @@ public class AuthenticationServiceTests
         var login = "testuser";
         var password = "ValidPassword123!";
 
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((ReSeller?)null);
+        var user = CreateActiveUserWithNavProps(login);
+        user.ReSeller = null;
+        user.Owner = CreateActiveOwner(user);
+        var store = CreateActiveStore((Owner)user.Owner);
+        user.StoreUser = CreateActiveStoreUser(user, store);
+        user.UserRoles = new List<UserRole>();
+        user.Password = "$2a$11$stored_bcrypt_hash";
 
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync(CreateActiveOwner(CreateActiveUser()));
+        _mockUserRepository
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
+            .ReturnsAsync(user);
 
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsStoreAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockStoreUserRepository
-            .Setup(x => x.GetStoreUserByUserIdAndIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync(CreateActiveStoreUser(CreateActiveUser(), CreateActiveStore(CreateActiveOwner(CreateActiveUser()))));
+        _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(true);
 
         _mockHashPasswordService
             .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        var user = CreateActiveUser(login);
-        user.Password = "hashed_password";
-
-        _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
-            .ReturnsAsync(user);
+            .Returns("hashed_password_new_format");
 
         // Act
         var result = await service.IsValidUserAsync(login, password);
@@ -172,24 +150,29 @@ public class AuthenticationServiceTests
         var login = "admin";
         var password = "AdminPassword123!";
 
-        var adminUser = CreateActiveUser(login);
-        adminUser.Password = "hashed_password";
+        var adminUser = CreateActiveUserWithNavProps(login);
+        adminUser.Password = "$2a$11$stored_bcrypt_hash";
+        adminUser.Owner = null;
+        adminUser.ReSeller = null;
+        adminUser.StoreUser = null;
+
+        var superAdminRole = Role.Create((int)RoleType.SuperAdmin, "SuperAdmin", "", DateTimeOffset.UtcNow);
+        adminUser.UserRoles = new List<UserRole>
+        {
+            CreateUserRole(adminUser.Id, (int)RoleType.SuperAdmin, superAdminRole)
+        };
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(adminUser);
 
         _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(password, adminUser.Password))
+            .Returns(true);
+
+        _mockHashPasswordService
             .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(_testUserId))
-            .ReturnsAsync(true);
-
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((ReSeller?)null);
+            .Returns("hashed_password_new_format");
 
         // Act
         var result = await service.IsValidUserAsync(login, password);
@@ -207,36 +190,31 @@ public class AuthenticationServiceTests
         var login = "storeadmin";
         var password = "StoreAdminPassword123!";
 
-        var storeAdminUser = CreateActiveUser(login);
-        storeAdminUser.Password = "hashed_password";
+        var storeAdminUser = CreateActiveUserWithNavProps(login);
+        storeAdminUser.Password = "$2a$11$stored_bcrypt_hash";
+        storeAdminUser.ReSeller = null;
+        storeAdminUser.Owner = null;
+
+        var ownerAdminRole = Role.Create((int)RoleType.OwnerAdmin, "OwnerAdmin", "", DateTimeOffset.UtcNow);
+        storeAdminUser.UserRoles = new List<UserRole>
+        {
+            CreateUserRole(storeAdminUser.Id, (int)RoleType.OwnerAdmin, ownerAdminRole)
+        };
+
+        var store = CreateActiveStore(CreateActiveOwner(storeAdminUser));
+        storeAdminUser.StoreUser = CreateActiveStoreUser(storeAdminUser, store);
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(storeAdminUser);
 
         _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(password, storeAdminUser.Password))
+            .Returns(true);
+
+        _mockHashPasswordService
             .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsStoreAdmin(_testUserId))
-            .ReturnsAsync(true);
-
-        _mockStoreRepository
-            .Setup(x => x.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync(new List<Store> { CreateActiveStore(CreateActiveOwner(storeAdminUser)) });
-
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((ReSeller?)null);
-
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((Owner?)null);
+            .Returns("hashed_password_new_format");
 
         // Act
         var result = await service.IsValidUserAsync(login, password);
@@ -253,21 +231,24 @@ public class AuthenticationServiceTests
         var login = "reseller";
         var password = "ResellerPassword123!";
 
-        var reSellerUser = CreateActiveUser(login);
-        reSellerUser.Password = "hashed_password";
+        var reSellerUser = CreateActiveUserWithNavProps(login);
+        reSellerUser.Password = "$2a$11$stored_bcrypt_hash";
+        reSellerUser.Owner = null;
+
+        var activeReSeller = CreateActiveReSeller(reSellerUser);
+        reSellerUser.ReSeller = activeReSeller;
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(reSellerUser);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
+            .Setup(x => x.VerifyPassword(password, reSellerUser.Password))
+            .Returns(true);
 
-        var activeReSeller = CreateActiveReSeller(reSellerUser);
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync(activeReSeller);
+        _mockHashPasswordService
+            .Setup(x => x.HashPassword(password))
+            .Returns("hashed_password_new_format");
 
         // Act
         var result = await service.IsValidUserAsync(login, password);
@@ -289,7 +270,7 @@ public class AuthenticationServiceTests
         var password = "anypassword";
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -297,7 +278,7 @@ public class AuthenticationServiceTests
 
         // Assert
         result.Succeeded.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.Code == "User.NotFound");
+        result.Errors.Should().Contain(e => e.Code == "Auth.InvalidCredentials");
     }
 
     [Fact]
@@ -312,7 +293,7 @@ public class AuthenticationServiceTests
         inactiveUser.IsActive = false;
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(inactiveUser);
 
         // Act
@@ -320,7 +301,7 @@ public class AuthenticationServiceTests
 
         // Assert
         result.Succeeded.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.Code == "User.Inactive");
+        result.Errors.Should().Contain(e => e.Code == "Auth.AccountInactive");
     }
 
     [Fact]
@@ -329,30 +310,25 @@ public class AuthenticationServiceTests
         // Arrange
         var service = CreateService();
         var login = "testuser";
-        var correctPassword = "CorrectPassword123!";
-        var wrongPassword = "WrongPassword456!";
+        var password = "WrongPassword456!";
 
         var user = CreateActiveUser(login);
-        user.Password = "hashed_correct_password";
+        user.Password = "$2a$11$stored_bcrypt_hash";
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(user);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(wrongPassword))
-            .Returns("hashed_wrong_password");
-
-        _mockHashPasswordService
-            .Setup(x => x.HashPassword(correctPassword))
-            .Returns("hashed_correct_password");
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(false);
 
         // Act
-        var result = await service.IsValidUserAsync(login, wrongPassword);
+        var result = await service.IsValidUserAsync(login, password);
 
         // Assert
         result.Succeeded.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.Code == "User.InvalidPassword");
+        result.Errors.Should().Contain(e => e.Code == "Auth.InvalidCredentials");
     }
 
     [Fact]
@@ -364,31 +340,26 @@ public class AuthenticationServiceTests
         var password = "password";
 
         var ownerUser = CreateActiveUser(login);
-        ownerUser.Password = "hashed_password";
+        ownerUser.Password = "$2a$11$stored_bcrypt_hash";
+        ownerUser.ReSeller = null;
+
+        var inactiveOwner = CreateInactiveOwner(ownerUser);
+        ownerUser.Owner = inactiveOwner;
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(ownerUser);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((ReSeller?)null);
-
-        var inactiveOwner = CreateInactiveOwner(ownerUser);
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync(inactiveOwner);
+            .Setup(x => x.VerifyPassword(password, ownerUser.Password))
+            .Returns(true);
 
         // Act
         var result = await service.IsValidUserAsync(login, password);
 
         // Assert
         result.Succeeded.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.Code == "User.Inactive");
+        result.Errors.Should().Contain(e => e.Code == "Auth.AccountInactive");
     }
 
     [Fact]
@@ -400,35 +371,24 @@ public class AuthenticationServiceTests
         var password = "password";
 
         var storeAdminUser = CreateActiveUser(login);
-        storeAdminUser.Password = "hashed_password";
+        storeAdminUser.Password = "$2a$11$stored_bcrypt_hash";
+        storeAdminUser.ReSeller = null;
+        storeAdminUser.Owner = null;
+        storeAdminUser.StoreUser = null;
+
+        var ownerAdminRole = Role.Create((int)RoleType.OwnerAdmin, "OwnerAdmin", "", DateTimeOffset.UtcNow);
+        storeAdminUser.UserRoles = new List<UserRole>
+        {
+            CreateUserRole(storeAdminUser.Id, (int)RoleType.OwnerAdmin, ownerAdminRole)
+        };
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(storeAdminUser);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsStoreAdmin(_testUserId))
-            .ReturnsAsync(true);
-
-        _mockStoreRepository
-            .Setup(x => x.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync(new List<Store>());
-
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((ReSeller?)null);
-
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((Owner?)null);
+            .Setup(x => x.VerifyPassword(password, storeAdminUser.Password))
+            .Returns(true);
 
         // Act
         var result = await service.IsValidUserAsync(login, password);
@@ -447,36 +407,21 @@ public class AuthenticationServiceTests
         var password = "password";
 
         var user = CreateActiveUser(login);
-        user.Password = "hashed_password";
+        user.Password = "$2a$11$stored_bcrypt_hash";
+        user.ReSeller = null;
+        user.Owner = null;
+        user.UserRoles = new List<UserRole>();
+
+        var inactiveStoreUser = CreateInactiveStoreUser(user, CreateActiveStore(CreateActiveOwner(user)));
+        user.StoreUser = inactiveStoreUser;
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(user);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsStoreAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((ReSeller?)null);
-
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync((Owner?)null);
-
-        var inactiveStoreUser = CreateInactiveStoreUser(user, CreateActiveStore(CreateActiveOwner(user)));
-        _mockStoreUserRepository
-            .Setup(x => x.GetStoreUserByUserIdAndIgnoreQueryFiltersAsync(_testUserId))
-            .ReturnsAsync(inactiveStoreUser);
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(true);
 
         // Act
         var result = await service.IsValidUserAsync(login, password);
@@ -484,6 +429,37 @@ public class AuthenticationServiceTests
         // Assert
         result.Succeeded.Should().BeFalse();
         result.Errors.Should().Contain(e => e.Code == "Store.Inactive");
+    }
+
+    [Fact]
+    public async Task IsValidUserAsync_ShouldReturnFailure_WhenReSellerIsInactive()
+    {
+        // Arrange
+        var service = CreateService();
+        var login = "inactivereseller";
+        var password = "password";
+
+        var reSellerUser = CreateActiveUser(login);
+        reSellerUser.Password = "$2a$11$stored_bcrypt_hash";
+        reSellerUser.Owner = null;
+
+        var inactiveReSeller = CreateInactiveReSeller(reSellerUser);
+        reSellerUser.ReSeller = inactiveReSeller;
+
+        _mockUserRepository
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
+            .ReturnsAsync(reSellerUser);
+
+        _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(password, reSellerUser.Password))
+            .Returns(true);
+
+        // Act
+        var result = await service.IsValidUserAsync(login, password);
+
+        // Assert
+        result.Succeeded.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.Code == "Auth.AccountInactive");
     }
 
     #endregion
@@ -500,12 +476,12 @@ public class AuthenticationServiceTests
         var user = CreateActiveUser(login);
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(user);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(null!))
-            .Returns("hashed_null");
+            .Setup(x => x.VerifyPassword(null!, user.Password))
+            .Returns(false);
 
         // Act
         var result = await service.IsValidUserAsync(login, null!);
@@ -523,7 +499,7 @@ public class AuthenticationServiceTests
         var password = "password";
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -531,6 +507,83 @@ public class AuthenticationServiceTests
 
         // Assert
         result.Succeeded.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region Password Upgrade Tests
+
+    [Fact]
+    public async Task IsValidUserAsync_WithLegacyHash_ShouldUpgradePassword()
+    {
+        // Arrange
+        var service = CreateService();
+        var login = "legacyuser";
+        var password = "password";
+
+        var user = CreateActiveUser(login);
+        user.Password = "legacy_sha256_hash"; // Old format (doesn't start with '$')
+        user.ReSeller = null;
+        user.Owner = CreateActiveOwner(user);
+        var store = CreateActiveStore((Owner)user.Owner);
+        user.StoreUser = CreateActiveStoreUser(user, store);
+        user.UserRoles = new List<UserRole>();
+
+        _mockUserRepository
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
+            .ReturnsAsync(user);
+
+        // VerifyPassword returns true (legacy match)
+        _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(true);
+
+        // HashPassword returns new format (different from legacy)
+        _mockHashPasswordService
+            .Setup(x => x.HashPassword(password))
+            .Returns("hashed_password_new_format");
+
+        // Act
+        var result = await service.IsValidUserAsync(login, password);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        // Password should have been upgraded
+        user.Password.Should().Be("hashed_password_new_format");
+        _mockUserRepository.Verify(x => x.UpdateAsync(user), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsValidUserAsync_WithBCryptHash_ShouldNotUpgradePassword()
+    {
+        // Arrange
+        var service = CreateService();
+        var login = "bcryptuser";
+        var password = "password";
+
+        var user = CreateActiveUser(login);
+        user.Password = "$2a$11$bcrypt_stored_hash"; // Already BCrypt format (starts with '$')
+        user.ReSeller = null;
+        user.Owner = CreateActiveOwner(user);
+        var store = CreateActiveStore((Owner)user.Owner);
+        user.StoreUser = CreateActiveStoreUser(user, store);
+        user.UserRoles = new List<UserRole>();
+
+        _mockUserRepository
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
+            .ReturnsAsync(user);
+
+        _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(true);
+
+        // Act
+        var result = await service.IsValidUserAsync(login, password);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        // Password should NOT have been upgraded (already BCrypt)
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>()), Times.Never);
     }
 
     #endregion
@@ -546,45 +599,25 @@ public class AuthenticationServiceTests
         var password = "password";
 
         var user = CreateActiveUser(login);
-        user.Password = "hashed_password";
+        user.Password = "$2a$11$stored_bcrypt_hash";
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(user);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsStoreAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((ReSeller?)null);
-
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((Owner?)null);
-
-        _mockStoreUserRepository
-            .Setup(x => x.GetStoreUserByUserIdAndIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((StoreUser?)null);
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(false);
 
         // Act
         await service.IsValidUserAsync(login, password);
 
         // Assert
-        _mockUserRepository.Verify(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login), Times.Once);
+        _mockUserRepository.Verify(x => x.GetByLoginWithRelatedAsync(login), Times.Once);
     }
 
     [Fact]
-    public async Task IsValidUserAsync_ShouldCallHashPasswordService_WithCorrectPassword()
+    public async Task IsValidUserAsync_ShouldCallVerifyPassword_WithCorrectPassword()
     {
         // Arrange
         var service = CreateService();
@@ -592,41 +625,47 @@ public class AuthenticationServiceTests
         var password = "MySecurePassword123!";
 
         var user = CreateActiveUser(login);
-        user.Password = "hashed_password";
+        user.Password = "$2a$11$stored_bcrypt_hash";
 
         _mockUserRepository
-            .Setup(x => x.GetUserByLoginIgnoreQueryFiltersAsync(login))
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
             .ReturnsAsync(user);
 
         _mockHashPasswordService
-            .Setup(x => x.HashPassword(password))
-            .Returns("hashed_password");
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsSuperAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockUserRoleRepository
-            .Setup(x => x.IsStoreAdmin(It.IsAny<Guid>()))
-            .ReturnsAsync(false);
-
-        _mockReSellerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((ReSeller?)null);
-
-        _mockOwnerRepository
-            .Setup(x => x.GetByUserIdIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((Owner?)null);
-
-        _mockStoreUserRepository
-            .Setup(x => x.GetStoreUserByUserIdAndIgnoreQueryFiltersAsync(It.IsAny<Guid>()))
-            .ReturnsAsync((StoreUser?)null);
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(false);
 
         // Act
         await service.IsValidUserAsync(login, password);
 
         // Assert
-        _mockHashPasswordService.Verify(x => x.HashPassword(password), Times.Once);
+        _mockHashPasswordService.Verify(x => x.VerifyPassword(password, user.Password), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsValidUserAsync_ShouldNotCallUpdateAsync_WhenPasswordDoesNotMatch()
+    {
+        // Arrange
+        var service = CreateService();
+        var login = "testuser";
+        var password = "wrongpassword";
+
+        var user = CreateActiveUser(login);
+        user.Password = "$2a$11$stored_bcrypt_hash";
+
+        _mockUserRepository
+            .Setup(x => x.GetByLoginWithRelatedAsync(login))
+            .ReturnsAsync(user);
+
+        _mockHashPasswordService
+            .Setup(x => x.VerifyPassword(password, user.Password))
+            .Returns(false);
+
+        // Act
+        await service.IsValidUserAsync(login, password);
+
+        // Assert
+        _mockUserRepository.Verify(x => x.UpdateAsync(It.IsAny<User>()), Times.Never);
     }
 
     #endregion
@@ -680,13 +719,13 @@ public class AuthenticationServiceTests
         var reSeller = ReSeller.Create(user.Id, false, 10f, 5f, Guid.NewGuid(), "Inactive ReSeller");
         typeof(ReSeller).GetProperty("Id")!.SetValue(reSeller, Guid.NewGuid());
         typeof(ReSeller).GetProperty("User")!.SetValue(reSeller, user);
+        reSeller.IsActive = false;
         return reSeller;
     }
 
     private StoreUser CreateActiveStoreUser(User user, Store store)
     {
         var storeUser = StoreUser.Create(user.Id, store.Id, Guid.NewGuid());
-        // Use reflection to set navigation properties since they're not part of Create()
         typeof(StoreUser).GetProperty("User")!.SetValue(storeUser, user);
         typeof(StoreUser).GetProperty("Store")!.SetValue(storeUser, store);
         storeUser.IsActive = true;
@@ -696,11 +735,17 @@ public class AuthenticationServiceTests
     private StoreUser CreateInactiveStoreUser(User user, Store store)
     {
         var storeUser = StoreUser.Create(user.Id, store.Id, Guid.NewGuid());
-        // Use reflection to set navigation properties since they're not part of Create()
         typeof(StoreUser).GetProperty("User")!.SetValue(storeUser, user);
         typeof(StoreUser).GetProperty("Store")!.SetValue(storeUser, store);
         storeUser.IsActive = false;
         return storeUser;
+    }
+
+    private UserRole CreateUserRole(Guid userId, int roleId, Role role)
+    {
+        var userRole = UserRole.Create(userId, roleId, Guid.NewGuid());
+        typeof(UserRole).GetProperty("Role")!.SetValue(userRole, role);
+        return userRole;
     }
 
     #endregion

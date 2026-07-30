@@ -28,17 +28,17 @@ public sealed class AuthLoginTests
     }
 
     [Fact]
-    public async Task Login_with_unknown_user_returns_200_with_failure_body()
+    public async Task Login_with_unknown_user_returns_401()
     {
         // Password length >= 8 passes validation, so the request reaches the handler,
-        // which returns ResponseResult.Failure(400). The controller wraps it in Ok() => HTTP 200.
+        // which returns ResponseResult.Failure(401). The controller maps it to 401 Unauthorized.
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login",
             new { Login = "nobody-" + Guid.NewGuid().ToString("N") + "@test.com", Password = "Password123" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
         body!.Succeeded.Should().BeFalse();
-        body.ActionCode.Should().Be(400);
+        body.ActionCode.Should().Be(401);
     }
 }

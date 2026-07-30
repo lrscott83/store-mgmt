@@ -33,11 +33,19 @@ Per-store paid-plan lifecycle: plan activation (owner, once), manual payment rec
 | Seed value | `"5"` |
 | Accessor | `GetPaymentGraceDaysAsync()` returning `int` (fallback `5`) |
 
+### `SystemConfigurationType.DueSoonDays`
+
+| Property | Value |
+|----------|-------|
+| Enum id | `4` |
+| Default value | `"5"` (fallback when no row exists) |
+| Accessor | `GetDueSoonDaysAsync()` returning `Task<int>` (fallback `5`) |
+
 ## Requirements
 
 ### R1: Billing Status State Machine
 
-The system MUST compute `StoreBillingStatusType` from `(paymentStartDate, nextDueDate, today, dueSoonDays, graceDays)`.
+The system MUST compute `StoreBillingStatusType` from `(paymentStartDate, nextDueDate, today, dueSoonDays, graceDays)`. The `dueSoonDays` value SHALL be obtained from `ISystemConfigurationRepository.GetDueSoonDaysAsync()` (default `5`), replacing the previously hardcoded literal `5`.
 
 | Status | Condition |
 |--------|-----------|
@@ -127,7 +135,125 @@ The system MUST provide pure static methods in `StoreBillingUtils`.
 - GIVEN `startDate = 2026-01-10`, `trialMonths = 1`, `today = 2026-02-05`
 - THEN `IsInTrial` SHALL be `true`
 
-<!-- R3 removed: StoreBillingService/IStoreBillingService dead code deleted -->
+### R2.5: StoreBillingSummary MUST expose `IsInTrial`
+
+`Domain/Entities/Billing/StoreBillingSummary.cs` SHALL add a `bool IsInTrial { get; init; }` property.
+
+This makes `IsInTrial` a first-class field of the billing summary contract, eliminating the need for consumers to compute it independently with hardcoded or duplicated logic.
+
+#### Scenario: Summary carries IsInTrial
+
+- GIVEN a `StoreBillingSummary` is constructed with `IsInTrial = true`
+- WHEN the property is read
+- THEN it SHALL be `true`
+
+### R2.6: BillingService MUST compute `IsInTrial` canonically
+
+`BillingService.GetStoreBillingSummaryAsync()` SHALL compute `IsInTrial` using:
+
+```
+StoreBillingUtils.IsInTrial(store.PaymentStartDate, trialMonths, today)
+```
+
+The `trialMonths` and `today` variables already present in the method SHALL be reused — no new config reads or clock calls.
+
+#### Scenario: BillingService computes IsInTrial
+
+- GIVEN `store.PaymentStartDate = 2026-01-10`, `trialMonths = 1`, `today = 2026-02-05`
+- WHEN `GetStoreBillingSummaryAsync` is called
+- THEN `IsInTrial` SHALL be `true`
+
+### R2.7: GetMeQueryHandler MUST consume `billing.IsInTrial`
+
+`GetMeQueryHandler.Handle()` SHALL use `billing.IsInTrial` from `StoreBillingSummary` instead of computing inline with a hardcoded `AddMonths(1) >= today`.
+
+#### Scenario: GetMe reads IsInTrial from billing summary
+
+- GIVEN a store in trial (`billing.IsInTrial = true`)
+- WHEN `GetMe` is called
+- THEN `CurrentUserDto.IsInTrial` SHALL be `true`
+
+### R2.8: All billing states MUST report correct `isInTrial`
+
+The `IsInTrial` value SHALL be consistent with `StoreBillingUtils.IsInTrial` across all states:
+
+| `PaymentStartDate` | Condition | `IsInTrial` |
+|---|---|---|
+| `null` | N/A | `false` |
+| Non-null | `today <= startDate + trialMonths` | `true` |
+| Non-null | `today > startDate + trialMonths` | `false` |
+
+#### Scenario: Free store (null PaymentStartDate)
+
+- GIVEN `PaymentStartDate = null`
+- WHEN computing billing summary
+- THEN `IsInTrial` SHALL be `false` AND `Status` SHALL be `NoAplica`
+
+#### Scenario: Store within trial period
+
+- GIVEN `PaymentStartDate = 2026-01-10`, `TestingPeriodInMonths = 1`, `today = 2026-02-05`
+- THEN `IsInTrial` SHALL be `true`
+
+#### Scenario: Store past trial period
+
+- GIVEN `PaymentStartDate = 2026-01-10`, `TestingPeriodInMonths = 1`, `today = 2026-02-20`
+- THEN `IsInTrial` SHALL be `false`
+
+### R3: Configurable DueSoonDays
+
+The system MUST expose `DueSoonDays` as a configurable `SystemConfigurationType` entry with a database-backed repository accessor, replacing the current hardcoded `5`.
+
+#### R3.1: SystemConfigurationType.DueSoonDays
+
+`SystemConfigurationType` MUST add `DueSoonDays = 4`.
+
+| Property | Value |
+|----------|-------|
+| Enum id | `4` |
+| Default | `5` (returned when no row exists) |
+| Accessor | `GetDueSoonDaysAsync()` returning `Task<int>` |
+
+#### R3.2: ISystemConfigurationRepository.GetDueSoonDaysAsync()
+
+`ISystemConfigurationRepository` MUST declare `Task<int> GetDueSoonDaysAsync()`.
+
+#### R3.3: SystemConfigurationRepository.GetDueSoonDaysAsync()
+
+`SystemConfigurationRepository` MUST implement `GetDueSoonDaysAsync()` returning `FirstOrDefaultAsync(c => c.Id == 4)?.Value ?? 5`.
+
+#### R3.4: BillingService consumption
+
+`BillingService.GetStoreBillingSummaryAsync()` MUST call `GetDueSoonDaysAsync()` instead of using the hardcoded literal `5` for the `dueSoonDays` parameter passed to `StoreBillingUtils.GetBillingStatus()`.
+
+#### R3.5: GetStoresToCollectQueryHandler consumption
+
+`GetStoresToCollectQueryHandler` MUST read `DueSoonDays` from the repository (via `ISystemConfigurationRepository`) instead of the hardcoded `5`.
+
+#### Scenario: DueSoonDays=5 (default) — backward compatible
+
+- GIVEN no `SystemConfiguration` row with `Id == 4` exists
+- WHEN `GetDueSoonDaysAsync()` is called
+- THEN it SHALL return `5`
+- AND billing status computation behaves identically to today's hardcoded behavior
+
+#### Scenario: DueSoonDays configured via database
+
+- GIVEN a `SystemConfiguration` row with `Id == 4` and `Value == "7"`
+- WHEN `GetDueSoonDaysAsync()` is called
+- THEN it SHALL return `7`
+- AND `PorVencer` window shifts accordingly (wider by 2 days)
+
+#### Scenario: BillingService test uses mock
+
+- GIVEN `BillingService` constructed with a mock `ISystemConfigurationRepository`
+- WHEN `GetStoreBillingSummaryAsync` is invoked
+- THEN the mock's `GetDueSoonDaysAsync()` SHALL be called and its return value used
+
+#### Scenario: GetStoresToCollect test uses mock
+
+- GIVEN `GetStoresToCollectQueryHandler` with a mock `ISystemConfigurationRepository`
+- WHEN the handler filters stores by status
+- THEN the mock's `GetDueSoonDaysAsync()` SHALL be called
 
 ### R4: Enforcement — Overdue Downgrade
 
@@ -262,3 +388,74 @@ The interface SHALL reside in `Application.Abstractions.Time`. The `Infrastructu
 ### R11: BillingService Unit Coverage
 
 `BillingService` MUST have unit tests covering: free store (`NoAplica`, no throw), unknown store (`NoAplica`), paid store without payments (amount = sum of module prices), paid store with payment (uses last payment price), reseller commission computation, months-active never negative.
+
+### R12: StoreDto.PaymentStartDate MUST Be Nullable
+
+The system MUST expose `StoreDto.PaymentStartDate` as `DateOnly?` (nullable).
+(Previously: `DateOnly` non-nullable — free stores returned sentinel `0001-01-01`.)
+
+When a free store is returned via the API, `PaymentStartDate` SHALL be `null`.
+When a paid store is returned, `PaymentStartDate` SHALL be the actual date.
+
+#### Scenario: Get store by ID (free store)
+
+- GIVEN a store with no payment start date (free store)
+- WHEN `GET /stores/{id}` is called
+- THEN response `paymentStartDate` is `null`
+
+#### Scenario: Get store by ID (paid store)
+
+- GIVEN a store with `PaymentStartDate = 2026-03-10`
+- WHEN `GET /stores/{id}` is called
+- THEN response `paymentStartDate` is `"2026-03-10"`
+
+### R13: Store Seed MUST NOT Set PaymentStartDate for Free Stores
+
+`StoreSeed.SeedStoreAsync`, `SeedStoresAdminUserAsync`, and
+`SeedStoreInNewTenantAsync` MUST NOT pass a `paymentStartDate` argument when
+creating stores that have no payment parameters.
+
+`Store.Create(…)`'s `paymentStartDate` parameter defaults to `null`, so the
+callers simply drop the `DateOnly.FromDateTime(DateTime.UtcNow)` argument.
+
+#### Scenario: Seed free store
+
+- GIVEN `StoreSeed.SeedStoreAsync` is called with no payment parameters
+- WHEN a store is created
+- THEN its `PaymentStartDate` is `null`
+
+#### Scenario: Seed store with admin user
+
+- GIVEN `StoreSeed.SeedStoresAdminUserAsync` is called with no payment params
+- WHEN a store is created
+- THEN its `PaymentStartDate` is `null`
+
+#### Scenario: Seed store in new tenant
+
+- GIVEN `StoreSeed.SeedStoreInNewTenantAsync` is called with no payment params
+- WHEN a store is created
+- THEN its `PaymentStartDate` is `null`
+
+### R14: Regression — All Existing Tests MUST Pass
+
+All billing E2E tests (31 tests via `BillingSeed`), store CRUD E2E tests (via
+`StoreSeed`), and solution-wide unit tests MUST remain green after the seed and
+DTO changes.
+
+#### Scenario: Billing E2E tests pass
+
+- GIVEN the billing E2E test suite (31 tests)
+- WHEN the seed and DTO changes are applied
+- THEN all billing E2E tests pass
+
+#### Scenario: Store CRUD E2E tests pass
+
+- GIVEN the store CRUD E2E test suite
+- WHEN the changes are applied
+- THEN all store CRUD E2E tests pass
+
+#### Scenario: Unit tests pass
+
+- GIVEN all unit tests in the solution
+- WHEN the changes are applied
+- THEN all unit tests pass

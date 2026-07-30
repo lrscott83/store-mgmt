@@ -15,29 +15,44 @@ namespace Infrastructure.Persistence.Repositories
             _stores = dbContext.Set<Store>();
         }
 
-        public async Task<IEnumerable<Store>> GetActiveStoresByUserIdAsync(Guid userId)
+        public async Task<IEnumerable<Store>> GetActiveStoresByUserIdAsync(Guid userId, Guid? excludeStoreId = null)
         {
-            return await _stores
+            IQueryable<Store> query = _stores
                 .Where(s => s.Owner != null && s.Owner.IsActive && s.Owner.UserId == userId && s.IsActive)
                 .Include(s => s.Owner)
-                .ToListAsync();
+                    .ThenInclude(o => o.User);
+
+            if (excludeStoreId.HasValue)
+                query = query.Where(s => s.Id != excludeStoreId.Value);
+
+            return await query.ToListAsync();
         }
 
-        public async Task<IEnumerable<Store>> GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(Guid userId)
+        public async Task<IEnumerable<Store>> GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(Guid userId, Guid? excludeStoreId = null)
         {
-            return await _stores
+            IQueryable<Store> query = _stores
                 .Where(s => s.Owner != null && s.Owner.IsActive && s.Owner.UserId == userId && s.IsActive)
                 .Include(s => s.Owner)
-                .IgnoreQueryFilters()
-                .ToListAsync();
+                    .ThenInclude(o => o.User)
+                .IgnoreQueryFilters();
+
+            if (excludeStoreId.HasValue)
+                query = query.Where(s => s.Id != excludeStoreId.Value);
+
+            return await query.ToListAsync();
         }
 
-        public async Task<IEnumerable<Store>> GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync()
+        public async Task<IEnumerable<Store>> GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(Guid? excludeStoreId = null)
         {
-            return await _stores
+            IQueryable<Store> query = _stores
                 .Include(s => s.Owner)
-                .IgnoreQueryFilters()
-                .ToListAsync();
+                    .ThenInclude(o => o.User)
+                .IgnoreQueryFilters();
+
+            if (excludeStoreId.HasValue)
+                query = query.Where(s => s.Id != excludeStoreId.Value);
+
+            return await query.ToListAsync();
         }
 
         public async Task<Store> GetStoreByIdIgnoreQueryFiltersAsync(Guid id)
@@ -45,9 +60,16 @@ namespace Infrastructure.Persistence.Repositories
             return await _stores.Where(s => s.Id == id).IgnoreQueryFilters().FirstOrDefaultAsync();
         }
 
+        public async Task<Store?> GetStoreByIdAsync(Guid id)
+        {
+            return await _stores.Where(s => s.Id == id).FirstOrDefaultAsync();
+        }
+
         public async Task<Store> GetStoreByIdIncludingModulesAsync(Guid id)
         {
             return await _stores.Where(s => s.Id == id)
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
                 .Include(s => s.StoreModules.Where(sm => sm.IsActive))
                 .ThenInclude(sm => sm.Module)
                 .FirstOrDefaultAsync();
@@ -56,15 +78,26 @@ namespace Infrastructure.Persistence.Repositories
         public async Task<Store> GetStoreByIdIncludingModulesIgnoreQueryFiltersAsync(Guid id)
         {
             return await _stores.Where(s => s.Id == id)
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
                 .Include(s => s.StoreModules.Where(sm => sm.IsActive))
                 .ThenInclude(sm => sm.Module)
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync();
         }
 
+        public new async Task<bool> ExistsAsync(Guid id)
+        {
+            return await _stores.IgnoreQueryFilters().AnyAsync(s => s.Id == id);
+        }
+
         public async Task<IEnumerable<Store>> GetStoresAsync(bool includeInactive)
         {
-            return await _stores.Where(s => includeInactive || s.IsActive).ToListAsync();
+            return await _stores
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
+                .Where(s => includeInactive || s.IsActive)
+                .ToListAsync();
         }
 
         public async Task<bool> IsUniqueNameAsync(string name)

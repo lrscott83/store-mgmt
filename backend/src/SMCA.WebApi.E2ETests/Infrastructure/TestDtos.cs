@@ -1,12 +1,11 @@
 namespace SMCA.WebApi.E2ETests.Infrastructure;
 
-// Mirrors Application.Dtos.Authentication.AuthDto (record Login, AuthToken, RefreshToken, ExpiresIn),
+// Mirrors Application.Dtos.Authentication.AuthDto (record Login, AuthToken, ExpiresIn),
 // deserialized from camelCase JSON.
 public sealed class AuthData
 {
     public string Login { get; set; } = string.Empty;
     public string AuthToken { get; set; } = string.Empty;
-    public string RefreshToken { get; set; } = string.Empty;
     public DateTime ExpiresIn { get; set; }
 }
 
@@ -20,7 +19,7 @@ public sealed class StoreData
     public bool Approved { get; set; }
     public Guid OwnerId { get; set; }
     public string? OwnerName { get; set; }
-    public DateOnly PaymentStartDate { get; set; }
+    public DateOnly? PaymentStartDate { get; set; }
     public DateOnly NextPaymentDate { get; set; }
     public List<ModuleData> Modules { get; set; } = new();
 }
@@ -73,6 +72,9 @@ public sealed class RosterUserData
     public bool IsReSeller { get; set; }
     public Guid SelectedStoreId { get; set; }
     public RosterVerifierData Verifier { get; set; } = new();
+    public string WrappedDek { get; set; } = string.Empty;
+    public string WrapSalt { get; set; } = string.Empty;
+    public string WrapIv { get; set; } = string.Empty;
 }
 
 public sealed class RosterData

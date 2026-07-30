@@ -51,7 +51,7 @@ public sealed class AuthMeFailureTests
             var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
             body!.Succeeded.Should().BeFalse();
             body.ActionCode.Should().Be(404);
-            body.Errors.Should().ContainSingle(e => e.Code == "User.Inactive");
+            body.Errors.Should().ContainSingle(e => e.Code == "Auth.AccountInactive");
         }
         finally
         {

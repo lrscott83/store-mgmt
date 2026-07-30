@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Domain.Entities.Stores;
 using FluentAssertions;
+using Infrastructure.Persistence.Contexts;
+using Microsoft.Extensions.DependencyInjection;
 using SMCA.WebApi.E2ETests.Infrastructure;
 using Xunit;
 
@@ -68,5 +71,72 @@ public sealed class StoresByCurrentUserTests
     {
         var response = await _f.CreateClient().GetAsync("/api/v1/stores/by-current-user");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_sees_only_their_owned_stores()
+    {
+        var ownerA = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        Guid storeA2Id;
+        using (var scope = _f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var store2 = Store.Create($"OA-Store-2-{Guid.NewGuid():N}", ownerA.OwnerId, false, ownerA.TenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+            db.Set<Store>().Add(store2);
+            await db.SaveChangesAsync();
+            storeA2Id = store2.Id;
+        }
+        var ownerB = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, ownerA.UserId, ownerA.Login)
+                .GetAsync("/api/v1/stores/by-current-user");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreData>>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            body.Data.Should().Contain(s => s.Id == ownerA.StoreId);
+            body.Data.Should().Contain(s => s.Id == storeA2Id);
+            body.Data.Should().NotContain(s => s.Id == ownerB.StoreId);
+        }
+        finally
+        {
+            await StoreSeed.CleanupStoreAsync(_f, storeA2Id);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, ownerA.StoreId, ownerA.UserId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, ownerB.StoreId, ownerB.UserId);
+        }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_sees_OwnerName_populated()
+    {
+        var ownerA = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        Guid storeA2Id;
+        using (var scope = _f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var store2 = Store.Create($"OA-Store-2-{Guid.NewGuid():N}", ownerA.OwnerId, false, ownerA.TenantId, DateOnly.FromDateTime(DateTime.UtcNow));
+            db.Set<Store>().Add(store2);
+            await db.SaveChangesAsync();
+            storeA2Id = store2.Id;
+        }
+        var ownerB = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, ownerA.UserId, ownerA.Login)
+                .GetAsync("/api/v1/stores/by-current-user");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreData>>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            body.Data.Should().Contain(s => s.Id == ownerA.StoreId);
+            body.Data.Should().Contain(s => s.Id == storeA2Id);
+            body.Data.Should().NotContain(s => s.Id == ownerB.StoreId);
+            body.Data!.ForEach(store => store.OwnerName.Should().NotBeNullOrEmpty());
+        }
+        finally
+        {
+            await StoreSeed.CleanupStoreAsync(_f, storeA2Id);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, ownerA.StoreId, ownerA.UserId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, ownerB.StoreId, ownerB.UserId);
+        }
     }
 }

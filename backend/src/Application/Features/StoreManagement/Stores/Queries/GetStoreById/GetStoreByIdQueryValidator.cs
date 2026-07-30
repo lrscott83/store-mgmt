@@ -1,5 +1,4 @@
 ﻿using Domain.Interfaces.Repositories;
-using Domain.Interfaces.Services.Stores;
 using FluentValidation;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -9,11 +8,11 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreById
     public class GetStoreByIdQueryValidator : AbstractValidator<GetStoreByIdQuery>
     {
         private readonly IStringLocalizer<I18n> _localizer;
-        private readonly IGetStoreByIdService _storeByIdService;
-        public GetStoreByIdQueryValidator(IStringLocalizer<I18n> localizer, IGetStoreByIdService storeByIdService)
+        private readonly IStoreRepository _storeRepository;
+        public GetStoreByIdQueryValidator(IStringLocalizer<I18n> localizer, IStoreRepository storeRepository)
         {
             _localizer = localizer;
-            _storeByIdService = storeByIdService;
+            _storeRepository = storeRepository;
 
             RuleFor(x => x.Id)
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
@@ -23,7 +22,7 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoreById
         }
         private async Task<bool> StoreExists(Guid storeId, CancellationToken cancellationToken)
         {
-            return await _storeByIdService.GetStoreByIdIncludingModulesAsync(storeId) != null;
+            return await _storeRepository.ExistsAsync(storeId);
         }
     }
 }

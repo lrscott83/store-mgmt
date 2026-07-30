@@ -2,6 +2,7 @@
 using Domain.Common.Constants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.BearerToken;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 
 namespace SMCA.WebApi.Services
@@ -22,15 +23,13 @@ namespace SMCA.WebApi.Services
         {
             get
             {
-                {
-                    string auth = _httpContextAccessor.HttpContext?.Request?.Headers?["Authorization"];
-
-                    /*Bearer token*/
-                    var key = "Bearer ";
-                    var keyLength = key.Length;
-                    var accessToken = auth.Substring(keyLength, auth.Length - keyLength);
-                    return accessToken;
-                }
+                var authHeader = _httpContextAccessor.HttpContext?.Request?.Headers["Authorization"].FirstOrDefault();
+                if (string.IsNullOrEmpty(authHeader))
+                    return string.Empty;
+                if (AuthenticationHeaderValue.TryParse(authHeader, out var parsed) &&
+                    "Bearer".Equals(parsed.Scheme, StringComparison.OrdinalIgnoreCase))
+                    return parsed.Parameter ?? string.Empty;
+                return string.Empty;
             }
         }
 

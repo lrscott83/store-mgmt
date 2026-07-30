@@ -30,7 +30,7 @@ public class GetMeOverdueDowngradeTests
         };
 
         // Act
-        var result = GetMeQueryHandler.FilterForBilling(modules, billing);
+        var result = StoreBillingUtils.FilterForBilling(modules, billing);
 
         // Assert
         result.Should().BeEquivalentTo(new List<int> { 1, 3 });
@@ -51,7 +51,7 @@ public class GetMeOverdueDowngradeTests
         };
 
         // Act
-        var result = GetMeQueryHandler.FilterForBilling(modules, billing);
+        var result = StoreBillingUtils.FilterForBilling(modules, billing);
 
         // Assert
         result.Should().BeEquivalentTo(new List<int> { 1, 2 });
@@ -72,7 +72,7 @@ public class GetMeOverdueDowngradeTests
         };
 
         // Act
-        var result = GetMeQueryHandler.FilterForBilling(modules, billing);
+        var result = StoreBillingUtils.FilterForBilling(modules, billing);
 
         // Assert
         result.Should().BeEquivalentTo(new List<int> { 1, 2 });
@@ -93,7 +93,7 @@ public class GetMeOverdueDowngradeTests
         };
 
         // Act
-        var result = GetMeQueryHandler.FilterForBilling(modules, billing);
+        var result = StoreBillingUtils.FilterForBilling(modules, billing);
 
         // Assert
         result.Should().BeEquivalentTo(new List<int> { 1, 2 });
@@ -114,7 +114,7 @@ public class GetMeOverdueDowngradeTests
         };
 
         // Act
-        var result = GetMeQueryHandler.FilterForBilling(modules, billing);
+        var result = StoreBillingUtils.FilterForBilling(modules, billing);
 
         // Assert
         result.Should().BeEquivalentTo(new List<int> { 1, 2 });

@@ -4,12 +4,18 @@ namespace Domain.Entities.Users
 {
     public class UserErrors
     {
-        public static Error LoginNotFound(string login) 
-            => new("User.NotFound", $"El usuario '{login}' no existe en el sistema.");
+        /// <summary>
+        /// Generic invalid credentials error — prevents user enumeration.
+        /// Maps to HTTP 401 Unauthorized.
+        /// </summary>
+        public static readonly Error InvalidCredentials = new("Auth.InvalidCredentials", "Invalid credentials");
+
+        /// <summary>
+        /// Account-level inactive error — same message as InvalidCredentials.
+        /// Maps to HTTP 403 Forbidden so the client can show a "contact support" page.
+        /// </summary>
+        public static readonly Error AccountInactive = new("Auth.AccountInactive", "Invalid credentials");
 
         public static readonly Error NotFound = new("User.NotFound", $"El usuario no existe.");
-        public static readonly Error Inactive = new("User.Inactive", $"El usuario está inactivo.");
-        public static Error InvalidPassword(string login) 
-            => new("User.InvalidPassword", $"La contraseña del usuario '{login}' no es válida.");
     }
 }

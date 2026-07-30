@@ -20,6 +20,7 @@ using System.Configuration;
 using Serilog.Sinks.Elasticsearch;
 using System.Reflection;
 using System;
+using System.Threading.RateLimiting;
 using SMCA.WebApi.OptionsSetup;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,8 +43,10 @@ builder.Host.UseSerilog(logger);
 // Add services to the container.
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<TenantIdProvider>();
 builder.Services.AddScoped<IHttpContextService, HttpContextService>();
+builder.Services.AddSingleton<ITokenBlacklistService, TokenBlacklistService>();
 builder.Services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
 //Register the Permission policy handlers
@@ -52,11 +55,14 @@ builder.Services.AddSingleton<IAuthorizationHandler, FeatureTypeHandler>();
 builder.Services.AddScoped<IClaimsTransformation, ClaimsTransformerService>();
 
 builder.Services
-    .AddApplication()
+    .AddApplication(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
-builder.Services.AddScoped<IHashPasswordService, HashPasswordService>();
+builder.Services.AddScoped<IAuthTokenConfig, JwtAuthTokenConfig>();
 builder.Services.AddScoped<IOfflineVerifierService, OfflineVerifierService>();
+builder.Services.AddScoped<IStoreKeyWrapService, StoreKeyWrapService>();
+builder.Services.AddScoped<IStoreDataKeyProvider>(_ =>
+    new StoreDataKeyProvider(builder.Configuration.GetValue<string>("StoreEncryption:MasterSecret")!));
 
 builder.Services.Configure<TenantConnectionSettings>(options =>
     builder.Configuration.GetSection(nameof(TenantConnectionSettings)).Bind(options));
@@ -102,6 +108,36 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddApiVersioningExtension();
 builder.Services.AddHealthChecks();
 
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        options.AddPolicy("LoginPolicy", context =>
+            RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 3,
+                    QueueLimit = 0
+                }));
+
+        options.AddPolicy("RegisterPolicy", context =>
+            RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(10),
+                    SegmentsPerWindow = 10,
+                    QueueLimit = 0
+                }));
+    });
+}
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -135,6 +171,11 @@ app.UseRouting();
 app.UseAuthentication();
 
 app.UseAuthorization();
+
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
 
 app.UseMiddleware<ErrorHandlerMiddleware>();
 app.UseHealthChecks("/health");

@@ -17,7 +17,6 @@ public sealed class StoreGetByIdTests
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var name = $"Store-{Guid.NewGuid():N}";
         var fixture = await StoreSeed.SeedStoreAsync(_f, name, approved: true);
         try
@@ -29,7 +28,7 @@ public sealed class StoreGetByIdTests
             body.Data!.Id.Should().Be(fixture.StoreId);
             body.Data.Name.Should().Be(name);
             body.Data.Modules.Should().NotBeEmpty();
-            body.Data.PaymentStartDate.Should().Be(today);
+            body.Data.PaymentStartDate.Should().BeNull();
             body.Data.NextPaymentDate.Should().Be(default(DateOnly));
         }
         finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fixture); await DbTestHelpers.CleanupUserAsync(_f, adminId); }

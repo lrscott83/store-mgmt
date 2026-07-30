@@ -35,7 +35,7 @@ public sealed class AuthRegisterDuplicateTests
                 StoreName = $"Store-{Guid.NewGuid():N}",
                 Code = (string?)null
             });
-            first.StatusCode.Should().Be(HttpStatusCode.OK);
+            first.StatusCode.Should().Be(HttpStatusCode.Created);
 
             var created = await DbTestHelpers.GetUserByLoginAsync(_factory, login);
             created.Should().NotBeNull();

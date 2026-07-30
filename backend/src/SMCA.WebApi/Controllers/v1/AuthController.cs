@@ -1,12 +1,15 @@
 ﻿using Application.Dtos.Authentication;
 using Application.Features.Authentication.Commands.Login;
+using Application.Features.Authentication.Commands.Refresh;
 using Application.Features.Authentication.Commands.Register;
+using Application.Features.Authentication.Commands.Revoke;
 using Application.Features.Authentication.Queries.GetMe;
 using Application.Features.Authentication.Queries.Logout;
 using Application.ResponseModels;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace SMCA.WebApi.Controllers.v1
 {
@@ -15,11 +18,49 @@ namespace SMCA.WebApi.Controllers.v1
     public class AuthController : BaseApiController
     {
         [HttpPost("login")]
-        [ProducesResponseType(typeof(ResponseResult<AuthDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(AuthDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         [AllowAnonymous]
-        public async Task<IActionResult> AuthAsync(LoginCommand command)
+        [EnableRateLimiting("LoginPolicy")]
+        public async Task<IActionResult> AuthAsync([FromBody] LoginCommand command)
         {
-            return Ok(await Sender.Send(command));
+            var result = await Sender.Send(command);
+
+            if (result.Succeeded)
+                return Ok(result);
+
+            return result.ActionCode switch
+            {
+                400 => BadRequest(result),     // Validation errors
+                401 => Unauthorized(result),   // Invalid credentials
+                403 => StatusCode(403, result), // Disabled user/store
+                _ => BadRequest(result)
+            };
+        }
+
+        [HttpPost("refresh")]
+        [ProducesResponseType(typeof(ResponseResult<AuthDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status401Unauthorized)]
+        [AllowAnonymous]
+        public async Task<IActionResult> RefreshAsync([FromBody] RefreshCommand command)
+        {
+            var result = await Sender.Send(command);
+            if (result.Succeeded)
+                return Ok(result);
+
+            return Unauthorized(result);
+        }
+
+        [HttpPost("revoke")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [Authorize]
+        public async Task<IActionResult> RevokeAsync([FromBody] RevokeCommand command)
+        {
+            await Sender.Send(command);
+            return NoContent();
         }
 
         [HttpGet("logout")]
@@ -32,17 +73,32 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpGet("me")]
         [ProducesResponseType(typeof(ResponseResult<CurrentUserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetMeAsync()
         {
             return Ok(await Sender.Send(new GetMeQuery()));
         }
 
         [HttpPost("register")]
-        [ProducesResponseType(typeof(ResponseResult<AuthDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult<AuthDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status500InternalServerError)]
         [AllowAnonymous]
-        public async Task<IActionResult> RegisterAsync(RegisterCommand command)
+        [EnableRateLimiting("RegisterPolicy")]
+        public async Task<IActionResult> RegisterAsync([FromBody] RegisterCommand command)
         {
-            return Ok(await Sender.Send(command));
+            var result = await Sender.Send(command);
+
+            if (result.Succeeded)
+                return Created("/api/v1/auth/me", result);
+
+            return result.ActionCode switch
+            {
+                400 => BadRequest(result),
+                _ => BadRequest(result)
+            };
         }
 
         [HttpGet("ping")]

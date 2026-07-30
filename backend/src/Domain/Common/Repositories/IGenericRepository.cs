@@ -6,6 +6,7 @@ namespace Domain.Common.Repositories
     public interface IGenericRepository<TEntity> where TEntity : Entity
     {
         Task<TEntity> AddAsync(TEntity entity);
+        Task AddRangeAsync(IEnumerable<TEntity> entities);
         Task<bool> DeleteAsync(IEnumerable<TEntity> entities);
         Task<bool> DeleteAsync(TEntity entity);
         Task<IReadOnlyCollection<TEntity>> GetAllAsync();

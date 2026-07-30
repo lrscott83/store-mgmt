@@ -69,6 +69,10 @@ public sealed class FeaturesActivateGapTests
         var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         var snap = await FeatureSeed.SnapshotAsync(_f);
 
+        // 🛡️ Clean up StoreRoleFeature refs that may reference TodayReports(50) before deleting it
+        // (FK_StoreRoleFeature_Feature_FeatureId with DeleteBehavior.Restrict blocks the delete)
+        await FeatureSeed.CleanFeatureRefsAsync(_f, (int)FeatureType.TodayReports);
+
         int moduleId = 0, order = 0; bool availableToStore = false, existed;
         string name = "TodayReports", description = "";
         using (var scope = _f.Services.CreateScope())

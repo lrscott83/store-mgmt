@@ -1,6 +1,7 @@
 using Application.Abstractions.Features;
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Time;
+using Application.Abstractions.Authentication;
 using Application.Features.Authentication.Queries.GetMe;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Billing;
@@ -47,7 +48,8 @@ public class GetMeQueryHandlerTests
             mocks.AllowedFeaturesService.Object,
             mocks.StoreModuleRepository.Object,
             mocks.BillingService.Object,
-            mocks.DateTimeProvider.Object);
+            mocks.DateTimeProvider.Object,
+            mocks.TokenBlacklistService.Object);
 
         var query = new GetMeQuery();
 
@@ -82,7 +84,8 @@ public class GetMeQueryHandlerTests
             mocks.AllowedFeaturesService.Object,
             mocks.StoreModuleRepository.Object,
             mocks.BillingService.Object,
-            mocks.DateTimeProvider.Object);
+            mocks.DateTimeProvider.Object,
+            mocks.TokenBlacklistService.Object);
 
         var query = new GetMeQuery();
 
@@ -109,7 +112,8 @@ public class GetMeQueryHandlerTests
             AllowedFeaturesService = new Mock<IAllowedFeaturesService>(),
             StoreModuleRepository = new Mock<IStoreModuleRepository>(),
             BillingService = new Mock<IBillingService>(),
-            DateTimeProvider = new Mock<IDateTimeProvider>()
+            DateTimeProvider = new Mock<IDateTimeProvider>(),
+            TokenBlacklistService = new Mock<ITokenBlacklistService>()
         };
 
         mocks.DateTimeProvider.Setup(c => c.UtcNow).Returns(new DateTimeOffset(DateTime.UtcNow, TimeSpan.Zero));
@@ -126,6 +130,7 @@ public class GetMeQueryHandlerTests
         public Mock<IStoreModuleRepository> StoreModuleRepository { get; set; } = null!;
         public Mock<IBillingService> BillingService { get; set; } = null!;
         public Mock<IDateTimeProvider> DateTimeProvider { get; set; } = new();
+        public Mock<ITokenBlacklistService> TokenBlacklistService { get; set; } = null!;
     }
 
     #endregion

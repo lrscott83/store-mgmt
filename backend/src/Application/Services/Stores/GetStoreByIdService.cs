@@ -3,7 +3,9 @@ using Domain.Common.Constants;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Stores;
 
-namespace Domain.Entities.Stores
+using Domain.Entities.Stores;
+
+namespace Application.Services.Stores
 {
     public class GetStoreByIdService : IGetStoreByIdService
     {

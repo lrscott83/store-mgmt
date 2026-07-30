@@ -32,27 +32,49 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPut]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> SetMyStoreIdAsync([FromBody] SetMyStoreCommand command)
         {
             return Ok(await Sender.Send(command));
         }
 
+        /// <summary>
+        /// Gets stores accessible by the current authenticated user. SuperAdmin sees all stores across tenants. Other authorized roles see only their owned stores.
+        /// </summary>
         [HttpGet("by-current-user")]
         [ProducesResponseType(typeof(ResponseResult<List<StoreDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoresByCurrentUserQueryAsync()
         {
             return Ok(await Sender.Send(new GetStoresByCurrentUserQuery()));
         }
 
+        /// <summary>
+        /// Get all stores, optionally including inactive ones.
+        /// Only available for SuperAdmin and StoresAdmin roles.
+        /// When includeInactive is false (default), only active stores are returned.
+        /// </summary>
         [HttpGet("list/{includeInactive}")]
         [ProducesResponseType(typeof(ResponseResult<List<StoreDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> GetStoresAsync(bool includeInactive = false)
         {
             return Ok(await Sender.Send(new GetStoresQuery(includeInactive)));
         }
 
+        /// <summary>
+        /// Get store by its unique identifier.
+        /// Only available for SuperAdmin and StoresAdmin roles.
+        /// </summary>
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ResponseResult<StoreDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetStoreByIdAsync(Guid id)
         {
             return Ok(await Sender.Send(new GetStoreByIdQuery(id)));
@@ -70,6 +92,9 @@ namespace SMCA.WebApi.Controllers.v1
 
         [HttpPut("{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> UpdatedStoreAsync(Guid id, [FromBody] UpdateStoreCommand command)
         {
             return Ok(await Sender.Send(
@@ -91,10 +116,14 @@ namespace SMCA.WebApi.Controllers.v1
         }
 
         /// <summary>
-        /// Delete tenant by id
+        /// Deactivate store by id
         /// </summary>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
         public async Task<IActionResult> DeleteAsync(Guid id)
         {

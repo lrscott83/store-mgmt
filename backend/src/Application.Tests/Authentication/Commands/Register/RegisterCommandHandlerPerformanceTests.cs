@@ -85,7 +85,9 @@ public class RegisterCommandHandlerPerformanceTests : RegisterCommandHandlerTest
 
         // Assert
         result.Succeeded.Should().BeTrue();
-        result.Data.Should().BeTrue();
+        result.Data.Login.Should().Be(command.Login);
+        result.Data.AuthToken.Should().Be("mock-jwt-token-for-testing");
+        result.Data.ExpiresIn.Should().BeAfter(DateTime.UtcNow);
     }
 
     [Fact]

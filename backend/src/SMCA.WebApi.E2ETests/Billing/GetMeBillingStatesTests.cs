@@ -54,6 +54,7 @@ public sealed class GetMeBillingStatesTests
             // All modules (free) should be present — no filtering
             body.Data.StoreModuleIds.Should().Contain(FreeModuleId);
             body.Data.PaymentDueDate.Should().BeNull();
+            body.Data.IsInTrial.Should().Be(false);
         }
         finally
         {
@@ -85,6 +86,7 @@ public sealed class GetMeBillingStatesTests
             body.Data.StoreModuleIds.Should().Contain(FreeModuleId);
             body.Data.StoreModuleIds.Should().Contain(PaidModuleId);
             body.Data.PaymentDueDate.Should().NotBeNull();
+            body.Data.IsInTrial.Should().Be(false); // With TestingPeriodInMonths=1 (seed data), trial from May 18 ended Jun 18
         }
         finally
         {
@@ -116,6 +118,7 @@ public sealed class GetMeBillingStatesTests
             body.Data.StoreModuleIds.Should().Contain(FreeModuleId);
             body.Data.StoreModuleIds.Should().Contain(PaidModuleId);
             body.Data.PaymentDueDate.Should().NotBeNull();
+            body.Data.IsInTrial.Should().Be(false);
         }
         finally
         {

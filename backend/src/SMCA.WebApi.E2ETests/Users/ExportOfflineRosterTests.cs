@@ -40,7 +40,7 @@ public sealed class ExportOfflineRosterTests
             body!.Succeeded.Should().BeTrue();
 
             var roster = body.Data!;
-            roster.FormatVersion.Should().Be(1);
+            roster.FormatVersion.Should().Be(2);
             roster.StoreId.Should().Be(owner.StoreId);
             Guid.TryParse(roster.BundleId, out _).Should().BeTrue();
 
@@ -54,6 +54,10 @@ public sealed class ExportOfflineRosterTests
                 user.Verifier.Hash.Should().NotBeNullOrEmpty();
                 user.Verifier.Salt.Should().NotBeNullOrEmpty();
                 user.Verifier.Iterations.Should().Be(210_000);
+
+                user.WrappedDek.Should().NotBeNullOrEmpty();
+                user.WrapSalt.Should().NotBeNullOrEmpty();
+                user.WrapIv.Should().NotBeNullOrEmpty();
             }
         }
         finally
@@ -169,6 +173,66 @@ public sealed class ExportOfflineRosterTests
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, storeUser.StoreId, storeUser.UserId, storeUser.OwnerUserId);
+        }
+    }
+
+    [Fact]
+    public async Task SuperAdmin_export_twice_DEK_stability()
+    {
+        var login = $"sa-dek-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        try
+        {
+            await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "dek-u1", "DEK User One");
+            await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "dek-u2", "DEK User Two");
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+
+            // First export
+            var r1 = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r1.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body1 = await r1.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body1!.Succeeded.Should().BeTrue();
+            var roster1 = body1.Data!;
+            roster1.FormatVersion.Should().Be(2);
+            roster1.Users.Should().HaveCount(2);
+
+            foreach (var user in roster1.Users)
+            {
+                user.WrappedDek.Should().NotBeNullOrEmpty();
+                user.WrapSalt.Should().NotBeNullOrEmpty();
+                user.WrapIv.Should().NotBeNullOrEmpty();
+            }
+
+            // Second export
+            var r2 = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r2.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body2 = await r2.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body2!.Succeeded.Should().BeTrue();
+            var roster2 = body2.Data!;
+            roster2.FormatVersion.Should().Be(2);
+            roster2.Users.Should().HaveCount(2);
+
+            foreach (var user in roster2.Users)
+            {
+                user.WrappedDek.Should().NotBeNullOrEmpty();
+                user.WrapSalt.Should().NotBeNullOrEmpty();
+                user.WrapIv.Should().NotBeNullOrEmpty();
+            }
+
+            // WrappedDek differs between exports (different salt/IV per wrap)
+            for (int i = 0; i < roster1.Users.Count; i++)
+            {
+                roster1.Users[i].WrappedDek.Should().NotBe(roster2.Users[i].WrappedDek);
+            }
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(owner.StoreId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
         }
     }
 

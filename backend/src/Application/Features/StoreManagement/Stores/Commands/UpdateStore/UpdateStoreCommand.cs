@@ -5,6 +5,7 @@ using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Enums;
+using Domain.Common.Results;
 using Domain.Common.Utils;
 using Domain.Entities.Modules;
 using Domain.Entities.Owners;
@@ -18,7 +19,6 @@ using Domain.Interfaces.Services.Tenants;
 using Microsoft.Extensions.Localization;
 using Resources;
 using System.Net;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
 {
@@ -69,9 +69,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
         public async Task<ResponseResult<bool>> Handle(UpdateStoreCommand request, CancellationToken cancellationToken)
         {
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
-                throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
+                throw new ApiException(_localizer["Forbidden"], HttpStatusCode.Forbidden);
 
             var store = await _storeByIdService.GetStoreByIdIncludingModulesAsync(request.Id);
+            if (store is null)
+                throw new ValidationException { Errors = new List<Error> { new Error("Id", _localizer["StoreNotFound"]) } };
+
             if (_storeRepository.Where(s => s.Id != request.Id).Any(s => s.Name == request.Name))
                 throw new ValidationException(_localizer["StoreAlreadyExists"]);
 
@@ -125,10 +128,11 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
 
             List<int> insertedModuleIds = new List<int>();
             List<int> updatedModuleIds = new List<int>();
+            Dictionary<int, Module> modulesById = (await _moduleRepository.GetModulesByIdsAsync(moduleIds)).ToDictionary(m => m.Id);
             foreach (var moduleId in moduleIds)
             {
                 StoreModule? storeModule = storeModules.FirstOrDefault(module => module.ModuleId == moduleId);
-                Module module = await _moduleRepository.GetByIdAsync(moduleId);
+                Module module = modulesById[moduleId];
                 if (storeModule == null)
                 {
                     // Insert
@@ -156,7 +160,10 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             {
                 List<int> featureIds = await _featureRepository.GetAvailableFeatureIdsByModuleIdsAsync(insertedModuleIds);
                 var storeRoleFeatures = await _storeRoleFeaturesGenerator.GenerateStoreRoleFeaturesAsync(storeId, tenantId, featureIds);
-                storeRoleFeatures.ForEach(async storeRoleFeature => await _storeRoleFeatureRepository.AddAsync(storeRoleFeature));
+                foreach (var storeRoleFeature in storeRoleFeatures)
+                {
+                    await _storeRoleFeatureRepository.AddAsync(storeRoleFeature);
+                }
             }
 
             foreach (var updatedModuleId in updatedModuleIds)

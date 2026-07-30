@@ -19,7 +19,7 @@ public sealed class AuthLoginFailureTests
     }
 
     [Fact]
-    public async Task Login_with_wrong_password_for_active_user_returns_200_with_InvalidPassword()
+    public async Task Login_with_wrong_password_for_active_user_returns_401()
     {
         var login = $"wrongpass_{Guid.NewGuid():N}@test.com";
         var userId = await DbTestHelpers.SeedSuperAdminAsync(_factory, login, "Password123");
@@ -28,11 +28,10 @@ public sealed class AuthLoginFailureTests
             var res = await _client.PostAsJsonAsync("/api/v1/auth/login",
                 new { Login = login, Password = "WrongPassword1" });
 
-            res.StatusCode.Should().Be(HttpStatusCode.OK);
+            res.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
             var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
             body!.Succeeded.Should().BeFalse();
-            body.ActionCode.Should().Be(400);
-            body.Errors.Should().ContainSingle(e => e.Code == "User.InvalidPassword");
+            body.Errors.Should().ContainSingle(e => e.Code == "Auth.InvalidCredentials");
         }
         finally
         {
@@ -41,7 +40,7 @@ public sealed class AuthLoginFailureTests
     }
 
     [Fact]
-    public async Task Login_with_inactive_user_returns_200_with_Inactive()
+    public async Task Login_with_inactive_user_returns_403()
     {
         var login = $"inactive_{Guid.NewGuid():N}@test.com";
         var userId = await DbTestHelpers.SeedInactiveUserAsync(_factory, login, "Password123");
@@ -50,11 +49,10 @@ public sealed class AuthLoginFailureTests
             var res = await _client.PostAsJsonAsync("/api/v1/auth/login",
                 new { Login = login, Password = "Password123" });
 
-            res.StatusCode.Should().Be(HttpStatusCode.OK);
+            res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
             var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
             body!.Succeeded.Should().BeFalse();
-            body.ActionCode.Should().Be(400);
-            body.Errors.Should().ContainSingle(e => e.Code == "User.Inactive");
+            body.Errors.Should().ContainSingle(e => e.Code == "Auth.AccountInactive");
         }
         finally
         {

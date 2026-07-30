@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Application.Dtos.Authentication;
 using Domain.Entities.Owners;
 using Domain.Entities.Stores;
 using FluentAssertions;
@@ -42,10 +43,13 @@ public sealed class AuthRegisterSuccessTests
                 Code = (string?)null
             });
 
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<AuthDto>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
-            body.Data.Should().BeTrue();
+            body.Data.Should().NotBeNull();
+            body.Data!.Login.Should().Be(login);
+            body.Data.AuthToken.Should().NotBeNullOrEmpty();
+            body.Data.ExpiresIn.Should().BeAfter(DateTime.UtcNow);
 
             var user = await DbTestHelpers.GetUserByLoginAsync(_factory, login);
             user.Should().NotBeNull();

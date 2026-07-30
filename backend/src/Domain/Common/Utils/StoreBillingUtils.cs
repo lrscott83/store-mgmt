@@ -1,4 +1,6 @@
 using System;
+using Domain.Entities.Billing;
+using Domain.Entities.Modules;
 
 namespace Domain.Common.Utils
 {
@@ -41,5 +43,22 @@ namespace Domain.Common.Utils
 
         public static bool IsInTrial(DateOnly? paymentStartDate, int trialMonths, DateOnly today)
             => paymentStartDate is not null && today <= paymentStartDate.Value.AddMonths(trialMonths);
+
+        /// <summary>
+        /// Filters modules based on the store's billing status.
+        /// Free plan (NoAplica) → all modules accessible.
+        /// Active paid plan (AlDia, PorVencer, EnGracia) → all modules accessible.
+        /// Overdue (Vencido) → only free (PriceIncluded) modules accessible.
+        /// </summary>
+        public static List<int> FilterForBilling(IEnumerable<Module> modules, StoreBillingSummary billing)
+        {
+            if (billing.Status == StoreBillingStatusType.NoAplica)
+                return modules.Select(m => m.Id).ToList();
+
+            if (billing.Status != StoreBillingStatusType.Vencido)
+                return modules.Select(m => m.Id).ToList();
+
+            return modules.Where(m => m.PriceIncluded).Select(m => m.Id).ToList();
+        }
     }
 }

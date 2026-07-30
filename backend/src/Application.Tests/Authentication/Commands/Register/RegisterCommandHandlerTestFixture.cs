@@ -1,5 +1,4 @@
 using Application.Abstractions.Authentication;
-using Application.Abstractions.HttpContext;
 using Application.Dtos.Authentication;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
@@ -15,6 +14,7 @@ using Domain.Interfaces.Services.Owners;
 using Domain.Interfaces.Services.Stores;
 using FluentAssertions;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Application.Features.Authentication.Commands.Register;
 using Resources;
@@ -28,15 +28,15 @@ public abstract class RegisterCommandHandlerTestFixture
 {
     // Mock dependencies
     protected readonly Mock<IApplicationUnitOfWork> MockUnitOfWork;
-    protected readonly Mock<IUserRepository> MockUserRepository;
-    protected readonly Mock<IHttpContextService> MockHttpContextService;
     protected readonly Mock<ICreateOwnerService> MockCreateOwnerService;
     protected readonly Mock<ICreateStoreService> MockCreateStoreService;
     protected readonly Mock<IModuleRepository> MockModuleRepository;
     protected readonly Mock<IReSellerRepository> MockReSellerRepository;
     protected readonly Mock<IReSellerOwnerRepository> MockReSellerOwnerRepository;
     protected readonly Mock<IJwtProvider> MockJwtProvider;
+    protected readonly Mock<IAuthTokenConfig> MockAuthTokenConfig;
     protected readonly Mock<IStringLocalizer<I18n>> MockLocalizer;
+    protected readonly Mock<ILogger<RegisterCommandHandler>> MockLogger;
 
     // Test data
     protected readonly Guid TestOwnerId = Guid.NewGuid();
@@ -53,20 +53,25 @@ public abstract class RegisterCommandHandlerTestFixture
     {
         // Initialize mocks
         MockUnitOfWork = new Mock<IApplicationUnitOfWork>();
-        MockUserRepository = new Mock<IUserRepository>();
-        MockHttpContextService = new Mock<IHttpContextService>();
         MockCreateOwnerService = new Mock<ICreateOwnerService>();
         MockCreateStoreService = new Mock<ICreateStoreService>();
         MockModuleRepository = new Mock<IModuleRepository>();
         MockReSellerRepository = new Mock<IReSellerRepository>();
         MockReSellerOwnerRepository = new Mock<IReSellerOwnerRepository>();
         MockJwtProvider = new Mock<IJwtProvider>();
+        MockAuthTokenConfig = new Mock<IAuthTokenConfig>();
         MockLocalizer = new Mock<IStringLocalizer<I18n>>();
+        MockLogger = new Mock<ILogger<RegisterCommandHandler>>();
 
         // Setup JWT provider to return a mock token
         MockJwtProvider
             .Setup(x => x.GenerateToken(It.IsAny<Guid>(), It.IsAny<string>()))
             .Returns("mock-jwt-token");
+
+        // Setup AuthTokenConfig to return a default token lifetime
+        MockAuthTokenConfig
+            .Setup(x => x.TokenLifetimeDays)
+            .Returns(30);
 
         // Initialize test entities
         TestUser = CreateTestUser();
@@ -85,15 +90,15 @@ public abstract class RegisterCommandHandlerTestFixture
     {
         return new RegisterCommandHandler(
             MockUnitOfWork.Object,
-            MockUserRepository.Object,
-            MockHttpContextService.Object,
             MockLocalizer.Object,
             MockCreateOwnerService.Object,
             MockCreateStoreService.Object,
             MockModuleRepository.Object,
             MockJwtProvider.Object,
+            MockAuthTokenConfig.Object,
             MockReSellerRepository.Object,
-            MockReSellerOwnerRepository.Object);
+            MockReSellerOwnerRepository.Object,
+            MockLogger.Object);
     }
 
     /// <summary>

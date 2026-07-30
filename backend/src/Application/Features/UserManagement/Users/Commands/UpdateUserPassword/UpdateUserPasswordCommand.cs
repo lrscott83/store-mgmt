@@ -50,12 +50,12 @@ namespace Application.Features.UserManagement.Users.Commands.UpdateUserPassword
             {
                 string hashedPassword = _hashPasswordService.HashPassword(request.OldPassword);
                 if (user.Password != hashedPassword)
-                    return ResponseResult.Failure<bool>(UserErrors.InvalidPassword(user.Login), (int)HttpStatusCode.BadRequest);
+                    return ResponseResult.Failure<bool>(UserErrors.InvalidCredentials, (int)HttpStatusCode.BadRequest);
             }
             else if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
-                return ResponseResult.Failure<bool>(UserErrors.InvalidPassword(user.Login), (int)HttpStatusCode.BadRequest);
+                return ResponseResult.Failure<bool>(UserErrors.InvalidCredentials, (int)HttpStatusCode.BadRequest);
 
-            user.Password = request.NewPassword;
+            user.Password = _hashPasswordService.HashPassword(request.NewPassword);
             await _userRepository.UpdateAsync(user);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }

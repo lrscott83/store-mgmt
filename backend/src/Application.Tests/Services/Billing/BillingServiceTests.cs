@@ -7,18 +7,20 @@ using Domain.Entities.StorePayments;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
 using Moq;
 using Xunit;
 
 namespace Application.Tests.Services.Billing;
 
-public class BillingServiceTests
+public class BillingServiceTests : IDisposable
 {
     private readonly Mock<IStoreRepository> _storeRepository = new();
     private readonly Mock<IStorePaymentRepository> _paymentRepository = new();
     private readonly Mock<IModuleRepository> _moduleRepository = new();
     private readonly Mock<ISystemConfigurationRepository> _configRepository = new();
     private readonly Mock<IDateTimeProvider> _dateTimeProvider = new();
+    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
     private readonly Guid _tenantId = Guid.NewGuid();
     private readonly Guid _ownerId = Guid.NewGuid();
 
@@ -27,6 +29,7 @@ public class BillingServiceTests
         // Default config values — deterministic across all tests
         _configRepository.Setup(x => x.GetPaymentGraceDaysAsync()).ReturnsAsync(5);
         _configRepository.Setup(x => x.GetTestingPeriodInMonthsAsync()).ReturnsAsync(1);
+        _configRepository.Setup(x => x.GetDueSoonDaysAsync()).ReturnsAsync(5);
 
         // Default payment repo: no last payment, 0 paid months
         _paymentRepository.Setup(x => x.GetLastByStoreIdAsync(It.IsAny<Guid>()))
@@ -42,7 +45,8 @@ public class BillingServiceTests
         _paymentRepository.Object,
         _moduleRepository.Object,
         _configRepository.Object,
-        _dateTimeProvider.Object);
+        _dateTimeProvider.Object,
+        _cache);
 
     /// <summary>
     /// Creates a Store with the given modules and wires up all repository mocks
@@ -230,4 +234,6 @@ public class BillingServiceTests
 
         result.MonthsActive.Should().BeGreaterThanOrEqualTo(0);
     }
+
+    public void Dispose() => _cache?.Dispose();
 }

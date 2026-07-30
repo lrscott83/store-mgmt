@@ -53,7 +53,7 @@ public class ExportOfflineRosterQueryHandlerTests
 
         // The owned store has a random ID — it won't match _storeId.
         var ownedStore = Store.Create("My Store", Guid.NewGuid(), true, _tenantId);
-        mocks.StoreRepository.Setup(x => x.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(_callerUserId))
+        mocks.StoreRepository.Setup(x => x.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(_callerUserId, null))
             .ReturnsAsync(new List<Store> { ownedStore });
 
         var handler = CreateHandler(mocks);
@@ -97,6 +97,11 @@ public class ExportOfflineRosterQueryHandlerTests
         mocks.OfflineVerifierService.Setup(x => x.CreateVerifier(It.IsAny<string>()))
             .Returns(fixedVerifier);
 
+        var fixedDek = new byte[32];
+        mocks.StoreDataKeyProvider.Setup(x => x.GetDek(_storeId)).Returns(fixedDek);
+        mocks.StoreKeyWrapService.Setup(x => x.WrapDek(It.IsAny<string>(), fixedDek))
+            .Returns(new WrappedDekResult("dGVzdC13cmFwcGVk", "dGVzdC1zYWx0", "dGVzdC1pdg=="));
+
         var handler = CreateHandler(mocks);
 
         var result = await handler.Handle(new ExportOfflineRosterQuery(_storeId), CancellationToken.None);
@@ -105,7 +110,7 @@ public class ExportOfflineRosterQueryHandlerTests
         result.Data.Should().NotBeNull();
 
         var dto = result.Data!;
-        dto.FormatVersion.Should().Be(1);
+        dto.FormatVersion.Should().Be(2);
         dto.StoreId.Should().Be(_storeId);
         Guid.TryParse(dto.BundleId, out _).Should().BeTrue();
 
@@ -121,6 +126,10 @@ public class ExportOfflineRosterQueryHandlerTests
             user.Verifier.Hash.Should().Be("dGVzdC1oYXNo");
             user.Verifier.Salt.Should().Be("dGVzdC1zYWx0");
             user.Verifier.Iterations.Should().Be(210_000);
+
+            user.WrappedDek.Should().Be("dGVzdC13cmFwcGVk");
+            user.WrapSalt.Should().Be("dGVzdC1zYWx0");
+            user.WrapIv.Should().Be("dGVzdC1pdg==");
         }
     }
 
@@ -137,6 +146,11 @@ public class ExportOfflineRosterQueryHandlerTests
         var fixedVerifier = new OfflineVerifierResult("hash-1", "salt-1", 210_000);
         mocks.OfflineVerifierService.Setup(x => x.CreateVerifier(It.IsAny<string>()))
             .Returns(fixedVerifier);
+
+        var fixedDek = new byte[32];
+        mocks.StoreDataKeyProvider.Setup(x => x.GetDek(_storeId)).Returns(fixedDek);
+        mocks.StoreKeyWrapService.Setup(x => x.WrapDek(It.IsAny<string>(), fixedDek))
+            .Returns(new WrappedDekResult("wrap-1", "salt-1", "iv-1"));
 
         var user1 = CreateUser(_userId1, "u1", "password-hash-1", "User One", true);
         var user2 = CreateUser(_userId2, "u2", "password-hash-2", "User Two", true);
@@ -161,6 +175,9 @@ public class ExportOfflineRosterQueryHandlerTests
             x => x.CreateVerifier("password-hash-2"), Times.Once);
         mocks.OfflineVerifierService.Verify(
             x => x.CreateVerifier(It.IsAny<string>()), Times.Exactly(2));
+
+        mocks.StoreDataKeyProvider.Verify(x => x.GetDek(_storeId), Times.Once);
+        mocks.StoreKeyWrapService.Verify(x => x.WrapDek(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Exactly(2));
     }
 
     #endregion
@@ -179,6 +196,8 @@ public class ExportOfflineRosterQueryHandlerTests
             UserRoleRepository = new Mock<IUserRoleRepository>(),
             AllowedFeaturesService = new Mock<IAllowedFeaturesService>(),
             OfflineVerifierService = new Mock<IOfflineVerifierService>(),
+            StoreKeyWrapService = new Mock<IStoreKeyWrapService>(),
+            StoreDataKeyProvider = new Mock<IStoreDataKeyProvider>(),
             Localizer = new Mock<IStringLocalizer<I18n>>()
         };
     }
@@ -196,6 +215,8 @@ public class ExportOfflineRosterQueryHandlerTests
             mocks.UserRoleRepository.Object,
             mocks.AllowedFeaturesService.Object,
             mocks.OfflineVerifierService.Object,
+            mocks.StoreKeyWrapService.Object,
+            mocks.StoreDataKeyProvider.Object,
             mocks.Localizer.Object);
     }
 
@@ -267,6 +288,8 @@ public class ExportOfflineRosterQueryHandlerTests
         public Mock<IUserRoleRepository> UserRoleRepository { get; set; } = null!;
         public Mock<IAllowedFeaturesService> AllowedFeaturesService { get; set; } = null!;
         public Mock<IOfflineVerifierService> OfflineVerifierService { get; set; } = null!;
+        public Mock<IStoreKeyWrapService> StoreKeyWrapService { get; set; } = null!;
+        public Mock<IStoreDataKeyProvider> StoreDataKeyProvider { get; set; } = null!;
         public Mock<IStringLocalizer<I18n>> Localizer { get; set; } = null!;
     }
 

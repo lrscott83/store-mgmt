@@ -22,7 +22,7 @@ public class LoginCommandValidatorTests
     public async Task Validate_ValidLoginAndPassword_ShouldPass()
     {
         // Arrange
-        var command = new LoginCommand("validuser", "Password123");
+        var command = new LoginCommand("validuser@test.com", "Password123");
 
         // Act
         var result = await _validator.ValidateAsync(command);
@@ -62,7 +62,7 @@ public class LoginCommandValidatorTests
     public async Task Validate_EmptyPassword_ShouldFail()
     {
         // Arrange
-        var command = new LoginCommand("validuser", "");
+        var command = new LoginCommand("validuser@test.com", "");
 
         // Act
         var result = await _validator.ValidateAsync(command);
@@ -98,13 +98,13 @@ public class LoginCommandValidatorTests
     /// This test SHOULD FAIL until password minimum length is added.
     /// </summary>
     [Theory]
-    [InlineData("Abcdefg")]      // 8 chars but no number/special - borderline
+    [InlineData("Abcdefg")]      // 7 chars - below minimum of 8
     [InlineData("Pass1!")]        // 6 chars - definitely too short
     [InlineData("Short")]         // 5 chars - way too short
     public async Task Validate_ShortPassword_ShouldFail_Security(string shortPassword)
     {
         // Arrange
-        var command = new LoginCommand("validuser", shortPassword);
+        var command = new LoginCommand("validuser@test.com", shortPassword);
 
         // Act
         var result = await _validator.ValidateAsync(command);
