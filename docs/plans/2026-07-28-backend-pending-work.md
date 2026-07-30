@@ -243,10 +243,20 @@ confirming first.
 
 ### 7b. The roster DTO carries no billing fields — decision needed
 
-**Status: OPEN — the only unresolved item in this document.** Confirmed still true at the
-audit date: `Application/Dtos/Management/StoreUsers/OfflineRosterUserDto.cs` carries
-`WrappedDek`, `WrapSalt` and `WrapIv` but none of the three billing fields. Nothing is
-blocked on writing code here; it is blocked on the decision below being made.
+**Status: OPEN — the only unresolved item in this document. Planned in
+`docs/plans/2026-07-30-offline-roster-billing-gate-backend-plan.md`.**
+
+The audit found this item is worse than described below. The problem is not only that the
+banner stays silent: `ExportOfflineRosterQuery` never calls `StoreBillingUtils.FilterForBilling`,
+so **the paid-module lock does not exist offline at all**. A roster exported from a `Vencido`
+store grants full paid access to every device that imports it. The missing billing fields are
+the second-order problem — they are what would let the device explain the lock, not enforce it.
+
+A third factor compounds both: `ExpiresAt = now.AddDays(35)` against a monthly billing cycle,
+so a bundle can outlive a full cycle. That is the only lever against a store that expires
+*after* export, and setting it is a product decision.
+
+The linked plan covers all three. Task 3 is blocked on a TTL sign-off.
 
 `UserModel` on the frontend gained three REQUIRED fields from the billing feature
 (commit `b57fc3e`, 2026-07-27): `paymentDueDate`, `isInTrial`, `paymentStatus`. The
