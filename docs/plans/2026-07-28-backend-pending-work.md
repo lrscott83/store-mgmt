@@ -9,14 +9,28 @@ Scope: `backend/` only. Frontend work is tracked separately — see "Not in this
 This is the index of backend work. Each item states the problem, the proposed solution,
 where the full plan lives, and — as of the audit date — its status against the code.
 
-## How this file was audited
+## How this file was audited, and why the plans are gone
 
-Every status line below was checked against `backend/src`, not against the linked plans.
-That distinction matters here: **the three implementation plans still show 144 unticked
-checkboxes between them** (`billing-e2e-coverage-plan.md` 93, `offline-auth-backend-plan.md`
-26, `at-rest-encryption-backend-plan.md` 25) for work that is demonstrably done. The work
-landed through SDD changes without anyone ticking the plans, so plan checkbox state is not
-evidence of anything. Read the code.
+Every status line below was checked against `backend/src`, not against the plans. That
+distinction mattered: the three implementation plans still showed **144 unticked checkboxes
+between them** (billing 93, offline-auth 26, at-rest 25) for work that was demonstrably done.
+The work landed through SDD changes and nobody ever ticked a box, so checkbox state was not
+evidence of anything.
+
+Those three plans and their two companion documents were **deleted on 2026-07-30**, once every
+one of their 29 task groups was verified present in the code. A plan that shows 144 open tasks
+for finished work is worse than no plan: the next reader schedules work that already exists.
+They are in git history if the reasoning is ever needed — `git log --diff-filter=D -- docs/plans/`.
+
+Deleted: `2026-07-28-billing-e2e-coverage-plan.md`, `2026-07-28-billing-e2e-coverage-design.md`,
+`2026-07-28-billing-new-endpoints-test-suites.md`, `2026-07-25-offline-auth-backend-plan.md`,
+`2026-07-25-at-rest-encryption-backend-plan.md`.
+
+Kept: this index (§7b is still open), `2026-07-30-offline-roster-billing-gate-backend-plan.md`
+(open), `2026-07-25-at-rest-encryption-local-data-design.md` (the frontend half has not
+shipped), and the two reference inventories `endpoints-e2e-coverage.md` and
+`backend/docs/plans/api-endpoints-owner-storeuser.md`, which describe the API rather than a
+unit of work and therefore have no "resolved" state to reach.
 
 ---
 
@@ -55,7 +69,7 @@ becomes an explicit operator action through `PUT /stores/{id}/payment-date`. Rat
 data migration is irreversible in practice, so the chosen option is the one that cannot
 interrupt service or fabricate debt for an existing customer.
 
-**Plan**: `docs/plans/2026-07-28-billing-e2e-coverage-design.md` (finding F1, change C1).
+**Plan**: deleted 2026-07-30, recoverable from git history (finding F1, change C1).
 
 ---
 
@@ -83,7 +97,7 @@ BEFORE any fix is applied.
 `?? DateOnly.MaxValue` substitution. `GetStatus` already returns `NoAplica` for a null
 start date; its signature adapts to the nullable due date.
 
-**Plan**: `docs/plans/2026-07-28-billing-e2e-coverage-design.md` (finding F2, change C2).
+**Plan**: deleted 2026-07-30, recoverable from git history (finding F2, change C2).
 
 **Shared root cause with item 1**: `null` is the correct domain model for "the billing
 clock never started", and the code keeps substituting a magic date for it. Note also that
@@ -110,7 +124,7 @@ without waiting real days.
 the existing suite must stay green across it. It unlocks a `MutableDateTimeProvider` in
 the end-to-end tests, with automatic restoration through an `IDisposable` scope.
 
-**Plan**: `docs/plans/2026-07-28-billing-e2e-coverage-design.md` (change C3).
+**Plan**: deleted 2026-07-30, recoverable from git history (change C3).
 
 ---
 
@@ -128,7 +142,7 @@ shaped like the existing `SetStorePaymentDateCommandValidator`. Negative tests a
 error **code**, not just the status — a 400 on its own proves nothing, it may be failing
 for a different reason than intended.
 
-**Plan**: `docs/plans/2026-07-28-billing-e2e-coverage-design.md` (change C4).
+**Plan**: deleted 2026-07-30, recoverable from git history (change C4).
 
 ---
 
@@ -146,7 +160,7 @@ a reseller could charge a store it does not own.
 **Solution.** Delete the class, its interface `IStoreBillingService`, and the DI
 registration.
 
-**Plan**: `docs/plans/2026-07-28-billing-e2e-coverage-design.md` (change C5).
+**Plan**: deleted 2026-07-30, recoverable from git history (change C5).
 
 ---
 
@@ -170,8 +184,8 @@ three missing `StoreBillingUtilsTests` cases. Two standing rules: negative tests
 the error code, and money tests assert money (concrete amounts read back from the
 persisted `StorePayment`).
 
-**Plan**: `docs/plans/2026-07-28-billing-e2e-coverage-plan.md` (2687 lines, tasks 1-19)
-and `docs/plans/2026-07-28-billing-new-endpoints-test-suites.md` (reference material).
+**Plan**: deleted 2026-07-30, recoverable from git history (was 2687 lines, tasks 1-19, plus
+a reference-material companion).
 
 **Suggested work order** (strict TDD, each step starts with a failing test): item 2 →
 item 3 → free-store `/auth/me` end-to-end test → item 1 → item 4 → item 6 → item 5.
@@ -189,7 +203,10 @@ place. §7b below is the one part of this item still open, and it is a decision,
 
 **Solution.** Delivered as planned.
 
-**Plan**: `docs/plans/2026-07-25-offline-auth-backend-plan.md`.
+**Plan**: deleted 2026-07-30, recoverable from git history. The PBKDF2 verifier contract it
+specified survives in `docs/plans/2026-07-25-offline-auth-frontend-plan.md`, in
+`app/shared/lib/offline/offline-crypto.ts`, and in the tests on both sides — the frontend has
+to match it byte-for-byte, so it was never single-sourced here.
 
 **Constraint carried from the frontend side**: offline authentication must be OPTIONAL.
 The mode is decided by ONE question asked before any credential is evaluated — is the
@@ -324,8 +341,9 @@ below. The ordering is now moot on this side: the backend is ready and the front
 
 **Solution.** Delivered: derived DEK via HKDF, no EF migration required.
 
-**Plan**: `docs/plans/2026-07-25-at-rest-encryption-backend-plan.md`, with the shared
-design in `docs/plans/2026-07-25-at-rest-encryption-local-data-design.md`.
+**Plan**: deleted 2026-07-30, recoverable from git history. The shared design at
+`docs/plans/2026-07-25-at-rest-encryption-local-data-design.md` is KEPT — the frontend half of
+this feature has not shipped and still depends on it.
 
 **Ordering decision already made**: offline-auth ships before at-rest encryption.
 
