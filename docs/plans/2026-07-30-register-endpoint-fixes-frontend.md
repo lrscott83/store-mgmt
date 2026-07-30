@@ -56,10 +56,15 @@ landed with the same backend work.
 10 minutes. `options.RejectionStatusCode` is 429 for both.
 
 The frontend handles 429 nowhere — a grep across `apps/web-store-pos/app` and `packages`
-returns no reference to the status. A rate-limited login currently surfaces as whatever the
-generic error path renders, which will read to the user as "wrong password" rather than
-"too many attempts". Five attempts per minute is reachable by a person mistyping a password,
-so this is not a theoretical path.
+returns no reference to the status.
+
+**Corrected 2026-07-30 by the exploration**, which traced the actual branch: a rate-limited
+login falls to the `else` in `login.tsx:129-156` and renders `AUTH.SERVER_ERROR` — *"Algo
+salió mal. Intentá de nuevo."* Register falls to `REGISTRATION.UNEXPECTED_ERROR`. An earlier
+version of this section said it would read as "wrong password"; that was wrong — 401 is what
+maps to `AUTH.INVALID_CREDENTIALS`, and a 429 never reaches it. The user is still misled, just
+by generic-failure copy rather than a credentials message, and five attempts per minute is
+reachable by a person mistyping a password.
 
 **Frontend work:** handle 429 on both `login` and `register`, with a distinct message.
 
