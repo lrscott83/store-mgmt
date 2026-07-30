@@ -200,3 +200,40 @@ the disable will hide.
 None blocking. The exploration's three open decisions are all resolved and recorded above:
 (1) option A for the 18 SAFE items, (2) take the `today-report.tsx` free fix, (3)
 `owner-edit.tsx` global store fetch acknowledged as knowingly untouched.
+
+---
+
+## Addendum — where delivery went past this proposal (2026-07-30)
+
+Everything above is preserved as written. It recorded the decisions honestly at the time it
+was written, and rewriting it to match the outcome would destroy the only record of *why*
+the outcome had to change. Four of its statements are no longer true of the shipped result;
+each is listed here with what superseded it.
+
+**1. `exhaustive-deps` ships at `error`, not `warn`.** The "Success looks like" bullet
+specified `warn`. Every lint script now runs with `--max-warnings=0` (`60381c5`), which makes
+`warn` and `error` fail identically — so a severity of `warn` described a leniency that does
+not exist. Raised to `error` in `9ec5519`.
+
+**2. Group A's 6 live warnings were fixed, not left visible.** The "Out of scope" section
+kept them visible on the explicit grounds that *"the lint script is `eslint .` with no
+`--max-warnings=0`, so these do not fail the gate."* Both halves of that premise died in
+`60381c5`: the gate now fails on any warning. With the premise gone the exemption had no
+support, and the user asked for zero deferred findings. `654b884` wraps each of the six
+`loadX` in `useCallback` over the `intl` object it reads. This is narrower than the refactor
+this proposal rejected — that rejection covered the *other 17* sites, which remain untouched
+and out of scope.
+
+**3. The other declared-but-unregistered plugins were removed, not registered later.**
+`eslint-plugin-react`, `-import`, `-unused-imports`, `-prettier` and `only-warn` were deleted
+from `@store-mgmt/eslint-config`'s devDependencies in `60381c5`. A declared-but-unregistered
+plugin is the exact illusion that hid the dead hook directives for months; deleting the
+declaration removes the illusion, where a deferred "separate change" would have preserved it.
+
+**4. The "unrelated warning backlog" is gone.** The 28 `no-unused-vars`, 8
+`turbo/no-undeclared-env-vars`, 3 `prefer-const` and 2 `no-explicit-any` deferred here were
+resolved in `60381c5` (the `^_` convention for deliberately-unread bindings, node globals for
+`scripts/**/*.mjs`) and `f6116e0` (dead bindings deleted). The gate reports zero.
+
+The residual-risk section stands unchanged: the 11 documented disables still silence a live
+rule, and `owner-edit.tsx:177` is still where that trade is most likely to be collected.
