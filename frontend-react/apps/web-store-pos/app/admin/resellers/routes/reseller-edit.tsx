@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
@@ -36,7 +36,6 @@ function makeSnapshot(r: ReSeller): Snapshot {
 }
 
 export function ResellerEditPage() {
-  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { formatMessage } = useIntl();
 

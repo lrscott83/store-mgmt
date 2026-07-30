@@ -98,7 +98,6 @@ export class ProductOnlineService implements ProductService {
     isActive: boolean,
     availableToSale: boolean,
     discountFromInvantory: boolean,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _barcode?: string,
   ): Promise<BaseResponseModel<boolean>> {
     // ANGULAR-BUG-SUSPECT #4: mirrors product-online.service.ts:71-93 — the online createProduct

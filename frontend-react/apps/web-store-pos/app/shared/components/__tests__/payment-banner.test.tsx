@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { UserModel, PaymentStatus } from '@store-mgmt/domain';
+import type { UserModel } from '@store-mgmt/domain';
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {

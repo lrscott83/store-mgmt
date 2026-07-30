@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { PaymentType, OrderType } from '@store-mgmt/domain';
-import type { Order, SaleCredit, Product, ProductCategory } from '@store-mgmt/domain';
+import type { Order } from '@store-mgmt/domain';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 
 // --- Global mocks ---

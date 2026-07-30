@@ -136,7 +136,7 @@ async function renderPage(isSuperAdmin = false) {
   return result;
 }
 
-function fillValidForm(isSuperAdmin = false) {
+function fillValidForm() {
   fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
     target: { value: 'Jane Owner' },
   });
@@ -324,7 +324,7 @@ describe('OwnerCreatePage — successful submit', () => {
     });
 
     await renderPage(false);
-    fillValidForm(false);
+    fillValidForm();
 
     fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
@@ -361,7 +361,7 @@ describe('OwnerCreatePage — server error', () => {
     });
 
     await renderPage(false);
-    fillValidForm(false);
+    fillValidForm();
 
     fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
@@ -378,7 +378,7 @@ describe('OwnerCreatePage — server error', () => {
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue(new Error('Network'));
 
     await renderPage(false);
-    fillValidForm(false);
+    fillValidForm();
 
     fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
