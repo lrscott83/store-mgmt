@@ -1,0 +1,23 @@
+{
+  // The emitted shape of the package: `src` minus its tests, declarations into
+  // `dist`. Every emit-only option lives here rather than in `tsconfig.json`,
+  // because `tsconfig.json` answers a different question — what belongs to the
+  // project for typecheck and type-aware lint — and that answer includes the
+  // tests and the vitest setup, neither of which may reach `dist`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
+}

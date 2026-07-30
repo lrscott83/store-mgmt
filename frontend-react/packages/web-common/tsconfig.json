@@ -8,10 +8,6 @@
     "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
-    "noEmit": false,
-    "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
@@ -19,6 +15,11 @@
     "jsx": "react-jsx",
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"]
+  // `vitest.setup.ts` is in here on purpose: its `import
+  // '@testing-library/jest-dom'` is a module augmentation, and an augmentation
+  // only applies to files in the same compilation. Left out, every jest-dom
+  // matcher in a test is an untyped property access — which is exactly how
+  // seven of them went unnoticed until the tests entered the project.
+  "include": ["src/**/*", "vitest.config.ts", "vitest.setup.ts"],
+  "exclude": ["node_modules", "dist"]
 }
