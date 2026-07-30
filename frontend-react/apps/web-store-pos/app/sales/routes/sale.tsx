@@ -45,7 +45,6 @@ export function SalePage() {
         setSelectedCategoryId(availableCategories[0].id);
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId]);
 
   // Angular parity (sale-category-products.component.ts:31-43): refetches
@@ -61,7 +60,6 @@ export function SalePage() {
     productService.getProductsToSaleByCategoryId(selectedCategoryId).then((result) => {
       setProducts(result.data ?? []);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId, selectedCategoryId]);
 
   function selectCategory(category: ProductCategory) {

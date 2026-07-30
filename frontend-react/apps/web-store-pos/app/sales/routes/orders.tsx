@@ -72,7 +72,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadOrders reads only the listed deps
   }, [storeId, paymentType, isCredit]);
 
   function toggleDatePanel(dateId: string) {

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { EModules } from '@store-mgmt/domain';
+import type { ChartData, TopProduct } from '~/sales/lib/services/order-offline-service';
 
 // ─── Global mocks ─────────────────────────────────────────────────────────────
 
@@ -40,15 +41,19 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 });
 
 const { mockOrderService, mockExpenseService, mockSaleCreditService, mockCurrencyService } = vi.hoisted(() => ({
+  // Typed so a mock return value that drifts from the real view model is a
+  // typecheck failure. An untyped vi.fn() let a TopProduct without its `id`
+  // through, which surfaced only as a React "unique key prop" warning on
+  // stderr while the test still passed.
   mockOrderService: {
-    getLastMonthSales: vi.fn().mockReturnValue([]),
-    getLastMonthSaleProfits: vi.fn().mockReturnValue([]),
+    getLastMonthSales: vi.fn<() => ChartData[]>().mockReturnValue([]),
+    getLastMonthSaleProfits: vi.fn<() => ChartData[]>().mockReturnValue([]),
     getActiveOrdersPriceToday: vi.fn().mockReturnValue(0),
     getActiveOrdersPriceYesterday: vi.fn().mockReturnValue(0),
     getActiveOrdersProfitToday: vi.fn().mockReturnValue(0),
     getActiveOrdersProfitYesterday: vi.fn().mockReturnValue(0),
-    getTopProductsProfitInLastMonth: vi.fn().mockReturnValue([]),
-    getTopProductsSaleQuantityInLastMonth: vi.fn().mockReturnValue([]),
+    getTopProductsProfitInLastMonth: vi.fn<() => TopProduct[]>().mockReturnValue([]),
+    getTopProductsSaleQuantityInLastMonth: vi.fn<() => TopProduct[]>().mockReturnValue([]),
   },
   mockExpenseService: {
     getActiveExpensesPriceToday: vi.fn().mockReturnValue(0),
@@ -455,8 +460,12 @@ describe('DashboardPage — REGRESSION (bucket-b, KEEP): charts + KPI/currency/t
   it('renders SalesChart and ProfitChart components (not plain Día|Ventas/Ganancias tables) alongside KPI cards, currency selector, and top-products sections', () => {
     mockOrderService.getLastMonthSales.mockReturnValue([{ label: new Date(), value: 10 }]);
     mockOrderService.getLastMonthSaleProfits.mockReturnValue([{ label: new Date(), value: 5 }]);
-    mockOrderService.getTopProductsProfitInLastMonth.mockReturnValue([{ name: 'Ron', value: 100 }]);
-    mockOrderService.getTopProductsSaleQuantityInLastMonth.mockReturnValue([{ name: 'Ron', value: 20 }]);
+    mockOrderService.getTopProductsProfitInLastMonth.mockReturnValue([
+      { id: 'p1', name: 'Ron', value: 100 },
+    ]);
+    mockOrderService.getTopProductsSaleQuantityInLastMonth.mockReturnValue([
+      { id: 'p1', name: 'Ron', value: 20 },
+    ]);
 
     render(
       <Wrapper>

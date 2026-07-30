@@ -3,35 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { UserModel } from '@store-mgmt/domain';
-
-const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
-
-function makeUser(overrides: Partial<UserModel> = {}): UserModel {
-  return {
-    id: 'u1',
-    fullName: 'Juan Pérez',
-    email: 'juan@test.com',
-    cellPhone: '+54911',
-    isActive: true,
-    password: '',
-    login: 'juan@test.com',
-    authToken: 'tok',
-    refreshToken: 'ref',
-    expiresIn: Date.now() + THIRTY_FIVE_DAYS_MS,
-    roles: [],
-    featureIds: [70],
-    storeModuleIds: [],
-    isSuperAdmin: false,
-    isOwnerAdmin: false,
-    isReSeller: false,
-    selectedStoreId: 's1',
-    paymentDueDate: null,
-    isInTrial: false,
-    paymentStatus: 'NoAplica',
-    ...overrides,
-  };
-}
 
 const mockLogout = vi.fn();
 const mockNavigate = vi.fn();
@@ -57,14 +28,14 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
     selectedStoreId: 's1',
   };
   const useAuthStore = vi.fn((selector?: (s: unknown) => unknown) => {
-    const state = { user: mockUser, isAuthenticated: true, logout: vi.fn() };
+    const state = { user: mockUser, isAuthenticated: true, logout: mockLogout };
     if (typeof selector === 'function') return selector(state);
     return state;
   });
   (useAuthStore as unknown as { getState: () => unknown }).getState = () => ({
     user: mockUser,
     isAuthenticated: true,
-    logout: vi.fn(),
+    logout: mockLogout,
   });
   return { useAuthStore };
 });
@@ -247,6 +218,18 @@ describe('Navbar — S-NAV-7: logout delegates the redirect to auth-store (Decis
     fireEvent.click(screen.getByText('Salir'));
 
     expect(mockNavigate).not.toHaveBeenCalledWith('/login');
+  });
+
+  it('delegates to auth-store logout() when logout is clicked', () => {
+    render(
+      <Wrapper>
+        <Navbar isSidebarOpen={false} onSidebarToggle={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de usuario' }));
+    fireEvent.click(screen.getByText('Salir'));
+
+    expect(mockLogout).toHaveBeenCalled();
   });
 });
 

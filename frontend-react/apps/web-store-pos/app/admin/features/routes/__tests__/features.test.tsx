@@ -258,7 +258,9 @@ describe('FeaturesPage — double-submit guard', () => {
       (resolve) => { resolveFirst = resolve; }
     );
 
-    vi.mocked(featureHttpService.activateFeatures).mockReturnValueOnce(firstCall as any);
+    vi.mocked(featureHttpService.activateFeatures).mockReturnValueOnce(
+      firstCall as ReturnType<typeof featureHttpService.activateFeatures>,
+    );
     const { showToastSuccess } = await import('~/shared/lib/toast');
 
     const { FeaturesPage } = await import('../features');

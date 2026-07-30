@@ -109,7 +109,6 @@ describe('TodayExpensesPage — smoke render', () => {
       createdDate: new Date(),
       createdByName: '',
     } as Expense;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockImpl = () =>
       ({
         getStorageExpenses: vi.fn().mockReturnValue([expense]),
@@ -166,7 +165,6 @@ describe('TodayExpensesPage — delete gated by confirmDialog (T5)', () => {
   it('T5: confirms via confirmDialog with the exact Angular keys, then calls deleteExpense(id)', async () => {
     const expense = makeExpense();
     const deleteExpenseMock = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockImpl = () =>
       ({
         getStorageExpenses: vi.fn().mockReturnValue([expense]),
@@ -205,7 +203,6 @@ describe('TodayExpensesPage — delete gated by confirmDialog (T5)', () => {
   it('T5: does NOT call deleteExpense when the confirmDialog is cancelled', async () => {
     const expense = makeExpense();
     const deleteExpenseMock = vi.fn().mockReturnValue({ succeeded: true, errors: [] });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockImpl = () =>
       ({
         getStorageExpenses: vi.fn().mockReturnValue([expense]),

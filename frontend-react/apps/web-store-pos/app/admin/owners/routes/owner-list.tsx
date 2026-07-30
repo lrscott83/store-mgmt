@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
@@ -15,7 +15,7 @@ export function OwnerListPage() {
   const [owners, setOwners] = useState<Owner[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  async function loadOwners() {
+  const loadOwners = useCallback(async () => {
     try {
       const res = await ownerHttpService.listOwners();
       setOwners(res.data);
@@ -23,11 +23,11 @@ export function OwnerListPage() {
     } catch {
       setError(intl.formatMessage({ id: 'OWNER.ERROR' }));
     }
-  }
+  }, [intl]);
 
   useEffect(() => {
     loadOwners();
-  }, []);
+  }, [loadOwners]);
 
   async function handleDelete(id: string) {
     try {

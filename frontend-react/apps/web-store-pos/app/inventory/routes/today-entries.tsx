@@ -47,7 +47,7 @@ export function TodayEntriesPage() {
 
   useEffect(() => {
     loadEntries();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadEntries reads only storeId
   }, [storeId]);
 
   function handleEdit(entry: InventoryEntryView) {

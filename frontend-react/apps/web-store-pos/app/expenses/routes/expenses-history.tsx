@@ -101,7 +101,7 @@ export function ExpensesHistoryPage() {
 
   useEffect(() => {
     void loadExpenses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadExpenses reads only the listed deps
   }, [storeId, paymentType]);
 
   function toggleDayPanel(dayId: string) {

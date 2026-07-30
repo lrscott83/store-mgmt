@@ -1,0 +1,8 @@
+{
+  // The published shape of the package: `src` minus its tests, emitted to
+  // `dist`. `tsconfig.json` deliberately owns the tests as well, so that
+  // `typecheck` and type-aware linting see them; only the build has a reason
+  // to leave them out, and that reason is this file.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+}

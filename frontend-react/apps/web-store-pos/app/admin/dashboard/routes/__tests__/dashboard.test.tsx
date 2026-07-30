@@ -336,13 +336,17 @@ describe('AdminDashboardPage — succeeded:false leaves table empty', () => {
     const { usageHttpService } = await import(
       '~/admin/dashboard/lib/services/usage-http-service'
     );
+    // The backend really does return `data: null` on a failed response, which the
+    // BaseResponseModel type does not admit — hence the cast through the awaited
+    // return type rather than a blanket `any`.
+    type StoresLastWeekResponse = Awaited<ReturnType<typeof usageHttpService.getStoresLastWeek>>;
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: false,
-      data: null as any,
+      data: null,
       message: 'Internal server error',
       actionCode: 0,
       errors: [],
-    });
+    } as unknown as StoresLastWeekResponse);
 
     const { AdminDashboardPage } = await import('../dashboard');
     render(

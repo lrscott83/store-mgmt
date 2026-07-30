@@ -175,7 +175,6 @@ describe('TodayReportPage — Generar Reporte PDF export button', () => {
 
     expect(button).toBeInTheDocument();
     // DOCUMENT_POSITION_FOLLOWING (4) means salesSummaryHeading comes AFTER button.
-    // eslint-disable-next-line no-bitwise
     expect(button.compareDocumentPosition(salesSummaryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

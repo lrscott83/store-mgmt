@@ -76,8 +76,9 @@ export function registerServiceWorker(): void {
   // never rewritten and the browser fetched it as a literal URL
   // (`GET virtual:pwa-register` → CORS/ERR_FAILED), leaving the SW unregistered.
   // A plain literal lets the plugin resolve it — to the real `registerSW` in a
-  // build, to a no-op stub in dev (`devOptions.enabled: false`). It stays a
-  // dynamic import so it's off the SSR path, and Vitest (no PWA plugin) still
+  // build, and in dev too, since `devOptions.enabled: true` (vite.config.ts)
+  // serves a real worker so the install flow can be exercised locally. It stays
+  // a dynamic import so it's off the SSR path, and Vitest (no PWA plugin) still
   // intercepts it via `vi.doMock('virtual:pwa-register', …)` at runtime.
   void import('virtual:pwa-register').then(({ registerSW }) => {
     setupServiceWorker(registerSW);

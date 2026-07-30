@@ -69,7 +69,7 @@ let mockGetUserById = vi.fn();
 let mockCreateUser = vi.fn();
 let mockEditUser = vi.fn();
 let mockActivateUser = vi.fn();
-let mockDeleteUser = vi.fn();
+const mockDeleteUser = vi.fn();
 
 vi.mock('~/management/users/lib/services/user-http-service', () => ({
   userHttpService: {

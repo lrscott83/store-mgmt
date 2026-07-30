@@ -98,7 +98,7 @@ export function EntriesPage() {
 
   useEffect(() => {
     loadEntries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadEntries reads only storeId
   }, [storeId]);
 
   function toggleDayPanel(dayId: string) {

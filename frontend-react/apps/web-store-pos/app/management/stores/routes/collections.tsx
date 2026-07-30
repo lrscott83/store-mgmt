@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
@@ -24,7 +24,7 @@ export function CollectionsPage() {
   const [rows, setRows] = useState<StoreToCollect[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  async function loadRows() {
+  const loadRows = useCallback(async () => {
     try {
       const res = await storeHttpService.getStoresToCollect();
       setRows(res.data);
@@ -32,11 +32,11 @@ export function CollectionsPage() {
     } catch {
       setError(intl.formatMessage({ id: 'BILLING.COLLECTIONS.ERROR' }));
     }
-  }
+  }, [intl]);
 
   useEffect(() => {
     loadRows();
-  }, []);
+  }, [loadRows]);
 
   async function handleRegisterPayment(storeId: string) {
     try {

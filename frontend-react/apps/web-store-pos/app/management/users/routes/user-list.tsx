@@ -33,7 +33,7 @@ export function UserListPage() {
 
   useEffect(() => {
     loadUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only fetch (Angular ngOnInit parity)
   }, []);
 
   async function handleLifecycleAction(

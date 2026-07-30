@@ -88,7 +88,7 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 // ─── Auth store mock ──────────────────────────────────────────────────────────
 
 let mockUser: UserModel | null = makeUser();
-let mockUpdateUser = vi.fn();
+const mockUpdateUser = vi.fn();
 let mockGetUserByToken = vi.fn();
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
@@ -108,7 +108,7 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 // ─── storeHttpService mock ────────────────────────────────────────────────────
 
-let mockListStores = vi.fn();
+const mockListStores = vi.fn();
 let mockGetStore = vi.fn();
 let mockCreateStore = vi.fn();
 let mockUpdateStore = vi.fn();

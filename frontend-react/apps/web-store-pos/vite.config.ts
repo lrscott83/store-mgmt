@@ -52,7 +52,13 @@ export default defineConfig({
     host: 'localhost',
   },
   preview: {
-    port: 3333,
+    // MUST differ from `server.port`. A service worker's scope is its origin,
+    // so sharing a port makes `vite preview` and `pnpm dev` share one SW
+    // registration: the worker installed by a production preview survives and
+    // keeps controlling dev tabs, serving cached responses over HMR (observed
+    // as a blank screen in `pnpm dev`). `devOptions.enabled: true` above means
+    // dev registers a real worker too, so the collision goes both ways.
+    port: 4173,
     host: 'localhost',
   },
   envDir: join(__dirname, '../..'),

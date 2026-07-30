@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
@@ -23,7 +23,7 @@ export function AdminStoreListPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  async function loadStores() {
+  const loadStores = useCallback(async () => {
     try {
       const res = await storeHttpService.listStores();
       setStores(res.data);
@@ -31,11 +31,11 @@ export function AdminStoreListPage() {
     } catch {
       setError(formatMessage({ id: 'STORES.ERROR' }));
     }
-  }
+  }, [formatMessage]);
 
   useEffect(() => {
     loadStores();
-  }, []);
+  }, [loadStores]);
 
   async function handleApprove(id: string) {
     const confirmed = await confirmDialog({

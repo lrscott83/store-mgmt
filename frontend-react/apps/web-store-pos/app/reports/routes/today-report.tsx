@@ -74,8 +74,7 @@ export function TodayReportPage() {
 
   useEffect(() => {
     loadReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId]);
+  }, [loadReport]);
 
   // presentation-parity-bucket-b WU3: 1:1 port of Angular's
   // InventoryTodaySaleComponent.generateReport() (inventory-today-sale.component.ts:44-99,

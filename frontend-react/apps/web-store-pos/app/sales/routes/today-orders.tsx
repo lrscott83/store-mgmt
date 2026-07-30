@@ -44,7 +44,7 @@ export function TodayOrdersPage() {
 
   useEffect(() => {
     loadTodayOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadTodayOrders reads only the listed deps
   }, [storeId, paymentType, isCredit]);
 
   // Angular's OrderOfflineService.updateTodayOrder/deactivateOrder return a Result/DataResult

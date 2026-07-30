@@ -12,7 +12,6 @@ const API_TIMEOUT = 30000;
 // deliberate divergence from Angular (whose LoadingInterceptor wraps ALL
 // requests) — background sync must stay invisible to the user.
 declare module 'axios' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   export interface AxiosRequestConfig {
     skipLoading?: boolean;
   }

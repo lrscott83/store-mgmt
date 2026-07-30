@@ -32,7 +32,7 @@ export function TodaySaleCreditsPage() {
 
   useEffect(() => {
     void loadSaleCredits();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSaleCredits reads only storeId
   }, [storeId]);
 
   // WU2 (flagged mismatch #5): updateSaleCredit/paidSaleCredit return a SYNC DataResult

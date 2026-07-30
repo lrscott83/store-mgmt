@@ -34,7 +34,7 @@ export function TodayExpensesPage() {
 
   useEffect(() => {
     void loadExpenses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadExpenses reads only storeId
   }, [storeId]);
 
   function openCreate() {

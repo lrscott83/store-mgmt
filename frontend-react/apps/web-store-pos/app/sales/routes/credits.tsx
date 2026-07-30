@@ -67,7 +67,7 @@ export function SaleCreditsPage() {
 
   useEffect(() => {
     void loadSaleCredits();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSaleCredits reads only storeId
   }, [storeId]);
 
   function toggleDatePanel(dateId: string) {
