@@ -64,7 +64,7 @@ namespace SMCA.WebApi.Controllers.v1
         {
             var result = await Sender.Send(command);
             return result.Succeeded
-                ? CreatedAtAction(nameof(GetStoreByIdAsync), new { id = result.Data!.Id }, result)
+                ? CreatedAtAction("GetStoreById", new { id = result.Data!.Id }, result)
                 : Ok(result);
         }
 
