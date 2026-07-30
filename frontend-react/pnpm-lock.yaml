@@ -150,12 +150,21 @@ importers:
 
   packages/domain:
     devDependencies:
+      '@store-mgmt/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
       '@types/node':
         specifier: ^22
         version: 22.19.19
       '@vitest/coverage-v8':
         specifier: ^3.2.3
         version: 3.2.4(vitest@3.2.4(@types/node@22.19.19)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(terser@5.48.0))
+      eslint:
+        specifier: ^9.31.0
+        version: 9.39.4(jiti@2.7.0)
+      globals:
+        specifier: ^16.3.0
+        version: 16.5.0
       rimraf:
         specifier: ^6.0.1
         version: 6.1.3
