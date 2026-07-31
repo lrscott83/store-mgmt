@@ -875,3 +875,115 @@ describe('OwnerEditPage — reSellerId label is GENERAL.RESELLER', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-C — 3 unguarded reads in owner-edit.tsx, mixed
+// idioms: getOwner uses the page loadError, loadStores uses its own storesError,
+// listResellers stays silent (no new error UI, unchanged).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — getOwner succeeded:false (Req: Owner Edit Load Surfaces succeeded:false via OWNER.ERROR)', () => {
+  it('shows OWNER.ERROR and does not populate form fields when getOwner resolves with succeeded:false', async () => {
+    await setAuthUser(false);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    // The backend really does return `data: null` on a failed response, which the
+    // pre-union BaseResponseModel type does not admit yet — hence the cast through
+    // the awaited return type rather than a blanket `any` (dashboard.test.tsx precedent).
+    type GetOwnerResponse = Awaited<ReturnType<typeof ownerHttpService.getOwner>>;
+    vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    } as unknown as GetOwnerResponse);
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText(esMessages['GENERAL.FULL_NAME'])).not.toBeInTheDocument();
+  });
+});
+
+describe('OwnerEditPage — loadStores succeeded:false (Req: Owner Edit Stores Tab Fetch Surfaces succeeded:false via Its Own storesError State)', () => {
+  it('sets storesError (not loadError) to STORES.ERROR, does not set stores from data', async () => {
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    type ListStoresResponse = Awaited<ReturnType<typeof storeHttpService.listStores>>;
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    } as unknown as ListStoresResponse);
+
+    await renderPage(true);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.STORES'] }));
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['STORES.ERROR'])).toBeInTheDocument();
+    });
+
+    // getOwner succeeded in this render (default renderPage mock) — the only alert
+    // on screen must be the dedicated storesError, not the page-level loadError.
+    expect(screen.queryAllByRole('alert')).toHaveLength(1);
+  });
+});
+
+describe('OwnerEditPage — listResellers succeeded:false (Req: Owner Edit Reseller Dropdown Fetch Preserves Its Existing Silent-Failure Idiom)', () => {
+  it('leaves the dropdown empty and renders no new error UI when listResellers resolves with succeeded:false', async () => {
+    await setAuthUser(true);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    type ListResellersResponse = Awaited<ReturnType<typeof resellerHttpService.listResellers>>;
+    vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    } as unknown as ListResellersResponse);
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['GENERAL.RESELLER'])).toBeInTheDocument();
+    });
+
+    // only the "--" placeholder option remains — resellers is never populated from
+    // the failed response, but no error banner/message is introduced either.
+    const select = screen.getByLabelText(esMessages['GENERAL.RESELLER']) as HTMLSelectElement;
+    expect(select.options.length).toBe(1);
+    expect(screen.queryAllByRole('alert')).toHaveLength(0);
+  });
+});

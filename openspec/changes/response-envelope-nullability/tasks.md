@@ -42,13 +42,13 @@ Delivery is commits-only on `feat/response-envelope-nullability` — no PR split
 
 ## Phase 3 (WU-C): owner-edit — 3 guards, mixed idioms
 
-- [ ] 3.1 RED: `getOwner` `succeeded:false` → `loadError=OWNER.ERROR`, no form setters called.
-- [ ] 3.2 GREEN: guard at `owner-edit.tsx:141-144`.
-- [ ] 3.3 RED: `loadStores` `succeeded:false` → dedicated `storesError=STORES.ERROR` (NOT `loadError`).
-- [ ] 3.4 GREEN: guard at `owner-edit.tsx:85-93`.
-- [ ] 3.5 RED: `listResellers` `succeeded:false` → `resellers` unset, NO new error UI (stays silent).
-- [ ] 3.6 GREEN: `if (!res.succeeded) return;` at `owner-edit.tsx:162-165`.
-- [ ] 3.7 Gates green, commit WU-C.
+- [x] 3.1 RED: `getOwner` `succeeded:false` → `loadError=OWNER.ERROR`, no form setters called. NOTE: this test passed even before the guard — `owner` starts `null` and `o.fullName` throws inside `.then`, which the adjacent `.catch` swallows into `OWNER.ERROR` by accident. Guard added anyway per spec/tasks (non-negotiable) — without it, WU-D's union flip turns that same `null.fullName` access into a compile error, so this site would surface in WU0/4.6 regardless.
+- [x] 3.2 GREEN: guard at `owner-edit.tsx:141-144`.
+- [x] 3.3 RED: `loadStores` `succeeded:false` → dedicated `storesError=STORES.ERROR` (NOT `loadError`).
+- [x] 3.4 GREEN: guard at `owner-edit.tsx:85-93`.
+- [x] 3.5 RED: `listResellers` `succeeded:false` → `resellers` unset, NO new error UI (stays silent).
+- [x] 3.6 GREEN: `if (!res.succeeded) return;` at `owner-edit.tsx:162-165`.
+- [x] 3.7 Gates green, commit WU-C.
 
 ## Phase 4 (WU-D): type flip — INDIVISIBLE, one commit
 
