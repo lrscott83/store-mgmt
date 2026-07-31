@@ -13,7 +13,8 @@ namespace Domain.Interfaces.Repositories
         Task<IEnumerable<User>> GetAllUsersIncludingStoreAndRolesAsync(bool includeInactive, CancellationToken cancellationToken = default);
         Task<IEnumerable<User>> GetAllUsersByStoreIdIncludingStoreAndRolesAsync(Guid storeId, bool includeInactive, CancellationToken cancellationToken = default);
         Task<User> GetUserByIdIncludingStoreAndRoles(Guid userId, CancellationToken cancellationToken = default);
-        Task<User?> GetByLoginWithRelatedAsync(string login, CancellationToken cancellationToken = default);
+        Task<User?> GetByLoginWithRelatedAsync(string login);
+        Task<User?> GetByLoginWithRelatedAsync(string login, CancellationToken cancellationToken);
 
         new Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
     }

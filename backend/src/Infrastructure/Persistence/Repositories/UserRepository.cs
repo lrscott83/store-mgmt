@@ -77,7 +77,10 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<User?> GetByLoginWithRelatedAsync(string login, CancellationToken cancellationToken = default)
+        public Task<User?> GetByLoginWithRelatedAsync(string login)
+            => GetByLoginWithRelatedAsync(login, default);
+
+        public async Task<User?> GetByLoginWithRelatedAsync(string login, CancellationToken cancellationToken)
         {
             return await _users
                 .Where(u => u.Login == login)
