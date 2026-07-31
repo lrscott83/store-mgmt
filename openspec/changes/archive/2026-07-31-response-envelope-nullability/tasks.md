@@ -42,7 +42,7 @@ Delivery is commits-only on `feat/response-envelope-nullability` — no PR split
 
 ## Phase 3 (WU-C): owner-edit — 3 guards, mixed idioms
 
-- [x] 3.1 RED: `getOwner` `succeeded:false` → `loadError=OWNER.ERROR`, no form setters called. NOTE: this test passed even before the guard — `owner` starts `null` and `o.fullName` throws inside `.then`, which the adjacent `.catch` swallows into `OWNER.ERROR` by accident. Guard added anyway per spec/tasks (non-negotiable) — without it, WU-D's union flip turns that same `null.fullName` access into a compile error, so this site would surface in WU0/4.6 regardless.
+- [x] 3.1 RED: `getOwner` `succeeded:false` → `loadError=OWNER.ERROR`, no form setters called. NOTE: this test passed even before the guard existed — `owner` starts `null` and `o.fullName` throws inside `.then`, which the adjacent `.catch` swallows into `OWNER.ERROR` by accident. Guard added anyway per spec/tasks (non-negotiable) — without it, WU-D's union flip turns that same `null.fullName` access into a compile error, so this site would surface in WU0/4.6 regardless. Later strengthened post-verify by commit `bcf8aea` with a type-level `@ts-expect-error` probe so the guard is compiler-enforced, not just behaviourally coincidental.
 - [x] 3.2 GREEN: guard at `owner-edit.tsx:141-144`.
 - [x] 3.3 RED: `loadStores` `succeeded:false` → dedicated `storesError=STORES.ERROR` (NOT `loadError`).
 - [x] 3.4 GREEN: guard at `owner-edit.tsx:85-93`.
@@ -63,4 +63,4 @@ Delivery is commits-only on `feat/response-envelope-nullability` — no PR split
 
 ## Phase 5: Deferred to sdd-archive (not an apply task)
 
-- [ ] 5.1 Flag for archive: correct `frontend-react/openspec/specs/admin/spec.md:312,596,1114` — `message`/`actionCode` become nullable; `errors` stays non-null. Do not move/merge/restructure either openspec tree.
+- [x] 5.1 Correct `frontend-react/openspec/specs/admin/spec.md:312,596,1114` — `message`/`actionCode` are now stated as nullable (`string | null` / `number | null`); `errors` stays non-null. Performed by sdd-archive during archival of this change; neither openspec tree was moved/merged/restructured. Also: verify's WARNING (owner-edit `getOwner` guard test not discriminating at runtime) was fixed post-verify by commit `bcf8aea` (type-level `@ts-expect-error` probe), and 6 dead pre-union casts were removed by commit `5290a72`. Final HEAD `a9288bb`, gates green (typecheck 5/5, test 2173/2173, lint --max-warnings=0 4/4).

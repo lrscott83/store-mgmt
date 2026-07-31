@@ -309,8 +309,9 @@ A `usageHttpService` singleton MUST exist at
 | `getStoresLastMonth()` | GET | `/v1/usages/stores-last-month` | `BaseResponseModel<StoreUsages>` |
 
 `StoreUsages` MUST be defined as `{ storeUsagesCountDays: number[]; activeStoreCount: number }`.
-`BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
-MUST use `''`, `0`, and `[]` respectively — never `null`.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 
 `usageHttpService` MUST NOT define its own Axios instance; all calls MUST use the shared `apiClient`.
 
@@ -593,8 +594,9 @@ A `resellerHttpService` singleton MUST exist at
 | `updateReseller(id: string, payload)` | PUT | `/v1/reSellers/:id` | `BaseResponseModel<boolean>` |
 
 The `ReSeller` type is imported from `@store-mgmt/domain` (`packages/domain/src/models/store.ts`).
-`BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
-MUST use `''`, `0`, and `[]` respectively — never `null`.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 
 `resellerHttpService` MUST NOT define its own Axios instance. All calls MUST use the shared
 `apiClient` from `~/shared/lib/http/api-client`.
@@ -1111,8 +1113,9 @@ An `ownerHttpService` singleton MUST exist at
 | `deleteOwner(id: string)` | DELETE | `/v1/owners/:id` | `BaseResponseModel<boolean>` |
 
 `Owner` and `OwnerStoreModule` are imported from `@store-mgmt/domain`.
-`BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
-MUST use `''`, `0`, and `[]` respectively — never `null`.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 `ownerHttpService` MUST NOT define its own Axios instance; all calls MUST use the shared `apiClient`.
 `getOwnerDetailsById` (GET `/v1/owners/details/:id`) MUST NOT be included — it is dead code.
 

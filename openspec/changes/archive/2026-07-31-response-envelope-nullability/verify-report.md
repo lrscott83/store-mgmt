@@ -117,3 +117,9 @@ None.
 ## Final Verdict
 
 **PASS WITH WARNINGS.** All spec requirements across all 4 spec files are satisfied by real code with passing tests (except the one test-quality WARNING noted above, which does not indicate incorrect behavior). All three gates (typecheck/test/lint) independently re-run and green. No unsafe casts, no new i18n keys, no unauthorized UX changes across the 37 unscoped guards — every one traced to and matching its file's pre-existing idiom or a verified "never fails" data-layer fact. The `owner-edit.tsx` `listResellers` silence constraint holds exactly. The ADR-3 collapse probe is proven load-bearing by direct reproduction of TS2578. Ready for `sdd-archive`, which must still perform the deferred task 5.1 spec correction.
+
+---
+
+## Post-Verify Update (recorded by sdd-archive)
+
+After this report was written, the orchestrator addressed the WARNING directly: commit `bcf8aea` added a type-level `@ts-expect-error` probe in `owner-edit.tsx`'s test/source pairing that asserts the guard where the compiler enforces it (replacing reliance on the runtime `.catch`-swallow fallthrough), and commit `5290a72` removed 6 dead pre-union casts (already anticipated by this report's "No Shortcut Silencing" section). Gates re-confirmed green at final HEAD `a9288bb`: typecheck 5/5, test 2173/2173 (155 files), lint --max-warnings=0 4/4. The WARNING above is considered RESOLVED as of that commit; this file is otherwise preserved verbatim as the audit trail of the verify phase.
