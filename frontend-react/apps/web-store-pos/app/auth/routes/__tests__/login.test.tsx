@@ -171,6 +171,26 @@ describe('LoginPage (AUTH-01)', () => {
     });
   });
 
+  it('displays rate-limit copy on a 429 response, distinct from the server-error fallback', async () => {
+    const loginFn = vi.fn().mockRejectedValue({ status: 429 });
+    renderLogin(loginFn);
+
+    fireEvent.change(screen.getByLabelText('Usuario'), {
+      target: { value: 'user@test.com' },
+    });
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
+      target: { value: 'wrong' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+
+    await waitFor(() => {
+      // AUTH.TOO_MANY_ATTEMPTS = "Demasiados intentos. Esperá un momento antes de volver a intentar."
+      expect(
+        screen.getByText('Demasiados intentos. Esperá un momento antes de volver a intentar.')
+      ).toBeInTheDocument();
+    });
+  });
+
   // AUTH-ERR-PARITY: mirrors Angular login.component.ts:162-167 INVALID_ERROR path
   // (auth.service.ts:60-70). A HTTP-200 body-level failure (succeeded:false, e.g.
   // wrong credentials returned by LoginCommandHandler's ResponseResult.Failure)

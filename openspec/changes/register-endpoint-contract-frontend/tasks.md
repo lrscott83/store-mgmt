@@ -42,10 +42,10 @@ Files: `frontend-react/packages/domain/src/models/auth.ts`, `frontend-react/apps
 
 Files: `frontend-react/apps/web-store-pos/app/auth/routes/login.tsx`, `.../auth/routes/__tests__/login.test.tsx`, `.../shared/lib/i18n/es.ts`
 
-- [ ] 2.1 RED: in `login.test.tsx`, add a test alongside the existing 401 case (~line 154) that does `vi.fn().mockRejectedValue({ status: 429 })` and asserts the new `AUTH.TOO_MANY_ATTEMPTS` copy renders. Confirm it fails (currently falls to the `else` branch → `AUTH.SERVER_ERROR` text).
-- [ ] 2.2 GREEN: add `'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Esperá un momento antes de volver a intentar.'` to `es.ts` (voseo namespace, near the other `AUTH.*` keys, lines 75-86).
-- [ ] 2.3 GREEN: in `login.tsx`, insert `else if (status === 429) { setErrors({ form: intl.formatMessage({ id: 'AUTH.TOO_MANY_ATTEMPTS' }) }); }` between the existing `status === 403` branch and the final `else` (lines 151-155).
-- [ ] 2.4 Gate (WU2): `pnpm test` → `pnpm typecheck` → lint. Re-run the 401/403 regression cases to confirm unchanged. Commit: "feat(auth): surface 429 rate-limit copy on login".
+- [x] 2.1 RED: in `login.test.tsx`, add a test alongside the existing 401 case (~line 154) that does `vi.fn().mockRejectedValue({ status: 429 })` and asserts the new `AUTH.TOO_MANY_ATTEMPTS` copy renders. Confirm it fails (currently falls to the `else` branch → `AUTH.SERVER_ERROR` text).
+- [x] 2.2 GREEN: add `'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Esperá un momento antes de volver a intentar.'` to `es.ts` (voseo namespace, near the other `AUTH.*` keys, lines 75-86).
+- [x] 2.3 GREEN: in `login.tsx`, insert `else if (status === 429) { setErrors({ form: intl.formatMessage({ id: 'AUTH.TOO_MANY_ATTEMPTS' }) }); }` between the existing `status === 403` branch and the final `else` (lines 151-155).
+- [x] 2.4 Gate (WU2): `pnpm test` → `pnpm typecheck` → lint. Re-run the 401/403 regression cases to confirm unchanged. Commit: "feat(auth): surface 429 rate-limit copy on login".
 
 ## Phase 3: WU3 — Register 429 feedback
 
