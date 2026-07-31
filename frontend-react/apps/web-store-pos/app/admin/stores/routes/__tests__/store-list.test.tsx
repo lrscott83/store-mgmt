@@ -363,17 +363,13 @@ describe('AdminStoreListPage — succeeded:false response', () => {
     const { storeHttpService } = await import(
       '~/management/stores/lib/services/store-http-service'
     );
-    // The backend really does return `data: null` on a failed response, which the
-    // pre-union BaseResponseModel type does not admit yet — hence the cast through
-    // the awaited return type rather than a blanket `any` (dashboard.test.tsx precedent).
-    type ListStoresResponse = Awaited<ReturnType<typeof storeHttpService.listStores>>;
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: false,
       data: null,
       message: null,
       actionCode: null,
       errors: [{ code: 'E01', description: 'failed' }],
-    } as unknown as ListStoresResponse);
+    });
 
     const { AdminStoreListPage } = await import('../store-list');
     render(

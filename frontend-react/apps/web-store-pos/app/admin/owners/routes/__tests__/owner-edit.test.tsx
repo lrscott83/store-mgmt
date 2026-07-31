@@ -888,17 +888,13 @@ describe('OwnerEditPage — getOwner succeeded:false (Req: Owner Edit Load Surfa
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
-    // The backend really does return `data: null` on a failed response, which the
-    // pre-union BaseResponseModel type does not admit yet — hence the cast through
-    // the awaited return type rather than a blanket `any` (dashboard.test.tsx precedent).
-    type GetOwnerResponse = Awaited<ReturnType<typeof ownerHttpService.getOwner>>;
     vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
       succeeded: false,
       data: null,
       message: null,
       actionCode: null,
       errors: [{ code: 'E01', description: 'failed' }],
-    } as unknown as GetOwnerResponse);
+    });
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
@@ -918,14 +914,13 @@ describe('OwnerEditPage — loadStores succeeded:false (Req: Owner Edit Stores T
     const { storeHttpService } = await import(
       '~/management/stores/lib/services/store-http-service'
     );
-    type ListStoresResponse = Awaited<ReturnType<typeof storeHttpService.listStores>>;
     vi.mocked(storeHttpService.listStores).mockResolvedValue({
       succeeded: false,
       data: null,
       message: null,
       actionCode: null,
       errors: [{ code: 'E01', description: 'failed' }],
-    } as unknown as ListStoresResponse);
+    });
 
     await renderPage(true);
 
@@ -962,14 +957,13 @@ describe('OwnerEditPage — listResellers succeeded:false (Req: Owner Edit Resel
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
-    type ListResellersResponse = Awaited<ReturnType<typeof resellerHttpService.listResellers>>;
     vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
       succeeded: false,
       data: null,
       message: null,
       actionCode: null,
       errors: [{ code: 'E01', description: 'failed' }],
-    } as unknown as ListResellersResponse);
+    });
 
     const { OwnerEditPage } = await import('../owner-edit');
     await act(async () => {
