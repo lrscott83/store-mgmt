@@ -150,18 +150,18 @@ Three independent commits on `feat/register-endpoint-contract-frontend`. Revert 
 
 ## Success Criteria
 
-- [ ] `register()` returns `BaseResponseModel<<register-response type>>`; no `boolean` remains at
+- [x] `register()` returns `BaseResponseModel<<register-response type>>`; no `boolean` remains at
       `auth-http-service.ts:18`.
-- [ ] The new type has `expiresIn: string` and no required `refreshToken`; `AuthModel` is unchanged.
-- [ ] `pnpm -C packages/domain build` run, then `pnpm typecheck` passes workspace-wide.
-- [ ] `auth-http-service.test.ts` no longer asserts `typeof result.data === 'boolean'`; it asserts
+- [x] The new type has `expiresIn: string` and no required `refreshToken`; `AuthModel` is unchanged.
+- [x] `pnpm -C packages/domain build` run, then `pnpm typecheck` passes workspace-wide.
+- [x] `auth-http-service.test.ts` no longer asserts `typeof result.data === 'boolean'`; it asserts
       the `{ login, authToken, expiresIn }` shape.
-- [ ] `register.test.tsx` still asserts `navigate('/login')` on success, with an object `data`.
-- [ ] A `{ status: 429 }` login rejection renders the new `AUTH.*` copy (test).
-- [ ] A `{ response: { status: 429 } }` register rejection renders the new `REGISTRATION.*` copy (test).
-- [ ] Both keys exist in `es.ts` as flat `AUTH.*` / `REGISTRATION.*` siblings.
-- [ ] `git diff` touches zero lines of `api-client.ts`.
-- [ ] `pnpm test` green; lint clean at `--max-warnings=0`.
+- [x] `register.test.tsx` still asserts `navigate('/login')` on success, with an object `data`.
+- [x] A `{ status: 429 }` login rejection renders the new `AUTH.*` copy (test).
+- [x] A `{ response: { status: 429 } }` register rejection renders the new `REGISTRATION.*` copy (test).
+- [x] Both keys exist in `es.ts` as flat `AUTH.*` / `REGISTRATION.*` siblings.
+- [x] `git diff` touches zero lines of `api-client.ts`.
+- [x] `pnpm test` green; lint clean at `--max-warnings=0`.
 
 ## Notes on the Exploration
 

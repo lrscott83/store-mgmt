@@ -1,4 +1,4 @@
-# auth-rate-limit-feedback Specification
+# Delta for auth-rate-limit-feedback
 
 ## Purpose
 
