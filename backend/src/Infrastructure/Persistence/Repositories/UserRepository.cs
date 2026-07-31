@@ -67,11 +67,7 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<User> GetUserByIdIncludingStoreAndRoles(Guid userId, CancellationToken cancellationToken = default)
         {
-            return await _users
-                .Where(u => u.Id == userId)
-                .Include(u => u.StoreUser).ThenInclude(u => u.Store).ThenInclude(s => s.Owner)
-                .Include(u => u.UserRoles.Where(ur => ur.IsActive && ur.Role.IsActive)).ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync(cancellationToken);
+            return await IncludeStoreAndRoles(_users.Where(u => u.Id == userId)).FirstOrDefaultAsync(cancellationToken);
         }
 
         public async Task<User> GetUserByLoginIgnoreQueryFiltersAsync(string login)

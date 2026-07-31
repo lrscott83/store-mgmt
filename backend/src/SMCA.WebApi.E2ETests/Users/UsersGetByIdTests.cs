@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Domain.Common.Enums;
+using Domain.Common.Extensions;
 using FluentAssertions;
 using SMCA.WebApi.E2ETests.Infrastructure;
 using Xunit;
@@ -82,7 +83,9 @@ public sealed class UsersGetByIdTests
             body.Data!.Id.Should().Be(target.UserId);
             body.Data.OwnerName.Should().Be("E2E OwnerAdmin");
             body.Data.StoreName.Should().NotBeNullOrEmpty();
-            body.Data.RoleNames.Should().Contain("OwnerAdmin");
+            // Role rows are seeded with RoleType.X.GetDisplayName() as Name
+            // (RoleEntityTypeConfiguration) — e.g. OwnerAdmin -> "Administrador de tienda".
+            body.Data.RoleNames.Should().Contain(RoleType.OwnerAdmin.GetDisplayName());
         }
         finally
         {
