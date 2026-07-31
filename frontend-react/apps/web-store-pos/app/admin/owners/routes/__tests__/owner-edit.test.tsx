@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Owner, ReSeller } from '@store-mgmt/domain';
+import type { BaseResponseModel, Owner, ReSeller } from '@store-mgmt/domain';
 
 // ─── react-router mock ────────────────────────────────────────────────────────
 
@@ -906,6 +906,21 @@ describe('OwnerEditPage — getOwner succeeded:false (Req: Owner Edit Load Surfa
       expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
     });
     expect(screen.queryByLabelText(esMessages['GENERAL.FULL_NAME'])).not.toBeInTheDocument();
+  });
+
+  // The runtime test above locks the observable behaviour, but it cannot tell a
+  // guarded read from an unguarded one: without the guard, `res.data` is null,
+  // `o.fullName` throws, and the `.catch` at owner-edit.tsx:165 sets the very same
+  // OWNER.ERROR. Both paths render identically. The guard is enforced by the
+  // compiler, so that is where it has to be asserted.
+  it('type-level: getOwner data cannot be read before succeeded is checked', () => {
+    // Never invoked — the body is a compile-time assertion.
+    const probe = (res: BaseResponseModel<Owner>) => {
+      // @ts-expect-error `data` is Owner | null until `succeeded` narrows the union
+      void res.data.fullName;
+      if (res.succeeded) void res.data.fullName;
+    };
+    expect(probe).toBeTypeOf('function');
   });
 });
 
