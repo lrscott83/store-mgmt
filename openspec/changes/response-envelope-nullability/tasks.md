@@ -25,13 +25,13 @@ Delivery is commits-only on `feat/response-envelope-nullability` — no PR split
 
 ## Phase 1 (WU-A): owner-list / reseller-list / store-list guards
 
-- [ ] 1.1 RED: test `succeeded:false` on `ownerHttpService.listOwners()` renders `OWNER.ERROR`, `owners` unset.
-- [ ] 1.2 GREEN: guard at `owner-list.tsx:20-21`.
-- [ ] 1.3 RED: same for `reseller-list.tsx` → `RESELLERS.ERROR`.
-- [ ] 1.4 GREEN: guard at `reseller-list.tsx:19-20`.
-- [ ] 1.5 RED: same for `store-list.tsx` → `STORES.ERROR`.
-- [ ] 1.6 GREEN: guard at `store-list.tsx:28-29`.
-- [ ] 1.7 Gates green (`typecheck`/`test`/`lint --max-warnings=0`), commit WU-A.
+- [x] 1.1 RED: test `succeeded:false` on `ownerHttpService.listOwners()` renders `OWNER.ERROR`, `owners` unset.
+- [x] 1.2 GREEN: guard at `owner-list.tsx:20-21`.
+- [x] 1.3 RED: same for `reseller-list.tsx` → `RESELLERS.ERROR`.
+- [x] 1.4 GREEN: guard at `reseller-list.tsx:19-20`.
+- [x] 1.5 RED: same for `store-list.tsx` → `STORES.ERROR`.
+- [x] 1.6 GREEN: guard at `store-list.tsx:28-29`.
+- [x] 1.7 Gates green (`typecheck`/`test`/`lint --max-warnings=0`), commit WU-A.
 
 ## Phase 2 (WU-B): user-list guard
 

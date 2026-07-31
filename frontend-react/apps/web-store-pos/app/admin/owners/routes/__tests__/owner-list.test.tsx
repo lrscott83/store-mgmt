@@ -496,3 +496,39 @@ describe('OwnerListPage — HTTP error inline', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-A — succeeded:false is a resolved value, not a
+// rejection; loadOwners must guard it the same as the catch branch above.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerListPage — succeeded:false response', () => {
+  it('shows OWNER.ERROR when listOwners resolves with succeeded:false, does not set owners from data', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    // The backend really does return `data: null` on a failed response, which the
+    // pre-union BaseResponseModel type does not admit yet — hence the cast through
+    // the awaited return type rather than a blanket `any` (dashboard.test.tsx precedent).
+    type ListOwnersResponse = Awaited<ReturnType<typeof ownerHttpService.listOwners>>;
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    } as unknown as ListOwnersResponse);
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
+    });
+  });
+});
