@@ -5,14 +5,14 @@
 ### S2: Register Return Type Parity (Updated 2026-07-30)
 
 **Requirement**: `POST /api/v1/auth/register` returns `201 Created` with `ResponseResult<AuthDto>`.
-The frontend `register()` MUST resolve to `Promise<BaseResponseModel<RegisterAuthResponse>>`, a
+The frontend `register()` MUST resolve to `Promise<BaseResponseModel<RegisterAuthModel>>`, a
 **new, distinct** domain type — NOT `AuthModel`. `AuthModel.refreshToken` is required and
 `AuthModel.expiresIn` is a `number`; the register response has no `refreshToken` and its
 `expiresIn` is an ISO-8601 string, so `AuthModel` MUST NOT be reused or widened to fit it.
 
 **Shape**:
 ```typescript
-interface RegisterAuthResponse {
+interface RegisterAuthModel {
   login: string;
   authToken: string;
   expiresIn: string; // ISO-8601 wire string — NOT epoch number
@@ -22,9 +22,9 @@ interface RegisterAuthResponse {
 
 **Constraints**:
 - The return type MUST change from `BaseResponseModel<boolean>` to
-  `BaseResponseModel<RegisterAuthResponse>` — this REPLACES the `boolean` signature at
+  `BaseResponseModel<RegisterAuthModel>` — this REPLACES the `boolean` signature at
   `auth-http-service.ts:18`, which is false as of this change.
-- `RegisterAuthResponse` MUST be its own type; it MUST NOT alias or extend `AuthModel`.
+- `RegisterAuthModel` MUST be its own type; it MUST NOT alias or extend `AuthModel`.
 - The service MUST return the envelope verbatim — no flattening, no selective `data` extraction.
 
 (Previously: this section claimed the frontend extracts and stores `data.authToken` immediately
