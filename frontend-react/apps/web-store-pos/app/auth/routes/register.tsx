@@ -133,6 +133,8 @@ export default function RegisterPage() {
             form: message ?? intl.formatMessage({ id: 'REGISTRATION.VALIDATION_ERROR' }),
           });
         }
+      } else if (status === 429) {
+        setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.TOO_MANY_ATTEMPTS' }) });
       } else {
         setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.UNEXPECTED_ERROR' }) });
       }

@@ -347,6 +347,21 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     });
   });
 
+  it('shows rate-limit copy on a 429 response, distinct from the unexpected-error fallback', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue({ response: { status: 429 } });
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.'
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
   it('shows "Algo salió mal" fallback in Spanish on generic network error (REGISTRATION.UNEXPECTED_ERROR)', async () => {
     vi.mocked(authHttpService.register).mockRejectedValue(new Error('network down'));
     renderRegister();

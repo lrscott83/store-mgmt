@@ -51,10 +51,10 @@ Files: `frontend-react/apps/web-store-pos/app/auth/routes/login.tsx`, `.../auth/
 
 Files: `frontend-react/apps/web-store-pos/app/auth/routes/register.tsx`, `.../auth/routes/__tests__/register.test.tsx`, `.../shared/lib/i18n/es.ts`
 
-- [ ] 3.1 RED: in `register.test.tsx`, add a test alongside the existing UNEXPECTED_ERROR case (~line 344) that does `vi.mocked(authHttpService.register).mockRejectedValue({ response: { status: 429 } })` and asserts the new `REGISTRATION.TOO_MANY_ATTEMPTS` copy renders. Confirm it fails (currently falls to `else` → `REGISTRATION.UNEXPECTED_ERROR` text).
-- [ ] 3.2 GREEN: add `'REGISTRATION.TOO_MANY_ATTEMPTS': 'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.'` to `es.ts` (usted/tuteo namespace, near the other `REGISTRATION.*` keys, lines 102-125). Do NOT copy the voseo phrasing from `AUTH.TOO_MANY_ATTEMPTS`.
-- [ ] 3.3 GREEN: in `register.tsx`, change the `if (status === 400) {...} else {...}` at line ~128-138 into `if (status === 400) {...} else if (status === 429) { setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.TOO_MANY_ATTEMPTS' }) }); } else {...}`. `finally` block (isLoading reset) stays untouched.
-- [ ] 3.4 Gate (WU3): `pnpm test` → `pnpm typecheck` → lint. Re-run the 400/email-taken/validation-error regression cases to confirm unchanged. Commit: "feat(auth): surface 429 rate-limit copy on register".
+- [x] 3.1 RED: in `register.test.tsx`, add a test alongside the existing UNEXPECTED_ERROR case (~line 344) that does `vi.mocked(authHttpService.register).mockRejectedValue({ response: { status: 429 } })` and asserts the new `REGISTRATION.TOO_MANY_ATTEMPTS` copy renders. Confirm it fails (currently falls to `else` → `REGISTRATION.UNEXPECTED_ERROR` text).
+- [x] 3.2 GREEN: add `'REGISTRATION.TOO_MANY_ATTEMPTS': 'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.'` to `es.ts` (usted/tuteo namespace, near the other `REGISTRATION.*` keys, lines 102-125). Do NOT copy the voseo phrasing from `AUTH.TOO_MANY_ATTEMPTS`.
+- [x] 3.3 GREEN: in `register.tsx`, change the `if (status === 400) {...} else {...}` at line ~128-138 into `if (status === 400) {...} else if (status === 429) { setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.TOO_MANY_ATTEMPTS' }) }); } else {...}`. `finally` block (isLoading reset) stays untouched.
+- [x] 3.4 Gate (WU3): `pnpm test` → `pnpm typecheck` → lint. Re-run the 400/email-taken/validation-error regression cases to confirm unchanged. Commit: "feat(auth): surface 429 rate-limit copy on register".
 
 ## Notes
 
