@@ -35,10 +35,10 @@ Delivery is commits-only on `feat/response-envelope-nullability` — no PR split
 
 ## Phase 2 (WU-B): user-list guard
 
-- [ ] 2.1 RED: `succeeded:false` inside `.then` → `USERS.ERROR`, `users` unset (not a rejection).
-- [ ] 2.2 RED: `succeeded:true` still populates `users`, clears error (regression scenario).
-- [ ] 2.3 GREEN: guard inside `.then` at `user-list.tsx:23-26`.
-- [ ] 2.4 Gates green, commit WU-B.
+- [x] 2.1 RED: `succeeded:false` inside `.then` → `USERS.ERROR`, `users` unset (not a rejection).
+- [x] 2.2 RED: `succeeded:true` still populates `users`, clears error (regression scenario).
+- [x] 2.3 GREEN: guard inside `.then` at `user-list.tsx:23-26`.
+- [x] 2.4 Gates green, commit WU-B.
 
 ## Phase 3 (WU-C): owner-edit — 3 guards, mixed idioms
 
