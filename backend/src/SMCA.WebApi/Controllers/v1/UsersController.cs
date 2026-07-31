@@ -27,9 +27,12 @@ namespace SMCA.WebApi.Controllers.v1
         /// <returns></returns>
         [HttpGet("all/{includeInactive}")]
         [ProducesResponseType(typeof(ResponseResult<List<UserListDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [HasPermission(StoreRoleFeatures.UsersAdmin)]
 
-        public async Task<IActionResult> GetAllUsersAsync(bool includeInactive)
+        public async Task<IActionResult> GetAllUsersAsync([FromRoute] bool includeInactive)
         {
             return Ok(await Sender.Send(new GetAllUsersQuery(includeInactive)));
         }
@@ -41,8 +44,11 @@ namespace SMCA.WebApi.Controllers.v1
         /// <returns></returns>
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ResponseResult<UserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [HasPermission(StoreRoleFeatures.UsersAdmin)]
-        public async Task<IActionResult> GetUserAsync(Guid id)
+        public async Task<IActionResult> GetUserAsync([FromRoute] Guid id)
         {
             return Ok(await Sender.Send(new GetUserByIdQuery(id)));
         }

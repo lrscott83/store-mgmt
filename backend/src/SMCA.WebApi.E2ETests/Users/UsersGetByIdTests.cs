@@ -1,10 +1,19 @@
 using System.Net;
+using System.Net.Http.Json;
 using Domain.Common.Enums;
 using FluentAssertions;
 using SMCA.WebApi.E2ETests.Infrastructure;
 using Xunit;
 
 namespace SMCA.WebApi.E2ETests.Users;
+
+public sealed class UserByIdData
+{
+    public Guid Id { get; set; }
+    public string? OwnerName { get; set; }
+    public string? StoreName { get; set; }
+    public List<string> RoleNames { get; set; } = new();
+}
 
 [Collection("e2e")]
 public sealed class UsersGetByIdTests
@@ -56,5 +65,29 @@ public sealed class UsersGetByIdTests
             r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, actor.UserId); }
+    }
+
+    [Fact]
+    public async Task Get_owner_admin_returns_full_body_with_owner_store_and_roles()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var actorId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var target = await UserSeed.SeedOwnerAdminWithStoreAsync(_f);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, actorId, login).GetAsync($"/api/v1/users/{target.UserId}");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<UserByIdData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            body.Data!.Id.Should().Be(target.UserId);
+            body.Data.OwnerName.Should().Be("E2E OwnerAdmin");
+            body.Data.StoreName.Should().NotBeNullOrEmpty();
+            body.Data.RoleNames.Should().Contain("OwnerAdmin");
+        }
+        finally
+        {
+            await AuthzSeed.CleanupStoreGraphAsync(_f, target.StoreId, target.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, actorId);
+        }
     }
 }

@@ -22,7 +22,11 @@ namespace Application.Features.UserManagement.Users.Queries.GetUserById
 
         public async Task<ResponseResult<UserDto>> Handle(GetUserByIdQuery query, CancellationToken cancellationToken)
         {
-            User user = await _userRepository.GetUserByIdIncludingStoreAndRoles(query.UserId);
+            User? user = await _userRepository.GetUserByIdIncludingStoreAndRoles(query.UserId, cancellationToken);
+
+            if (user is null)
+                return ResponseResult.Failure<UserDto>(UserErrors.NotFound, 404);
+
             UserDto userDto = _mapper.Map<UserDto>(user);
             return ResponseResult.Success(userDto);
         }

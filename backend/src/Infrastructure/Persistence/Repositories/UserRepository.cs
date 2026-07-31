@@ -6,6 +6,7 @@ using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
+using System.Threading;
 using System.Xml.Linq;
 
 namespace Infrastructure.Persistence.Repositories
@@ -18,37 +19,45 @@ namespace Infrastructure.Persistence.Repositories
             _users = dbContext.Set<User>();
         }
 
-        public async Task<IEnumerable<User>> GetAllUsersByStoreIdIncludingStoreAndRolesAsync(Guid storeId, bool includeInactive)
+        public async Task<IEnumerable<User>> GetAllUsersByStoreIdIncludingStoreAndRolesAsync(Guid storeId, bool includeInactive, CancellationToken cancellationToken = default)
         {
-            return await _users
+            var query = _users
                 .Where(u => (includeInactive || u.IsActive)
                     && u.StoreUser != null && u.StoreUser.StoreId == storeId
                     && u.StoreUser.User != null && u.StoreUser.User.IsActive
                     && u.StoreUser.Store != null && u.StoreUser.Store.IsActive 
-                    && u.StoreUser.Store.Owner != null && u.StoreUser.Store.Owner.IsActive)
-                .Include(u => u.StoreUser).ThenInclude(u => u.Store).ThenInclude(s => s.Owner)
-                .Include(u => u.UserRoles.Where(ur => ur.IsActive && ur.Role.IsActive)).ThenInclude(ur => ur.Role)
-                .ToListAsync();
+                    && u.StoreUser.Store.Owner != null && u.StoreUser.Store.Owner.IsActive);
+
+            query = IncludeStoreAndRoles(query);
+
+            return await query.Take(1000).ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<User>> GetAllUsersIncludingStoreAndRolesAndIgnoreQueryFiltersAsync(bool includeInactive)
+        public async Task<IEnumerable<User>> GetAllUsersIncludingStoreAndRolesAndIgnoreQueryFiltersAsync(bool includeInactive, CancellationToken cancellationToken = default)
         {
-            return await _users
-                .Where(u => (includeInactive || u.IsActive))
-                .Include(u => u.StoreUser).ThenInclude(u => u.Store).ThenInclude(s => s.Owner)
-                .Include(u => u.UserRoles.Where(ur => ur.IsActive && ur.Role.IsActive)).ThenInclude(ur => ur.Role)
-                .IgnoreQueryFilters()
-                .ToListAsync();
+            var query = _users.Where(u => (includeInactive || u.IsActive));
+
+            query = IncludeStoreAndRoles(query);
+
+            return await query.IgnoreQueryFilters().Take(1000).ToListAsync(cancellationToken);
         }
 
-        public async Task<IEnumerable<User>> GetAllUsersIncludingStoreAndRolesAsync(bool includeInactive)
+        public async Task<IEnumerable<User>> GetAllUsersIncludingStoreAndRolesAsync(bool includeInactive, CancellationToken cancellationToken = default)
         {
-            return await _users
+            var query = _users
                 .Where(u => (includeInactive || u.IsActive)
-                    && u.StoreUser != null && u.StoreUser.IsActive && u.StoreUser.Store.IsActive)
-                .Include(u => u.StoreUser).ThenInclude(u => u.Store).ThenInclude(s => s.Owner)
-                .Include(u => u.UserRoles.Where(ur => ur.IsActive && ur.Role.IsActive)).ThenInclude(ur => ur.Role)
-                .ToListAsync();
+                    && u.StoreUser != null && u.StoreUser.IsActive && u.StoreUser.Store.IsActive);
+
+            query = IncludeStoreAndRoles(query);
+
+            return await query.Take(1000).ToListAsync(cancellationToken);
+        }
+
+        private IQueryable<User> IncludeStoreAndRoles(IQueryable<User> query)
+        {
+            return query
+                .Include(u => u.StoreUser).ThenInclude(u => u.Store).ThenInclude(s => s.Owner).ThenInclude(o => o.User)
+                .Include(u => u.UserRoles.Where(ur => ur.IsActive && ur.Role.IsActive)).ThenInclude(ur => ur.Role);
         }
 
         public async Task<User> GetUserByIdIgnoreQueryFiltersAsync(string id)
@@ -56,13 +65,13 @@ namespace Infrastructure.Persistence.Repositories
             return await _users.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id.ToString() == id);
         }
 
-        public async Task<User> GetUserByIdIncludingStoreAndRoles(Guid userId)
+        public async Task<User> GetUserByIdIncludingStoreAndRoles(Guid userId, CancellationToken cancellationToken = default)
         {
             return await _users
                 .Where(u => u.Id == userId)
                 .Include(u => u.StoreUser).ThenInclude(u => u.Store).ThenInclude(s => s.Owner)
                 .Include(u => u.UserRoles.Where(ur => ur.IsActive && ur.Role.IsActive)).ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         public async Task<User> GetUserByLoginIgnoreQueryFiltersAsync(string login)
@@ -72,7 +81,7 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<User?> GetByLoginWithRelatedAsync(string login)
+        public async Task<User?> GetByLoginWithRelatedAsync(string login, CancellationToken cancellationToken = default)
         {
             return await _users
                 .Where(u => u.Login == login)
@@ -81,10 +90,16 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(u => u.StoreUser)
                     .ThenInclude(su => su.Store)
                     .ThenInclude(s => s.Owner)
+                    .ThenInclude(o => o.User)
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public new async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            return await _users.IgnoreQueryFilters().AnyAsync(u => u.Id == id, cancellationToken);
         }
 
         public async Task<bool> IsUniqueLoginAsync(string login)

@@ -3,6 +3,7 @@ using Domain.Common.Enums;
 using Domain.Entities.Owners;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
+using Domain.Entities.StoreUsers;
 using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
 using Infrastructure.Persistence.Contexts;
@@ -57,6 +58,7 @@ public static class UserSeed
         await db.SaveChangesAsync();
         db.Set<StoreModule>().Add(StoreModule.Create(store.Id, AuthzSeed.ManagementModuleId, 0, true, 0, 0, 0, tenantId));
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.OwnerAdmin, tenantId));
+        db.Set<StoreUser>().Add(StoreUser.Create(user.Id, store.Id, tenantId));
         user.SelectedStoreId = store.Id;
         await db.SaveChangesAsync();
         return new UserWithRolesFixture(user.Id, login, owner.Id, store.Id, new() { (int)RoleType.OwnerAdmin });
