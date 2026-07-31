@@ -11,6 +11,23 @@ export interface AuthModel {
   expiresIn: number;
 }
 
+/**
+ * Payload returned by `POST /api/v1/auth/register` (`ResponseResult<AuthDto>`).
+ * `authToken` is typed here but deliberately NOT consumed by the register
+ * call-site — Angular parity navigates to /login without auto-authenticating
+ * (see register-endpoint-contract-frontend Decision 1). `refreshToken` is
+ * intentionally absent, not optional: RegisterCommand.cs:132 never populates
+ * one, and omitting it (plus `expiresIn` being a string here vs a number on
+ * `AuthModel`) keeps this type structurally non-assignable to `AuthModel` in
+ * both directions.
+ */
+export interface RegisterAuthModel {
+  login: string;
+  authToken: string;
+  /** ISO-8601 timestamp (backend DateTime), NOT epoch ms like AuthModel.expiresIn. */
+  expiresIn: string;
+}
+
 export interface StoreModuleFeatures {
   storeId: string;
   storeName: string;

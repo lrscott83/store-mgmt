@@ -85,7 +85,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('succeeded:false shows errors[0].description and does not navigate', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: false,
-      data: false,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 400,
       errors: [{ code: 'LOGIN_TAKEN', description: 'Login already exists' }],
@@ -103,7 +103,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('succeeded:true navigates to /login', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],
@@ -134,7 +134,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('?code=ABC123 flows into the register payload', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],
@@ -153,7 +153,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('register() payload never includes passwordConfirmation', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],
@@ -307,7 +307,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
   it('shows "Registrando..." on the submit button while loading (AUTH.REGISTERING)', async () => {
     let resolveRegister: (value: {
       succeeded: boolean;
-      data: boolean;
+      data: { login: string; authToken: string; expiresIn: string };
       message: string;
       actionCode: number;
       errors: { code: string; description: string }[];
@@ -325,7 +325,13 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
       expect(screen.getByRole('button', { name: 'Registrando...' })).toBeInTheDocument();
     });
 
-    resolveRegister!({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
+    resolveRegister!({
+      succeeded: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
   });
 
   it('shows the offline banner text exactly (REGISTRATION.OFFLINE_BANNER)', async () => {
@@ -359,7 +365,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
   it('navigates straight to /login on success and never renders the interim REGISTRATION.SUCCESS_REDIRECT screen (Angular has no such screen)', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],
