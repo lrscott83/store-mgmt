@@ -429,7 +429,7 @@ describe('UserEditPage — S-EDIT-1: pre-fills UserDetailsForm after getById', (
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Pre-filled Name' }) });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Pre-filled Name' }) });
   });
 
   it('pre-fills the fullName input from the fetched user', async () => {
@@ -448,7 +448,7 @@ describe('UserEditPage — S-EDIT-2: details submit calls editUser', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Existing User' }) });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
     mockEditUser = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -469,7 +469,7 @@ describe('UserEditPage — S-EDIT-NAV: successful save navigates to the users li
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Existing User' }) });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
     mockEditUser = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -491,7 +491,7 @@ describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = false;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser() });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser() });
   });
 
   it('details submit is disabled when offline', async () => {
@@ -508,7 +508,7 @@ describe('UserEditPage — S-EDIT-6: isActive hidden for non-admin', () => {
     mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: false });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser() });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser() });
   });
 
   it('does not show isActive toggle for regular (non-admin) user', async () => {
@@ -544,7 +544,7 @@ describe('UserEditPage — S-NOCRED: no credentials/password UI is rendered (Req
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser() });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser() });
   });
 
   it('does not render any password/credentials fields or change-password action', async () => {

@@ -93,6 +93,7 @@ describe('ownerHttpService.getOwner — HTTP-3: GET /v1/owners/:id', () => {
     const { ownerHttpService } = await import('../owner-http-service');
     const result = await ownerHttpService.getOwner('o1');
     expect(result.succeeded).toBe(true);
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.fullName).toBe('John Owner');
     expect(result.message).toBe('');
     expect(result.actionCode).toBe(0);

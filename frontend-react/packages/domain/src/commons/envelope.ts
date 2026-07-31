@@ -18,7 +18,7 @@ export function success<T>(data: T): BaseResponseModel<T> {
 
 export function failure<T>(errors: BaseError[]): BaseResponseModel<T> {
   return {
-    data: null as unknown as T,
+    data: null,
     succeeded: false,
     message: '',
     actionCode: 400,

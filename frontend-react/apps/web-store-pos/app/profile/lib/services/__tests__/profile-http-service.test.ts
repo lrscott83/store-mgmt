@@ -46,7 +46,7 @@ describe('profileHttpService.updateProfile — HTTP-2: PUT /v1/users/{id}', () =
     const { profileHttpService } = await import('../profile-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.put as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: { id: 'u1', fullName: 'María García' } },
+      data: { succeeded: true, data: { id: 'u1', fullName: 'María García' } },
     });
 
     const result = await profileHttpService.updateProfile('u1', {
@@ -56,6 +56,7 @@ describe('profileHttpService.updateProfile — HTTP-2: PUT /v1/users/{id}', () =
       isActive: true,
     });
 
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.fullName).toBe('María García');
   });
 });

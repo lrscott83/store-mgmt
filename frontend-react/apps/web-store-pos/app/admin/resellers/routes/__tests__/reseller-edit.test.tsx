@@ -512,7 +512,7 @@ describe('ResellerEditPage — server-side error', () => {
     });
     vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
       succeeded: false,
-      data: false,
+      data: null,
       message: '',
       actionCode: 0,
       errors: [{ code: 'ERR02', description: 'Update failed on server' }],

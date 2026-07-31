@@ -214,7 +214,7 @@ describe('FeaturesPage — error state (succeeded false)', () => {
     const { showToastError } = await import('~/shared/lib/toast');
     vi.mocked(featureHttpService.activateFeatures).mockResolvedValue({
       succeeded: false,
-      data: false,
+      data: null,
       message: 'error',
       actionCode: 0,
       errors: [],

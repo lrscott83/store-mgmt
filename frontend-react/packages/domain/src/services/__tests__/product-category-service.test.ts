@@ -51,6 +51,7 @@ class FakeProductCategoryService implements ProductCategoryService {
 
   async getProductCategoriesView(): Promise<BaseResponseModel<ProductCategoryView[]>> {
     const available = await this.getAvailableProductCategories();
+    if (!available.succeeded) return failure(available.errors);
     return success(available.data.map((c) => ({ ...c, productsCount: 0 })));
   }
 }
@@ -69,9 +70,11 @@ describe('ProductCategoryService', () => {
     expect(updated.succeeded).toBe(true);
 
     const available = await svc.getAvailableProductCategories();
+    if (!available.succeeded) throw new Error('expected succeeded response');
     expect(available.data.map((c) => c.name)).toEqual(['Bebidas Updated', 'Snacks']);
 
     const view = await svc.getProductCategoriesView();
+    if (!view.succeeded) throw new Error('expected succeeded response');
     expect(view.data).toHaveLength(2);
     expect(view.data[0]).toHaveProperty('productsCount', 0);
   });

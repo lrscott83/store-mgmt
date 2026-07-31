@@ -76,6 +76,10 @@ export function ResellerEditPage() {
     resellerHttpService
       .getReseller(id)
       .then((res) => {
+        if (!res.succeeded) {
+          setLoadError(formatMessage({ id: 'RESELLERS.ERROR' }));
+          return;
+        }
         const r = res.data;
         setReseller(r);
         setLogin(r.login ?? '');

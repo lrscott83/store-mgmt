@@ -136,6 +136,7 @@ describe('authHttpService.register — POST /v1/auth/register (registerOwner par
 
     expect(result).toHaveProperty('succeeded', true);
     expect(result).toHaveProperty('errors');
+    if (!result.succeeded) throw new Error('expected succeeded response');
     const data: RegisterAuthModel = result.data;
     expect(data.login).toBe('janedoe');
   });

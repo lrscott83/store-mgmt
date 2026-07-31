@@ -29,7 +29,11 @@ export function InventoryAvailablePage() {
     // groups its own active entries and sources product/category names internally (via
     // ProductRepository / ProductRepository.getCategoryRepository()), so the category/product
     // fetching this page used to do purely to build the `enriched` array is no longer needed.
-    setCategories(inventorySvc.getInventoryCategoriesView().data);
+    const response = inventorySvc.getInventoryCategoriesView();
+    // InventoryOfflineService.getInventoryCategoriesView is a sync local-storage read that
+    // never actually fails; this guard exists for the type only.
+    if (!response.succeeded) return;
+    setCategories(response.data);
   }, [storeId]);
 
   // Header total inventory value — Angular's InventoryAvailableComponent.getInventoryCostTotal()

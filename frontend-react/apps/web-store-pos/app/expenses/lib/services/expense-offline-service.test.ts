@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
-import type { Expense, UserModel } from '@store-mgmt/domain';
+import type { BaseResponseModel, Expense, UserModel } from '@store-mgmt/domain';
 import { ExpenseOfflineService } from './expense-offline-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 const storeId = 'store-test';
+
+// response-envelope-nullability: `data` only narrows to non-null on the succeeded
+// branch. These tests only ever exercise the success path, so unwrap once instead of
+// repeating an `if (!x.succeeded) throw` guard at every assertion site.
+function unwrap<T>(response: BaseResponseModel<T>): T {
+  if (!response.succeeded) throw new Error('expected succeeded response');
+  return response.data;
+}
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -347,7 +355,7 @@ describe('ExpenseOfflineService', () => {
     create({ date: dayBefore, total: 111 });
     create({ date: dayAfter, total: 222 });
 
-    const result = svc.getExpensesInDay(target).data;
+    const result = unwrap(svc.getExpensesInDay(target));
     expect(result).toHaveLength(1);
     expect(result[0].total).toBe(50);
   });
@@ -361,7 +369,7 @@ describe('ExpenseOfflineService', () => {
     create({ date: new Date(`${day}T18:00:00.000`), total: 30 });
     create({ date: new Date(`${day}T12:00:00.000`), total: 20 });
 
-    const result = svc.getExpensesInDay(new Date(`${day}T10:00:00.000`)).data;
+    const result = unwrap(svc.getExpensesInDay(new Date(`${day}T10:00:00.000`)));
     expect(result.map((e) => e.total)).toEqual([30, 20, 10]);
   });
 
@@ -375,8 +383,9 @@ describe('ExpenseOfflineService', () => {
     create({ date: today, total: 50 });
     const response = await svc.getExpensesInDayObservable(today);
     expect(response.succeeded).toBe(true);
-    expect(response.data).toHaveLength(1);
-    expect(response.data[0].total).toBe(50);
+    const data = unwrap(response);
+    expect(data).toHaveLength(1);
+    expect(data[0].total).toBe(50);
   });
 
   it('getExpensesInDayObservable honors the passed date (BUG FIX carried through)', async () => {
@@ -384,8 +393,9 @@ describe('ExpenseOfflineService', () => {
     create({ date: target, total: 50 });
     create({ date: new Date('2024-03-16T01:00:00.000'), total: 222 });
     const response = await svc.getExpensesInDayObservable(target);
-    expect(response.data).toHaveLength(1);
-    expect(response.data[0].total).toBe(50);
+    const data = unwrap(response);
+    expect(data).toHaveLength(1);
+    expect(data[0].total).toBe(50);
   });
 
   // S-EXP-7: note defaults to '' when not provided
@@ -483,16 +493,18 @@ describe('ExpenseOfflineService', () => {
       create({ type: ExpenseType.Comida });
       create({ type: ExpenseType.Transporte });
       const response = await svc.filterExpensesObservable(ExpenseType.Comida);
-      expect(response.data).toHaveLength(1);
-      expect(response.data[0].type).toBe(ExpenseType.Comida);
+      const data = unwrap(response);
+      expect(data).toHaveLength(1);
+      expect(data[0].type).toBe(ExpenseType.Comida);
     });
 
     it('filters by paymentType when provided', async () => {
       create({ paymentType: PaymentType.Efectivo });
       create({ paymentType: PaymentType.Tarjeta });
       const response = await svc.filterExpensesObservable(undefined, PaymentType.Tarjeta);
-      expect(response.data).toHaveLength(1);
-      expect(response.data[0].paymentType).toBe(PaymentType.Tarjeta);
+      const data = unwrap(response);
+      expect(data).toHaveLength(1);
+      expect(data[0].paymentType).toBe(PaymentType.Tarjeta);
     });
 
     it('filters by date range when startDate/endDate provided', async () => {
@@ -504,15 +516,16 @@ describe('ExpenseOfflineService', () => {
         new Date('2024-05-01T00:00:00.000'),
         new Date('2024-07-01T00:00:00.000'),
       );
-      expect(response.data).toHaveLength(1);
-      expect(response.data[0].date.getMonth()).toBe(5); // June
+      const data = unwrap(response);
+      expect(data).toHaveLength(1);
+      expect(data[0].date.getMonth()).toBe(5); // June
     });
 
     it('excludes soft-deleted expenses regardless of filters', async () => {
       const deleted = create();
       svc.deleteExpense(deleted.id);
       const response = await svc.filterExpensesObservable();
-      expect(response.data).toHaveLength(0);
+      expect(unwrap(response)).toHaveLength(0);
     });
 
     it('returns all active expenses when no filters provided', async () => {

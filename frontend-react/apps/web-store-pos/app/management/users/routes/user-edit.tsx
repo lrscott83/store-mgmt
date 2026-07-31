@@ -34,6 +34,10 @@ export function UserEditPage() {
     userHttpService
       .getUserById(userId)
       .then((res) => {
+        if (!res.succeeded) {
+          setLoadError(intl.formatMessage({ id: 'USERS.ERROR' }));
+          return;
+        }
         setStoreUser(res.data);
         setLoadError('');
       })

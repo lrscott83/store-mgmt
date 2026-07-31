@@ -83,13 +83,19 @@ export function InventoryTodayQuantitiesPage() {
     // WU3 (service-return-shape-parity Slice 1, category B): getInventoryEntriesInDay now
     // returns BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`.
     // Fase 4: renamed from getByDate (date arg ignored — always returns today).
-    const todayEntries = inventorySvc.getInventoryEntriesInDay(today).data;
+    const entriesResponse = inventorySvc.getInventoryEntriesInDay(today);
+    // InventoryOfflineService's category-B reads are sync local-storage reads that never
+    // actually fail; these guards exist for the type only.
+    if (!entriesResponse.succeeded) return;
+    const todayEntries = entriesResponse.data;
 
     // Angular lines 78-81: getInventoryCategoriesView() — zero-arg (Fase 4 GATE-B), sources
     // each product's `disponible` quantity by grouping the service's own active entries; the
     // `enriched` products array is no longer needed as an input.
+    const categoriesResponse = inventorySvc.getInventoryCategoriesView();
+    if (!categoriesResponse.succeeded) return;
     const availableByProduct = new Map<string, number>();
-    for (const cat of inventorySvc.getInventoryCategoriesView().data) {
+    for (const cat of categoriesResponse.data) {
       for (const prod of cat.products) {
         availableByProduct.set(prod.productId, prod.totalAvailable);
       }

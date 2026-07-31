@@ -354,7 +354,7 @@ describe('OwnerCreatePage — server error', () => {
     );
     vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
       succeeded: false,
-      data: '',
+      data: null,
       message: '',
       actionCode: 0,
       errors: [{ code: 'E01', description: 'Login already taken' }],

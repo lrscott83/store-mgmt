@@ -541,7 +541,7 @@ describe('OwnerEditPage — PUT failure inline error', () => {
     });
     vi.mocked(ownerHttpService.updateOwner).mockResolvedValue({
       succeeded: false,
-      data: false,
+      data: null,
       message: '',
       actionCode: 0,
       errors: [{ code: 'E01', description: 'Owner not found' }],

@@ -52,14 +52,14 @@ Delivery is commits-only on `feat/response-envelope-nullability` — no PR split
 
 ## Phase 4 (WU-D): type flip — INDIVISIBLE, one commit
 
-- [ ] 4.1 `base.ts:13-19` interface → 2-branch discriminated union on `succeeded`; `message string|null`, `actionCode number|null` both branches; `errors: BaseError[]` stays non-null (ADR-1).
-- [ ] 4.2 `envelope.ts:21` remove `null as unknown as T` → `data: null` in `failure()` (ADR-2); factories keep `message:''`/`actionCode:200|400`.
-- [ ] 4.3 Add ADR-3 union-collapse `@ts-expect-error` probe to `envelope.test.ts`.
-- [ ] 4.4 Annotate `user-home.test.ts:38` helper `: BaseResponseModel<boolean>`.
-- [ ] 4.5 `register.test.tsx:85-92` failure fixture → `data: null`, drop fabricated payload.
-- [ ] 4.6 Fix EVERY remaining file named by 0.1's compiler output — **this sub-list is not enumerable now; expand it verbatim from WU0 before starting 4.6, do not assume it's just 4.1-4.5**.
-- [ ] 4.7 `pnpm typecheck`, `pnpm test`, `pnpm lint --max-warnings=0` green across all 4 packages.
-- [ ] 4.8 ONE commit for all of WU-D, even if diff exceeds ~400 lines (red-tree between commits is disallowed by commits-only policy).
+- [x] 4.1 `base.ts:13-19` interface → 2-branch discriminated union on `succeeded`; `message string|null`, `actionCode number|null` both branches; `errors: BaseError[]` stays non-null (ADR-1).
+- [x] 4.2 `envelope.ts:21` remove `null as unknown as T` → `data: null` in `failure()` (ADR-2); factories keep `message:''`/`actionCode:200|400`.
+- [x] 4.3 Add ADR-3 union-collapse `@ts-expect-error` probe to `envelope.test.ts`.
+- [x] 4.4 Annotate `user-home.test.ts:38` helper `: BaseResponseModel<boolean>`.
+- [x] 4.5 `register.test.tsx:85-92` failure fixture → `data: null`, drop fabricated payload.
+- [x] 4.6 Fixed EVERY remaining file named by 0.1's compiler output — 37 files (2 packages/domain, 35 apps/web-store-pos: 18 production call-sites + 19 test files), full list recorded in apply-progress topic_key `sdd/response-envelope-nullability/apply-progress`. Production guards mirror each file's own idiom (visible error state / silent early-return where the offline service factory provably never fails); test files narrow via local `if (!x.succeeded) throw` or a per-file `unwrap()` helper; several pre-existing test fixtures missing `succeeded: true` on success mocks were also corrected (they worked by coincidence pre-union).
+- [x] 4.7 `pnpm typecheck`, `pnpm test`, `pnpm lint --max-warnings=0` green across all 4 packages (2172/2172 tests, 0 typecheck errors, 0 lint warnings).
+- [x] 4.8 ONE commit for all of WU-D (~41 files, exceeds 400 lines — red-tree between commits is disallowed by commits-only policy, per design).
 
 ## Phase 5: Deferred to sdd-archive (not an apply task)
 

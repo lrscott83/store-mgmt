@@ -29,6 +29,9 @@ export function TodayExpensesPage() {
   async function loadExpenses() {
     const svc = new ExpenseOfflineService(storeId);
     const response = await svc.getExpensesInDayObservable(new Date());
+    // ExpenseOfflineService.getExpensesInDayObservable is a same-tick `Promise.resolve(...)`
+    // over local storage — it never actually fails; this guard exists for the type only.
+    if (!response.succeeded) return;
     setExpenses(response.data);
   }
 

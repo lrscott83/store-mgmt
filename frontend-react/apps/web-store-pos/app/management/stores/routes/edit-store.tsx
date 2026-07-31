@@ -7,6 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreForm } from '~/management/stores/components/store-form';
+import { success } from '@store-mgmt/domain';
 import type { Store, Module, Owner } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
@@ -48,9 +49,13 @@ export function EditStorePage() {
       Promise.all([
         storeHttpService.getStore(storeId),
         storeHttpService.getModulesToStore(),
-        (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve({ data: [] as Owner[] }),
+        (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve(success([] as Owner[])),
       ])
         .then(([storeRes, modulesRes, ownersRes]) => {
+          if (!storeRes.succeeded || !modulesRes.succeeded || !ownersRes.succeeded) {
+            setLoadError(intl.formatMessage({ id: 'STORES.ERROR' }));
+            return;
+          }
           const fetchedStore = storeRes.data;
           // Merge store.modules into catalog: selected=true, override price overrides
           const storeModuleIds = new Set(fetchedStore.modules.map((m) => m.id));
@@ -78,9 +83,13 @@ export function EditStorePage() {
     } else {
       Promise.all([
         storeHttpService.getModulesToStore(),
-        (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve({ data: [] as Owner[] }),
+        (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve(success([] as Owner[])),
       ])
         .then(([modulesRes, ownersRes]) => {
+          if (!modulesRes.succeeded || !ownersRes.succeeded) {
+            setCatalogError(intl.formatMessage({ id: 'STORES.ERROR' }));
+            return;
+          }
           setModules(modulesRes.data);
           setOwners(ownersRes.data);
           setCatalogError('');

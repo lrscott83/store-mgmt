@@ -27,6 +27,10 @@ export function CollectionsPage() {
   const loadRows = useCallback(async () => {
     try {
       const res = await storeHttpService.getStoresToCollect();
+      if (!res.succeeded) {
+        setError(intl.formatMessage({ id: 'BILLING.COLLECTIONS.ERROR' }));
+        return;
+      }
       setRows(res.data);
       setError(undefined);
     } catch {

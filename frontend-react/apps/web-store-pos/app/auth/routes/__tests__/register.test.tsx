@@ -34,6 +34,7 @@ vi.mock('~/shared/lib/auth/connectivity-service', () => ({
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import RegisterPage from '../register';
+import type { BaseResponseModel, RegisterAuthModel } from '@store-mgmt/domain';
 
 function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText('Nombre Completo'), { target: { value: 'Jane Doe' } });
@@ -85,7 +86,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('succeeded:false shows errors[0].description and does not navigate', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: false,
-      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
+      data: null,
       message: '',
       actionCode: 400,
       errors: [{ code: 'LOGIN_TAKEN', description: 'Login already exists' }],
@@ -305,13 +306,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
   });
 
   it('shows "Registrando..." on the submit button while loading (AUTH.REGISTERING)', async () => {
-    let resolveRegister: (value: {
-      succeeded: boolean;
-      data: { login: string; authToken: string; expiresIn: string };
-      message: string;
-      actionCode: number;
-      errors: { code: string; description: string }[];
-    }) => void;
+    let resolveRegister: (value: BaseResponseModel<RegisterAuthModel>) => void;
     vi.mocked(authHttpService.register).mockReturnValue(
       new Promise((resolve) => {
         resolveRegister = resolve;

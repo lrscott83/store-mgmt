@@ -165,6 +165,7 @@ describe('ProductService', () => {
     expect(byBarcode.data?.id).toBe('p1');
 
     const toSelect = await svc.getProductsToSelect();
+    if (!toSelect.succeeded) throw new Error('expected succeeded response');
     expect(toSelect.data[0]).toEqual({ id: 'p1', fullName: 'Bebidas - Coca Cola' });
 
     const availableByCategory = await svc.getAvailableProductsByCategoryId('cat1');

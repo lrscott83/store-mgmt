@@ -24,7 +24,7 @@ describe('storeHttpService.listStores — HTTP-2: GET /v1/stores/by-current-user
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: [{ id: 's1', name: 'Store One' }] },
+      data: { succeeded: true, data: [{ id: 's1', name: 'Store One' }] },
     });
   });
 
@@ -38,6 +38,7 @@ describe('storeHttpService.listStores — HTTP-2: GET /v1/stores/by-current-user
   it('returns the data array from the response', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const result = await storeHttpService.listStores();
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data).toHaveLength(1);
     expect(result.data[0].name).toBe('Store One');
   });
@@ -48,7 +49,7 @@ describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: { id: 's1', name: 'Store One' } },
+      data: { succeeded: true, data: { id: 's1', name: 'Store One' } },
     });
   });
 
@@ -62,6 +63,7 @@ describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {
   it('returns the store from the response', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const result = await storeHttpService.getStore('s1');
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.name).toBe('Store One');
   });
 
@@ -69,9 +71,10 @@ describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: { id: 's1', name: 'Store One', paymentStartDate: '2026-03-10' } },
+      data: { succeeded: true, data: { id: 's1', name: 'Store One', paymentStartDate: '2026-03-10' } },
     });
     const result = await storeHttpService.getStore('s1');
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.paymentStartDate).toBe('2026-03-10');
   });
 
@@ -79,9 +82,10 @@ describe('storeHttpService.getStore — HTTP-3: GET /v1/stores/:id', () => {
     const { storeHttpService } = await import('../store-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: { id: 's1', name: 'Store One', paymentStartDate: null } },
+      data: { succeeded: true, data: { id: 's1', name: 'Store One', paymentStartDate: null } },
     });
     const result = await storeHttpService.getStore('s1');
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.paymentStartDate).toBeNull();
   });
 });
@@ -91,7 +95,7 @@ describe('storeHttpService.createStore — HTTP-4: POST /v1/stores', () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: { id: 'new-s', name: 'New Store' } },
+      data: { succeeded: true, data: { id: 'new-s', name: 'New Store' } },
     });
   });
 
@@ -120,6 +124,7 @@ describe('storeHttpService.createStore — HTTP-4: POST /v1/stores', () => {
       approved: false,
       moduleIds: [],
     });
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.name).toBe('New Store');
   });
 });
@@ -217,6 +222,7 @@ describe('storeHttpService.getStoresToCollect — HTTP-12: GET /v1/stores/to-col
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {
+        succeeded: true,
         data: [
           {
             storeId: 's1',
@@ -241,6 +247,7 @@ describe('storeHttpService.getStoresToCollect — HTTP-12: GET /v1/stores/to-col
   it('returns the raw response.data (no mapping)', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const result = await storeHttpService.getStoresToCollect();
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data).toHaveLength(1);
     expect(result.data[0]).toEqual({
       storeId: 's1',
@@ -279,7 +286,7 @@ describe('storeHttpService.getReSellerCommissions — HTTP-14: GET /v1/stores/re
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: [{ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 }] },
+      data: { succeeded: true, data: [{ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 }] },
     });
   });
 
@@ -293,6 +300,7 @@ describe('storeHttpService.getReSellerCommissions — HTTP-14: GET /v1/stores/re
   it('returns the raw response.data (no mapping)', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const result = await storeHttpService.getReSellerCommissions();
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data).toHaveLength(1);
     expect(result.data[0]).toEqual({ year: 2026, month: 7, paymentCount: 3, totalCommission: 90 });
   });
@@ -303,7 +311,7 @@ describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStor
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: [{ id: 1, name: 'Module A', price: 10, currentPrice: 8, priceIncluded: false, discountText: '', selected: false }] },
+      data: { succeeded: true, data: [{ id: 1, name: 'Module A', price: 10, currentPrice: 8, priceIncluded: false, discountText: '', selected: false }] },
     });
   });
 
@@ -317,6 +325,7 @@ describe('storeHttpService.getModulesToStore — HTTP-11: GET /v1/modules/ToStor
   it('returns module array from response', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const result = await storeHttpService.getModulesToStore();
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data).toHaveLength(1);
     expect(result.data[0].name).toBe('Module A');
   });
@@ -327,7 +336,7 @@ describe('storeHttpService.listOwners — OWNER-1: GET /v1/owners/all/true', () 
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: [{ id: 'o1', fullName: 'Owner One' }] },
+      data: { succeeded: true, data: [{ id: 'o1', fullName: 'Owner One' }] },
     });
   });
 
@@ -341,6 +350,7 @@ describe('storeHttpService.listOwners — OWNER-1: GET /v1/owners/all/true', () 
   it('returns owner array from response', async () => {
     const { storeHttpService } = await import('../store-http-service');
     const result = await storeHttpService.listOwners();
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data).toHaveLength(1);
     expect(result.data[0].fullName).toBe('Owner One');
   });
