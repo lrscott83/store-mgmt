@@ -180,7 +180,7 @@ async function createTestOrder(
   details?: string,
 ): Promise<Order> {
   const result = await svc.createOrder(cartItems, orderType, isCredit, paymentType, details, clientName);
-  return result.data as Order;
+  return unwrap(result);
 }
 
 describe('OrderOfflineService', () => {
@@ -265,7 +265,7 @@ describe('OrderOfflineService', () => {
       const product = makeProduct({ id: 'p1', name: 'Cola', categoryId: 'cat1', categoryName: 'Drinks', price: 4 });
       const items = makeCartItems([{ product, quantity: 2 }]);
       const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
-      const oi = result.data!.orderItems[0];
+      const oi = unwrap(result).orderItems[0];
       expect(oi.productId).toBe('p1');
       expect(oi.productName).toBe('Cola');
       expect(oi.quantity).toBe(2);
@@ -285,7 +285,7 @@ describe('OrderOfflineService', () => {
         { product: productB, quantity: 1 }, // cart index 1
       ]);
       const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
-      const orderItems = result.data!.orderItems;
+      const orderItems = unwrap(result).orderItems;
       expect(orderItems[0].order).toBe(5); // productA.order, NOT cart index 0
       expect(orderItems[1].order).toBe(2); // productB.order, NOT cart index 1
     });
