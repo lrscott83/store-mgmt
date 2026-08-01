@@ -83,13 +83,22 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     expect(screen.queryByLabelText(/code/i)).not.toBeInTheDocument();
   });
 
-  it('succeeded:false shows errors[0].description and does not navigate', async () => {
-    vi.mocked(authHttpService.register).mockResolvedValue({
-      succeeded: false,
-      data: null,
-      message: '',
-      actionCode: 400,
-      errors: [{ code: 'LOGIN_TAKEN', description: 'Login already exists' }],
+  // Backend contract: AuthController.RegisterAsync returns Created(...) on success and
+  // BadRequest(result) on EVERY failure (AuthController.cs:90-102) — a succeeded:false
+  // envelope therefore NEVER resolves; it always arrives as an axios rejection whose body
+  // is { succeeded:false, data:null, message:null, errors:[{code,description}], actionCode }.
+  it('HTTP 400 rejection surfaces errors[0].description and does not navigate', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          succeeded: false,
+          data: null,
+          message: null,
+          actionCode: 400,
+          errors: [{ code: 'Login', description: 'Login already exists' }],
+        },
+      },
     });
     renderRegister();
     fillRequiredFields();
@@ -97,6 +106,28 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Login already exists')).toBeInTheDocument();
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  // Guard the array — an empty/missing errors[] on a 400 must not throw and falls back to
+  // the existing generic copy (ResponseResult.Message is always null, so there is no other
+  // signal to read).
+  it('HTTP 400 rejection with an empty errors[] falls back to the generic validation-error copy', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue({
+      response: {
+        status: 400,
+        data: { succeeded: false, data: null, message: null, actionCode: 400, errors: [] },
+      },
+    });
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Error de validación. Por favor, revise sus datos.')
+      ).toBeInTheDocument();
     });
     expect(mockNavigate).not.toHaveBeenCalled();
   });

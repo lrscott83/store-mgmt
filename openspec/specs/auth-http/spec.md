@@ -98,32 +98,50 @@ for "auto-login". That framing is INCORRECT for this change — see S3, Decision
 
 ---
 
-### S3: Response Envelope Handling at Call-Site (Updated 2026-07-30)
+### S3: Response Envelope Handling at Call-Site (Corrected 2026-07-31)
 
-**Requirement**: `register.tsx` MUST branch on the `succeeded` field. On `succeeded === true` it
-MUST navigate to `/login` — this behavior is **REAFFIRMED unchanged** (Angular parity, Decision 1:
-no auto-authentication). The resolved `data.authToken` MUST be received and typed but MUST NOT be
-persisted, stored, or used to hydrate a session on this path — it is deliberately discarded.
+**Requirement**: `register.tsx` MUST branch on whether `register()` resolves or rejects, NOT on a
+resolved `succeeded: false` envelope. `AuthController.RegisterAsync` (backend) returns
+`201 Created` on success and `BadRequest(result)` on EVERY failure
+(`AuthController.cs:90-102`) — a `succeeded: false` envelope therefore NEVER resolves; axios
+raises it as a rejection because the HTTP status is non-2xx. On a resolved response (always
+`succeeded: true`) the call MUST navigate to `/login` — this behavior is **REAFFIRMED unchanged**
+(Angular parity, Decision 1: no auto-authentication). The resolved `data.authToken` MUST be
+received and typed but MUST NOT be persisted, stored, or used to hydrate a session on this path —
+it is deliberately discarded.
 
 **Flow**:
 ```
-register() resolves:
-├─ succeeded === true → navigate('/login') — authToken received, deliberately unused
-├─ succeeded === false → setErrors({ form: errors[0].description })
-└─ (does not throw; transport errors caught separately in the outer catch)
+register() settles:
+├─ resolves (always succeeded: true) → navigate('/login') — authToken received, deliberately unused
+└─ rejects (HTTP 4xx/5xx, including every succeeded:false case) → caught in the outer catch:
+   ├─ status === 400 → setErrors({ form: response.data.errors[0]?.description ?? REGISTRATION.VALIDATION_ERROR })
+   ├─ status === 429 → setErrors({ form: REGISTRATION.TOO_MANY_ATTEMPTS })
+   └─ otherwise → setErrors({ form: REGISTRATION.UNEXPECTED_ERROR })
 ```
 
 **Constraints**:
-- Navigate to `/login` unconditionally on `succeeded === true`.
+- Navigate to `/login` unconditionally when `register()` resolves.
 - No branch of the register success path MUST read `data.authToken` to hydrate a session, call an
   auth-store login/session action, or otherwise authenticate the user.
-- Surface `errors[0].description` ONLY when `succeeded === false`.
-- Network/HTTP transport failures MUST be caught in a separate outer catch block, independent of
-  the envelope branch.
+- Failure text MUST be read from the rejection body's `errors[0].description`, guarding the array
+  access (it MUST NOT index blindly) — `ResponseResult.Message` is always `null`
+  (`ResponseResult.cs:14-17`; `ErrorHandlerMiddleware` only ever sets `.Errors`), so
+  `response.data.message` MUST NOT be read for this purpose.
+- A missing/empty `errors` array on an HTTP 400 falls back to the existing generic copy
+  (`REGISTRATION.VALIDATION_ERROR`).
+- The HTTP 429 branch is unchanged and independent of the description-reading logic above.
 
 (Previously: required extracting and storing the JWT for "auto-login" as part of the success
 branch. REJECTED by Decision 1 — Angular's `register.component.ts:75` navigates to `/login`
 without authenticating; the forced re-login round trip is preserved on purpose.)
+
+(Also previously: this section documented a resolved `succeeded === false` branch reading
+`errors[0].description` directly off the resolved value, and a `response.data.message`-based
+`REGISTRATION.EMAIL_TAKEN` mapping on HTTP 400. Both were INCORRECT — the backend never resolves a
+failure (see Requirement above) and never populates `.Message`, so neither path was reachable.
+That dead code has been removed from `register.tsx`, and the unreferenced `REGISTRATION.EMAIL_TAKEN`
+i18n key has been removed from `es.ts`.)
 
 #### Scenario: Successful registration navigates to /login without consuming the token
 - GIVEN `register()` resolves with `succeeded: true` and `data.authToken` present
@@ -131,10 +149,17 @@ without authenticating; the forced re-login round trip is preserved on purpose.)
 - THEN the app navigates to `/login`
 - AND no code path reads `data.authToken` to hydrate a session or invoke a login/auth-store action
 
-#### Scenario: Registration failure still surfaces the description
-- GIVEN `register()` resolves with `succeeded: false` and `errors: [{ description: "..." }]`
+#### Scenario: Registration failure surfaces the backend's literal description
+- GIVEN `register()` rejects with an HTTP 400 response whose body is
+  `{ succeeded: false, data: null, message: null, actionCode: 400, errors: [{ code: "Login", description: "..." }] }`
 - WHEN the register flow completes
 - THEN the form error is set to `errors[0].description`
+- AND no navigation occurs
+
+#### Scenario: HTTP 400 rejection with an empty errors array falls back to generic copy
+- GIVEN `register()` rejects with an HTTP 400 response whose body has `errors: []`
+- WHEN the register flow completes
+- THEN the form error is set to `REGISTRATION.VALIDATION_ERROR`
 - AND no navigation occurs
 
 ---

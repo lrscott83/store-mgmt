@@ -118,21 +118,22 @@ export default function RegisterPage() {
       });
       if (response.succeeded) {
         navigate('/login');
-      } else {
-        setErrors({ form: response.errors[0].description });
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status: number; data?: { message?: string } } };
+      // Backend contract: AuthController.RegisterAsync returns Created(...) on success and
+      // BadRequest(result) on EVERY failure — a succeeded:false envelope never resolves, it
+      // always arrives here as a rejection. ResponseResult.Message is always null (no setter
+      // populated by ErrorHandlerMiddleware), so the literal failure text lives at
+      // errors[0].description, never at data.message.
+      const axiosErr = err as {
+        response?: { status: number; data?: { errors?: Array<{ description?: string }> } };
+      };
       const status = axiosErr.response?.status;
-      const message = axiosErr.response?.data?.message;
       if (status === 400) {
-        if (message?.toLowerCase().includes('email')) {
-          setErrors({ email: intl.formatMessage({ id: 'REGISTRATION.EMAIL_TAKEN' }) });
-        } else {
-          setErrors({
-            form: message ?? intl.formatMessage({ id: 'REGISTRATION.VALIDATION_ERROR' }),
-          });
-        }
+        const description = axiosErr.response?.data?.errors?.[0]?.description;
+        setErrors({
+          form: description ?? intl.formatMessage({ id: 'REGISTRATION.VALIDATION_ERROR' }),
+        });
       } else if (status === 429) {
         setErrors({ form: intl.formatMessage({ id: 'REGISTRATION.TOO_MANY_ATTEMPTS' }) });
       } else {
