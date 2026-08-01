@@ -366,7 +366,7 @@ export class OrderOfflineService {
     // getCategoryCartItemsView is a sync local-storage read that always returns success();
     // this guard exists for the type only.
     const response = this.getCategoryCartItemsView(date);
-    return Promise.resolve(success(response.succeeded ? response.data : []));
+    return Promise.resolve(response);
   }
 
   /**
