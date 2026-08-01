@@ -21,8 +21,8 @@ namespace Infrastructure.Persistence.Repositories
         {
             return await _roles
                 .IgnoreQueryFilters()
-                .Where(r => r.IsActive && 
-                    (includeSuperAdminRole && r.Id == (int)RoleType.SuperAdmin) )
+                .Where(r => r.IsActive &&
+                    (r.Id != (int)RoleType.SuperAdmin || includeSuperAdminRole))
                 .ToListAsync();
         }
 
@@ -33,9 +33,12 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync(r => r.Name == name);
         }
 
-        public Task<IEnumerable<Role>> GetRolesByIds(HashSet<Guid> roleIds)
+        public async Task<IEnumerable<Role>> GetRolesByIds(HashSet<int> roleIds)
         {
-            throw new NotImplementedException();
+            return await _roles
+                .IgnoreQueryFilters()
+                .Where(r => roleIds.Contains(r.Id))
+                .ToListAsync();
         }
     }
 }

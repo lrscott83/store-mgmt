@@ -47,7 +47,7 @@ export class StoreService extends BaseService<Store>{
     }
 
     editStore(storeId: string, name: string, address: string, description: string, approved: boolean, 
-        paymentStartDate: Date, isActive: boolean, moduleIds: number[]): Observable<BaseResponseModel<boolean>> {
+        paymentStartDate: string | null, isActive: boolean, moduleIds: number[]): Observable<BaseResponseModel<boolean>> {
         const editStoreRequest = {
             id: storeId,
             name: name,

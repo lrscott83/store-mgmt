@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Domain.Common.Enums;
 using Domain.Entities.StoreUsers;
 using Domain.Entities.UserRoles;
@@ -227,6 +229,31 @@ public sealed class ExportOfflineRosterTests
             {
                 roster1.Users[i].WrappedDek.Should().NotBe(roster2.Users[i].WrappedDek);
             }
+
+            // Unwrap each user's DEK from BOTH exports (KEK derived from the real stored
+            // User.Password hash) and assert the recovered DEKs are byte-identical.
+            for (int i = 0; i < roster1.Users.Count; i++)
+            {
+                var user1 = roster1.Users[i];
+                var user2 = roster2.Users[i];
+                user1.Id.Should().Be(user2.Id);
+
+                string storedPasswordHash;
+                using (var scope = _f.Services.CreateScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    storedPasswordHash = await db.Set<User>().IgnoreQueryFilters()
+                        .Where(u => u.Id == user1.Id)
+                        .Select(u => u.Password)
+                        .SingleAsync();
+                }
+
+                var dek1 = UnwrapDek(storedPasswordHash, user1.WrappedDek, user1.WrapSalt, user1.WrapIv);
+                var dek2 = UnwrapDek(storedPasswordHash, user2.WrappedDek, user2.WrapSalt, user2.WrapIv);
+
+                dek1.Should().HaveCount(32);
+                dek1.Should().BeEquivalentTo(dek2);
+            }
         }
         finally
         {
@@ -234,6 +261,27 @@ public sealed class ExportOfflineRosterTests
             await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
             await DbTestHelpers.CleanupUserAsync(_f, saUserId);
         }
+    }
+
+    private static byte[] UnwrapDek(string storedPasswordHash, string wrappedDek, string wrapSalt, string wrapIv)
+    {
+        // Mirrors StoreKeyWrapService: KEK = Pbkdf2(UTF8(hash), salt, 210_000, SHA256, 32);
+        // wire format = Base64(ciphertext || tag), tag = 16 bytes; IV = 12 bytes.
+        byte[] kek = Rfc2898DeriveBytes.Pbkdf2(
+            Encoding.UTF8.GetBytes(storedPasswordHash),
+            Convert.FromBase64String(wrapSalt),
+            210_000,
+            HashAlgorithmName.SHA256,
+            32);
+
+        byte[] wrapped = Convert.FromBase64String(wrappedDek);
+        byte[] ciphertext = wrapped[..^16];
+        byte[] tag = wrapped[^16..];
+
+        byte[] dek = new byte[32];
+        using var aesGcm = new AesGcm(kek, 16);
+        aesGcm.Decrypt(Convert.FromBase64String(wrapIv), ciphertext, tag, dek);
+        return dek;
     }
 
     private async Task SeedStoreUserAsync(Guid storeId, Guid tenantId, string prefix, string fullName)

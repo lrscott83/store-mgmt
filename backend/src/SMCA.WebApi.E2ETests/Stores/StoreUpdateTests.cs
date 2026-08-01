@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Infrastructure.Persistence.Contexts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SMCA.WebApi.E2ETests.Infrastructure;
 using Xunit;
 
@@ -9,13 +12,24 @@ namespace SMCA.WebApi.E2ETests.Stores;
 [Collection("e2e")]
 public sealed class StoreUpdateTests
 {
+    private readonly WebAppFixture _fixture;
     private readonly AppTestFactory _f;
-    public StoreUpdateTests(WebAppFixture fixture) => _f = fixture.Factory;
+    public StoreUpdateTests(WebAppFixture fixture)
+    {
+        _fixture = fixture;
+        _f = fixture.Factory;
+    }
 
     private static object Body(Guid bodyId, string name, IEnumerable<int> moduleIds) => new
     {
         Id = bodyId, Name = name, Address = "a", Description = "d", Approved = false,
         ModuleIds = moduleIds, IsActive = true
+    };
+
+    private static object BodyWithPaymentDate(Guid bodyId, string name, IEnumerable<int> moduleIds, string paymentStartDate) => new
+    {
+        Id = bodyId, Name = name, Address = "a", Description = "d", Approved = false,
+        ModuleIds = moduleIds, IsActive = true, paymentStartDate
     };
 
     [Fact]
@@ -50,6 +64,59 @@ public sealed class StoreUpdateTests
             r.StatusCode.Should().Be(HttpStatusCode.OK);
         }
         finally { await StoreSeed.CleanupStoreFixtureAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task Update_with_payment_date_in_body_persists_explicit_date()
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await BillingSeed.SeedFreeStoreAsync(_f);
+        try
+        {
+            // General PUT with an explicit paymentStartDate (SuperAdmin) must persist it,
+            // not silently ignore the field (the debt T-B3 closed).
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}",
+                    BodyWithPaymentDate(Guid.Empty, $"n-{Guid.NewGuid():N}", new[] { BillingSeed.ManagementModuleId }, "2026-07-01"));
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var store = await db.Set<Domain.Entities.Stores.Store>()
+                .IgnoreQueryFilters()
+                .FirstAsync(s => s.Id == fx.StoreId);
+            store.PaymentStartDate.Should().Be(new DateOnly(2026, 7, 1));
+        }
+        finally { await BillingSeed.CleanupAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task Update_with_explicit_payment_date_beats_auto_activation()
+    {
+        using var _ = _fixture.Clock.Pin(new DateTimeOffset(2026, 7, 15, 0, 0, 0, TimeSpan.Zero));
+
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await BillingSeed.SeedFreeStoreAsync(_f);
+        try
+        {
+            // Adding the paid Statistics module (id=6) would auto-set PaymentStartDate to today
+            // (2026-07-15); the explicit date in the body must win (spec 3c).
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .PutAsJsonAsync($"/api/v1/stores/{fx.StoreId}",
+                    BodyWithPaymentDate(Guid.Empty, $"n-{Guid.NewGuid():N}",
+                        new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId }, "2026-07-01"));
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var store = await db.Set<Domain.Entities.Stores.Store>()
+                .IgnoreQueryFilters()
+                .FirstAsync(s => s.Id == fx.StoreId);
+            store.PaymentStartDate.Should().Be(new DateOnly(2026, 7, 1));
+        }
+        finally { await BillingSeed.CleanupAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }
 
     [Fact]

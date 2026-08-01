@@ -29,19 +29,19 @@ namespace Application.Features.UserManagement.Users.Queries.GetAllUsers
 
         public async Task<ResponseResult<IEnumerable<UserListDto>>> Handle(GetAllUsersQuery query, CancellationToken cancellationToken)
         {
-            IEnumerable<User> users = await FindUsersIncludingRoles(query.IncludeInactive);
+            IEnumerable<User> users = await FindUsersIncludingRoles(query.IncludeInactive, cancellationToken);
             IEnumerable<UserListDto> userDtos = _mapper.Map<IEnumerable<UserListDto>>(users).ToList();
             return ResponseResult.Success(userDtos);
         }
 
-        private async Task<IEnumerable<User>> FindUsersIncludingRoles(bool includeInactive)
+        private async Task<IEnumerable<User>> FindUsersIncludingRoles(bool includeInactive, CancellationToken cancellationToken)
         {
             if (_httpContextService.IsSuperAdmin)
-                return await _userRepository.GetAllUsersIncludingStoreAndRolesAndIgnoreQueryFiltersAsync(includeInactive);
+                return await _userRepository.GetAllUsersIncludingStoreAndRolesAndIgnoreQueryFiltersAsync(includeInactive, cancellationToken);
 
             return _httpContextService.IsOwnerAdmin
-                ? await _userRepository.GetAllUsersIncludingStoreAndRolesAsync(includeInactive)
-                : await _userRepository.GetAllUsersByStoreIdIncludingStoreAndRolesAsync(_httpContextService.StoreId.ToGuid(), includeInactive);
+                ? await _userRepository.GetAllUsersIncludingStoreAndRolesAsync(includeInactive, cancellationToken)
+                : await _userRepository.GetAllUsersByStoreIdIncludingStoreAndRolesAsync(_httpContextService.StoreId.ToGuid(), includeInactive, cancellationToken);
         }
     }
 }

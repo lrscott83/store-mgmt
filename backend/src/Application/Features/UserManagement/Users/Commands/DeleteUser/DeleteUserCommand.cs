@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Extensions;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
@@ -35,11 +36,14 @@ namespace Application.Features.UserManagement.Users.Commands.DeleteUser
         public async Task<ResponseResult<bool>> Handle(DeleteUserCommand request, CancellationToken cancellationToken)
         {
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
-                throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
+                throw new ApiException(_localizer["DontHavePermission"], HttpStatusCode.Forbidden);
+
+            if (request.Id == _httpContextService.UserExternalId.ToGuid())
+                throw new ApiException(_localizer["CannotDeleteSelf"], HttpStatusCode.BadRequest);
 
             var user = await _userRepository.GetByIdAsync(request.Id);
             if (user is null)
-                throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
+                throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.NotFound);
             user.IsActive = false;
             await _userRepository.UpdateAsync(user);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

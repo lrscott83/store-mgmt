@@ -242,7 +242,7 @@ export class EditStoreComponent implements OnInit, OnDestroy {
       this.formGroup.addControl('description', new FormControl("", []));
     }
     if (this.isSuperAdmin && this.editStoreId) {
-      this.formGroup.addControl('paymentStartDate', new FormControl("", Validators.required));
+      this.formGroup.addControl('paymentStartDate', new FormControl(""));
     }
     if (this.isSuperAdmin) {
       this.formGroup.addControl('isActive', new FormControl(false, []));

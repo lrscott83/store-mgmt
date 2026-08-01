@@ -1,14 +1,34 @@
 # Tasks: offline-auth-backend
 
-**Status**: Draft
-**Last Updated**: 2026-07-29
+**Status**: ✅ Complete — 15/15 tasks done (archived)
+**Last Updated**: 2026-07-31
 **Dependencies**: All tasks are sequential within phases; phases can be parallelized as noted.
+
+## Completion (15/15)
+
+- [x] Task 1 — Create IOfflineVerifierService interface + OfflineVerifierResult record
+- [x] Task 2 — Create OfflineVerifierService implementation
+- [x] Task 3 — Create unit tests for OfflineVerifierService
+- [x] Task 4 — Register OfflineVerifierService in DI
+- [x] Task 5 — Add GetStoreUsersByStoreIdAsync to IStoreUserRepository
+- [x] Task 6 — Implement GetStoreUsersByStoreIdAsync in StoreUserRepository
+- [x] Task 7 — Add GetAllowedFeatureIdsForUserAsync to IAllowedFeaturesService
+- [x] Task 8 — Implement GetAllowedFeatureIdsForUserAsync in AllowedFeaturesService
+- [x] Task 9 — Create unit tests for AllowedFeaturesService new overload
+- [x] Task 10 — Create DTOs (OfflineVerifierDto, OfflineRosterUserDto, OfflineRosterDto)
+- [x] Task 11 — Create ExportOfflineRosterQuery + Handler
+- [x] Task 12 — Create handler unit tests
+- [x] Task 13 — Add action to StoreUsersController
+- [x] Task 14 — Create E2E tests
+- [x] Task 15 — Run full test suite and fix regressions
 
 ---
 
 ## Phase 1: OfflineVerifierService (PBKDF2)
 
 ### Task 1: Create IOfflineVerifierService interface + OfflineVerifierResult record
+
+**Status**: ✅ Complete
 
 **Files to create:**
 - `backend/src/Application/Abstractions/Authentication/IOfflineVerifierService.cs`
@@ -26,6 +46,8 @@
 ---
 
 ### Task 2: Create OfflineVerifierService implementation
+
+**Status**: ✅ Complete
 
 **Files to create:**
 - `backend/src/Application/Services/Authentication/OfflineVerifierService.cs`
@@ -50,6 +72,8 @@
 
 ### Task 3: Create unit tests for OfflineVerifierService
 
+**Status**: ✅ Complete
+
 **Files to create:**
 - `backend/src/Application.Tests/Services/Authentication/OfflineVerifierServiceTests.cs`
 
@@ -69,6 +93,8 @@
 
 ### Task 4: Register OfflineVerifierService in DI
 
+**Status**: ✅ Complete
+
 **Files to modify:**
 - `backend/src/SMCA.WebApi/Program.cs`
 
@@ -87,6 +113,8 @@
 
 ### Task 5: Add GetStoreUsersByStoreIdAsync to IStoreUserRepository
 
+**Status**: ✅ Complete
+
 **Files to modify:**
 - `backend/src/Domain/Interfaces/Repositories/IStoreUserRepository.cs`
 
@@ -101,6 +129,8 @@
 ---
 
 ### Task 6: Implement GetStoreUsersByStoreIdAsync in StoreUserRepository
+
+**Status**: ✅ Complete
 
 **Files to modify:**
 - `backend/src/Infrastructure/Persistence/Repositories/StoreUserRepository.cs`
@@ -125,6 +155,8 @@
 
 ### Task 7: Add GetAllowedFeatureIdsForUserAsync to IAllowedFeaturesService
 
+**Status**: ✅ Complete
+
 **Files to modify:**
 - `backend/src/Application/Abstractions/Features/IAllowedFeaturesService.cs`
 
@@ -139,6 +171,8 @@
 ---
 
 ### Task 8: Implement GetAllowedFeatureIdsForUserAsync in AllowedFeaturesService
+
+**Status**: ✅ Complete
 
 **Files to modify:**
 - `backend/src/Application/Services/Features/AllowedFeaturesService.cs`
@@ -169,6 +203,8 @@
 
 ### Task 9: Create unit tests for AllowedFeaturesService new overload
 
+**Status**: ✅ Complete
+
 **Files to create:**
 - `backend/src/Application.Tests/Services/Features/AllowedFeaturesServiceTests.cs`
 
@@ -193,6 +229,8 @@
 
 ### Task 10: Create DTOs (OfflineVerifierDto, OfflineRosterUserDto, OfflineRosterDto)
 
+**Status**: ✅ Complete
+
 **Files to create:**
 - `backend/src/Application/Dtos/Management/StoreUsers/OfflineVerifierDto.cs`
 - `backend/src/Application/Dtos/Management/StoreUsers/OfflineRosterUserDto.cs`
@@ -214,6 +252,8 @@
 
 ### Task 11: Create ExportOfflineRosterQuery + Handler
 
+**Status**: ✅ Complete
+
 **Files to create:**
 - `backend/src/Application/Features/Management/Users/Queries/ExportOfflineRoster/ExportOfflineRosterQuery.cs`
 
@@ -227,7 +267,7 @@
   3. Load `storeModuleIds` from `IStoreModuleRepository.GetAvailableModulesByStoreIdAsync(storeId)`
   4. Load store users via `_storeUsers.GetStoreUsersByStoreIdAsync(storeId, includeInactive: true)`
   5. For each user: load role features, group into `StoreModuleFeaturesDto[]`, compute feature IDs via `_allowedFeatures.GetAllowedFeatureIdsForUserAsync`, compute verifier via `_verifier.CreateVerifier(user.Password)`, map per-user role flags via `_userRoles.IsSuperAdmin/IsStoreAdmin/IsReSeller`
-  6. Assemble bundle: `bundleId = Guid.NewGuid().ToString()`, `issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()`, `expiresAt = issuedAt + 35 days ms`, `formatVersion = 1`
+  6. Assemble bundle: `bundleId = Guid.NewGuid().ToString()`, `issuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()`, `expiresAt = issuedAt + 35 days ms`, `formatVersion = 2`
   7. Return `ResponseResult.Success(dto)`
 
 **How to verify:**
@@ -239,6 +279,8 @@
 
 ### Task 12: Create handler unit tests
 
+**Status**: ✅ Complete
+
 **Files to create:**
 - `backend/src/Application.Tests/Management/Users/Queries/ExportOfflineRoster/ExportOfflineRosterQueryHandlerTests.cs`
 
@@ -248,7 +290,7 @@
 - Test cases (4):
   1. Non-admin/non-owner caller → `ThrowAsync<ApiException>` (use FluentAssertions `.Invoking(s => s.Handle(...)).Should().ThrowAsync<ApiException>()`)
   2. OwnerAdmin requesting foreign store → `ThrowAsync<ApiException>`
-  3. SuperAdmin, store with 2 users → `Succeeded`, `Users.Count==2`, each user has `Verifier.Hash/Salt` non-empty and `Iterations==210000`, `FormatVersion==1`, `ExpiresAt-IssuedAt==35d ms`, `BundleId` valid GUID
+  3. SuperAdmin, store with 2 users → `Succeeded`, `Users.Count==2`, each user has `Verifier.Hash/Salt` non-empty and `Iterations==210000`, `FormatVersion==2`, `ExpiresAt-IssuedAt==35d ms`, `BundleId` valid GUID
   4. Verifier called per user → mock returns fixed result, use Moq `Verify` to confirm `CreateVerifier` called once per user with that user's `User.Password`
 
 **How to verify:**
@@ -262,6 +304,8 @@
 ## Phase 5: Controller + E2E tests
 
 ### Task 13: Add action to StoreUsersController
+
+**Status**: ✅ Complete
 
 **Files to modify:**
 - `backend/src/SMCA.WebApi/Controllers/v1/StoreUsersController.cs`
@@ -287,6 +331,8 @@
 
 ### Task 14: Create E2E tests
 
+**Status**: ✅ Complete
+
 **Files to create/modify:**
 - Create: `backend/src/SMCA.WebApi.E2ETests/Users/ExportOfflineRosterTests.cs`
 - Modify: `backend/src/SMCA.WebApi.E2ETests/Infrastructure/TestDtos.cs`
@@ -299,11 +345,16 @@
   - `ApiResponse<T>` wrapper (already exists in `Infrastructure/`)
 - Create `ExportOfflineRosterTests.cs` in `Users/` folder matching existing test patterns:
   - `[Collection("e2e")]`, constructor takes `WebAppFixture`, try/finally cleanup
-  - Test cases (4):
-    1. SuperAdmin → 200, 2 users, `formatVersion==1`, every `verifier.iterations==210000`, `verifier.hash` non-empty, `expiresAt-issuedAt==35d ms`, `bundleId` parses as GUID
-    2. OwnerAdmin own store → 200, same shape
-    3. OwnerAdmin foreign store → non-success (400/403)
-    4. Plain store user → 403 Forbidden (`[HasPermission]` blocks)
+   - Test cases (4):
+     1. SuperAdmin → 200, 2 users, `formatVersion==2`, every `verifier.iterations==210000`, `verifier.hash` non-empty, `expiresAt-issuedAt==35d ms`, `bundleId` parses as GUID
+     2. OwnerAdmin own store → 200, same shape
+     3. OwnerAdmin foreign store → non-success (400/403)
+     4. Plain store user → 403 Forbidden (`[HasPermission]` blocks)
+
+   Follow-up commit `42deff4b` added 3 more E2E tests (7 total in the file), resolving both verify warnings:
+     5. `SuperAdmin_empty_store_returns_empty_users` → 200, `Users: []` (closes R7 coverage gap)
+     6. `SuperAdmin_nonexistent_store_returns_empty_users` → 200, `Users: []` (closes R8 coverage gap)
+     7. `SuperAdmin_export_twice_DEK_stability` → export twice, unwrap both → identical DEKs; `WrappedDek` differs between exports (fresh salt/IV per wrap)
 
 **How to verify:**
 - `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj --filter "FullyQualifiedName~ExportOfflineRosterTests"`
@@ -316,6 +367,8 @@
 ## Phase 6: Full suite verification
 
 ### Task 15: Run full test suite and fix regressions
+
+**Status**: ✅ Complete
 
 **What to implement:**
 - Run entire test suite: `dotnet test backend/src/SMCA.sln`
@@ -369,3 +422,16 @@ T10 ─────────────────────────�
 | 13 | Modify | `backend/src/SMCA.WebApi/Controllers/v1/StoreUsersController.cs` |
 | 14a | Create | `backend/src/SMCA.WebApi.E2ETests/Users/ExportOfflineRosterTests.cs` |
 | 14b | Modify | `backend/src/SMCA.WebApi.E2ETests/Infrastructure/TestDtos.cs` |
+
+---
+
+## Evolution Note (post-verification — commit `42deff4b`, 2026-07-30)
+
+The feature was implemented and verified in its original FormatVersion-1 form (commit `4eb56c07`, 2026-07-29). Commit `42deff4b` then **evolved the contract after verification**:
+
+1. **FormatVersion 1 → 2** — `ExportOfflineRosterQuery.cs` now sets `FormatVersion = 2` (const at line 33).
+2. **DEK wrapping per user** — new `IStoreKeyWrapService` + `IStoreDataKeyProvider` (HKDF-derived per-store DEK from `StoreEncryption:MasterSecret`, PBKDF2 KEK + AES-GCM-128 wrap). The handler loads the DEK once per export (`GetDek`), wraps it per user (`WrapDek`), and attaches `WrappedDek`/`WrapSalt`/`WrapIv` to each `OfflineRosterUserDto`.
+3. **3 new E2E tests** (empty store, nonexistent store, DEK stability) — resolve both verify warnings (R7/R8 coverage gaps + E2E DTO missing fields; `RosterUserData` now mirrors the full DTO shape).
+4. **Gates**: E2E suite 237/237 passing (per commit message); full suite 510/510 passing (per at-rest-encryption-backend archive report).
+
+The merged contract (FormatVersion=2, R10–R13) lives in the main spec `openspec/specs/offline-auth/spec.md`. The at-rest-encryption-backend change holds the delta spec and design for the DEK-wrapping evolution.

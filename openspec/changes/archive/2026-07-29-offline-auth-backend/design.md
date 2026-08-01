@@ -1,5 +1,7 @@
 # Design: Offline Roster Export Endpoint
 
+> **Post-verification evolution note**: This design documents the original FormatVersion-1 implementation (commit `4eb56c07`). Commit `42deff4b` (2026-07-30) **evolved the contract after verification** — FormatVersion 1→2 and per-user DEK wrapping (`WrappedDek`/`WrapSalt`/`WrapIv` via `IStoreKeyWrapService` + `IStoreDataKeyProvider`). See the **Post-Verification Evolution** section at the end of this file, and the full evolved design in `openspec/changes/archive/2026-07-29-at-rest-encryption-backend/design.md`. The merged source of truth is `openspec/specs/offline-auth/spec.md`.
+
 ## Technical Approach
 
 Layered addition following existing Clean Architecture patterns. A MediatR query (`ExportOfflineRosterQuery`) reached from a new action on `StoreUsersController`. The handler authorizes (SuperAdmin any store; OwnerAdmin only owned stores), loads the store's users, assembles the same permission shape `/me` returns, and attaches a per-user PBKDF2 verifier computed by a new `IOfflineVerifierService`. The backend never sees or stores the "master" — file encryption happens client-side.
@@ -269,7 +271,7 @@ Following `GetMeQueryHandlerTests` pattern (`TestMocks` nested class, `CreateMoc
 |---|------|-------|--------|
 | a | Non-admin/non-owner caller | `IsSuperAdminOrOwnerAdmin==false` | `ThrowAsync<ApiException>` |
 | b | OwnerAdmin wrong store | `IsOwnerAdmin==true`, store not in owned list | `ThrowAsync<ApiException>` |
-| c | SuperAdmin with 2 users | `IsSuperAdmin==true`, store has 2 users | `Succeeded`, `Users.Count==2`, each has Verifier.Hash/Salt non-empty, `FormatVersion==1`, `ExpiresAt-IssuedAt==35d ms`, `BundleId` valid Guid |
+| c | SuperAdmin with 2 users | `IsSuperAdmin==true`, store has 2 users | `Succeeded`, `Users.Count==2`, each has Verifier.Hash/Salt non-empty, `FormatVersion==2`, `ExpiresAt-IssuedAt==35d ms`, `BundleId` valid Guid |
 | d | Verifier called per user | Mock `IOfflineVerifierService` with fixed result | `CreateVerifier` called once per user with that user's `User.Password` |
 
 Mock contract: `IHttpContextService`, `IStoreUserRepository`, `IStoreRepository`, `IStoreModuleRepository`, `IStoreRoleFeatureRepository`, `IUserRoleRepository`, `IAllowedFeaturesService`, `IOfflineVerifierService`, `IStringLocalizer<I18n>`.
@@ -280,7 +282,7 @@ Following `AuthMePermissionsTests` pattern (`[Collection("e2e")]`, ctor takes `W
 
 | # | Scenario | Seed | Assert |
 |---|----------|------|--------|
-| a | SuperAdmin success | `DbTestHelpers.SeedSuperAdminAsync` | 200, 2 users, formatVersion==1, every verifier.iterations==210000, verifier.hash non-empty, expiresAt-issuedAt==35d ms, bundleId parses as Guid |
+| a | SuperAdmin success | `DbTestHelpers.SeedSuperAdminAsync` | 200, 2 users, formatVersion==2, every verifier.iterations==210000, verifier.hash non-empty, expiresAt-issuedAt==35d ms, bundleId parses as Guid |
 | b | OwnerAdmin own store | `AuthzSeed.SeedOwnerAdminAsync` with 2 users | 200, same shape as (a) |
 | c | OwnerAdmin foreign store | OwnerAdmin A requesting store B | Non-success (400 — ApiException surfaces via `ErrorHandlerMiddleware`) |
 | d | Plain store user | `AuthzSeed.SeedStoreUserAsync` | Forbidden (403 — `[HasPermission]` blocks) |
@@ -304,3 +306,40 @@ No migration required. All additions are purely additive code. Deployment: stand
 ## Open Questions
 
 - [ ] None — all design decisions resolved against verified source code.
+
+---
+
+## Post-Verification Evolution (commit `42deff4b`, 2026-07-30)
+
+The base feature (this design, FormatVersion 1) was implemented in `4eb56c07` and verified **PASS WITH WARNINGS**. The follow-up SDD batch `42deff4b` evolved the contract **after** that verification:
+
+### 1. FormatVersion 1 → 2
+
+`ExportOfflineRosterQuery.cs` now declares `private const int FormatVersion = 2` (line 33) and the handler sets `FormatVersion = FormatVersion` on the bundle (line 135). All handler unit tests and E2E assertions updated from `.Be(1)` to `.Be(2)`.
+
+### 2. DEK wrapping per user
+
+| Addition | Detail |
+|----------|--------|
+| `IStoreDataKeyProvider.GetDek(Guid storeId)` | HKDF-SHA256 derivation of a stable 32-byte DEK per store from `StoreEncryption:MasterSecret` (config, `Jwt:SecretKey` pattern). Empty/whitespace secret → `ArgumentException`. |
+| `IStoreKeyWrapService.WrapDek(string storedPasswordHash, byte[] dek)` | PBKDF2 KEK (210k iters, SHA256, 16B fresh salt) + AES-GCM-128 (12B fresh IV). Output `WrappedDek = Base64(ciphertext ‖ tag)`, `WrapSalt`, `WrapIv`. |
+| `OfflineRosterUserDto` | +`WrappedDek`, `WrapSalt`, `WrapIv` (string, default `""`). |
+| Handler integration | `var dek = _storeDataKeyProvider.GetDek(query.StoreId);` **once** per export (line 79), then `_storeKeyWrapService.WrapDek(su.User.Password, dek)` per user inside the existing loop (line 102). |
+| DI | Both services registered `AddScoped` in `Program.cs` (line 60); `StoreDataKeyProvider` via factory delegate reading `StoreEncryption:MasterSecret`. |
+
+### 3. New tests closing both verify warnings
+
+- `SuperAdmin_empty_store_returns_empty_users` — closes R7 (Empty Store) coverage gap.
+- `SuperAdmin_nonexistent_store_returns_empty_users` — closes R8 (Invalid StoreId) coverage gap.
+- `SuperAdmin_export_twice_DEK_stability` — export twice → unwrap both → DEKs identical; `WrappedDek` differs per export (fresh salt/IV).
+- `RosterUserData` E2E DTO now mirrors the full per-user shape (`Roles`, role booleans, `SelectedStoreId`, wrap fields) — closes the missing-fields warning.
+- Unit tests: `StoreKeyWrapServiceTests` (round-trip unwrap, distinct salt/IV) + `StoreDataKeyProviderTests` (determinism, per-store uniqueness, known-answer, missing secret).
+
+### 4. Gates after evolution
+
+- E2E suite: **237/237 passing** (commit message).
+- Full suite: **510/510 passing** (per `at-rest-encryption-backend` archive report).
+
+### Reference
+
+The complete evolved design (crypto parameters, file changes, mismatches vs. the reference plan) is in `openspec/changes/archive/2026-07-29-at-rest-encryption-backend/design.md`. The merged contract is `openspec/specs/offline-auth/spec.md` (FormatVersion=2, R10–R13).

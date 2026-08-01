@@ -30,9 +30,9 @@ namespace Application.Features.UserManagement.Users.Commands.UpdateUser
 
         }
 
-        private async Task<bool> UserExists(Guid tenantId, CancellationToken cancellationToken)
+        private async Task<bool> UserExists(Guid userId, CancellationToken cancellationToken)
         {
-            return await _userRepository.GetByIdAsync(tenantId) != null;
+            return await _userRepository.ExistsAsync(userId, cancellationToken);
         }
     }
 

@@ -49,6 +49,7 @@ namespace SMCA.WebApi.Middlewares
                         // custom application error
                         response.StatusCode = (int)e.StatusCode;
                         responseModel.ActionCode = (int)e.StatusCode;
+                        responseModel.Errors = new List<Error> { new Error(e.AcctionCode ?? "App.Unexpected", e.Message) };
                         break;
                     case KeyNotFoundException e:
                         // not found error

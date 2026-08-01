@@ -43,7 +43,7 @@ public sealed class UsersDeleteTests
     }
 
     [Fact]
-    public async Task Delete_nonexistent_returns_400()
+    public async Task Delete_nonexistent_returns_404()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
         var id = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -51,7 +51,10 @@ public sealed class UsersDeleteTests
         {
             var r = await DbTestHelpers.AuthedClient(_f, id, login)
                 .DeleteAsync($"/api/v1/users/{Guid.NewGuid()}");
-            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            r.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body!.Errors.Should().NotBeEmpty();
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, id); }
     }
@@ -61,5 +64,43 @@ public sealed class UsersDeleteTests
     {
         var r = await _f.CreateClient().DeleteAsync($"/api/v1/users/{Guid.NewGuid()}");
         r.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Delete_as_store_user_with_users_feature_returns_403()
+    {
+        var actor = await AuthzSeed.SeedStoreUserAsync(_f, (int)FeatureType.Users);
+        var victim = await DbTestHelpers.SeedUserWithRoleAsync(_f, (int)RoleType.OwnerAdmin);
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, actor.UserId, actor.Login)
+                .DeleteAsync($"/api/v1/users/{victim.UserId}");
+            r.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body!.Errors.Should().NotBeEmpty();
+        }
+        finally
+        {
+            await AuthzSeed.CleanupStoreGraphAsync(_f, actor.StoreId, actor.UserId, actor.OwnerUserId);
+            await DbTestHelpers.CleanupUserAsync(_f, victim.UserId);
+        }
+    }
+
+    [Fact]
+    public async Task Delete_self_as_super_admin_returns_400()
+    {
+        var login = $"sa-{Guid.NewGuid():N}@test.com";
+        var id = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, id, login)
+                .DeleteAsync($"/api/v1/users/{id}");
+            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body!.Errors.Should().NotBeEmpty();
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, id); }
     }
 }

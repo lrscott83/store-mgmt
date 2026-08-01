@@ -30,7 +30,7 @@ namespace Application.Features.UserManagement.Users.Commands.AddUserRoles
         }
 
         private async Task<bool> UserExists(Guid userId, CancellationToken cancellationToken) 
-            => await _userRepository.GetByIdAsync(userId) != null;
+            => await _userRepository.ExistsAsync(userId, cancellationToken);
 
         private async Task<bool> AreVisibleRolesToCurrentUser(IEnumerable<int> roleIds, CancellationToken cancellationToken)
         {

@@ -2,7 +2,7 @@
 
 **Capability**: offline-auth — offline roster export and verifier computation
 **Status**: Active
-**Last Updated**: 2026-07-29
+**Last Updated**: 2026-07-31
 
 ## Purpose
 
@@ -231,7 +231,7 @@ The system MUST set `OfflineRosterDto.FormatVersion = 2` (up from `1`).
 
 ## Verification Criteria
 
-- [x] All 4 E2E scenarios pass (SuperAdmin success, OwnerAdmin own store, OwnerAdmin other store, plain user denied) — E2E tests compile and scenarios verified structurally
+- [x] All 7 E2E scenarios pass — `ExportOfflineRosterTests` 7/7: SuperAdmin full bundle, OwnerAdmin own store (200), OwnerAdmin foreign store (400), empty store (`SuperAdmin_empty_store_returns_empty_users`), nonexistent store (`SuperAdmin_nonexistent_store_returns_empty_users`), plain user denied (403), DEK stability across exports
 - [x] OfflineVerifierService unit tests pass (reproducibility, fresh salt) — 2/2 passing
 - [x] Handler unit tests pass (4 cases: auth deny, ownership deny, success shape, verifier per user) — 4/4 passing
 - [x] Existing suite passes unchanged — 251 tests pass, ZERO regressions
@@ -239,10 +239,10 @@ The system MUST set `OfflineRosterDto.FormatVersion = 2` (up from `1`).
 - [x] `bundleId` is a new GUID per request — verified in handler unit test
 - [x] `OfflineVerifierService` registered in DI — `AddScoped<IOfflineVerifierService, OfflineVerifierService>()` in Program.cs
 - [x] StoreKeyWrapService unit tests pass (round-trip unwrap, distinct salt/IV) — 2/2 passing
-- [x] StoreDataKeyProvider unit tests pass (determinism, per-store uniqueness, known-answer, missing secret) — 4/4 passing
+- [x] StoreDataKeyProvider unit tests pass (determinism, per-store uniqueness, 32-byte output, empty/whitespace secret throws) — 5/5 passing. NO known-answer test exists — gap tracked by T-A1 (`backend-test-and-debt-closure` adds `GetDek_known_answer_matches_independent_vector`)
 - [x] Handler returns `FormatVersion == 2` with non-empty wrap fields per user — verified in handler test
 - [x] DEK loaded exactly once per export (not per user) — verified via mock
-- [x] E2E: export twice → unwrap both → DEKs are identical — round-trip stability verified
+- [x] E2E `SuperAdmin_export_twice_DEK_stability` asserts wrap fields non-empty and `WrappedDek` differs between exports (proving fresh salt/IV) — it does NOT unwrap the DEKs for byte comparison; the unwrap assertion (dek₁ == dek₂, 32B) is added by T-A2 (`backend-test-and-debt-closure`)
 
 ## Related Specifications
 
@@ -255,5 +255,5 @@ The system MUST set `OfflineRosterDto.FormatVersion = 2` (up from `1`).
 - **Spec**: Active (this document, includes at-rest-encryption-backend delta)
 - **Design**: See `openspec/changes/archive/2026-07-29-offline-auth-backend/design.md` (base) + `openspec/changes/archive/2026-07-29-at-rest-encryption-backend/design.md` (delta)
 - **Implementation**: Base offline-auth complete (15/15 tasks). At-rest encryption — 12/12 tasks complete.
-- **Verification**: Base — PASS WITH WARNINGS (R7/R8 lack dedicated test coverage). At-rest encryption — PASS (15/15 scenarios compliant, 510/510 tests pass).
+- **Verification**: Base — PASS (R7 covered by `SuperAdmin_empty_store_returns_empty_users`, R8 by `SuperAdmin_nonexistent_store_returns_empty_users`). At-rest encryption — PASS (15/15 scenarios compliant, 510/510 tests pass).
 - **Archive**: Base at `openspec/changes/archive/2026-07-29-offline-auth-backend/`. At-rest encryption at `openspec/changes/archive/2026-07-29-at-rest-encryption-backend/`.

@@ -18,40 +18,35 @@ namespace Application.Features.UserManagement.Users.Commands.AddUserRoles
     {
         private readonly IMediator _mediator;
         private readonly IHttpContextService _httpContextService;
-        private readonly IUserRepository _userRepository;
         private readonly IUserRoleRepository _userRoleRepository;
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         public AddUserRolesCommandHandler(
             IMediator mediator,
             IHttpContextService httpContextService,
-            IUserRepository userRepository,
             IUserRoleRepository userRoleRepository,
             IApplicationUnitOfWork applicationUnitOfWork)
         {
             _mediator = mediator;
             _httpContextService = httpContextService;
-            _userRepository = userRepository;
             _userRoleRepository = userRoleRepository;
             _applicationUnitOfWork = applicationUnitOfWork;
         }
 
         public async Task<ResponseResult<IEnumerable<ListViewDto>>> Handle(AddUserRolesCommand request, CancellationToken cancellationToken)
         {
-            var user = await _userRepository.GetByIdAsync(request.UserId);
             Guid tenantId = _httpContextService.TenantId.ToGuid();
-            var userRoles = _userRoleRepository.Where(ur => ur.UserId == request.UserId);
-            foreach (var roleId in request.RoleIds)
+            var userRoles = (await _userRoleRepository.GetByUserIdAsync(request.UserId, cancellationToken))
+                .ToDictionary(ur => ur.RoleId);
+            foreach (var roleId in request.RoleIds.Distinct())
             {
-                UserRole userRole = userRoles.FirstOrDefault(x => x.RoleId == roleId);
-                if (userRole == null)
+                if (!userRoles.TryGetValue(roleId, out var userRole))
                 {
-                    userRole = UserRole.Create(user.Id, roleId, tenantId);
+                    userRole = UserRole.Create(request.UserId, roleId, tenantId);
                     await _userRoleRepository.AddAsync(userRole);
                 }
                 else if (!userRole.IsActive)
                 {
                     userRole.IsActive = true;
-                    await _userRoleRepository.UpdateAsync(userRole);
                 }
             }
 

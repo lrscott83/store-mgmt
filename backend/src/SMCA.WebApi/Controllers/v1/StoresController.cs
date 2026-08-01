@@ -99,13 +99,15 @@ namespace SMCA.WebApi.Controllers.v1
         {
             return Ok(await Sender.Send(
                 new UpdateStoreCommand(id, command.Name, command.Address, command.Description,
-                command.Approved, command.ModuleIds, command.IsActive)));
+                command.Approved, command.ModuleIds, command.IsActive, command.PaymentStartDate)));
         }
 
         /// <summary>
         /// Set store PaymentStartDate (SuperAdmin only).
-        /// Use a separate endpoint instead of including PaymentStartDate in the update command,
-        /// since only SuperAdmin can set this date and it has distinct semantics from general store updates.
+        /// The general update command also carries PaymentStartDate — the handler applies it
+        /// only when non-null and the caller is SuperAdmin (same SuperAdmin gate as this endpoint).
+        /// This dedicated endpoint remains for the payment-date-only operation, with semantics
+        /// distinct from general store updates.
         /// </summary>
         [HttpPut("{storeId}/payment-date")]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
@@ -130,18 +132,32 @@ namespace SMCA.WebApi.Controllers.v1
             return Ok(await Sender.Send(new DeactivateStoreCommand(id)));
         }
 
+        /// <summary>
+        /// Approve a store by its identifier. Only available for SuperAdmin.
+        /// </summary>
         [HttpPost("approve")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
-        public async Task<IActionResult> ApproveStoreAsync(ApproveStoreCommand command)
+        public async Task<IActionResult> ApproveStoreAsync([FromBody] ApproveStoreCommand command)
         {
             return Ok(await Sender.Send(command));
         }
 
+        /// <summary>
+        /// Disapprove a store by its identifier. Only available for SuperAdmin.
+        /// </summary>
         [HttpPost("disapprove")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.SuperAdmin)]
-        public async Task<IActionResult> DisapproveStoreAsync(DisapproveStoreCommand command)
+        public async Task<IActionResult> DisapproveStoreAsync([FromBody] DisapproveStoreCommand command)
         {
             return Ok(await Sender.Send(command));
         }

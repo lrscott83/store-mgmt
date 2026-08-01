@@ -44,6 +44,22 @@ public class StoreDataKeyProviderTests
     }
 
     [Fact]
+    public void GetDek_known_answer_matches_independent_vector()
+    {
+        // Known-answer vector independently computed per RFC 5869 (HKDF-Extract/Expand via raw
+        // HMAC-SHA256) with Python 3.13 `hmac` and PowerShell `HMACSHA256` — neither uses
+        // HKDF.DeriveKey, so this is NOT self-referential. Inputs pinned to production:
+        // MasterSecret const below, fixed storeId, salt: null -> 32 zero bytes (RFC 5869 §2.2).
+        var storeId = Guid.Parse("3F2504E0-4F89-41D3-9A0C-0305E82C3301");
+        const string expectedHex = "1947de72a86a46962bf851db33476e3db6681fab9cac9f7701488ab80f0ff21f";
+
+        var dek = new StoreDataKeyProvider(MasterSecret).GetDek(storeId);
+
+        dek.Should().HaveCount(32);
+        dek.Should().BeEquivalentTo(Convert.FromHexString(expectedHex));
+    }
+
+    [Fact]
     public void Constructor_throws_on_empty_secret()
     {
         var act = () => new StoreDataKeyProvider("");

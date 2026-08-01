@@ -30,7 +30,7 @@ public sealed class StoreApproveTests
     }
 
     [Fact]
-    public async Task Approve_already_approved_returns_succeeded_data_false()
+    public async Task Approve_already_approved_returns_succeeded_data_true()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -46,8 +46,8 @@ public sealed class StoreApproveTests
     }
 
     [Fact]
-    public async Task Approve_unknown_store_returns_400_code_Id()
-        => await AssertApprove400(Guid.NewGuid());
+    public async Task Approve_unknown_store_returns_404_code_StoreNotFound()
+        => await AssertApprove404(Guid.NewGuid());
 
     [Fact]
     public async Task Approve_empty_id_returns_400_code_Id()
@@ -70,6 +70,20 @@ public sealed class StoreApproveTests
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
             b!.Errors.Should().Contain(e => e.Code == "Id");
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    private async Task AssertApprove404(Guid id)
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/approve", new { Id = id });
+            r.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "StoreNotFound");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }

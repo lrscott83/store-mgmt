@@ -23,7 +23,7 @@ using System.Net;
 namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
 {
     public sealed record UpdateStoreCommand(Guid Id, string Name, string? Address, string? Description, 
-        bool Approved, List<int> ModuleIds, bool IsActive)
+        bool Approved, List<int> ModuleIds, bool IsActive, DateOnly? PaymentStartDate = null)
         : ICommand<bool> { }
 
     public class UpdateStoreCommandHandler : ICommandHandler<UpdateStoreCommand, bool>
@@ -95,6 +95,10 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
 
             if (store.PaymentStartDate is null && hasPaidModuleRequested)
                 store.PaymentStartDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
+
+            // Explicit PaymentStartDate (SuperAdmin only) wins over auto-activation.
+            if (request.PaymentStartDate is not null && _httpContextService.IsSuperAdmin)
+                store.PaymentStartDate = request.PaymentStartDate;
 
             await _storeRepository.UpdateAsync(store);
             await UpdateStoreModules(store.Id, store.TenantId, request.ModuleIds);

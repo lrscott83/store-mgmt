@@ -26,6 +26,6 @@ namespace Application.Features.UserManagement.Users.Commands.DeleteUserRoles
         }
 
         private async Task<bool> UserExists(Guid userId, CancellationToken cancellationToken)
-            => await _userRepository.GetByIdAsync(userId) != null;
+            => await _userRepository.ExistsAsync(userId, cancellationToken);
     }
 }

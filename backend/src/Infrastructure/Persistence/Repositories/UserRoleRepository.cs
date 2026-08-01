@@ -32,6 +32,14 @@ namespace Infrastructure.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<IReadOnlyList<UserRole>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            return await _userRoles
+                .AsTracking()
+                .Where(ur => ur.UserId == userId)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<IReadOnlyCollection<int>> GetUserFeatureIdsForClaims(Guid userId, Guid storeId)
         {
             return await _userRoles.IgnoreQueryFilters().Where(ur => ur.UserId == userId &&

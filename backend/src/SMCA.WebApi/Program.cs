@@ -20,7 +20,6 @@ using System.Configuration;
 using Serilog.Sinks.Elasticsearch;
 using System.Reflection;
 using System;
-using System.Threading.RateLimiting;
 using SMCA.WebApi.OptionsSetup;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -114,27 +113,8 @@ if (!builder.Environment.IsEnvironment("Testing"))
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-        options.AddPolicy("LoginPolicy", context =>
-            RateLimitPartition.GetSlidingWindowLimiter(
-                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                factory: _ => new SlidingWindowRateLimiterOptions
-                {
-                    PermitLimit = 5,
-                    Window = TimeSpan.FromMinutes(1),
-                    SegmentsPerWindow = 3,
-                    QueueLimit = 0
-                }));
-
-        options.AddPolicy("RegisterPolicy", context =>
-            RateLimitPartition.GetSlidingWindowLimiter(
-                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                factory: _ => new SlidingWindowRateLimiterOptions
-                {
-                    PermitLimit = 10,
-                    Window = TimeSpan.FromMinutes(10),
-                    SegmentsPerWindow = 10,
-                    QueueLimit = 0
-                }));
+        options.AddPolicy("LoginPolicy", RateLimitPolicies.Login);
+        options.AddPolicy("RegisterPolicy", RateLimitPolicies.Register);
     });
 }
 

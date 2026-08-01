@@ -36,7 +36,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 |---|---|---|---|---|---|---|
 | 1 | CRITICAL | `POST /api/v1/auth/login` | `AuthController.AuthAsync` | ✅ Done | ✅ Archived | `auth-login-security-fixes` |
 | 2 | CRITICAL | `GET /api/v1/auth/logout` | `AuthController.Logout` | ✅ Done | ✅ Archived | `logout-endpoint-fixes` |
-| 3 | CRITICAL | `GET /api/v1/auth/me` | `AuthController.GetMeAsync` | ✅ Done | 🔶 Applied (pending archive) | `getme-endpoint-fixes` |
+| 3 | CRITICAL | `GET /api/v1/auth/me` | `AuthController.GetMeAsync` | ✅ Done | ✅ Archived | `getme-endpoint-fixes` |
 | 4 | CRITICAL | `POST /api/v1/auth/register` | `AuthController.RegisterAsync` | ✅ Done | ✅ Applied | `register-endpoint-fixes` |
 | 5 | CRITICAL | `GET /api/v1/auth/ping` | `AuthController.PingAsync` | ✅ Done | ⬜ N/A (unused endpoint, no fixes applied) | — |
 | 6 | CRITICAL | `POST /api/v1/stores` | `StoresController.CreateStoreAsync` | ✅ Done | ✅ Applied | `create-store-endpoint-fixes` |
@@ -45,16 +45,16 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 | 9 | CRITICAL | `GET /api/v1/stores/{id}` | `StoresController.GetStoreByIdAsync` | ✅ Done | ✅ Applied | `store-getbyid-fixes` |
 | 10 | CRITICAL | `PUT /api/v1/stores/{id}` | `StoresController.UpdatedStoreAsync` | ✅ Done | ✅ Archived | `update-store-endpoint-fixes` |
 | 11 | CRITICAL | `DELETE /api/v1/stores/{id}` | `StoresController.DeleteAsync` | ✅ Done | ✅ Applied | `delete-store-endpoint-fixes` |
-| 12 | CRITICAL | `PUT /api/v1/stores` | `StoresController.SetMyStoreIdAsync` | ✅ Done | ✅ Applied | `set-my-store-endpoint-fixes` |
-| 13 | CRITICAL | `POST /api/v1/stores/approve` | `StoresController.ApproveStoreAsync` | ⬜ Pending | ⬜ N/A | — |
-| 14 | CRITICAL | `POST /api/v1/stores/disapprove` | `StoresController.DisapproveStoreAsync` | ⬜ Pending | ⬜ N/A | — |
-| 15 | CRITICAL | `GET /api/v1/users/all/{includeInactive}` | `UsersController.GetAllUsersAsync` | ⬜ Pending | ⬜ N/A | — |
-| 16 | CRITICAL | `GET /api/v1/users/{id}` | `UsersController.GetUserAsync` | ⬜ Pending | ⬜ N/A | — |
-| 17 | CRITICAL | `PUT /api/v1/users/{id}` | `UsersController.UpdatedAsync` | ⬜ Pending | ⬜ N/A | — |
-| 18 | CRITICAL | `DELETE /api/v1/users/{id}` | `UsersController.DeleteUserAsync` | ⬜ Pending | ⬜ N/A | — |
-| 19 | CRITICAL | `POST /api/v1/users/activate` | `UsersController.ActivateUserAsync` | ⬜ Pending | ⬜ N/A | — |
-| 20 | CRITICAL | `POST /api/v1/users/AddUserRoles` | `UsersController.AddUserRolesAsync` | ⬜ Pending | ⬜ N/A | — |
-| 21 | CRITICAL | `POST /api/v1/users/DeleteUserRoles` | `UsersController.RemoveUserRolesAsync` | ⬜ Pending | ⬜ N/A | — |
+| 12 | CRITICAL | `PUT /api/v1/stores` | `StoresController.SetMyStoreIdAsync` | ✅ Done | ✅ Archived | `set-my-store-endpoint-fixes` |
+| 13 | CRITICAL | `POST /api/v1/stores/approve` | `StoresController.ApproveStoreAsync` | ✅ Done | ✅ Archived | `approve-store-endpoint-fixes` |
+| 14 | CRITICAL | `POST /api/v1/stores/disapprove` | `StoresController.DisapproveStoreAsync` | ✅ Done | ✅ Archived | `approve-store-endpoint-fixes` |
+| 15 | CRITICAL | `GET /api/v1/users/all/{includeInactive}` | `UsersController.GetAllUsersAsync` | ✅ Done | ✅ Archived | `get-users-all-endpoint-fixes` |
+| 16 | CRITICAL | `GET /api/v1/users/{id}` | `UsersController.GetUserAsync` | ✅ Done | ✅ Archived | `get-user-by-id-endpoint-fixes` |
+| 17 | CRITICAL | `PUT /api/v1/users/{id}` | `UsersController.UpdatedAsync` | ✅ Done | ✅ Archived | `update-user-endpoint-fixes` |
+| 18 | CRITICAL | `DELETE /api/v1/users/{id}` | `UsersController.DeleteUserAsync` | ✅ Done | ✅ Archived | `delete-user-endpoint-fixes` |
+| 19 | CRITICAL | `POST /api/v1/users/activate` | `UsersController.ActivateUserAsync` | ✅ Done | ✅ Archived | `activate-user-endpoint-fixes` |
+| 20 | CRITICAL | `POST /api/v1/users/AddUserRoles` | `UsersController.AddUserRolesAsync` | ✅ Done | ✅ Archived | `user-roles-endpoint-fixes` |
+| 21 | CRITICAL | `POST /api/v1/users/DeleteUserRoles` | `UsersController.RemoveUserRolesAsync` | ✅ Done | ✅ Archived | `user-roles-endpoint-fixes` |
 | 22 | CRITICAL | `POST /api/v1/users/change-password` | `UsersController.ChangePasswordAsync` | ⬜ Pending | ⬜ N/A | — |
 | 23 | CRITICAL | `GET /api/v1/Owners/all/{includeInactive}` | `OwnersController.GetAllOwnersAsync` | ⬜ Pending | ⬜ N/A | — |
 | 24 | CRITICAL | `GET /api/v1/Owners/{id}` | `OwnersController.GetOwnerAsync` | ⬜ Pending | ⬜ N/A | — |
@@ -68,6 +68,28 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 | 32 | HIGH | `GET /api/v1/Features/all/{includeInactive}` | `FeaturesController.GetFeaturesAsync` | ⬜ Pending | ⬜ N/A | — |
 | 33 | HIGH | `POST /api/v1/Features/activate` | `FeaturesController.ActivateFeaturesAsync` | ⬜ Pending | ⬜ N/A | — |
 | 34 | HIGH | `GET /api/v1/Features/available` | `FeaturesController.GetAvailableFeaturesToStoreQueryAsync` | ⬜ Pending | ⬜ N/A | — |
+
+---
+
+## Follow-up Debt
+
+### ActivateStoreCommand — guard bug + validator double-query (dead code, decision C)
+
+`ActivateStoreCommand.cs:46-47` (`backend/src/Application/Features/StoreManagement/Stores/Commands/ActivateStore/`) shares the same guard bug fixed by `activate-user-endpoint-fixes` on the Users side: it throws `ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest)` instead of `DontHavePermission` + `HttpStatusCode.Forbidden` when the actor is not SuperAdmin/OwnerAdmin. Its validator (`ActivateStoreCommandValidator.cs:20,24-27`) also carries the double-query existence rule (`MustAsync(StoreExists)` → full `GetStoreByIdIncludingModulesAsync` load in the validator + another in the handler), the exact pattern removed from ActivateUser/DeleteUser. The handler additionally lacks a null-check on the fetched store (`:49-50` — would NRE if the validator existence rule were removed without adding one).
+
+**Status**: Dead code today — zero callers (grep across `backend/src` hits only the command + validator files; `ApproveStore` is self-contained; no endpoint exposes `ActivateStore`).
+
+**Options**: (A) fix if ever wired up — mirror `activate-user-endpoint-fixes`: 403 `DontHavePermission` guard, remove validator double-query, add null-check → 404; (B) remove as dead code.
+
+**Logged at archive**: `activate-user-endpoint-fixes` (user decision C — out of scope; plan doc note only, no code changes).
+
+---
+
+### User roles endpoints — URL casing + `GetAllActiveRolesAsync` latent bug
+
+- **URL casing debt**: `POST /api/v1/users/AddUserRoles` and `POST /api/v1/users/DeleteUserRoles` use PascalCase routes, inconsistent with `all/{includeInactive}`, `activate`, `change-password`. NOT changed in `user-roles-endpoint-fixes` (user decision — breaking change for frontend + E2E tests). If ever normalized, requires coordinated frontend + test update.
+- **`GetAllActiveRolesAsync` latent bug fixed** (in `user-roles-endpoint-fixes`, RoleRepository.cs): original WHERE only returned SuperAdmin role (or nothing when `includeSuperAdminRole=false`) despite the "GetAllActiveRoles" name. Fixed to `r.Id != (int)RoleType.SuperAdmin || includeSuperAdminRole`. Sole caller is `GetUserRolesByUserIdQuery` (grep-verified) — no other endpoint affected.
+- **`GetRolesByIds` dead stub repurposed**: `IRoleRepository.GetRolesByIds(HashSet<Guid>)` was a `NotImplementedException` stub with zero callers; repurposed to `HashSet<int>` (Role keys are `int`) and implemented as batched `IgnoreQueryFilters().Where(r => roleIds.Contains(r.Id))` — used by `VisibleRoleService` to kill the per-role N+1.
 
 ---
 
@@ -106,7 +128,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
   - `GetMeBillingTests.cs` (Billing/) — billing state in /me
   - `GetMeBillingStatesTests.cs` (Billing/) — billing status transitions
 - **Coverage**: ✅ **Full** (auth, permissions, billing states, store scoping)
-- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `getme-endpoint-fixes` — pending archive)
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `getme-endpoint-fixes` — archived 2026-07-29)
 
 ### POST `/api/v1/auth/register`
 - **Purpose**: Register a new user account
@@ -203,20 +225,20 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **Controller**: `StoresController.ApproveStoreAsync()`
 - **Authorization**: `[HasPermission(SuperAdmin)]`
 - **E2E Tests**:
-  - `StoreApproveTests.cs` — approve store, re-approve, unauthenticated, invalid ID
+  - `StoreApproveTests.cs` — approve store, re-approve, unauthenticated, invalid ID (unknown → 404)
   - `StoreAuthorizationTests.cs` (Auth/) — authorization check
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `approve-store-endpoint-fixes` — 8 issues fixed: double DB query + over-fetching removed, dead auth guard removed, null check → 404, ProducesResponseType 400/401/403/404, XML docs, [FromBody], misleading test name fixed. Same fixes applied to DisapproveStore in same change.)
 
 ### POST `/api/v1/stores/disapprove`
 - **Purpose**: Disapprove/reject a store
 - **Controller**: `StoresController.DisapproveStoreAsync()`
 - **Authorization**: `[HasPermission(SuperAdmin)]`
 - **E2E Tests**:
-  - `StoreDisapproveTests.cs` — disapprove, re-disapprove, unauthenticated, invalid ID
+  - `StoreDisapproveTests.cs` — disapprove, re-disapprove, unauthenticated, invalid ID (unknown → 404)
   - `StoreAuthorizationTests.cs` (Auth/) — authorization check
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (fixed alongside approve-store-endpoint-fixes — same 8 issues, same pattern)
 
 ### GET `/api/v1/users/all/{includeInactive}`
 - **Purpose**: List all users, optionally including inactive
@@ -225,7 +247,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **E2E Tests**:
   - `UsersListTests.cs` — list active/inactive, role filtering, invalid bool, unauthenticated
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `get-users-all-endpoint-fixes` — 8 issues fixed: NRE missing ThenInclude, CancellationToken propagation, Take(1000) safety cap, ProducesResponseType 400/401/403, [FromRoute], FluentValidation validator, RoleNames init, DRY Include helper)
 
 ### GET `/api/v1/users/{id}`
 - **Purpose**: Get user by ID
@@ -234,16 +256,16 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **E2E Tests**:
   - `UsersGetByIdTests.cs` — existing user, non-existent, unauthenticated, unauthorized role
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `get-user-by-id-endpoint-fixes` — 400 contract kept + lightweight `ExistsAsync` (AnyAsync), OwnerName `.ThenInclude(o => o.User)` fix, race-guard envelope 404, CancellationToken propagation, ProducesResponseType 400/401/403, UserDto NRT `string?` + `RoleNames = []`, N1 `GetByLoginWithRelatedAsync` same fix, E2E body-asserting test RED→GREEN; spec `users-e2e` R2 aligned 404→400)
 
 ### PUT `/api/v1/users/{id}`
 - **Purpose**: Update user profile
 - **Controller**: `UsersController.UpdatedAsync()`
 - **Authorization**: `[HasPermission(ProfileAdmin)]`
 - **E2E Tests**:
-  - `UsersUpdateTests.cs` — update own profile, update others, authorization, validation
-- **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+  - `UsersUpdateTests.cs` — 13 tests: update own profile (super admin, owner admin), 403 store user without feature, 401 unauthenticated, 400 empty body, 400 non-existent id, IDOR envelope-404 (store user with Profile feature → other user), partial body preserves email/cellphone, empty cellphone clears, omitted isActive preserved, explicit isActive:false deactivates (admin), owner admin edits staff → 200, store user self-edit isActive ignored
+- **Coverage**: ✅ **Full** (13 E2E tests)
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `update-user-endpoint-fixes` — 8 issues resolved: IDOR ownership guard envelope-404, tri-state partial update (null=keep / ""=clear / value=assign), NRE race guard, validator ExistsAsync single round-trip, bool? IsActive admin-gated, UpdateAsync retained for NoTracking DbContext, ProducesResponseType 400/401/403/404 + [FromRoute], validator param rename)
 
 ### DELETE `/api/v1/users/{id}`
 - **Purpose**: Delete a user
@@ -252,16 +274,16 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **E2E Tests**:
   - `UsersDeleteTests.cs` — delete user, non-existent, unauthenticated
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `delete-user-endpoint-fixes` — see status table; detail section previously stale as "Pending")
 
 ### POST `/api/v1/users/activate`
 - **Purpose**: Activate or deactivate a user
 - **Controller**: `UsersController.ActivateUserAsync()`
 - **Authorization**: `[HasPermission(UsersAdmin)]`
 - **E2E Tests**:
-  - `UsersActivateTests.cs` — activate/deactivate, non-existent ID
+  - `UsersActivateTests.cs` — 4 tests: activate (IsActive=true → 200), deactivate (IsActive=false → 200), non-existent id → 404, StoreUser with Users feature → 403
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `activate-user-endpoint-fixes` — 6 issues fixed: IsActive honored (hardcoded `true` → `request.IsActive`), 403 `DontHavePermission` guard first (feature-granted StoreUser blocked — no more 400 `UserNotFound` mask), 404 `UserNotFound` for non-existent id, validator structural-only (double round-trip `MustAsync(UserExists)` removed), Swagger `[ProducesResponseType]` 400/401/403/404, namespace moved to `UserManagement.Users.Commands.ActivateUser`; 4 E2E tests RED→GREEN)
 
 ### POST `/api/v1/users/AddUserRoles`
 - **Purpose**: Add roles to a user
@@ -270,7 +292,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **E2E Tests**:
   - `UsersRolesTests.cs` — add roles, duplicate roles, delete roles
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `user-roles-endpoint-fixes` — 500 NRE `role.Name` fixed, 500 NRE `user.Id` race removed, 500 duplicate-RoleIds PK conflict fixed, N+1 killed in handler + VisibleRoleService, validators `GetByIdAsync` → `ExistsAsync`, `GetByUserIdAsync` repo method, query cleanup, `[FromBody]` + ProducesResponseType 400/401/403/404, 7 E2E tests incl. RED→GREEN)
 
 ### POST `/api/v1/users/DeleteUserRoles`
 - **Purpose**: Remove roles from a user
@@ -279,7 +301,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **E2E Tests**:
   - `UsersRolesTests.cs` — add then delete roles
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (fixed alongside `user-roles-endpoint-fixes` — validator `ExistsAsync` swap, `[FromBody]` + ProducesResponseType, shared `GetUserRolesByUserId` query cleanup, Delete Selected body assert test)
 
 ### POST `/api/v1/users/change-password`
 - **Purpose**: Change current user's password
@@ -889,7 +911,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 | `UsersGetByIdTests.cs` | GET `/api/v1/users/{id}` |
 | `UsersListTests.cs` | GET `/api/v1/users/all/{includeInactive}` |
 | `UsersRolesTests.cs` | POST `/api/v1/users/AddUserRoles`, POST `/api/v1/users/DeleteUserRoles` |
-| `UsersUpdateTests.cs` | PUT `/api/v1/users/{id}` |
+| `UsersUpdateTests.cs` | PUT `/api/v1/users/{id}` (13 tests) |
 
 ---
 

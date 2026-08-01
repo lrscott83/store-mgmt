@@ -13,5 +13,6 @@ namespace Domain.Interfaces.Repositories
         Task<IReadOnlyCollection<int>> GetUserFeatureIdsForClaims(Guid userId, Guid storeId);
         Task<IEnumerable<int>> GetActiveRoleIdsByUser(Guid userId);
         Task<IEnumerable<UserRole>> GetActiveUserRolesByIds(Guid userId, HashSet<int> roleIds);
+        Task<IReadOnlyList<UserRole>> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
     }
 }

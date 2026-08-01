@@ -9,7 +9,7 @@ export interface Store {
     address: string;
     description: string;
     approved: boolean;
-    paymentStartDate: Date;
+    paymentStartDate: string | null;
     modules: Module[];
     isActive: boolean;
 }

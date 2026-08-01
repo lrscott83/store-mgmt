@@ -54,7 +54,7 @@
           @if (isSuperAdmin && editStoreId) {
           <mat-form-field appearance="outline" floatLabel="auto" class="mat-form-field">
             <mat-label>{{'STORE.PAYMENT_START_DATE'| translate}}</mat-label>
-            <input matInput [matDatepicker]="picker" formControlName="paymentStartDate" required autocomplete="off">
+            <input matInput [matDatepicker]="picker" formControlName="paymentStartDate" autocomplete="off">
             <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
             <mat-datepicker #picker></mat-datepicker>
             @if (isControlInvalid('paymentStartDate','required')) {

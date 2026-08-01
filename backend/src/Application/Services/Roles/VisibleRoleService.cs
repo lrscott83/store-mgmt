@@ -1,6 +1,7 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Roles;
 using Domain.Common.Utils;
+using Domain.Entities.Roles;
 using Domain.Interfaces.Repositories;
 
 namespace Application.Services.Roles
@@ -17,17 +18,22 @@ namespace Application.Services.Roles
 
         public async Task<bool> AreVisibleRolesToCurrentUserAsync(IEnumerable<int> roleIds)
         {
-            foreach (var roleId in roleIds)
+            var roleIdsSet = roleIds.ToHashSet();
+            var roles = await _roleRepository.GetRolesByIds(roleIdsSet);
+            var rolesById = roles.ToDictionary(r => r.Id);
+            foreach (var roleId in roleIdsSet)
             {
-                if (!await IsVisibleRoleToCurrentUser(roleId))
+                if (!rolesById.TryGetValue(roleId, out var role))
+                    return false;
+
+                if (!IsVisibleRoleToCurrentUser(role))
                     return false;
             }
             return true;
         }
 
-        private async Task<bool> IsVisibleRoleToCurrentUser(int roleId)
+        private bool IsVisibleRoleToCurrentUser(Role role)
         {
-            var role = await _roleRepository.GetByIdAsync(roleId);
             if (!ApplicationAdminRoleNameUtils.IsSuperAdminOrOwnerAdmin(role.Name))
                 return role.IsActive;
 

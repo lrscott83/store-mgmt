@@ -30,7 +30,7 @@ public sealed class StoreDisapproveTests
     }
 
     [Fact]
-    public async Task Disapprove_already_disapproved_returns_succeeded_data_false()
+    public async Task Disapprove_already_disapproved_returns_succeeded_data_true()
     {
         var login = $"admin-{Guid.NewGuid():N}@test.com";
         var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -46,8 +46,8 @@ public sealed class StoreDisapproveTests
     }
 
     [Fact]
-    public async Task Disapprove_unknown_store_returns_400_code_Id()
-        => await AssertDisapprove400(Guid.NewGuid());
+    public async Task Disapprove_unknown_store_returns_404_code_StoreNotFound()
+        => await AssertDisapprove404(Guid.NewGuid());
 
     [Fact]
     public async Task Disapprove_empty_id_returns_400_code_Id()
@@ -70,6 +70,20 @@ public sealed class StoreDisapproveTests
             r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
             b!.Errors.Should().Contain(e => e.Code == "Id");
+        }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    private async Task AssertDisapprove404(Guid id)
+    {
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        try
+        {
+            var r = await DbTestHelpers.AuthedClient(_f, adminId, login).PostAsJsonAsync("/api/v1/stores/disapprove", new { Id = id });
+            r.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            b!.Errors.Should().Contain(e => e.Code == "StoreNotFound");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }

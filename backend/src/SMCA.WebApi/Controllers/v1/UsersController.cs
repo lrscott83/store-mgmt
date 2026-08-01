@@ -1,6 +1,6 @@
 ﻿using Application.Dtos.Common;
 using Application.Dtos.UserManagement;
-using Application.Features.Management.Users.Commands.ActivateUser;
+using Application.Features.UserManagement.Users.Commands.ActivateUser;
 using Application.Features.UserManagement.Users.Commands.AddUserRoles;
 using Application.Features.UserManagement.Users.Commands.DeleteUser;
 using Application.Features.UserManagement.Users.Commands.DeleteUserRoles;
@@ -58,8 +58,12 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPut("{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.ProfileAdmin)]
-        public async Task<IActionResult> UpdatedAsync(Guid id, [FromBody] UpdateUserCommand command)
+        public async Task<IActionResult> UpdatedAsync([FromRoute] Guid id, [FromBody] UpdateUserCommand command)
         {
             command.Id = id;
             return Ok(await Sender.Send(command));
@@ -68,10 +72,16 @@ namespace SMCA.WebApi.Controllers.v1
         /// <summary>
         /// Delete user by id
         /// </summary>
+        /// <param name="id">User Id</param>
+        /// <returns></returns>
         [HttpDelete("{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.UsersAdmin)]
-        public async Task<IActionResult> DeleteUserAsync(Guid id)
+        public async Task<IActionResult> DeleteUserAsync([FromRoute] Guid id)
         {
             return Ok(await Sender.Send(new DeleteUserCommand(id)));
         }
@@ -81,6 +91,10 @@ namespace SMCA.WebApi.Controllers.v1
         /// </summary>
         [HttpPost("activate")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.UsersAdmin)]
         public async Task<IActionResult> ActivateUserAsync([FromBody] ActivateUserCommand command)
         {
@@ -93,8 +107,12 @@ namespace SMCA.WebApi.Controllers.v1
         /// <returns></returns>
         [HttpPost("AddUserRoles")]
         [ProducesResponseType(typeof(ResponseResult<IEnumerable<ListViewDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.UsersAdmin)]
-        public async Task<IActionResult> AddUserRolesAsync(AddUserRolesCommand command)
+        public async Task<IActionResult> AddUserRolesAsync([FromBody] AddUserRolesCommand command)
         {
             return Ok(await Sender.Send(command));
         }
@@ -105,8 +123,12 @@ namespace SMCA.WebApi.Controllers.v1
         /// <returns></returns>
         [HttpPost("DeleteUserRoles")]
         [ProducesResponseType(typeof(ResponseResult<IEnumerable<ListViewDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.UsersAdmin)]
-        public async Task<IActionResult> RemoveUserRolesAsync(DeleteUserRolesCommand command)
+        public async Task<IActionResult> RemoveUserRolesAsync([FromBody] DeleteUserRolesCommand command)
         {
             return Ok(await Sender.Send(command));
         }

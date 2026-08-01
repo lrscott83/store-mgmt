@@ -2,8 +2,10 @@
 
 **Change**: offline-auth-backend
 **Origin**: SDD proposal `sdd/offline-auth-backend/proposal`
-**Status**: Draft
-**Last Updated**: 2026-07-29
+**Status**: **Superseded** — merged into the main spec
+**Last Updated**: 2026-07-31
+
+> **Supersession note**: This delta was authored against the original FormatVersion-1 contract and is retained for audit. The **source of truth** is the main spec at `openspec/specs/offline-auth/spec.md`, which already carries the evolved contract: `FormatVersion = 2` + DEK wrapping (R10–R13, merged from the `at-rest-encryption-backend` delta in commit `42deff4b`). This file is kept in sync below for archive coherence, but future readers MUST use the main spec.
 
 ## Purpose
 
@@ -82,23 +84,28 @@ Every response MUST include these fields:
 | `bundleId` | string | New `Guid.NewGuid().ToString()` per request |
 | `issuedAt` | Int64 | `DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()` |
 | `expiresAt` | Int64 | `issuedAt + 35 days` in ms |
-| `formatVersion` | int | Always `1` |
+| `formatVersion` | int | Always `2` (bumped from `1` by commit `42deff4b`) |
 | `storeId` | Guid | Matches the requested storeId |
 
 #### Scenario: Bundle structure correct
 - GIVEN a successful export
-- THEN `formatVersion == 1`, `bundleId` is a valid non-empty GUID string
+- THEN `formatVersion == 2`, `bundleId` is a valid non-empty GUID string
 - AND `expiresAt - issuedAt == 35 * 86400 * 1000`
 - AND `storeId` matches the request parameter
 
 ### R5: Per-User Data Shape (MUST)
 
-Each `OfflineRosterUserDto` MUST contain: `Id`, `Login`, `FullName`, `IsActive`, `Roles` (list of `StoreModuleFeaturesDto`), `FeatureIds`, `StoreModuleIds`, `IsSuperAdmin`, `IsOwnerAdmin`, `IsReSeller`, `SelectedStoreId`, `Verifier` (Hash, Salt, Iterations).
+Each `OfflineRosterUserDto` MUST contain: `Id`, `Login`, `FullName`, `IsActive`, `Roles` (list of `StoreModuleFeaturesDto`), `FeatureIds`, `StoreModuleIds`, `IsSuperAdmin`, `IsOwnerAdmin`, `IsReSeller`, `SelectedStoreId`, `Verifier` (Hash, Salt, Iterations), `WrappedDek`, `WrapSalt`, `WrapIv`.
 
 #### Scenario: Shape matches /me output
 - GIVEN a store user
 - WHEN the roster is exported
 - THEN the user's `Roles`, `FeatureIds`, `StoreModuleIds`, and role booleans match what `/me` would return for that user in that store
+
+#### Scenario: Wrap fields populated in version 2
+- GIVEN a store with at least one user
+- WHEN the roster is exported with FormatVersion=2
+- THEN every `OfflineRosterUserDto` has non-empty `WrappedDek`, `WrapSalt`, `WrapIv`
 
 ### R6: Inactive Users Included (MUST)
 
@@ -134,3 +141,82 @@ A non-existent storeId called by a SuperAdmin SHOULD return an empty roster (`Us
 #### Scenario: Concurrent calls produce independent salts
 - GIVEN multiple concurrent calls to `CreateVerifier` with the same input
 - THEN each result has a unique salt and hash (no shared Random state)
+
+### R10: DEK Derivation — HKDF (MUST) — added by commit `42deff4b`
+
+The system MUST derive a deterministic 32-byte DEK per store via `HKDF.DeriveKey(SHA256, UTF8(masterSecret), 32, salt: null, info: UTF8(storeId.D))`. The master secret MUST be configured via `StoreEncryption:MasterSecret` (following `Jwt:SecretKey` pattern). Empty/whitespace secret MUST throw `ArgumentException`.
+
+| Parameter | Value |
+|-----------|-------|
+| Algorithm | `HKDF.DeriveKey` (SHA256) |
+| IKM | UTF-8 bytes of `StoreEncryption:MasterSecret` |
+| Salt | `null` |
+| Info | UTF-8 bytes of `storeId.ToString("D")` |
+| Output | 32 bytes |
+
+#### Scenario: Deterministic per store
+- GIVEN a configured `StoreEncryption:MasterSecret`
+- WHEN `GetDek(storeId)` is called twice with the same storeId
+- THEN both calls return identical 32-byte arrays
+
+#### Scenario: Different per store
+- GIVEN two distinct store IDs
+- WHEN `GetDek` is called for each
+- THEN the two DEKs differ (no collision)
+
+#### Scenario: Known-answer HKDF match
+- GIVEN a known master secret and storeId
+- WHEN `GetDek` is called
+- THEN the result equals an independent `HKDF.DeriveKey(...)` computation
+
+### R11: DEK Wrapping — PBKDF2 KEK + AES-GCM (MUST) — added by commit `42deff4b`
+
+The system MUST wrap a DEK per user using PBKDF2-derived KEK and AES-GCM-128. The WrappedDek layout MUST be `Base64(ciphertext ‖ tag)`.
+
+| Step | Detail |
+|------|--------|
+| KEK | `Rfc2898DeriveBytes.Pbkdf2(UTF8(storedPasswordHash), wrapSalt, 210000, SHA256, 32)` |
+| WrapSalt | 16 random bytes (fresh per call) |
+| WrapIv | 12 random bytes (fresh per call) |
+| AEAD | `AesGcm(kek, 16).Encrypt(iv, dek, ciphertext, tag)` |
+| Output | `WrappedDek=Base64(ciphertext ‖ tag)`, `WrapSalt=Base64(salt)`, `WrapIv=Base64(iv)` |
+
+#### Scenario: Round-trip unwrap
+- GIVEN a known stored password hash and a random 32-byte DEK
+- WHEN `WrapDek(hash, dek)` is called
+- THEN the output fields are valid Base64, salt is 16 bytes, iv is 12 bytes, wrapped is 48 bytes (32+16)
+- AND reconstructing the KEK with the same PBKDF2 params and decrypting returns the original DEK
+
+#### Scenario: Distinct salt/IV per call
+- GIVEN the same stored password hash and same DEK
+- WHEN `WrapDek` is called twice
+- THEN `WrapSalt`, `WrapIv`, and `WrappedDek` all differ between calls
+
+### R12: Handler DEK Integration (MUST) — added by commit `42deff4b`
+
+The handler MUST load the DEK once per export (`IStoreDataKeyProvider.GetDek(storeId)`) and wrap it per user (`IStoreKeyWrapService.WrapDek(user.Password, dek)`) inside the existing user loop.
+
+#### Scenario: DEK loaded once
+- GIVEN a store with N users
+- WHEN the handler processes the export
+- THEN `IStoreDataKeyProvider.GetDek` is called exactly once (not per user)
+
+#### Scenario: Wrap per user
+- GIVEN a store with N users
+- WHEN the handler processes the export
+- THEN `IStoreKeyWrapService.WrapDek` is called exactly N times — once per user with that user's `User.Password` and the shared DEK
+
+### R13: Bundle FormatVersion Bump (MUST) — added by commit `42deff4b`
+
+The system MUST set `OfflineRosterDto.FormatVersion = 2` (up from `1`).
+
+#### Scenario: Version 2 bundle
+- GIVEN a successful export
+- WHEN the handler returns the roster
+- THEN `FormatVersion == 2`
+
+## Archive Status
+
+- **Merged into main spec**: `openspec/specs/offline-auth/spec.md` (updated in commit `42deff4b` — R4/R5 modified, R10–R13 added).
+- **This delta is superseded** and retained for audit trail only.
+- **Evolution source**: `openspec/changes/archive/2026-07-29-at-rest-encryption-backend/` (delta spec + design for the DEK-wrapping evolution).

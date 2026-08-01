@@ -123,6 +123,9 @@
   <data name="BaseFee" xml:space="preserve">
     <value>BaseFee</value>
   </data>
+  <data name="CannotDeleteSelf" xml:space="preserve">
+    <value>You cannot delete yourself</value>
+  </data>
   <data name="CarrierAddressIsMain" xml:space="preserve">
     <value>Carrier Address is main address</value>
   </data>
@@ -501,7 +504,7 @@
   <data name="UserNotCreated" xml:space="preserve">
     <value>The user could not be created</value>
   </data>
-  <data name="UserNotFoud" xml:space="preserve">
+  <data name="UserNotFound" xml:space="preserve">
     <value>User not found</value>
   </data>
   <data name="UserNotRole" xml:space="preserve">

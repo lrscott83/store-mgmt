@@ -7,6 +7,6 @@ namespace Domain.Interfaces.Repositories
     {
         Task<IEnumerable<Role>> GetAllActiveRolesAsync(Guid tenantId, bool includeSuperAdminRole);
         Task<Role> GetRoleByNameAndTenantIdIgnoreQueryFiltersAsync(string name, Guid tenantId);
-        Task<IEnumerable<Role>> GetRolesByIds(HashSet<Guid> roleIds);
+        Task<IEnumerable<Role>> GetRolesByIds(HashSet<int> roleIds);
     }
 }
