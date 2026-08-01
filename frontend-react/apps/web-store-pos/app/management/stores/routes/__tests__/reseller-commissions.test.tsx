@@ -183,3 +183,37 @@ describe('ReSellerCommissionsPage — empty state', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-D — getReSellerCommissions succeeded:false is
+// a resolved value, not a rejection; loadRows must guard it the same as the
+// existing catch branch, surfacing BILLING.COMMISSIONS.ERROR.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ReSellerCommissionsPage — getReSellerCommissions succeeded:false', () => {
+  it('shows BILLING.COMMISSIONS.ERROR and does not set rows from data', async () => {
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.getReSellerCommissions).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    const { default: ReSellerCommissionsPage } = await import('../reseller-commissions');
+    render(
+      <Wrapper>
+        <ReSellerCommissionsPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['BILLING.COMMISSIONS.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByText('07/2026')).not.toBeInTheDocument();
+  });
+});

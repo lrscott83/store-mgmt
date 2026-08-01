@@ -202,3 +202,37 @@ describe('CollectionsPage — empty state', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-D — getStoresToCollect succeeded:false is a
+// resolved value, not a rejection; loadRows must guard it the same as the
+// existing catch branch, surfacing BILLING.COLLECTIONS.ERROR.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('CollectionsPage — getStoresToCollect succeeded:false', () => {
+  it('shows BILLING.COLLECTIONS.ERROR and does not set rows from data', async () => {
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.getStoresToCollect).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    const { default: CollectionsPage } = await import('../collections');
+    render(
+      <Wrapper>
+        <CollectionsPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['BILLING.COLLECTIONS.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Store One')).not.toBeInTheDocument();
+  });
+});

@@ -538,6 +538,36 @@ describe('UserEditPage — S-ERR-1: getById rejection renders error, no form mou
   });
 });
 
+// response-envelope-nullability WU-D — getUserById succeeded:false is a resolved
+// value, not a rejection; S-ERR-1 above only covers the .catch(rejection) branch.
+// The load guard must surface USERS.ERROR the same way, without reading `.data`
+// off a null-carrying failure envelope.
+describe('UserEditPage — getUserById succeeded:false', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockIsOnline = true;
+    mockParams = { id: 'u1' };
+    mockGetUserById = vi.fn().mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+  });
+
+  it('shows USERS.ERROR and does not mount the details form when getUserById resolves with succeeded:false', async () => {
+    const { UserEditPage } = await import('../user-edit');
+    render(<Wrapper><UserEditPage /></Wrapper>);
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['USERS.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText(/nombre completo/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('UserEditPage — S-NOCRED: no credentials/password UI is rendered (Req: Edit User Has No Admin Password Change)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

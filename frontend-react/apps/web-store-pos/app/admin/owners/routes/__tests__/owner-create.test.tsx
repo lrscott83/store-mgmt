@@ -226,6 +226,50 @@ describe('OwnerCreatePage — reSellerId SuperAdmin-only', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-D — listResellers succeeded:false (Req:
+// BEHAVIORAL GAP, pinned not fixed). This guard silently swallows the failure —
+// no error state, no error UI — matching the pre-existing `.catch()` sibling
+// right below it (owner-create.tsx:57-59, "non-critical — reseller list failure
+// doesn't block form"). This test pins that existing silent-failure idiom; it
+// does NOT assert any new user-facing behavior.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — listResellers succeeded:false (silent-failure idiom, pinned)', () => {
+  it('leaves the dropdown empty and renders no error UI when listResellers resolves with succeeded:false', async () => {
+    await setAuthUser(true);
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    const { OwnerCreatePage } = await import('../owner-create');
+    await act(async () => {
+      render(
+        <Wrapper>
+          <OwnerCreatePage />
+        </Wrapper>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/revendedor|reseller|gestor/i)).toBeInTheDocument();
+    });
+
+    // only the "--" placeholder option remains — resellers is never populated
+    // from the failed response, but no error banner/message is introduced either.
+    const select = screen.getByLabelText(/revendedor|reseller|gestor/i) as HTMLSelectElement;
+    expect(select.options.length).toBe(1);
+    expect(screen.queryAllByRole('alert')).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-CREATE-4 — PASSWORD_REGEX validation
 // ═══════════════════════════════════════════════════════════════════════════════
 

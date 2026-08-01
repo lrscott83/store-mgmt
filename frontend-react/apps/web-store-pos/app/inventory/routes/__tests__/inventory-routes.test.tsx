@@ -169,6 +169,12 @@ function bm<T>(data: T): { data: T; succeeded: true; message: ''; actionCode: 20
   return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
 }
 
+// response-envelope-nullability WU-D — the resolved-failure shape the category-B sync reads
+// guard against, even though the local-storage read they wrap never actually produces it.
+function bmFail(): { data: null; succeeded: false; message: null; actionCode: null; errors: [{ code: string; description: string }] } {
+  return { data: null, succeeded: false, message: null, actionCode: null, errors: [{ code: 'E01', description: 'failed' }] };
+}
+
 // ─── InventoryAvailablePage ──────────────────────────────────────────────────
 
 import { InventoryAvailablePage } from '../available';
@@ -393,6 +399,30 @@ describe('InventoryAvailablePage — empty-state message (Angular parity: zero c
   });
 });
 
+// response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed.
+// getInventoryCategoriesView succeeded:false silently swallows (no error state,
+// no error UI) — same idiom as the sibling silent guards on this branch. This
+// test pins the current behavior; it does not assert any new user-facing text.
+describe('InventoryAvailablePage — getInventoryCategoriesView succeeded:false (silent-failure idiom, pinned)', () => {
+  it('falls back to the zero-categories empty state with no error UI when the read fails', async () => {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bmFail()),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryAvailablePage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText('No existe ningún producto disponible')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
 // ─── TodayEntriesPage ────────────────────────────────────────────────────────
 
 import { TodayEntriesPage } from '../today-entries';
@@ -488,6 +518,30 @@ describe('TodayEntriesPage — empty-day message (Angular parity: today-entries.
     // empty branch renders the product-oriented INVENTORY.NO_ENTRY_FOUND, which is wrong here.
     expect(screen.getByText('No existe ninguna entrada en el día')).toBeInTheDocument();
     expect(screen.queryByText('No existe ningún producto disponible')).not.toBeInTheDocument();
+  });
+});
+
+// response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed.
+// getInventoryEntriesInDay succeeded:false silently swallows (no error state, no
+// error UI) — same idiom as the sibling silent guards on this branch. This test
+// pins the current behavior; it does not assert any new user-facing text.
+describe('TodayEntriesPage — getInventoryEntriesInDay succeeded:false (silent-failure idiom, pinned)', () => {
+  it('shows the empty-day message with no error UI when the read fails', () => {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bmFail()),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText('No existe ninguna entrada en el día')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 
@@ -958,6 +1012,59 @@ describe('InventoryTodayQuantitiesPage — smoke render', () => {
   });
 });
 
+// response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed, WORSE
+// than the sibling silent guards: `setIsLoading(false)` only runs at the very
+// end of the effect (today-quantities.tsx:153), AFTER both `succeeded` guards.
+// An early `return` on either guard leaves `isLoading` stuck at its initial
+// `true` forever — the page shows the loading spinner permanently, with no
+// error and no timeout. This test pins that current behavior; it does not
+// assert any new user-facing text.
+describe('InventoryTodayQuantitiesPage — getInventoryEntriesInDay succeeded:false (silent-failure idiom, pinned — stuck spinner)', () => {
+  it('leaves the page on the loading spinner forever, with no error UI, when the read fails', async () => {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bmFail()),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodayQuantitiesPage />
+      </Wrapper>,
+    );
+
+    // Give any pending microtask a chance to run — there is none that clears isLoading.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByText('Cargando...')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(esMessages['INVENTORY.QUANTITIES.NO_PRODUCTS'])).not.toBeInTheDocument();
+  });
+
+  // Second, independent guard on the same effect (today-quantities.tsx:96) —
+  // entries succeeds but the categories read fails. Same stuck-spinner outcome.
+  it('leaves the page on the loading spinner forever, with no error UI, when getInventoryCategoriesView fails (entries succeeded)', async () => {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bmFail()),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodayQuantitiesPage />
+      </Wrapper>,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByText('Cargando...')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
 // ─── InventoryTodayQuantitiesPage — Angular formula parity ──────────────────
 //
 // Angular reference: inventory-today-quantities.component.ts:57-137. Product set filtered to
@@ -1129,6 +1236,34 @@ describe('InventoryTodaySalesProfitPage — smoke render', () => {
       </Wrapper>,
     );
     expect(screen.getByText(/Ganancias del Día/i)).toBeInTheDocument();
+  });
+});
+
+// response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed, WORSE
+// than the sibling silent guards: `setIsLoading(false)` only runs at the very
+// end of the effect (today-sales-profit.tsx:203), AFTER the `succeeded` guard.
+// An early `return` leaves `isLoading` stuck at its initial `true` forever —
+// the page shows the loading spinner permanently, with no error and no
+// timeout. This test pins that current behavior; it does not assert any new
+// user-facing text.
+describe('InventoryTodaySalesProfitPage — getInventoryEntriesInDay succeeded:false (silent-failure idiom, pinned — stuck spinner)', () => {
+  it('leaves the page on the loading spinner forever, with no error UI, when the read fails', async () => {
+    vi.mocked(InventoryOfflineService).mockImplementationOnce(
+      () =>
+        ({
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bmFail()),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <InventoryTodaySalesProfitPage />
+      </Wrapper>,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByText('Cargando...')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

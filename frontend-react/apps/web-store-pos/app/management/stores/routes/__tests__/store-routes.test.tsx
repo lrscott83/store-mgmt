@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Store, Module, Owner } from '@store-mgmt/domain';
+import type { BaseResponseModel, Store, Module, Owner } from '@store-mgmt/domain';
 
 // ─── Domain factories ─────────────────────────────────────────────────────────
 
@@ -516,6 +516,87 @@ describe('EditStorePage — edit mode: store not found shows error state', () =>
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-D — succeeded:false is a resolved value, not a
+// rejection. Both effects Promise.all 2-3 calls and OR their `.succeeded` flags;
+// each has its own dedicated error state (loadError for edit mode, catalogError
+// for create mode) — the two must never be conflated.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('EditStorePage — edit mode: getStore/getModulesToStore/listOwners succeeded:false', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockParams = { id: 's1' };
+    mockGetStore = vi.fn().mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+  });
+
+  it('sets loadError (not catalogError) to STORES.ERROR and does not pre-fill the form', async () => {
+    const { EditStorePage } = await import('../edit-store');
+    render(<Wrapper><EditStorePage /></Wrapper>);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['STORES.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByDisplayValue('Edit Me')).not.toBeInTheDocument();
+    // Only the page-level loadError alert renders — never a second catalogError one.
+    expect(screen.queryAllByRole('alert')).toHaveLength(1);
+  });
+
+  // The runtime test above locks the observable behaviour, but it cannot tell a
+  // guarded read from an unguarded one: without the guard, `storeRes.data` is
+  // null, `fetchedStore.modules` throws synchronously inside the `.then`, which
+  // rejects the chain and lands in the very same `.catch` that sets the very
+  // same STORES.ERROR — both paths render identically. The guard is enforced by
+  // the compiler, so that is where it has to be asserted.
+  it('type-level: getStore data cannot be read before succeeded is checked', () => {
+    // Never invoked — the body is a compile-time assertion.
+    const probe = (res: BaseResponseModel<Store>) => {
+      // @ts-expect-error `data` is Store | null until `succeeded` narrows the union
+      void res.data.modules;
+      if (res.succeeded) void res.data.modules;
+    };
+    expect(probe).toBeTypeOf('function');
+  });
+});
+
+describe('EditStorePage — create mode: getModulesToStore/listOwners succeeded:false', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
+    mockParams = {};
+    mockGetModulesToStore = vi.fn().mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+  });
+
+  it('sets catalogError (not loadError) to STORES.ERROR and disables submit', async () => {
+    const { EditStorePage } = await import('../edit-store');
+    render(<Wrapper><EditStorePage /></Wrapper>);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['STORES.ERROR'])).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
+    });
+    expect(screen.queryAllByRole('alert')).toHaveLength(1);
   });
 });
 

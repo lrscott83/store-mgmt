@@ -11,6 +11,18 @@ function expensesResponse(expenses: Expense[] = []) {
   return Promise.resolve({ data: expenses, succeeded: true, message: '', actionCode: 200, errors: [] });
 }
 
+// response-envelope-nullability WU-D — the resolved-failure shape both offline reads guard
+// against, even though the local-storage read they wrap never actually produces it.
+function expensesFailureResponse() {
+  return Promise.resolve({
+    data: null,
+    succeeded: false as const,
+    message: null,
+    actionCode: null,
+    errors: [{ code: 'E01', description: 'failed' }],
+  });
+}
+
 // ─── Global mocks ────────────────────────────────────────────────────────────
 
 vi.mock('~/shared/lib/stores/auth-store', () => {
@@ -225,6 +237,49 @@ describe('TodayExpensesPage — delete gated by confirmDialog (T5)', () => {
 
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
     expect(deleteExpenseMock).not.toHaveBeenCalled();
+  });
+});
+
+// response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed.
+// getExpensesInDayObservable succeeded:false silently swallows (no error state,
+// no error UI) — same idiom as the sibling silent guards on this branch. This
+// test pins the current behavior; it does not assert any new user-facing text.
+describe('TodayExpensesPage — getExpensesInDayObservable succeeded:false (silent-failure idiom, pinned)', () => {
+  it('leaves the list empty with no error UI when the response resolves with succeeded:false', async () => {
+    const expense = {
+      id: 'e1',
+      type: ExpenseType.Comida,
+      total: 20,
+      date: new Date(),
+      paymentType: PaymentType.Efectivo,
+      note: '',
+      isActive: true,
+      createdDate: new Date(),
+      createdByName: '',
+    } as Expense;
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          getStorageExpenses: vi.fn().mockReturnValue([expense]),
+          getExpensesInDayObservable: vi.fn().mockReturnValue(expensesFailureResponse()),
+          create: vi.fn(),
+          update: vi.fn(),
+          deleteExpense: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <TodayExpensesPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['EXPENSES.EMPTY_STATE'])).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('expense-actions-toggle-e1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 
@@ -453,5 +508,36 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(await screen.findByText('(1)')).toBeInTheDocument();
     // $25.00 now appears twice: the header total and the (single) day-panel total.
     expect(screen.getAllByText('$25.00')).toHaveLength(2);
+  });
+});
+
+// response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed.
+// filterExpensesObservable succeeded:false silently swallows (no error state, no
+// error UI) — same idiom as the sibling silent guards on this branch. This test
+// pins the current behavior; it does not assert any new user-facing text.
+describe('ExpensesHistoryPage — filterExpensesObservable succeeded:false (silent-failure idiom, pinned)', () => {
+  it('shows the empty state with no error UI when the response resolves with succeeded:false', async () => {
+    const day1 = makeExpense({ id: 'a', date: new Date('2024-03-15T09:00:00.000'), total: 10 });
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          filterExpensesObservable: vi.fn().mockReturnValue(expensesFailureResponse()),
+          create: vi.fn(),
+          update: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <ExpensesHistoryPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('No se encontró ningún gasto')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(`$${day1.total}.00`)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

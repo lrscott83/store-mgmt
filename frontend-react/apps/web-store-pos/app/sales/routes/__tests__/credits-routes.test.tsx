@@ -11,6 +11,18 @@ function creditsResponse(credits: SaleCredit[] = []) {
   return Promise.resolve({ data: credits, succeeded: true, message: '', actionCode: 200, errors: [] });
 }
 
+// response-envelope-nullability WU-D — the resolved-failure shape both offline reads guard
+// against, even though the local-storage read they wrap never actually produces it.
+function creditsFailureResponse() {
+  return Promise.resolve({
+    data: null,
+    succeeded: false as const,
+    message: null,
+    actionCode: null,
+    errors: [{ code: 'E01', description: 'failed' }],
+  });
+}
+
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const state = { user: { selectedStoreId: 's1' }, isAuthenticated: true };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) =>
@@ -170,6 +182,32 @@ describe('TodaySaleCreditsPage — behavioral (Angular parity)', () => {
     await waitFor(() => expect(pay).toHaveBeenCalled());
     await waitFor(() => expect(mockShowBlockingError).toHaveBeenCalled());
   });
+
+  // response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed.
+  // getSaleCreditsInDayObservable succeeded:false silently swallows (no error
+  // state, no error UI) — same idiom as the sibling silent guards on this
+  // branch. This test pins the current behavior; it does not assert any new
+  // user-facing text.
+  it('shows the empty-day message with no error UI when getSaleCreditsInDayObservable resolves with succeeded:false', async () => {
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          getSaleCreditsInDayObservable: vi.fn().mockReturnValue(creditsFailureResponse()),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <TodaySaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['SALE_CREDIT.NO_SALE_CREDIT_FOUND_IN_DAY'])).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });
 
 describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
@@ -240,5 +278,37 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(svgClass()).toContain('rotate-180');
+  });
+
+  // response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed.
+  // filterSaleCredits succeeded:false silently swallows (no error state, no
+  // error UI) — same idiom as the sibling silent guards on this branch. This
+  // test pins the current behavior; it does not assert any new user-facing
+  // text.
+  it('shows the empty-history message with no error UI when filterSaleCredits resolves with succeeded:false', async () => {
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: vi.fn().mockResolvedValue({
+            data: null,
+            succeeded: false,
+            message: null,
+            actionCode: null,
+            errors: [{ code: 'E01', description: 'failed' }],
+          }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['SALE_CREDIT.NO_SALE_CREDIT_FOUND'])).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
