@@ -296,6 +296,37 @@ describe('ResellerListPage — error state', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-A — succeeded:false is a resolved value, not a
+// rejection; loadResellers must guard it the same as the catch branch above.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerListPage — succeeded:false response', () => {
+  it('shows RESELLERS.ERROR when listResellers resolves with succeeded:false, does not set resellers from data', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.listResellers).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    const { ResellerListPage } = await import('../reseller-list');
+    render(
+      <Wrapper>
+        <ResellerListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-RESELLERS-LIST-7 — NO activate/deactivate/delete buttons
 // ═══════════════════════════════════════════════════════════════════════════════
 

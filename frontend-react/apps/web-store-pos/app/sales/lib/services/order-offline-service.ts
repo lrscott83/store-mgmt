@@ -363,7 +363,10 @@ export class OrderOfflineService {
    * its `.data` as the payload rather than double-wrapping the whole envelope.
    */
   getCategoryCartItemsViewObservable(date: Date): Promise<BaseResponseModel<CategoryCartItemsView[]>> {
-    return Promise.resolve(success(this.getCategoryCartItemsView(date).data));
+    // getCategoryCartItemsView is a sync local-storage read that always returns success();
+    // this guard exists for the type only.
+    const response = this.getCategoryCartItemsView(date);
+    return Promise.resolve(response);
   }
 
   /**

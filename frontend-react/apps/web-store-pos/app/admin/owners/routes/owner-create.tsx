@@ -52,6 +52,7 @@ export function OwnerCreatePage() {
   useEffect(() => {
     if (!isSuperAdmin) return;
     resellerHttpService.listResellers().then((res) => {
+      if (!res.succeeded) return;
       setResellers(res.data);
     }).catch(() => {
       // non-critical — reseller list failure doesn't block form

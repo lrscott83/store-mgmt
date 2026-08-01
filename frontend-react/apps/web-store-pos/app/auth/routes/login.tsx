@@ -150,6 +150,8 @@ export default function LoginPage() {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.INVALID_CREDENTIALS' }) });
       } else if (status === 403) {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.ACCOUNT_INACTIVE' }) });
+      } else if (status === 429) {
+        setErrors({ form: intl.formatMessage({ id: 'AUTH.TOO_MANY_ATTEMPTS' }) });
       } else {
         setErrors({ form: intl.formatMessage({ id: 'AUTH.SERVER_ERROR' }) });
       }

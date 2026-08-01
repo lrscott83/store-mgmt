@@ -354,6 +354,37 @@ describe('AdminStoreListPage — error state', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-A — succeeded:false is a resolved value, not a
+// rejection; loadStores must guard it the same as the catch branch above.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminStoreListPage — succeeded:false response', () => {
+  it('shows STORES.ERROR when listStores resolves with succeeded:false, does not set stores from data', async () => {
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['STORES.ERROR'])).toBeInTheDocument();
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-STORES-PAGE-6 — Activate/Deactivate NOT wired (Req: Activate/Deactivate Removed)
 // ═══════════════════════════════════════════════════════════════════════════════
 

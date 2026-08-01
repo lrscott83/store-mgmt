@@ -107,7 +107,10 @@ export function TodayStatsPage() {
 
   useEffect(() => {
     const orderService = new OrderOfflineService(storeId);
-    setCategories(orderService.getCategoryCartItemsView(new Date()).data);
+    // OrderOfflineService.getCategoryCartItemsView is a sync local-storage read that never
+    // actually fails; this guard exists for the type only.
+    const categoriesResponse = orderService.getCategoryCartItemsView(new Date());
+    if (categoriesResponse.succeeded) setCategories(categoriesResponse.data);
 
     const activeOrders: Order[] = orderService.getActiveOrdersInDay(new Date());
     setSalesCashTotal(
@@ -122,7 +125,9 @@ export function TodayStatsPage() {
       const expenseService = new ExpenseOfflineService(storeId);
       void expenseService
         .getExpensesInDayObservable(new Date())
-        .then((response) => setExpenses(response.data));
+        .then((response) => {
+          if (response.succeeded) setExpenses(response.data);
+        });
     }
 
     if (hasCreditsModule) {
@@ -132,10 +137,14 @@ export function TodayStatsPage() {
       const creditService = new SaleCreditOfflineService(storeId);
       void creditService
         .getUnPaidSaleCreditsInDayObservable(new Date())
-        .then((response) => setSaleCredits(response.data));
+        .then((response) => {
+          if (response.succeeded) setSaleCredits(response.data);
+        });
       void creditService
         .getPaidSaleCreditsInDayObservable(new Date())
-        .then((response) => setPaidSaleCredits(response.data));
+        .then((response) => {
+          if (response.succeeded) setPaidSaleCredits(response.data);
+        });
     }
   }, [storeId, hasExpensesModule, hasCreditsModule]);
 

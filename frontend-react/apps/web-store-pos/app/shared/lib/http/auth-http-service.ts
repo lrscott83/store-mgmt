@@ -1,4 +1,10 @@
-import type { AuthModel, BaseResponseModel, RegisterRequest, UserModel } from '@store-mgmt/domain';
+import type {
+  AuthModel,
+  BaseResponseModel,
+  RegisterAuthModel,
+  RegisterRequest,
+  UserModel,
+} from '@store-mgmt/domain';
 import { apiClient } from './api-client';
 
 interface LoginPayload {
@@ -15,7 +21,7 @@ export const authHttpService = {
     return response.data;
   },
 
-  async register(payload: RegisterRequest): Promise<BaseResponseModel<boolean>> {
+  async register(payload: RegisterRequest): Promise<BaseResponseModel<RegisterAuthModel>> {
     const { fullName, login, password, cellPhone, email, storeName, code } = payload;
     const body: Record<string, string> = {
       fullName,
@@ -28,7 +34,7 @@ export const authHttpService = {
     if (code && code.trim() !== '') {
       body.code = code;
     }
-    const response = await apiClient.post<BaseResponseModel<boolean>>(
+    const response = await apiClient.post<BaseResponseModel<RegisterAuthModel>>(
       '/v1/auth/register',
       body
     );

@@ -39,9 +39,12 @@ export function TodayEntriesPage() {
     // WU3 (category B): getInventoryEntriesInDay now returns BaseResponseModel<InventoryEntryView[]>
     // (was a bare array) — unwrap `.data`. Fase 4: renamed from getByDate (the date arg is
     // ignored — always returns today, Angular parity).
-    const raw = svc.getInventoryEntriesInDay(new Date()).data;
+    const response = svc.getInventoryEntriesInDay(new Date());
+    // InventoryOfflineService.getInventoryEntriesInDay is a sync local-storage read that
+    // never actually fails; this guard exists for the type only.
+    if (!response.succeeded) return;
     setEntries(
-      raw.map((e: InventoryEntryView) => ({ ...e, productName: productMap.get(e.productId) ?? e.productName })),
+      response.data.map((e: InventoryEntryView) => ({ ...e, productName: productMap.get(e.productId) ?? e.productName })),
     );
   }
 

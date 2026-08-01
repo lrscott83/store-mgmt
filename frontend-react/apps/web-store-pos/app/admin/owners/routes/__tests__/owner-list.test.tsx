@@ -496,3 +496,35 @@ describe('OwnerListPage — HTTP error inline', () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-A — succeeded:false is a resolved value, not a
+// rejection; loadOwners must guard it the same as the catch branch above.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerListPage — succeeded:false response', () => {
+  it('shows OWNER.ERROR when listOwners resolves with succeeded:false, does not set owners from data', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['OWNER.ERROR'])).toBeInTheDocument();
+    });
+  });
+});

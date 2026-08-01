@@ -1,8 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SaleCreditOfflineService } from '../sale-credit-offline-service';
 import { PaymentType } from '@store-mgmt/domain';
-import type { SaleCredit, UserModel } from '@store-mgmt/domain';
+import type { BaseResponseModel, SaleCredit, UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+
+// response-envelope-nullability: `data` only narrows to non-null on the succeeded
+// branch. These tests only ever exercise the success path, so unwrap once instead of
+// repeating an `if (!x.succeeded) throw` guard at every assertion site.
+function unwrap<T>(response: BaseResponseModel<T>): T {
+  if (!response.succeeded) throw new Error('expected succeeded response');
+  return response.data;
+}
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -431,7 +439,7 @@ describe('SaleCreditOfflineService', () => {
       const earlier = createCredit('o2', 'Earlier', 20);
       setCreditDate(earlier.id, new Date(Date.now() - 60_000));
       const response = service.getSaleCreditsInDay(new Date());
-      expect(response.data.map((c) => c.id)).toEqual([earlier.id, later.id]);
+      expect(unwrap(response).map((c) => c.id)).toEqual([earlier.id, later.id]);
     });
   });
 
@@ -709,8 +717,9 @@ describe('SaleCreditOfflineService', () => {
       createCredit('o2', 'Bob', 30);
       const response = await service.filterSaleCredits(true, null, null, null);
       expect(response.succeeded).toBe(true);
-      expect(response.data).toHaveLength(1);
-      expect(response.data[0].isPaid).toBe(true);
+      const data = unwrap(response);
+      expect(data).toHaveLength(1);
+      expect(data[0].isPaid).toBe(true);
     });
 
     it('isPaid=false behaves as no filter on paid status (Angular quirk: !isPaid || ...)', async () => {
@@ -725,8 +734,9 @@ describe('SaleCreditOfflineService', () => {
       createCredit('o1', 'Juan Perez', 50);
       createCredit('o2', 'Maria Lopez', 30);
       const response = await service.filterSaleCredits(false, 'Perez', null, null);
-      expect(response.data).toHaveLength(1);
-      expect(response.data[0].client).toBe('Juan Perez');
+      const data = unwrap(response);
+      expect(data).toHaveLength(1);
+      expect(data[0].client).toBe('Juan Perez');
     });
 
     it('filters by date range when start/end provided', async () => {
@@ -740,8 +750,9 @@ describe('SaleCreditOfflineService', () => {
         new Date('2024-05-01T00:00:00.000'),
         new Date('2024-07-01T00:00:00.000'),
       );
-      expect(response.data).toHaveLength(1);
-      expect(response.data[0].total).toBe(20);
+      const data = unwrap(response);
+      expect(data).toHaveLength(1);
+      expect(data[0].total).toBe(20);
     });
 
     it('excludes voided credits regardless of filters', async () => {

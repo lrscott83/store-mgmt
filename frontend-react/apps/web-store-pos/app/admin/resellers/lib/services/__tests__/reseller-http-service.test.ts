@@ -91,6 +91,7 @@ describe('resellerHttpService.getReseller — HTTP-3: GET /v1/reSellers/:id', ()
     const { resellerHttpService } = await import('../reseller-http-service');
     const result = await resellerHttpService.getReseller('r1');
     expect(result.succeeded).toBe(true);
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.fullName).toBe('John Reseller');
     expect(result.message).toBe('');
     expect(result.actionCode).toBe(0);

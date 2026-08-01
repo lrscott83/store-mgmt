@@ -77,7 +77,7 @@ this work and must stay that way.
 **Out of scope:**
 
 - Offline authentication. That is a separate, already-written plan
-  (`docs/plans/2026-07-25-offline-auth-frontend-plan.md`) and is not touched here. Note the
+  (shipped; archived at `openspec/changes/archive/2026-07-29-offline-auth-frontend/`) and is not touched here. Note the
   dependency direction: offline auth cannot work until this shell fix ships, because no
   application code runs offline today.
 - Building an offline data layer for views that inherently call the API: `admin/*`,

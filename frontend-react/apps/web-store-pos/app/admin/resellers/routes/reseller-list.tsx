@@ -17,6 +17,10 @@ export function ResellerListPage() {
   const loadResellers = useCallback(async () => {
     try {
       const res = await resellerHttpService.listResellers();
+      if (!res.succeeded) {
+        setError(formatMessage({ id: 'RESELLERS.ERROR' }));
+        return;
+      }
       setResellers(res.data);
       setError(undefined);
     } catch {

@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EModules, OrderErrors, PaymentType, OrderType } from '@store-mgmt/domain';
-import type { Order, Product, InventoryEntryCost, OrderItem, UserModel } from '@store-mgmt/domain';
+import type { BaseResponseModel, Order, Product, InventoryEntryCost, OrderItem, UserModel } from '@store-mgmt/domain';
+
+// response-envelope-nullability: `data` only narrows to non-null on the succeeded
+// branch. These tests only ever exercise the success path, so unwrap once instead of
+// repeating an `if (!x.succeeded) throw` guard at every assertion site.
+function unwrap<T>(response: BaseResponseModel<T>): T {
+  if (!response.succeeded) throw new Error('expected succeeded response');
+  return response.data;
+}
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
@@ -172,7 +180,7 @@ async function createTestOrder(
   details?: string,
 ): Promise<Order> {
   const result = await svc.createOrder(cartItems, orderType, isCredit, paymentType, details, clientName);
-  return result.data as Order;
+  return unwrap(result);
 }
 
 describe('OrderOfflineService', () => {
@@ -257,7 +265,7 @@ describe('OrderOfflineService', () => {
       const product = makeProduct({ id: 'p1', name: 'Cola', categoryId: 'cat1', categoryName: 'Drinks', price: 4 });
       const items = makeCartItems([{ product, quantity: 2 }]);
       const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
-      const oi = result.data!.orderItems[0];
+      const oi = unwrap(result).orderItems[0];
       expect(oi.productId).toBe('p1');
       expect(oi.productName).toBe('Cola');
       expect(oi.quantity).toBe(2);
@@ -277,7 +285,7 @@ describe('OrderOfflineService', () => {
         { product: productB, quantity: 1 }, // cart index 1
       ]);
       const result = await service.createOrder(items, OrderType.Normal, false, PaymentType.Efectivo, undefined, '');
-      const orderItems = result.data!.orderItems;
+      const orderItems = unwrap(result).orderItems;
       expect(orderItems[0].order).toBe(5); // productA.order, NOT cart index 0
       expect(orderItems[1].order).toBe(2); // productB.order, NOT cart index 1
     });
@@ -540,7 +548,7 @@ describe('OrderOfflineService', () => {
       const order = await createTestOrder(service, items, PaymentType.Efectivo, false, '');
       const result = await service.getActiveTodayOrdersObservable();
       expect(result.succeeded).toBe(true);
-      expect(result.data.map((o) => o.id)).toEqual([order.id]);
+      expect(unwrap(result).map((o) => o.id)).toEqual([order.id]);
     });
 
     it('resolves succeeded:true with empty data when there are no active orders today', async () => {
@@ -728,7 +736,7 @@ describe('OrderOfflineService', () => {
       await createTestOrder(service, items1, PaymentType.Efectivo, false, '');
       await createTestOrder(service, items2, PaymentType.Efectivo, false, '');
 
-      const result = service.getCategoryCartItemsView(new Date()).data;
+      const result = unwrap(service.getCategoryCartItemsView(new Date()));
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('cat1');
       expect(result[0].name).toBe('Bebidas');
@@ -743,7 +751,7 @@ describe('OrderOfflineService', () => {
       ]);
       await createTestOrder(service, items, PaymentType.Efectivo, false, '');
 
-      const result = service.getCategoryCartItemsView(new Date()).data;
+      const result = unwrap(service.getCategoryCartItemsView(new Date()));
       expect(result[0].productItems).toHaveLength(2);
       const cola = result[0].productItems.find((p) => p.name === 'Cola');
       const fanta = result[0].productItems.find((p) => p.name === 'Fanta');
@@ -758,7 +766,7 @@ describe('OrderOfflineService', () => {
         { product: makeProduct({ id: 'p1', categoryId: 'cat2', categoryName: 'Snacks', price: 2 }), quantity: 1 },
       ]);
       await createTestOrder(service, items, PaymentType.Efectivo, false, '');
-      const result = service.getCategoryCartItemsView(new Date()).data;
+      const result = unwrap(service.getCategoryCartItemsView(new Date()));
       expect(result[0].order).toBe(1); // cat2's order from the mocked category list
     });
 
@@ -767,7 +775,7 @@ describe('OrderOfflineService', () => {
         { product: makeProduct({ id: 'p1', categoryId: 'unknown-cat', categoryName: 'Ghost', price: 2 }), quantity: 1 },
       ]);
       await createTestOrder(service, items, PaymentType.Efectivo, false, '');
-      const result = service.getCategoryCartItemsView(new Date()).data;
+      const result = unwrap(service.getCategoryCartItemsView(new Date()));
       expect(result[0].order).toBe(Number.MAX_VALUE);
     });
 
@@ -1123,7 +1131,7 @@ describe('OrderOfflineService', () => {
       ]);
       const result = await service.filterOrdersObservable(-1);
       expect(result.succeeded).toBe(true);
-      expect(result.data.map((o) => o.id).sort()).toEqual(['credit', 'non-credit']);
+      expect(unwrap(result).map((o) => o.id).sort()).toEqual(['credit', 'non-credit']);
     });
 
     it('isCredit=1 returns only credit orders', async () => {
@@ -1132,7 +1140,7 @@ describe('OrderOfflineService', () => {
         makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
       ]);
       const result = await service.filterOrdersObservable(1);
-      expect(result.data.map((o) => o.id)).toEqual(['credit']);
+      expect(unwrap(result).map((o) => o.id)).toEqual(['credit']);
     });
 
     it('isCredit=0 returns only non-credit orders', async () => {
@@ -1141,7 +1149,7 @@ describe('OrderOfflineService', () => {
         makeOrder({ id: 'non-credit', isCredit: false, isActive: true }),
       ]);
       const result = await service.filterOrdersObservable(0);
-      expect(result.data.map((o) => o.id)).toEqual(['non-credit']);
+      expect(unwrap(result).map((o) => o.id)).toEqual(['non-credit']);
     });
 
     it('excludes inactive orders regardless of isCredit filter', async () => {
@@ -1156,7 +1164,7 @@ describe('OrderOfflineService', () => {
         makeOrder({ id: 'tarjeta', paymentType: PaymentType.Tarjeta, isActive: true }),
       ]);
       const result = await service.filterOrdersObservable(-1, PaymentType.Tarjeta);
-      expect(result.data.map((o) => o.id)).toEqual(['tarjeta']);
+      expect(unwrap(result).map((o) => o.id)).toEqual(['tarjeta']);
     });
 
     it('filters by start date (inclusive) when provided', async () => {
@@ -1166,7 +1174,7 @@ describe('OrderOfflineService', () => {
         makeOrder({ id: 'after', date: now, isActive: true }),
       ]);
       const result = await service.filterOrdersObservable(-1, undefined, addDays(now, -1));
-      expect(result.data.map((o) => o.id)).toEqual(['after']);
+      expect(unwrap(result).map((o) => o.id)).toEqual(['after']);
     });
 
     it('filters by end date (exclusive) when provided', async () => {
@@ -1176,7 +1184,7 @@ describe('OrderOfflineService', () => {
         makeOrder({ id: 'after', date: now, isActive: true }),
       ]);
       const result = await service.filterOrdersObservable(-1, undefined, undefined, addDays(now, -1));
-      expect(result.data.map((o) => o.id)).toEqual(['before']);
+      expect(unwrap(result).map((o) => o.id)).toEqual(['before']);
     });
 
     // Angular parity (order-offline.service.ts:246-250, getActiveOrders): the private
@@ -1189,7 +1197,7 @@ describe('OrderOfflineService', () => {
         makeOrder({ id: 'middle', date: addDays(now, -1), isActive: true }),
       ]);
       const result = await service.filterOrdersObservable(-1);
-      expect(result.data.map((o) => o.id)).toEqual(['oldest', 'middle', 'newest']);
+      expect(unwrap(result).map((o) => o.id)).toEqual(['oldest', 'middle', 'newest']);
     });
   });
 

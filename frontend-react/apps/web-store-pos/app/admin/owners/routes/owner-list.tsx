@@ -18,6 +18,10 @@ export function OwnerListPage() {
   const loadOwners = useCallback(async () => {
     try {
       const res = await ownerHttpService.listOwners();
+      if (!res.succeeded) {
+        setError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+        return;
+      }
       setOwners(res.data);
       setError(undefined);
     } catch {

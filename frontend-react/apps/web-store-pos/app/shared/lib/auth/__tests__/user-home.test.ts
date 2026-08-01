@@ -7,7 +7,7 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
 }));
 
 import { resolveUserHomePath } from '../user-home';
-import type { UserModel } from '@store-mgmt/domain';
+import type { BaseResponseModel, UserModel } from '@store-mgmt/domain';
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -35,7 +35,7 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
-function envelope(data: boolean) {
+function envelope(data: boolean): BaseResponseModel<boolean> {
   return { data, succeeded: true, message: '', actionCode: 200, errors: [] };
 }
 

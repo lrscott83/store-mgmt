@@ -23,6 +23,10 @@ export function UserListPage() {
     userHttpService
       .getUsers()
       .then((res) => {
+        if (!res.succeeded) {
+          setError(intl.formatMessage({ id: 'USERS.ERROR' }));
+          return;
+        }
         setUsers(res.data);
         setError('');
       })

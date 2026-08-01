@@ -4,9 +4,17 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
-import type { InventoryEntry, OrderItem, Product, ProductCategory, UserModel } from '@store-mgmt/domain';
+import type { BaseResponseModel, InventoryEntry, OrderItem, Product, ProductCategory, UserModel } from '@store-mgmt/domain';
 
 const storeId = 's1';
+
+// response-envelope-nullability: `data` only narrows to non-null on the succeeded
+// branch. These tests only ever exercise the success path, so unwrap once instead of
+// repeating an `if (!x.succeeded) throw` guard at every assertion site.
+function unwrap<T>(response: BaseResponseModel<T>): T {
+  if (!response.succeeded) throw new Error('expected succeeded response');
+  return response.data;
+}
 
 function makeProduct(id: string, overrides: Partial<Product> = {}): Product {
   return {
@@ -698,7 +706,7 @@ describe('InventoryOfflineService', () => {
       ]);
       seedInventory(storeId, map);
 
-      const categories = service.getInventoryCategoriesView().data;
+      const categories = unwrap(service.getInventoryCategoriesView());
 
       expect(categories[0].categoryName).toBe('Bebidas');
       // (10*2 + 10*4) / 20 = 3
@@ -717,7 +725,7 @@ describe('InventoryOfflineService', () => {
       ]);
       seedInventory(storeId, map);
 
-      const categories = service.getInventoryCategoriesView().data;
+      const categories = unwrap(service.getInventoryCategoriesView());
 
       // (2*2 + 8*5) / 10 = 4.4
       expect(categories[0].products[0].avgCostPrice).toBeCloseTo(4.4, 5);
@@ -734,7 +742,7 @@ describe('InventoryOfflineService', () => {
       map.set('p2', [makeEntry('e2', 'p2', { categoryId: 'cat-1', available: 5, costPrice: 3 })]);
       seedInventory(storeId, map);
 
-      const categories = service.getInventoryCategoriesView().data;
+      const categories = unwrap(service.getInventoryCategoriesView());
 
       expect(categories).toHaveLength(1);
       expect(categories[0].totalQuantity).toBe(15);
@@ -751,7 +759,7 @@ describe('InventoryOfflineService', () => {
       map.set('p2', [makeEntry('e2', 'p2', { categoryId: 'cat-1', available: 5, costPrice: 3 })]); // value = 15
       seedInventory(storeId, map);
 
-      const categories = service.getInventoryCategoriesView().data;
+      const categories = unwrap(service.getInventoryCategoriesView());
 
       expect(categories[0].totalCostPrice).toBe(35);
     });
@@ -770,7 +778,7 @@ describe('InventoryOfflineService', () => {
       map.set('p2', [makeEntry('e2', 'p2', { categoryId: 'cat-2', available: 5, costPrice: 10 })]);
       seedInventory(storeId, map);
 
-      const categories = service.getInventoryCategoriesView().data;
+      const categories = unwrap(service.getInventoryCategoriesView());
 
       const bebidas = categories.find((c) => c.categoryId === 'cat-1');
       const snacks = categories.find((c) => c.categoryId === 'cat-2');
@@ -784,7 +792,7 @@ describe('InventoryOfflineService', () => {
       map.set('p1', [makeEntry('e1', 'p1', { categoryId: 'cat-1', quantity: 10, available: 0, costPrice: 2 })]);
       seedInventory(storeId, map);
 
-      const categories = service.getInventoryCategoriesView().data;
+      const categories = unwrap(service.getInventoryCategoriesView());
 
       // Fully-depleted product is excluded entirely — pre-existing divergence, not this gap's concern.
       expect(categories).toHaveLength(0);
@@ -889,7 +897,7 @@ describe('InventoryOfflineService', () => {
       seedInventory(storeId, map);
 
       // Passing yesterday's date must NOT change the result — the date arg is ignored.
-      const results = service.getInventoryEntriesInDay(yesterday).data;
+      const results = unwrap(service.getInventoryEntriesInDay(yesterday));
       expect(results.map((e) => e.id)).toEqual(['e-today']);
     });
 
@@ -972,8 +980,9 @@ describe('InventoryOfflineService', () => {
       map.set('p2', [makeEntry('e2', 'p2')]);
       seedInventory(storeId, map);
       const result = await service.filterInventoryEntries('p1');
-      expect(result.data).toHaveLength(1);
-      expect(result.data[0].productId).toBe('p1');
+      const data = unwrap(result);
+      expect(data).toHaveLength(1);
+      expect(data[0].productId).toBe('p1');
     });
 
     it('filters by date range when start/end provided', async () => {
@@ -988,8 +997,9 @@ describe('InventoryOfflineService', () => {
         new Date('2024-05-01T00:00:00.000'),
         new Date('2024-07-01T00:00:00.000'),
       );
-      expect(result.data).toHaveLength(1);
-      expect(result.data[0].id).toBe('e2');
+      const data = unwrap(result);
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe('e2');
     });
 
     it('excludes inactive entries regardless of filters', async () => {
@@ -1028,7 +1038,7 @@ describe('InventoryOfflineService', () => {
       seedInventory(storeId, map);
 
       const result = await service.getInventoryEntriesView();
-      const views = result.data;
+      const views = unwrap(result);
       expect(views).toHaveLength(1);
       expect(views[0].productId).toBe('p1');
       expect(views[0].productAvailable).toBe(10);
@@ -1048,7 +1058,7 @@ describe('InventoryOfflineService', () => {
       seedInventory(storeId, map);
 
       const result = await service.getInventoryEntriesView();
-      const views = result.data;
+      const views = unwrap(result);
       expect(views[0].availableEntries).toEqual([{ inventoryId: 'e3', costPrice: 2.5, quantity: 3 }]);
       expect(views[0].productAvailable).toBe(3);
     });
@@ -1060,7 +1070,7 @@ describe('InventoryOfflineService', () => {
       seedInventory(storeId, map);
 
       const result = await service.getInventoryEntriesView();
-      const views = result.data;
+      const views = unwrap(result);
       expect(views).toHaveLength(2);
       expect(views.map((v) => v.productId).sort()).toEqual(['p1', 'p2']);
     });

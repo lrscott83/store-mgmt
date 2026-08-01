@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { RegisterAuthModel } from '@store-mgmt/domain';
 
 vi.mock('~/shared/lib/http/api-client', () => ({
   apiClient: {
@@ -12,7 +13,13 @@ describe('authHttpService.register — POST /v1/auth/register (registerOwner par
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: true, succeeded: true, message: '', actionCode: 0, errors: [] },
+      data: {
+        data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
+        succeeded: true,
+        message: '',
+        actionCode: 0,
+        errors: [],
+      },
     });
   });
 
@@ -105,11 +112,17 @@ describe('authHttpService.register — POST /v1/auth/register (registerOwner par
     expect(body).not.toHaveProperty('passwordConfirmation');
   });
 
-  it('returns the envelope typed as BaseResponseModel<boolean>', async () => {
+  it('returns the envelope typed as BaseResponseModel<RegisterAuthModel>', async () => {
     const { authHttpService } = await import('../auth-http-service');
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: true, succeeded: true, message: '', actionCode: 0, errors: [] },
+      data: {
+        data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
+        succeeded: true,
+        message: '',
+        actionCode: 0,
+        errors: [],
+      },
     });
 
     const result = await authHttpService.register({
@@ -123,7 +136,9 @@ describe('authHttpService.register — POST /v1/auth/register (registerOwner par
 
     expect(result).toHaveProperty('succeeded', true);
     expect(result).toHaveProperty('errors');
-    expect(typeof result.data).toBe('boolean');
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    const data: RegisterAuthModel = result.data;
+    expect(data.login).toBe('janedoe');
   });
 });
 

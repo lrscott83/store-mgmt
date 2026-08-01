@@ -280,7 +280,7 @@ describe('ResellerCreatePage — server-side error', () => {
     );
     vi.mocked(resellerHttpService.createReseller).mockResolvedValue({
       succeeded: false,
-      data: false,
+      data: null,
       message: '',
       actionCode: 0,
       errors: [{ code: 'ERR01', description: 'Login already exists' }],

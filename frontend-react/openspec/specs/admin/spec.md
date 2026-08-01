@@ -309,8 +309,9 @@ A `usageHttpService` singleton MUST exist at
 | `getStoresLastMonth()` | GET | `/v1/usages/stores-last-month` | `BaseResponseModel<StoreUsages>` |
 
 `StoreUsages` MUST be defined as `{ storeUsagesCountDays: number[]; activeStoreCount: number }`.
-`BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
-MUST use `''`, `0`, and `[]` respectively — never `null`.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 
 `usageHttpService` MUST NOT define its own Axios instance; all calls MUST use the shared `apiClient`.
 
@@ -451,15 +452,18 @@ A unit test suite MUST exist at
 Tests MUST cover:
 - `getStoresLastWeek()` calls `GET /v1/usages/stores-last-week`.
 - `getStoresLastMonth()` calls `GET /v1/usages/stores-last-month`.
-- Mocks use non-nullable `BaseResponseModel<StoreUsages>` fields (`message: ''`, `actionCode: 0`,
-  `errors: []`).
+- Mocks populate the `BaseResponseModel<StoreUsages>` fields.
+
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 
 #### Scenario: S-ADMIN-DASHBOARD-TEST-1 — Service tests cover both endpoints
 
 - GIVEN `usageHttpService` is tested with a mocked `apiClient`
 - WHEN each method is called
 - THEN the correct URL is asserted for each method
-- AND mock responses use non-nullable `BaseResponseModel` fields
+- AND mock responses use `BaseResponseModel` fields
 
 #### Scenario: S-ADMIN-DASHBOARD-TEST-2 — Route smoke tests cover toggle behaviour
 
@@ -593,8 +597,9 @@ A `resellerHttpService` singleton MUST exist at
 | `updateReseller(id: string, payload)` | PUT | `/v1/reSellers/:id` | `BaseResponseModel<boolean>` |
 
 The `ReSeller` type is imported from `@store-mgmt/domain` (`packages/domain/src/models/store.ts`).
-`BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
-MUST use `''`, `0`, and `[]` respectively — never `null`.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 
 `resellerHttpService` MUST NOT define its own Axios instance. All calls MUST use the shared
 `apiClient` from `~/shared/lib/http/api-client`.
@@ -933,7 +938,7 @@ The following test suites MUST exist:
 
 | File | What it covers |
 |------|---------------|
-| `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts` | Service: all 4 methods call correct endpoints; mocks use non-nullable `BaseResponseModel` fields |
+| `app/admin/resellers/lib/services/__tests__/reseller-http-service.test.ts` | Service: all 4 methods call correct endpoints; mocks use `BaseResponseModel` fields |
 | `app/admin/resellers/routes/__tests__/reseller-list.test.tsx` | List page: load renders cards; inactive card has `deactive-reSeller` class; navigate-to-create; navigate-to-edit; no activate/deactivate/delete; HTTP error shows inline error |
 | `app/admin/resellers/routes/__tests__/reseller-create.test.tsx` | Create page: form fields present; submit disabled when invalid; password regex enforced; confirm-match enforced; success navigates to list; error shows inline; unsaved-changes guard triggers on dirty form |
 | `app/admin/resellers/routes/__tests__/reseller-edit.test.tsx` | Edit page: load pre-populates fields; login is disabled; success stays on page; error shows inline; unsaved-changes guard triggers on dirty; reSellerId absent |
@@ -941,15 +946,16 @@ The following test suites MUST exist:
 All test files that use `useIntl` MUST wrap the component under test in `IntlProvider`
 (consistent with project convention).
 
-Mocks for `BaseResponseModel<T>` MUST use `message: ''`, `actionCode: 0`, `errors: []` —
-never `null` for these fields.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 
 #### Scenario: S-ADMIN-RESELLERS-TEST-1 — Service tests cover all endpoints
 
 - GIVEN `resellerHttpService` is tested with a mocked `apiClient`
 - WHEN each of the four methods is called
 - THEN the correct URL is asserted for each method
-- AND mock responses use non-nullable `BaseResponseModel` fields
+- AND mock responses use `BaseResponseModel` fields
 
 #### Scenario: S-ADMIN-RESELLERS-TEST-2 — List smoke tests cover all scenarios
 
@@ -1111,8 +1117,9 @@ An `ownerHttpService` singleton MUST exist at
 | `deleteOwner(id: string)` | DELETE | `/v1/owners/:id` | `BaseResponseModel<boolean>` |
 
 `Owner` and `OwnerStoreModule` are imported from `@store-mgmt/domain`.
-`BaseResponseModel<T>` fields `message`, `actionCode`, and `errors` are NON-nullable; test mocks
-MUST use `''`, `0`, and `[]` respectively — never `null`.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 `ownerHttpService` MUST NOT define its own Axios instance; all calls MUST use the shared `apiClient`.
 `getOwnerDetailsById` (GET `/v1/owners/details/:id`) MUST NOT be included — it is dead code.
 
@@ -1526,20 +1533,22 @@ The following test suites MUST exist:
 
 | File | What it covers |
 |------|---------------|
-| `app/admin/owners/lib/services/__tests__/owner-http-service.test.ts` | Service: all 5 methods call correct endpoints; mocks use non-nullable `BaseResponseModel` fields |
+| `app/admin/owners/lib/services/__tests__/owner-http-service.test.ts` | Service: all 5 methods call correct endpoints; mocks use `BaseResponseModel` fields |
 | `app/admin/owners/routes/__tests__/owner-list.test.tsx` | List: load renders cards; state-based CSS classes; price/count computed; reSellerName fallback; email conditional; delete fires without confirm + refreshes; navigate-to-edit; no create button; HTTP error shows inline error |
 | `app/admin/owners/routes/__tests__/owner-create.test.tsx` | Create: fields present; reSellerId conditional on SuperAdmin; submit disabled when pristine/invalid; PASSWORD_REGEX; confirm-match; success navigates to `/management/stores/create`; failure shows inline error; unsaved-changes guard |
 | `app/admin/owners/routes/__tests__/owner-edit.test.tsx` | Edit: pre-populates fields; login disabled and excluded from PUT; SuperAdmin-only fields conditional; guest from loaded state; success stays on page; failure inline error; unsaved-changes guard; tab shell for SuperAdmin; no tabs for Reseller |
 
 All test files using `useIntl` MUST wrap the component under test in `IntlProvider`.
-Mocks for `BaseResponseModel<T>` MUST use `message: ''`, `actionCode: 0`, `errors: []` — never `null`.
+`BaseResponseModel<T>` fields `message` and `actionCode` are nullable (`string | null` /
+`number | null`) on both branches; `errors` remains non-nullable. Test mocks MAY use `null` for
+`message`/`actionCode`; `errors` mocks MUST still use `[]` (or a populated array) — never `null`.
 
 #### Scenario: S-ADMIN-OWNERS-TEST-1 — Service tests cover all endpoints
 
 - GIVEN `ownerHttpService` is tested with a mocked `apiClient`
 - WHEN each of the five methods is called
 - THEN the correct URL is asserted for each method
-- AND mock responses use non-nullable `BaseResponseModel` fields
+- AND mock responses use `BaseResponseModel` fields
 
 #### Scenario: S-ADMIN-OWNERS-TEST-2 — List smoke tests cover all scenarios
 

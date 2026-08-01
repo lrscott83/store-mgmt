@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Store, Module, Owner } from '@store-mgmt/domain';
+import type { BaseResponseModel, Store, Module, Owner } from '@store-mgmt/domain';
 
 // ─── Domain factories ─────────────────────────────────────────────────────────
 
@@ -180,14 +180,14 @@ describe('EditStorePage — mode resolution', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('no route param + selectedStoreId present -> edit mode, id = selectedStoreId', async () => {
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: 's-from-user' });
     mockParams = {};
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'User Store' }) });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'User Store' }) });
     const { EditStorePage } = await import('../edit-store');
     render(<Wrapper><EditStorePage /></Wrapper>);
     await waitFor(() => {
@@ -211,7 +211,7 @@ describe('EditStorePage — mode resolution', () => {
   it('/edit/:id -> edit mode, id from route param overrides selectedStoreId', async () => {
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: 's-from-user' });
     mockParams = { id: 's2' };
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ id: 's2', name: 'Param Store' }) });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ id: 's2', name: 'Param Store' }) });
     const { EditStorePage } = await import('../edit-store');
     render(<Wrapper><EditStorePage /></Wrapper>);
     await waitFor(() => {
@@ -243,8 +243,8 @@ describe('EditStorePage — create mode: success navigates to user create', () =
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
     mockCreateStore = vi.fn().mockResolvedValue({ data: makeStore() });
   });
 
@@ -269,8 +269,8 @@ describe('EditStorePage — create mode: HTTP error shown inline', () => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
     mockCreateStore = vi.fn().mockRejectedValue(new Error('Server error'));
   });
 
@@ -296,8 +296,8 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule({ name: 'Catalog Module' })] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule({ name: 'Catalog Module' })] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('renders module catalog in the form', async () => {
@@ -321,7 +321,7 @@ describe('EditStorePage — create mode: module catalog error blocks submit', ()
     mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
     mockParams = {};
     mockGetModulesToStore = vi.fn().mockRejectedValue(new Error('Catalog error'));
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('shows catalog error and disables submit when catalog fails', async () => {
@@ -337,8 +337,8 @@ describe('EditStorePage — create mode: isOwnerAdmin computed from feature', ()
   beforeEach(() => {
     vi.clearAllMocks();
     mockParams = {};
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
   });
 
   it('shows owner picker for non-superAdmin user who has EFeatures.Owners in featureIds', async () => {
@@ -373,8 +373,8 @@ describe('EditStorePage — create mode: HTTP-only, no offline notice (Req: HTTP
     vi.clearAllMocks();
     mockUser = makeUser({ selectedStoreId: '' });
     mockParams = {};
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('does NOT show an offline notice or gate submit on connectivity state (Angular store.service.ts is pure HTTP)', async () => {
@@ -395,9 +395,9 @@ describe('EditStorePage — edit mode: success navigates to store list', () => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
     mockGetMe = vi.fn().mockResolvedValue({ data: makeUser() });
   });
@@ -418,9 +418,9 @@ describe('EditStorePage — edit mode: pre-fills form from fetched store', () =>
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Pre-filled Name' }) });
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [makeModule()] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [makeOwner()] });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Pre-filled Name' }) });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [makeModule()] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [makeOwner()] });
   });
 
   it('pre-fills the name input from the fetched store', async () => {
@@ -437,9 +437,9 @@ describe('EditStorePage — edit mode: HTTP-only, no offline notice (Req: HTTP-O
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore() });
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore() });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('does NOT show an offline notice or gate submit on connectivity state (Angular store.service.ts is pure HTTP)', async () => {
@@ -456,9 +456,9 @@ describe('EditStorePage — no BaseRepository cache read/write on load or save (
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
     mockGetMe = vi.fn().mockResolvedValue({ data: makeUser() });
   });
@@ -482,9 +482,9 @@ describe('EditStorePage — edit mode: HTTP error shown inline without redirect'
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Edit Me' }) });
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Edit Me' }) });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockUpdateStore = vi.fn().mockRejectedValue(new Error('Update failed'));
   });
 
@@ -506,8 +506,8 @@ describe('EditStorePage — edit mode: store not found shows error state', () =>
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 'nonexistent' };
     mockGetStore = vi.fn().mockRejectedValue(new Error('Not found'));
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('shows error state when getStore fails', async () => {
@@ -519,14 +519,95 @@ describe('EditStorePage — edit mode: store not found shows error state', () =>
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-D — succeeded:false is a resolved value, not a
+// rejection. Both effects Promise.all 2-3 calls and OR their `.succeeded` flags;
+// each has its own dedicated error state (loadError for edit mode, catalogError
+// for create mode) — the two must never be conflated.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('EditStorePage — edit mode: getStore/getModulesToStore/listOwners succeeded:false', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockParams = { id: 's1' };
+    mockGetStore = vi.fn().mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+  });
+
+  it('sets loadError (not catalogError) to STORES.ERROR and does not pre-fill the form', async () => {
+    const { EditStorePage } = await import('../edit-store');
+    render(<Wrapper><EditStorePage /></Wrapper>);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['STORES.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByDisplayValue('Edit Me')).not.toBeInTheDocument();
+    // Only the page-level loadError alert renders — never a second catalogError one.
+    expect(screen.queryAllByRole('alert')).toHaveLength(1);
+  });
+
+  // The runtime test above locks the observable behaviour, but it cannot tell a
+  // guarded read from an unguarded one: without the guard, `storeRes.data` is
+  // null, `fetchedStore.modules` throws synchronously inside the `.then`, which
+  // rejects the chain and lands in the very same `.catch` that sets the very
+  // same STORES.ERROR — both paths render identically. The guard is enforced by
+  // the compiler, so that is where it has to be asserted.
+  it('type-level: getStore data cannot be read before succeeded is checked', () => {
+    // Never invoked — the body is a compile-time assertion.
+    const probe = (res: BaseResponseModel<Store>) => {
+      // @ts-expect-error `data` is Store | null until `succeeded` narrows the union
+      void res.data.modules;
+      if (res.succeeded) void res.data.modules;
+    };
+    expect(probe).toBeTypeOf('function');
+  });
+});
+
+describe('EditStorePage — create mode: getModulesToStore/listOwners succeeded:false', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true, selectedStoreId: '' });
+    mockParams = {};
+    mockGetModulesToStore = vi.fn().mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+  });
+
+  it('sets catalogError (not loadError) to STORES.ERROR and disables submit', async () => {
+    const { EditStorePage } = await import('../edit-store');
+    render(<Wrapper><EditStorePage /></Wrapper>);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['STORES.ERROR'])).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /guardar/i })).toBeDisabled();
+    });
+    expect(screen.queryAllByRole('alert')).toHaveLength(1);
+  });
+});
+
 describe('EditStorePage — edit mode: refreshes user after successful edit (no reload)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockParams = { id: 's1' };
-    mockGetStore = vi.fn().mockResolvedValue({ data: makeStore({ name: 'Existing Store' }) });
-    mockGetModulesToStore = vi.fn().mockResolvedValue({ data: [] });
-    mockListOwners = vi.fn().mockResolvedValue({ data: [] });
+    mockGetStore = vi.fn().mockResolvedValue({ succeeded: true, data: makeStore({ name: 'Existing Store' }) });
+    mockGetModulesToStore = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
+    mockListOwners = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
     mockUpdateStore = vi.fn().mockResolvedValue({ data: true });
     mockGetUserByToken = vi.fn().mockResolvedValue(makeUser());
   });

@@ -45,6 +45,7 @@ describe('usageHttpService.getStoresLastWeek — HTTP-2: GET /v1/usages/stores-l
     const { usageHttpService } = await import('../usage-http-service');
     const result = await usageHttpService.getStoresLastWeek();
     expect(result.succeeded).toBe(true);
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.storeUsagesCountDays).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(result.data.activeStoreCount).toBe(42);
   });
@@ -74,6 +75,7 @@ describe('usageHttpService.getStoresLastMonth — HTTP-3: GET /v1/usages/stores-
     const result = await usageHttpService.getStoresLastMonth();
     expect(apiClient.get).toHaveBeenCalledWith('/v1/usages/stores-last-month');
     expect(result.succeeded).toBe(true);
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.storeUsagesCountDays).toHaveLength(30);
     expect(result.data.activeStoreCount).toBe(10);
     expect(result.message).toBe('');

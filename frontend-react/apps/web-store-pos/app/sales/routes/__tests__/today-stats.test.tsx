@@ -371,3 +371,95 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     });
   });
 });
+
+// response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed. All 4
+// reads in this effect use the `if (response.succeeded) setX(...)` idiom — on
+// succeeded:false the corresponding state simply never updates: no error
+// state, no error UI, the panel just stays hidden/empty as if the read
+// returned nothing. These tests pin that current behavior; they do not assert
+// any new user-facing text.
+describe('TodayStatsPage — succeeded:false on each read (silent-failure idiom, pinned)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthState.user.storeModuleIds = [EModules.Expenses, EModules.Credits];
+    mockGetActiveOrdersInDay.mockReturnValue([]);
+  });
+
+  it('getCategoryCartItemsView succeeded:false: Ventas panel falls back to the 0-productos heading, no error UI', () => {
+    mockGetCategoryCartItemsView.mockReturnValue({
+      data: null,
+      succeeded: false,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    expect(screen.getByText('Ventas (0 productos)')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('getExpensesInDayObservable succeeded:false: Gastos panel renders with (0), never populated, no error UI', async () => {
+    mockGetExpensesInDayObservable.mockResolvedValue({
+      data: null,
+      succeeded: false,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    // Panel visibility is gated by module availability alone, not by data — the
+    // count stays at its initial 0 because setExpenses is never called.
+    expect(await screen.findByText('Gastos (0)')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('getUnPaidSaleCreditsInDayObservable succeeded:false: Créditos Por Cobrar panel renders with (0), never populated, no error UI', async () => {
+    mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue({
+      data: null,
+      succeeded: false,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText('Créditos Por Cobrar (0)')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('getPaidSaleCreditsInDayObservable succeeded:false: Créditos Pagados panel renders with (0), never populated, no error UI', async () => {
+    mockGetPaidSaleCreditsInDayObservable.mockResolvedValue({
+      data: null,
+      succeeded: false,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText('Créditos Pagados (0)')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});

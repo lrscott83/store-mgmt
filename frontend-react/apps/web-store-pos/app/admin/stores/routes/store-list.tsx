@@ -26,6 +26,10 @@ export function AdminStoreListPage() {
   const loadStores = useCallback(async () => {
     try {
       const res = await storeHttpService.listStores();
+      if (!res.succeeded) {
+        setError(formatMessage({ id: 'STORES.ERROR' }));
+        return;
+      }
       setStores(res.data);
       setError(undefined);
     } catch {

@@ -136,7 +136,7 @@ describe('UserListPage — S-LIST-1: online fetch and render', () => {
     mockUser = makeUser();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ data: [makeDomainUser({ fullName: 'Alice Smith' })] });
+    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'Alice Smith' })] });
   });
 
   it('fetches users on mount and renders them', async () => {
@@ -161,7 +161,7 @@ describe('UserListPage — S-LIST-2: empty state', () => {
     vi.clearAllMocks();
     mockIsOnline = true;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ data: [] });
+    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('shows empty state when no users exist', async () => {
@@ -178,7 +178,7 @@ describe('UserListPage — S-LIST-3: HTTP-only fetch regardless of connectivity 
     vi.clearAllMocks();
     mockIsOnline = false;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ data: [makeDomainUser({ fullName: 'Offline Fetch User' })] });
+    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'Offline Fetch User' })] });
   });
 
   it('calls the users HTTP service on mount even when isOnline=false (no local cache read)', async () => {
@@ -196,7 +196,7 @@ describe('UserListPage — S-LIST-4: no degraded/offline banner ever renders (Re
     vi.clearAllMocks();
     mockIsOnline = false;
     localStorageMock.clear();
-    mockGetUsers = vi.fn().mockResolvedValue({ data: [] });
+    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [] });
   });
 
   it('shows empty state and no degraded/cache notice when offline', async () => {
@@ -215,7 +215,7 @@ describe('UserListPage — S-LIST-5: lifecycle action wired through the gear men
     mockIsOnline = true;
     localStorageMock.clear();
     // Use isActive:false so the Activar menu item is present after opening the gear menu.
-    mockGetUsers = vi.fn().mockResolvedValue({ data: [makeDomainUser({ fullName: 'User Z', id: 'uz', isActive: false })] });
+    mockGetUsers = vi.fn().mockResolvedValue({ succeeded: true, data: [makeDomainUser({ fullName: 'User Z', id: 'uz', isActive: false })] });
     mockActivateUser = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -228,6 +228,63 @@ describe('UserListPage — S-LIST-5: lifecycle action wired through the gear men
     await waitFor(() => {
       expect(mockActivateUser).toHaveBeenCalledWith('uz', true);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-B — getUsers() uses .then/.catch, so
+// succeeded:false is a RESOLVED value inside .then, not a rejection. The .then
+// callback must guard it the same as the .catch branch's USERS.ERROR.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('UserListPage — succeeded:false response (Req: Users List Surfaces succeeded:false via USERS.ERROR)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser();
+    mockIsOnline = true;
+    localStorageMock.clear();
+    mockGetUsers = vi.fn().mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+  });
+
+  it('shows USERS.ERROR when getUsers resolves with succeeded:false, does not set users from data', async () => {
+    const { UserListPage } = await import('../user-list');
+    render(<Wrapper><UserListPage /></Wrapper>);
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['USERS.ERROR'])).toBeInTheDocument();
+    });
+    // users stays at its initial [] (never assigned res.data) — the card list's own
+    // empty-state renders, which is unchanged/expected, not evidence of a null crash.
+  });
+});
+
+describe('UserListPage — succeeded:true still populates users (regression)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser();
+    mockIsOnline = true;
+    localStorageMock.clear();
+    mockGetUsers = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: [makeDomainUser({ fullName: 'Still Works' })],
+      message: null,
+      actionCode: null,
+      errors: [],
+    });
+  });
+
+  it('renders users and clears the error state on succeeded:true', async () => {
+    const { UserListPage } = await import('../user-list');
+    render(<Wrapper><UserListPage /></Wrapper>);
+    await waitFor(() => {
+      expect(screen.getByText('Still Works')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(esMessages['USERS.ERROR'])).not.toBeInTheDocument();
   });
 });
 
@@ -372,7 +429,7 @@ describe('UserEditPage — S-EDIT-1: pre-fills UserDetailsForm after getById', (
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Pre-filled Name' }) });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Pre-filled Name' }) });
   });
 
   it('pre-fills the fullName input from the fetched user', async () => {
@@ -391,7 +448,7 @@ describe('UserEditPage — S-EDIT-2: details submit calls editUser', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Existing User' }) });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
     mockEditUser = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -412,7 +469,7 @@ describe('UserEditPage — S-EDIT-NAV: successful save navigates to the users li
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser({ fullName: 'Existing User' }) });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser({ fullName: 'Existing User' }) });
     mockEditUser = vi.fn().mockResolvedValue({ data: true });
   });
 
@@ -434,7 +491,7 @@ describe('UserEditPage — S-EDIT-4: details form offline blocked', () => {
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = false;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser() });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser() });
   });
 
   it('details submit is disabled when offline', async () => {
@@ -451,7 +508,7 @@ describe('UserEditPage — S-EDIT-6: isActive hidden for non-admin', () => {
     mockUser = makeUser({ isSuperAdmin: false, isOwnerAdmin: false });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser() });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser() });
   });
 
   it('does not show isActive toggle for regular (non-admin) user', async () => {
@@ -481,13 +538,43 @@ describe('UserEditPage — S-ERR-1: getById rejection renders error, no form mou
   });
 });
 
+// response-envelope-nullability WU-D — getUserById succeeded:false is a resolved
+// value, not a rejection; S-ERR-1 above only covers the .catch(rejection) branch.
+// The load guard must surface USERS.ERROR the same way, without reading `.data`
+// off a null-carrying failure envelope.
+describe('UserEditPage — getUserById succeeded:false', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser({ isSuperAdmin: true });
+    mockIsOnline = true;
+    mockParams = { id: 'u1' };
+    mockGetUserById = vi.fn().mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+  });
+
+  it('shows USERS.ERROR and does not mount the details form when getUserById resolves with succeeded:false', async () => {
+    const { UserEditPage } = await import('../user-edit');
+    render(<Wrapper><UserEditPage /></Wrapper>);
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['USERS.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText(/nombre completo/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('UserEditPage — S-NOCRED: no credentials/password UI is rendered (Req: Edit User Has No Admin Password Change)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUser = makeUser({ isSuperAdmin: true });
     mockIsOnline = true;
     mockParams = { id: 'u1' };
-    mockGetUserById = vi.fn().mockResolvedValue({ data: makeDomainUser() });
+    mockGetUserById = vi.fn().mockResolvedValue({ succeeded: true, data: makeDomainUser() });
   });
 
   it('does not render any password/credentials fields or change-password action', async () => {

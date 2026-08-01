@@ -24,7 +24,7 @@ describe('userHttpService.getUsers — HTTP-2: GET /v1/users/all/true', () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: [{ id: 'u1', fullName: 'User One', isActive: true }] },
+      data: { succeeded: true, data: [{ id: 'u1', fullName: 'User One', isActive: true }] },
     });
   });
 
@@ -38,6 +38,7 @@ describe('userHttpService.getUsers — HTTP-2: GET /v1/users/all/true', () => {
   it('returns the data array from the response', async () => {
     const { userHttpService } = await import('../user-http-service');
     const result = await userHttpService.getUsers();
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data).toHaveLength(1);
     expect(result.data[0].fullName).toBe('User One');
   });
@@ -48,7 +49,7 @@ describe('userHttpService.getUserById — HTTP-3: GET /v1/users/:id', () => {
     vi.clearAllMocks();
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { data: { id: 'u1', fullName: 'User One' } },
+      data: { succeeded: true, data: { id: 'u1', fullName: 'User One' } },
     });
   });
 
@@ -62,6 +63,7 @@ describe('userHttpService.getUserById — HTTP-3: GET /v1/users/:id', () => {
   it('returns the user from the response', async () => {
     const { userHttpService } = await import('../user-http-service');
     const result = await userHttpService.getUserById('u1');
+    if (!result.succeeded) throw new Error('expected succeeded response');
     expect(result.data.fullName).toBe('User One');
   });
 });

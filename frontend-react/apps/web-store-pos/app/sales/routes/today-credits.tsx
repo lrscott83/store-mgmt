@@ -27,6 +27,10 @@ export function TodaySaleCreditsPage() {
   async function loadSaleCredits() {
     const service = new SaleCreditOfflineService(storeId);
     const response = await service.getSaleCreditsInDayObservable(new Date());
+    // SaleCreditOfflineService.getSaleCreditsInDayObservable is a same-tick
+    // `Promise.resolve(...)` over local storage — it never actually fails; this guard
+    // exists for the type only.
+    if (!response.succeeded) return;
     setSaleCredits(response.data);
   }
 

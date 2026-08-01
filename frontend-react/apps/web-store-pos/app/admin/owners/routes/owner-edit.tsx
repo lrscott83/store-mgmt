@@ -85,6 +85,10 @@ export function OwnerEditPage() {
   async function loadStores() {
     try {
       const res = await storeHttpService.listStores();
+      if (!res.succeeded) {
+        setStoresError(intl.formatMessage({ id: 'STORES.ERROR' }));
+        return;
+      }
       setStores(res.data);
       setStoresError(undefined);
     } catch {
@@ -141,6 +145,10 @@ export function OwnerEditPage() {
     ownerHttpService
       .getOwner(id)
       .then((res) => {
+        if (!res.succeeded) {
+          setLoadError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+          return;
+        }
         const o = res.data;
         setOwner(o);
         setLogin((o as Owner & { login?: string }).login ?? '');
@@ -162,6 +170,7 @@ export function OwnerEditPage() {
   useEffect(() => {
     if (!isSuperAdmin) return;
     resellerHttpService.listResellers().then((res) => {
+      if (!res.succeeded) return;
       setResellers(res.data);
     }).catch(() => {
       // non-critical

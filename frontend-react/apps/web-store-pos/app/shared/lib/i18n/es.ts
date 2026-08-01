@@ -80,6 +80,7 @@ const messages: Record<string, string> = {
   'AUTH.INVALID_CREDENTIALS': 'Email o contraseña inválidos',
   'AUTH.ACCOUNT_INACTIVE': 'Tu cuenta está inactiva. Contactá soporte.',
   'AUTH.SERVER_ERROR': 'Algo salió mal. Intentá de nuevo.',
+  'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Esperá un momento antes de volver a intentar.',
   'AUTH.INVALID_ERROR': 'La autenticación no es válida por el siguiente error: {error}',
   'AUTH.OFFLINE_LOGIN': 'Estás offline. Se requiere conexión para iniciar sesión.',
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
@@ -113,11 +114,12 @@ const messages: Record<string, string> = {
   // literals in touched files).
   'REGISTRATION.UNEXPECTED_ERROR':
     'Ocurrió un error inesperado en la creación de la cuenta. Por favor, revise su conexión o contacte al equipo de soporte técnico.',
-  // NEW — React-invented client-side email-uniqueness/validation sub-cases (Angular's
-  // onSubmit has no equivalent branching), spec-fixed Spanish text per the blanket
-  // text-parity rule (view-text-parity DoD).
-  'REGISTRATION.EMAIL_TAKEN': 'Este correo ya está registrado.',
+  // NEW — React-invented client-side validation sub-case (Angular's onSubmit has no
+  // equivalent branching), spec-fixed Spanish text per the blanket text-parity rule
+  // (view-text-parity DoD).
   'REGISTRATION.VALIDATION_ERROR': 'Error de validación. Por favor, revise sus datos.',
+  'REGISTRATION.TOO_MANY_ATTEMPTS':
+    'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.',
   // Terms-acceptance toggle (Angular register.component.html:191-210, vocabs/es.ts:135-137)
   'REGISTRATION.ACCEPT_CONDITIONS': 'Estoy de acuerdo con los ',
   'REGISTRATION.TERMS_CONDITIONS': 'términos y condiciones',

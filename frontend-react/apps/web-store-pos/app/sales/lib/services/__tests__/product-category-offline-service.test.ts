@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { UserModel } from '@store-mgmt/domain';
+import type { BaseResponseModel, UserModel } from '@store-mgmt/domain';
 import { ProductCategoryOfflineService } from '../product-category-offline-service';
 import { ProductCategoryRepository } from '../../repositories/product-category-repository';
 import { ProductRepository } from '../../repositories/product-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+
+// response-envelope-nullability: `data` only narrows to non-null on the succeeded
+// branch. These tests only ever exercise the success path, so unwrap once instead of
+// repeating an `if (!x.succeeded) throw` guard at every assertion site.
+function unwrap<T>(response: BaseResponseModel<T>): T {
+  if (!response.succeeded) throw new Error('expected succeeded response');
+  return response.data;
+}
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -120,8 +128,9 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
 
       const result = await service.getAvailableProductCategories();
       expect(result.succeeded).toBe(true);
-      expect(result.data.map((c) => c.name)).toEqual(['Bebidas', 'Galletas']);
-      expect(result.data.every((c) => c.isActive)).toBe(true);
+      const data = unwrap(result);
+      expect(data.map((c) => c.name)).toEqual(['Bebidas', 'Galletas']);
+      expect(data.every((c) => c.isActive)).toBe(true);
     });
   });
 
@@ -161,10 +170,11 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
 
       const view = await service.getProductCategoriesView();
       expect(view.succeeded).toBe(true);
-      expect(view.data.map((v) => v.name)).toEqual(['Bebidas', 'Snacks']);
-      const bebidasView = view.data.find((v) => v.id === bebidas.id)!;
+      const viewData = unwrap(view);
+      expect(viewData.map((v) => v.name)).toEqual(['Bebidas', 'Snacks']);
+      const bebidasView = viewData.find((v) => v.id === bebidas.id)!;
       expect(bebidasView.productsCount).toBe(1);
-      const snacksView = view.data.find((v) => v.name === 'Snacks')!;
+      const snacksView = viewData.find((v) => v.name === 'Snacks')!;
       expect(snacksView.productsCount).toBe(0);
     });
 
@@ -175,7 +185,7 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
       const view = await service.getProductCategoriesView();
-      expect(view.data.map((v) => v.id)).toEqual([active.id]);
+      expect(unwrap(view).map((v) => v.id)).toEqual([active.id]);
     });
 
     it('resolves an empty array when there are no active categories', async () => {

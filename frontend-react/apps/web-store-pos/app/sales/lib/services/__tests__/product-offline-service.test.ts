@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { UserModel } from '@store-mgmt/domain';
+import type { BaseResponseModel, UserModel } from '@store-mgmt/domain';
 import { ProductOfflineService } from '../product-offline-service';
 import { ProductRepository } from '../../repositories/product-repository';
 import { ProductCategoryRepository } from '../../repositories/product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+
+// response-envelope-nullability: `data` only narrows to non-null on the succeeded
+// branch. These tests only ever exercise the success path, so unwrap once instead of
+// repeating an `if (!x.succeeded) throw` guard at every assertion site.
+function unwrap<T>(response: BaseResponseModel<T>): T {
+  if (!response.succeeded) throw new Error('expected succeeded response');
+  return response.data;
+}
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -85,9 +93,10 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'C', 1, '', 3, false, true, true);
 
       const result = await service.getAvailableProductsByCategoryId(categoryId);
-      expect(result.data).toHaveLength(2);
-      expect(result.data.map((p) => p.name)).toEqual(['B', 'A']);
-      expect(result.data.map((p) => p.order)).toEqual([1, 2]);
+      const data = unwrap(result);
+      expect(data).toHaveLength(2);
+      expect(data.map((p) => p.name)).toEqual(['B', 'A']);
+      expect(data.map((p) => p.order)).toEqual([1, 2]);
     });
 
     it('resolves an empty array when no products match', async () => {
@@ -190,8 +199,9 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'Fanta', 1.5, '', 2, true, false, true);
 
       const result = await service.getProductsToSaleByCategoryId(categoryId);
-      expect(result.data).toHaveLength(1);
-      expect(result.data[0].name).toBe('Coca Cola');
+      const data = unwrap(result);
+      expect(data).toHaveLength(1);
+      expect(data[0].name).toBe('Coca Cola');
     });
 
     it('resolves an empty array when no products match', async () => {
@@ -257,7 +267,7 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(snacksId, 'Papas', 1, '', 1, true, true, true);
 
       const result = await service.getProductsToSelect();
-      expect(result.data.map((p) => p.fullName)).toEqual([
+      expect(unwrap(result).map((p) => p.fullName)).toEqual([
         'Bebidas - Coca Cola',
         'Bebidas - Fanta',
         'Snacks - Papas',

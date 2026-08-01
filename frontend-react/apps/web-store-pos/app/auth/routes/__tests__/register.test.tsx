@@ -34,6 +34,7 @@ vi.mock('~/shared/lib/auth/connectivity-service', () => ({
 import { authHttpService } from '~/shared/lib/http/auth-http-service';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import RegisterPage from '../register';
+import type { BaseResponseModel, RegisterAuthModel } from '@store-mgmt/domain';
 
 function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText('Nombre Completo'), { target: { value: 'Jane Doe' } });
@@ -82,13 +83,22 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     expect(screen.queryByLabelText(/code/i)).not.toBeInTheDocument();
   });
 
-  it('succeeded:false shows errors[0].description and does not navigate', async () => {
-    vi.mocked(authHttpService.register).mockResolvedValue({
-      succeeded: false,
-      data: false,
-      message: '',
-      actionCode: 400,
-      errors: [{ code: 'LOGIN_TAKEN', description: 'Login already exists' }],
+  // Backend contract: AuthController.RegisterAsync returns Created(...) on success and
+  // BadRequest(result) on EVERY failure (AuthController.cs:90-102) — a succeeded:false
+  // envelope therefore NEVER resolves; it always arrives as an axios rejection whose body
+  // is { succeeded:false, data:null, message:null, errors:[{code,description}], actionCode }.
+  it('HTTP 400 rejection surfaces errors[0].description and does not navigate', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          succeeded: false,
+          data: null,
+          message: null,
+          actionCode: 400,
+          errors: [{ code: 'Login', description: 'Login already exists' }],
+        },
+      },
     });
     renderRegister();
     fillRequiredFields();
@@ -100,10 +110,32 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
+  // Guard the array — an empty/missing errors[] on a 400 must not throw and falls back to
+  // the existing generic copy (ResponseResult.Message is always null, so there is no other
+  // signal to read).
+  it('HTTP 400 rejection with an empty errors[] falls back to the generic validation-error copy', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue({
+      response: {
+        status: 400,
+        data: { succeeded: false, data: null, message: null, actionCode: 400, errors: [] },
+      },
+    });
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Error de validación. Por favor, revise sus datos.')
+      ).toBeInTheDocument();
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('succeeded:true navigates to /login', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],
@@ -134,7 +166,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('?code=ABC123 flows into the register payload', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],
@@ -153,7 +185,7 @@ describe('RegisterPage — auth-http-register-parity call-site', () => {
   it('register() payload never includes passwordConfirmation', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],
@@ -305,13 +337,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
   });
 
   it('shows "Registrando..." on the submit button while loading (AUTH.REGISTERING)', async () => {
-    let resolveRegister: (value: {
-      succeeded: boolean;
-      data: boolean;
-      message: string;
-      actionCode: number;
-      errors: { code: string; description: string }[];
-    }) => void;
+    let resolveRegister: (value: BaseResponseModel<RegisterAuthModel>) => void;
     vi.mocked(authHttpService.register).mockReturnValue(
       new Promise((resolve) => {
         resolveRegister = resolve;
@@ -325,7 +351,13 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
       expect(screen.getByRole('button', { name: 'Registrando...' })).toBeInTheDocument();
     });
 
-    resolveRegister!({ succeeded: true, data: true, message: '', actionCode: 0, errors: [] });
+    resolveRegister!({
+      succeeded: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
   });
 
   it('shows the offline banner text exactly (REGISTRATION.OFFLINE_BANNER)', async () => {
@@ -337,6 +369,21 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
     await waitFor(() => {
       expect(
         screen.getByText('Estás offline. Se requiere conexión para registrarte.')
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows rate-limit copy on a 429 response, distinct from the unexpected-error fallback', async () => {
+    vi.mocked(authHttpService.register).mockRejectedValue({ response: { status: 429 } });
+    renderRegister();
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Demasiados intentos de registro. Por favor, espere unos minutos antes de volver a intentar.'
+        )
       ).toBeInTheDocument();
     });
   });
@@ -359,7 +406,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
   it('navigates straight to /login on success and never renders the interim REGISTRATION.SUCCESS_REDIRECT screen (Angular has no such screen)', async () => {
     vi.mocked(authHttpService.register).mockResolvedValue({
       succeeded: true,
-      data: true,
+      data: { login: 'janedoe', authToken: 'token', expiresIn: '2026-08-01T00:00:00Z' },
       message: '',
       actionCode: 0,
       errors: [],

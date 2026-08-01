@@ -28,6 +28,10 @@ export function ReSellerCommissionsPage() {
   const loadRows = useCallback(async () => {
     try {
       const res = await storeHttpService.getReSellerCommissions();
+      if (!res.succeeded) {
+        setError(intl.formatMessage({ id: 'BILLING.COMMISSIONS.ERROR' }));
+        return;
+      }
       setRows(res.data);
       setError(undefined);
     } catch {

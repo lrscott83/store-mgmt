@@ -3,7 +3,7 @@
 **Capability**: auth-http registration contract  
 **Origin**: SDD change `auth-http-register-parity` (Slice 2, Fase 1 — auth cluster)  
 **Status**: Active  
-**Last Updated**: 2026-07-12
+**Last Updated**: 2026-07-31
 
 ---
 
@@ -17,7 +17,7 @@ Define the HTTP contract for user registration in the auth-http service layer. T
 
 ### In Scope
 - **RegisterRequest model shape**: Required fields (`fullName`, `login`, `password`, `cellPhone`, `email`, `storeName`) and optional `code` field; explicit exclusion of `passwordConfirmation` from the wire payload.
-- **register() service contract**: POST to `/v1/auth/register` with conditional code inclusion; return type `Promise<BaseResponseModel<boolean>>`.
+- **register() service contract**: POST to `/v1/auth/register` with conditional code inclusion; return type `Promise<BaseResponseModel<RegisterAuthModel>>`.
 - **Envelope handling**: Response branching on `succeeded` field; surface `errors[0].description` on failure; navigate to `/login` on success.
 - **Form integration**: Register form supplies `login` and `storeName` required inputs; reads `?code` query parameter; client-only validation of `passwordConfirmation` match.
 
@@ -64,58 +64,103 @@ Define the HTTP contract for user registration in the auth-http service layer. T
 
 ### S2: Register Return Type Parity (Updated 2026-07-30)
 
-**Requirement**: `POST /api/v1/auth/register` now returns `201 Created` with `AuthDto { login, authToken, expiresIn }`. The frontend `register()` MUST handle `Promise<BaseResponseModel<AuthDto>>` and extract the JWT token from `data.authToken` on successful registration for auto-login.
+**Requirement**: `POST /api/v1/auth/register` returns `201 Created` with `ResponseResult<AuthDto>`.
+The frontend `register()` MUST resolve to `Promise<BaseResponseModel<RegisterAuthModel>>`, a
+**new, distinct** domain type — NOT `AuthModel`. `AuthModel.refreshToken` is required and
+`AuthModel.expiresIn` is a `number`; the register response has no `refreshToken` and its
+`expiresIn` is an ISO-8601 string, so `AuthModel` MUST NOT be reused or widened to fit it.
 
 **Shape**:
 ```typescript
-Promise<BaseResponseModel<AuthDto>>
-
-// AuthDto structure:
-interface AuthDto {
+interface RegisterAuthModel {
   login: string;
   authToken: string;
-  expiresIn: string;
-}
-
-// BaseResponseModel<AuthDto> structure:
-{
-  succeeded: boolean;
-  data?: AuthDto;
-  errors?: Array<{ code?: string; description: string }>;
+  expiresIn: string; // ISO-8601 wire string — NOT epoch number
+  // refreshToken intentionally absent: RegisterCommand.cs never sets one
 }
 ```
 
 **Constraints**:
-- Return type changed from `BaseResponseModel<boolean>` to `BaseResponseModel<AuthDto>` — the handler no longer discards the JWT.
-- On successful registration (`201 Created`), `data.authToken` contains the JWT for immediate auto-login.
-- Location header SHOULD be present: `Location: /api/v1/auth/me`.
-- The frontend plan at `docs/plans/2026-07-30-register-endpoint-fixes-frontend.md` documents the new contract.
-- The service MUST return the envelope verbatim; no flattening, no selective extraction of `data`.
+- The return type MUST change from `BaseResponseModel<boolean>` to
+  `BaseResponseModel<RegisterAuthModel>` — this REPLACES the `boolean` signature at
+  `auth-http-service.ts:18`, which is false as of this change.
+- `RegisterAuthModel` MUST be its own type; it MUST NOT alias or extend `AuthModel`.
+- The service MUST return the envelope verbatim — no flattening, no selective `data` extraction.
 
-**Rationale**: The backend now returns the already-generated JWT instead of a boolean, eliminating the need for an extra `/auth/login` call after registration.
+(Previously: this section claimed the frontend extracts and stores `data.authToken` immediately
+for "auto-login". That framing is INCORRECT for this change — see S3, Decision 1.)
+
+#### Scenario: register() resolves with the real AuthDto shape, not a boolean
+- GIVEN the backend responds 201 with `{ succeeded: true, data: { login: "juan", authToken: "eyJ...", expiresIn: "2026-08-29T00:00:00Z" } }`
+- WHEN `authHttpService.register(...)` resolves
+- THEN `result.data` has `login`, `authToken`, and a string `expiresIn`, with no `refreshToken` field
+- AND `result.data` is never typed or coerced as `boolean` or as `AuthModel`
 
 ---
 
-### S3: Response Envelope Handling at Call-Site (Updated 2026-07-30)
+### S3: Response Envelope Handling at Call-Site (Corrected 2026-07-31)
 
-**Requirement**: `register.tsx` MUST branch on the `succeeded` field of the resolved response envelope. No envelope flattening; no conflation of transport errors with envelope-false. On success, the JWT token from `data.authToken` MUST be stored for auto-login.
+**Requirement**: `register.tsx` MUST branch on whether `register()` resolves or rejects, NOT on a
+resolved `succeeded: false` envelope. `AuthController.RegisterAsync` (backend) returns
+`201 Created` on success and `BadRequest(result)` on EVERY failure
+(`AuthController.cs:90-102`) — a `succeeded: false` envelope therefore NEVER resolves; axios
+raises it as a rejection because the HTTP status is non-2xx. On a resolved response (always
+`succeeded: true`) the call MUST navigate to `/login` — this behavior is **REAFFIRMED unchanged**
+(Angular parity, Decision 1: no auto-authentication). The resolved `data.authToken` MUST be
+received and typed but MUST NOT be persisted, stored, or used to hydrate a session on this path —
+it is deliberately discarded.
 
 **Flow**:
 ```
-register() resolves:
-├─ succeeded === true → store JWT (data.authToken) + navigate('/login') [auto-login]
-├─ succeeded === false → setErrors({ form: errors[0].description })
-└─ (does not throw; transport errors caught separately in outer catch)
+register() settles:
+├─ resolves (always succeeded: true) → navigate('/login') — authToken received, deliberately unused
+└─ rejects (HTTP 4xx/5xx, including every succeeded:false case) → caught in the outer catch:
+   ├─ status === 400 → setErrors({ form: response.data.errors[0]?.description ?? REGISTRATION.VALIDATION_ERROR })
+   ├─ status === 429 → setErrors({ form: REGISTRATION.TOO_MANY_ATTEMPTS })
+   └─ otherwise → setErrors({ form: REGISTRATION.UNEXPECTED_ERROR })
 ```
 
 **Constraints**:
-- On `succeeded === true`, extract `data.authToken` and store it (cookie/secure storage) to complete the auto-login flow without a separate POST /auth/login call.
-- Navigate to `/login` ONLY when `succeeded === true`.
-- Surface `errors[0].description` as the user-facing error message ONLY when `succeeded === false`.
-- Network/HTTP transport failures (axios throw) MUST be caught in a separate outer catch block, independent of the envelope branch.
-- The envelope MUST be returned verbatim by the service, not transformed or reduced by the service layer.
+- Navigate to `/login` unconditionally when `register()` resolves.
+- No branch of the register success path MUST read `data.authToken` to hydrate a session, call an
+  auth-store login/session action, or otherwise authenticate the user.
+- Failure text MUST be read from the rejection body's `errors[0].description`, guarding the array
+  access (it MUST NOT index blindly) — `ResponseResult.Message` is always `null`
+  (`ResponseResult.cs:14-17`; `ErrorHandlerMiddleware` only ever sets `.Errors`), so
+  `response.data.message` MUST NOT be read for this purpose.
+- A missing/empty `errors` array on an HTTP 400 falls back to the existing generic copy
+  (`REGISTRATION.VALIDATION_ERROR`).
+- The HTTP 429 branch is unchanged and independent of the description-reading logic above.
 
-**Rationale**: Angular register.component.ts:72-82 branches on `response.succeeded`. Migration rule 10 (call-sites use the same logic) requires identical branching.
+(Previously: required extracting and storing the JWT for "auto-login" as part of the success
+branch. REJECTED by Decision 1 — Angular's `register.component.ts:75` navigates to `/login`
+without authenticating; the forced re-login round trip is preserved on purpose.)
+
+(Also previously: this section documented a resolved `succeeded === false` branch reading
+`errors[0].description` directly off the resolved value, and a `response.data.message`-based
+`REGISTRATION.EMAIL_TAKEN` mapping on HTTP 400. Both were INCORRECT — the backend never resolves a
+failure (see Requirement above) and never populates `.Message`, so neither path was reachable.
+That dead code has been removed from `register.tsx`, and the unreferenced `REGISTRATION.EMAIL_TAKEN`
+i18n key has been removed from `es.ts`.)
+
+#### Scenario: Successful registration navigates to /login without consuming the token
+- GIVEN `register()` resolves with `succeeded: true` and `data.authToken` present
+- WHEN the register flow completes
+- THEN the app navigates to `/login`
+- AND no code path reads `data.authToken` to hydrate a session or invoke a login/auth-store action
+
+#### Scenario: Registration failure surfaces the backend's literal description
+- GIVEN `register()` rejects with an HTTP 400 response whose body is
+  `{ succeeded: false, data: null, message: null, actionCode: 400, errors: [{ code: "Login", description: "..." }] }`
+- WHEN the register flow completes
+- THEN the form error is set to `errors[0].description`
+- AND no navigation occurs
+
+#### Scenario: HTTP 400 rejection with an empty errors array falls back to generic copy
+- GIVEN `register()` rejects with an HTTP 400 response whose body has `errors: []`
+- WHEN the register flow completes
+- THEN the form error is set to `REGISTRATION.VALIDATION_ERROR`
+- AND no navigation occurs
 
 ---
 
@@ -215,11 +260,12 @@ layer.
 ## Verification Criteria
 
 - [x] All 5 spec requirements are implemented and test-covered.
-- [x] S2 updated: `register()` returns `Promise<BaseResponseModel<AuthDto>>` — service tests verify `AuthDto` shape including `login`, `authToken`, `expiresIn`.
-- [x] S3 updated: call-site stores JWT token on successful registration (auto-login flow).
+- [x] S2 updated: `register()` returns `Promise<BaseResponseModel<RegisterAuthModel>>` — service tests verify `RegisterAuthModel` shape including `login`, `authToken`, string `expiresIn`, and no `refreshToken`.
+- [x] S3 updated: call-site receives `data.authToken` but deliberately discards it — navigates to `/login` unconditionally on success, no auto-login (Decision 1, Angular parity).
 - [x] S6: `getMe()` billing fields passthrough — `UserModel` carries `paymentDueDate`/`isInTrial`/`paymentStatus` unchanged; no mapping added.
-- [x] Service tests verify: body includes login/storeName, excludes passwordConfirmation, includes code only when non-empty (trim), returns `BaseResponseModel<AuthDto>`.
-- [x] Component tests verify: form renders login/storeName, code flows from query param without visible input, passwordConfirmation blocks submit locally and is never sent, envelope branch succeeds on true/false with auto-login, navigate only on success.
+- [x] Service tests verify: body includes login/storeName, excludes passwordConfirmation, includes code only when non-empty (trim), returns `BaseResponseModel<RegisterAuthModel>`.
+- [x] Component tests verify: form renders login/storeName, code flows from query param without visible input, passwordConfirmation blocks submit locally and is never sent, envelope branch succeeds on true/false without auto-login (authToken received but unused), navigate only on success.
+- [x] Rate-limit feedback (auth-rate-limit-feedback capability): login/register surface distinct copy on HTTP 429, existing non-429 branches unchanged.
 - [x] Backend: 52 unit tests + 11 E2E tests passing; `POST /api/v1/auth/register` returns `201 Created` with `AuthDto`.
 - [x] Rate limiting: `RegisterPolicy` (10 req / 10 min per IP) configured, returns 429 on excess.
 - [x] Full regression gate: typecheck 5/5 packages, zero build warnings.
@@ -231,6 +277,9 @@ layer.
 - **auth-http-login** (not yet defined; future Slice 3 will formalize login contract similarly)
 - **auth-authorization** (Slice 4 — not yet specified; deferred decision-gates for terms, email validation, cellPhone masking)
 - **usage-tracker** (Slice 5 — out of auth-http scope)
+- **auth-rate-limit-feedback** (added by `register-endpoint-contract-frontend`): defines the HTTP
+  429 copy surfaced on `login.tsx`/`register.tsx`; a sibling capability, not folded into this file
+  because it governs UI copy branching, not the HTTP contract itself.
 
 ---
 

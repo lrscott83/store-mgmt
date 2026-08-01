@@ -96,6 +96,9 @@ export function ExpensesHistoryPage() {
       undefined,
       undefined,
     );
+    // ExpenseOfflineService.filterExpensesObservable is a same-tick `Promise.resolve(success(...))`
+    // over local storage — it never actually fails; this guard exists for the type only.
+    if (!response.succeeded) return;
     setDayGroups(groupExpensesByDay(response.data));
   }
 

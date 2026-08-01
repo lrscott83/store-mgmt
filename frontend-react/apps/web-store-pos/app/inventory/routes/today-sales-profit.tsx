@@ -106,7 +106,11 @@ export function InventoryTodaySalesProfitPage() {
     // WU3 (service-return-shape-parity Slice 1, category B): getInventoryEntriesInDay now
     // returns BaseResponseModel<InventoryEntryView[]> (was a bare array) — unwrap `.data`.
     // Fase 4: renamed from getByDate (date arg ignored — always returns today).
-    const todayEntries = inventorySvc.getInventoryEntriesInDay(today).data;
+    const entriesResponse = inventorySvc.getInventoryEntriesInDay(today);
+    // InventoryOfflineService.getInventoryEntriesInDay is a sync local-storage read that
+    // never actually fails; this guard exists for the type only.
+    if (!entriesResponse.succeeded) return;
+    const todayEntries = entriesResponse.data;
 
     // Angular lines 79-120: build a profit row per candidate product.
     const productProfits: ProductProfitRow[] = products.map((prod) => {

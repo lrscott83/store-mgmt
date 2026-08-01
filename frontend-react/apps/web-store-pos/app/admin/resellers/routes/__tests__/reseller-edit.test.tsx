@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { ReSeller } from '@store-mgmt/domain';
+import type { BaseResponseModel, ReSeller } from '@store-mgmt/domain';
 
 // ─── react-router mock ────────────────────────────────────────────────────────
 
@@ -512,7 +512,7 @@ describe('ResellerEditPage — server-side error', () => {
     });
     vi.mocked(resellerHttpService.updateReseller).mockResolvedValue({
       succeeded: false,
-      data: false,
+      data: null,
       message: '',
       actionCode: 0,
       errors: [{ code: 'ERR02', description: 'Update failed on server' }],
@@ -561,6 +561,52 @@ describe('ResellerEditPage — HTTP throw on update', () => {
     await waitFor(() => {
       expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// response-envelope-nullability WU-D — getReseller succeeded:false is a resolved
+// value, not a rejection; the load guard must surface RESELLERS.ERROR the same as
+// the existing .catch() branch, and must not read `.data` off a null-carrying
+// failure envelope.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerEditPage — getReseller succeeded:false', () => {
+  it('shows RESELLERS.ERROR and does not populate form fields when getReseller resolves with succeeded:false', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.getReseller).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: null,
+      errors: [{ code: 'E01', description: 'failed' }],
+    });
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['RESELLERS.ERROR'])).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText(esMessages['GENERAL.FULL_NAME'])).not.toBeInTheDocument();
+  });
+
+  // The runtime test above locks the observable behaviour, but it cannot tell a
+  // guarded read from an unguarded one: without the guard, `res.data` is null,
+  // `r.login` throws synchronously inside the `.then`, which rejects the chain
+  // and lands in the very same `.catch` that sets the very same RESELLERS.ERROR —
+  // both paths render identically. The guard is enforced by the compiler, so
+  // that is where it has to be asserted.
+  it('type-level: getReseller data cannot be read before succeeded is checked', () => {
+    // Never invoked — the body is a compile-time assertion.
+    const probe = (res: BaseResponseModel<ReSeller>) => {
+      // @ts-expect-error `data` is ReSeller | null until `succeeded` narrows the union
+      void res.data.fullName;
+      if (res.succeeded) void res.data.fullName;
+    };
+    expect(probe).toBeTypeOf('function');
   });
 });
 
