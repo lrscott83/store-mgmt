@@ -2,6 +2,7 @@ import type { Product } from '@store-mgmt/domain';
 import { ProductCategoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
+import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { ProductCategoryRepository } from './product-category-repository';
 
 function generateId(): string {
@@ -381,15 +382,24 @@ export class ProductRepository {
     if (current.size === 0) this.setProductsLocalStorage(productsMap);
   }
 
-  /** 1:1 port of Angular `getProductsJson` (product.repository.ts:301-303). */
+  /**
+   * 1:1 port of Angular `getProductsJson` (product.repository.ts:301-303). At-rest
+   * encryption seam: decrypted immediately at the `getItem` boundary (design's uniform
+   * seam rule) — this raw getter is used by the sync export path, so plaintext must come
+   * back out even when the entity is stored as ciphertext.
+   */
   getProductsJson(): string | null {
-    return localStorage.getItem(this.getStorageKey());
+    return decryptEntity(localStorage.getItem(this.getStorageKey()));
   }
 
-  /** Private port of Angular `setProductsLocalStorage` (product.repository.ts:287-290) — Map-entries write. */
+  /**
+   * Private port of Angular `setProductsLocalStorage` (product.repository.ts:287-290) —
+   * Map-entries write. At-rest encryption seam: encrypted immediately after
+   * `JSON.stringify`, before `setItem`.
+   */
   private setProductsLocalStorage(products: Map<string, Product>): void {
     const productMapJson = JSON.stringify(Array.from(products.entries()));
-    localStorage.setItem(this.getStorageKey(), productMapJson);
+    localStorage.setItem(this.getStorageKey(), encryptEntity(productMapJson));
   }
 
   /** Private port of Angular `getStorageKey` (product.repository.ts:292-295) — records the last-used key. */
@@ -410,7 +420,7 @@ export class ProductRepository {
    */
   private getProductsFromLocalStorage(): Map<string, Product> {
     try {
-      const productMapJson = localStorage.getItem(this.getStorageKey());
+      const productMapJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
       if (productMapJson && productMapJson !== '{}') {
         return new Map(JSON.parse(productMapJson));
       }
