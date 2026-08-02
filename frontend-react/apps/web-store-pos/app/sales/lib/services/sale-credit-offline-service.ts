@@ -1,6 +1,7 @@
 import type { BaseResponseModel, SaleCredit } from '@store-mgmt/domain';
 import { DataResult, PaymentType, Result, SaleCreditErrors, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
+import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 
@@ -362,9 +363,13 @@ export class SaleCreditOfflineService {
     return Result.Success();
   }
 
-  /** Private port of Angular `setSaleCreditsLocalStorage` (sale-credit-offline.service.ts:276-279) — plain-array write. */
+  /**
+   * Private port of Angular `setSaleCreditsLocalStorage`
+   * (sale-credit-offline.service.ts:276-279) — plain-array write. At-rest encryption
+   * seam: encrypted immediately after `JSON.stringify`, before `setItem`.
+   */
   private setSaleCreditsLocalStorage(saleCredits: SaleCredit[]): void {
-    localStorage.setItem(this.getStorageKey(), JSON.stringify(saleCredits));
+    localStorage.setItem(this.getStorageKey(), encryptEntity(JSON.stringify(saleCredits)));
   }
 
   /** Private port of Angular `getStorageKey` (sale-credit-offline.service.ts:236-239) — records the last-used key. */
@@ -388,7 +393,7 @@ export class SaleCreditOfflineService {
    */
   private getSaleCreditsFromLocalStorage(): SaleCredit[] {
     try {
-      const saleCreditsJson = localStorage.getItem(this.getStorageKey());
+      const saleCreditsJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
       if (saleCreditsJson) {
         const saleCredits = JSON.parse(saleCreditsJson) as SaleCredit[];
         return saleCredits.map((c) => this.reviveSaleCreditDates(c));
