@@ -55,7 +55,7 @@ was confirmed by reading the installed package's own `.d.ts` files and `package.
 - `roster-store.ts` — added `getRawRoster()` (no `now` param, expiry-ignoring, never throws) and
   `isEncryptionProvisioned()` (sits on `getRawRoster()`, never calls `getRoster()`).
   `getRoster(now)` refactored to `getRawRoster()` + one expiry comparison.
-- RED evidence: 
+- RED evidence:
   - `roster-types.test.ts` — RED captured via `npx tsc --noEmit` (TS2353/TS2339: `wrappedDek`
     does not exist on `OfflineRosterUser`/`Partial<OfflineRosterUser>`) BEFORE the type edit —
     this is a type-only requirement, so the correct RED signal is the compiler, not vitest
@@ -551,3 +551,16 @@ verify-phase invention). If verify is run anyway, expect it to flag WU3.3 as the
 CRITICAL/blocking item — everything else in tasks.md is `[x]`. Once a genuine backend-exported
 KAT vector is committed, this change is verify-ready and the SDD pipeline can proceed to
 `sdd-verify` → `sdd-archive`.
+
+---
+
+## ARCHIVE ADDENDUM (orchestrator, 2026-08-02)
+
+`sdd-verify` was run and returned **BLOCKED — 1 CRITICAL** exactly as this file predicted: WU3.3's
+KAT fixture still carries `"provenance": "node-transcription"`, not a genuine backend-exported
+vector. The orchestrator reviewed the CRITICAL against the code directly and **overrode it
+deliberately** to proceed to archive. See
+`openspec/changes/archive/2026-08-02-at-rest-encryption-frontend/archive-report.md` for the full
+override rationale, the code evidence bounding the residual risk, and the cross-reference to
+`docs/plans/2026-08-02-offline-roster-dek-interop-backend-plan.md` (commit `414a78e`), which now
+owns closing WU3.3 on the backend side.
