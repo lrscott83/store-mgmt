@@ -1,6 +1,7 @@
 import type { ProductCategory } from '@store-mgmt/domain';
 import { ProductCategoryErrors, Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
+import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -199,9 +200,12 @@ export class ProductCategoryRepository {
     if (current.size === 0) this.setProductCategoriesLocalStorage(categoriesMap);
   }
 
-  /** 1:1 port of Angular `getCategoriesJson` (repo.ts:172-174). */
+  /**
+   * 1:1 port of Angular `getCategoriesJson` (repo.ts:172-174). At-rest encryption seam:
+   * decrypted immediately at the `getItem` boundary.
+   */
   getCategoriesJson(): string | null {
-    return localStorage.getItem(this.getStorageKey());
+    return decryptEntity(localStorage.getItem(this.getStorageKey()));
   }
 
   /** Private port of Angular `getStorageKey` (repo.ts:158-161) — records the last-used key. */
@@ -215,10 +219,14 @@ export class ProductCategoryRepository {
     return StorageKeys.entityKey('product-categories', this.storeId);
   }
 
-  /** Private port of Angular `setProductCategoriesLocalStorage` (repo.ts:167-170) — Map-entries write. */
+  /**
+   * Private port of Angular `setProductCategoriesLocalStorage` (repo.ts:167-170) —
+   * Map-entries write. At-rest encryption seam: encrypted immediately after
+   * `JSON.stringify`, before `setItem`.
+   */
   private setProductCategoriesLocalStorage(categories: Map<string, ProductCategory>): void {
     const categoryMapJson = JSON.stringify(Array.from(categories.entries()));
-    localStorage.setItem(this.getStorageKey(), categoryMapJson);
+    localStorage.setItem(this.getStorageKey(), encryptEntity(categoryMapJson));
   }
 
   /**
@@ -228,7 +236,7 @@ export class ProductCategoryRepository {
    */
   private getProductCategoriesFromLocalStorage(): Map<string, ProductCategory> {
     try {
-      const categoryMapJson = localStorage.getItem(this.getStorageKey());
+      const categoryMapJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
       if (categoryMapJson && categoryMapJson !== '{}') {
         return new Map(JSON.parse(categoryMapJson));
       }
