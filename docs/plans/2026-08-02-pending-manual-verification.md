@@ -41,7 +41,23 @@ Not repeated here. That plan is the queue. One correction worth carrying: the ga
 
 ---
 
-## 3. Stale SDD change folders — an audit, not implementation
+## 3. Offline auth — smoke checklist never run, and its blocker is gone
+
+**Change:** `offline-auth-frontend` (archived 2026-07-29)
+**Document:** `docs/plans/2026-07-28-offline-auth-frontend-smoke-checklist.md` — **0 of 9 steps executed**
+**Blocked on:** a human with a real device/browser.
+
+The change was archived with this checklist untouched. Its own header says steps 13.1-13.2 were *"structurally blocked on backend §7a"* — the roster export endpoint.
+
+**That blocker no longer exists.** `GET /v1/storeusers/{storeId}/offline-roster` is implemented and live (`StoreUsersController.cs:41-45`), and the stale comments in `roster-http-service.ts` / `roster-export-panel.tsx` claiming otherwise were corrected during the at-rest work. Nobody went back to the checklist after the endpoint shipped.
+
+- [ ] Re-read the 9 steps against today's reality, drop or rewrite whatever the endpoint's arrival made obsolete, and run what remains.
+
+This one is worth doing **before** the PWA walkthrough if a device is available: it exercises roster import and offline login, which is the substrate the PWA offline shell renders on top of. A failure here would explain a failure there.
+
+---
+
+## 4. Stale SDD change folders — an audit, not implementation
 
 Two change folders sit open in the **legacy** `frontend-react/openspec/` tree (not the canonical repo-root `openspec/`):
 
