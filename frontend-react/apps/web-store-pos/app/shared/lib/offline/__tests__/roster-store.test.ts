@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   importRoster,
   getRoster,
+  getRawRoster,
+  isEncryptionProvisioned,
   findRosterUser,
   isRosterProvisioned,
   clearRoster,
@@ -133,6 +135,66 @@ describe('roster-store — D3 shape guard (expiresAt/issuedAt/bundleId/users mus
     );
     expect(getRoster(20_000)).toBeNull();
     expect(isRosterProvisioned(20_000)).toBe(false);
+  });
+});
+
+describe('roster-store — getRawRoster (design §4, trap 1: expiry-ignoring raw read)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('returns the bundle even when expiresAt is in the past, while getRoster returns null for the same bytes', () => {
+    // Bypass importRoster's own expiry guard, simulating a bundle that
+    // expired AFTER it was stored (the only way an expired bundle exists on
+    // disk in practice).
+    localStorage.setItem(
+      'lizoft.offline-roster',
+      JSON.stringify(makeBundle({ expiresAt: 5_000, formatVersion: 2 })),
+    );
+
+    expect(getRawRoster()).toEqual(makeBundle({ expiresAt: 5_000, formatVersion: 2 }));
+    expect(getRoster(10_000)).toBeNull();
+  });
+
+  it('returns null and does not throw when no bundle is stored', () => {
+    expect(getRawRoster()).toBeNull();
+  });
+
+  it('returns null on a malformed stored shape, same as getRoster', () => {
+    localStorage.setItem(ROSTER_KEY, 'not-json{{{');
+    expect(getRawRoster()).toBeNull();
+  });
+});
+
+describe('roster-store — isEncryptionProvisioned (design §4, trap 1)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('stays true for an expired v2 bundle with a wrapped DEK', () => {
+    localStorage.setItem(
+      ROSTER_KEY,
+      JSON.stringify(
+        makeBundle({
+          expiresAt: 5_000,
+          formatVersion: 2,
+          users: [
+            {
+              ...makeBundle().users[0],
+              wrappedDek: 'ct',
+              wrapSalt: 'salt',
+              wrapIv: 'iv',
+            },
+          ],
+        }),
+      ),
+    );
+    expect(isEncryptionProvisioned()).toBe(true);
+  });
+
+  it('is false for a v1 bundle', () => {
+    importRoster(makeBundle({ formatVersion: 1 }), 10_000);
+    expect(isEncryptionProvisioned()).toBe(false);
+  });
+
+  it('is false with no bundle at all', () => {
+    expect(isEncryptionProvisioned()).toBe(false);
   });
 });
 

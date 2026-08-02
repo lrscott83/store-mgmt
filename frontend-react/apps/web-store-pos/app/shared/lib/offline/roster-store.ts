@@ -114,10 +114,16 @@ export function importRoster(bundle: OfflineRosterBundle, now: number = Date.now
 }
 
 /**
- * Reads the stored roster, if any. Never throws — an absent, corrupt,
- * malformed (D3), or expired bundle all resolve to `null`.
+ * Design §4 (trap 1 resolution): the raw stored bundle, shape-guarded (D3),
+ * EXPIRY-IGNORING. Never throws. No `now` parameter — taking one would
+ * invite reintroducing the expiry check here.
+ *
+ * "Expired" means "authenticate online again"; it never means "your data
+ * is plaintext" — encryption-provisioning state must survive expiry, so
+ * this is the raw reader that `isEncryptionProvisioned()` and the DEK
+ * unwrap wire points sit on, never `getRoster()`.
  */
-export function getRoster(now: number = Date.now()): OfflineRosterBundle | null {
+export function getRawRoster(): OfflineRosterBundle | null {
   const raw = localStorage.getItem(ROSTER_KEY);
   if (!raw) return null;
 
@@ -128,10 +134,30 @@ export function getRoster(now: number = Date.now()): OfflineRosterBundle | null 
     return null;
   }
 
-  if (!hasValidShape(parsed)) return null;
-  if (parsed.expiresAt <= now) return null;
+  return hasValidShape(parsed) ? parsed : null;
+}
 
-  return parsed;
+/**
+ * Reads the stored roster, if any. Never throws — an absent, corrupt,
+ * malformed (D3), or expired bundle all resolve to `null`. Now DEFINED AS
+ * `getRawRoster()` plus one expiry comparison — one gate, one place, not
+ * two parallel readers that can drift (design §4).
+ */
+export function getRoster(now: number = Date.now()): OfflineRosterBundle | null {
+  const bundle = getRawRoster();
+  if (!bundle || bundle.expiresAt <= now) return null;
+  return bundle;
+}
+
+/**
+ * Design §4 (trap 1): are the bytes on disk supposed to be ciphertext?
+ * Expiry is irrelevant here — an expired v2 bundle still means the on-disk
+ * business data is ciphertext, so this predicate sits on `getRawRoster()`,
+ * NEVER on `getRoster()`.
+ */
+export function isEncryptionProvisioned(): boolean {
+  const bundle = getRawRoster();
+  return !!bundle && bundle.formatVersion >= 2 && bundle.users.some((u) => !!u.wrappedDek);
 }
 
 export function findRosterUser(login: string, now: number = Date.now()): OfflineRosterUser | null {
