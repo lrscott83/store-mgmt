@@ -73,4 +73,23 @@ describe('RosterExportPanel — offline-device-provisioning "Admin export action
     });
     expect(serializeRosterMock).toHaveBeenCalledWith(bundle, 'master', 's1');
   });
+
+  // WU14 (regression coverage, not new behavior): the export panel forwards
+  // the fetched bundle to serializeRoster verbatim, regardless of its
+  // formatVersion — same case as above with a v2 bundle.
+  it('fetches and serializes a v2 bundle the same way (WU14 regression coverage)', async () => {
+    const bundle = { bundleId: 'b1', issuedAt: 1, expiresAt: 2, formatVersion: 2, storeId: 's1', users: [] };
+    getOfflineRosterMock.mockResolvedValue(bundle);
+    serializeRosterMock.mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: /exportar roster sin conexión/i }));
+    fireEvent.change(screen.getByLabelText(/contraseña maestra/i), { target: { value: 'master' } });
+    fireEvent.click(screen.getByRole('button', { name: /^confirmar$/i }));
+
+    await waitFor(() => {
+      expect(getOfflineRosterMock).toHaveBeenCalledWith('s1');
+    });
+    expect(serializeRosterMock).toHaveBeenCalledWith(bundle, 'master', 's1');
+  });
 });

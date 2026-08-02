@@ -165,6 +165,58 @@ describe('LoginPage — offline-auth-mode end-to-end (real roster-store + real o
     expect(loginOfflineFn).not.toHaveBeenCalled();
   });
 
+  // WU14 (regression coverage, not new behavior): expiry has nothing to do
+  // with encryption provisioning — same actually-expired case as above with
+  // formatVersion:2 and wrap fields populated.
+  it('an actually-expired v2 (wrap-field-carrying) stored bundle also falls through to the online login action (WU14 regression coverage)', async () => {
+    const verifier = await makeVerifier('secret');
+    const expiredBundle: OfflineRosterBundle = {
+      bundleId: 'expired-2',
+      issuedAt: 1_000,
+      expiresAt: Date.now() - 1_000, // GIVEN: expiresAt in the past
+      formatVersion: 2,
+      storeId: 's1',
+      users: [
+        {
+          id: 'u1',
+          login: 'ana',
+          fullName: 'Ana',
+          isActive: true,
+          roles: [],
+          featureIds: [],
+          storeModuleIds: [],
+          isSuperAdmin: false,
+          isOwnerAdmin: false,
+          isReSeller: false,
+          selectedStoreId: 's1',
+          verifier,
+          wrappedDek: 'ct',
+          wrapSalt: 'salt',
+          wrapIv: 'iv',
+        },
+      ],
+    };
+    localStorage.setItem(ROSTER_KEY, JSON.stringify(expiredBundle));
+
+    const loginFn = vi.fn().mockResolvedValue(makeOnlineUser());
+    const loginOfflineFn = vi.fn();
+    renderLogin({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      login: loginFn,
+      loginOffline: loginOfflineFn,
+    });
+
+    await submit();
+
+    await waitFor(() => {
+      expect(loginFn).toHaveBeenCalledWith('ana', 'secret');
+    });
+    expect(loginOfflineFn).not.toHaveBeenCalled();
+  });
+
   // offline-auth-mode: "Inactive roster user is rejected distinctly"
   it('an actually-inactive roster user is rejected with AUTH.ACCOUNT_INACTIVE, not the generic message', async () => {
     const verifier = await makeVerifier('secret');
@@ -201,6 +253,60 @@ describe('LoginPage — offline-auth-mode end-to-end (real roster-store + real o
     // `OfflineUserInactiveError` instance thrown by production code against
     // a real inactive roster user, not a hand-built `Object.assign` stand-in
     // (contrast `login.offline.test.tsx`'s A3 test).
+    const loginOfflineFn = vi.fn((login: string, password: string) =>
+      authenticateOffline(login, password),
+    );
+    renderLogin({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      login: loginFn,
+      loginOffline: loginOfflineFn,
+    });
+
+    await submit();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tu cuenta está inactiva. Contactá soporte.')).toBeInTheDocument();
+    });
+    expect(loginFn).not.toHaveBeenCalled();
+  });
+
+  // WU14 (regression coverage, not new behavior): the active-user check runs
+  // before any DEK unwrap is attempted — same inactive-user case as above
+  // with formatVersion:2 and wrap fields populated.
+  it('an actually-inactive v2 (wrap-field-carrying) roster user is also rejected with AUTH.ACCOUNT_INACTIVE (WU14 regression coverage)', async () => {
+    const verifier = await makeVerifier('secret');
+    const bundle: OfflineRosterBundle = {
+      bundleId: 'inactive-2',
+      issuedAt: 1_000,
+      expiresAt: Date.now() + 1_000_000,
+      formatVersion: 2,
+      storeId: 's1',
+      users: [
+        {
+          id: 'u1',
+          login: 'ana',
+          fullName: 'Ana',
+          isActive: false, // GIVEN: a roster user marked inactive
+          roles: [],
+          featureIds: [],
+          storeModuleIds: [],
+          isSuperAdmin: false,
+          isOwnerAdmin: false,
+          isReSeller: false,
+          selectedStoreId: 's1',
+          verifier,
+          wrappedDek: 'ct',
+          wrapSalt: 'salt',
+          wrapIv: 'iv',
+        },
+      ],
+    };
+    importRoster(bundle);
+
+    const loginFn = vi.fn();
     const loginOfflineFn = vi.fn((login: string, password: string) =>
       authenticateOffline(login, password),
     );

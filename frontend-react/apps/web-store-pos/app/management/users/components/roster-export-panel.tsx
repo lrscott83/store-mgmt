@@ -14,9 +14,8 @@ import { serializeRoster } from '~/shared/lib/offline/roster-serializer';
  * resolution) rather than inline in `user-list.tsx`, keeping the list page
  * thin.
  *
- * **BLOCKED-for-verification**: `GET /v1/storeusers/{storeId}/offline-roster`
- * does not exist server-side yet (§7a, 0% implemented). This wiring is
- * buildable and unit-testable against a mocked `rosterHttpService` only.
+ * WU14 correction: `GET /v1/storeusers/{storeId}/offline-roster` DOES exist
+ * server-side — `StoreUsersController.cs` implements exactly this route.
  */
 export function RosterExportPanel() {
   const intl = useIntl();

@@ -28,9 +28,35 @@ function makeBundle(): OfflineRosterBundle {
   };
 }
 
+// WU14 (regression coverage, not new behavior): the container's crypto
+// (serializeRoster/deserializeRoster) has no notion of formatVersion — this
+// is the same v1 fixture above with formatVersion:2 and the wrap fields
+// populated, proving the container round-trips a v2 bundle identically.
+function makeV2Bundle(): OfflineRosterBundle {
+  return {
+    ...makeBundle(),
+    formatVersion: 2,
+    users: [
+      {
+        ...makeBundle().users[0],
+        wrappedDek: 'ct',
+        wrapSalt: 'salt',
+        wrapIv: 'iv',
+      },
+    ],
+  };
+}
+
 describe('roster-serializer — bundle container round-trips losslessly', () => {
   it('deserializes to the exact original bundle with the same master + storeId', async () => {
     const bundle = makeBundle();
+    const payload = await serializeRoster(bundle, 'm', 's1');
+    const result = await deserializeRoster(payload, 'm', 's1');
+    expect(result).toEqual(bundle);
+  });
+
+  it('deserializes a v2 bundle (with wrap fields) to the exact original, same as v1 (WU14 regression coverage)', async () => {
+    const bundle = makeV2Bundle();
     const payload = await serializeRoster(bundle, 'm', 's1');
     const result = await deserializeRoster(payload, 'm', 's1');
     expect(result).toEqual(bundle);

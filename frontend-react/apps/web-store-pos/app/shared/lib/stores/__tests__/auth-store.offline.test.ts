@@ -3,6 +3,7 @@ import { useAuthStore } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
 import { importRoster, isRosterProvisioned } from '../../offline/roster-store';
 import { sha256Base64, pbkdf2Base64 } from '../../offline/offline-crypto';
+import { clearDek } from '../../storage/data-key-store';
 import type { OfflineRosterBundle } from '../../offline/roster-types';
 
 const FIXED_SALT = 'AAAAAAAAAAAAAAAAAAAAAA==';
@@ -37,10 +38,47 @@ async function seedRoster(): Promise<void> {
   importRoster(bundle);
 }
 
+// WU14 (regression coverage, not new behavior): a v2 roster twin of
+// seedRoster() above, with the wrap fields populated — proves the
+// store-level `loginOffline` hydration seam (setUser) does not care about
+// formatVersion.
+async function seedV2Roster(): Promise<void> {
+  const preHash = await sha256Base64('secret');
+  const hash = await pbkdf2Base64(preHash, FIXED_SALT, ITERATIONS);
+  const bundle: OfflineRosterBundle = {
+    bundleId: 'b1',
+    issuedAt: 1000,
+    expiresAt: Date.now() + 1_000_000,
+    formatVersion: 2,
+    storeId: 's1',
+    users: [
+      {
+        id: 'u1',
+        login: 'ana',
+        fullName: 'Ana Pérez',
+        isActive: true,
+        roles: [],
+        featureIds: [1],
+        storeModuleIds: [],
+        isSuperAdmin: false,
+        isOwnerAdmin: false,
+        isReSeller: false,
+        selectedStoreId: 's1',
+        verifier: { hash, salt: FIXED_SALT, iterations: ITERATIONS },
+        // Deliberately absent wrappedDek/wrapSalt/wrapIv: this test asserts
+        // the plain hydration seam, not DEK unwrap (already covered by
+        // offline-auth-service.test.ts's dedicated v2 describe block).
+      },
+    ],
+  };
+  importRoster(bundle);
+}
+
 // auth-session spec: "loginOffline hydrates through the existing setUser seam"
 describe('useAuthStore.loginOffline (D6)', () => {
   beforeEach(() => {
     localStorage.clear();
+    clearDek();
     useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
   });
 
@@ -68,6 +106,17 @@ describe('useAuthStore.loginOffline (D6)', () => {
     const state = useAuthStore.getState();
     expect(state.isAuthenticated).toBe(false);
     expect(state.isLoading).toBe(false);
+  });
+
+  it('hydrates through setUser exactly like a v1 login (WU14 regression coverage: v2 roster, no wrap fields present)', async () => {
+    await seedV2Roster();
+
+    const user = await useAuthStore.getState().loginOffline('ana', 'secret');
+
+    expect(user.id).toBe('u1');
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.user?.id).toBe('u1');
   });
 });
 

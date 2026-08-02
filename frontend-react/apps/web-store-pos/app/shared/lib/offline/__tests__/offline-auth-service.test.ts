@@ -123,6 +123,43 @@ describe('offline-auth-service — authenticateOffline (offline-auth-mode spec)'
     await expect(authenticateOffline('ana', 'secret')).rejects.toBeInstanceOf(NoRosterError);
   });
 
+  // WU14 (regression coverage, not new behavior): verifier/rejection
+  // mechanics have nothing to do with encryption provisioning — same
+  // wrong-password case as above with formatVersion:2 and no wrap fields
+  // (so this device is NOT encryption-provisioned; a v2-but-unwrapped
+  // roster must reject exactly like a v1 one).
+  it('rejects a wrong password with OfflineInvalidPasswordError (v2 roster, WU14 regression coverage)', async () => {
+    const verifier = await makeVerifier('secret');
+    const bundle: OfflineRosterBundle = {
+      bundleId: 'b1',
+      issuedAt: 1000,
+      expiresAt: Date.now() + 1_000_000,
+      formatVersion: 2,
+      storeId: 's1',
+      users: [
+        {
+          id: 'u1',
+          login: 'ana',
+          fullName: 'Ana Pérez',
+          isActive: true,
+          roles: [],
+          featureIds: [1, 2],
+          storeModuleIds: [3],
+          isSuperAdmin: false,
+          isOwnerAdmin: true,
+          isReSeller: false,
+          selectedStoreId: 's1',
+          verifier,
+        },
+      ],
+    };
+    importRoster(bundle);
+
+    await expect(authenticateOffline('ana', 'wrong')).rejects.toBeInstanceOf(
+      OfflineInvalidPasswordError,
+    );
+  });
+
   // offline-auth-mode: "Offline-hydrated UserModel carries no-billing-data defaults"
   it('maps billing fields to the no-billing-data defaults (design correction #1)', async () => {
     await seedBundle();

@@ -52,6 +52,18 @@ describe('roster-store — fresh import + read', () => {
     expect(getRoster(10_000)).toEqual(bundle);
   });
 
+  // WU14 (regression coverage, not new behavior): import/read mechanics are
+  // format-version-agnostic — same assertion as above with formatVersion:2
+  // and the wrap fields populated.
+  it('persists and reads back the exact bundle (v2 roster with wrap fields, WU14 regression coverage)', () => {
+    const bundle = makeBundle({
+      formatVersion: 2,
+      users: [{ ...makeBundle().users[0], wrappedDek: 'ct', wrapSalt: 'salt', wrapIv: 'iv' }],
+    });
+    importRoster(bundle, 10_000);
+    expect(getRoster(10_000)).toEqual(bundle);
+  });
+
   it('findRosterUser finds a user by login', () => {
     const bundle = makeBundle();
     importRoster(bundle, 10_000);
@@ -129,6 +141,26 @@ describe('roster-store — D3 shape guard (expiresAt/issuedAt/bundleId/users mus
         issuedAt: 1000,
         expiresAt: '2099-01-01T00:00:00.000Z',
         formatVersion: 1,
+        storeId: 's1',
+        users: [],
+      }),
+    );
+    expect(getRoster(20_000)).toBeNull();
+    expect(isRosterProvisioned(20_000)).toBe(false);
+  });
+
+  // WU14 (regression coverage, not new behavior): the D3 shape guard runs
+  // BEFORE any encryption-specific field is inspected — same malformed
+  // ISO-string case as above, with formatVersion:2, proving the guard is
+  // format-version-agnostic too.
+  it('getRoster returns null (never throws) on a malformed stored shape (v2, WU14 regression coverage)', () => {
+    localStorage.setItem(
+      ROSTER_KEY,
+      JSON.stringify({
+        bundleId: 'b1',
+        issuedAt: 1000,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        formatVersion: 2,
         storeId: 's1',
         users: [],
       }),

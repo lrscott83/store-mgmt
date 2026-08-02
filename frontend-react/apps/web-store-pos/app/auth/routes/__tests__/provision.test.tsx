@@ -5,7 +5,12 @@ import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
 import Provision from '../provision';
 import { serializeRoster } from '~/shared/lib/offline/roster-serializer';
-import { getRoster, isRosterProvisioned, importRoster } from '~/shared/lib/offline/roster-store';
+import {
+  getRoster,
+  isRosterProvisioned,
+  isEncryptionProvisioned,
+  importRoster,
+} from '~/shared/lib/offline/roster-store';
 import type { OfflineRosterBundle } from '~/shared/lib/offline/roster-types';
 
 function makeBundle(overrides: Partial<OfflineRosterBundle> = {}): OfflineRosterBundle {
@@ -65,6 +70,48 @@ describe('Provision route (offline-device-provisioning spec)', () => {
     });
     expect(getRoster()?.bundleId).toBe(bundle.bundleId);
     expect(isRosterProvisioned()).toBe(true);
+  });
+
+  // WU14 (regression coverage, not new behavior): the import flow itself
+  // has nothing to do with encryption provisioning — same successful-import
+  // case as above with a v2 bundle carrying wrap fields, additionally
+  // asserting isEncryptionProvisioned() flips true (which the v1 case never
+  // exercises).
+  it('successfully imports a v2 bundle (with wrap fields) and makes both isRosterProvisioned() and isEncryptionProvisioned() true (WU14 regression coverage)', async () => {
+    const bundle = makeBundle({
+      formatVersion: 2,
+      users: [
+        {
+          id: 'u1',
+          login: 'ana',
+          fullName: 'Ana',
+          isActive: true,
+          roles: [],
+          featureIds: [],
+          storeModuleIds: [],
+          isSuperAdmin: false,
+          isOwnerAdmin: false,
+          isReSeller: false,
+          selectedStoreId: 's1',
+          verifier: { hash: 'h', salt: 's', iterations: 210_000 },
+          wrappedDek: 'ct',
+          wrapSalt: 'salt',
+          wrapIv: 'iv',
+        },
+      ],
+    });
+    const payload = await serializeRoster(bundle, 'master', 's1');
+    renderProvision();
+
+    await selectFile(payload);
+    await fillAndSubmit('s1', 'master');
+
+    await waitFor(() => {
+      expect(screen.getByText(/dispositivo activado/i)).toBeInTheDocument();
+    });
+    expect(getRoster()?.bundleId).toBe(bundle.bundleId);
+    expect(isRosterProvisioned()).toBe(true);
+    expect(isEncryptionProvisioned()).toBe(true);
   });
 
   it('shows a wrong-master-password-specific message and imports nothing', async () => {
