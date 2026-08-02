@@ -23,3 +23,25 @@ export const PRECACHE_GLOB_IGNORES = [
 
 // Parity with today's vite.config.ts maximumFileSizeToCacheInBytes.
 export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+
+// The asset families the offline shell cannot work without, at the counts the
+// glob comments above already claim in prose. `computePrecacheDiff` compares
+// on-disk → manifest and so is blind to a family that vanished from the BUILD
+// OUTPUT: a deleted woff2 is not on disk, therefore not "missing from the
+// manifest", therefore green — while offline fonts break. These counts close
+// that hole and make task 8.2 of the pwa-offline-shell change a build gate
+// instead of a human squinting at Cache Storage.
+//
+// Route chunks and CSS are deliberately absent: their count moves with every
+// code split, so pinning them would fail on unrelated work. Adding a tutorial
+// screenshot, a font or an icon is expected to fail the gate until the number
+// here is updated on purpose.
+export const REQUIRED_PRECACHE_FAMILIES = [
+  { family: 'index.html', expected: 1 },
+  { family: 'assets/manifest-*.js', expected: 1 },
+  { family: 'manifest.webmanifest', expected: 1 },
+  { family: 'favicon.png', expected: 1 },
+  { family: 'images/**/*.png', expected: 6 },
+  { family: 'fonts/**/*.woff2', expected: 5 },
+  { family: 'icons/*.png', expected: 8 },
+];

@@ -14,8 +14,9 @@ import {
   PRECACHE_GLOB_PATTERNS,
   PRECACHE_GLOB_IGNORES,
   MAX_FILE_SIZE_BYTES,
+  REQUIRED_PRECACHE_FAMILIES,
 } from './precache-patterns.mjs';
-import { computePrecacheDiff } from './precache-diff.mjs';
+import { computePrecacheDiff, checkRequiredFamilies } from './precache-diff.mjs';
 
 const BUILD_CLIENT_DIR = resolve(process.cwd(), 'build/client');
 const SW_PATH = resolve(BUILD_CLIENT_DIR, 'service-worker.js');
@@ -110,6 +111,17 @@ async function main() {
     );
   }
 
+  const { shortfalls } = checkRequiredFamilies(injectedUrls);
+  if (shortfalls.length > 0) {
+    errors.push(
+      'required precache families are off their declared counts ' +
+        '(see REQUIRED_PRECACHE_FAMILIES in precache-patterns.mjs):\n' +
+        shortfalls
+          .map((s) => `  - ${s.family}: expected ${s.expected}, found ${s.actual}`)
+          .join('\n')
+    );
+  }
+
   if (errors.length > 0) {
     console.error('verify-sw-precache: FAILED\n');
     for (const error of errors) {
@@ -120,7 +132,8 @@ async function main() {
   }
 
   console.log(
-    `verify-sw-precache: OK — ${injectedEntries.length} precached entries; shell and route manifest each present exactly once.`
+    `verify-sw-precache: OK — ${injectedEntries.length} precached entries; shell and route manifest ` +
+      `each present exactly once; all ${REQUIRED_PRECACHE_FAMILIES.length} required families at their declared counts.`
   );
 }
 
