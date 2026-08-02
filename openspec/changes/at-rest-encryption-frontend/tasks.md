@@ -200,31 +200,39 @@ OUTSIDE their read's try/catch — none needed to move.
 Depends on: WU3, WU4. **Per design's ordering constraint, WU11 and WU12 must land in the same
 commit, or WU12 first** — see WU12 note below; do not commit WU11 alone.
 
-- [ ] 11.1 RED: `auth-store.test.ts` — with a v2 roster seeded (for this login) and
+- [x] 11.1 RED: `auth-store.test.ts` — with a v2 roster seeded (for this login) and
       `authHttpService` mocked, online `login(login, password)` leaves `getDek() !== null`
       afterward. `[dek-lifecycle-and-unlock-gate#Online login sets the DEK]`
       GREEN: `auth-store.ts` — after successful `/me` hydration, unwrap via `unwrapDek` and
       `setDek(dek, bundle.storeId)`.
-- [ ] 11.2 RED: `logout()` → `getDek() === null`.
+      DONE: `auth-store.dek.test.ts` (new file, real wrap fixture built with the same crypto path
+      `unwrapDek` expects, not a mock).
+- [x] 11.2 RED: `logout()` → `getDek() === null`.
       `[dek-lifecycle-and-unlock-gate#Logout clears the DEK]`
       GREEN: `auth-store.logout()` calls `clearDek()` (sync, static import from `storage/`).
-- [ ] 11.3 RED: no roster seeded for this login → `login` still resolves successfully and
+      DONE: added to `auth-store.test.ts`'s existing `logout` describe block.
+- [x] 11.3 RED: no roster seeded for this login → `login` still resolves successfully and
       `getDek()` stays `null`, no throw (the online-auth-only MUST — the majority case).
       `[dek-lifecycle-and-unlock-gate#Login with no roster entry leaves DEK null]`
       GREEN: unwrap is skipped entirely when there's no v2 entry for this login — confirm this is
       already true by construction from 11.1's guard, don't add a redundant branch.
-- [ ] 11.4 RED: roster entry wrapped under a different (older) password → `login` REJECTS with a
+      DONE: passed immediately as flagged (no defect) — kept as the majority-case regression guard.
+- [x] 11.4 RED: roster entry wrapped under a different (older) password → `login` REJECTS with a
       `DekUnwrapError`-named error (must rethrow, not swallow).
       `[at-rest-encryption-errors#DekUnwrapError online path MUST fail login]`
       GREEN: unwrap call is NOT wrapped in a swallowing try/catch on the online path.
-- [ ] 11.5 RED: `offline-auth-service.test.ts` — v2 roster → `authenticateOffline` leaves
+      DONE: real wrap-under-a-different-password fixture, asserts `rejects.toMatchObject({name:
+      'DekUnwrapError'})` and `getDek()` stays null.
+- [x] 11.5 RED: `offline-auth-service.test.ts` — v2 roster → `authenticateOffline` leaves
       `getDek() !== null`; v1 roster → succeeds exactly as today and `getDek()` stays `null` (the
       11 existing fixtures become this regression — confirm none of them need a code change, only
       an assertion added). `[dek-lifecycle-and-unlock-gate#Offline login sets the DEK]`
       GREEN: `authenticateOffline` — unwrap after the existing verifier check, before
       `toUserModel`.
-- [ ] 11.6 Gates + commit (bundled with WU12 — see WU12.4):
-      `feat(auth): unwrap and clear DEK on login/logout paths`.
+      DONE: added `expect(getDek()).toBeNull()` to the existing v1 happy-path test (regression for
+      all 11 v1 fixtures in the file) + a new v2 describe block with a real wrap fixture.
+- [x] 11.6 Gates + commit (bundled with WU12 — see WU12.4):
+      `feat(auth): unwrap and clear DEK on login/logout paths`. Commit `2929ad4`.
 
 ## WU12 — Unlock gate (must land with or before WU11) — [dek-lifecycle-and-unlock-gate gate]
 
@@ -236,28 +244,35 @@ commit WU11. This is cheaper than one giant combined commit and still satisfies 
 
 Depends on: WU2 (`getRawRoster`), WU4 (`getDek`).
 
-- [ ] 12.1 RED: `unlock-gate.test.ts` — all four rows of the §5 combinations table as four cases;
+- [x] 12.1 RED: `unlock-gate.test.ts` — all four rows of the §5 combinations table as four cases;
       the "no roster + no DEK → false" row is the explicit stranding-bug regression.
       `[dek-lifecycle-and-unlock-gate#needsUnlock per-user all four combinations]`
       GREEN: `offline/unlock-gate.ts` — `needsUnlock(user)`.
-- [ ] 12.2 RED: `loaders.test.ts` — `guestOnlyLoader` with an authenticated online-auth-only user
+      DONE: `unlock-gate.test.ts` (new file, 9 cases — 4 rows + null-user + no-entry-for-login +
+      v1-roster + empty-string-wrap-fields + expiry-ignoring).
+- [x] 12.2 RED: `loaders.test.ts` — `guestOnlyLoader` with an authenticated online-auth-only user
       and no roster → returns a redirect (majority case, unchanged). Then: v2 roster for this
       login + no DEK → returns `null` (renders the form, does NOT bounce).
       `[dek-lifecycle-and-unlock-gate#guestOnlyLoader renders unlock form]`
       GREEN: `guestOnlyLoader` gates on `!needsUnlock(user)`, dynamic import.
-- [ ] 12.3 RED: `authLoader` in the locked-provisioned state → redirects to `/login?unlock=1` AND
+      DONE: RED failure was the locked-read trap itself firing (real `MissingDataKeyError` thrown
+      from `resolveUserHomePath`'s category-repository read) — proof the check had to precede it.
+- [x] 12.3 RED: `authLoader` in the locked-provisioned state → redirects to `/login?unlock=1` AND
       `useAuthStore.getState().user` is still non-null (no logout called).
       `[dek-lifecycle-and-unlock-gate#authLoader redirects without logging out]`
       GREEN: `authLoader` — `unlockGate(user)` helper, dynamic import, no `logout()` call.
-- [ ] 12.4 RED: `login.tsx.test.tsx` — `?unlock=1` renders `AUTH.UNLOCK_REQUIRED`; a thrown
+- [x] 12.4 RED: `login.tsx.test.tsx` — `?unlock=1` renders `AUTH.UNLOCK_REQUIRED`; a thrown
       `{name: 'DekUnwrapError'}` (either path) renders `AUTH.UNLOCK_FAILED`.
       `[at-rest-encryption-errors#unlock banner and failure copy exact strings]`
       GREEN: `login.tsx` — one `err.name` dispatch case added (no static offline import — D4
       convention preserved); `i18n/es.ts` — add the two exact Spanish keys verbatim from the spec
       table.
-- [ ] 12.5 Gates + commit, WU12 first: `feat(auth): add unlock gate to authLoader and guestOnlyLoader`.
-      Then WU11's commit (11.6) immediately after, same apply session:
-      `feat(auth): unwrap and clear DEK on login/logout paths`.
+      DONE: two dispatch sites, not one — `offlineErrorMessageId` (offline path) AND a new
+      explicit `err.name === 'DekUnwrapError'` branch in the online catch (the online path has no
+      shared dispatcher function, per the existing code shape).
+- [x] 12.5 Gates + commit, WU12 first: `feat(auth): add unlock gate to authLoader and guestOnlyLoader`.
+      Commit `ba6335b`. Then WU11's commit (11.6) immediately after, same apply session:
+      `feat(auth): unwrap and clear DEK on login/logout paths`. Commit `2929ad4`.
 
 ## WU13 — Eager migration pass — [entity-migration]
 

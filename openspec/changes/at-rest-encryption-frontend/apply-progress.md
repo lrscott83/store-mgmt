@@ -265,10 +265,154 @@ numbers, per the apply instructions, and found the design's own numbers already 
 9. `bc74356` — `feat(expenses): apply entity encryption seam to expenses`
 10. `5aaa354` — `feat(sales): apply entity encryption seam to sale-credits`
 
+## Batch C (WU12 then WU11) — the unlock gate + auth wiring, FIRST real behavior change
+
+**Ordering honored exactly as design/tasks specify: WU12 committed first (inert gate — nothing
+sets a DEK yet, so `needsUnlock` is always `false` at that commit), then WU11 (the commit that
+actually starts producing ciphertext on provisioned devices).** WU3.3 (real-backend KAT) was
+explicitly out of scope for this batch per the apply instructions that launched it — it remains
+unattempted and is still the hard gate before `sdd-verify` on the full change (see below).
+
+### WU12 — unlock gate — commit `ba6335b`
+
+- `offline/unlock-gate.ts` (new) — `needsUnlock(user)`: `false` for a null user; `false` if
+  `getDek() !== null`; else expiry-ignoring `getRawRoster()` read, `false` if no bundle or
+  `formatVersion < 2`; else looks up this user's `login` in `bundle.users` and requires
+  **non-empty** `wrappedDek`/`wrapSalt`/`wrapIv` (the backend defaults these to `""`, not `null`).
+- `auth/routes/loaders.ts` — added `unlockGate(user)` helper (dynamic import of `unlock-gate.ts`,
+  D1/D4 convention preserved — zero static `offline/` imports in this file) wired into exactly
+  the two loaders design §5 names:
+  - `authLoader`: authenticated + `needsUnlock` → `redirect('/login?unlock=1')`, **no `logout()`
+    call** — session and roster survive so the re-login can complete offline.
+  - `guestOnlyLoader`: authenticated + `needsUnlock` → returns `null` (renders the login form)
+    **before** calling `resolveUserHomePath` — that call reads business-entity storage seams that
+    throw `MissingDataKeyError` while locked, so the check had to precede it. This was proven, not
+    assumed: the RED run for this case failed with a REAL `MissingDataKeyError` propagating out of
+    `ProductCategoryRepository.getProductCategoriesFromLocalStorage` via
+    `resolveUserHomePath` → `hasAnyAvailableToSaleProduct`, i.e. the locked-read trap itself firing
+    because the gate didn't exist yet — direct evidence the ordering in the design is load-bearing,
+    not decorative.
+- `auth/routes/login.tsx` — `?unlock=1` (via `useSearchParams`, same pattern as `register.tsx`)
+  renders `AUTH.UNLOCK_REQUIRED`; **two** separate `DekUnwrapError` dispatch sites (not one, per
+  the existing code shape): `offlineErrorMessageId` gained one `name === 'DekUnwrapError'` case for
+  the offline path, and the online path's `catch` block gained its own explicit
+  `err.name === 'DekUnwrapError'` check (checked first, before the `loginRejectionDescription`/
+  status-code branches) since the online path has no shared dispatcher function to extend.
+- `shared/lib/i18n/es.ts` — `AUTH.UNLOCK_REQUIRED` / `AUTH.UNLOCK_FAILED`, copied verbatim from
+  the spec's ratified-copy table.
+- RED evidence: `unlock-gate.test.ts` (new, 9 cases) failed on `Failed to resolve import` before
+  the module existed. `loaders.test.ts`'s new "unlock gate" describe block (6 new cases) failed
+  for two different real reasons — the `MissingDataKeyError` propagation described above for the
+  locked-`guestOnlyLoader` case, and a plain `expected null to be an instance of Response` for the
+  locked-`authLoader` case (it returned `null`, unchanged, before the gate existed). `login.test.tsx`'s
+  new "unlock gate banner" describe block (3 new cases) failed on missing banner text / missing
+  failure text before the `?unlock=1` read and the `err.name` branch existed.
+- Gates: `pnpm typecheck` 5/5, `pnpm test` 169 files / 2264 tests (+1 file, +18 tests: 9
+  `unlock-gate.test.ts` + 6 `loaders.test.ts` + 3 `login.test.tsx`), `pnpm lint` 4/4.
+
+### WU11 — auth wiring — commit `2929ad4`
+
+- `stores/auth-store.ts` — added a **static** import of `setDek`/`clearDek` from
+  `storage/data-key-store` (legal by design D6: that module is a genuine zero-import leaf under
+  `storage/`, not `offline/`). `login()`: after the existing `get().getUserByToken()` hydration,
+  dynamically imports `getRawRoster` (`offline/roster-store`) and looks up `bundle.users` by
+  `user.login` (the hydrated user's login, matching what `needsUnlock` itself checks against — not
+  the raw `email` submit-form parameter, since those can differ for some auth flows even though
+  they're the same value in the common case). If a non-empty wrap entry exists, dynamically imports
+  `unwrapDek` (`offline/dek-unwrap`) and calls `setDek(dek, bundle.storeId)`. **Not** wrapped in a
+  swallowing try/catch beyond the existing outer `catch (err) { set(...); throw err; }`, which
+  already rethrows — so a `DekUnwrapError` here fails the `login()` promise exactly as the errors
+  spec requires. `logout()` now calls `clearDek()` unconditionally (before the existing
+  `AUTH_MODEL`-only clear's `set()` call) — this transitively covers the offline 1h idle-lock too,
+  since `app-layout.tsx`'s idle timer already calls `useAuthStore.getState().logout()` and needed
+  no separate wiring; confirmed by reading `app-layout.tsx`, not assumed.
+- `offline/offline-auth-service.ts` — added **static** imports of `unwrapDek` and `setDek` (legal:
+  this file already lives under `offline/`, D6 doesn't apply here). `authenticateOffline` unwraps
+  immediately after the existing `isActive` check (verifier already confirmed the password is
+  correct at that point) and before `toUserModel`, using the SAME `bundle` the function already
+  held from its one `getRoster()` read — no second roster read introduced.
+- RED evidence, both files use REAL wrap fixtures (not mocks) built with the identical crypto path
+  `unwrapDek` itself uses (`sha256Base64` → `pbkdf2Base64` → `aesGcmEncrypt`), so a passing test
+  proves the wiring recovers the actual correct DEK, not merely that some function was invoked:
+  - `auth-store.dek.test.ts` (new file, 3 cases: 11.1 non-null DEK after online login with a
+    real wrap entry for this login — RED failed on `expected null not to be null`; 11.3 no-roster
+    login still resolves, DEK stays null — **passed immediately on first run, as task 11.3 itself
+    flags as expected given a correct 11.1 guard**, no code defect, kept as the majority-case
+    regression guard; 11.4 wrapped-under-a-different-password login rejects with a
+    `DekUnwrapError`-named error — RED failed because the promise resolved instead of rejecting).
+    Gotcha found and fixed while writing this file: an initial version used `vi.resetModules()` +
+    a freshly re-imported `auth-store`, which silently created a SEPARATE
+    `storage/data-key-store.ts` module instance from the one the test file's own top-level
+    `getDek()` import observed — assertions read a permanently-empty DEK slot and 11.1 failed even
+    after the GREEN implementation was correct. Fixed by dropping `resetModules()` and using the
+    same statically-imported `useAuthStore` singleton the production code shares (mirroring how
+    `login()` already dynamically imports `authHttpService` at call time, so `vi.doMock` still
+    intercepts it without needing a fresh module registry).
+  - `offline-auth-service.test.ts` — added `expect(getDek()).toBeNull()` to the existing v1
+    happy-path test (this is the regression assertion 11.5 names for all 11 pre-existing v1
+    fixtures in the file — none needed a code change) + a new describe block with a real v2 wrap
+    fixture asserting `getDek()` is non-null and equals the expected bytes after a successful
+    offline login.
+- Gates: `pnpm typecheck` 5/5, `pnpm test` 170 files / 2269 tests (+1 file, +5 tests: 3
+  `auth-store.dek.test.ts` + 1 `auth-store.test.ts` logout case + 1 `offline-auth-service.test.ts`
+  v2 case), `pnpm lint` 4/4.
+
+### The four roster×DEK combinations after this batch (all four directly tested)
+
+| Roster provisioned for this user | DEK in memory | `needsUnlock` | Pinned by |
+|---|---|---|---|
+| No | null | `false` (majority case) | `unlock-gate.test.ts` row 1 + `loaders.test.ts` "majority case" (both loaders) |
+| No | present (rare: roster cleared post-unlock) | `false` | `unlock-gate.test.ts` row 2 |
+| **Yes** | **null** | **`true`** | `unlock-gate.test.ts` row 3 + `loaders.test.ts` "locked provisioned" (both loaders) — this is the one that was proven to matter via the real `MissingDataKeyError` RED failure above |
+| Yes | present | `false` | `unlock-gate.test.ts` row 4 + `loaders.test.ts` "unlocked provisioned" (both loaders) |
+
+### Reload path (design §11) — confirmed, not just asserted in isolation
+
+The DEK is module-level-only in `data-key-store.ts` (already true since WU4) and nothing in this
+batch persists it anywhere. On a provisioned device: reload → `getDek()` is `null` →
+`needsUnlock` is `true` → `authLoader` redirects to `/login?unlock=1` **without** calling
+`logout()` (asserted directly in `loaders.test.ts` via a `logoutSpy` that must NOT be called) →
+user re-enters their password → the normal login flow (offline if the local bundle is valid,
+online if expired) unwraps the DEK as a side effect via WU11's wiring → `authLoader` passes on the
+next run. On an unprovisioned device, `isEncryptionProvisioned()` stays `false` so `needsUnlock`
+stays `false` and the reload path is byte-for-byte unchanged (pinned by the "majority case"
+rows above, which are the same assertions that existed before this batch).
+
+### Deviations from tasks.md / design.md (Batch C)
+
+**One, both already anticipated by the plan itself, not new drift:**
+
+1. `guestOnlyLoader`'s RED evidence for the locked-provisioned case was a genuinely thrown
+   `MissingDataKeyError` from deep inside `resolveUserHomePath`, not a clean assertion failure —
+   tasks.md 12.2 predicted the shape of this case but not that the RED run would surface the trap
+   itself firing. Treated as confirming evidence for the design's own ordering requirement, not a
+   deviation from it — no design/task text needed correction.
+2. `login.tsx`'s `DekUnwrapError` dispatch needed TWO separate code sites (`offlineErrorMessageId`
+   for the offline path, a new explicit branch in the online `catch` block) rather than the single
+   "one `err.name` dispatch case added" tasks.md 12.4 describes — because the online path in the
+   existing code has no shared dispatcher function to extend, unlike the offline path. Functionally
+   identical outcome (`AUTH.UNLOCK_FAILED` on both paths), just two edit sites instead of one.
+
+No other module map path, function signature, ordering constraint, or file location deviated from
+design.md §5/§10/§11.
+
+## Explicitly NOT done after Batch C
+
+- **WU3.3 — real-backend KAT interop vector.** Still not attempted (out of scope for this batch
+  per its own launch instructions). `dek-kat.json` still carries `"provenance":
+  "node-transcription"`. **Still the hard gate before `sdd-verify` runs on the full change** — the
+  unwrap path is now LIVE in production code (WU11), which makes this gate more load-bearing than
+  when it was deferred during Batches A/B, not less.
+- **WU13 — eager entity migration pass.** Not started. Depends on WU11 (now landed) — unblocked,
+  next in sequence.
+- **WU14 — v2 fixtures alongside the 11 existing v1 fixtures + stale-comment cleanup.** Not
+  started. Depends on WU11-13 landing first (fixtures should reflect the final shape) — WU13 still
+  pending.
+
 ## Next
 
-`sdd-apply` again for Batch C (WU12 then WU11 — the unlock gate landing first as an inert gate,
-then auth wiring, the FIRST real behavior change) once WU3.3's real-backend KAT vector has
-landed, since that batch is where the unwrap path goes live and depends on the KAT being
-backend-proven, not just node-transcribed. WU3.3 remains the hard gate before `sdd-verify` runs
-on the full change; it has not been attempted in either batch so far.
+`sdd-apply` again for Batch D (WU13 — eager entity migration pass) and then Batch E (WU14 — v2
+fixtures + stale-comment cleanup), per the tasks.md batching plan. WU3.3 (real-backend KAT) is
+independent of both and remains the hard gate before `sdd-verify` on the full change — it has not
+been attempted in any batch so far and should be sequenced before verify regardless of when
+WU13/WU14 land.
