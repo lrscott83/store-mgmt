@@ -12,6 +12,8 @@ import { OFFLINE_SESSION_TOKEN } from '../offline-session';
 import { getDek, clearDek } from '../../storage/data-key-store';
 import { aesGcmEncrypt } from '../../storage/aes-gcm';
 import { base64FromBytes, bytesFromBase64 } from '../../storage/base64';
+import { isEncrypted } from '../../storage/entity-crypto';
+import { StorageKeys } from '../../storage/storage-keys';
 import type { OfflineRosterBundle } from '../roster-types';
 
 const FIXED_SALT = 'AAAAAAAAAAAAAAAAAAAAAA==';
@@ -181,5 +183,19 @@ describe('offline-auth-service — authenticateOffline DEK unwrap (design §11, 
 
     expect(getDek()).not.toBeNull();
     expect(Array.from(getDek()!)).toEqual(Array.from(FIXED_DEK));
+  });
+
+  // design §12 (entity-migration, WU13.6): migration fires right after
+  // setDek on the offline login path too, wrapped so its failure never
+  // blocks login.
+  it('13.6: a plaintext key is marked enc:v1: after offline login resolves', async () => {
+    const productsKey = StorageKeys.entityKey('products', 's1');
+    localStorage.setItem(productsKey, '[{"id":1,"name":"widget"}]');
+
+    await seedV2Bundle(await wrapDek('secret', FIXED_DEK));
+
+    await authenticateOffline('ana', 'secret');
+
+    expect(isEncrypted(localStorage.getItem(productsKey)!)).toBe(true);
   });
 });

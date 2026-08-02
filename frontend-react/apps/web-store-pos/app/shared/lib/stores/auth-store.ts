@@ -207,6 +207,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           wrapIv: entry.wrapIv,
         });
         setDek(dek, bundle!.storeId);
+        // design §12 (entity-migration, WU13): eager migration fires right
+        // after a successful DEK unwrap. Swallowed — its failure must NEVER
+        // block login; the worst outcome is "still plaintext", never
+        // "cannot log in".
+        try {
+          const { runEntityMigration } = await import('../storage/entity-migration');
+          runEntityMigration();
+        } catch {
+          // intentionally swallowed — see comment above.
+        }
       }
 
       set({ isLoading: false });

@@ -11,6 +11,8 @@ import { importRoster } from '../../offline/roster-store';
 import { sha256Base64, pbkdf2Base64 } from '../../offline/offline-crypto';
 import { aesGcmEncrypt } from '../../storage/aes-gcm';
 import { base64FromBytes, bytesFromBase64 } from '../../storage/base64';
+import { isEncrypted } from '../../storage/entity-crypto';
+import { StorageKeys } from '../../storage/storage-keys';
 import type { OfflineRosterBundle } from '../../offline/roster-types';
 import type { AuthModel, BaseResponseModel, UserModel } from '@store-mgmt/domain';
 
@@ -157,6 +159,32 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
       useAuthStore.getState().login('ana@example.com', 'secret'),
     ).rejects.toMatchObject({ name: 'DekUnwrapError' });
     expect(getDek()).toBeNull();
+
+    vi.doUnmock('~/shared/lib/http/auth-http-service');
+  });
+});
+
+// design §12 (entity-migration, WU13.6): migration fires right after
+// setDek on the online login path, wrapped so its failure never blocks
+// login.
+describe('useAuthStore.login — eager entity migration wiring (design §12, WU13)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+  });
+
+  it('13.6: a plaintext key is marked enc:v1: after login resolves', async () => {
+    const storeId = 's1';
+    const productsKey = StorageKeys.entityKey('products', storeId);
+    localStorage.setItem(productsKey, '[{"id":1,"name":"widget"}]');
+
+    await seedV2Roster(await wrapDek('secret', FIXED_DEK));
+    mockAuthHttp(successEnvelope(), makeAuthUser());
+
+    await useAuthStore.getState().login('ana@example.com', 'secret');
+
+    expect(isEncrypted(localStorage.getItem(productsKey)!)).toBe(true);
 
     vi.doUnmock('~/shared/lib/http/auth-http-service');
   });

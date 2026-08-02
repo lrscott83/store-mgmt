@@ -8,6 +8,7 @@ import { OFFLINE_SESSION_TOKEN } from './offline-session';
 // `auth-store.ts`-specific).
 import { unwrapDek } from './dek-unwrap';
 import { setDek } from '../storage/data-key-store';
+import { runEntityMigration } from '../storage/entity-migration';
 
 export class NoRosterError extends Error {
   readonly name = 'NoRosterError';
@@ -130,6 +131,15 @@ export async function authenticateOffline(login: string, password: string): Prom
       wrapIv: user.wrapIv,
     });
     setDek(dek, bundle.storeId);
+    // design §12 (entity-migration, WU13): eager migration fires right
+    // after a successful DEK unwrap. Swallowed — its failure must NEVER
+    // block login; the worst outcome is "still plaintext", never "cannot
+    // log in".
+    try {
+      runEntityMigration();
+    } catch {
+      // intentionally swallowed — see comment above.
+    }
   }
 
   return toUserModel(user);
