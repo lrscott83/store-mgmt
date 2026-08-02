@@ -2,6 +2,7 @@ import type { BaseResponseModel, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
 import { DataResult, ExpenseErrors, Result, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
+import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
@@ -248,9 +249,13 @@ export class ExpenseOfflineService {
     return Result.Success();
   }
 
-  /** Private port of Angular `setExpensesLocalStorage` (expense-offline.service.ts:200-203) — plain-array write. */
+  /**
+   * Private port of Angular `setExpensesLocalStorage` (expense-offline.service.ts:200-203) —
+   * plain-array write. At-rest encryption seam: encrypted immediately after
+   * `JSON.stringify`, before `setItem`.
+   */
   private setExpensesLocalStorage(expenses: Expense[]): void {
-    localStorage.setItem(this.getStorageKey(), JSON.stringify(expenses));
+    localStorage.setItem(this.getStorageKey(), encryptEntity(JSON.stringify(expenses)));
   }
 
   /** Private port of Angular `getStorageKey` (expense-offline.service.ts:163-166) — records the last-used key. */
@@ -273,7 +278,7 @@ export class ExpenseOfflineService {
    */
   private getExpensesFromLocalStorage(): Expense[] {
     try {
-      const expensesJson = localStorage.getItem(this.getStorageKey());
+      const expensesJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
       if (expensesJson) {
         const expenses = JSON.parse(expensesJson) as Expense[];
         return expenses.map((e) => this.reviveExpenseDates(e));
