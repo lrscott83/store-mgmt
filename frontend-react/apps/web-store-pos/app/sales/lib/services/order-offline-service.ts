@@ -2,6 +2,7 @@ import type { BaseResponseModel, Order, OrderItem } from '@store-mgmt/domain';
 import { DataResult, OrderErrors, OrderType, PaymentType, Result, success } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
+import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -561,15 +562,20 @@ export class OrderOfflineService {
   /**
    * 1:1 port of Angular `getOrdersJson` (order-offline.service.ts:416-418) — falsy-check
    * fallback (`||`), NOT nullish (`??`): an empty-string stored value also falls back to
-   * `"[]"`, matching Angular exactly.
+   * `"[]"`, matching Angular exactly. At-rest encryption seam: decrypted immediately at
+   * the `getItem` boundary, BEFORE the `||` fallback.
    */
   getOrdersJson(): string {
-    return localStorage.getItem(this.getStorageKey()) || '[]';
+    return decryptEntity(localStorage.getItem(this.getStorageKey())) || '[]';
   }
 
-  /** Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) — plain-array write. */
+  /**
+   * Private port of Angular `setOrdersLocalStorage` (order-offline.service.ts:420-423) —
+   * plain-array write. At-rest encryption seam: encrypted immediately after
+   * `JSON.stringify`, before `setItem`.
+   */
   private setOrdersLocalStorage(orders: Order[]): void {
-    localStorage.setItem(this.getStorageKey(), JSON.stringify(orders));
+    localStorage.setItem(this.getStorageKey(), encryptEntity(JSON.stringify(orders)));
   }
 
   /** Private port of Angular `getStorageKey` (order-offline.service.ts:407-410) — records the last-used key. */
@@ -593,7 +599,7 @@ export class OrderOfflineService {
    */
   private getOrdersFromLocalStorage(): Order[] {
     try {
-      const ordersJson = localStorage.getItem(this.getStorageKey());
+      const ordersJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
       if (ordersJson) {
         const orders = JSON.parse(ordersJson) as Order[];
         return orders.map((order) => this.reviveAndBackfillOrder(order));
