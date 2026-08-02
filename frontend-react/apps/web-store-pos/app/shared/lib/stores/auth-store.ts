@@ -7,6 +7,11 @@ import { StorageService } from '../auth/storage-service';
 // construction. `logout()` is synchronous and must call `clearDek()`
 // synchronously, so a dynamic import is not an option for that call site.
 import { setDek, clearDek } from '../storage/data-key-store';
+// Static, and NOT from `auth-http-service`: tests mock that module, and Vitest
+// throws on a named export a mock factory omits. `getUserByToken` imports the
+// service dynamically inside a try, so such a throw is swallowed as if it were
+// a network failure — silently degrading the user instead of failing loudly.
+import { SessionRejectedError } from '../http/session-rejected-error';
 
 const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
 
@@ -17,6 +22,26 @@ const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
 let authRedirect: ((path: string) => void) | undefined;
 export function registerAuthRedirect(fn: (path: string) => void): void {
   authRedirect = fn;
+}
+
+/**
+ * Did the server pass judgement on this session, or did it just fail to answer?
+ *
+ * Only the first ends the session. 401 and 404 are verdicts — 404 is the code
+ * `GetMeQuery` passes for both `NotFound` and `AccountInactive`. Everything
+ * else, including 5xx and a bare network error, is the server being broken or
+ * absent, which must leave an offline user signed in.
+ *
+ * Matched on `name` rather than `instanceof`: `auth-http-service` is imported
+ * dynamically here, so the class identity a caller sees is not guaranteed to be
+ * the one this module would close over.
+ */
+function isSessionRejection(err: unknown): boolean {
+  if ((err as { name?: string } | null)?.name === 'SessionRejectedError') {
+    return true;
+  }
+  const status = (err as { response?: { status?: number } } | null)?.response?.status;
+  return status === 401 || status === 404;
 }
 
 interface AuthState {
@@ -102,6 +127,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { authHttpService } = await import('../http/auth-http-service');
       const fresh = await authHttpService.getMe();
+      // Belt and braces: getMe already throws SessionRejectedError on a
+      // succeeded:false envelope, so `fresh` cannot be nullish here. Spreading
+      // a null would NOT throw — `{...null}` is `{}` — so the old code wrote a
+      // user with no id, no login and no roles over the cached profile and
+      // stayed authenticated. Never let that shape be constructed again.
+      if (!fresh) {
+        throw new SessionRejectedError();
+      }
       const userWithExpiry: UserModel = {
         ...fresh,
         authToken: auth.authToken,
@@ -111,7 +144,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       StorageService.setCurrentUser(userWithExpiry);
       set({ user: userWithExpiry, isAuthenticated: true, error: null });
       return userWithExpiry;
-    } catch {
+    } catch (err: unknown) {
+      // Two failures wearing the same coat, and they need opposite answers.
+      //
+      // "I could not reach anyone" (no network, DNS, timeout, or a 5xx — the
+      // server is broken, not deciding) must retain the synchronously-hydrated
+      // user. That is what this catch was written for and it must not regress:
+      // clearing here breaks offline use, which is the whole product.
+      //
+      // "The server answered, and the answer is that this session is over"
+      // (a succeeded:false envelope, a 401, a 404 — the status GetMeQuery
+      // already passes for AccountInactive) is a verdict. A deactivated user
+      // whose token the backend just blacklisted must not stay signed in.
+      if (isSessionRejection(err)) {
+        get().logout();
+        return null;
+      }
       // Offline-resilient: retain the synchronously-hydrated user, never clear.
       return bestEffortUser;
     }
