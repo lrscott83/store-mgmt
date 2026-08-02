@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore, registerAuthRedirect } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
+import { getDek, setDek, clearDek } from '../../storage/data-key-store';
 import type { UserModel } from '@store-mgmt/domain';
 
 const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
@@ -162,6 +163,20 @@ describe('useAuthStore', () => {
       expect(state.isAuthenticated).toBe(false);
       expect(state.user).toBeNull();
       expect(localStorage.getItem(StorageKeys.AUTH_MODEL)).toBeNull();
+    });
+  });
+
+  // design §11 (dek-lifecycle-and-unlock-gate, WU11.2): "Logout clears the DEK".
+  describe('logout — clears the in-memory DEK (design §11)', () => {
+    afterEach(() => clearDek());
+
+    it('leaves getDek() null after logout when a DEK was set', () => {
+      setDek(new Uint8Array(32), 's1');
+      expect(getDek()).not.toBeNull();
+
+      useAuthStore.getState().logout();
+
+      expect(getDek()).toBeNull();
     });
   });
 

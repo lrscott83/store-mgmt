@@ -3,6 +3,11 @@ import { getRoster } from './roster-store';
 import type { OfflineRosterUser } from './roster-types';
 import { verifyOfflinePassword } from './offline-crypto';
 import { OFFLINE_SESSION_TOKEN } from './offline-session';
+// design §2 module map: this file already lives under `offline/`, so these
+// are STATIC imports (no D6 constraint here — that constraint is
+// `auth-store.ts`-specific).
+import { unwrapDek } from './dek-unwrap';
+import { setDek } from '../storage/data-key-store';
 
 export class NoRosterError extends Error {
   readonly name = 'NoRosterError';
@@ -112,6 +117,19 @@ export async function authenticateOffline(login: string, password: string): Prom
 
   if (!user.isActive) {
     throw new OfflineUserInactiveError();
+  }
+
+  // design §11 (dek-lifecycle-and-unlock-gate, WU11.5): unwrap AFTER the
+  // verifier check passes (the password is confirmed correct at this
+  // point), BEFORE toUserModel. A v1 roster (no wrap fields on `user`)
+  // skips this entirely -- DEK stays null, exactly today's behavior.
+  if (user.wrappedDek && user.wrapSalt && user.wrapIv) {
+    const dek = await unwrapDek(password, {
+      wrappedDek: user.wrappedDek,
+      wrapSalt: user.wrapSalt,
+      wrapIv: user.wrapIv,
+    });
+    setDek(dek, bundle.storeId);
   }
 
   return toUserModel(user);

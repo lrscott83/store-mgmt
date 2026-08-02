@@ -9,15 +9,38 @@ import {
 import { importRoster } from '../roster-store';
 import { sha256Base64, pbkdf2Base64 } from '../offline-crypto';
 import { OFFLINE_SESSION_TOKEN } from '../offline-session';
+import { getDek, clearDek } from '../../storage/data-key-store';
+import { aesGcmEncrypt } from '../../storage/aes-gcm';
+import { base64FromBytes, bytesFromBase64 } from '../../storage/base64';
 import type { OfflineRosterBundle } from '../roster-types';
 
 const FIXED_SALT = 'AAAAAAAAAAAAAAAAAAAAAA==';
 const ITERATIONS = 210_000;
+const FIXED_DEK = new Uint8Array(32).fill(0x55);
 
 async function makeVerifier(password: string) {
   const preHash = await sha256Base64(password);
   const hash = await pbkdf2Base64(preHash, FIXED_SALT, ITERATIONS);
   return { hash, salt: FIXED_SALT, iterations: ITERATIONS };
+}
+
+// design §11 (dek-lifecycle-and-unlock-gate, WU11.5): builds a REAL wrap
+// entry using the same crypto path `unwrapDek` expects, so this test proves
+// `authenticateOffline` actually recovers the correct DEK, not just that
+// some function was called.
+async function wrapDek(
+  password: string,
+  dek: Uint8Array,
+): Promise<{ wrappedDek: string; wrapSalt: string; wrapIv: string }> {
+  const wrapSaltBytes = new Uint8Array(16).fill(0x07);
+  const wrapSalt = base64FromBytes(wrapSaltBytes);
+  const wrapIvBytes = new Uint8Array(12).fill(0x08);
+  const wrapIv = base64FromBytes(wrapIvBytes);
+  const preHash = await sha256Base64(password);
+  const kekBase64 = await pbkdf2Base64(preHash, wrapSalt, ITERATIONS);
+  const kek = bytesFromBase64(kekBase64);
+  const ciphertextWithTag = aesGcmEncrypt(kek, wrapIvBytes, dek);
+  return { wrappedDek: base64FromBytes(ciphertextWithTag), wrapSalt, wrapIv };
 }
 
 async function seedBundle(overrides: Partial<OfflineRosterBundle['users'][number]> = {}) {
@@ -51,7 +74,10 @@ async function seedBundle(overrides: Partial<OfflineRosterBundle['users'][number
 }
 
 describe('offline-auth-service — authenticateOffline (offline-auth-mode spec)', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+  });
 
   it('returns a hydrated UserModel for the right password', async () => {
     await seedBundle();
@@ -63,6 +89,11 @@ describe('offline-auth-service — authenticateOffline (offline-auth-mode spec)'
     expect(user.isOwnerAdmin).toBe(true);
     expect(user.selectedStoreId).toBe('s1');
     expect(user.authToken).toBe(OFFLINE_SESSION_TOKEN);
+    // design §11 (WU11.5) regression: this bundle carries `formatVersion: 1`
+    // (no wrap fields) — the DEK unwrap must be skipped entirely, exactly
+    // today's behavior. All 11 pre-existing v1 fixtures in this file are
+    // this same regression case.
+    expect(getDek()).toBeNull();
   });
 
   it('rejects a wrong password with OfflineInvalidPasswordError', async () => {
@@ -102,5 +133,53 @@ describe('offline-auth-service — authenticateOffline (offline-auth-mode spec)'
     expect(user.password).toBe('');
     expect(user.refreshToken).toBe('');
     expect(user.expiresIn).toBe(0);
+  });
+});
+
+// design §11 (dek-lifecycle-and-unlock-gate, WU11.5): the offline path
+// unwraps AFTER the verifier check passes (password is confirmed correct),
+// before `toUserModel`.
+describe('offline-auth-service — authenticateOffline DEK unwrap (design §11, WU11.5)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+  });
+
+  async function seedV2Bundle(wrapFields: { wrappedDek: string; wrapSalt: string; wrapIv: string }) {
+    const verifier = await makeVerifier('secret');
+    const bundle: OfflineRosterBundle = {
+      bundleId: 'b1',
+      issuedAt: 1000,
+      expiresAt: Date.now() + 1_000_000,
+      formatVersion: 2,
+      storeId: 's1',
+      users: [
+        {
+          id: 'u1',
+          login: 'ana',
+          fullName: 'Ana Pérez',
+          isActive: true,
+          roles: [],
+          featureIds: [1, 2],
+          storeModuleIds: [3],
+          isSuperAdmin: false,
+          isOwnerAdmin: true,
+          isReSeller: false,
+          selectedStoreId: 's1',
+          verifier,
+          ...wrapFields,
+        },
+      ],
+    };
+    importRoster(bundle);
+  }
+
+  it('leaves getDek() non-null after a successful v2 offline login', async () => {
+    await seedV2Bundle(await wrapDek('secret', FIXED_DEK));
+
+    await authenticateOffline('ana', 'secret');
+
+    expect(getDek()).not.toBeNull();
+    expect(Array.from(getDek()!)).toEqual(Array.from(FIXED_DEK));
   });
 });

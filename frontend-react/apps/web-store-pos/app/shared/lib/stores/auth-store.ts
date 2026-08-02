@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import type { UserModel } from '@store-mgmt/domain';
 import { StorageKeys } from '../storage/storage-keys';
 import { StorageService } from '../auth/storage-service';
+// Design D6 / §2: `data-key-store.ts` is a genuine zero-import leaf under
+// `storage/`, NOT `offline/` — a STATIC import here is legal by
+// construction. `logout()` is synchronous and must call `clearDek()`
+// synchronously, so a dynamic import is not an option for that call site.
+import { setDek, clearDek } from '../storage/data-key-store';
 
 const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
 
@@ -178,6 +183,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!user) {
         throw new Error('AUTH: failed to load user after login');
       }
+
+      // design §11 (dek-lifecycle-and-unlock-gate, WU11 — first behavior
+      // change): unwrap + set the DEK when this login has a v2 roster entry.
+      // Dynamic imports (D6): `roster-store`/`dek-unwrap` are `offline/`
+      // modules and this file is evaluated on every page load.
+      // NOT wrapped in a swallowing try/catch — a DekUnwrapError here (wrong
+      // password relative to the roster's wrap, parameter drift, tampered
+      // bundle) MUST fail this login call, never be swallowed. Swallowing it
+      // would authenticate the user with `needsUnlock` permanently true,
+      // looping authLoader -> /login -> "successful" login -> authLoader.
+      // No roster entry for this login, or a device not
+      // encryption-provisioned, skips the unwrap entirely: no error, DEK
+      // stays null (the online-auth-only majority case).
+      const { getRawRoster } = await import('../offline/roster-store');
+      const bundle = getRawRoster();
+      const entry = bundle?.users.find((u) => u.login === user.login);
+      if (entry?.wrappedDek && entry.wrapSalt && entry.wrapIv) {
+        const { unwrapDek } = await import('../offline/dek-unwrap');
+        const dek = await unwrapDek(password, {
+          wrappedDek: entry.wrappedDek,
+          wrapSalt: entry.wrapSalt,
+          wrapIv: entry.wrapIv,
+        });
+        setDek(dek, bundle!.storeId);
+      }
+
       set({ isLoading: false });
       return user;
     } catch (err) {
@@ -216,6 +247,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // remove ONLY the AUTH_MODEL key. `token` and `currentUser` intentionally
     // stay stale (Angular 1:1 parity, not a bug).
     localStorage.removeItem(StorageKeys.AUTH_MODEL);
+    // design §11: release the in-memory DEK on every logout, including the
+    // offline idle-lock's 1h-inactivity call (app-layout.tsx's
+    // `useAuthStore.getState().logout()`) — that call site needed no
+    // separate wiring, it already routes through this same action.
+    clearDek();
     set({ user: null, isAuthenticated: false, error: null });
 
     // Decision 2: conditional redirect (Angular auth.service.ts:83-98) — skip
