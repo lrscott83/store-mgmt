@@ -10,12 +10,12 @@ indefinitely under the illusion of protection.
 ## Requirements
 
 ### Requirement: Migration runs only when provisioned and never blocks login
-`runEntityMigration()` MUST return immediately, performing no reads or writes, when `isEncryptionProvisioned()` is false. It MUST be invoked after a successful DEK unwrap on both login paths, wrapped so that any failure inside it is swallowed and never propagates to the caller — the worst outcome is "still plaintext," never "cannot log in."
+`runEntityMigration()` MUST return immediately, touching none of the six entity keys, when `isEncryptionProvisioned()` is false. (Evaluating that guard necessarily reads the roster key — `isEncryptionProvisioned()` sits on `getRawRoster()`, which reads it. The guarantee is about entity data, not about performing zero storage access.) It MUST be invoked after a successful DEK unwrap on both login paths, wrapped so that any failure inside it is swallowed and never propagates to the caller — the worst outcome is "still plaintext," never "cannot log in."
 
 #### Scenario: Unprovisioned device — no-op
 - GIVEN `isEncryptionProvisioned()` is false
 - WHEN `runEntityMigration()` is called
-- THEN no `localStorage` key is read or written
+- THEN none of the six entity keys is read or written (the roster key is read by the guard itself)
 
 #### Scenario: A failure inside migration does not fail login
 - GIVEN a provisioned device where migration will throw partway through
