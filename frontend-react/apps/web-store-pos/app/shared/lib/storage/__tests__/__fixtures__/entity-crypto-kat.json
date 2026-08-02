@@ -1,0 +1,9 @@
+{
+  "_header": {
+    "purpose": "Frozen enc:v1: envelope sample — confirms the envelope layout (enc:v1: + base64(iv(12)‖ciphertext‖tag(16))) stays stable across releases. Frontend-only: entity ciphertext has no interop partner, but a value written by today's code must remain readable by every future version.",
+    "generator": "@noble/ciphers/aes.js gcm(dek, iv).encrypt(utf8(plaintext)), envelope = iv ‖ ciphertextWithTag, stored = 'enc:v1:' + base64(envelope)"
+  },
+  "dekBase64": "mZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZk=",
+  "plaintext": "[{\"id\":\"p1\",\"name\":\"Producto Frozen\",\"price\":100}]",
+  "stored": "enc:v1:RERERERERERERERE+wgto7zIT+D1BRj44o2mPHVE3RjyWCLChxTYsqeUY7mOkLdC8v/Y69nPofJtKiy+Qx7Td35KneqMjphVtYO3YFMn"
+}
