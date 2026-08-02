@@ -8,6 +8,7 @@ import type {
 import { DataResult, InventoryErrors, ProductErrors, Result, success } from '@store-mgmt/domain';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
+import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import {
   hasAvailableProductToSale,
@@ -893,9 +894,14 @@ export class InventoryOfflineService {
 
   /**
    * 1:1 port of Angular's `setInventoriesLocalStorage` (inventory-offline.service.ts:526-529).
+   * At-rest encryption seam: encrypted immediately after `JSON.stringify`, before
+   * `setItem`.
    */
   private setInventoriesLocalStorage(inventories: Map<string, InventoryEntry[]>): void {
-    localStorage.setItem(this.getStorageKey(), JSON.stringify(Array.from(inventories.entries())));
+    localStorage.setItem(
+      this.getStorageKey(),
+      encryptEntity(JSON.stringify(Array.from(inventories.entries()))),
+    );
   }
 
   /**
@@ -920,10 +926,11 @@ export class InventoryOfflineService {
    * (that was the deleted InventoryRepository.getAll's behavior — a rule-10/12 defect).
    * Unlike getProductsJson/getCategoriesJson (raw `string | null`, no fallback), this one has
    * a genuine Angular quirk: `|| "{}"` returns the literal string `"{}"` (NOT `"[]"`) when the
-   * key is missing — ported literally, not "fixed".
+   * key is missing — ported literally, not "fixed". At-rest encryption seam: decrypted
+   * immediately at the `getItem` boundary, BEFORE the `||` fallback.
    */
   getInventoryEntriesJson(): string {
-    return localStorage.getItem(this.getStorageKey()) || '{}';
+    return decryptEntity(localStorage.getItem(this.getStorageKey())) || '{}';
   }
 
   /**
@@ -936,7 +943,7 @@ export class InventoryOfflineService {
    */
   private getInventoriesFromLocalStorage(): Map<string, InventoryEntry[]> {
     try {
-      const inventoriesJson = localStorage.getItem(this.getStorageKey());
+      const inventoriesJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
       if (inventoriesJson && inventoriesJson !== '{}') {
         const inventoryMap: Map<string, InventoryEntry[]> = new Map(JSON.parse(inventoriesJson));
         inventoryMap.forEach((entries) => {
