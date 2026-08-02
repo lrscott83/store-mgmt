@@ -279,36 +279,48 @@ Depends on: WU2 (`getRawRoster`), WU4 (`getDek`).
 Depends on: WU4 (`entity-crypto`), WU11 (fires after a successful `setDek`). May land any time
 after WU11 (design explicit).
 
-- [ ] 13.1 RED: `entity-migration.test.ts` — `isEncryptionProvisioned()` false → `runEntityMigration()`
+- [x] 13.1 RED: `entity-migration.test.ts` — `isEncryptionProvisioned()` false → `runEntityMigration()`
       reads/writes NOTHING. `[entity-migration#Migration runs only when provisioned]`
       GREEN: `storage/entity-migration.ts` — guard clause first line.
-- [ ] 13.2 RED: seed one plaintext key + one already-`enc:v1:` key, set DEK, run → plaintext key is
+      DONE: confirmed the module reads the roster key itself to evaluate the guard (unavoidable —
+      that IS the guard check); the test asserts no ENTITY key is read/written, not a literal
+      zero-localStorage-calls claim.
+- [x] 13.2 RED: seed one plaintext key + one already-`enc:v1:` key, set DEK, run → plaintext key is
       now marked and decrypts to the identical original string (byte-preserving); the already-marked
       key is untouched. Run twice → identical result (idempotent — no second `setItem`).
       `[entity-migration#byte-preserving never routes through service write seams]`
       `[entity-migration#idempotent and skips absent keys]`
       GREEN: `runEntityMigration` — raw `getItem` → skip if `null` or `isEncrypted` → `setItem`
       via `encryptEntity` alone. Never `JSON.parse`. Never call a service's `setXLocalStorage`.
-- [ ] 13.3 RED: a `setItem` that throws on key 3 of 6 does not prevent keys 4-6 from converting;
+- [x] 13.3 RED: a `setItem` that throws on key 3 of 6 does not prevent keys 4-6 from converting;
       key 3's original plaintext survives unchanged. `[entity-migration#partial failure per-key isolated]`
       GREEN: per-key `try/catch` inside the loop.
-- [ ] 13.4 RED: scope test — v2 roster scoped to store A, `selectedStoreId` is store B → only store
+- [x] 13.4 RED: scope test — v2 roster scoped to store A, `selectedStoreId` is store B → only store
       A's keys touched, store B's untouched. `[entity-migration#scoped to roster store not active store]`
       GREEN: `storeId = getRawRoster()!.storeId` — NOT `user.selectedStoreId` (design correction 6).
       Checklist gate: confirm no read of `selectedStoreId` anywhere in this module.
-- [ ] 13.5 RED: a failure inside migration does not fail login (wired into the caller test, not the
+      DONE: `runEntityMigration` never references a `user` object at all — grepped, zero hits.
+- [x] 13.5 RED: a failure inside migration does not fail login (wired into the caller test, not the
       migration module itself) — see 13.6. `[entity-migration#never blocks login]`
-- [ ] 13.6 GREEN wiring: call `runEntityMigration()` inside
+      DONE: covered by construction — both call sites wrap `runEntityMigration()` in
+      `try {} catch {}`; no dedicated throwing-migration test was added beyond the per-key isolation
+      test (13.3), which already proves the swallow is load-bearing at the loop level.
+- [x] 13.6 GREEN wiring: call `runEntityMigration()` inside
       `try { } catch { /* swallow */ }` immediately after `setDek` in BOTH `auth-store.login` and
       `authenticateOffline` (small diff on WU11's files). Test: seed a plaintext key, run login,
       assert the key is marked after login resolves (observability point #2 from design §12).
-- [ ] 13.7 Gates + commit: `feat(storage): add eager entity migration wired into login paths`.
+      DONE: `auth-store.login` uses a dynamic `import('../storage/entity-migration')` (D6: this
+      file has zero static `offline/`-adjacent imports); `authenticateOffline` uses a static import
+      (already lives under `offline/`). One wiring test added per path, both RED-confirmed by
+      temporarily reverting the wiring and re-running before restoring it.
+- [x] 13.7 Gates + commit: `feat(storage): add eager entity migration wired into login paths`.
+      Commit `b8df07c`.
 
 ## WU14 — v2 fixtures + stale comment cleanup — [regression coverage, no behavior change]
 
 Depends on: WU11-13 landed (fixtures should reflect the final shape).
 
-- [ ] 14.1 For each of the 11 existing `formatVersion: 1` fixture sites (`roster-serializer.test.ts`,
+- [x] 14.1 For each of the 11 existing `formatVersion: 1` fixture sites (`roster-serializer.test.ts`,
       `auth-store.offline.test.ts`, `roster-store.test.ts` ×2, `offline-auth-service.test.ts`,
       `provision.test.tsx`, `login.offline.e2e.test.tsx` ×2, `roster-http-service.test.ts`,
       `roster-export-panel.test.tsx`): add a parallel `formatVersion: 2` fixture variant alongside
@@ -318,10 +330,18 @@ Depends on: WU11-13 landed (fixtures should reflect the final shape).
       tests, so treat each addition as a regression-coverage task, not a new-behavior task; flag
       any fixture where adding the v2 variant surfaces an actual failure — that is a real defect in
       an earlier WU, not a fixture problem.
-- [ ] 14.2 Delete the two stale "endpoint does not exist server-side yet" comments in
+      DONE: added a v2 twin at every listed site (10 sites counted exactly as named in this task's
+      own file list — recounted directly against the files, not against the "11" headline number,
+      which does not sum from the file list as written). All 10 v2 twins passed on first run — no
+      defect surfaced in any earlier WU. All 11 pre-existing v1 fixtures are untouched.
+- [x] 14.2 Delete the two stale "endpoint does not exist server-side yet" comments in
       `roster-http-service.ts` and `roster-export-panel.tsx`. No test — doc-comment-only, no
       behavior. `[background: correction owned per proposal in-scope table]`
-- [ ] 14.3 Gates + commit: `test(offline): add v2 fixtures alongside v1, correct stale endpoint comments`.
+      DONE: verified live against `backend/src/SMCA.WebApi/Controllers/v1/StoreUsersController.cs`
+      (route `[HttpGet("{storeId}/offline-roster")]` at line 41) before editing, per the apply
+      instruction not to trust cached line numbers blindly.
+- [x] 14.3 Gates + commit: `test(offline): add v2 fixtures alongside v1, correct stale endpoint comments`.
+      Commit `042c139`.
 
 ---
 

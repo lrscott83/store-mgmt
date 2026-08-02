@@ -4,9 +4,12 @@ Artifact store: hybrid. Engram topic key: `sdd/at-rest-encryption-frontend/apply
 Branch: `feat/at-rest-encryption-frontend`, cut from `main` (clean apart from the two
 dependency files: `apps/web-store-pos/package.json`, `pnpm-lock.yaml`).
 
-**Batch A (WU0-4) + Batch B (WU5-10) are DONE.** WU11-14 are NOT started. This file merges
-Batch A's original record (unchanged below, WU0-4 sections) with Batch B's new record (WU5-10
-section added after WU4). Nothing from Batch A's record was altered or removed.
+**Batches A (WU0-4), B (WU5-10), C (WU12 then WU11), D (WU13), and E (WU14) are ALL DONE.**
+This is the FINAL apply batch of the whole change — 21 commits total on the branch. Only
+WU3.3 (real-backend KAT interop) remains outstanding, and it is independent of WU13/WU14 and
+was explicitly out of scope for every batch so far. This file merges Batch D+E's new record
+(appended at the end, after Batch C) onto the prior file. Nothing from Batches A/B/C's record
+was altered or removed.
 
 ---
 
@@ -409,10 +412,142 @@ design.md §5/§10/§11.
   started. Depends on WU11-13 landing first (fixtures should reflect the final shape) — WU13 still
   pending.
 
+## Batch D (WU13) — eager entity migration pass
+
+### WU13 — commit `b8df07c`
+
+- `storage/entity-migration.ts` (new) — `runEntityMigration()`: guard-returns immediately when
+  `isEncryptionProvisioned()` is false (zero entity-key reads/writes — the guard's own
+  `getRawRoster()` read of the roster key is unavoidable and is not an entity read). Scoped to
+  `getRawRoster()!.storeId`, never `selectedStoreId` — the module never references a `user`
+  object at all (grepped, zero hits, satisfying the checklist gate directly rather than by
+  inspection alone). Iterates the same six entity names in WU5-10's landing order (products →
+  product-categories → inventory-entries → orders → expenses → saleCredits) via
+  `StorageKeys.entityKey(name, storeId)`, raw `getItem` → skip if `null` or already `enc:v1:` →
+  `setItem(key, encryptEntity(raw))`. Never `JSON.parse`s, never calls a service's
+  `setXLocalStorage`. Each key wrapped in its own `try/catch` for per-key isolation.
+- Wired into both login paths immediately after `setDek`, inside `try {} catch {}`:
+  - `stores/auth-store.ts` `login()` — dynamic `import('../storage/entity-migration')` (D6: this
+    file must stay at zero static `offline/`-adjacent imports; the dynamic-import convention
+    already used for `dek-unwrap`/`roster-store` in WU11 extends naturally here).
+  - `offline/offline-auth-service.ts` `authenticateOffline` — static import (file already lives
+    under `offline/`, no D6 constraint, matching the existing static imports of `unwrapDek`/`setDek`
+    from WU11).
+- RED evidence: `entity-migration.test.ts` (new, 4 tests covering 13.1-13.4) failed on
+  `Failed to resolve import "../entity-migration"` before the module existed (confirmed by
+  temporarily moving the just-written implementation aside and re-running, then restoring it —
+  the implementation was drafted before the test file in this session, so RED was confirmed
+  retroactively by this move-aside/restore technique rather than a natural pre-implementation
+  RED). The two wiring tests (13.6, one added to `auth-store.dek.test.ts`, one added to
+  `offline-auth-service.test.ts`) were each RED-confirmed properly: the wiring block was
+  temporarily reverted in each production file, the specific new test re-run and observed to
+  fail with `expected false to be true` (the entity key was never marked), then the wiring was
+  restored and the test re-run GREEN.
+- **13.1's exact assertion needed one correction while writing it**: the spec scenario says
+  "no localStorage key is read or written" for the unprovisioned guard, but
+  `isEncryptionProvisioned()` itself necessarily reads the roster key (`lizoft.offline-roster`)
+  to decide the guard — that read is unavoidable and is not what the spec's guarantee is
+  protecting. The test was written scoped to the six ENTITY keys specifically (asserts zero
+  entity-key `getItem` calls and zero `setItem` calls of any kind), which is the guarantee that
+  actually matters: an unprovisioned device's business data is never touched.
+- **Partial-failure behavior, pinned by test**: `entity-migration.test.ts`'s "partial failure is
+  per-key isolated" test seeds all six real entity keys with plaintext, makes `setItem` throw for
+  the third key only (`inventory-entries`, via a `Storage.prototype.setItem` spy that
+  conditionally throws and otherwise delegates to a captured reference to the real
+  implementation), runs migration, and asserts: the other five keys ARE converted to `enc:v1:`,
+  the third key's value is byte-identical to its original plaintext (not corrupted, not
+  partially written — `setItem` is atomic per key), and `runEntityMigration()` itself does not
+  throw (per-key `try/catch` swallows it). A device interrupted mid-pass (quota exceeded, tab
+  closed) is therefore always fully readable via `decryptEntity`'s permanent passthrough; the
+  next successful unlock retries whatever didn't convert.
+- 13.5 (documented, not independently tested): a failure inside migration not failing login is
+  covered by construction — both call sites wrap the call in `try {} catch {}` — and by 13.3's
+  per-key isolation test, which is the load-bearing proof that the swallow behavior actually
+  matters at the loop level. No separate "migration throws, login still resolves" integration
+  test was added; flagged here rather than silently treated as done.
+- Gates: `pnpm typecheck` 5/5, `pnpm test` **171 files / 2275 tests** (+1 file, +6 tests: 4
+  `entity-migration.test.ts` + 1 `auth-store.dek.test.ts` wiring case + 1
+  `offline-auth-service.test.ts` wiring case), `pnpm lint` 4/4.
+
+### Deviations from tasks.md / design.md (Batch D)
+
+**None in the implementation.** One process deviation, self-corrected: the module was drafted
+before its test file in this session (reversed from the strict RED-first ordering used in every
+prior batch); RED was still captured and verified (by moving the finished module aside, running
+the test suite, confirming the right failure reason, then restoring it) before GREEN was
+accepted, so the letter of strict TDD's RED-then-GREEN discipline holds even though the drafting
+order was not literal top-to-bottom RED-first. Flagged for transparency, not hidden.
+
+## Batch E (WU14) — v2 fixtures + stale comment cleanup
+
+### WU14 — commit `042c139`
+
+- Added a `formatVersion: 2` regression-coverage twin at each of the 9 files tasks.md 14.1 names
+  (`roster-serializer.test.ts`, `auth-store.offline.test.ts`, `roster-store.test.ts` ×2,
+  `offline-auth-service.test.ts`, `provision.test.tsx`, `login.offline.e2e.test.tsx` ×2,
+  `roster-http-service.test.ts`, `roster-export-panel.test.tsx`) — **10 sites by direct count
+  against the task's own file list**, not 11 as its headline number states; the discrepancy is in
+  tasks.md's own arithmetic (the list as written sums to 10), not a site that was missed — no
+  additional v1-fixture site exists beyond these 10, confirmed by grepping every
+  `formatVersion: 1` occurrence in `apps/web-store-pos/app` and accounting for each hit (the
+  files NOT in this task's list — `entity-crypto.test.ts`, `unlock-gate.test.ts`,
+  `roster-types.test.ts` — already carry both v1 AND v2 coverage from WU2/WU4/WU12 and are
+  correctly excluded from this "pre-existing fixture" list).
+- Every v2 twin **passed on first run** — no defect surfaced in any earlier WU. Per the task's own
+  instruction ("flag any fixture where adding the v2 variant surfaces an actual failure — that is
+  a real defect"), this is recorded as a clean pass, not silently skipped.
+- All 11 pre-existing `formatVersion: 1` fixtures are byte-for-byte untouched — they remain the
+  permanent plaintext-mode regression tests per the ratified "formatVersion < 2 means encryption
+  not provisioned, behaves exactly as today" decision.
+- `roster-http-service.ts` and `roster-export-panel.tsx` — deleted the stale "does not exist
+  server-side yet" doc comments. **Verified live before editing** (per the apply instruction not
+  to trust cached line numbers): `rg -n "offline-roster"
+  backend/src/SMCA.WebApi/Controllers/v1/StoreUsersController.cs` confirms
+  `[HttpGet("{storeId}/offline-roster")]` at line 41 — the route exists and is implemented.
+- Gates: `pnpm typecheck` 5/5, `pnpm test` **171 files / 2285 tests** (+0 files, +10 tests — all
+  new tests added to existing files, no new test files), `pnpm lint` 4/4.
+
+### Deviations from tasks.md / design.md (Batch E)
+
+**None**, aside from the "10 vs 11" arithmetic note above, which is a discrepancy in tasks.md's
+own headline count versus its own file list, not a deviation in what was implemented.
+
+## Gate numbers — full change, cumulative
+
+| Gate | Baseline (before WU0) | End of Batch C | End of Batch D (WU13) | End of Batch E (WU14, FINAL) |
+|---|---|---|---|---|
+| `pnpm typecheck` | 5/5 tasks | 5/5 tasks | 5/5 tasks | 5/5 tasks |
+| `pnpm test` (web-store-pos) | 155 files / 2196 tests | 170 files / 2269 tests | 171 files / 2275 tests | 171 files / 2285 tests |
+| `pnpm test` (domain + web-common) | 95/95, 11/11 | unchanged | unchanged | unchanged |
+| `pnpm lint` | 4/4 packages | 4/4 packages | 4/4 packages | 4/4 packages |
+
+Net across the WHOLE change: **+16 test files, +89 tests**, zero regressions at any batch
+boundary.
+
+## Commits (Batch D+E, in order)
+
+11. `b8df07c` — `feat(storage): add eager entity migration wired into login paths`
+12. `042c139` — `test(offline): add v2 fixtures alongside v1, correct stale endpoint comments`
+
+(Commits 1-10 are Batches A-C, listed in their own sections above.)
+
+## Outstanding across the WHOLE change (as of end of Batch E)
+
+- **WU3.3 — real-backend KAT interop vector.** STILL NOT attempted in any batch. `dek-kat.json`
+  still carries `"provenance": "node-transcription"` with a header stating in plain text that it
+  does NOT prove backend interop. **This remains the single hard gate before `sdd-verify` can run
+  on this change** — everything else in the WU spine (WU0-14) is now implemented and gated GREEN.
+  Requires bringing up the real .NET backend and running a one-off harness against
+  `StoreKeyWrapService`/`StoreDataKeyProvider` for the same fixed password used in the existing
+  fixture, then replacing the fixture's `provenance` label with `"dotnet-backend"` plus the
+  backend commit SHA, and confirming `dek-unwrap.kat.test.ts` passes unmodified against the new
+  fixture. This cannot be completed by an agent alone in this sandbox (no .NET runtime available).
+- No other task in the WU0-14 spine remains open.
+
 ## Next
 
-`sdd-apply` again for Batch D (WU13 — eager entity migration pass) and then Batch E (WU14 — v2
-fixtures + stale-comment cleanup), per the tasks.md batching plan. WU3.3 (real-backend KAT) is
-independent of both and remains the hard gate before `sdd-verify` on the full change — it has not
-been attempted in any batch so far and should be sequenced before verify regardless of when
-WU13/WU14 land.
+`sdd-verify` cannot run cleanly until WU3.3 lands (it is the change's own hard gate, not a
+verify-phase invention). If verify is run anyway, expect it to flag WU3.3 as the sole
+CRITICAL/blocking item — everything else in tasks.md is `[x]`. Once a genuine backend-exported
+KAT vector is committed, this change is verify-ready and the SDD pipeline can proceed to
+`sdd-verify` → `sdd-archive`.
