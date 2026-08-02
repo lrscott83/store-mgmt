@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useIntl } from 'react-intl';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { Button } from '~/shared/components/ui/button';
@@ -38,6 +38,12 @@ function offlineErrorMessageId(err: unknown): string {
   if (name === 'OfflineUserInactiveError') {
     return 'AUTH.ACCOUNT_INACTIVE';
   }
+  // design §10 / at-rest-encryption-errors: the offline verifier has already
+  // passed by the time unwrap runs, so a DekUnwrapError here means parameter
+  // drift or a corrupt bundle — not a wrong password.
+  if (name === 'DekUnwrapError') {
+    return 'AUTH.UNLOCK_FAILED';
+  }
   // Includes NoRosterError, OfflineVerifierError, and anything unexpected.
   return 'AUTH.SERVER_ERROR';
 }
@@ -45,6 +51,12 @@ function offlineErrorMessageId(err: unknown): string {
 export default function LoginPage() {
   const navigate = useNavigate();
   const intl = useIntl();
+  // design §5/§10: `authLoader`/`guestOnlyLoader` redirect here with
+  // `?unlock=1` when `needsUnlock` is true — a reload on a provisioned
+  // device. Without this banner the user lands on a bare login screen with
+  // no explanation, which reads as a bug.
+  const [searchParams] = useSearchParams();
+  const isUnlockRequired = searchParams.get('unlock') === '1';
   // `loginOffline` is destructured from the hook — NOT
   // `useAuthStore.getState()` — per design correction #3:
   // `login.test.tsx`'s existing mock is a bare `vi.fn()` with no `getState`,
@@ -129,6 +141,16 @@ export default function LoginPage() {
     } catch (err: unknown) {
       // Reveal the form again so the user can see the error and retry.
       setIsSubmitting(false);
+      // design §10 / at-rest-encryption-errors: the online unwrap (inside
+      // auth-store.login, after successful /me hydration) rethrows a
+      // DekUnwrapError rather than swallowing it — this is the ONE path
+      // that must fail loudly (a swallowed failure would authenticate the
+      // user with `needsUnlock` permanently true, looping authLoader ->
+      // /login -> "successful" login -> authLoader forever).
+      if ((err as { name?: string } | null)?.name === 'DekUnwrapError') {
+        setErrors({ form: intl.formatMessage({ id: 'AUTH.UNLOCK_FAILED' }) });
+        return;
+      }
       // Angular login.component.ts:162-167 INVALID_ERROR path: a body-level
       // failure (HTTP 200 + succeeded:false) carries the backend's own message
       // (auth-store tags it as loginRejectionDescription). Surface it verbatim,
@@ -173,6 +195,12 @@ export default function LoginPage() {
       {isOffline && (
         <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
           {intl.formatMessage({ id: 'AUTH.OFFLINE_LOGIN' })}
+        </div>
+      )}
+
+      {isUnlockRequired && (
+        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+          {intl.formatMessage({ id: 'AUTH.UNLOCK_REQUIRED' })}
         </div>
       )}
 

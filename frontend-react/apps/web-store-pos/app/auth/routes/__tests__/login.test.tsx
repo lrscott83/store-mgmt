@@ -304,6 +304,77 @@ describe('LoginPage (AUTH-01)', () => {
   });
 });
 
+// design §5/§10 (dek-lifecycle-and-unlock-gate + at-rest-encryption-errors):
+// the unlock banner (?unlock=1) and the DekUnwrapError failure copy, exact
+// ratified Spanish strings.
+describe('LoginPage — unlock gate banner + DekUnwrapError copy (design §10)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
+  });
+
+  function renderLoginAt(path: string, loginFn = vi.fn()) {
+    const mockStore = {
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      initialize: vi.fn(),
+      setUser: vi.fn(),
+      logout: vi.fn(),
+      login: loginFn,
+    };
+    vi.mocked(useAuthStore).mockReturnValue(mockStore);
+    return render(
+      <IntlProvider locale="es" messages={messages}>
+        <MemoryRouter initialEntries={[path]}>
+          <LoginPage />
+        </MemoryRouter>
+      </IntlProvider>
+    );
+  }
+
+  it('renders AUTH.UNLOCK_REQUIRED when reached with ?unlock=1', () => {
+    renderLoginAt('/login?unlock=1');
+    expect(
+      screen.getByText(
+        'Ingresá tu contraseña para desbloquear los datos de este dispositivo.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('does NOT render the unlock banner without ?unlock=1', () => {
+    renderLoginAt('/login');
+    expect(
+      screen.queryByText(
+        'Ingresá tu contraseña para desbloquear los datos de este dispositivo.'
+      )
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders AUTH.UNLOCK_FAILED when the online login call rejects with a DekUnwrapError-named error', async () => {
+    const rejection = Object.assign(new Error('unwrap failed'), { name: 'DekUnwrapError' });
+    const loginFn = vi.fn().mockRejectedValue(rejection);
+    renderLoginAt('/login', loginFn);
+
+    fireEvent.change(screen.getByLabelText('Usuario'), {
+      target: { value: 'user@test.com' },
+    });
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
+      target: { value: 'password123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.'
+        )
+      ).toBeInTheDocument();
+    });
+  });
+});
+
 describe('LoginPage — view-text-parity: identifier label forced literal parity (GENERAL.LOGIN)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

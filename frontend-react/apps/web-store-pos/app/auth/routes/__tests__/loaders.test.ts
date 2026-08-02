@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('~/shared/lib/stores/auth-store', () => ({
   useAuthStore: {
@@ -22,6 +22,9 @@ import {
   superAdminLoader,
   resellerFeatureLoader,
 } from '../loaders';
+import { importRoster } from '~/shared/lib/offline/roster-store';
+import { setDek, clearDek } from '~/shared/lib/storage/data-key-store';
+import type { OfflineRosterBundle } from '~/shared/lib/offline/roster-types';
 import type { UserModel } from '@store-mgmt/domain';
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
@@ -132,6 +135,125 @@ describe('Route Loaders (AUTH-04)', () => {
       setAuthState(null);
       await guestOnlyLoader();
       expect(preloadHeavyChunks).not.toHaveBeenCalled();
+    });
+  });
+
+  // design §5 (dek-lifecycle-and-unlock-gate): authLoader/guestOnlyLoader are
+  // the ONLY two loaders wired to the unlock gate (app-layout.tsx:17 makes
+  // authLoader the single chokepoint for every authenticated route). These
+  // tests exercise the REAL `unlock-gate`/`roster-store`/`data-key-store`
+  // modules (dynamic-imported by loaders.ts) against real localStorage — only
+  // `useAuthStore` is mocked, matching the rest of this file.
+  describe('unlock gate — authLoader + guestOnlyLoader (design §5, four combinations)', () => {
+    const UNLOCK_LOGIN = 'user@test.com';
+
+    function makeV2Bundle(overrides: Partial<OfflineRosterBundle> = {}): OfflineRosterBundle {
+      return {
+        bundleId: 'b1',
+        issuedAt: 1000,
+        expiresAt: Date.now() + 1_000_000,
+        formatVersion: 2,
+        storeId: 's1',
+        users: [
+          {
+            id: 'u1',
+            login: UNLOCK_LOGIN,
+            fullName: 'Test User',
+            isActive: true,
+            roles: [],
+            featureIds: [],
+            storeModuleIds: [],
+            isSuperAdmin: false,
+            isOwnerAdmin: false,
+            isReSeller: false,
+            selectedStoreId: 's1',
+            verifier: { hash: 'h', salt: 's', iterations: 210_000 },
+            wrappedDek: 'ct',
+            wrapSalt: 'salt',
+            wrapIv: 'iv',
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      localStorage.clear();
+      clearDek();
+    });
+
+    afterEach(() => {
+      localStorage.clear();
+      clearDek();
+    });
+
+    it('guestOnlyLoader — majority case: authenticated online-auth-only user, no roster -> redirect home (unchanged)', async () => {
+      setAuthState(makeUser({ login: UNLOCK_LOGIN }));
+      const result = await guestOnlyLoader();
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/sales/products');
+    });
+
+    it('guestOnlyLoader — locked provisioned visitor: v2 roster + no DEK -> renders the form (null, no redirect)', async () => {
+      importRoster(makeV2Bundle());
+      setAuthState(makeUser({ login: UNLOCK_LOGIN }));
+
+      const result = await guestOnlyLoader();
+
+      expect(result).toBeNull();
+      expect(preloadHeavyChunks).not.toHaveBeenCalled();
+    });
+
+    it('guestOnlyLoader — unlocked provisioned visitor: v2 roster + DEK present -> redirect home', async () => {
+      importRoster(makeV2Bundle());
+      setDek(new Uint8Array(32), 's1');
+      setAuthState(makeUser({ login: UNLOCK_LOGIN }));
+
+      const result = await guestOnlyLoader();
+
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/sales/products');
+    });
+
+    it('authLoader — locked-provisioned: redirects to /login?unlock=1 WITHOUT logging out', async () => {
+      importRoster(makeV2Bundle());
+      const user = makeUser({ login: UNLOCK_LOGIN });
+      const logoutSpy = vi.fn();
+      vi.mocked(useAuthStore.getState).mockReturnValue({
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        initialize: vi.fn(),
+        getUserByToken: vi.fn(),
+        setUser: vi.fn(),
+        updateUser: vi.fn(),
+        login: vi.fn(),
+        loginOffline: vi.fn(),
+        logout: logoutSpy,
+      });
+
+      const result = await authLoader();
+
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/login?unlock=1');
+      expect(logoutSpy).not.toHaveBeenCalled();
+    });
+
+    it('authLoader — unprovisioned device: passes through unchanged (majority case)', async () => {
+      setAuthState(makeUser({ login: UNLOCK_LOGIN }));
+      const result = await authLoader();
+      expect(result).toBeNull();
+    });
+
+    it('authLoader — unlocked provisioned device: passes through unchanged', async () => {
+      importRoster(makeV2Bundle());
+      setDek(new Uint8Array(32), 's1');
+      setAuthState(makeUser({ login: UNLOCK_LOGIN }));
+
+      const result = await authLoader();
+
+      expect(result).toBeNull();
     });
   });
 

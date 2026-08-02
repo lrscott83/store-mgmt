@@ -83,6 +83,11 @@ const messages: Record<string, string> = {
   'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Esperá un momento antes de volver a intentar.',
   'AUTH.INVALID_ERROR': 'La autenticación no es válida por el siguiente error: {error}',
   'AUTH.OFFLINE_LOGIN': 'Estás offline. Se requiere conexión para iniciar sesión.',
+  // at-rest-encryption-errors spec §"unlock banner and failure copy exact
+  // strings" — ratified verbatim, do not reword.
+  'AUTH.UNLOCK_REQUIRED': 'Ingresá tu contraseña para desbloquear los datos de este dispositivo.',
+  'AUTH.UNLOCK_FAILED':
+    'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.',
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
   'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',
 
