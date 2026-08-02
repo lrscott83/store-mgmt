@@ -4,8 +4,9 @@ Artifact store: hybrid. Engram topic key: `sdd/at-rest-encryption-frontend/apply
 Branch: `feat/at-rest-encryption-frontend`, cut from `main` (clean apart from the two
 dependency files: `apps/web-store-pos/package.json`, `pnpm-lock.yaml`).
 
-**This batch = Batch A (WU0-4) only.** WU5-14 are NOT started. No previous apply-progress
-existed — first batch.
+**Batch A (WU0-4) + Batch B (WU5-10) are DONE.** WU11-14 are NOT started. This file merges
+Batch A's original record (unchanged below, WU0-4 sections) with Batch B's new record (WU5-10
+section added after WU4). Nothing from Batch A's record was altered or removed.
 
 ---
 
@@ -117,20 +118,20 @@ was confirmed by reading the installed package's own `.d.ts` files and `package.
     a discovery task, exactly as design §6 describes it ("no interop partner needed").
 - Test count: 159→162 files, 2215→2228 tests.
 
-## Gate numbers — before and after this batch
+## Gate numbers — before and after Batch A
 
-| Gate | Baseline (before WU0) | After WU4 (end of this batch) |
+| Gate | Baseline (before WU0) | After WU4 (end of Batch A) |
 |---|---|---|
 | `pnpm typecheck` | 5/5 tasks | 5/5 tasks |
 | `pnpm test` (web-store-pos) | 155 files / 2196 tests | 162 files / 2228 tests |
 | `pnpm test` (domain + web-common, cached) | 95/95, 11/11 | unchanged (95/95, 11/11 — no files touched in those packages) |
 | `pnpm lint` | 4/4 packages | 4/4 packages |
 
-Net for this batch: **+32 tests, +7 test files**, zero regressions, zero behavior change on any
+Net for Batch A: **+32 tests, +7 test files**, zero regressions, zero behavior change on any
 device (WU1-4 are all dead code / pure functions with no call sites wired in yet — matches the
 design's own "Behavior change on any device: none" for WU1-4).
 
-## Explicitly NOT done in this batch
+## Explicitly NOT done after Batch A (carried into Batch B's scope where applicable)
 
 - **WU3.3 — real-backend KAT interop vector.** Deferred per the task prompt: requires bringing
   up the real .NET backend and running a one-off harness against
@@ -139,9 +140,9 @@ design's own "Behavior change on any device: none" for WU1-4).
   that it does NOT prove backend interop. **This is a hard gate before `sdd-verify` runs on the
   full change** (per design §6 and tasks.md 3.3) — it must be swapped for a genuine
   `"provenance": "dotnet-backend"` vector with a backend commit SHA before this change is
-  verify-ready. Not attempted in this batch; no backend was started.
-- **WU5-10 — the six entity seams** (products, product-categories, inventory-entries, orders,
-  expenses, saleCredits). Not started. Depends on WU4 (done) but is out of scope for Batch A.
+  verify-ready. **STILL NOT attempted as of end of Batch B** — no backend was started; out of
+  scope for both batches so far.
+- ~~WU5-10 — the six entity seams~~ — **DONE in Batch B, see below.**
 - **WU11 — auth wiring** (first behavior change: login/logout unwrap+clear DEK). Not started.
 - **WU12 — unlock gate** (`authLoader`/`guestOnlyLoader`, must land before/with WU11). Not
   started.
@@ -149,7 +150,7 @@ design's own "Behavior change on any device: none" for WU1-4).
 - **WU14 — v2 fixtures alongside the 11 existing v1 fixtures + stale-comment cleanup.** Not
   started.
 
-## Deviations from tasks.md / design.md
+## Deviations from tasks.md / design.md (Batch A)
 
 None beyond the corrected `@noble/ciphers` version (1.3.0 in the plan → 2.2.0 actually
 installed, v2 API), which was explicitly called out as expected/allowed in the apply prompt.
@@ -158,16 +159,116 @@ marker-first in `decryptEntity`, `getRawRoster` with no `now` param never callin
 and file location (`data-key-store.ts` under `storage/`, base64 duplicated not imported,
 `offline-crypto.ts` untouched) from design.md §1-§7 survived contact with the code unchanged.
 
-## Commits (this batch, in order)
+## Commits (Batch A, in order)
 
 1. `189dbdb` — `feat(storage): add base64 and AES-GCM primitives`
 2. `f27b9bd` — `feat(offline): add getRawRoster and isEncryptionProvisioned`
 3. `327d5fb` — `feat(offline): add dek-unwrap with node-transcribed KAT`
 4. `c858dc1` — `feat(storage): add data-key-store and entity-crypto`
 
+---
+
+## Batch B (WU5-10) — the six entity seams
+
+**Scope**: wire `encryptEntity`/`decryptEntity` into the 16 call sites across the six
+business-entity storage classes: `product-repository.ts`, `product-category-repository.ts`,
+`inventory-offline-service.ts`, `order-offline-service.ts`, `expense-offline-service.ts`,
+`sale-credit-offline-service.ts`. No DEK is ever set until WU11, so this batch is a proven no-op
+in plaintext mode on every device — the whole point of six independent, small commits.
+
+### Call-site count — confirmed by reading each file directly, not by line number
+
+Design's corrected count (16, not the proposal/explore's 18) held with **zero further drift**:
+
+| File | Seams | Sites (read live from the file) |
+|---|---|---|
+| `product-repository.ts` | 3 | `getProductsJson` (raw getter), `setProductsLocalStorage` (write), `getProductsFromLocalStorage` (read, try-wrapped) |
+| `product-category-repository.ts` | 3 | `getCategoriesJson`, `setProductCategoriesLocalStorage`, `getProductCategoriesFromLocalStorage` |
+| `inventory-offline-service.ts` | 3 | `getInventoryEntriesJson` (Angular-parity `\|\| '{}'` fallback, NOT `'[]'`), `setInventoriesLocalStorage`, `getInventoriesFromLocalStorage` |
+| `order-offline-service.ts` | 3 | `getOrdersJson` (Angular-parity `\|\| '[]'` fallback), `setOrdersLocalStorage`, `getOrdersFromLocalStorage` |
+| `expense-offline-service.ts` | 2 | `setExpensesLocalStorage`, `getExpensesFromLocalStorage` — **no raw `getXJson` getter exists for expenses**, confirmed by reading the whole file |
+| `sale-credit-offline-service.ts` | 2 | `setSaleCreditsLocalStorage`, `getSaleCreditsFromLocalStorage` — **no raw `getXJson` getter exists for sale-credits either** |
+| **Total** | **16** | 6 encrypt (write) + 10 decrypt (read/raw-getter) |
+
+All six auto-init writes (the `setXLocalStorage` call after a caught parse/decrypt failure)
+were confirmed to already sit OUTSIDE their read method's `try`/`catch` — none needed to move.
+This is what makes the locked-read trap resolve correctly: a locked read's `decryptEntity` throw
+is swallowed inside the `try`, falls through to the auto-init `setXLocalStorage` call OUTSIDE
+the `try`, which calls `encryptEntity` on an empty container — and THAT throws too (provisioned
++ no DEK), propagating out uncaught. The existing ciphertext is never touched.
+
+### Work units completed
+
+For each of the six, one `.crypto.test.ts` file was written FIRST (RED), covering three cases
+against the REAL service classes (no mocking of the encryption layer):
+1. plaintext-mode twin (no roster provisioned) — write/read raw `localStorage` value directly,
+   byte-identical to pre-change behavior (this case passes immediately even before the seam is
+   wired — expected, it's a permanent regression guard, not a discovery case).
+2. provisioned + unlocked (`importRoster` a v2 bundle + `setDek` directly, no login flow —
+   auth wiring is WU11) — write through the service, raw stored value starts with `enc:v1:`,
+   then read back through the service and confirm the round-trip.
+3. locked-read trap (v2 roster imported, `clearDek()` called after writing real ciphertext) —
+   the service's normal read throws `MissingDataKeyError`, and the raw ciphertext at that
+   storage key is BYTE-IDENTICAL before and after the failed read attempt.
+
+Cases 2 and 3 were the true RED cases for every seam (case 1 passed trivially before the code
+change, as predicted) — confirmed via `npx vitest run <file>` before writing any encrypt/decrypt
+call, in every one of the six files.
+
+- **products — commit `9abd1b9`**: `product-repository.ts`. Needed a real category (via
+  `ProductCategoryRepository.addProductCategoryData`, a public method) as test scaffolding
+  since `addProductData` guards on category existence before persisting.
+- **product-categories — commit `d4f94ea`**: `product-category-repository.ts`. Straightforward,
+  same shape as products.
+- **inventory-entries — commit `1439e93`**: `inventory-offline-service.ts`. Test scaffolding
+  needed a real product (via a seeded `ProductRepository`) since `createInventoryEntry` guards
+  on product existence. Confirmed the `getInventoryEntriesJson` `\|\| '{}'` fallback still fires
+  correctly: `decryptEntity(null)` returns `null`, so `null \|\| '{}'` is unchanged.
+- **orders — commit `d1554dc`**: `order-offline-service.ts`. Test used `discountFromInvantory:
+  false` on the cart product and `isCredit: false` on `createOrder` to keep the inventory-
+  deduction and sale-credit-creation cascades (real, unmocked `InventoryOfflineService`/
+  `SaleCreditOfflineService` instances constructed internally by `OrderOfflineService`) out of
+  scope — this seam test only asserts the orders storage key itself, not the cascades.
+- **expenses — commit `bc74356`**: `expense-offline-service.ts`. Only 2 seams (no `getXJson`),
+  confirmed by reading the full file before writing the test.
+- **sale-credits — commit `5aaa354`**: `sale-credit-offline-service.ts`. Only 2 seams, same
+  confirmation. This is the sixth and last seam — all 16 call sites are now wired.
+
+### Gate numbers — before and after Batch B
+
+| Gate | Baseline (end of Batch A) | After WU10 (end of Batch B) |
+|---|---|---|
+| `pnpm typecheck` | 5/5 tasks | 5/5 tasks |
+| `pnpm test` (web-store-pos) | 162 files / 2228 tests | 168 files / 2246 tests |
+| `pnpm test` (domain + web-common, cached) | 95/95, 11/11 | unchanged (95/95, 11/11) |
+| `pnpm lint` | 4/4 packages | 4/4 packages |
+
+Net for Batch B: **+18 tests, +6 test files** (3 tests × 6 seam files), zero regressions, zero
+behavior change on any device (no DEK is ever set until WU11 — every seam is a proven no-op in
+plaintext mode, matching the design's own "Behavior change: NONE" classification for WU5-10).
+
+### Deviations from tasks.md / design.md (Batch B)
+
+**None.** Every seam location, the uniform seam rule (decrypt before sentinel/`\|\|`/parse,
+encrypt after `stringify`), the auto-init-outside-try invariant, and the 16-site count all
+survived contact with the code exactly as design.md predicted. No line-number drift was found
+beyond what design.md had already corrected (orders +3, sale-credits −11 vs. explore's original
+claim) — this batch located every call site by reading the file, not by trusting cached line
+numbers, per the apply instructions, and found the design's own numbers already accurate.
+
+### Commits (Batch B, in order)
+
+5. `9abd1b9` — `feat(sales): apply entity encryption seam to products`
+6. `d4f94ea` — `feat(sales): apply entity encryption seam to product-categories`
+7. `1439e93` — `feat(inventory): apply entity encryption seam to inventory-entries`
+8. `d1554dc` — `feat(sales): apply entity encryption seam to orders`
+9. `bc74356` — `feat(expenses): apply entity encryption seam to expenses`
+10. `5aaa354` — `feat(sales): apply entity encryption seam to sale-credits`
+
 ## Next
 
-`sdd-apply` again for Batch B (WU5-10, the six seams) — or, per the task forecast's recommended
-batching, continue straight through Batch C (WU12 then WU11) once WU3.3's real-backend vector
-has landed, since that batch is where the unwrap path goes live and depends on the KAT being
-backend-proven, not just node-transcribed.
+`sdd-apply` again for Batch C (WU12 then WU11 — the unlock gate landing first as an inert gate,
+then auth wiring, the FIRST real behavior change) once WU3.3's real-backend KAT vector has
+landed, since that batch is where the unwrap path goes live and depends on the KAT being
+backend-proven, not just node-transcribed. WU3.3 remains the hard gate before `sdd-verify` runs
+on the full change; it has not been attempted in either batch so far.

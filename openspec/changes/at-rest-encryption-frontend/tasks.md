@@ -161,15 +161,15 @@ WU11; that is what makes six small commits safe and worth doing individually rat
 For EACH of the six (products, product-categories, inventory-entries, orders, expenses,
 saleCredits), the same task shape:
 
-- [ ] 5.x RED: `<seam>.crypto.test.ts` — plaintext-mode twin FIRST: with no roster provisioned,
+- [x] 5.x RED: `<seam>.crypto.test.ts` — plaintext-mode twin FIRST: with no roster provisioned,
       write then read the raw stored value directly via `localStorage.getItem(...)` — it is plain
       JSON, byte-identical to pre-change behavior. `[entity-at-rest-encryption#Plaintext mode leaves raw value untouched]`
-- [ ] 5.x RED (same file, second case): with a v2 roster + DEK set (test seeds `setDek` directly,
+- [x] 5.x RED (same file, second case): with a v2 roster + DEK set (test seeds `setDek` directly,
       no login flow yet — auth wiring is WU11), write through the service, then read the raw
       stored value directly — it starts with `enc:v1:`; then read through the service — the object
       round-trips with Map/date revival intact. `[entity-at-rest-encryption#Ciphertext marker present on provisioned+unlocked write]`
       `[entity-at-rest-encryption#Seam boundary applies uniformly]`
-- [ ] 5.x RED (locked-read trap): provisioned device, no DEK, existing `enc:v1:` data at the key →
+- [x] 5.x RED (locked-read trap): provisioned device, no DEK, existing `enc:v1:` data at the key →
       the service's normal read fails loudly (propagated `MissingDataKeyError`), and the raw stored
       ciphertext is UNCHANGED after the read attempt — no auto-init overwrite.
       `[entity-at-rest-encryption#Locked read never destroys existing ciphertext]` — this is the
@@ -179,13 +179,21 @@ saleCredits), the same task shape:
       `JSON.stringify`; wrap every read call in `decryptEntity` immediately at the `getItem`
       boundary, before any sentinel comparison or `||` fallback. Verify the auto-init write stays
       OUTSIDE the read's try/catch (already true today — do not move it).
-- [ ] 5.x Gates + commit, one per seam:
-  - [ ] `feat(sales): apply entity encryption seam to products`
-  - [ ] `feat(sales): apply entity encryption seam to product-categories`
-  - [ ] `feat(inventory): apply entity encryption seam to inventory-entries`
-  - [ ] `feat(sales): apply entity encryption seam to orders`
-  - [ ] `feat(expenses): apply entity encryption seam to expenses`
-  - [ ] `feat(sales): apply entity encryption seam to sale-credits`
+- [x] 5.x Gates + commit, one per seam:
+  - [x] `feat(sales): apply entity encryption seam to products` — commit `9abd1b9`.
+  - [x] `feat(sales): apply entity encryption seam to product-categories` — commit `d4f94ea`.
+  - [x] `feat(inventory): apply entity encryption seam to inventory-entries` — commit `1439e93`.
+  - [x] `feat(sales): apply entity encryption seam to orders` — commit `d1554dc`.
+  - [x] `feat(expenses): apply entity encryption seam to expenses` — commit `bc74356`.
+  - [x] `feat(sales): apply entity encryption seam to sale-credits` — commit `5aaa354`.
+
+DONE (Batch B): all 16 call sites confirmed by reading each file directly (not by line number,
+per apply instructions) — products 3, product-categories 3, inventory-entries 3, orders 3,
+expenses 2, sale-credits 2 = 16, exactly matching design's corrected count with ZERO further
+drift beyond what design already found. Each seam's `.crypto.test.ts` covers all three cases
+(plaintext-mode twin, provisioned+unlocked round-trip, locked-read trap) against the REAL service
+classes (no mocking of the encryption layer). All six auto-init writes confirmed to already sit
+OUTSIDE their read's try/catch — none needed to move.
 
 ## WU11 — Auth wiring (FIRST behavior change) — [dek-lifecycle-and-unlock-gate acquisition/release]
 
