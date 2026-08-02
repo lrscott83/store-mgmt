@@ -6,11 +6,14 @@ import type {
   UserModel,
 } from '@store-mgmt/domain';
 import { apiClient } from './api-client';
+import { SessionRejectedError } from './session-rejected-error';
 
 interface LoginPayload {
   login: string;
   password: string;
 }
+
+export { SessionRejectedError } from './session-rejected-error';
 
 export const authHttpService = {
   async login(payload: LoginPayload): Promise<BaseResponseModel<AuthModel>> {
@@ -42,7 +45,10 @@ export const authHttpService = {
   },
 
   async getMe(): Promise<UserModel> {
-    const response = await apiClient.get<{ data: UserModel }>('/v1/auth/me');
+    const response = await apiClient.get<BaseResponseModel<UserModel>>('/v1/auth/me');
+    if (!response.data.succeeded) {
+      throw new SessionRejectedError(response.data.errors[0]?.description);
+    }
     return response.data.data;
   },
 };

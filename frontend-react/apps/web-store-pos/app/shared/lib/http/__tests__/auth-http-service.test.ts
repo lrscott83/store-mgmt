@@ -152,6 +152,7 @@ describe('authHttpService.getMe — GET /v1/auth/me (billing fields passthrough)
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {
+        succeeded: true,
         data: {
           id: 'user-1',
           login: 'janedoe',
@@ -159,6 +160,9 @@ describe('authHttpService.getMe — GET /v1/auth/me (billing fields passthrough)
           isInTrial: true,
           paymentStatus: 'PorVencer',
         },
+        message: null,
+        actionCode: 200,
+        errors: [],
       },
     });
 
@@ -176,6 +180,7 @@ describe('authHttpService.getMe — GET /v1/auth/me (billing fields passthrough)
     const { apiClient } = await import('~/shared/lib/http/api-client');
     (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {
+        succeeded: true,
         data: {
           id: 'user-2',
           login: 'johndoe',
@@ -183,6 +188,9 @@ describe('authHttpService.getMe — GET /v1/auth/me (billing fields passthrough)
           isInTrial: false,
           paymentStatus: 'AlDia',
         },
+        message: null,
+        actionCode: 200,
+        errors: [],
       },
     });
 
