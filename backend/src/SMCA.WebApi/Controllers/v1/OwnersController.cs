@@ -19,46 +19,72 @@ namespace SMCA.WebApi.Controllers.v1
     public class OwnersController : BaseApiController
     {
         /// <summary>
-        /// Get all users
+        /// Get all owners
         /// </summary>
+        /// <param name="includeInactive">Whether to include inactive owners</param>
         /// <returns></returns>
         [HttpGet("all/{includeInactive}")]
         [ProducesResponseType(typeof(ResponseResult<List<OwnerDto>>), StatusCodes.Status200OK)]
-        
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetAllOwnersAsync(bool includeInactive)
         {
             return Ok(await Sender.Send(new GetAllOwnersQuery(includeInactive)));
         }
 
         /// <summary>
-        /// Get user by id
+        /// Get owner by id
         /// </summary>
         /// <param name="id">Owner Id</param>
         /// <returns></returns>
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(ResponseResult<OwnerDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetOwnerAsync(Guid id)
         {
             return Ok(await Sender.Send(new GetOwnerByIdQuery(id)));
         }
 
         /// <summary>
-        /// Add user
+        /// Create a new owner
         /// </summary>
-        /// <returns></returns>
+        /// <param name="command">The create-owner command with login, password, full name, cellphone and optional ReSellerId, email and description</param>
+        /// <returns>A 201 Created response with a ResponseResult envelope carrying the created OwnerDto, or an error envelope</returns>
         [HttpPost()]
-        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseResult<OwnerDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> CreateOwnerAsync(CreateOwnerCommand command)
         {
-            return Ok(await Sender.Send(command));
+            var result = await Sender.Send(command);
+            return result.Succeeded
+                ? CreatedAtAction("GetOwner", new { id = result.Data!.Id }, result)
+                : Ok(result);
         }
 
         /// <summary>
-        /// Updated user by id
+        /// Updates an owner by id
         /// </summary>
+        /// <param name="id">Owner Id</param>
+        /// <param name="command">The update-owner command with full name, cellphone and optional ReSellerId, email and description</param>
+        /// <returns>A 200 OK response with a ResponseResult envelope carrying the updated OwnerDto, or an error envelope</returns>
         [HttpPut("{id}")]
-        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> UpdatedAsync(Guid id, [FromBody] UpdateOwnerCommand command)
+        [ProducesResponseType(typeof(ResponseResult<OwnerDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> UpdatedAsync([FromRoute] Guid id, [FromBody] UpdateOwnerCommand command)
         {
             command.Id = id;
             return Ok(await Sender.Send(command));

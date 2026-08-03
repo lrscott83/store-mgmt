@@ -39,6 +39,8 @@ namespace Application.Services.Owners
             var user = User.Create(login, passwordHashed, fullName, cellPhone, email, tenant.Id);
             await _userRepository.AddAsync(user);
 
+            // Guest is always false for admin-created owners (OwnerAdmin/ReSeller).
+            // The entity default (true) applies only to self-registered users.
             var owner = Owner.Create(user.Id, false, tenant.Id, description ?? "");
             owner.User = user; // Assign navigation property for proper entity tracking
             await _ownerRepository.AddAsync(owner);

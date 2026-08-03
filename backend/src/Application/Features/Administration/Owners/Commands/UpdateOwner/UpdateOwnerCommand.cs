@@ -1,8 +1,11 @@
 ﻿using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Dtos.Administration.Owners;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using AutoMapper;
+using Domain.Common.Extensions;
 using Domain.Entities.Owners;
 using Domain.Entities.ReSellerOwners;
 using Domain.Entities.ReSellers;
@@ -13,7 +16,7 @@ using System.Net;
 
 namespace Application.Features.Administration.Owners.Commands.UpdateOwner
 {
-    public sealed class UpdateOwnerCommand : ICommand<bool>
+    public sealed class UpdateOwnerCommand : ICommand<OwnerDto>
     {
         public Guid Id { get; set; }
         public Guid? ReSellerId { get; set; }
@@ -26,7 +29,7 @@ namespace Application.Features.Administration.Owners.Commands.UpdateOwner
 
     }
 
-    public class UpdateOwnerCommandHandler : ICommandHandler<UpdateOwnerCommand, bool>
+    public class UpdateOwnerCommandHandler : ICommandHandler<UpdateOwnerCommand, OwnerDto>
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IOwnerRepository _ownerRepository;
@@ -34,6 +37,7 @@ namespace Application.Features.Administration.Owners.Commands.UpdateOwner
         private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IMapper _mapper;
 
         public UpdateOwnerCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -41,7 +45,8 @@ namespace Application.Features.Administration.Owners.Commands.UpdateOwner
             IReSellerRepository reSellerRepository,
             IReSellerOwnerRepository reSellerOwnerRepository,
             IHttpContextService httpContextService,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            IMapper mapper)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -49,14 +54,23 @@ namespace Application.Features.Administration.Owners.Commands.UpdateOwner
             _reSellerRepository = reSellerRepository;
             _reSellerOwnerRepository = reSellerOwnerRepository;
             _localizer = localizer;
+            _mapper = mapper;
         }
 
-        public async Task<ResponseResult<bool>> Handle(UpdateOwnerCommand request, CancellationToken cancellationToken)
+        public async Task<ResponseResult<OwnerDto>> Handle(UpdateOwnerCommand request, CancellationToken cancellationToken)
         {
-            if (!(_httpContextService.IsSuperAdmin || _httpContextService.IsReSeller))
-                throw new ApiException(_localizer["OwnerNotFound"], HttpStatusCode.BadRequest);
+            Owner? owner = await _ownerRepository.GetOwnerWithUserTrackedAsync(request.Id, cancellationToken);
+            if (owner is null)
+                throw new ApiException(_localizer["OwnerNotFound"], HttpStatusCode.NotFound)
+                {
+                    AcctionCode = "OwnerNotFound"
+                };
 
-            Owner owner = await _ownerRepository.GetOwnerIncludingUserByIdAsync(request.Id);
+            if (!_httpContextService.IsSuperAdmin && owner.TenantId != _httpContextService.TenantId.ToGuid())
+                throw new ApiException(_localizer["OwnerNotFound"], HttpStatusCode.NotFound)
+                {
+                    AcctionCode = "OwnerNotFound"
+                };
 
             owner.User.FullName = request.FullName;
             owner.User.CellPhone = request.CellPhone;
@@ -65,8 +79,8 @@ namespace Application.Features.Administration.Owners.Commands.UpdateOwner
             owner.Description = request.Description;
             owner.Guest = request.Guest;
             await UpdateReSellerOwnerAsync(request.ReSellerId, owner.Id, owner.TenantId);
-            await _ownerRepository.UpdateAsync(owner);
-            return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
+            await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
+            return ResponseResult.Success(_mapper.Map<OwnerDto>(owner));
         }
 
         private async Task UpdateReSellerOwnerAsync(Guid? reSellerId, Guid ownerId, Guid tenantId)
@@ -75,17 +89,19 @@ namespace Application.Features.Administration.Owners.Commands.UpdateOwner
             if (reSellerId.HasValue)
             {
                 ReSeller reSeller = await _reSellerRepository.GetByIdAsync(reSellerId.Value);
+                if (reSeller is null)
+                    throw new ApiException(_localizer["ReSellerNotFound"], HttpStatusCode.BadRequest)
+                    {
+                        AcctionCode = "ReSellerId"
+                    };
                 if (reSellerOwner != null)
                 {
-                    if (reSellerId.HasValue)
-                    {
-                        // Update
-                        reSellerOwner.IsActive = true;
-                        reSellerOwner.ReSellerId = reSellerId.Value;
-                        reSellerOwner.PercentDiscountPrice = reSeller.PercentDiscountPrice;
-                        reSellerOwner.DiscountPrice = reSeller.DiscountPrice;
-                        await _reSellerOwnerRepository.UpdateAsync(reSellerOwner);
-                    }
+                    // Update
+                    reSellerOwner.IsActive = true;
+                    reSellerOwner.ReSellerId = reSellerId.Value;
+                    reSellerOwner.PercentDiscountPrice = reSeller.PercentDiscountPrice;
+                    reSellerOwner.DiscountPrice = reSeller.DiscountPrice;
+                    await _reSellerOwnerRepository.UpdateAsync(reSellerOwner);
                 }
                 else
                 {

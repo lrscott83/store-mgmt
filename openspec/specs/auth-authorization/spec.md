@@ -110,3 +110,23 @@ The reseller and owner-admin checks MUST be implemented as independent condition
 - Pre-existing divergence (storeId param, ADR-2) KEPT — rationalized as out-of-scope refinement (own micro-slice pending); no `!user` guard added (ADR-3, non-nullable param convention).
 - Sourced from Angular `authorization.service.ts` only; no live API validation performed.
 - Single-commit delivery: all 4 gates shipped together in commit 4c0c73d on feat/frontend-parity-audit (no PRs, no chaining).
+
+---
+
+## Delta for auth-authorization: UpdateOwnerCommandHandler Tenant-Scope
+
+**Change**: `owners-update-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: AUTH-OU1 — Handler-Level Tenant-Scope Check (SuperAdmin Bypass)
+
+The update handler MUST enforce `owner.TenantId == _httpContextService.TenantId` for non-SuperAdmin actors (per OU-CH2); denial MUST surface as envelope 404 (anti-enumeration). SuperAdmin MUST bypass for any tenant.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | Cross-tenant | Non-SuperAdmin; other tenant | Update issued | 404 envelope |
+| 1b | SuperAdmin | SuperAdmin; any tenant | Update issued | Bypasses; proceeds |
+| 1c | Same tenant | Same-tenant admin | Update issued | Proceeds |

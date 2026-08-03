@@ -358,3 +358,99 @@ With the VisibleRoleService null-guard (CH-R4), an AddUserRoles request whose `R
 - [x] Both validators issue single `ExistsAsync(userId, ct)`; zero `GetByIdAsync`/`FindAsync`
 - [x] DeleteUserRoles handler batch logic untouched (VL-R2)
 - [x] Non-existent RoleId → 400 (no 500); duplicate RoleIds pass validation — `Add_roles_with_nonexistent_role_id_returns_400` + `Add_roles_with_duplicate_role_ids_returns_200_single_row` GREEN (verify re-run 2026-08-01)
+
+---
+
+## Delta for validation: UpdateUserPasswordCommandValidator
+
+**Change**: `change-password-endpoint-fixes`
+
+### MODIFIED Requirements
+
+#### Requirement: VL-CPW1 — UserExists Swaps GetByIdAsync → ExistsAsync
+
+The `MustAsync(UserExists)` rule on `UserId` MUST call `IUserRepository.ExistsAsync(userId, cancellationToken)` (single lightweight `IgnoreQueryFilters().AnyAsync` PK lookup — same pattern as `UpdateUserCommandValidator.cs:33-36`) instead of `GetByIdAsync(tenantId) != null` (`:40`). Eliminates the full entity fetch + the double round-trip with the handler load (finding #5). The `UserNotFound` message and the 400 contract MUST be preserved; cancellation token MUST be propagated.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | User exists | Valid existing GUID | Validator runs `ExistsAsync(userId, ct)` | Single lightweight query; passes |
+| 1b | User absent | Non-existent GUID | Validator runs `ExistsAsync` | Fails → 400 `UserNotFound` |
+| 1c | No full fetch | Any request | Validator executes | Zero `GetByIdAsync`/`FindAsync` calls from validator |
+
+#### Requirement: VL-CPW2 — Misnamed Param `tenantId` Renamed to `userId`
+
+The `UserExists` helper parameter MUST be renamed from `tenantId` to `userId` (`UpdateUserPasswordCommandValidator.cs:38`) — the parameter is a user id, not a tenant id; the misname hides the cross-tenant bug class.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Correct name | Validator source inspected | `UserExists` signature | Parameter named `userId` (Guid) |
+
+#### Requirement: VL-CPW3 — NewPassword Enforces Password Policy (8 + Uppercase)
+
+The `NewPassword` rule MUST add `.MinimumLength(8)` with `_localizer["PasswordMinLength", "{PropertyName}", 8]` and `password.Any(char.IsUpper)` with `_localizer["PasswordRequiresUppercase", "{PropertyName}"]`, mirroring `RegisterCommandValidator.cs:22-26`. The `NotNull`/`NotEmpty` rules MUST be retained. Requires keys `PasswordMinLength` + `PasswordRequiresUppercase` to be added to BOTH `I18n.resx` and `I18n.en.resx` (decision D9 — also fixes the latent register fallback to literal key names).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 3a | Too short | NewPassword = 7 chars | Validator runs | Fails → 400 with `PasswordMinLength` key |
+| 3b | No uppercase | NewPassword = `"alllowercase123"` | Validator runs | Fails → 400 with `PasswordRequiresUppercase` key |
+| 3c | Policy parity | Register validator policy | NewPassword rule compared | Same MinimumLength(8) + uppercase rules |
+
+#### Requirement: VL-CPW4 — OldPassword/NewPassword Required Rules Retained; Validation → Real HTTP 400
+
+`OldPassword` and `NewPassword` MUST keep `NotNull().NotEmpty()` with `IsRequired` messages. The FluentValidation pipeline (`ValidationBehaviour` → `ValidationException`) MUST surface as a REAL HTTP 400 (FluentValidation interceptor — no 200+envelope for validation failures).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 4a | Missing old password | `oldPassword` omitted/null | POST `change-password/{id}` | HTTP 400 |
+| 4b | Missing new password | `newPassword` omitted/null | POST `change-password/{id}` | HTTP 400 |
+| 4c | Pipeline status | Any validation failure | ValidationBehaviour runs | Throws `ValidationException` → real HTTP 400 |
+
+### Verification Criteria
+
+- [x] Validator issues single `ExistsAsync(userId, ct)`; zero `GetByIdAsync`/`FindAsync`
+- [x] Param named `userId`
+- [x] NewPassword policy byte-matches Register (8 + uppercase) with the 2 resx keys in BOTH files
+- [x] Missing OldPassword/NewPassword → 400; weak NewPassword → 400 with localized key — E2E 8/8 GREEN (apply evidence)
+
+---
+
+## Delta for validation: UpdateOwnerCommandValidator
+
+**Change**: `owners-update-endpoint-fixes`
+
+---
+
+### REMOVED Requirements
+
+#### Requirement: VL-O1 — OwnerExists Async Rule + IOwnerRepository Dependency
+
+(Reason: `MustAsync(OwnerExists)` runs a redundant `GetByIdAsync(tenantId)` DB query before the handler's tracked load — a double round-trip; it fails with 400 for nonexistent ids, making the handler's real 404 unreachable. Mirrors `delete-user-endpoint-fixes` VL-D1.)
+(Migration: handler single gate, OU-CH1)
+
+The `MustAsync(OwnerExists)` rule, the `OwnerExists` method, the `_ownerRepository` field, its ctor param, and `using Domain.Interfaces.Repositories;` MUST be removed. `ExistsAsync` MUST NOT be added as a replacement.
+
+#### Requirement: VL-O2 — ReSellerExists Async Rule + IReSellerRepository Dependency
+
+(Reason: existence check moved to handler null guard OU-CH6 — single gate keeps the R8 400 contract without NPE.)
+(Migration: handler, OU-CH6)
+
+The `MustAsync(ReSellerExists)` rule, the `ReSellerExists` method, the `_reSellerRepository` field, and its ctor param MUST be removed.
+
+### MODIFIED Requirements
+
+#### Requirement: VL-O3 — Structural-Only Validation
+
+The validator MUST keep only structural rules: Id, FullName, CellPhone `NotNull().NotEmpty()`; Email format only when non-empty. MUST issue zero DB queries.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | Empty id | `Guid.Empty` | Validation runs | Fails; no DB query |
+| 1b | Valid id | Non-empty GUID | Validation runs | Passes structural; no async rule |
+| 1c | 404 reachable | Valid GUID, owner absent | Full flow | Exactly 1 query (handler); HTTP 404 |
+
+### RENAMED Requirements
+
+#### Requirement: VL-O4 — OwnerExists Param `tenantId` → `ownerId`
+
+(Reason: the param receives the owner id, misnamed `tenantId` — hides the cross-tenant bug class.)
+(Migration: rename the helper param if any existence helper survives; vacuous once VL-O1 deletes the helper.)

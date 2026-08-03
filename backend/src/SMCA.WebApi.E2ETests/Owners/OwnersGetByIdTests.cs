@@ -27,16 +27,18 @@ public sealed class OwnersGetByIdTests
     }
 
     [Fact]
-    public async Task Get_owner_by_id_nonexistent_returns_400_OwnerId()
+    public async Task Get_owner_by_id_nonexistent_returns_404()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
         var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
         try
         {
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).GetAsync($"/api/v1/Owners/{Guid.NewGuid()}");
-            r.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
             var b = await r.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
-            b!.Errors.Should().Contain(e => e.Code == "OwnerId");
+            b!.Succeeded.Should().BeFalse();
+            b.ActionCode.Should().Be(404);
+            b.Errors.Should().Contain(e => e.Code == "Owner.NotFound");
         }
         finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }

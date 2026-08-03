@@ -134,15 +134,33 @@ namespace SMCA.WebApi.Controllers.v1
         }
 
         /// <summary>
-        /// Delete User Roles
+        /// Change password for user by id
         /// </summary>
+        /// <param name="id">User Id</param>
+        /// <param name="command">Change password command</param>
         /// <returns></returns>
-        [HttpPost("change-password")]
+        [HttpPost("change-password/{id}")]
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [HasPermission(StoreRoleFeatures.ProfileAdmin)]
-        public async Task<IActionResult> ChangePasswordAsync(UpdateUserPasswordCommand command)
+        public async Task<IActionResult> ChangePasswordAsync([FromRoute] Guid id, [FromBody] UpdateUserPasswordCommand command)
         {
-            return Ok(await Sender.Send(command));
+            command.UserId = id;
+            var result = await Sender.Send(command);
+            if (result.Succeeded)
+                return Ok(result);
+
+            return result.ActionCode switch
+            {
+                400 => BadRequest(result),
+                401 => Unauthorized(result),
+                403 => StatusCode(403, result),
+                404 => NotFound(result),
+                _ => BadRequest(result)
+            };
         }
     }
 }

@@ -16,7 +16,7 @@ namespace Infrastructure.Persistence.Repositories
             _owners = dbContext.Set<Owner>();
         }
 
-        public async Task<IEnumerable<Owner>> GetAllOwnersIncludingStoreModulesAsync(bool includeInactive)
+        public async Task<IEnumerable<Owner>> GetAllOwnersIncludingStoreModulesAsync(bool includeInactive, CancellationToken cancellationToken = default)
         {
             return await _owners
                 .Where(o => includeInactive || o.IsActive)
@@ -24,7 +24,8 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
                 .Include(o => o.ReSellerOwner).ThenInclude(ro => ro.ReSeller).ThenInclude(r => r.User)
                 .IgnoreQueryFilters()
-                .ToListAsync();
+                .Take(1000)
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<Owner> GetByUserIdIgnoreQueryFiltersAsync(Guid userId)
@@ -34,14 +35,26 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<Owner> GetOwnerIncludingUserByIdAsync(Guid ownerId)
+        public async Task<Owner> GetOwnerIncludingUserByIdAsync(Guid ownerId, CancellationToken cancellationToken = default)
         {
             return await _owners
                 .Where(o => o.Id == ownerId)
                 .Include(o => o.User)
-                .Include(o => o.ReSellerOwner)
+                .Include(o => o.ReSellerOwner).ThenInclude(ro => ro.ReSeller).ThenInclude(r => r.User)
+                .Include(o => o.Stores.Where(s => s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync();
+                .Take(1)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<Owner> GetOwnerWithUserTrackedAsync(Guid ownerId, CancellationToken cancellationToken = default)
+        {
+            return await _owners
+                .AsTracking()
+                .Where(o => o.Id == ownerId)
+                .Include(o => o.User)
+                .Take(1)
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         public async Task<Owner> GetOwnerWithAllDataToDeleteByIdAsync(Guid ownerId)
@@ -56,14 +69,15 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<IEnumerable<Owner>> GetReSellerOwnersIncludingStoreModulesAsync(Guid reSellerId, bool includeInactive)
+        public async Task<IEnumerable<Owner>> GetReSellerOwnersIncludingStoreModulesAsync(Guid reSellerId, bool includeInactive, CancellationToken cancellationToken = default)
         {
             return await _owners
                 .Where(o => o.ReSellerOwner != null && o.ReSellerOwner.ReSeller != null && o.ReSellerOwner.ReSeller.UserId == reSellerId && (includeInactive || o.IsActive))
                 .Include(o => o.User)
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
                 .IgnoreQueryFilters()
-                .ToListAsync();
+                .Take(1000)
+                .ToListAsync(cancellationToken);
         }
     }
 }

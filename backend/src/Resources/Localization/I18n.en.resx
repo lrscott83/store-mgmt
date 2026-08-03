@@ -519,4 +519,10 @@
   <data name="You are not logged in with an external user" xml:space="preserve">
     <value>You are not logged in with an external user</value>
   </data>
+  <data name="PasswordMinLength" xml:space="preserve">
+    <value>{0} must be at least {1} characters</value>
+  </data>
+  <data name="PasswordRequiresUppercase" xml:space="preserve">
+    <value>{0} must contain at least one uppercase letter</value>
+  </data>
 </root>

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Application.Dtos.Administration.Owners;
 using FluentAssertions;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
@@ -29,10 +30,13 @@ public sealed class OwnersCreateTests
                 Login = newLogin, Password = "Password123", FullName = "E2E Owner",
                 Cellphone = "0000000000", ReSellerId = (Guid?)null, Email = (string?)null, Description = "e2e"
             });
-            r.StatusCode.Should().Be(HttpStatusCode.OK);
-            var b = await r.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            r.StatusCode.Should().Be(HttpStatusCode.Created);
+            var b = await r.Content.ReadFromJsonAsync<ApiResponse<OwnerDto>>(ApiResponse.Json);
             b!.Succeeded.Should().BeTrue();
-            b.Data.Should().BeTrue();
+            b.Data!.Id.Should().NotBeEmpty();
+            // R3.1 / OC-CT3: 201 must carry a Location header pointing at the created resource.
+            r.Headers.Location.Should().NotBeNull();
+            r.Headers.Location!.AbsolutePath.Should().Be($"/api/v1/owners/{b.Data.Id}");
 
             var created = await DbTestHelpers.GetUserByLoginAsync(_f, newLogin);
             created.Should().NotBeNull();

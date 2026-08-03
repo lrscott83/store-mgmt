@@ -338,3 +338,88 @@ Both actions MUST declare `[ProducesResponseType]` for 400, 401, 403, and 404 in
 - [x] `[FromBody]` on both command parameters
 - [x] Both actions declare 400/401/403/404 + existing 200
 - [x] Existing E2E tests pass unchanged (additive metadata only) — UsersRolesTests 11/11 GREEN, 5-class Users regression 47/47 GREEN (verify re-run 2026-08-01)
+
+---
+
+## Delta for api-controller: ChangePasswordAsync Route + Real Status Codes
+
+**Change**: `change-password-endpoint-fixes`
+
+### MODIFIED Requirements
+
+#### Requirement: UC-CPW1 — Route `change-password/{id}` + `[FromBody]`, Id From Route
+
+`ChangePasswordAsync` MUST change its route from `[HttpPost("change-password")]` to `[HttpPost("change-password/{id}")]`, take `Guid id` from the route, and bind the command body with `[FromBody]`, setting `command.UserId = id` (mirrors `UpdatedAsync` — the ONLY shape both frontends call: Angular `user.service.ts:65-66`, React `profile-http-service.ts:28-37`; the current body-`UserId` route is unreachable, finding #6). The `[HasPermission(StoreRoleFeatures.ProfileAdmin)]` filter MUST be retained.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | Route shape | Controller source inspected | `ChangePasswordAsync` declaration | `change-password/{id}`; `[FromBody]` on command |
+| 1b | Id mapped | Request `POST /change-password/xyz` | Action executes | `command.UserId == xyz` |
+| 1c | Filter kept | Non-ProfileAdmin actor | Action invoked | 403 (filter-level, unchanged) |
+| 1d | Angular consumer | `user.service.ts` changePassword | Request sent | URL `change-password/${id}` matches route |
+| 1e | React consumer | `profile-http-service.ts` changePassword | Request sent | URL `/v1/users/change-password/${userId}` matches route |
+
+#### Requirement: UC-CPW2 — Swagger Documents 200, 400, 401, 403, 404
+
+`ChangePasswordAsync` MUST declare `[ProducesResponseType(typeof(ResponseResult<bool>), 200)]` plus `[ProducesResponseType]` for 400, 401, 403, and 404 (mirrors `AddUserRolesAsync:108-113` / `DeleteUserAsync`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | 200 documented | Swagger generated | `ChangePasswordAsync` inspected | 200 `ResponseResult<bool>` listed |
+| 2b–2e | 400/401/403/404 documented | Swagger generated | `ChangePasswordAsync` inspected | All four error statuses listed |
+
+#### Requirement: UC-CPW3 — ActionCode Switch Maps Failures to REAL HTTP Statuses
+
+When `result.Succeeded == false`, `ChangePasswordAsync` MUST map `result.ActionCode` to real HTTP statuses with the envelope as the body, mirroring `AuthController.cs:35-41`: `400 => BadRequest(result)`, `401 => Unauthorized(result)`, `403 => StatusCode(403, result)`, `404 => NotFound(result)`, default `=> BadRequest(result)`; on success `Ok(result)`. Business failures MUST NOT return `Ok(...)` 200+envelope (finding #3 — required by the React consumer which rejects on non-2xx and logs out on ANY resolved 200 failure).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 3a | Wrong old password | Handler failure ActionCode 400 | Action returns | HTTP 400 + envelope body |
+| 3b | Out-of-tenant / null race | Handler failure ActionCode 404 | Action returns | HTTP 404 + envelope body |
+| 3c | Auth-route parity | Any non-success | Switch evaluated | Real status per ActionCode; no 200+envelope |
+| 3d | Success | `Succeeded == true` | Action returns | HTTP 200 + envelope |
+
+### Verification Criteria
+
+- [x] Route `change-password/{id}` + `[FromBody]` + `command.UserId = id`
+- [x] ProducesResponseType 200/400/401/403/404 documented in Swagger
+- [x] All handler failure ActionCodes map to real statuses (400/401/403/404); zero `Ok(failure)`
+- [x] E2E green: re-login new → 200; wrong old → 400; cross-tenant admin → 404; weak → 400 — 8/8 GREEN (apply evidence)
+
+---
+
+## Delta for api-controller: UpdatedAsync (OwnersController)
+
+**Change**: `owners-update-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: OC-OU1 — Swagger Documents 200, 400, 401, 403, 404, 500
+
+`UpdatedAsync` MUST declare 200 typed `ResponseResult<OwnerDto>` + `[ProducesResponseType]` for 400, 401, 403, 404, 500 (mirrors `GetOwnerAsync:42-48`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | 200 typed | Swagger generated | `UpdatedAsync` inspected | 200 `ResponseResult<OwnerDto>` listed |
+| 1b | Five errors | Swagger generated | `UpdatedAsync` inspected | 400, 401, 403, 404, 500 listed |
+
+#### Requirement: OC-OU2 — XML Doc Corrected
+
+Summary MUST read "Updates an owner by id" (was "Updated user by id"); `<param name="id">` and `<returns>` MUST be present.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Summary + docs | Source inspected | `UpdatedAsync` declaration | Correct summary; `<param>` and `<returns>` present |
+
+#### Requirement: OC-OU3 — ActionCode Switch Maps Failures to Real HTTP Statuses
+
+When `Succeeded == false`, `UpdatedAsync` MUST map ActionCode to real HTTP statuses (mirrors `AuthController.cs:35-41`): 400→BadRequest, 401→Unauthorized, 403→Forbidden, 404→NotFound, default→BadRequest; success → `Ok(result)`. Business failures MUST NOT return 200+envelope.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 3a | 404 mapped | Handler failure ActionCode 404 | Action returns | HTTP 404 + envelope |
+| 3b | 400 mapped | Validation/handler failure 400 | Action returns | HTTP 400 + envelope |
+| 3c | 403 mapped | Auth denial | Action returns | HTTP 403 + envelope |
+| 3d | Success | `Succeeded == true` | Action returns | HTTP 200 + `OwnerDto` envelope |

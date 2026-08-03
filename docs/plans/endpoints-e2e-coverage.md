@@ -13,7 +13,7 @@
 | AuthController | 5 | 5 | 0 | 100% | |
 | StoresController | 12 | 10 | 2 | 83% | |
 | UsersController | 8 | 8 | 0 | 100% | |
-| OwnersController | 5 | 5 | 0 | 100% | |
+| OwnersController | 5 | 5 | 0 | 100% | ✅ Reviewed |
 | FeaturesController | 3 | 3 | 0 | 100% | |
 | StoreUsersController | 4 | 3 | 1 | 75% | |
 | UsagesController | 3 | 1 | 2 | 33% | |
@@ -55,11 +55,11 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 | 19 | CRITICAL | `POST /api/v1/users/activate` | `UsersController.ActivateUserAsync` | ✅ Done | ✅ Archived | `activate-user-endpoint-fixes` |
 | 20 | CRITICAL | `POST /api/v1/users/AddUserRoles` | `UsersController.AddUserRolesAsync` | ✅ Done | ✅ Archived | `user-roles-endpoint-fixes` |
 | 21 | CRITICAL | `POST /api/v1/users/DeleteUserRoles` | `UsersController.RemoveUserRolesAsync` | ✅ Done | ✅ Archived | `user-roles-endpoint-fixes` |
-| 22 | CRITICAL | `POST /api/v1/users/change-password` | `UsersController.ChangePasswordAsync` | ⬜ Pending | ⬜ N/A | — |
-| 23 | CRITICAL | `GET /api/v1/Owners/all/{includeInactive}` | `OwnersController.GetAllOwnersAsync` | ⬜ Pending | ⬜ N/A | — |
-| 24 | CRITICAL | `GET /api/v1/Owners/{id}` | `OwnersController.GetOwnerAsync` | ⬜ Pending | ⬜ N/A | — |
-| 25 | CRITICAL | `POST /api/v1/Owners` | `OwnersController.CreateOwnerAsync` | ⬜ Pending | ⬜ N/A | — |
-| 26 | CRITICAL | `PUT /api/v1/Owners/{id}` | `OwnersController.UpdatedAsync` | ⬜ Pending | ⬜ N/A | — |
+| 22 | CRITICAL | `POST /api/v1/users/change-password` | `UsersController.ChangePasswordAsync` | ✅ Done | ✅ Archived | `change-password-endpoint-fixes` |
+| 23 | CRITICAL | `GET /api/v1/Owners/all/{includeInactive}` | `OwnersController.GetAllOwnersAsync` | ✅ Done | ✅ Applied | `owners-getall-endpoint-fixes` |
+| 24 | CRITICAL | `GET /api/v1/Owners/{id}` | `OwnersController.GetOwnerAsync` | ✅ Done | ✅ Applied | `owners-getbyid-endpoint-fixes` |
+| 25 | CRITICAL | `POST /api/v1/Owners` | `OwnersController.CreateOwnerAsync` | ✅ Done | ✅ Applied | `owners-create-endpoint-fixes` |
+| 26 | CRITICAL | `PUT /api/v1/Owners/{id}` | `OwnersController.UpdatedAsync` | ✅ Done | ✅ Applied | `owners-update-endpoint-fixes` |
 | 27 | CRITICAL | `DELETE /api/v1/Owners/{id}` | `OwnersController.DeleteOwnerAsync` | ⬜ Pending | ⬜ N/A | — |
 | 28 | HIGH | `POST /api/v1/stores/{storeId}/payments` | `StoresController.RegisterStorePaymentAsync` | ⬜ Pending | ⬜ N/A | — |
 | 29 | HIGH | `PUT /api/v1/stores/{storeId}/payment-date` | `StoresController.SetStorePaymentDateAsync` | ⬜ Pending | ⬜ N/A | — |
@@ -304,13 +304,13 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **Review**: ✅ **Done** (fixed alongside `user-roles-endpoint-fixes` — validator `ExistsAsync` swap, `[FromBody]` + ProducesResponseType, shared `GetUserRolesByUserId` query cleanup, Delete Selected body assert test)
 
 ### POST `/api/v1/users/change-password`
-- **Purpose**: Change current user's password
+- **Purpose**: Change a user's password (self-service or admin reset)
 - **Controller**: `UsersController.ChangePasswordAsync()`
 - **Authorization**: `[HasPermission(ProfileAdmin)]`
 - **E2E Tests**:
-  - `UsersChangePasswordTests.cs` — change password, validation
+  - `UsersChangePasswordTests.cs` — 8 tests: self change + re-login proof (new password 200 / old password 401), wrong old password → 400, weak new password → 400, non-existent id → 400, cross-tenant OwnerAdmin → 404 (anti-enumeration), same-tenant OwnerAdmin → 200, StoreUser without Profile → 403 (filter-level), SuperAdmin cross-tenant → 200
 - **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `change-password-endpoint-fixes` — route `change-password/{id}` + `[FromBody]` + `command.UserId = id`, broken random-salt self-verify fixed via `VerifyPassword` (BCrypt + legacy SHA256 fallback), null-guard → 404, admin gate 400→404, tenant-scope check closes cross-tenant IDOR (SuperAdmin bypass), NewPassword policy 8+uppercase with new resx keys, real ActionCode→HTTP status mapping 400/401/403/404, E2E seeds store raw SHA256 accepted by VerifyPassword tier-3)
 
 ### GET `/api/v1/Owners/all/{includeInactive}`
 - **Purpose**: List all owners, optionally including inactive
@@ -319,38 +319,39 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 - **E2E Tests**:
   - `OwnersListTests.cs` — list active/inactive, authorization
   - `OwnersListGapTests.cs` — edge cases: missing permissions, invalid bool
-- **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+  - `OwnersListAuthTests.cs` — 403 auth rejection test (NEW)
+- **Coverage**: ✅ **Full** (27/27 E2E tests, 2 new)
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `owners-getall-endpoint-fixes` — 7 issues fixed: auth gate 400→403, `.Take(1000)` safety cap, `[ProducesResponseType]` 400/401/403/500, XML doc "Get all owners" + `<param>`, Guid.Empty guard, CancellationToken propagation, null guard)
 
 ### GET `/api/v1/Owners/{id}`
 - **Purpose**: Get owner by ID
 - **Controller**: `OwnersController.GetOwnerAsync()`
 - **Authorization**: `[HasPermission(OwnersAdmin)]`
 - **E2E Tests**:
-  - `OwnersGetByIdTests.cs` — existing owner, non-existent, empty GUID
-- **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+  - `OwnersGetByIdTests.cs` — existing owner, non-existent (envelope 404), empty GUID, unauthenticated
+- **Coverage**: ✅ **Full** (27/27 E2E, 3 GetById-specific)
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `owners-getbyid-endpoint-fixes` — 7 issues fixed: N+1 includes, double-query eliminado + 400→404 envelope, CancellationToken propagation, `[ProducesResponseType]` 400/401/403/404/500, XML doc "Get owner by id", null guard, validator structural-only. ⚠️ Breaking: 400→404 envelope ActionCode)
 
 ### POST `/api/v1/Owners`
 - **Purpose**: Create a new owner
 - **Controller**: `OwnersController.CreateOwnerAsync()`
 - **Authorization**: `[HasPermission(OwnersAdmin)]`
 - **E2E Tests**:
-  - `OwnersCreateTests.cs` — happy path creation
-  - `OwnersCreateValidationTests.cs` — validation errors (missing fields, invalid data)
-  - `OwnersCreateGapTests.cs` — authorization gap scenarios
-- **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+  - `OwnersCreateTests.cs` — happy path creation, 201 Created, OwnerDto response, Location header
+  - `OwnersCreateValidationTests.cs` — validation errors, duplicate login 409, unauthorized 403, password complexity
+  - `OwnersCreateGapTests.cs` — ReSeller creation 201, missing ReSeller 400
+- **Coverage**: ✅ **Full** (31/31 Owners E2E, 13 Create-specific)
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `owners-create-endpoint-fixes` — 9 fixes: NRE null guard, 200→201 Created + OwnerDto + Location, auth gate 400→403, duplicate 400→409, [ProducesResponseType] 201/400/401/403/409/500, password complexity, Guest doc, XML docs. ⚠️ Breaking: 200→201, bool→OwnerDto, 400→403, 400→409)
 
 ### PUT `/api/v1/Owners/{id}`
 - **Purpose**: Update owner details
 - **Controller**: `OwnersController.UpdatedAsync()`
 - **Authorization**: `[HasPermission(OwnersAdmin)]`
 - **E2E Tests**:
-  - `OwnersUpdateTests.cs` — update name, isActive, non-existent, validation
-  - `OwnersUpdateGapTests.cs` — edge cases: empty cellphone, invalid reSellerId
-- **Coverage**: ✅ **Full**
-- **Review**: ⬜ Pending
+  - `OwnersUpdateTests.cs` — 6 tests: persist (200 + OwnerDto), 404 nonexistent, 400 empty FullName, 400 invalid Email, 403 OwnerAdmin, 404 cross-tenant IDOR
+  - `OwnersUpdateGapTests.cs` — 2 tests: 400 empty CellPhone, 400 nonexistent ReSeller
+- **Coverage**: ✅ **Full** (8 E2E tests, 2 new)
+- **Review**: ✅ **Done** (api-endpoint-review + fixes via SDD `owners-update-endpoint-fixes` — 14 bugs fixed: NoTracking User persistence, null guard → 404, tenant-scope IDOR guard, OwnerAdmin auth alignment, ResponseResult\<OwnerDto\>, ProducesResponseType 400/401/403/404/500, validator structural-only, double-query removed, lightweight AsTracking query, ReSeller null guard, XML docs, param rename, redundant HasValue removed, 2 new E2E tests. ⚠️ Breaking: bool→OwnerDto, 400→404, OwnerAdmin→403)
 
 ### DELETE `/api/v1/Owners/{id}`
 - **Purpose**: Delete an owner
@@ -906,7 +907,7 @@ Tracks which endpoints have been reviewed via `api-endpoint-review` skill and wh
 | `StoreUsersCrudTests.cs` | POST `/api/v1/StoreUsers`, GET `/api/v1/StoreUsers/{id}` |
 | `StoreUsersListTests.cs` | GET `/api/v1/StoreUsers/list/{includeInactive}` |
 | `UsersActivateTests.cs` | POST `/api/v1/users/activate` |
-| `UsersChangePasswordTests.cs` | POST `/api/v1/users/change-password` |
+| `UsersChangePasswordTests.cs` | POST `/api/v1/users/change-password/{id}` |
 | `UsersDeleteTests.cs` | DELETE `/api/v1/users/{id}` |
 | `UsersGetByIdTests.cs` | GET `/api/v1/users/{id}` |
 | `UsersListTests.cs` | GET `/api/v1/users/all/{includeInactive}` |

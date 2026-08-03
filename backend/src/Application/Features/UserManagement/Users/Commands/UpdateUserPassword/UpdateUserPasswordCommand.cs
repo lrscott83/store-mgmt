@@ -9,7 +9,6 @@ using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Resources;
-using System.Net;
 
 namespace Application.Features.UserManagement.Users.Commands.UpdateUserPassword
 {
@@ -45,15 +44,21 @@ namespace Application.Features.UserManagement.Users.Commands.UpdateUserPassword
 
         public async Task<ResponseResult<bool>> Handle(UpdateUserPasswordCommand request, CancellationToken cancellationToken)
         {
-            User user = await _userRepository.GetByIdAsync(request.UserId);
+            User? user = await _userRepository.GetByIdAsync(request.UserId);
+            if (user is null)
+                return ResponseResult.Failure<bool>(UserErrors.NotFound, 404);
+
             if (request.UserId == _httpContextService.UserExternalId.ToGuid())
             {
-                string hashedPassword = _hashPasswordService.HashPassword(request.OldPassword);
-                if (user.Password != hashedPassword)
-                    return ResponseResult.Failure<bool>(UserErrors.InvalidCredentials, (int)HttpStatusCode.BadRequest);
+                if (!_hashPasswordService.VerifyPassword(request.OldPassword, user.Password))
+                    return ResponseResult.Failure<bool>(UserErrors.InvalidCredentials, 400);
             }
             else if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
-                return ResponseResult.Failure<bool>(UserErrors.InvalidCredentials, (int)HttpStatusCode.BadRequest);
+                return ResponseResult.Failure<bool>(UserErrors.NotFound, 404);
+
+            if (!_httpContextService.IsSuperAdmin
+                && user.TenantId != _httpContextService.TenantId.ToGuid())
+                return ResponseResult.Failure<bool>(UserErrors.NotFound, 404);
 
             user.Password = _hashPasswordService.HashPassword(request.NewPassword);
             await _userRepository.UpdateAsync(user);

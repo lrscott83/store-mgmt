@@ -31,13 +31,15 @@ namespace Application.Features.UserManagement.Users.Commands.UpdateUserPassword
 
             RuleFor(x => x.NewPassword)
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-              .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
+              .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
+              .MinimumLength(8).WithMessage(_localizer["PasswordMinLength", "{PropertyName}", 8])
+              .Must(password => !string.IsNullOrEmpty(password) && password.Any(char.IsUpper)).WithMessage(_localizer["PasswordRequiresUppercase", "{PropertyName}"]);
 
         }
 
-        private async Task<bool> UserExists(Guid tenantId, CancellationToken cancellationToken)
+        private async Task<bool> UserExists(Guid userId, CancellationToken cancellationToken)
         {
-            return await _userRepository.GetByIdAsync(tenantId) != null;
+            return await _userRepository.ExistsAsync(userId, cancellationToken);
         }
     }
 }

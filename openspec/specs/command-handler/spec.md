@@ -469,3 +469,143 @@ The query handler MUST NOT load the User entity (no `GetByIdAsync`; use `query.U
 - [x] VisibleRoleService: null-guard → false; single batch query; grant rules byte-identical
 - [x] Query handler: no user load; no `Task.FromResult`; `Selected` int compare
 - [x] No 500 on: deleted-user race, non-existent RoleId, duplicate RoleIds — UsersRolesTests 11/11 GREEN (verify re-run 2026-08-01)
+
+---
+
+## Delta for command-handler: UpdateUserPasswordCommand Handler Contract
+
+**Change**: `change-password-endpoint-fixes`
+
+### ADDED Requirements
+
+#### Requirement: CH-CPW1 — Null-Guard Returns Envelope 404 (No NRE)
+
+The handler MUST null-check the user fetched via `GetByIdAsync(request.UserId)`; a null user MUST return `ResponseResult.Failure<bool>(UserErrors.NotFound, 404)` (mirrors `UpdateUserCommand.cs:46-48`). Today the handler dereferences `user.Password` on a null race (validated-then-deleted) → 500.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | Null guard | User deleted mid-request | Handler executes | Envelope 404 `UserNotFound`; no 500 |
+| 1b | Live user | User exists | Handler executes | Proceeds to branch logic |
+
+#### Requirement: CH-CPW2 — Self Branch Verifies Old Password with VerifyPassword
+
+For `request.UserId == _httpContextService.UserExternalId` (self-service), the handler MUST call `_hashPasswordService.VerifyPassword(request.OldPassword, user.Password)` (mirrors `AuthenticationService.cs:44`) and MUST NOT compare two `HashPassword` outputs (the current random-salt compare at `:49-53` can NEVER match — dead code). A failed verify MUST return a failure with ActionCode 400 (wrong old password → real HTTP 400 via UC-CPW3).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Correct old password | `VerifyPassword` returns true | Self branch runs | Proceeds to hash + persist new password |
+| 2b | Wrong old password | `VerifyPassword` returns false | Self branch runs | Failure envelope; ActionCode 400 |
+| 2c | No hash-of-hash compare | Any self request | Handler executes | Zero `HashPassword` calls against `OldPassword` |
+
+#### Requirement: CH-CPW3 — Admin Branch Tenant-Scope Check (Anti-Enumeration)
+
+For non-self targets, the handler MUST keep the admin gate (`IsSuperAdminOrOwnerAdmin`) AND MUST add a tenant-scope check: if the actor is NOT a SuperAdmin and `user.TenantId` != the `TenantId` claim (`_httpContextService.TenantId`), return envelope 404 (`UserNotFound`) — anti-enumeration, decision D4. SuperAdmin MUST bypass the tenant check (any tenant). Closes the cross-tenant IDOR via `FindAsync` filter-skip (`GenericRepository.cs:84`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 3a | Cross-tenant OwnerAdmin | OwnerAdmin actor; target TenantId ≠ claim | Admin branch runs | Envelope 404; no password change |
+| 3b | Same-tenant OwnerAdmin | Target TenantId == claim | Admin branch runs | Resets password; 200 |
+| 3c | SuperAdmin cross-tenant | SuperAdmin actor; any target tenant | Admin branch runs | Resets password; 200 |
+| 3d | Non-admin non-self | StoreUser+Profile, target ≠ self | Admin branch runs | Envelope 404 (unchanged gate) |
+
+#### Requirement: CH-CPW4 — Real Failure Statuses via ActionCode (No 200+Envelope)
+
+The handler MUST return `ResponseResult.Failure<T>` with the correct `ActionCode` (400 wrong-old-password / invalid; 404 null-race or out-of-tenant) so the controller's ActionCode switch (UC-CPW3) maps them to REAL HTTP statuses. Business failures MUST NOT be silently returned as `Ok(...)` 200+envelope.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 4a | Wrong old password | Verify fails | Handler returns | Failure ActionCode 400 |
+| 4b | Out-of-tenant | Tenant-scope check fails | Handler returns | Failure ActionCode 404 |
+| 4c | Success | All guards pass; persist OK | Handler returns | `ResponseResult.Success(SaveChanges > 0)` |
+
+#### Requirement: CH-CPW5 — UpdateAsync + SaveChangesAsync Semantics Preserved (Untracked Entity)
+
+The handler MUST keep `_userRepository.UpdateAsync(user)` before `_applicationUnitOfWork.SaveChangesAsync(ct)` and MUST set `user.Password = _hashPasswordService.HashPassword(request.NewPassword)` before persisting. `ApplicationDbContext` uses `QueryTrackingBehavior.NoTracking`, so `GetByIdAsync` (`FindAsync`) returns an UNTRACKED entity — `UpdateAsync` (`Entry.State = Modified`) is what attaches it; without it `SaveChangesAsync` sees no changes (same note as `UpdateUserCommand.cs:59-62`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 5a | New password hashed | Guards pass | Handler persists | `user.Password` = BCrypt hash of NewPassword |
+| 5b | Change persists | Untracked entity from `GetByIdAsync` | `UpdateAsync` runs | Entity attached; `SaveChangesAsync` persists |
+| 5c | Result truth | Save affects 1 row | Handler returns | `Success(true)` |
+
+### Verification Criteria
+
+- [x] Null user → envelope 404 (no NRE/500)
+- [x] Self branch uses `VerifyPassword`; zero hash-of-hash compare; wrong old → ActionCode 400
+- [x] Cross-tenant non-SuperAdmin admin → 404; SuperAdmin crosses tenants; same-tenant admin reset works
+- [x] `UpdateAsync` + `SaveChangesAsync` retained; NewPassword hashed before persist — E2E 8/8 GREEN (apply evidence)
+
+---
+
+## Delta for command-handler: UpdateOwnerCommandHandler
+
+**Change**: `owners-update-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: OU-CH1 — Null Guard Returns Envelope 404 (No NRE/500)
+
+The handler MUST fetch via `GetOwnerWithUserTrackedAsync(request.Id)` into `Owner? owner` and MUST return `ResponseResult.Failure<OwnerDto>(OwnerErrors.NotFound, 404)` when null (controller maps to HTTP 404) — never dereference `owner.User`.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | Nonexistent owner | Owner absent | Handler fetches | Envelope 404; no 500 |
+| 1b | Existing owner | Owner present | Handler fetches | Non-null; proceeds |
+
+#### Requirement: OU-CH2 — Tenant-Scope Check (SuperAdmin Bypass)
+
+Non-SuperAdmin actors MUST be blocked when `owner.TenantId != _httpContextService.TenantId` → envelope 404 (anti-enumeration). SuperAdmin MUST bypass.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Cross-tenant OwnerAdmin | OwnerAdmin; TenantId ≠ claim | Handler checks | 404 envelope; no write |
+| 2b | Same-tenant OwnerAdmin | TenantId == claim | Handler checks | Proceeds |
+| 2c | SuperAdmin cross-tenant | SuperAdmin; any tenant | Handler checks | Proceeds |
+
+#### Requirement: OU-CH3 — Auth Gate Denies Non-Granted Actors, Denial → 403
+
+The gate MUST accept only actors granted `OwnersAdmin` (roles SuperAdmin + ReSeller, per `StoreRoleFeatures.OwnersAdmin` annotations) and MUST return 403 on denial — not 400 `OwnerNotFound`. NOTE: an OwnerAdmin-role actor is NOT granted the Owners feature, so the class-level `[HasPermission]` filter returns 403 before the handler runs.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 3a | OwnerAdmin denied | OwnerAdmin actor | Gate evaluates | 403 `ForbidResult`; handler never runs |
+| 3b | Denied actor | Actor lacks OwnersAdmin feature | Gate evaluates | 403; no 400 `OwnerNotFound` |
+
+#### Requirement: OU-CH4 — Tracked Persistence (NoTracking Fix)
+
+The handler MUST persist via the `AsTracking()`-loaded entity so `User.FullName/CellPhone/Email` changes are tracked and saved by `SaveChangesAsync` — no silent drop.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 4a | User nav persists | Owner+User loaded tracked | Field changes + `SaveChangesAsync` | DB row reflects FullName/CellPhone/Email |
+| 4b | Single query | Any update | Handler executes | Exactly 1 DB round-trip (handler), 0 from validator |
+
+#### Requirement: OU-CH5 — OwnerDto Return
+
+`UpdateOwnerCommand` MUST be `ICommand<OwnerDto>`; handler MUST return `ResponseResult<OwnerDto>` via AutoMapper projection (IMapper + OwnerProfile).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 5a | OwnerDto envelope | Valid update | Handler returns | `Data` is `OwnerDto` with updated fields |
+
+#### Requirement: OU-CH6 — ReSeller Null Guard + Redundant Guard Removal
+
+The handler MUST null-check `GetByIdAsync(reSellerId.Value)` before touching `.DiscountPrice` (ApiException 400, no NPE) and MUST remove the nested `if (reSellerId.HasValue)` inside the outer block.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 6a | ReSeller missing | reSellerId set; ReSeller absent | `UpdateReSellerOwnerAsync` | 400; no NRE/500 |
+| 6b | Redundant guard gone | reSellerId set; reSellerOwner exists | Inner branch runs | Updates run without inner HasValue check |
+
+#### Requirement: OU-CH7 — ReSellerOwner Tri-State
+
+Provided reSellerId + existing reSellerOwner → update existing; provided + none → create new; null + existing → delete; null + none → no-op.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 7a | Update existing | reSellerId set; reSellerOwner exists | Handler runs | reSellerOwner updated (active, ids, prices) |
+| 7b | Create new | reSellerId set; no reSellerOwner | Handler runs | ReSellerOwner row created |
+| 7c | Delete | reSellerId null; reSellerOwner exists | Handler runs | ReSellerOwner deleted |
+| 7d | No-op | reSellerId null; no reSellerOwner | Handler runs | Nothing created/deleted |

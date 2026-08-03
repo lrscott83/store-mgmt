@@ -49,14 +49,17 @@ The system MUST return 400 with `Errors[].Code` matching the property name for e
 
 ### R5: PUT /api/v1/Owners/{id}
 
-The system MUST persist FullName/IsActive changes on valid update (200). MUST return 400 with property code for invalid input.
+The system MUST persist FullName/IsActive/User.CellPhone/User.Email changes on a valid update and return HTTP 200 with a `ResponseResult<OwnerDto>` envelope (Data = updated `OwnerDto`). MUST return HTTP 404 for a nonexistent owner. MUST return 400 with property code for invalid input.
+(Previously: returned 200 `ResponseResult<bool>`; nonexistent owner returned 400 `Code == "Id"` via validator; User navigation changes silently dropped)
 
 | # | Scenario | GIVEN | WHEN | THEN |
 |---|----------|-------|------|------|
-| 1 | Happy update | Existing owner | `PUT` with `FullName="Updated"`, `IsActive=false` | 200; DB reflects changes |
-| 2 | Nonexistent ID | Random GUID | `PUT` with valid body | 400, `Code == "Id"` |
-| 3 | Empty FullName | Existing owner | `PUT` with `FullName: ""` | 400, `Code == "FullName"` |
-| 4 | Invalid Email | Existing owner | `PUT` with `Email: "not-an-email"` | 400, `Code == "Email"` |
+| 1 | Happy update | Existing owner | `PUT` `FullName="Updated"`, `IsActive=false` | 200; `Data` is `OwnerDto`; DB reflects changes incl. `User.FullName` |
+| 2 | Nonexistent ID | Random GUID | `PUT` with valid body | 404 (was 400, `Code == "Id"`) |
+| 3 | Empty FullName | Existing owner | `PUT` `FullName: ""` | 400, `Code == "FullName"` |
+| 4 | Invalid Email | Existing owner | `PUT` `Email: "not-an-email"` | 400, `Code == "Email"` |
+| 5 | OwnerAdmin denied (403) | OwnerAdmin actor, seeded owner | `PUT` with valid body | 403 via `[HasPermission(OwnersAdmin)]` filter — feature grants SuperAdmin+ReSeller only; no write |
+| 6 | Cross-tenant IDOR | Non-SuperAdmin actor, owner in other tenant | `PUT` with valid body | 404 envelope; no write |
 
 ### R6: DELETE /api/v1/Owners/{id}
 
@@ -78,12 +81,13 @@ The system MUST allow ReSeller actors to create owners (200).
 
 ### R8: Update Validation Gaps
 
-The system MUST return 400 with property code for empty CellPhone and nonexistent ReSellerId on update.
+The system MUST return 400 with property code for empty CellPhone. MUST return 400 (not NRE/500) when `ReSellerId` references a nonexistent ReSeller — check moved from validator to handler null guard.
+(Previously: validator `MustAsync(ReSellerExists)` produced the 400)
 
 | # | Scenario | GIVEN | WHEN | THEN |
 |---|----------|-------|------|------|
-| 1 | Empty CellPhone | Existing owner | `PUT` with `CellPhone: ""` | 400, `Code == "CellPhone"` |
-| 2 | Nonexistent ReSellerId | Existing owner | `PUT` with `ReSellerId: Guid.NewGuid()` | 400, `Code == "ReSellerId"` |
+| 1 | Empty CellPhone | Existing owner | `PUT` `CellPhone: ""` | 400, `Code == "CellPhone"` |
+| 2 | Nonexistent ReSellerId | Existing owner | `PUT` `ReSellerId: Guid.NewGuid()` | 400, `Code == "ReSellerId"`; no NRE |
 
 ### R9: List includeInactive Toggle (Gap)
 

@@ -1,0 +1,51 @@
+schema: spec-driven
+
+project: store-mgmt
+strict_tdd: true
+
+context: |
+  SMCA Store Management monorepo: .NET 8 backend (backend/), Angular 21 legacy frontend (frontend/, parity source of truth),
+  React 19 migration target (frontend-react/). Backend is Clean Architecture + CQRS: Domain, Application, Infrastructure,
+  SMCA.Presentation, SMCA.WebApi, Resources. Stack: EF Core 8 + Npgsql PostgreSQL, MediatR 12, FluentValidation 11,
+  AutoMapper 13, Identity + JWT, Hangfire, Serilog. Solution: backend/src/SMCA.sln. Tests: Domain.UnitTests,
+  Application.Tests, SMCA.WebApi.E2ETests (xUnit + FluentAssertions + Moq + WebApplicationFactory). Frontend: pnpm +
+  Turborepo, React 19 / RRv7 SSR, Vitest + Testing Library, strict TDD pattern.
+  Conventions: ResponseResult<T> envelope + i18n error keys, conventional commits, docs/plans per change,
+  gentle-ai.verify-result/v1 verify reports.
+
+testing:
+  backend_test: dotnet test backend/src/SMCA.sln
+  backend_e2e_filtered: dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj --filter "FullyQualifiedName~<Feature>" --no-build
+  backend_build: dotnet build backend/src/SMCA.sln
+  frontend_test: pnpm test
+  frontend_typecheck: pnpm typecheck
+  frontend_lint: pnpm lint
+  coverage_command: dotnet test --collect:"XPlat Code Coverage"
+  coverage_threshold: 0
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Frontend changes must state the Angular parity source (mirror, never improve)
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Strict TDD: every implementation task pairs with a RED test task first
+  apply:
+    guidelines:
+      - Follow existing code patterns (CQRS commands/validators/mappers, ResponseResult envelope)
+      - No AI attribution; conventional commits only
+    tdd: true
+    test_command: dotnet test backend/src/SMCA.sln
+  verify:
+    test_command: dotnet test backend/src/SMCA.sln
+    build_command: dotnet build backend/src/SMCA.sln
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

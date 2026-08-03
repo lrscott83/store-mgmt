@@ -131,3 +131,23 @@ RR-G1 documented `Task<bool> ExistsAsync(Guid id)`; the implemented signature (`
 
 - [ ] Main repository spec documents the `CancellationToken` parameter on `ExistsAsync` (merged at archive)
 - [ ] No new repository method introduced by this change
+
+---
+
+## Delta for repository: IOwnerRepository + OwnerRepository
+
+**Change**: `owners-update-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: RR-O1 — GetOwnerWithUserTrackedAsync (AsTracking, Owner+User Only)
+
+`IOwnerRepository` MUST add `Task<Owner> GetOwnerWithUserTrackedAsync(Guid id, CancellationToken cancellationToken = default)`. Implementation MUST use `AsTracking()`, `.Include(o => o.User)` only (no ReSellerOwner/Stores chain), and forward the token to `FirstOrDefaultAsync`. The update path MUST stop using `GetOwnerIncludingUserByIdAsync`.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | Tracked load | Any update | Query executes | `AsTracking()` present; Owner+User loaded; no 5-join chain |
+| 1b | Token forwarded | Request with token | Query executes | Token reaches `FirstOrDefaultAsync` |
+| 1c | Update path light | Update flow | Repository call | Heavy include method not used on update path |

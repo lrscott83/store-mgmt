@@ -255,4 +255,10 @@
   <data name="You are not logged in with an external user" xml:space="preserve">
     <value>No ha iniciado sesión con un usuario externo</value>
   </data>
+  <data name="PasswordMinLength" xml:space="preserve">
+    <value>{0} debe tener al menos {1} caracteres</value>
+  </data>
+  <data name="PasswordRequiresUppercase" xml:space="preserve">
+    <value>{0} debe contener al menos una letra mayúscula</value>
+  </data>
 </root>
