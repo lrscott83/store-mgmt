@@ -125,4 +125,122 @@ describe('parseCsvProducts', () => {
       expect(result.products[0].price).toBe(1.5);
     });
   });
+
+  describe('CSV-07: cost/quantity optional columns (REQ-1)', () => {
+    it('parses cost and quantity when both columns are present with valid values', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120,10'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBe(120);
+      expect(result.products[0].quantity).toBe(10);
+    });
+
+    it('resolves cost and quantity to undefined when the columns are absent entirely', () => {
+      const csv = ['category,name,price', 'Pizzas,Pizza de Queso,150'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBeUndefined();
+      expect(result.products[0].quantity).toBeUndefined();
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('resolves cost to undefined when the cost cell is empty', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,,10'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBeUndefined();
+      expect(result.products[0].quantity).toBe(10);
+    });
+
+    it('resolves quantity to undefined when the quantity cell is empty', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120,'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBe(120);
+      expect(result.products[0].quantity).toBeUndefined();
+    });
+
+    it('treats cost="0" as a valid explicit zero, not absent', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,0,10'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBe(0);
+    });
+
+    it('parses quantity="0" successfully at the parse level (REQ-3 governs entry creation)', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120,0'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].quantity).toBe(0);
+    });
+
+    it('parses quantity="-3" as a negative number at the parse level', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120,-3'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].quantity).toBe(-3);
+    });
+
+    it('resolves cost to undefined for a non-numeric value ("15O")', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,15O,10'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBeUndefined();
+    });
+
+    it('resolves quantity to undefined for a non-numeric value ("15O")', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120,15O'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].quantity).toBeUndefined();
+    });
+
+    it('truncates a decimal quantity via parseInt semantics (2.5 -> 2)', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120,2.5'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].quantity).toBe(2);
+    });
+
+    it('truncates a decimal quantity below 1 to 0 (0.4 -> 0)', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120,0.4'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].quantity).toBe(0);
+    });
+
+    it('trims leading/trailing whitespace from cost', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150, 120 ,10'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBe(120);
+    });
+
+    it('trims leading/trailing whitespace from quantity', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,120, 10 '].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].quantity).toBe(10);
+    });
+
+    it('supports decimal cost without truncation (119.99)', () => {
+      const csv = ['category,name,price,cost,quantity', 'Pizzas,Pizza de Queso,150,119.99,10'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0].cost).toBe(119.99);
+    });
+
+    it('is observably identical for a legacy 3-column CSV (no cost/quantity columns)', () => {
+      const csv = [
+        'category,name,price',
+        'Bebidas,Coca Cola,1.50',
+        'Bebidas,Pepsi,1.20',
+        'Snacks,Chips,10',
+      ].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(3);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0]).toMatchObject({ name: 'Coca Cola', price: 1.5, category: 'Bebidas' });
+      expect(result.products[0].cost).toBeUndefined();
+      expect(result.products[0].quantity).toBeUndefined();
+    });
+
+    it('matches cost/quantity by header name regardless of column order', () => {
+      const csv = ['quantity,cost,category,name,price', '10,120,Pizzas,Pizza de Queso,150'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0]).toMatchObject({
+        name: 'Pizza de Queso',
+        price: 150,
+        category: 'Pizzas',
+        cost: 120,
+        quantity: 10,
+      });
+    });
+  });
 });

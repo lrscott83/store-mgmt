@@ -5,7 +5,13 @@ export interface ParsedProductRow {
   // frontend/src/app/_services/csv/models/csv-product.model.ts) and its `validateProducts`
   // check (frontend/src/app/_services/csv/csv-product.service.ts:26-34), which treats
   // `category` as mandatory, exactly like `name` and `price`.
+  //
+  // `cost`/`quantity` are React-only OPTIONAL fields, normalized to `undefined` here; they
+  // never produce an error and never drop a row (decisions #7/#8, csv-import-cost-quantity-
+  // entries, 2026-08-04).
   category: string;
+  cost?: number;
+  quantity?: number;
 }
 
 export type CsvRowErrorCode = 'MISSING_NAME' | 'MISSING_PRICE' | 'INVALID_PRICE' | 'MISSING_CATEGORY';
@@ -96,6 +102,35 @@ function isBlankRow(row: string[]): boolean {
   return row.length === 0 || (row.length === 1 && row[0].trim() === '');
 }
 
+/**
+ * Decision #7: absent, non-numeric or negative -> undefined (caller falls back to price). 0 is
+ * legal. Validated with `Number(raw)` (not bare `parseFloat`) because `parseFloat`/`parseInt`
+ * stop at the first invalid character instead of rejecting the whole string — `parseFloat("15O")`
+ * is `15`, not `NaN` — which would silently accept a malformed cell (REQ-1 scenario 8).
+ */
+function parseOptionalCost(raw: string): number | undefined {
+  if (!raw) return undefined;
+  if (isNaN(Number(raw))) return undefined;
+  const value = parseFloat(raw);
+  return isNaN(value) || value < 0 ? undefined : value;
+}
+
+/**
+ * Decision #9: parseInt truncates (2.5 -> 2); absent or non-numeric -> undefined. Same
+ * full-string validation caveat as `parseOptionalCost` applies (REQ-1 scenario 9).
+ *
+ * NOTE (REQ-1 scenarios 6/7, spec #1871): zero and negative values are intentionally
+ * PRESERVED here, not collapsed to `undefined` — the parser only reports "could this cell be
+ * read as a number at all", it does not decide whether the row qualifies for an entry. That
+ * gating (`quantity > 0`) is REQ-3's job, downstream, at entry-creation time.
+ */
+function parseOptionalQuantity(raw: string): number | undefined {
+  if (!raw) return undefined;
+  if (isNaN(Number(raw))) return undefined;
+  const value = parseInt(raw, 10);
+  return isNaN(value) ? undefined : value;
+}
+
 export function parseCsvProducts(csvText: string): CsvParseResult {
   const products: ParsedProductRow[] = [];
   const errors: CsvRowError[] = [];
@@ -115,6 +150,8 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
   const nameIdx = headers.indexOf('name');
   const priceIdx = headers.indexOf('price');
   const categoryIdx = headers.indexOf('category');
+  const costIdx = headers.indexOf('cost');
+  const quantityIdx = headers.indexOf('quantity');
 
   let dataRowNum = 0;
   for (let i = headerIndex + 1; i < rows.length; i++) {
@@ -145,14 +182,20 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
 
     // --- Validate category (Angular parity — required, not optional:
     // csv-product.service.ts:26-34 `item['category'] && item['name'] && typeof item['price'] ===
-    // 'number'`) ---
+    // 'number'`. This "required, not optional" claim scopes to `category` ONLY — the
+    // React-only `cost`/`quantity` columns below are optional and never fail a row
+    // (decisions #7/#8, csv-import-cost-quantity-entries, 2026-08-04). ---
     const category = categoryIdx >= 0 ? (fields[categoryIdx] ?? '') : '';
     if (!category) {
       errors.push({ row: dataRowNum, errorCode: 'MISSING_CATEGORY' });
       continue;
     }
 
-    products.push({ name, price, category });
+    // --- Optional cost/quantity (React-only, REQ-1) ---
+    const cost = parseOptionalCost(costIdx >= 0 ? (fields[costIdx] ?? '') : '');
+    const quantity = parseOptionalQuantity(quantityIdx >= 0 ? (fields[quantityIdx] ?? '') : '');
+
+    products.push({ name, price, category, cost, quantity });
   }
 
   return { products, errors };
