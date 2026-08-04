@@ -6,11 +6,14 @@ import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { parseCsvProducts } from '../lib/csv-product-parser';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 
-// Byte-identical to Angular's `sampleData` (csv-product-importer-modal.component.ts:27-30).
-const SAMPLE_DATA = `category,name,price
-Pizzas,Pizza de Queso,150
-Pizzas,Pizza Especial,200
-Confituras,Caramelo,20`;
+// Was byte-identical to Angular's `sampleData` (csv-product-importer-modal.component.ts:27-30).
+// DIVERGES DELIBERATELY (decision #15, csv-import-cost-quantity-entries, 2026-08-04): the
+// template advertises the 5-column React shape. A 3-column Angular-era file still imports
+// unchanged (headers matched by name, decision #4). Do not restore the 3-column template.
+const SAMPLE_DATA = `category,name,price,cost,quantity
+Pizzas,Pizza de Queso,150,100,10
+Pizzas,Pizza Especial,200,140,5
+Confituras,Caramelo,20,12,50`;
 
 // Small inline download glyph — Angular renders <mat-icon>file_download</mat-icon>; there is no
 // shared DownloadIcon in the icon set, so it is inlined here (same precedent as the cart SVG).
@@ -28,12 +31,13 @@ interface CsvProductImporterModalProps {
 }
 
 /**
- * Strict parity with Angular's `csv-product-importer-modal.component.html/.ts`: a required-file
- * form showing the expected CSV structure + a downloadable sample, then Cerrar / Importar. The
- * file is parsed on Importar (not on selection), and the parsed rows are handed to `onImport`,
- * which owns creation (mirrors Angular's importProducts -> parseCsv -> createCsvProducts split).
- * No client-side preview table — Angular has none (invalid rows are dropped by the parent's
- * validateProducts-parity filter, matching Angular).
+ * Strict parity with Angular's `csv-product-importer-modal.component.html/.ts` EXCEPT the sample
+ * template's column set (see `SAMPLE_DATA`) — a required-file form showing the expected CSV
+ * structure + a downloadable sample, then Cerrar / Importar. The file is parsed on Importar (not
+ * on selection), and the parsed rows are handed to `onImport`, which owns creation (mirrors
+ * Angular's importProducts -> parseCsv -> createCsvProducts split). No client-side preview table
+ * — Angular has none (invalid rows are dropped by the parent's validateProducts-parity filter,
+ * matching Angular).
  */
 export function CsvProductImporterModal({ onImport, onClose }: CsvProductImporterModalProps) {
   const intl = useIntl();

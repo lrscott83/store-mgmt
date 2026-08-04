@@ -39,6 +39,27 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
     expect(screen.getByText('Descargar Ejemplo')).toBeInTheDocument();
   });
 
+  // REQ-7: the sample template gains cost/quantity columns, English header, concrete non-blank
+  // example values in every row (csv-import-cost-quantity-entries, 2026-08-04).
+  it('renders the 5-column header exactly, with concrete cost/quantity values on every example row', () => {
+    render(
+      <Wrapper>
+        <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    const sample = screen.getByText(/Pizzas,Pizza de Queso/).textContent ?? '';
+    const lines = sample.trim().split('\n');
+    expect(lines[0]).toBe('category,name,price,cost,quantity');
+    expect(lines).toHaveLength(4);
+    for (const line of lines.slice(1)) {
+      const cells = line.split(',');
+      expect(cells).toHaveLength(5);
+      const [, , , cost, quantity] = cells;
+      expect(cost.trim()).not.toBe('');
+      expect(quantity.trim()).not.toBe('');
+    }
+  });
+
   it('downloadSample triggers an anchor download of productos_ejemplo.csv', () => {
     // jsdom implements neither URL.createObjectURL nor revokeObjectURL — define them so the
     // component's blob-download path can run (and be asserted) without a real object URL.
