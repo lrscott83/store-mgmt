@@ -533,6 +533,58 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC6 — the interceptor's 401 and 500 paths are untouched by this change.
+// Status classification is confined to 403/404/409 inside the page components;
+// the interceptor already raised its own blocking dialog for 500 (out of this
+// component's scope, not asserted here) and never logs out on 401.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — FE-OC6: untouched paths', () => {
+  it('shows OWNER.ERROR (not a business-specific key) when createOwner rejects with 500', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      response: { status: 500 },
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+    // A single alert region — the page raises no second dialog of its own; the
+    // interceptor's blocking Swal is out of this component's scope.
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+  });
+
+  it('leaves the auth store untouched (no logout) when createOwner rejects with 401', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      response: { status: 401 },
+    });
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+
+    const authStore = vi.mocked(useAuthStore).mock.results[0]?.value;
+    expect(authStore?.logout).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-CREATE-3b — submit disabled while pristine / enabled when dirty
 // ═══════════════════════════════════════════════════════════════════════════════
 

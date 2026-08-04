@@ -62,9 +62,9 @@ Branch: create from the current HEAD (`main`), per project rule.
 
 ## Phase 5: The paths that must NOT change (FE-OC6) — WU5
 
-- [ ] 5.1 `owner-create.test.tsx`: reject with `status: 500` → the page shows `OWNER.ERROR` and raises no dialog of its own (the interceptor's dialog is out of the component's scope and is not asserted here).
-- [ ] 5.2 A 401 rejection leaves the auth store untouched — no logout, no redirect. Assert against the mocked store.
-- [ ] 5.3 Confirm `api-client.ts` has zero diff in this change.
+- [x] 5.1 `owner-create.test.tsx`: reject with `status: 500` → the page shows `OWNER.ERROR` and raises no dialog of its own (the interceptor's dialog is out of the component's scope and is not asserted here).
+- [x] 5.2 A 401 rejection leaves the auth store untouched — no logout, no redirect. Assert against the mocked store.
+- [x] 5.3 Confirm `api-client.ts` has zero diff in this change.
 
 ## Phase 6: Gates
 
