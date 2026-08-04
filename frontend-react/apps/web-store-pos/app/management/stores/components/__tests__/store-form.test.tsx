@@ -379,15 +379,39 @@ describe('StoreForm — VALID-2: paymentStartDate required for superAdmin in edi
   });
 });
 
-// ─── DG-7: readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null} ─
+// ─── DG-7: readOnly = "the owner already spent their one plan activation" ─────
+//
+// `openspec/specs/billing/spec.md:5` — "plan activation (owner, once)". The lock
+// exists to spend the owner's SINGLE activation; afterwards only a super admin
+// may change the plan.
+//
+// `initialValues?.paymentStartDate != null` used to be a sound PROXY for "already
+// activated", because the billing clock only started when a paid module was first
+// selected (activation-on-first-paid, `UpdateStoreCommand.cs:96-97`). The proxy
+// dies the moment EVERY store starts its clock at creation: it would spend the
+// owner's one activation at birth — before they ever picked a plan — locking them
+// out of the paid plan permanently.
+//
+// So the predicate is now the real condition it always stood for: the store is ON
+// the paid plan, i.e. a non-`priceIncluded` module is selected.
+//
+// Note on the tab clicked in each case: the activate button only renders when the
+// browsed tab differs from the selected plan (`plan-picker.tsx:97-106`). A store
+// on the paid plan must therefore be probed from the FREE tab, and vice versa —
+// probing the already-selected tab would assert nothing.
+
+const FREE_SELECTED = makeModule({ id: 1, priceIncluded: true, selected: true });
+const PAID_SELECTED = makeModule({ id: 2, priceIncluded: false, selected: true });
+const PAID_AVAILABLE = makeModule({ id: 2, priceIncluded: false, selected: false });
 
 describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
-  it('locks the picker for an activated store viewed by a non-super-admin (owner)', async () => {
+  it('locks the picker for an owner whose store is already ON the paid plan', async () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
         <StoreForm
           {...baseProps}
+          modules={[FREE_SELECTED, PAID_SELECTED]}
           isOwnerAdmin={true}
           isEditMode={true}
           owners={[makeOwner({ id: 'o1' })]}
@@ -395,20 +419,23 @@ describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
         />
       </Wrapper>
     );
-    fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
     expect(screen.queryByRole('button', { name: 'Activar este plan' })).not.toBeInTheDocument();
   });
 
-  it('keeps the picker interactive for a super admin even on an activated store', async () => {
+  it('keeps the picker interactive for an owner still on the free plan, even though the billing clock already runs', async () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>
         <StoreForm
           {...baseProps}
-          isSuperAdmin={true}
+          modules={[FREE_SELECTED, PAID_AVAILABLE]}
+          isOwnerAdmin={true}
           isEditMode={true}
           owners={[makeOwner({ id: 'o1' })]}
-          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
+          // Every store now carries a paymentStartDate from creation — it must
+          // NOT be read as "the owner already activated the paid plan".
+          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2026-08-04' }}
         />
       </Wrapper>
     );
@@ -416,7 +443,25 @@ describe('StoreForm — PlanPicker readOnly wiring (DG-7)', () => {
     expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
   });
 
-  it('keeps the picker interactive in create mode (no paymentStartDate yet)', async () => {
+  it('keeps the picker interactive for a super admin even on the paid plan', async () => {
+    const { StoreForm } = await import('../store-form');
+    render(
+      <Wrapper>
+        <StoreForm
+          {...baseProps}
+          modules={[FREE_SELECTED, PAID_SELECTED]}
+          isSuperAdmin={true}
+          isEditMode={true}
+          owners={[makeOwner({ id: 'o1' })]}
+          initialValues={{ ownerId: 'o1', name: 'Existing Store', paymentStartDate: '2024-01-01' }}
+        />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /Gratis/ }));
+    expect(screen.getByRole('button', { name: 'Activar este plan' })).toBeInTheDocument();
+  });
+
+  it('keeps the picker interactive in create mode (no plan chosen yet)', async () => {
     const { StoreForm } = await import('../store-form');
     render(
       <Wrapper>

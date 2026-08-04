@@ -69,6 +69,19 @@ export function StoreForm({
   const isAdminUser = isSuperAdmin || isOwnerAdmin;
   const submitDisabled = isLoading || externalSubmitDisabled;
 
+  /**
+   * DG-7 — "plan activation (owner, once)" (`openspec/specs/billing/spec.md`).
+   * The lock spends the owner's single activation, so it must engage on the real
+   * condition: the store is already ON the paid plan.
+   *
+   * This used to read `initialValues?.paymentStartDate != null`, a sound proxy
+   * back when the billing clock only started on first paid module. Once EVERY
+   * store starts its clock at creation, that proxy would spend the owner's one
+   * activation at birth — before any plan was chosen — locking them out of the
+   * paid plan forever.
+   */
+  const isOnPaidPlan = modules.some((m) => !m.priceIncluded && m.selected);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setValidationError('');
@@ -236,7 +249,7 @@ export function StoreForm({
           <PlanPicker
             modules={modules}
             onChange={setModuleIds}
-            readOnly={!isSuperAdmin && initialValues?.paymentStartDate != null}
+            readOnly={!isSuperAdmin && isOnPaidPlan}
           />
         </div>
       </Card>

@@ -140,15 +140,28 @@ no Angular source.)
 
 `PlanPicker` MUST accept a `readOnly` prop. When `true`, plan tabs MUST still render, but the
 "Activar este plan" button MUST NOT render and `onChange` MUST NOT fire on tab interaction.
-`store-form` MUST compute `readOnly={!isSuperAdmin && paymentStartDate != null}`.
+`store-form` MUST compute `readOnly={!isSuperAdmin && isOnPaidPlan}`, where `isOnPaidPlan` is
+`modules.some((m) => !m.priceIncluded && m.selected)`.
 
-#### Scenario: Activated owner sees a locked picker
-- GIVEN a store with `paymentStartDate` set and the current user is not super admin
+The lock enforces `billing/spec.md` — "plan activation (owner, once)" — so it MUST engage on the
+store actually being on the paid plan. It MUST NOT be derived from `paymentStartDate != null`:
+that was a sound proxy only while the billing clock started on the first paid module, and it
+became wrong once every store starts its clock at creation, where it would spend the owner's
+single activation at birth and lock them out of the paid plan permanently.
+
+#### Scenario: Owner already on the paid plan sees a locked picker
+- GIVEN a store with a `priceIncluded: false` module selected and the current user is not super admin
 - WHEN the edit form renders `PlanPicker`
 - THEN `readOnly` is `true`: no "Activar este plan" button renders and clicking a tab does not call `onChange`
 
+#### Scenario: Owner still on the free plan keeps their one activation
+- GIVEN a store on the free plan (no `priceIncluded: false` module selected) whose `paymentStartDate`
+  is set from creation, and the current user is not super admin
+- WHEN the edit form renders `PlanPicker`
+- THEN `readOnly` is `false`: the "Activar este plan" button renders, so the owner can still activate the paid plan once
+
 #### Scenario: Super admin keeps full control
-- GIVEN a store with `paymentStartDate` set and the current user is super admin
+- GIVEN a store on the paid plan and the current user is super admin
 - WHEN the edit form renders `PlanPicker`
 - THEN `readOnly` is `false`: the "Activar este plan" button renders and tab clicks call `onChange`
 
