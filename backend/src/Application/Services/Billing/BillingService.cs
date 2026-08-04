@@ -45,7 +45,10 @@ public class BillingService : IBillingService
 
     public async Task<StoreBillingSummary> GetStoreBillingSummaryAsync(Guid storeId)
     {
-        var store = await _storeRepository.GetByIdAsync(storeId);
+        // Must include StoreModules: GetByIdAsync is a bare FindAsync and this project has no
+        // lazy-loading proxies, so store.StoreModules would always be empty and PlanType would
+        // always resolve to "Free".
+        var store = await _storeRepository.GetStoreByIdIncludingModulesAsync(storeId);
         if (store is null)
             return new StoreBillingSummary { StoreId = storeId, Status = StoreBillingStatusType.NoAplica, PlanType = "Free" };
 

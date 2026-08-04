@@ -508,7 +508,11 @@ public sealed class StoreCreationTrialTests
             using var atAssertion = _fixture.Clock.Pin(AtUtc(due.AddDays(6)));
             var me = await MeAsync(DbTestHelpers.AuthedClient(_f, created.OwnerUserId, created.OwnerLogin));
 
-            me.Data!.StoreModuleIds.Should().Contain(StoreSeed.ManagementModuleId);
+            // Assert the precondition first: without it, "the paid module was correctly cut"
+            // and "the store was never resolved at all" both surface as an empty list.
+            me.Data!.PaymentStatus.Should().Be("Vencido");
+
+            me.Data.StoreModuleIds.Should().Contain(StoreSeed.ManagementModuleId);
             me.Data.StoreModuleIds.Should().NotContain(BillingSeed.StatisticsModuleId);
         }
         finally
