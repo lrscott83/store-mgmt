@@ -27,5 +27,15 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json'],
     },
+    // Type-testing: `expectTypeOf`/`assertType` contracts in `*.test-d.ts`
+    // files are checked by the real TypeScript compiler (unlike the runtime
+    // suite, which esbuild-transpiles and never type-checks). Without this,
+    // a generic that lies about its shape (e.g. `BaseResponseModel<string>`
+    // when the wire returns an `Owner`) passes `pnpm test` silently; it only
+    // gets caught by a separate manual `tsc --noEmit` run outside the loop.
+    typecheck: {
+      enabled: true,
+      include: ['app/**/*.test-d.ts'],
+    },
   },
 });
