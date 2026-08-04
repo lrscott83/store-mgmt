@@ -259,7 +259,7 @@ Baseline landmarks (all under `BillingConfigSeed.PinAsync()` with the defaults `
 
 Spec link: `specs/billing-e2e-coverage/spec.md` §D. Design ref: D8.
 
-- [ ] **`StoreCreationTrialTests.cs`** — append:
+- [x] **`StoreCreationTrialTests.cs`** — append:
   15. `New_store_absent_from_to_collect_during_trial` — `RegisterStoreAsync()` pinned at `Start`
       (`AlDia`, in trial), under `BillingConfigSeed.PinAsync` (the "to collect" query reads
       `ISystemConfigurationRepository` uncached, so the pin still matters for determinism even though

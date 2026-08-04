@@ -510,4 +510,66 @@ public sealed class StoreCreationTrialTests
             await CleanupCreatedStoreAsync(created);
         }
     }
+
+    // ---------------------------------------------------------------------
+    // D. Collections (tests 15-16)
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task New_store_absent_from_to_collect_during_trial()
+    {
+        // The "to collect" query reads ISystemConfigurationRepository uncached, so the pin still
+        // matters for determinism even though the cache-eviction half is a no-op on this path.
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var clock = _fixture.Clock.Pin(AnchorInstant);
+
+        var registered = await RegisterStoreAsync();
+        var adminLogin = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, adminLogin, "Password123");
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, adminLogin).GetAsync("/api/v1/stores/to-collect");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreToCollectDto>>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+
+            body.Data.Should().NotContain(s => s.StoreId == registered.StoreId);
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task Free_plan_store_shows_zero_amount_in_to_collect()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var atCreation = _fixture.Clock.Pin(AnchorInstant);
+        // A registered store has paid modules and cannot demonstrate this — free-only via the
+        // admin endpoint.
+        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId });
+        var adminLogin = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, adminLogin, "Password123");
+        try
+        {
+            var due = Start.AddMonths(2);
+            using var atAssertion = _fixture.Clock.Pin(AtUtc(due.AddDays(-3)));
+
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, adminLogin).GetAsync("/api/v1/stores/to-collect");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<StoreToCollectDto>>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+
+            var entry = body.Data!.FirstOrDefault(s => s.StoreId == created.StoreId);
+            entry.Should().NotBeNull();
+            entry!.Amount.Should().Be(0);
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+            await CleanupCreatedStoreAsync(created);
+        }
+    }
 }
