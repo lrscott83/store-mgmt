@@ -661,6 +661,86 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC6 — the interceptor's 401 and 500 paths are untouched by this change.
+// Status classification is confined to 403/404/409 inside the page components;
+// the interceptor already raised its own blocking dialog for 500 (out of this
+// component's scope, not asserted here) and never logs out on 401.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — FE-OC6: untouched paths', () => {
+  it('shows OWNER.ERROR (not a business-specific key) when updateOwner rejects with 500', async () => {
+    await setAuthUser(false);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(ownerHttpService.updateOwner).mockRejectedValue({
+      response: { status: 500 },
+    });
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+    // A single alert region — the page raises no second dialog of its own; the
+    // interceptor's blocking Swal is out of this component's scope.
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+  });
+
+  it('leaves the auth store untouched (no logout) when updateOwner rejects with 401', async () => {
+    await setAuthUser(false);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(ownerHttpService.updateOwner).mockRejectedValue({
+      response: { status: 401 },
+    });
+    const { useAuthStore } = await import('~/shared/lib/stores/auth-store');
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+
+    const authStore = vi.mocked(useAuthStore).mock.results[0]?.value;
+    expect(authStore?.logout).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // FE-OC4 — the update snapshot comes from the persisted entity (res.data)
 // ═══════════════════════════════════════════════════════════════════════════════
 
