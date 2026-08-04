@@ -634,4 +634,25 @@ public sealed class StoreCreationTrialTests
             await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
         }
     }
+
+    // ---------------------------------------------------------------------
+    // F. Existing data (test 18)
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Legacy_stores_with_null_paymentStartDate_are_not_retro_activated()
+    {
+        // Bypasses CreateStoreService entirely — paymentStartDate: null at seed time, per
+        // BillingSeed.cs:50, matching Billing/BackfillMigrationTests.cs's pattern. Legacy rows
+        // by definition never went through CreateStoreService.
+        var legacyStore = await BillingSeed.SeedFreeStoreAsync(_f);
+        try
+        {
+            (await ReadPaymentStartDateAsync(legacyStore.StoreId)).Should().BeNull();
+        }
+        finally
+        {
+            await BillingSeed.CleanupAsync(_f, legacyStore);
+        }
+    }
 }

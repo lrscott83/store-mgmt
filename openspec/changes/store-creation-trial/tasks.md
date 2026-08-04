@@ -309,7 +309,7 @@ Spec link: `specs/billing-e2e-coverage/spec.md` §E. Design ref: D9 — **the co
 Spec link: `specs/billing-e2e-coverage/spec.md` §F + "StoreActivationTests Remains Unchanged". Design
 ref: D8, D12.
 
-- [ ] **`StoreCreationTrialTests.cs`** — append:
+- [x] **`StoreCreationTrialTests.cs`** — append:
   18. `Legacy_stores_with_null_paymentStartDate_are_not_retro_activated` — seed directly via
       `BillingSeed.SeedFreeStoreAsync(_f)` (bypasses `CreateStoreService` entirely, `paymentStartDate: null`
       at seed time), pattern per `Billing/BackfillMigrationTests.cs`. Assert
@@ -318,7 +318,7 @@ ref: D8, D12.
   directly through `BillingSeed`, matching the fact that legacy rows never went through
   `CreateStoreService`.
 
-- [ ] **No-op confirmation task — `backend/src/SMCA.WebApi.E2ETests/Billing/StoreActivationTests.cs`**
+- [x] **No-op confirmation task — `backend/src/SMCA.WebApi.E2ETests/Billing/StoreActivationTests.cs`**
   Confirm the file is **untouched**: `git diff --stat` for this path shows no changes. All three tests
   (`Paid_module_on_null_start_sets_paymentStartDate_to_today`, `Free_modules_only_leaves_paymentStartDate_null`,
   `Existing_paymentStartDate_unchanged_when_adding_modules`) remain exactly as they are today.
