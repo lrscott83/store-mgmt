@@ -31,10 +31,10 @@ Branch: create from the current HEAD (`main`), per project rule.
 
 ## Phase 1: Response types (FE-OC1) — WU1
 
-- [ ] 1.1 RED — `owner-http-service.test.ts`: in the create suite, assert the resolved `res.data` is an `Owner` (`data.id`, `data.fullName`, `data.reSellerName` readable). Expect a type error / failure against the `BaseResponseModel<string>` generic.
-- [ ] 1.2 RED — same file, update suite: assert `res.data` is an `Owner` rather than `true`.
-- [ ] 1.3 GREEN — `owner-http-service.ts:39,47`: change both generics to `BaseResponseModel<Owner>`; import `Owner` from `@store-mgmt/domain` (already imported at line 1).
-- [ ] 1.4 `pnpm typecheck` — 0 errors. Any call site reading `data` as `string`/`boolean` surfaces here (expected: none).
+- [x] 1.1 RED — `owner-http-service.test.ts`: in the create suite, assert the resolved `res.data` is an `Owner` (`data.id`, `data.fullName`, `data.reSellerName` readable). Expect a type error / failure against the `BaseResponseModel<string>` generic.
+- [x] 1.2 RED — same file, update suite: assert `res.data` is an `Owner` rather than `true`.
+- [x] 1.3 GREEN — `owner-http-service.ts:39,47`: change both generics to `BaseResponseModel<Owner>`; import `Owner` from `@store-mgmt/domain` (already imported at line 1).
+- [x] 1.4 `pnpm typecheck` — 0 errors. Any call site reading `data` as `string`/`boolean` surfaces here (expected: none).
 
 ## Phase 2: The classifier (D2) — WU2
 

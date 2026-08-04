@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { ReSeller } from '@store-mgmt/domain';
+import type { Owner, ReSeller } from '@store-mgmt/domain';
 
 // ─── react-router mock ────────────────────────────────────────────────────────
 
@@ -50,6 +50,26 @@ vi.mock('~/shared/lib/hooks/use-unsaved-changes-prompt', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+function makeOwner(overrides: Partial<Owner> = {}): Owner {
+  return {
+    id: 'o1',
+    userId: 'u1',
+    fullName: 'Jane Owner',
+    cellPhone: '+53 5 123-4567',
+    email: 'jane@example.com',
+    description: '',
+    guest: false,
+    isActive: true,
+    reSellerId: '',
+    reSellerName: 'ADMIN',
+    approved: true,
+    storeModules: [],
+    createdDate: new Date('2024-01-01'),
+    createdByName: 'admin',
+    ...overrides,
+  };
+}
 
 function makeReseller(overrides: Partial<ReSeller> = {}): ReSeller {
   return {
@@ -361,7 +381,7 @@ describe('OwnerCreatePage — successful submit', () => {
     );
     vi.mocked(ownerHttpService.createOwner).mockResolvedValue({
       succeeded: true,
-      data: '',
+      data: makeOwner(),
       message: '',
       actionCode: 0,
       errors: [],

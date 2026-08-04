@@ -196,7 +196,7 @@ async function renderPage(isSuperAdmin = false, ownerOverrides: Partial<Owner> =
   });
   vi.mocked(ownerHttpService.updateOwner).mockResolvedValue({
     succeeded: true,
-    data: true,
+    data: makeOwner(ownerOverrides),
     message: '',
     actionCode: 0,
     errors: [],

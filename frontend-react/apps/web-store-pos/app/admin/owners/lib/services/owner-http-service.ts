@@ -36,16 +36,16 @@ export const ownerHttpService = {
     return response.data;
   },
 
-  async createOwner(payload: CreateOwnerPayload): Promise<BaseResponseModel<string>> {
-    const response = await apiClient.post<BaseResponseModel<string>>(
+  async createOwner(payload: CreateOwnerPayload): Promise<BaseResponseModel<Owner>> {
+    const response = await apiClient.post<BaseResponseModel<Owner>>(
       '/v1/owners/',
       payload
     );
     return response.data;
   },
 
-  async updateOwner(id: string, payload: UpdateOwnerPayload): Promise<BaseResponseModel<boolean>> {
-    const response = await apiClient.put<BaseResponseModel<boolean>>(
+  async updateOwner(id: string, payload: UpdateOwnerPayload): Promise<BaseResponseModel<Owner>> {
+    const response = await apiClient.put<BaseResponseModel<Owner>>(
       `/v1/owners/${id}`,
       payload
     );

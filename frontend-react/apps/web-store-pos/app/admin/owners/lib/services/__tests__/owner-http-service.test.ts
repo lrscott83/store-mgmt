@@ -108,7 +108,22 @@ describe('ownerHttpService.createOwner — HTTP-4: POST /v1/owners/', () => {
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {
         succeeded: true,
-        data: '',
+        data: {
+          id: 'o1',
+          userId: 'u1',
+          fullName: 'Jane',
+          cellPhone: '+53 5 123-4567',
+          email: 'jane@example.com',
+          description: '',
+          guest: false,
+          isActive: true,
+          reSellerId: '',
+          reSellerName: 'ADMIN',
+          approved: true,
+          storeModules: [],
+          createdDate: new Date(),
+          createdByName: 'admin',
+        },
         message: '',
         actionCode: 0,
         errors: [],
@@ -132,7 +147,9 @@ describe('ownerHttpService.createOwner — HTTP-4: POST /v1/owners/', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/v1/owners/', payload);
   });
 
-  it('returns response.data with non-nullable string (BaseResponseModel<string>)', async () => {
+  // FE-OC1 / S-1: the backend returns the created OwnerDto — res.data is an
+  // Owner, not the string the old (lying) generic declared.
+  it('returns response.data as an Owner (BaseResponseModel<Owner>)', async () => {
     const { ownerHttpService } = await import('../owner-http-service');
     const result = await ownerHttpService.createOwner({
       fullName: 'Jane',
@@ -144,7 +161,10 @@ describe('ownerHttpService.createOwner — HTTP-4: POST /v1/owners/', () => {
       reSellerId: '',
     });
     expect(result.succeeded).toBe(true);
-    expect(result.data).toBe('');
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data.id).toBe('o1');
+    expect(result.data.fullName).toBe('Jane');
+    expect(result.data.reSellerName).toBe('ADMIN');
     expect(result.message).toBe('');
     expect(result.actionCode).toBe(0);
     expect(result.errors).toEqual([]);
@@ -158,7 +178,22 @@ describe('ownerHttpService.updateOwner — HTTP-5: PUT /v1/owners/:id', () => {
     (apiClient.put as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {
         succeeded: true,
-        data: true,
+        data: {
+          id: 'o1',
+          userId: 'u1',
+          fullName: 'Jane Updated',
+          cellPhone: '+53 5 123-4567',
+          email: 'jane@example.com',
+          description: '',
+          guest: false,
+          isActive: true,
+          reSellerId: '',
+          reSellerName: 'ADMIN',
+          approved: true,
+          storeModules: [],
+          createdDate: new Date(),
+          createdByName: 'admin',
+        },
         message: '',
         actionCode: 0,
         errors: [],
@@ -182,7 +217,9 @@ describe('ownerHttpService.updateOwner — HTTP-5: PUT /v1/owners/:id', () => {
     expect(apiClient.put).toHaveBeenCalledWith('/v1/owners/o1', payload);
   });
 
-  it('returns response.data (BaseResponseModel<boolean>)', async () => {
+  // FE-OC1 / S-2: the backend returns the persisted OwnerDto — res.data is an
+  // Owner, not the boolean the old (lying) generic declared.
+  it('returns response.data as an Owner (BaseResponseModel<Owner>)', async () => {
     const { ownerHttpService } = await import('../owner-http-service');
     const result = await ownerHttpService.updateOwner('o1', {
       fullName: 'Jane Updated',
@@ -194,6 +231,8 @@ describe('ownerHttpService.updateOwner — HTTP-5: PUT /v1/owners/:id', () => {
       reSellerId: '',
     });
     expect(result.succeeded).toBe(true);
+    if (!result.succeeded) throw new Error('expected succeeded response');
+    expect(result.data.fullName).toBe('Jane Updated');
     expect(result.message).toBe('');
     expect(result.actionCode).toBe(0);
     expect(result.errors).toEqual([]);
