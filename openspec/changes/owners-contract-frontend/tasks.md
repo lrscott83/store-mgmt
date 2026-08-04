@@ -43,13 +43,13 @@ Branch: create from the current HEAD (`main`), per project rule.
 
 ## Phase 3: Create page (FE-OC2, FE-OC5) — WU3
 
-- [ ] 3.1 RED — `owner-create.test.tsx`: `createOwner` rejects with `{ response: { status: 409 } }` → the `role="alert"` region shows the `OWNER.DUPLICATE_LOGIN` copy and `navigate` was NOT called.
-- [ ] 3.2 RED — same, `status: 403` → `OWNER.FORBIDDEN`.
-- [ ] 3.3 RED — same, `status: 400` → `OWNER.ERROR` (unclassified stays generic).
-- [ ] 3.4 RED — same, rejection with no `response` → `OWNER.ERROR` (a transport failure is never a business failure).
-- [ ] 3.5 GREEN — `es.ts`: add `OWNER.DUPLICATE_LOGIN` ("Ese login ya está en uso. Elegí otro."), `OWNER.FORBIDDEN` ("No tenés permiso para esta acción."), `OWNER.NOT_FOUND` ("El propietario no existe o fue eliminado."), beside the existing `OWNER.*` block (~line 763).
-- [ ] 3.6 GREEN — `owner-create.tsx:102-104`: in the `catch`, `setServerError(intl.formatMessage({ id: ownerErrorMessageId(error, { 409: 'OWNER.DUPLICATE_LOGIN', 403: 'OWNER.FORBIDDEN' }) }))`. Bind the caught error (`catch (error)`).
-- [ ] 3.7 Regression — the existing success test (S-ADMIN-OWNERS-CREATE-7) and the `!res.succeeded` test both still pass, unmodified. The guard at `owner-create.tsx:96-99` is NOT removed (D3).
+- [x] 3.1 RED — `owner-create.test.tsx`: `createOwner` rejects with `{ response: { status: 409 } }` → the `role="alert"` region shows the `OWNER.DUPLICATE_LOGIN` copy and `navigate` was NOT called.
+- [x] 3.2 RED — same, `status: 403` → `OWNER.FORBIDDEN`.
+- [x] 3.3 RED — same, `status: 400` → `OWNER.ERROR` (unclassified stays generic).
+- [x] 3.4 RED — same, rejection with no `response` → `OWNER.ERROR` (a transport failure is never a business failure).
+- [x] 3.5 GREEN — `es.ts`: add `OWNER.DUPLICATE_LOGIN` ("Ese login ya está en uso. Elegí otro."), `OWNER.FORBIDDEN` ("No tenés permiso para esta acción."), `OWNER.NOT_FOUND` ("El propietario no existe o fue eliminado."), beside the existing `OWNER.*` block (~line 763).
+- [x] 3.6 GREEN — `owner-create.tsx:102-104`: in the `catch`, `setServerError(intl.formatMessage({ id: ownerErrorMessageId(error, { 409: 'OWNER.DUPLICATE_LOGIN', 403: 'OWNER.FORBIDDEN' }) }))`. Bind the caught error (`catch (error)`).
+- [x] 3.7 Regression — the existing success test (S-ADMIN-OWNERS-CREATE-7) and the `!res.succeeded` test both still pass, unmodified. The guard at `owner-create.tsx:96-99` is NOT removed (D3).
 
 ## Phase 4: Edit page (FE-OC3, FE-OC4) — WU4
 

@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
+import { ownerErrorMessageId } from '~/admin/owners/lib/owner-error-message';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
@@ -99,8 +100,15 @@ export function OwnerCreatePage() {
       }
 
       navigate('/management/stores/create');
-    } catch {
-      setServerError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+    } catch (error) {
+      setServerError(
+        intl.formatMessage({
+          id: ownerErrorMessageId(error, {
+            409: 'OWNER.DUPLICATE_LOGIN',
+            403: 'OWNER.FORBIDDEN',
+          }),
+        })
+      );
     } finally {
       setIsSubmitting(false);
     }

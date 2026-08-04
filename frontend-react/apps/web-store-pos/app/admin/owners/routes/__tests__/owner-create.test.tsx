@@ -453,6 +453,86 @@ describe('OwnerCreatePage — server error', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC2 — create classifies its rejected business failures by HTTP status
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
+  it('shows OWNER.DUPLICATE_LOGIN and does not navigate when createOwner rejects with 409', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      response: { status: 409 },
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.DUPLICATE_LOGIN']);
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('shows OWNER.FORBIDDEN when createOwner rejects with 403', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      response: { status: 403 },
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.FORBIDDEN']);
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('shows OWNER.ERROR (generic) when createOwner rejects with an unclassified status', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      response: { status: 400 },
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+  });
+
+  it('shows OWNER.ERROR when createOwner rejects with no response (network failure)', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      isNetworkError: true,
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-CREATE-3b — submit disabled while pristine / enabled when dirty
 // ═══════════════════════════════════════════════════════════════════════════════
 
