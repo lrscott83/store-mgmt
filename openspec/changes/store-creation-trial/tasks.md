@@ -226,7 +226,7 @@ Baseline landmarks (all under `BillingConfigSeed.PinAsync()` with the defaults `
 | 13 | `due.AddDays(6)` (2026-05-16) | `Vencido` |
 | 14 | `due.AddDays(6)` (2026-05-16) | `StoreModuleIds` contains only the free module |
 
-- [ ] **`StoreCreationTrialTests.cs`** — append:
+- [x] **`StoreCreationTrialTests.cs`** — append:
   8. `Day_one_is_in_trial_and_AlDia` — `RegisterStoreAsync()` pinned at `Start`; `MeAsync` asserts
      `IsInTrial=true`, `PaymentStatus="AlDia"`.
   9. `Trial_ends_one_month_after_creation` — create pinned at `Start` (two-pin idiom: re-pin before the

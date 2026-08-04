@@ -357,4 +357,157 @@ public sealed class StoreCreationTrialTests
             await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
         }
     }
+
+    // ---------------------------------------------------------------------
+    // C. Derived math + module filter under Vencido (tests 8-14)
+    //
+    // Baseline landmarks (all under BillingConfigSeed.PinAsync() defaults: trialMonths=1,
+    // graceDays=5, dueSoonDays=5, Start = 2026-03-10):
+    //   due = Start.AddMonths(2) = 2026-05-10
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Day_one_is_in_trial_and_AlDia()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var clock = _fixture.Clock.Pin(AnchorInstant);
+
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            var me = await MeAsync(AuthTestHelpers.BearerClient(_f, registered.Token));
+            me.Data!.IsInTrial.Should().BeTrue();
+            me.Data.PaymentStatus.Should().Be("AlDia");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task Trial_ends_one_month_after_creation()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var atCreation = _fixture.Clock.Pin(AnchorInstant);
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            // Two-pin idiom (see header): flat, not nested — atCreation stays in scope.
+            using var atAssertion = _fixture.Clock.Pin(AnchorInstant.AddMonths(1).AddDays(1));
+            var me = await MeAsync(AuthTestHelpers.BearerClient(_f, registered.Token));
+            me.Data!.IsInTrial.Should().BeFalse();
+            me.Data.PaymentStatus.Should().Be("AlDia");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task First_due_is_creation_plus_two_months()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var clock = _fixture.Clock.Pin(AnchorInstant);
+
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            var me = await MeAsync(AuthTestHelpers.BearerClient(_f, registered.Token));
+            me.Data!.PaymentDueDate.Should().Be(Start.AddMonths(2));
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task PorVencer_five_days_before_due()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var atCreation = _fixture.Clock.Pin(AnchorInstant);
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            var due = Start.AddMonths(2);
+            using var atAssertion = _fixture.Clock.Pin(AtUtc(due.AddDays(-5)));
+            var me = await MeAsync(AuthTestHelpers.BearerClient(_f, registered.Token));
+            me.Data!.PaymentStatus.Should().Be("PorVencer");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task EnGracia_from_due_plus_one_through_due_plus_five()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var atCreation = _fixture.Clock.Pin(AnchorInstant);
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            var due = Start.AddMonths(2);
+            var client = AuthTestHelpers.BearerClient(_f, registered.Token);
+
+            using var atLowerBoundary = _fixture.Clock.Pin(AtUtc(due.AddDays(1)));
+            (await MeAsync(client)).Data!.PaymentStatus.Should().Be("EnGracia");
+
+            using var atUpperBoundary = _fixture.Clock.Pin(AtUtc(due.AddDays(5)));
+            (await MeAsync(client)).Data!.PaymentStatus.Should().Be("EnGracia");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task Vencido_from_due_plus_six()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var atCreation = _fixture.Clock.Pin(AnchorInstant);
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            var due = Start.AddMonths(2);
+            using var atAssertion = _fixture.Clock.Pin(AtUtc(due.AddDays(6)));
+            var me = await MeAsync(AuthTestHelpers.BearerClient(_f, registered.Token));
+            me.Data!.PaymentStatus.Should().Be("Vencido");
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task Vencido_store_keeps_only_free_modules()
+    {
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var atCreation = _fixture.Clock.Pin(AnchorInstant);
+        // Not via register (design D8 corollary: register assigns all six paid modules, too many
+        // to make a crisp assertion) — one free + one paid module via the admin endpoint.
+        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
+        try
+        {
+            // Creation is still via the real API; only the "which store" pointer is seeded,
+            // per GetMeBillingStatesTests.cs's pattern.
+            await SetSelectedStoreIdAsync(created.OwnerUserId, created.StoreId);
+
+            var due = Start.AddMonths(2);
+            using var atAssertion = _fixture.Clock.Pin(AtUtc(due.AddDays(6)));
+            var me = await MeAsync(DbTestHelpers.AuthedClient(_f, created.OwnerUserId, created.OwnerLogin));
+
+            me.Data!.StoreModuleIds.Should().Contain(StoreSeed.ManagementModuleId);
+            me.Data.StoreModuleIds.Should().NotContain(BillingSeed.StatisticsModuleId);
+        }
+        finally
+        {
+            await CleanupCreatedStoreAsync(created);
+        }
+    }
 }
