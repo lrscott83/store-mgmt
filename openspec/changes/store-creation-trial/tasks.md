@@ -193,7 +193,7 @@ Spec link: `specs/billing-e2e-coverage/spec.md` §A. Design ref: D6, D7, D8, D9 
 
 Spec link: `specs/billing-e2e-coverage/spec.md` §B. Design ref: D8 (register row), D9's precursor.
 
-- [ ] **`StoreCreationTrialTests.cs`** — append:
+- [x] **`StoreCreationTrialTests.cs`** — append:
   6. `Register_creates_store_with_paymentStartDate_today` — `RegisterStoreAsync()`; assert
      `ReadPaymentStartDateAsync(storeId) == Start`.
   7. `Register_store_reports_trial_in_billing_summary` — `RegisterStoreAsync()` under

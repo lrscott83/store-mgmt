@@ -313,4 +313,48 @@ public sealed class StoreCreationTrialTests
             await CleanupCreatedStoreAsync(created);
         }
     }
+
+    // ---------------------------------------------------------------------
+    // B. Self-registration (tests 6-7)
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Register_creates_store_with_paymentStartDate_today()
+    {
+        using var clock = _fixture.Clock.Pin(AnchorInstant);
+
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            (await ReadPaymentStartDateAsync(registered.StoreId)).Should().Be(Start);
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
+
+    [Fact]
+    public async Task Register_store_reports_trial_in_billing_summary()
+    {
+        // Config pin required — this test reads SystemConfiguration-derived fields.
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
+        using var clock = _fixture.Clock.Pin(AnchorInstant);
+
+        var registered = await RegisterStoreAsync();
+        try
+        {
+            var me = await MeAsync(AuthTestHelpers.BearerClient(_f, registered.Token));
+            me.Data!.IsInTrial.Should().BeTrue();
+            // Module 6 "Estadísticas" passes GetAvailableModulesToStore's filter, so a
+            // self-registered store always receives at least one paid module.
+            me.Data.PlanType.Should().Be("Paid");
+            me.Data.PaymentStatus.Should().Be("AlDia");
+            me.Data.PaymentDueDate.Should().Be(Start.AddMonths(2));
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
+        }
+    }
 }
