@@ -64,7 +64,7 @@ internal sealed class RegisterStorePaymentCommandHandler : ICommandHandler<Regis
                 throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
         }
 
-        // Store must have been activated (PaymentStartDate != null)
+        // Legacy rows can still carry a null start date (no migration/backfill); new stores always carry one.
         if (store.PaymentStartDate is null)
             throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
 

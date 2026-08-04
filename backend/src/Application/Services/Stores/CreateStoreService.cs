@@ -1,4 +1,5 @@
-﻿using Domain.Entities.Modules;
+﻿using Application.Abstractions.Time;
+using Domain.Entities.Modules;
 using Domain.Entities.StoreModules;
 using Domain.Entities.Stores;
 using Domain.Interfaces.Repositories;
@@ -16,10 +17,11 @@ namespace Application.Services.Stores
         private readonly IOwnerRepository _ownerRepository;
         private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
         private readonly IStoreRoleFeatureGenerator _storeRoleFeaturesGenerator;
-        public CreateStoreService(IStoreRepository storeRepository, IModuleRepository moduleRepository, 
+        private readonly IDateTimeProvider _dateTimeProvider;
+        public CreateStoreService(IStoreRepository storeRepository, IModuleRepository moduleRepository,
             IStoreModuleRepository storeModuleRepository, IOwnerRepository ownerRepository,
             IStoreRoleFeatureRepository storeRoleFeatureRepository, IStoreRoleFeatureGenerator storeRoleFeaturesGenerator,
-            IFeatureRepository featureRepository)
+            IFeatureRepository featureRepository, IDateTimeProvider dateTimeProvider)
         {
             _storeRepository = storeRepository;
             _moduleRepository = moduleRepository;
@@ -28,12 +30,17 @@ namespace Application.Services.Stores
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _storeRoleFeaturesGenerator = storeRoleFeaturesGenerator;
             _featureRepository = featureRepository;
+            _dateTimeProvider = dateTimeProvider;
         }
 
-        public async Task<Store> CreateStoreAsync(Guid ownerId, Guid tenantId, string name, string? address, string? description, 
+        public async Task<Store> CreateStoreAsync(Guid ownerId, Guid tenantId, string name, string? address, string? description,
             bool approved, List<int> moduleIds)
         {
-            var store = Store.Create(name, ownerId, approved, tenantId, null, address, description);
+            // Every created store starts its trial clock unconditionally (paid or free-only modules).
+            // Identical derivation to UpdateStoreCommandHandler.cs's activation-on-first-paid conditional,
+            // so the two paths cannot drift.
+            var store = Store.Create(name, ownerId, approved, tenantId,
+                DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime), address, description);
             await _storeRepository.AddAsync(store);
 
             var modules = (await _moduleRepository.GetModulesByIdsAsync(moduleIds)).ToDictionary(m => m.Id);

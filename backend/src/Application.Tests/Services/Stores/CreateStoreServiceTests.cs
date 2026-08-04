@@ -1,3 +1,4 @@
+using Application.Abstractions.Time;
 using Application.Services.Stores;
 using Domain.Entities.Features;
 using Domain.Entities.Modules;
@@ -28,10 +29,12 @@ public class CreateStoreServiceTests
     private readonly Mock<IOwnerRepository> _mockOwnerRepository;
     private readonly Mock<IStoreRoleFeatureRepository> _mockStoreRoleFeatureRepository;
     private readonly Mock<IStoreRoleFeatureGenerator> _mockStoreRoleFeatureGenerator;
+    private readonly Mock<IDateTimeProvider> _mockDateTimeProvider;
     // Test data
     private readonly Guid _testOwnerId = Guid.NewGuid();
     private readonly Guid _testTenantId = Guid.NewGuid();
     private readonly Guid _testStoreId = Guid.NewGuid();
+    private static readonly DateTimeOffset FixedNow = new(2026, 3, 10, 0, 0, 0, TimeSpan.Zero);
 
     public CreateStoreServiceTests()
     {
@@ -42,6 +45,7 @@ public class CreateStoreServiceTests
         _mockOwnerRepository = new Mock<IOwnerRepository>();
         _mockStoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>();
         _mockStoreRoleFeatureGenerator = new Mock<IStoreRoleFeatureGenerator>();
+        _mockDateTimeProvider = new Mock<IDateTimeProvider>();
         // Default successful setups
         SetupDefaultSuccessfulScenarios();
     }
@@ -55,7 +59,8 @@ public class CreateStoreServiceTests
             _mockOwnerRepository.Object,
             _mockStoreFeatureRepository.Object,
             _mockStoreRoleFeatureGenerator.Object,
-            _mockFeatureRepository.Object);
+            _mockFeatureRepository.Object,
+            _mockDateTimeProvider.Object);
     }
 
     private void SetupDefaultSuccessfulScenarios()
@@ -64,6 +69,13 @@ public class CreateStoreServiceTests
         _mockStoreRepository
             .Setup(x => x.AddAsync(It.IsAny<Store>()))
             .ReturnsAsync((Store s) => s);
+
+        // Date time provider setup — mandatory: an unconfigured Mock<IDateTimeProvider>.UtcNow
+        // returns default(DateTimeOffset) (0001-01-01), which would silently poison every other
+        // test in this file that does not care about the clock.
+        _mockDateTimeProvider
+            .Setup(x => x.UtcNow)
+            .Returns(FixedNow);
 
         // Module repository setup - returns valid modules by ids
         _mockModuleRepository
@@ -140,7 +152,7 @@ public class CreateStoreServiceTests
     }
 
     [Fact]
-    public async Task CreateStoreAsync_ShouldSetPaymentStartDate_NullInitially()
+    public async Task CreateStoreAsync_ShouldSetPaymentStartDate_ToProviderToday()
     {
         // Arrange
         var service = CreateService();
@@ -156,7 +168,30 @@ public class CreateStoreServiceTests
             new List<int> { 1 });
 
         // Assert
-        result.PaymentStartDate.Should().BeNull();
+        result.PaymentStartDate.Should().Be(DateOnly.FromDateTime(FixedNow.UtcDateTime));
+    }
+
+    [Fact]
+    public async Task CreateStoreAsync_ShouldUseProviderClock_NotWallClock()
+    {
+        // Arrange
+        var distinctInstant = new DateTimeOffset(2030, 11, 20, 0, 0, 0, TimeSpan.Zero);
+        _mockDateTimeProvider.Setup(x => x.UtcNow).Returns(distinctInstant);
+        var service = CreateService();
+
+        // Act
+        var result = await service.CreateStoreAsync(
+            _testOwnerId,
+            _testTenantId,
+            "Store",
+            null,
+            null,
+            false,
+            new List<int> { 1 });
+
+        // Assert
+        result.PaymentStartDate.Should().Be(DateOnly.FromDateTime(distinctInstant.UtcDateTime));
+        result.PaymentStartDate.Should().NotBe(DateOnly.FromDateTime(FixedNow.UtcDateTime));
     }
 
     [Fact]
