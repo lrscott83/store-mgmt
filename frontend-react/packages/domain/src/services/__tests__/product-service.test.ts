@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ProductService } from '../product-service';
 import type { Product, ProductSelectView } from '../../models/product';
-import type { CsvProduct } from '../../models/csv-product';
+import type { CsvProduct, CsvImportResult, CsvProductCreated } from '../../models/csv-product';
 import type { BaseResponseModel } from '../../models/base';
 import { success, failure } from '../../commons/envelope';
 
@@ -64,13 +64,13 @@ class FakeProductService implements ProductService {
     return success(true);
   }
 
-  async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<boolean>> {
-    csvProducts.forEach((row, index) => {
-      this.items.push(
-        makeProduct({ id: `csv-${index}`, name: row.name, price: row.price, categoryName: row.category }),
-      );
+  async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<CsvImportResult>> {
+    const created: CsvProductCreated[] = csvProducts.map((row, index) => {
+      const id = `csv-${index}`;
+      this.items.push(makeProduct({ id, name: row.name, price: row.price, categoryName: row.category }));
+      return { ...row, id };
     });
-    return success(true);
+    return success({ created, failed: [] });
   }
 
   async getProductsToSaleByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>> {
@@ -182,6 +182,10 @@ describe('ProductService', () => {
 
     const csvResult = await svc.createCsvProducts([{ category: 'Snacks', name: 'Papas', price: 1.5 }]);
     expect(csvResult.succeeded).toBe(true);
+    if (!csvResult.succeeded) throw new Error('expected succeeded response');
+    expect(csvResult.data.created).toHaveLength(1);
+    expect(csvResult.data.created[0]).toMatchObject({ category: 'Snacks', name: 'Papas', price: 1.5 });
+    expect(csvResult.data.failed).toHaveLength(0);
 
     const bulkResult = await svc.createProducts('cat1', [{ name: 'Sprite', price: 2 }]);
     expect(bulkResult.succeeded).toBe(true);

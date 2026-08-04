@@ -1,5 +1,6 @@
 import type {
   BaseResponseModel,
+  CsvImportResult,
   CsvProduct,
   Product,
   ProductSelectView,
@@ -77,9 +78,16 @@ export class ProductOnlineService implements ProductService {
     return response.data;
   }
 
-  async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<boolean>> {
+  /**
+   * Generic-only change (csv-import-cost-quantity-entries, decision #2): declared as
+   * `BaseResponseModel<CsvImportResult>` to satisfy `ProductService`, body untouched. The backend
+   * `import` endpoint actually returns a boolean envelope, so this declared type is not backed by
+   * the API — the online path is dead under `USE_ONLINE_SERVICE:false` (`global-config.ts:2`),
+   * and reviving it needs a backend contract change that is explicitly out of scope here.
+   */
+  async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<CsvImportResult>> {
     const url = this.API_URL + 'import';
-    const response = await apiClient.post<BaseResponseModel<boolean>>(url, { csvProducts });
+    const response = await apiClient.post<BaseResponseModel<CsvImportResult>>(url, { csvProducts });
     return response.data;
   }
 

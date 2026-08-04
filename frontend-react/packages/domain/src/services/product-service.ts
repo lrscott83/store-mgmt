@@ -1,5 +1,5 @@
 import type { Product, ProductSelectView } from '../models/product';
-import type { CsvProduct } from '../models/csv-product';
+import type { CsvProduct, CsvImportResult } from '../models/csv-product';
 import type { BaseResponseModel } from '../models/base';
 
 /**
@@ -30,7 +30,7 @@ export interface ProductService {
   getProductsToSelect(): Promise<BaseResponseModel<ProductSelectView[]>>;
   getAvailableProductsByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>>;
   deleteProduct(id: string): Promise<BaseResponseModel<boolean>>;
-  createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<boolean>>;
+  createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<CsvImportResult>>;
 
   getProductsToSaleByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>>;
 

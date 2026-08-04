@@ -1,7 +1,25 @@
-import type { BaseResponseModel, CsvProduct, Product, ProductService, ProductSelectView } from '@store-mgmt/domain';
+import type {
+  BaseResponseModel,
+  CsvImportResult,
+  CsvProduct,
+  CsvProductCreated,
+  Product,
+  ProductService,
+  ProductSelectView,
+} from '@store-mgmt/domain';
 import { failure, ProductErrors, success } from '@store-mgmt/domain';
 import { ProductRepository } from '../repositories/product-repository';
 import { ProductCategoryRepository } from '../repositories/product-category-repository';
+
+// Module-local id generator (same pattern as inventory-offline-service.ts:89,
+// order-offline-service.ts:58, expense-offline-service.ts:9,
+// sale-credit-offline-service.ts:8, product-repository.ts:8,
+// product-category-repository.ts:6). Needed here (ADR-3) because the id must be known BEFORE
+// `addProductData` is called, so it can be threaded onto the created row and later addressed by
+// an inventory entry.
+function generateId(): string {
+  return crypto.randomUUID();
+}
 
 /**
  * ProductOfflineService — React mirror of Angular's
@@ -194,22 +212,39 @@ export class ProductOfflineService implements ProductService {
   }
 
   /**
-   * 1:1 port of Angular `createCsvProducts` (product-offline.service.ts:74-84) — per row resolves
-   * the category by name (creating it via `addProductCategoryByName` if absent), then
-   * `getNextOrder` + `addProduct` with the SAME hardcoded flags as `createProducts`. NO barcode
-   * (Flag #2 RATIFIED: Angular's `CsvProduct` is `{category,name,price}`). `Failure([])` on any
-   * failure (ANGULAR-BUG-SUSPECT #1).
+   * Was a 1:1 port of Angular `createCsvProducts` (product-offline.service.ts:74-84). DIVERGES
+   * DELIBERATELY (decisions #2/#3/#13/#15). Unchanged: per-row category resolve-or-create, the
+   * hardcoded flags, no barcode, the non-short-circuited forEach. Changed: the id is generated
+   * HERE and handed to `addProductData` (instead of `addProduct` generating and discarding it) so
+   * the caller can address inventory entries to the created products; the return is a per-row
+   * `CsvImportResult` instead of `Success(true)`/`Failure([])`. It ALWAYS resolves `success(...)`
+   * — `failure()` hardcodes `data:null` (envelope.ts:19-27) and would destroy the payload — so
+   * callers branch on `data.failed.length > 0`, never on `succeeded`. ANGULAR-BUG-SUSPECT #1 is
+   * retired for THIS method only; `createProducts` still mirrors it.
    */
-  async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<boolean>> {
-    let hasError = false;
+  async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<CsvImportResult>> {
+    const created: CsvProductCreated[] = [];
+    const failed: CsvProduct[] = [];
     csvProducts.forEach((csvProduct) => {
       const category = this.categoryRepository.getProductCategoryByName(csvProduct.category);
       const categoryId = category ? category.id : this.categoryRepository.addProductCategoryByName(csvProduct.category);
       const order = this.getNextOrder(categoryId);
-      const result = this.productRepository.addProduct(categoryId, csvProduct.name, csvProduct.price, '', order, true, true, true);
-      if (!result.succeeded) hasError = true;
+      const id = generateId();
+      const result = this.productRepository.addProductData(
+        id,
+        categoryId,
+        csvProduct.name,
+        csvProduct.price,
+        '',
+        order,
+        true,
+        true,
+        true,
+      );
+      if (result.succeeded) created.push({ ...csvProduct, id });
+      else failed.push(csvProduct);
     });
-    return !hasError ? success(true) : failure([]);
+    return success({ created, failed });
   }
 
   /** Private 1:1 port of Angular `getNextOrder` (product-offline.service.ts:164-167). */

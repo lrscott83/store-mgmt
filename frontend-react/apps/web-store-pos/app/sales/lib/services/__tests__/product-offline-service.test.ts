@@ -349,13 +349,16 @@ describe('ProductOfflineService', () => {
   });
 
   describe('PROD-24: createCsvProducts (async, resolves/creates category per row)', () => {
-    it('creates the category by name when absent, then the product with discountFromInvantory: true', async () => {
+    it('creates the category by name when absent, then the product with discountFromInvantory: true, and always resolves succeeded:true (ADR-1)', async () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
 
       const result = await service.createCsvProducts([{ category: 'Snacks', name: 'Papas', price: 1.5 }]);
-      expect(result).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
+      if (!result.succeeded) throw new Error('expected succeeded response');
+      expect(result.succeeded).toBe(true);
+      expect(result.data.created).toHaveLength(1);
+      expect(result.data.failed).toHaveLength(0);
       const category = categoryRepository.getProductCategoryByName('Snacks');
       expect(category).not.toBeUndefined();
       const products = productRepository.getProductsByCategoryId(category!.id);
@@ -372,6 +375,76 @@ describe('ProductOfflineService', () => {
       await service.createCsvProducts([{ category: 'Bebidas', name: 'Coca Cola', price: 1.5 }]);
       expect(categoryRepository.getProductCategories()).toHaveLength(1);
       expect(productRepository.getProductsByCategoryId(existingId)).toHaveLength(1);
+    });
+
+    it('created row carries a real generated id resolvable via productRepository.getProductById', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+
+      const result = await service.createCsvProducts([{ category: 'Snacks', name: 'Papas', price: 1.5 }]);
+      if (!result.succeeded) throw new Error('expected succeeded response');
+      const createdRow = result.data.created[0];
+      expect(createdRow.id).toBeTruthy();
+      const persisted = productRepository.getProductById(createdRow.id);
+      expect(persisted).not.toBeUndefined();
+      expect(persisted!.name).toBe('Papas');
+    });
+
+    it('passes cost/quantity through unchanged onto the created row', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+
+      const result = await service.createCsvProducts([
+        { category: 'Snacks', name: 'Papas', price: 1.5, cost: 1, quantity: 20 },
+      ]);
+      if (!result.succeeded) throw new Error('expected succeeded response');
+      expect(result.data.created[0]).toMatchObject({ cost: 1, quantity: 20 });
+    });
+
+    it('a duplicate name+category lands in failed and creates nothing', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
+      productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
+
+      const result = await service.createCsvProducts([{ category: 'Bebidas', name: 'Coca Cola', price: 1.5 }]);
+      if (!result.succeeded) throw new Error('expected succeeded response');
+      expect(result.data.created).toHaveLength(0);
+      expect(result.data.failed).toHaveLength(1);
+      expect(result.data.failed[0]).toMatchObject({ category: 'Bebidas', name: 'Coca Cola' });
+      expect(productRepository.getProductsByCategoryId(categoryId)).toHaveLength(1);
+    });
+
+    it('a mixed batch splits correctly between created and failed', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
+      productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
+
+      const result = await service.createCsvProducts([
+        { category: 'Bebidas', name: 'Coca Cola', price: 1.5 },
+        { category: 'Bebidas', name: 'Fanta', price: 1.2 },
+      ]);
+      if (!result.succeeded) throw new Error('expected succeeded response');
+      expect(result.data.created).toHaveLength(1);
+      expect(result.data.created[0].name).toBe('Fanta');
+      expect(result.data.failed).toHaveLength(1);
+      expect(result.data.failed[0].name).toBe('Coca Cola');
+    });
+
+    it('resolves succeeded:true even when failed is non-empty (ADR-1)', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+      const categoryId = categoryRepository.addProductCategoryByName('Bebidas');
+      productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
+
+      const result = await service.createCsvProducts([{ category: 'Bebidas', name: 'Coca Cola', price: 1.5 }]);
+      expect(result.succeeded).toBe(true);
     });
   });
 });
