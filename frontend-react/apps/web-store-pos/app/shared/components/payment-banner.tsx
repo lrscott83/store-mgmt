@@ -22,7 +22,18 @@ export function PaymentBanner() {
   // DG-2: defaulting for a stale/pre-backend payload lives HERE, not in getMe.
   const paymentStatus = user?.paymentStatus ?? 'NoAplica';
 
-  if (paymentStatus === 'NoAplica' || paymentStatus === 'AlDia') {
+  // No billing clock at all → nothing to say.
+  if (paymentStatus === 'NoAplica') {
+    return null;
+  }
+
+  // An up-to-date plan is silent UNLESS it is inside the trial. `AlDia` is the
+  // status a store holds for the WHOLE trial, not an edge case: the first due
+  // date is `start + trialMonths + 1 month`, so `PorVencer` (due - DueSoonDays)
+  // always falls after the trial ends and can never overlap it. Returning early
+  // on `AlDia` therefore made the trial notice unreachable, leaving owners with
+  // no indication of the free month or of when the first charge lands.
+  if (paymentStatus === 'AlDia' && !user?.isInTrial) {
     return null;
   }
 
