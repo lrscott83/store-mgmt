@@ -184,6 +184,19 @@ public sealed class StoreCreationTrialTests
         return store.PaymentStartDate;
     }
 
+    /// <summary>
+    /// Reads the raw tenant of a store and of a user, bypassing query filters, so a test can
+    /// tell "the store is invisible to this caller" apart from "the store was never pointed at".
+    /// </summary>
+    private async Task<(Guid StoreTenantId, Guid UserTenantId)> ReadTenantsAsync(Guid storeId, Guid userId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var store = await db.Set<Store>().IgnoreQueryFilters().AsNoTracking().FirstAsync(s => s.Id == storeId);
+        var user = await db.Set<User>().IgnoreQueryFilters().AsNoTracking().FirstAsync(u => u.Id == userId);
+        return (store.TenantId, user.TenantId);
+    }
+
     private async Task SetSelectedStoreIdAsync(Guid userId, Guid storeId)
     {
         using var scope = _f.Services.CreateScope();
@@ -508,9 +521,16 @@ public sealed class StoreCreationTrialTests
             using var atAssertion = _fixture.Clock.Pin(AtUtc(due.AddDays(6)));
             var me = await MeAsync(DbTestHelpers.AuthedClient(_f, created.OwnerUserId, created.OwnerLogin));
 
-            // Assert the precondition first: without it, "the paid module was correctly cut"
+            // Localize an unresolved store before blaming the module filter:
+            // (1) did the SelectedStoreId pointer take, and (2) is the store visible to this
+            // caller's tenant at all? Either one failing produces the same empty module list.
+            me.Data!.SelectedStoreId.Should().Be(created.StoreId);
+            var (storeTenantId, userTenantId) = await ReadTenantsAsync(created.StoreId, created.OwnerUserId);
+            storeTenantId.Should().Be(userTenantId);
+
+            // Assert the precondition: without it, "the paid module was correctly cut"
             // and "the store was never resolved at all" both surface as an empty list.
-            me.Data!.PaymentStatus.Should().Be("Vencido");
+            me.Data.PaymentStatus.Should().Be("Vencido");
 
             me.Data.StoreModuleIds.Should().Contain(StoreSeed.ManagementModuleId);
             me.Data.StoreModuleIds.Should().NotContain(BillingSeed.StatisticsModuleId);
