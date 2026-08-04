@@ -1,7 +1,9 @@
 ﻿using Asp.Versioning;
+using Application.Abstractions.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using SMCA.WebApi.OptionsSetup;
 
@@ -48,6 +50,26 @@ namespace SMCA.WebApi.Extensions
                         OnAuthenticationFailed = async (context) =>
                         {
                             Console.WriteLine("Printing in the delegate OnAuthFailed");
+                        },
+                        OnTokenValidated = async (context) =>
+                        {
+                            // Blacklist enforcement: reject a token whose jti was already
+                            // revoked (logout / inactive-account /auth/me) BEFORE the action
+                            // executes. Lives here, not in JwtBearerOptionsSetup, because the
+                            // bearer handler uses the named "Bearer" options — the setup's
+                            // OnTokenValidated was silently dropped by the AddJwtBearer lambda.
+                            var jti = context.Principal?.Claims?
+                                .FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti)?.Value;
+
+                            if (!string.IsNullOrEmpty(jti))
+                            {
+                                var blacklistService = context.HttpContext.RequestServices
+                                    .GetRequiredService<ITokenBlacklistService>();
+                                if (await blacklistService.IsBlacklistedAsync(jti))
+                                {
+                                    context.Fail("Token has been revoked");
+                                }
+                            }
                         },
                         OnChallenge = async (context) =>
                         {

@@ -77,7 +77,20 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(typeof(ResponseResult), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetMeAsync()
         {
-            return Ok(await Sender.Send(new GetMeQuery()));
+            var result = await Sender.Send(new GetMeQuery());
+
+            if (result.Succeeded)
+                return Ok(result);
+
+            // Asymmetry: /auth/me maps ActionCode to a real HTTP status because failure
+            // here means "session over" — a terminated session must not look like a
+            // successful fetch. The other 63 actions keep the 200 + envelope convention.
+            // 401 stays reachable via the blacklist middleware (JwtBearerOptionsSetup).
+            return result.ActionCode switch
+            {
+                404 => NotFound(result), // GetMeQuery: no external id / user not found / inactive
+                _ => NotFound(result)    // ActionCode is int? — null falls to the default arm
+            };
         }
 
         [HttpPost("register")]

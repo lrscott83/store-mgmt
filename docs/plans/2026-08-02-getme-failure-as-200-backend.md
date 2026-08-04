@@ -1,5 +1,7 @@
 # `/auth/me` Returns Failure As HTTP 200 — Backend Implementation Plan
 
+> **STATUS: RESOLVED 2026-08-04** — Tasks 1–3 implemented and verified in change `getme-failure-as-200-backend` (spec AU-ME1, archive `openspec/changes/archive/2026-08-04-getme-failure-as-200-backend/`). Task 4 (frontend) was already implemented earlier on `frontend-react`; its history is referenced there and in the change's `explore.md`. Keep this doc as the historical record — do not re-run.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 Date: 2026-08-02
