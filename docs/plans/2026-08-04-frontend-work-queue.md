@@ -17,39 +17,22 @@ These frontend plans were confirmed resolved in code and their files removed on 
 `2026-08-02-owners-create-frontend.md`, `2026-08-02-owners-getall-frontend.md`,
 `owners-update-endpoint-fixes-frontend.md`. Recoverable from git history.
 
----
+**Group A — `owners-getbyid-envelope-404` — RESOLVED and removed from this queue on
+2026-08-04.** Full SDD cycle, verify PASS (0 CRITICAL, 0 WARNING, 1 SUGGESTION resolved).
+Branch `feat/owners-getbyid-envelope-404`, commits `05e4db2` (helper), `389c059` (load path),
+`97de04b` (archive). `ownerErrorMessageId` now derives a status from either channel —
+`error.response.status` or the envelope's `actionCode` when `succeeded === false` — and both
+arms of the owner-edit load effect index one hoisted `LOAD_ERROR_KEYS` map. The delta was
+merged into `openspec/specs/admin-owners-resellers/`; the archived artifacts live at
+`openspec/changes/archive/owners-getbyid-envelope-404/`. Its source plan
+`2026-08-02-owners-getbyid-frontend.md` was deleted with it.
 
-## A — `owners-getbyid-envelope-404` (P1)
-
-**Source plan:** `docs/plans/2026-08-02-owners-getbyid-frontend.md`
-**Blocked on:** nothing. The only item here that can be closed today.
-
-`GET /Owners/{id}` reports "owner not found" as **HTTP 200 with an envelope** carrying
-`succeeded: false, actionCode: 404` — verified at `GetOwnerByIdQuery.cs:34` (the handler
-returns `ResponseResult.Failure` with `HttpStatusCode.NotFound`) and
-`OwnersController.cs:51` (`return Ok(...)`, unconditional).
-
-The frontend classifies by HTTP status instead:
-
-- `app/admin/owners/lib/owner-error-message.ts:10` reads `error.response.status`
-- `app/admin/owners/routes/owner-edit.tsx:237` maps `404 -> OWNER.NOT_FOUND`, which the
-  load path never reaches
-- `app/admin/owners/routes/owner-edit.tsx:149-152` falls through to the generic `OWNER.ERROR`
-
-Net effect: the user is told something went wrong when the truth is that the owner does not
-exist.
-
-- [ ] Read `actionCode` off the envelope when `succeeded === false`, so both channels — HTTP
-      status and envelope code — resolve to the same message key.
-- [ ] Cover the envelope-404 load path in `owner-edit.test.tsx`.
-
-Note for whoever picks this up: the 200-with-envelope shape is the API's documented
-convention (66 `return Ok(await Sender.Send(...))` sites across 13 controllers), not a
-backend defect to wait on. `CreateOwnerAsync` is the exception, not the rule.
+Groups below keep their original letters, so B remains B — the priority numbers are what
+shifted.
 
 ---
 
-## B — Offline manual acceptance (P2)
+## B — Offline manual acceptance (P1)
 
 **Source plans:** `docs/plans/2026-07-28-offline-auth-frontend-smoke-checklist.md` (0 of 9 steps
 run), `docs/plans/2026-07-27-pwa-offline-shell-frontend-plan.md` (Tasks 7 and 8)
@@ -74,7 +57,7 @@ explain a failure in the walkthrough.
 
 ---
 
-## C — `cash-session-pos` (P3)
+## C — `cash-session-pos` (P2)
 
 **Source plan:** `docs/plans/sesion-de-caja-apertura-cierre-pos.md`
 **Blocked on:** nothing. Full SDD cycle from proposal — it is a new feature, not a fix.
@@ -87,7 +70,7 @@ Largest of the unblocked groups.
 
 ---
 
-## D — `offline-roster-contract-v3` (P4)
+## D — `offline-roster-contract-v3` (P3)
 
 **Source plans:** `docs/plans/2026-07-25-at-rest-encryption-frontend-plan.md` (the KAT fixture),
 `docs/plans/2026-08-04-offline-roster-billing-fields-frontend.md`
