@@ -58,7 +58,9 @@ public class BillingServiceTests : IDisposable
         typeof(Store).GetProperty("Id")!.SetValue(store, storeId);
         store.StoreModules = storeModules.ToList();
 
-        _storeRepository.Setup(x => x.GetByIdAsync(storeId)).ReturnsAsync(store);
+        // Must mirror what BillingService actually calls: GetByIdAsync is a bare FindAsync and
+        // would leave StoreModules unloaded, so the service reads the including-modules getter.
+        _storeRepository.Setup(x => x.GetStoreByIdIncludingModulesAsync(storeId)).ReturnsAsync(store);
 
         // Build Module entities that mirror the StoreModules
         var moduleList = storeModules.Select(sm =>
@@ -97,7 +99,7 @@ public class BillingServiceTests : IDisposable
     public async Task GetStoreBillingSummary_unknownStore_returnsNoAplica()
     {
         var storeId = Guid.NewGuid();
-        _storeRepository.Setup(x => x.GetByIdAsync(storeId)).ReturnsAsync((Store?)null);
+        _storeRepository.Setup(x => x.GetStoreByIdIncludingModulesAsync(storeId)).ReturnsAsync((Store?)null);
 
         var sut = CreateSut();
         var result = await sut.GetStoreBillingSummaryAsync(storeId);
