@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { BaseResponseModel, Product, ProductCategory } from '@store-mgmt/domain';
+import type { BaseResponseModel, CsvImportResult, Product, ProductCategory } from '@store-mgmt/domain';
 
 // --- Mutable in-memory fixtures, controlled per-test ---
 let mockCategories: ProductCategory[] = [];
@@ -25,7 +25,13 @@ const productServiceSpies = vi.hoisted(() => ({
   createProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   updateProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   deleteProduct: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
-  createCsvProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  // ADR-1/ADR-2 (csv-import-cost-quantity-entries): createCsvProducts ALWAYS resolves
+  // success(...) — a per-row {created,failed} payload replaces the old boolean, so callers
+  // branch on `data.failed.length > 0`, never on `succeeded`.
+  createCsvProducts: vi.fn(
+    (..._args: unknown[]): Promise<BaseResponseModel<CsvImportResult>> =>
+      Promise.resolve({ data: { created: [], failed: [] }, succeeded: true, message: '', actionCode: 200, errors: [] }),
+  ),
   createProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
   getMaxOrder: vi.fn((..._args: unknown[]) => Promise.resolve({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] })),
 }));
@@ -65,6 +71,26 @@ const categoryServiceSpies = vi.hoisted(() => ({
     message: '',
     actionCode: 200,
     errors: [],
+  })),
+}));
+
+// WU3 (csv-import-cost-quantity-entries): handleCsvImport constructs InventoryOfflineService
+// inline (ADR-5, mirrors today-entries.tsx:138-141) to create one entry per created row with a
+// qualifying quantity. ProductRepository/ProductCategoryRepository stay REAL — they are only
+// constructor args to the mocked service, never read, so no mock is needed for them.
+const inventoryServiceSpies = vi.hoisted(() => ({
+  createInventoryEntry: vi.fn(
+    (..._args: unknown[]): { succeeded: boolean; errors: unknown[]; data: undefined } | null => ({
+      succeeded: true,
+      errors: [],
+      data: undefined,
+    }),
+  ),
+}));
+
+vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
+  InventoryOfflineService: vi.fn().mockImplementation(() => ({
+    createInventoryEntry: inventoryServiceSpies.createInventoryEntry,
   })),
 }));
 
@@ -171,6 +197,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       errors: [],
     });
     productServiceSpies.createCsvProducts.mockClear();
+    productServiceSpies.createCsvProducts.mockResolvedValue({
+      data: { created: [], failed: [] },
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+    inventoryServiceSpies.createInventoryEntry.mockClear();
+    inventoryServiceSpies.createInventoryEntry.mockReturnValue({ succeeded: true, errors: [], data: undefined });
     showBlockingInfoMock.mockClear();
     showBlockingErrorMock.mockClear();
     showToastSuccessMock.mockClear();
@@ -652,12 +687,37 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
   // validateProducts): the whole file routes through ProductService.createCsvProducts, which
   // resolves/creates categories by NAME internally. Category-less rows are filtered out
   // (Angular's validateProducts). No barcode column (Flag #2 RATIFIED).
+  //
+  // csv-import-cost-quantity-entries (WU3): handleCsvImport also orchestrates one
+  // InventoryOfflineService.createInventoryEntry(id, quantity, costPrice) call per row
+  // `createCsvProducts` reports as `created` AND that carries a qualifying `quantity > 0`
+  // (decisions #7/#8/#12, ADR-5). `product.quantity` is preserved by the parser even when it is
+  // `0` or negative (REQ-1 sc.6/7) — the gate here MUST be `!product.quantity ||
+  // product.quantity <= 0`, a bare `!product.quantity` check would let a negative quantity
+  // (`!(-3)` is `false`) slip through.
   describe('handleCsvImport — ProductService.createCsvProducts call site', () => {
     function makeCsvFile(): File {
       return new File(['name,price,category\nChips,10,Snacks'], 'products.csv', { type: 'text/csv' });
     }
 
-    it('calls createCsvProducts with the parsed {category,name,price} rows', async () => {
+    function makeCsvFileWithCostQuantity(): File {
+      return new File(['name,price,category,cost,quantity\nChips,10,Snacks,6,12'], 'products.csv', { type: 'text/csv' });
+    }
+
+    function mockCreateCsvProductsOnce(
+      created: { id: string; category: string; name: string; price: number; cost?: number; quantity?: number }[],
+      failed: { category: string; name: string; price: number; cost?: number; quantity?: number }[] = [],
+    ) {
+      productServiceSpies.createCsvProducts.mockResolvedValueOnce({
+        data: { created, failed },
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
+    }
+
+    it('calls createCsvProducts with the parsed {category,name,price,cost,quantity} rows', async () => {
       render(
         <Wrapper>
           <ProductsPage />
@@ -665,13 +725,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('import-csv-button'));
-      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
+      // Concrete cost/quantity values (design R3): with real values the equality is no longer
+      // undefined-blind — it FAILS if cost/quantity aren't threaded from parser to service.
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
-        { category: 'Snacks', name: 'Chips', price: 10 },
+        { category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 },
       ]);
     });
 
@@ -692,15 +754,26 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() => expect(productServiceSpies.createCsvProducts).toHaveBeenCalledTimes(1));
+      // NOTE (design R3): this legacy 3-column fixture yields cost/quantity: undefined on the
+      // parsed row, written out explicitly for documentation. Vitest's recursive equality
+      // IGNORES explicitly-undefined properties, so this assertion CANNOT discriminate a
+      // regression that stops threading cost/quantity at all — it would pass either way. The
+      // real "legacy row creates no entry" guarantee is pinned by the dedicated
+      // 'does not create an entry when quantity is absent' case below, which asserts
+      // createInventoryEntry was never called.
       expect(productServiceSpies.createCsvProducts).toHaveBeenCalledWith([
-        { category: 'Snacks', name: 'Chips', price: 10 },
+        { category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
       ]);
     });
 
     // Angular handleSuccess parity (csv-product-importer-modal.component.ts:52-65): ALWAYS a
-    // success message with the imported count; a conditional "some already exist" info dialog
-    // ONLY when the response did not fully succeed.
-    it('always shows the success message with the imported count', async () => {
+    // success message; DIVERGES DELIBERATELY (decisions #14/#17) — the toast now reports REAL
+    // successes (products created + entries created), unconditionally, with no branching, even
+    // for a legacy CSV whose entries count is 0.
+    it('always shows both counts, including zero entries for a legacy CSV', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
+      ]);
       render(
         <Wrapper>
           <ProductsPage />
@@ -713,19 +786,142 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.'),
       );
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
       expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
 
-    it('shows the "already exist" info dialog only when the response did not fully succeed', async () => {
-      productServiceSpies.createCsvProducts.mockResolvedValueOnce({
-        data: false,
-        succeeded: false,
-        message: '',
-        actionCode: 200,
-        errors: [],
-      });
+    it('reports both real counts when some rows also create entries', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 },
+        { id: 'p2', category: 'Snacks', name: 'Soda', price: 5, cost: undefined, quantity: undefined },
+      ]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 2 productos y 1 entradas correctamente.'),
+      );
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates one inventory entry per created row with a qualifying quantity, called as (id, quantity, cost)', async () => {
+      mockCreateCsvProductsOnce([{ id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 }]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p1', 12, 6);
+    });
+
+    it('falls back to price when cost is absent (decision #7)', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p2', category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: 5 },
+      ]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p2', 5, 10);
+    });
+
+    // Decision #16: cost="0" is a VALID explicit zero, never a fallback trigger. `?? ` handles
+    // this correctly; `||` would NOT (0 is falsy), which is exactly the bug this pins.
+    it('uses an explicit cost of 0 for the entry, never falling back to price', async () => {
+      mockCreateCsvProductsOnce([{ id: 'p8', category: 'Snacks', name: 'Chips', price: 10, cost: 0, quantity: 5 }]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(1));
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledWith('p8', 5, 0);
+    });
+
+    it('does not create an entry when quantity is absent, zero, or negative', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p3', category: 'Snacks', name: 'A', price: 10, cost: 1, quantity: undefined },
+        { id: 'p4', category: 'Snacks', name: 'B', price: 10, cost: 1, quantity: 0 },
+        // The carry-forward risk this pins: the parser preserves negative quantity as -3 (REQ-1
+        // sc.7), so a bare `!product.quantity` check ("!(-3)" is `false` in JS) would let this
+        // row slip through to createInventoryEntry. It must not.
+        { id: 'p5', category: 'Snacks', name: 'C', price: 10, cost: 1, quantity: -3 },
+      ]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 3 productos y 0 entradas correctamente.'),
+      );
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+    });
+
+    it('does not count a bare-null return from createInventoryEntry toward the entries count (R2)', async () => {
+      inventoryServiceSpies.createInventoryEntry.mockReturnValueOnce(null);
+      mockCreateCsvProductsOnce([{ id: 'p6', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 }]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.'),
+      );
+    });
+
+    it('shows one blocking dialog enumerating each duplicate as "Categoría - Nombre", comma-joined', async () => {
+      mockCreateCsvProductsOnce(
+        [],
+        [
+          { category: 'Pizzas', name: 'Pizza de Queso', price: 150 },
+          { category: 'Confituras', name: 'Caramelo', price: 20 },
+        ],
+      );
       render(
         <Wrapper>
           <ProductsPage />
@@ -740,10 +936,28 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() =>
         expect(showBlockingInfoMock).toHaveBeenCalledWith(
           'Información',
-          'Algunos productos no fueron importados porque ya existen.',
+          'Algunos productos no fueron importados porque ya existen: Pizzas - Pizza de Queso, Confituras - Caramelo.',
         ),
       );
-      expect(showToastSuccessMock).toHaveBeenCalledTimes(1);
+      expect(showBlockingInfoMock).toHaveBeenCalledTimes(1);
+      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+    });
+
+    it('does not show the duplicate dialog when there are no failed rows', async () => {
+      mockCreateCsvProductsOnce([{ id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: 6, quantity: 12 }]);
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalledTimes(1));
+      expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Product, ProductCategory, ProductCategoryView } from '@store-mgmt/domain';
+import type { CsvProduct, Product, ProductCategory, ProductCategoryView } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -10,8 +10,11 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon, ChevronDownIcon } from '~/shared/components/ui/icons';
 import { showBlockingError, showBlockingInfo, confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
+import { ProductRepository } from '../lib/repositories/product-repository';
+import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { CategoryProductList } from '../components/category-product-list';
 import { CategoryActionsMenu } from '../components/category-actions-menu';
@@ -208,24 +211,68 @@ export function ProductsPage() {
   // validateProducts): category resolution/creation happens INSIDE createCsvProducts (per row,
   // by name). Rows without a category are filtered out here, mirroring Angular's
   // `validateProducts` (`item['category'] && item['name'] && price`). No barcode (Flag #2).
+  // DIVERGES DELIBERATELY (decision #12, csv-import-cost-quantity-entries, 2026-08-04): after
+  // `createCsvProducts` returns, this handler also creates one inventory entry per created row
+  // carrying a qualifying quantity, via the same primitive as manual entry
+  // (`InventoryOfflineService.createInventoryEntry`). The orchestration lives HERE, not inside
+  // `ProductOfflineService` — sales must not depend on inventory at the service layer.
   async function handleCsvImport(rows: ParsedProductRow[]) {
-    const csvProducts = rows
+    const csvProducts: CsvProduct[] = rows
       .filter((row) => row.category)
-      .map((row) => ({ category: row.category as string, name: row.name, price: row.price }));
+      .map((row) => ({
+        category: row.category,
+        name: row.name,
+        price: row.price,
+        cost: row.cost,
+        quantity: row.quantity,
+      }));
+
     const result = await productService.createCsvProducts(csvProducts);
+    // createCsvProducts always resolves success(...) by design (ADR-1): failure() hardcodes
+    // data:null (envelope.ts:19-27), which would destroy the {created,failed} payload. This ??
+    // is TS narrowing on the BaseResponseModel union, NOT a runtime failure path.
+    const { created, failed } = result.data ?? { created: [], failed: [] };
+
+    const inventoryService = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+    );
+
+    let entriesCreated = 0;
+    for (const product of created) {
+      // Absent, 0, or negative -> no entry (decision #8). The parser PRESERVES 0/negative
+      // quantities (REQ-1 sc.6/7) instead of collapsing them to undefined, so a bare
+      // `!product.quantity` check is insufficient here: `!(-3)` is `false` in JS and would let
+      // a negative-quantity row slip through to createInventoryEntry.
+      if (!product.quantity || product.quantity <= 0) continue;
+      const costPrice = product.cost ?? product.price; // decision #7/#16: 0 is a valid cost
+      const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice);
+      // R2: the primitive returns bare `null` (product not found) or a DataResult that may not
+      // have succeeded — the optional chain absorbs both, so neither inflates the count. Same
+      // idiom as today-entries.tsx:148.
+      if (entry?.succeeded) entriesCreated++;
+    }
+
     loadData();
     setModal(null);
 
     // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
-    // toast with the imported count (no title), PLUS a conditional info dialog when the
-    // response did not fully succeed ("some already exist") — the Spanish literal is
-    // Angular's own (component.ts:60,64), preserved verbatim. The toast is non-blocking, so
-    // it's no longer sequenced behind an awaited call before the conditional info dialog.
-    showToastSuccess(`Importados ${csvProducts.length} productos correctamente.`);
-    if (!result.succeeded) {
+    // toast (no title), PLUS a conditional info dialog when there are duplicates. DIVERGES
+    // DELIBERATELY (decisions #6/#14/#17): the toast reports REAL successes (products created +
+    // entries created), unconditionally, with no branching — even a legacy 3-column CSV reads
+    // "... y 0 entradas correctamente." The info dialog enumerates each duplicate as
+    // "Categoría - Nombre" instead of the generic literal. Both strings stay hardcoded Spanish
+    // (no i18n key), matching Angular's own and the pre-existing React literal — introducing
+    // keys is out of scope (R6). Swal renders `text` as `textContent` with no
+    // `white-space: pre-line` (sweetalert2 11.26.25, css `.swal2-html-container`), so the list
+    // MUST be single-line comma-joined, never newline-separated.
+    showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
+    if (failed.length > 0) {
       await showBlockingInfo(
         intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
-        'Algunos productos no fueron importados porque ya existen.',
+        `Algunos productos no fueron importados porque ya existen: ${failed
+          .map((p) => `${p.category} - ${p.name}`)
+          .join(', ')}.`,
       );
     }
   }
