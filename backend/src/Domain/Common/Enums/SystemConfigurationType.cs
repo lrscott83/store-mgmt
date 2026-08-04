@@ -15,5 +15,8 @@ namespace Domain.Common.Enums
 
         [Description("DueSoonDays")]
         DueSoonDays = 4,
+
+        [Description("OfflineRosterTtlDays")]
+        OfflineRosterTtlDays = 5,
     }
 }

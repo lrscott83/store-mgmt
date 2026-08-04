@@ -423,3 +423,113 @@ When `Succeeded == false`, `UpdatedAsync` MUST map ActionCode to real HTTP statu
 | 3b | 400 mapped | Validation/handler failure 400 | Action returns | HTTP 400 + envelope |
 | 3c | 403 mapped | Auth denial | Action returns | HTTP 403 + envelope |
 | 3d | Success | `Succeeded == true` | Action returns | HTTP 200 + `OwnerDto` envelope |
+
+---
+
+## Delta for api-controller: CreateOwnerAsync (OwnersController)
+
+**Change**: `owners-create-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: OC-CT1 — Swagger Documents 201, 400, 401, 403, 409, 500
+
+`CreateOwnerAsync` MUST declare `[ProducesResponseType(typeof(ResponseResult<OwnerDto>), StatusCodes.Status201Created)]` plus `[ProducesResponseType]` for 400, 401, 403, 409, and 500.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | 201 documented | Swagger/OpenAPI document generated | `CreateOwnerAsync` endpoint inspected | 201 with `ResponseResult<OwnerDto>` listed |
+| 1b–1f | 400/401/403/409/500 documented | Swagger/OpenAPI document generated | `CreateOwnerAsync` endpoint inspected | All five error statuses listed |
+
+#### Requirement: OC-CT2 — XML Documentation
+
+`CreateOwnerAsync` MUST carry an XML `<summary>` reading "Create a new owner", a `<param>` doc for each parameter, and a `<returns>` doc describing the created-owner envelope.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Summary | Controller source inspected | `CreateOwnerAsync` declaration | `<summary>` reads "Create a new owner" |
+| 2b | Param/returns | Controller source inspected | XML doc of `CreateOwnerAsync` | `<param>` per parameter and `<returns>` present |
+
+#### Requirement: OC-CT3 — Location Header on 201 Created
+
+On success, `CreateOwnerAsync` MUST return HTTP 201 with a `Location` header pointing to the created resource (`GET /api/v1/Owners/{id}`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 3a | Location present | Valid `POST` succeeds | Response returned | 201; `Location` header resolves to `GET /api/v1/Owners/{id}` |
+
+### Verification Criteria
+
+- [ ] `CreateOwnerAsync` declares 201 (typed `ResponseResult<OwnerDto>`) + 400, 401, 403, 409, 500
+- [ ] XML `<summary>` reads "Create a new owner"; `<param>`/`<returns>` docs present
+- [ ] 201 response includes `Location` header
+
+---
+
+## Delta for api-controller: GetOwnerAsync (OwnersController)
+
+**Change**: `owners-getbyid-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: OC-CT1 — Swagger Documents 400, 401, 403, 404, 500 for GetOwner
+
+`GetOwnerAsync` MUST declare `[ProducesResponseType(StatusCodes.Status400BadRequest)]`, `[ProducesResponseType(StatusCodes.Status401Unauthorized)]`, `[ProducesResponseType(StatusCodes.Status403Forbidden)]`, `[ProducesResponseType(StatusCodes.Status404NotFound)]`, and `[ProducesResponseType(StatusCodes.Status500InternalServerError)]` in addition to the existing 200 (mirrors `GetAllOwnersAsync:27-31`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a–1e | Five error statuses documented | Swagger/OpenAPI generated | `GetOwnerAsync` endpoint inspected | 400, 401, 403, 404, 500 listed as possible responses |
+| 1f | 200 preserved | Swagger/OpenAPI generated | `GetOwnerAsync` endpoint inspected | 200 OK with `ResponseResult<OwnerDto>` remains |
+
+#### Requirement: OC-CT2 — XML Doc Corrected + Param Documented
+
+The XML `<summary>` on `GetOwnerAsync` MUST read "Get owner by id" — it currently reads "Get user by id". The action MUST carry `<param name="id">` documenting the route parameter.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Summary corrected | Controller source inspected | `GetOwnerAsync` declaration | `<summary>` text is "Get owner by id" |
+| 2b | Param documented | Controller source inspected | `GetOwnerAsync` declaration | `<param name="id">` present |
+
+### Verification Criteria
+
+- [ ] `GetOwnerAsync` has `[ProducesResponseType]` for 400, 401, 403, 404, 500; 200 remains
+- [ ] XML summary says "Get owner by id"; `<param name="id">` present
+- [ ] Existing E2E tests pass unchanged (additive metadata only)
+
+---
+
+## Delta for api-controller: GetAllOwnersAsync (OwnersController)
+
+**Change**: `owners-getall-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: OC-CT1 — Swagger Documents 400, 401, 403, 500 for GetAllOwners
+
+`GetAllOwnersAsync` MUST declare `[ProducesResponseType(StatusCodes.Status400BadRequest)]`, `[ProducesResponseType(StatusCodes.Status401Unauthorized)]`, `[ProducesResponseType(StatusCodes.Status403Forbidden)]`, and `[ProducesResponseType(StatusCodes.Status500InternalServerError)]` in addition to the existing 200, mirroring prior endpoint-fixes deltas (`GetAllUsersAsync`, `GetUserByIdAsync`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a–1d | Four error statuses documented | Swagger/OpenAPI generated | `GetAllOwnersAsync` endpoint inspected | 400, 401, 403, 500 listed as possible responses |
+| 1e | 200 preserved | Swagger/OpenAPI generated | `GetAllOwnersAsync` endpoint inspected | 200 OK with `ResponseResult<List<OwnerDto>>` remains |
+
+#### Requirement: OC-CT2 — XML Doc Corrected + Param Documented
+
+The XML `<summary>` on `GetAllOwnersAsync` MUST read "Get all owners" — it currently reads "Get all users", incorrect copy referencing users instead of owners. The action MUST also carry `<param name="includeInactive">` documenting the route parameter.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Summary corrected | Controller source inspected | `GetAllOwnersAsync` declaration | `<summary>` text is "Get all owners" |
+| 2b | Param documented | Controller source inspected | `GetAllOwnersAsync` declaration | `<param name="includeInactive">` present |
+
+### Verification Criteria
+
+- [ ] `GetAllOwnersAsync` has `[ProducesResponseType]` for 400, 401, 403, 500; 200 remains
+- [ ] XML summary says "Get all owners"; `<param name="includeInactive">` present
+- [ ] All existing E2E tests (`OwnersListTests`, `OwnersListGapTests`) pass unchanged (additive metadata only)

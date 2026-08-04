@@ -10,5 +10,6 @@ namespace Domain.Interfaces.Repositories
         Task<float> GetReSellerPercentDiscountPriceAsync();
         Task<int> GetPaymentGraceDaysAsync();
         Task<int> GetDueSoonDaysAsync();
+        Task<int> GetOfflineRosterTtlDaysAsync();
     }
 }

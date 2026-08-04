@@ -29,7 +29,10 @@ namespace Infrastructure.Persistence.Repositories
 
         public async Task<IEnumerable<StoreModule>> GetStoreModulesByIdAsync(Guid storeId)
         {
-            return await _storeModules.Where(sm => sm.StoreId == storeId).ToListAsync();
+            return await _storeModules
+                .Include(sm => sm.Module)
+                .Where(sm => sm.StoreId == storeId)
+                .ToListAsync();
         }
     }
 }

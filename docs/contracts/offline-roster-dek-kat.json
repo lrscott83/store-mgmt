@@ -1,0 +1,16 @@
+{
+  "password": "Password123",
+  "storedPasswordHash": "AIxwOS46v70PpHu8LtlqqZvUnhWXJ/y6Dy5qvrOp1gE=",
+  "wrapSalt": "ZEplHk8lSOPz7nX3fuk/LA==",
+  "wrapIv": "zw/YuZDy7S4iQ0df",
+  "iterations": 210000,
+  "wrappedDek": "ZBtMo3BVWEviYiJLu231t\u002Bn79CkkAbyhxN1UY1HCUybM52jLNGXNPV8a5Z6x6UzY",
+  "expectedDek": "6\u002BlsyFPpYyQYHqFR43253v8j4ou2AFZWIDgNZOR\u002BR4I=",
+  "storeId": "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+  "masterSecret": "KAT-TEST-ONLY-MASTER-SECRET-3F8E4A2C-9D4B-4E6A-B2C5-8F1D7A3E9B40",
+  "_header": {
+    "provenance": "dotnet-backend",
+    "backendCommitSha": "d784a0481a63c6d3f0eeb257dc51b4de925d72df",
+    "dotnetVersion": "8.0.204"
+  }
+}

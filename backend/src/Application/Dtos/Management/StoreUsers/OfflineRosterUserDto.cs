@@ -19,4 +19,8 @@ public sealed class OfflineRosterUserDto
     public string WrappedDek { get; set; } = string.Empty;
     public string WrapSalt { get; set; } = string.Empty;
     public string WrapIv { get; set; } = string.Empty;
+    public DateOnly? PaymentDueDate { get; set; }
+    public bool IsInTrial { get; set; }
+    public string PaymentStatus { get; set; } = string.Empty;
+    public int WrapIterations { get; set; }
 }

@@ -2,12 +2,16 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Features;
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Time;
 using Application.Dtos.Authentication;
 using Application.Dtos.Management.StoreUsers;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Domain.Common.Extensions;
+using Domain.Common.Utils;
+using Domain.Entities.Billing;
 using Domain.Interfaces.Repositories;
+using Domain.Interfaces.Services.Billing;
 using Microsoft.Extensions.Localization;
 using Resources;
 using System.Net;
@@ -28,9 +32,12 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
         private readonly IOfflineVerifierService _offlineVerifierService;
         private readonly IStoreKeyWrapService _storeKeyWrapService;
         private readonly IStoreDataKeyProvider _storeDataKeyProvider;
+        private readonly IDateTimeProvider _dateTimeProvider;
+        private readonly ISystemConfigurationRepository _systemConfigurationRepository;
+        private readonly IBillingService _billingService;
         private readonly IStringLocalizer<I18n> _localizer;
 
-        private const int FormatVersion = 2;
+        private const int FormatVersion = 3;
 
         public ExportOfflineRosterQueryHandler(
             IHttpContextService httpContextService,
@@ -43,6 +50,9 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             IOfflineVerifierService offlineVerifierService,
             IStoreKeyWrapService storeKeyWrapService,
             IStoreDataKeyProvider storeDataKeyProvider,
+            IDateTimeProvider dateTimeProvider,
+            ISystemConfigurationRepository systemConfigurationRepository,
+            IBillingService billingService,
             IStringLocalizer<I18n> localizer)
         {
             _httpContextService = httpContextService;
@@ -55,6 +65,9 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             _offlineVerifierService = offlineVerifierService;
             _storeKeyWrapService = storeKeyWrapService;
             _storeDataKeyProvider = storeDataKeyProvider;
+            _dateTimeProvider = dateTimeProvider;
+            _systemConfigurationRepository = systemConfigurationRepository;
+            _billingService = billingService;
             _localizer = localizer;
         }
 
@@ -72,7 +85,8 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             }
 
             var storeModules = await _storeModuleRepository.GetStoreModulesByIdAsync(query.StoreId);
-            var storeModuleIds = storeModules.Select(sm => sm.ModuleId).ToList();
+            var billing = await _billingService.GetStoreBillingSummaryAsync(query.StoreId);
+            List<int> storeModuleIds = StoreBillingUtils.FilterForBilling(storeModules.Select(sm => sm.Module), billing);
 
             var storeUsers = (await _storeUserRepository.GetStoreUsersByStoreIdAsync(query.StoreId, includeInactive: true)).ToList();
 
@@ -122,16 +136,21 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                     },
                     WrappedDek = wrapped.WrappedDek,
                     WrapSalt = wrapped.WrapSalt,
-                    WrapIv = wrapped.WrapIv
+                    WrapIv = wrapped.WrapIv,
+                    PaymentDueDate = billing.NextDueDate,
+                    IsInTrial = billing.IsInTrial,
+                    PaymentStatus = billing.Status.ToString(),
+                    WrapIterations = wrapped.Iterations
                 });
             }
 
-            var now = DateTimeOffset.UtcNow;
+            int ttlDays = await _systemConfigurationRepository.GetOfflineRosterTtlDaysAsync();
+            var now = _dateTimeProvider.UtcNow;
             var dto = new OfflineRosterDto
             {
                 BundleId = Guid.NewGuid().ToString(),
                 IssuedAt = now.ToUnixTimeMilliseconds(),
-                ExpiresAt = now.AddDays(35).ToUnixTimeMilliseconds(),
+                ExpiresAt = now.AddDays(ttlDays).ToUnixTimeMilliseconds(),
                 FormatVersion = FormatVersion,
                 StoreId = query.StoreId,
                 Users = rosterUsers

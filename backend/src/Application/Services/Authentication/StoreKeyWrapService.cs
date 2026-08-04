@@ -37,6 +37,7 @@ public sealed class StoreKeyWrapService : IStoreKeyWrapService
         return new WrappedDekResult(
             Convert.ToBase64String(wrapped),
             Convert.ToBase64String(wrapSalt),
-            Convert.ToBase64String(wrapIv));
+            Convert.ToBase64String(wrapIv),
+            Iterations: KekIterations);
     }
 }

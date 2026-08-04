@@ -42,5 +42,11 @@ namespace Infrastructure.Persistence.Repositories
             SystemConfiguration? systemConfiguration = await _systemConfigurations.FirstOrDefaultAsync(conf => conf.Id == (int)SystemConfigurationType.DueSoonDays);
             return systemConfiguration != null ? int.Parse(systemConfiguration.Value) : 5;
         }
+
+        public async Task<int> GetOfflineRosterTtlDaysAsync()
+        {
+            SystemConfiguration? systemConfiguration = await _systemConfigurations.FirstOrDefaultAsync(conf => conf.Id == (int)SystemConfigurationType.OfflineRosterTtlDays);
+            return systemConfiguration != null ? int.Parse(systemConfiguration.Value) : 35;
+        }
     }
 }

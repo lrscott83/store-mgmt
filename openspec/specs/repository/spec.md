@@ -151,3 +151,73 @@ RR-G1 documented `Task<bool> ExistsAsync(Guid id)`; the implemented signature (`
 | 1a | Tracked load | Any update | Query executes | `AsTracking()` present; Owner+User loaded; no 5-join chain |
 | 1b | Token forwarded | Request with token | Query executes | Token reaches `FirstOrDefaultAsync` |
 | 1c | Update path light | Update flow | Repository call | Heavy include method not used on update path |
+
+---
+
+## Delta for repository: IOwnerRepository + OwnerRepository
+
+**Change**: `owners-getbyid-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: RR-1 — Complete Include Chain on GetOwnerIncludingUserByIdAsync
+
+`GetOwnerIncludingUserByIdAsync` MUST eagerly load the full navigation graph AutoMapper requires: `User`, `ReSellerOwner → ReSeller → User`, and `Stores.Where(s => s.IsActive) → StoreModules.Where(sm => sm.IsActive)` — mirroring `GetAllOwnersIncludingStoreModulesAsync` (`OwnerRepository.cs:23-25`).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | ReSeller resolved | Owner with ReSellerOwner→ReSeller→User graph | Query executes | `ReSellerOwner.ReSeller.User` eagerly loaded; DTO `GetReSellerName` resolves — no null |
+| 1b | Stores resolved | Owner with active Stores + active StoreModules | Query executes | `Stores.StoreModules` eagerly loaded with active-only filter |
+| 1c | Inactive excluded | Owner has inactive Store/StoreModule rows | Query executes | Inactive Stores/StoreModules not included in result |
+
+#### Requirement: RR-2 — CancellationToken Parameter on Interface + Implementation
+
+`IOwnerRepository.GetOwnerIncludingUserByIdAsync` MUST add `CancellationToken cancellationToken = default` as the final parameter (interface + implementation). The implementation MUST forward the token to `FirstOrDefaultAsync(cancellationToken)`.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Token passed to EF | Request with cancellation token | Query executes | `FirstOrDefaultAsync(cancellationToken)` receives the token |
+| 2b | Default when omitted | Existing callers not passing token | Same method called | `cancellationToken = default` applies; no compile errors |
+
+### Verification Criteria
+
+- [ ] Interface signature includes `CancellationToken cancellationToken = default`
+- [ ] Implementation has both ThenInclude chains + active filters, forwards token to `FirstOrDefaultAsync`
+- [ ] E2E `Get_owner_by_id_returns_200` passes with complete AutoMapper resolution
+- [ ] `dotnet build` passes — handler call site compiles unchanged (optional token param)
+
+---
+
+## Delta for repository: IOwnerRepository + OwnerRepository — GetAllOwners Queries
+
+**Change**: `owners-getall-endpoint-fixes`
+
+---
+
+### ADDED Requirements
+
+#### Requirement: RR-OC1 — `.Take(1000)` Safety Cap on Both GetAll Queries
+
+`GetAllOwnersIncludingStoreModulesAsync` and `GetReSellerOwnersIncludingStoreModulesAsync` MUST append `.Take(1000)` before `.ToListAsync()` to prevent unbounded result sets (mirrors RR2 in the `get-users-all-endpoint-fixes` Users repository delta).
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 1a | Limit applied | DB has 5000+ owners | Query executes | SQL includes TOP(1000)/LIMIT 1000; exactly 1000 rows returned |
+| 1b | Small result unaffected | DB has 50 owners | Query executes | SQL includes LIMIT 1000; all 50 rows returned |
+
+#### Requirement: RR-OC2 — CancellationToken Parameter on Interface + Implementation
+
+Both methods in `IOwnerRepository` MUST add `CancellationToken cancellationToken = default` as the final parameter. The implementations in `OwnerRepository` MUST accept and forward the token to `ToListAsync(cancellationToken)`.
+
+| # | Scenario | GIVEN | WHEN | THEN |
+|---|----------|-------|------|------|
+| 2a | Token passed to EF | Request with cancellation token | Query executes | `ToListAsync(cancellationToken)` receives the provided token |
+| 2b | Default when omitted | Existing callers not passing token | Same method called | `cancellationToken = default` applies; no compile errors |
+
+### Verification Criteria
+
+- [ ] Both interface methods include `CancellationToken cancellationToken = default`
+- [ ] Both implementations append `.Take(1000)` before `.ToListAsync(cancellationToken)`
+- [ ] `dotnet build` passes — existing callers compile unchanged (optional token param)

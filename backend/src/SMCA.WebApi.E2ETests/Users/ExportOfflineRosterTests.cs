@@ -2,8 +2,17 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using Application.Abstractions.Authentication;
+using Application.Dtos.Authentication;
+using Domain.Common.Constants;
 using Domain.Common.Enums;
+using Domain.Common.Extensions;
+using Domain.Entities.Owners;
+using Domain.Entities.StoreModules;
+using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.StoreUsers;
+using Domain.Entities.Stores;
+using Domain.Entities.SystemConfigurations;
 using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
 using FluentAssertions;
@@ -42,7 +51,7 @@ public sealed class ExportOfflineRosterTests
             body!.Succeeded.Should().BeTrue();
 
             var roster = body.Data!;
-            roster.FormatVersion.Should().Be(2);
+            roster.FormatVersion.Should().Be(3);
             roster.StoreId.Should().Be(owner.StoreId);
             Guid.TryParse(roster.BundleId, out _).Should().BeTrue();
 
@@ -60,6 +69,8 @@ public sealed class ExportOfflineRosterTests
                 user.WrappedDek.Should().NotBeNullOrEmpty();
                 user.WrapSalt.Should().NotBeNullOrEmpty();
                 user.WrapIv.Should().NotBeNullOrEmpty();
+                user.WrapIterations.Should().Be(210_000);
+                user.PaymentStatus.Should().NotBeNullOrEmpty();
             }
         }
         finally
@@ -198,7 +209,7 @@ public sealed class ExportOfflineRosterTests
             var body1 = await r1.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
             body1!.Succeeded.Should().BeTrue();
             var roster1 = body1.Data!;
-            roster1.FormatVersion.Should().Be(2);
+            roster1.FormatVersion.Should().Be(3);
             roster1.Users.Should().HaveCount(2);
 
             foreach (var user in roster1.Users)
@@ -214,7 +225,7 @@ public sealed class ExportOfflineRosterTests
             var body2 = await r2.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
             body2!.Succeeded.Should().BeTrue();
             var roster2 = body2.Data!;
-            roster2.FormatVersion.Should().Be(2);
+            roster2.FormatVersion.Should().Be(3);
             roster2.Users.Should().HaveCount(2);
 
             foreach (var user in roster2.Users)
@@ -248,8 +259,8 @@ public sealed class ExportOfflineRosterTests
                         .SingleAsync();
                 }
 
-                var dek1 = UnwrapDek(storedPasswordHash, user1.WrappedDek, user1.WrapSalt, user1.WrapIv);
-                var dek2 = UnwrapDek(storedPasswordHash, user2.WrappedDek, user2.WrapSalt, user2.WrapIv);
+                var dek1 = UnwrapDek(storedPasswordHash, user1.WrappedDek, user1.WrapSalt, user1.WrapIv, user1.WrapIterations);
+                var dek2 = UnwrapDek(storedPasswordHash, user2.WrappedDek, user2.WrapSalt, user2.WrapIv, user2.WrapIterations);
 
                 dek1.Should().HaveCount(32);
                 dek1.Should().BeEquivalentTo(dek2);
@@ -263,14 +274,326 @@ public sealed class ExportOfflineRosterTests
         }
     }
 
-    private static byte[] UnwrapDek(string storedPasswordHash, string wrappedDek, string wrapSalt, string wrapIv)
+    [Fact]
+    public async Task OwnerAdmin_export_vencidoStore_exportsOnlyPriceIncludedModules()
     {
-        // Mirrors StoreKeyWrapService: KEK = Pbkdf2(UTF8(hash), salt, 210_000, SHA256, 32);
+        using var _ = _f.Clock.Pin(new DateTimeOffset(2026, 7, 15, 0, 0, 0, TimeSpan.Zero));
+        var seeded = await BillingSeed.SeedPaidStoreAsync(_f, new DateOnly(2020, 1, 1));
+
+        try
+        {
+            await SetSelectedStoreAsync(seeded.UserId, seeded.StoreId);
+            await SeedStoreUserAsync(seeded.StoreId, seeded.TenantId, "venc-u1", "Vencido User One");
+
+            var client = DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{seeded.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+
+            var user = body.Data!.Users.Single();
+            // Vencido → only PriceIncluded (Management=7) survives; paid Statistics=6 is filtered out
+            user.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId });
+            user.PaymentStatus.Should().Be("Vencido");
+            user.PaymentDueDate.Should().NotBeNull();
+            user.IsInTrial.Should().BeFalse();
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(seeded.StoreId);
+            await BillingSeed.CleanupAsync(_f, seeded);
+        }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_export_aldiaStore_exportsAllModules()
+    {
+        using var _ = _f.Clock.Pin(new DateTimeOffset(2026, 7, 15, 0, 0, 0, TimeSpan.Zero));
+        var seeded = await BillingSeed.SeedPaidStoreAsync(_f, new DateOnly(2026, 5, 18));
+        await BillingSeed.SeedPaymentAsync(
+            _f,
+            seeded.StoreId,
+            amount: 1000f,
+            reSellerId: null,
+            reSellerPercentDiscountPrice: 0f,
+            byReSeller: false,
+            seeded.TenantId);
+
+        try
+        {
+            await SetSelectedStoreAsync(seeded.UserId, seeded.StoreId);
+            await SeedStoreUserAsync(seeded.StoreId, seeded.TenantId, "aldia-u1", "AlDia User One");
+
+            var client = DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{seeded.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+
+            var user = body.Data!.Users.Single();
+            // AlDia → all modules survive the gate (free + paid)
+            user.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
+            user.PaymentStatus.Should().BeOneOf("AlDia", "PorVencer");
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(seeded.StoreId);
+            await BillingSeed.CleanupAsync(_f, seeded);
+        }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_export_noAplicaStore_exportsAllModules()
+    {
+        var seeded = await SeedNoAplicaStoreAsync(_f);
+
+        try
+        {
+            await SetSelectedStoreAsync(seeded.UserId, seeded.StoreId);
+            await SeedStoreUserAsync(seeded.StoreId, seeded.TenantId, "noap-u1", "NoAplica User One");
+
+            var client = DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{seeded.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+
+            var user = body.Data!.Users.Single();
+            // NoAplica (never started billing) → all modules survive the gate
+            user.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
+            user.PaymentStatus.Should().Be("NoAplica");
+            user.PaymentDueDate.Should().BeNull();
+            user.IsInTrial.Should().BeFalse();
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(seeded.StoreId);
+            await BillingSeed.CleanupAsync(_f, seeded);
+        }
+    }
+
+    [Fact]
+    public async Task OwnerAdmin_export_roster_matches_me_output_for_user()
+    {
+        using var _ = _f.Clock.Pin(new DateTimeOffset(2026, 7, 15, 0, 0, 0, TimeSpan.Zero));
+        var seeded = await BillingSeed.SeedPaidStoreAsync(_f, new DateOnly(2026, 5, 18));
+        await BillingSeed.SeedPaymentAsync(
+            _f,
+            seeded.StoreId,
+            amount: 1000f,
+            reSellerId: null,
+            reSellerPercentDiscountPrice: 0f,
+            byReSeller: false,
+            seeded.TenantId);
+
+        try
+        {
+            // BillingSeed does not set SelectedStoreId; the OwnerAdmin exporter needs a real
+            // StoreIdClaim for the UsersAdmin permission filter to resolve.
+            await SetSelectedStoreAsync(seeded.UserId, seeded.StoreId);
+
+            // Plain StoreUser granted the Stores feature so the roster's Roles entry for the
+            // seeded store is non-empty, making the parity comparison meaningful.
+            var storeUser = await SeedStoreUserWithFeatureAsync(seeded.StoreId, seeded.TenantId, "parity-u1", "Parity User One");
+
+            // Export as the store's OWNER ADMIN — not a SuperAdmin. The role-feature query is
+            // tenant-scoped via (TenantId == ctx.TenantId || ctx.IsSuperAdmin); a SuperAdmin
+            // export bypasses that filter and can surface cross-tenant StoreRoleFeature rows
+            // that the target user's /me (tenant-scoped) never returns. Exporting as the
+            // OwnerAdmin keeps both endpoints tenant-scoped, so the comparison is apples-to-
+            // apples for the R5 S1 "for that user in that store" parity.
+            var rosterResponse = await DbTestHelpers.AuthedClient(_f, seeded.UserId, seeded.Login)
+                .GetAsync($"/api/v1/StoreUsers/{seeded.StoreId}/offline-roster");
+            rosterResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            var rosterBody = await rosterResponse.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            rosterBody!.Succeeded.Should().BeTrue();
+
+            var rosterUser = rosterBody.Data!.Users.Single(u => u.Id == storeUser.UserId);
+
+            // /me requires the target user's own JWT session, so the actor here is the store
+            // user, not the exporting OwnerAdmin.
+            var meResponse = await DbTestHelpers.AuthedClient(_f, storeUser.UserId, storeUser.Login)
+                .GetAsync("/api/v1/auth/me");
+            meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            var meBody = await meResponse.Content.ReadFromJsonAsync<ApiResponse<CurrentUserDto>>(ApiResponse.Json);
+            meBody!.Succeeded.Should().BeTrue();
+            var me = meBody.Data!;
+
+            // R5 S1 parity: the roster dimensions equal what /me returns for the same user in
+            // the same store. Lists are order-independent because each endpoint may order them
+            // differently (module ordering vs insertion order; feature ordering per service).
+            rosterUser.Roles.Should().BeEquivalentTo(me.Roles);
+            rosterUser.FeatureIds.Should().BeEquivalentTo(me.FeatureIds);
+            rosterUser.StoreModuleIds.Should().BeEquivalentTo(me.StoreModuleIds);
+            rosterUser.IsSuperAdmin.Should().Be(me.IsSuperAdmin);
+            rosterUser.IsOwnerAdmin.Should().Be(me.IsOwnerAdmin);
+            rosterUser.IsReSeller.Should().Be(me.IsReSeller);
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(seeded.StoreId);
+            await BillingSeed.CleanupAsync(_f, seeded);
+        }
+    }
+
+    [Fact]
+    public async Task SuperAdmin_export_configuredTtl7_applies7Days()
+    {
+        var login = $"sa-ttl-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        var originalValue = await GetOfflineRosterTtlValueAsync();
+
+        try
+        {
+            await SetOfflineRosterTtlValueAsync("7");
+            await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "ttl-u1", "TTL User One");
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            var roster = body.Data!;
+
+            var msPerDay = 24 * 60 * 60 * 1000L;
+            (roster.ExpiresAt - roster.IssuedAt).Should().Be(7 * msPerDay);
+        }
+        finally
+        {
+            await RestoreOfflineRosterTtlValueAsync(originalValue);
+            await CleanupStoreUsersAsync(owner.StoreId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
+        }
+    }
+
+    [Fact]
+    public async Task SuperAdmin_export_deletedTtlRow_usesDefault35()
+    {
+        var login = $"sa-ttl35-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        var originalValue = await GetOfflineRosterTtlValueAsync();
+
+        try
+        {
+            await DeleteOfflineRosterTtlRowAsync();
+            await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "ttl35-u1", "TTL35 User One");
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            var roster = body.Data!;
+
+            var msPerDay = 24 * 60 * 60 * 1000L;
+            (roster.ExpiresAt - roster.IssuedAt).Should().Be(35 * msPerDay);
+        }
+        finally
+        {
+            await RestoreOfflineRosterTtlValueAsync(originalValue);
+            await CleanupStoreUsersAsync(owner.StoreId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
+        }
+    }
+
+    [Fact]
+    public async Task SuperAdmin_export_unwrappedDek_byteEqualsGetDek()
+    {
+        var login = $"sa-dek-eq-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        try
+        {
+            await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "dekeq-u1", "DEK Equal User");
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            var user = body!.Data!.Users.Single();
+
+            user.WrapIterations.Should().Be(210_000);
+
+            string storedPasswordHash;
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                storedPasswordHash = await db.Set<User>().IgnoreQueryFilters()
+                    .Where(u => u.Id == user.Id)
+                    .Select(u => u.Password)
+                    .SingleAsync();
+            }
+
+            // Recover the DEK from wire fields ONLY (KEK from stored hash + salt + wire iterations)
+            var recovered = UnwrapDek(storedPasswordHash, user.WrappedDek, user.WrapSalt, user.WrapIv, user.WrapIterations);
+
+            using var providerScope = _f.Services.CreateScope();
+            var dataKeyProvider = providerScope.ServiceProvider.GetRequiredService<IStoreDataKeyProvider>();
+            var expected = dataKeyProvider.GetDek(owner.StoreId);
+
+            recovered.Should().HaveCount(32);
+            recovered.Should().BeEquivalentTo(expected);
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(owner.StoreId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
+        }
+    }
+
+    [Fact]
+    public async Task SuperAdmin_export_rawPassword_throwsAuthenticationTagMismatch()
+    {
+        var login = $"sa-dek-raw-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        try
+        {
+            await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "dekraw-u1", "DEK Raw User");
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            var user = body!.Data!.Users.Single();
+
+            // KEK derived from the RAW password instead of the stored hash → tag mismatch
+            var act = () => UnwrapDek("Password123", user.WrappedDek, user.WrapSalt, user.WrapIv, user.WrapIterations);
+
+            act.Should().Throw<AuthenticationTagMismatchException>();
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(owner.StoreId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
+        }
+    }
+
+    private static byte[] UnwrapDek(string storedPasswordHash, string wrappedDek, string wrapSalt, string wrapIv, int iterations)
+    {
+        // Mirrors StoreKeyWrapService: KEK = Pbkdf2(UTF8(hash), salt, iterations, SHA256, 32);
         // wire format = Base64(ciphertext || tag), tag = 16 bytes; IV = 12 bytes.
         byte[] kek = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(storedPasswordHash),
             Convert.FromBase64String(wrapSalt),
-            210_000,
+            iterations,
             HashAlgorithmName.SHA256,
             32);
 
@@ -297,6 +620,25 @@ public sealed class ExportOfflineRosterTests
         await db.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Like <see cref="SeedStoreUserAsync"/> but also grants the Stores feature (in the Management
+    /// module) so the roster and /me produce non-empty Roles/FeatureIds for the parity comparison.
+    /// </summary>
+    private async Task<(Guid UserId, string Login)> SeedStoreUserWithFeatureAsync(Guid storeId, Guid tenantId, string prefix, string fullName)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var login = $"{prefix}-{Guid.NewGuid():N}@test.com";
+        var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), fullName, "0000000000", login, tenantId);
+        user.SelectedStoreId = storeId;
+        db.Set<User>().Add(user);
+        db.Set<StoreUser>().Add(StoreUser.Create(user.Id, storeId, tenantId));
+        db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.StoreUser, tenantId));
+        db.Set<StoreRoleFeature>().Add(StoreRoleFeature.Create(storeId, (int)RoleType.StoreUser, AuthzSeed.StoresFeatureId, tenantId));
+        await db.SaveChangesAsync();
+        return (user.Id, login);
+    }
+
     private async Task CleanupStoreUsersAsync(Guid storeId)
     {
         using var scope = _f.Services.CreateScope();
@@ -318,6 +660,108 @@ public sealed class ExportOfflineRosterTests
         System.Linq.Expressions.Expression<Func<T, bool>> pred) where T : class
     {
         db.Set<T>().RemoveRange(await db.Set<T>().IgnoreQueryFilters().Where(pred).ToListAsync());
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Sets the user's SelectedStoreId so the claims transformer emits a real StoreIdClaim —
+    /// BillingSeed does not set it, and the UsersAdmin permission filter needs it to resolve modules.
+    /// </summary>
+    private async Task SetSelectedStoreAsync(Guid userId, Guid storeId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var user = await db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == userId);
+        user.SelectedStoreId = storeId;
+        // DbContext uses NoTracking by default — attach explicitly so the change persists.
+        db.Entry(user).State = EntityState.Modified;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Creates a store with PaymentStartDate null (never started billing → NoAplica) carrying BOTH
+    /// a free (Management, PriceIncluded) and a paid (Statistics) module, plus an OwnerAdmin user.
+    /// </summary>
+    private static async Task<BillingSeed.SeededStore> SeedNoAplicaStoreAsync(AppTestFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var tenantId = DataUtils.DefaultTenant.Id;
+        var login = $"noaplica-{Guid.NewGuid():N}@test.com";
+
+        var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), "E2E NoAplica Store", "0000000000", login, tenantId);
+        db.Set<User>().Add(user);
+        await db.SaveChangesAsync();
+
+        db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.OwnerAdmin, tenantId));
+        var owner = Owner.Create(user.Id, false, tenantId, "E2E NoAplica Store Owner");
+        db.Set<Owner>().Add(owner);
+        await db.SaveChangesAsync();
+
+        var store = Store.Create($"NoAplica-Store-{Guid.NewGuid():N}", owner.Id, true, tenantId, paymentStartDate: null);
+        db.Set<Store>().Add(store);
+        await db.SaveChangesAsync();
+
+        // Free module: Management (id=7), PriceIncluded=true
+        db.Set<StoreModule>().Add(StoreModule.Create(store.Id, BillingSeed.ManagementModuleId, 0, true, 0, 0, 0, tenantId));
+        // Paid module: Statistics (id=6), PriceIncluded=false
+        db.Set<StoreModule>().Add(StoreModule.Create(store.Id, BillingSeed.StatisticsModuleId, 1000f, false, 1000f, 0, 0, tenantId));
+        await db.SaveChangesAsync();
+
+        return new BillingSeed.SeededStore(user.Id, login, owner.Id, store.Id, tenantId);
+    }
+
+    private async Task<string?> GetOfflineRosterTtlValueAsync()
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var row = await db.Set<SystemConfiguration>().IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == (int)SystemConfigurationType.OfflineRosterTtlDays);
+        return row?.Value;
+    }
+
+    private async Task SetOfflineRosterTtlValueAsync(string value)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var row = await db.Set<SystemConfiguration>().IgnoreQueryFilters()
+            .SingleAsync(c => c.Id == (int)SystemConfigurationType.OfflineRosterTtlDays);
+        row.Value = value;
+        // DbContext uses NoTracking by default — attach explicitly so the change persists.
+        db.Entry(row).State = EntityState.Modified;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task DeleteOfflineRosterTtlRowAsync()
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var row = await db.Set<SystemConfiguration>().IgnoreQueryFilters()
+            .SingleAsync(c => c.Id == (int)SystemConfigurationType.OfflineRosterTtlDays);
+        db.Set<SystemConfiguration>().Remove(row);
+        await db.SaveChangesAsync();
+    }
+
+    private async Task RestoreOfflineRosterTtlValueAsync(string? originalValue)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var existing = await db.Set<SystemConfiguration>().IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == (int)SystemConfigurationType.OfflineRosterTtlDays);
+        if (existing is not null)
+        {
+            existing.Value = originalValue ?? "35";
+            // DbContext uses NoTracking by default — attach explicitly so the change persists.
+            db.Entry(existing).State = EntityState.Modified;
+            await db.SaveChangesAsync();
+            return;
+        }
+
+        // Row was deleted — re-create it so other tests keep working.
+        db.Set<SystemConfiguration>().Add(SystemConfiguration.Create(
+            (int)SystemConfigurationType.OfflineRosterTtlDays,
+            SystemConfigurationType.OfflineRosterTtlDays.GetDisplayName(),
+            originalValue ?? "35"));
         await db.SaveChangesAsync();
     }
 }

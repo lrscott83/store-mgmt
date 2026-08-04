@@ -30,4 +30,10 @@
     <ProjectReference Include="..\SMCA.WebApi\SMCA.WebApi.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\..\docs\contracts\offline-roster-dek-kat.json"
+          Link="offline-roster-dek-kat.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
