@@ -38,8 +38,8 @@ Branch: create from the current HEAD (`main`), per project rule.
 
 ## Phase 2: The classifier (D2) — WU2
 
-- [ ] 2.1 RED — new `admin/owners/lib/__tests__/owner-error-message.test.ts`: mapped status returns its key; unmapped status returns `OWNER.ERROR`; an error with no `response` (network) returns `OWNER.ERROR`; `undefined`/`null` error returns `OWNER.ERROR`.
-- [ ] 2.2 GREEN — new `admin/owners/lib/owner-error-message.ts` with `ownerErrorMessageId(error, byStatus)` exactly as designed in D2 (structural read, no axios import).
+- [x] 2.1 RED — new `admin/owners/lib/__tests__/owner-error-message.test.ts`: mapped status returns its key; unmapped status returns `OWNER.ERROR`; an error with no `response` (network) returns `OWNER.ERROR`; `undefined`/`null` error returns `OWNER.ERROR`.
+- [x] 2.2 GREEN — new `admin/owners/lib/owner-error-message.ts` with `ownerErrorMessageId(error, byStatus)` exactly as designed in D2 (structural read, no axios import).
 
 ## Phase 3: Create page (FE-OC2, FE-OC5) — WU3
 
