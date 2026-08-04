@@ -26,6 +26,11 @@ export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
 // ADR-4: Cuban +53 mobile format (from reseller-create.tsx:14)
 const PHONE_REGEX = /^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/;
 
+// D-3: one hoisted map shared by BOTH arms of the load effect — the resolved
+// succeeded:false envelope (actionCode) and the rejected .catch (response.status)
+// — so a future edit can't drift them apart.
+const LOAD_ERROR_KEYS: Record<number, string> = { 404: 'OWNER.NOT_FOUND', 403: 'OWNER.FORBIDDEN' };
+
 type TabKey = 'details' | 'stores' | 'users';
 
 interface Snapshot {
@@ -147,7 +152,7 @@ export function OwnerEditPage() {
       .getOwner(id)
       .then((res) => {
         if (!res.succeeded) {
-          setLoadError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+          setLoadError(intl.formatMessage({ id: ownerErrorMessageId(res, LOAD_ERROR_KEYS) }));
           return;
         }
         const o = res.data;
@@ -163,8 +168,8 @@ export function OwnerEditPage() {
         setSnapshot(makeSnapshot(o));
         setLoadError('');
       })
-      .catch(() => {
-        setLoadError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+      .catch((error) => {
+        setLoadError(intl.formatMessage({ id: ownerErrorMessageId(error, LOAD_ERROR_KEYS) }));
       });
   }, [id, intl]);
 

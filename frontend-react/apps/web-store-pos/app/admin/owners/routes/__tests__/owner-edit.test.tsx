@@ -1109,6 +1109,89 @@ describe('OwnerEditPage — getOwner succeeded:false (Req: Owner Edit Load Surfa
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// owners-getbyid-envelope-404 — load classifies succeeded:false by actionCode
+// (D-3: both load arms route through the same LOAD_ERROR_KEYS map)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — load classifies succeeded:false via actionCode (owners-getbyid-envelope-404)', () => {
+  it('shows OWNER.NOT_FOUND and does not populate form fields when getOwner resolves with succeeded:false, actionCode:404', async () => {
+    await setAuthUser(false);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: 404,
+      errors: [{ code: 'E01', description: 'not found' }],
+    });
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['OWNER.NOT_FOUND'])).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText(esMessages['GENERAL.FULL_NAME'])).not.toBeInTheDocument();
+  });
+
+  it('shows OWNER.FORBIDDEN when getOwner resolves with succeeded:false, actionCode:403', async () => {
+    await setAuthUser(false);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
+      succeeded: false,
+      data: null,
+      message: null,
+      actionCode: 403,
+      errors: [{ code: 'E01', description: 'forbidden' }],
+    });
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['OWNER.FORBIDDEN'])).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText(esMessages['GENERAL.FULL_NAME'])).not.toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// owners-getbyid-envelope-404 — load .catch gains a parameter, classifies
+// rejections through the same map (NEW behaviour — must RED on its own merits,
+// not riding the envelope-arm commit; today's .catch takes no parameter)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — load rejection classified by response.status (owners-getbyid-envelope-404)', () => {
+  it('shows OWNER.NOT_FOUND when getOwner rejects with error.response.status === 404', async () => {
+    await setAuthUser(false);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.getOwner).mockRejectedValue({ response: { status: 404 } });
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(esMessages['OWNER.NOT_FOUND'])).toBeInTheDocument();
+    });
+  });
+});
+
 describe('OwnerEditPage — loadStores succeeded:false (Req: Owner Edit Stores Tab Fetch Surfaces succeeded:false via Its Own storesError State)', () => {
   it('sets storesError (not loadError) to STORES.ERROR, does not set stores from data', async () => {
     const { storeHttpService } = await import(
