@@ -28,7 +28,8 @@ merged into `openspec/specs/admin-owners-resellers/`; the archived artifacts liv
 `2026-08-02-owners-getbyid-frontend.md` was deleted with it.
 
 Groups below keep their original letters, so B remains B — the priority numbers are what
-shifted.
+shifted. Group C was deferred to LAST by the user on 2026-08-04, so it now sits after D
+despite having no technical blocker.
 
 ---
 
@@ -57,20 +58,7 @@ explain a failure in the walkthrough.
 
 ---
 
-## C — `cash-session-pos` (P2)
-
-**Source plan:** `docs/plans/sesion-de-caja-apertura-cierre-pos.md`
-**Blocked on:** nothing. Full SDD cycle from proposal — it is a new feature, not a fix.
-
-Zero code exists: no match for `cashSession` / `openingBalance` / shift-opening anywhere in
-`app/`. The document is survey and design (7 POS products compared, a per-shift state machine
-proposed), and its §3.8 carries open decisions that belong in the SDD's proposal phase.
-
-Largest of the unblocked groups.
-
----
-
-## D — `offline-roster-contract-v3` (P3)
+## D — `offline-roster-contract-v3` (P2)
 
 **Source plans:** `docs/plans/2026-07-25-at-rest-encryption-frontend-plan.md` (the KAT fixture),
 `docs/plans/2026-08-04-offline-roster-billing-fields-frontend.md`
@@ -90,6 +78,38 @@ the proof: `app/shared/lib/offline/__tests__/__fixtures__/dek-kat.json` still de
 `"provenance": "node-transcription"` and `backendCommitSha: "UNKNOWN"`, and its own warning
 says it proves nothing about backend interop. Writing frontend code against a v3 contract
 before the backend emits one is writing against a contract that does not exist.
+
+---
+
+## C — `cash-session-pos` (P3 — LAST, deferred by the user on 2026-08-04)
+
+**Source plan:** `docs/plans/sesion-de-caja-apertura-cierre-pos.md`
+**Blocked on:** nothing technical. **Deferred by explicit user decision** — it goes last,
+after every other group, including the backend-blocked one. Do not start it because it
+happens to be unblocked.
+
+Zero code exists: no match for `cashSession` / `openingBalance` / shift-opening anywhere in
+`app/`. The document is survey and design (7 POS products compared, a per-shift state machine
+proposed), and its §3.8 carries five open decisions that belong in the SDD's proposal phase.
+
+Three of those five are already answered elsewhere in the same document, and were resolved on
+2026-08-04 so a future session does not re-litigate them:
+
+| §3.8 decision | Resolved | Where the document answers it |
+|---|---|---|
+| Blind count in v1 | No — deferred | §3.5: "toggle per store, OFF at the start, start simple" |
+| Multi-device | Yes — two open sessions on two devices | §3.1 scopes the constraint to `device + storeId`, mirroring Odoo's `_check_unicity` |
+| Close role | owner-admin | §3.5, already supported by `authorization-service` |
+
+Still genuinely open, and they are product calls the user has to make — they change the data
+model and the close gate:
+
+- **Difference threshold** — fixed amount per store, a percentage of expected, or both?
+- **Orphan session** — a shift left open overnight: force a manual count, auto-close, or
+  auto-close only when the shift had no sales?
+- **Denominations in v1** — single counted total, or the full bill/coin grid?
+
+Largest group by far, and the only one that is a new feature rather than a fix.
 
 ---
 
