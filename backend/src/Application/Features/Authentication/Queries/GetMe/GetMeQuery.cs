@@ -101,6 +101,7 @@ namespace Application.Features.Authentication.Queries.GetMe
                 PaymentDueDate = billing.NextDueDate,
                 IsInTrial = billing.IsInTrial,
                 PaymentStatus = billing.Status.ToString(),
+                PlanType = billing.PlanType,
             });
         }
 

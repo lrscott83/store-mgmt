@@ -20,5 +20,6 @@ namespace Application.Dtos.Authentication
         public DateOnly? PaymentDueDate { get; set; }
         public bool IsInTrial { get; set; }
         public string PaymentStatus { get; set; } = StoreBillingStatusType.NoAplica.ToString();
+        public string PlanType { get; set; } = "Free";
     }
 }

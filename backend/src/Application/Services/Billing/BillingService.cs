@@ -47,7 +47,7 @@ public class BillingService : IBillingService
     {
         var store = await _storeRepository.GetByIdAsync(storeId);
         if (store is null)
-            return new StoreBillingSummary { StoreId = storeId, Status = StoreBillingStatusType.NoAplica };
+            return new StoreBillingSummary { StoreId = storeId, Status = StoreBillingStatusType.NoAplica, PlanType = "Free" };
 
         var moduleIds = store.StoreModules.Select(sm => sm.ModuleId);
         var modules = await _moduleRepository.GetModulesByIdsAsync(moduleIds);
