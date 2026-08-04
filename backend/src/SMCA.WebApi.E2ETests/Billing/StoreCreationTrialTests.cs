@@ -582,6 +582,10 @@ public sealed class StoreCreationTrialTests
     [Fact]
     public async Task RegisterStorePayment_succeeds_for_a_brand_new_store()
     {
+        // RegisterStorePaymentCommand.cs:86 reads TestingPeriodInMonths uncached — pin it anyway
+        // so the due-date derivation below can't drift if the E2E database ever holds a
+        // non-default row (design D3's "apply uniformly" guidance).
+        await using var cfg = await BillingConfigSeed.PinAsync(_f);
         using var clock = _fixture.Clock.Pin(AnchorInstant);
 
         var registered = await RegisterStoreAsync();
