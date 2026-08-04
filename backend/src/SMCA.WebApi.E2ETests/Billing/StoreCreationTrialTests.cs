@@ -3,7 +3,9 @@ using System.Net.Http.Json;
 using Application.Dtos.Authentication;
 using Application.Dtos.StoreManagement;
 using Domain.Common.Constants;
+using Domain.Common.Enums;
 using Domain.Entities.Owners;
+using Domain.Entities.StorePayments;
 using Domain.Entities.Stores;
 using Domain.Entities.Users;
 using FluentAssertions;
@@ -570,6 +572,66 @@ public sealed class StoreCreationTrialTests
         {
             await DbTestHelpers.CleanupUserAsync(_f, adminId);
             await CleanupCreatedStoreAsync(created);
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // E. Payments (test 17)
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task RegisterStorePayment_succeeds_for_a_brand_new_store()
+    {
+        using var clock = _fixture.Clock.Pin(AnchorInstant);
+
+        var registered = await RegisterStoreAsync();
+        var adminLogin = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, adminLogin, "Password123");
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, adminLogin)
+                .PostAsync($"/api/v1/stores/{registered.StoreId}/payments", null);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            body.Data.Should().BeTrue();
+
+            using var scope = _f.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var payment = await db.Set<StorePayment>().IgnoreQueryFilters().AsNoTracking()
+                .Where(sp => sp.StoreId == registered.StoreId)
+                .OrderByDescending(sp => sp.PaymentBeforeDate)
+                .FirstAsync();
+
+            // Six qualifying paid modules from GetAvailableModulesToStore() — 5 Reportes,
+            // 6 Estadísticas, 8 Gastos, 9 Facturación, 10 Historiales, 11 Créditos — each
+            // GetCurrentPrice(2000, 75, 0) = 2000 - 1500 - 0 = 500. 6 * 500 = 3000.
+            // This is the corrected value (design.md ⚠ correction) — NOT 500.
+            payment.Price.Should().Be(6 * 500f);
+
+            var expectedDue = Start.AddMonths(3); // current due (Start + 2mo) advances by 1 month
+            payment.PaymentBeforeDate.Should().Be(new DateTimeOffset(expectedDue.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
+            payment.Year.Should().Be(expectedDue.Year);
+            payment.Month.Should().Be(expectedDue.Month);
+            payment.StorePaymentStatusId.Should().Be((int)StorePaymentStatusType.Paid);
+            payment.ByReSeller.Should().BeFalse();
+
+            // Deliberately not asserted: StoreBillingSummary.CurrentMonthAmount — known,
+            // pre-existing, out-of-scope divergence between raw Price sum and GetCurrentPrice
+            // sum (design D9).
+        }
+        finally
+        {
+            await DbTestHelpers.CleanupUserAsync(_f, adminId);
+            using (var scope = _f.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                db.Set<StorePayment>().RemoveRange(await db.Set<StorePayment>().IgnoreQueryFilters()
+                    .Where(sp => sp.StoreId == registered.StoreId).ToListAsync());
+                await db.SaveChangesAsync();
+            }
+            await DbTestHelpers.CleanupTenantCascadeAsync(_f, registered.TenantId);
         }
     }
 }

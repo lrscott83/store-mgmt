@@ -280,7 +280,7 @@ Spec link: `specs/billing-e2e-coverage/spec.md` §D. Design ref: D8.
 
 Spec link: `specs/billing-e2e-coverage/spec.md` §E. Design ref: D9 — **the corrected amount, 3000, not 500**.
 
-- [ ] **`StoreCreationTrialTests.cs`** — append:
+- [x] **`StoreCreationTrialTests.cs`** — append:
   17. `RegisterStorePayment_succeeds_for_a_brand_new_store` — `RegisterStoreAsync()` pinned at
       `Start` (or any instant at/after `Start.AddMonths(2)`, matching D9's derivation); as a SuperAdmin
       client, `POST /api/v1/stores/{storeId}/payments`. Assert:
