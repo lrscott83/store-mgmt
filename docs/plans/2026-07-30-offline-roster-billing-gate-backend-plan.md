@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 Date: 2026-07-30
-Scope: `backend/` only. Frontend impact is recorded in `docs/plans/2026-07-30-register-endpoint-fixes-frontend.md`; do not implement it here.
+Scope: `backend/` only. Frontend impact is recorded in `docs/plans/2026-08-04-offline-roster-billing-fields-frontend.md`; do not implement it here.
 Supersedes: §7b of `docs/plans/2026-07-28-backend-pending-work.md`, which framed this as "the payment banner stays silent". That framing understated it — see below.
 
 **Goal:** Make the billing gate exist offline. Today it does not: `ExportOfflineRosterQuery` ships every store module regardless of payment status, and the bundle carries no billing data for the device to re-derive the gate from.
@@ -125,7 +125,7 @@ Tasks 1 and 2 are snapshots taken at export time. Neither does anything about a 
 
 ### Task 4: Record the frontend impact
 
-- [ ] **Step 1: Append the resulting contract to** `docs/plans/2026-07-30-register-endpoint-fixes-frontend.md`: `formatVersion` 2 → 3, the three new per-user billing fields, and the new `expiresAt` window. State the values that actually shipped, not the ones planned.
+- [ ] **Step 1: Append the resulting contract to** `docs/plans/2026-08-04-offline-roster-billing-fields-frontend.md`: `formatVersion` 2 → 3, the three new per-user billing fields, and the new `expiresAt` window. State the values that actually shipped, not the ones planned.
 - [ ] **Step 2: Commit.**
 
 ---
