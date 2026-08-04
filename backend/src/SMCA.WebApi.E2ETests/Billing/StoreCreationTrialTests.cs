@@ -211,7 +211,10 @@ public sealed class StoreCreationTrialTests
     {
         using var clock = _fixture.Clock.Pin(AnchorInstant);
 
-        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId });
+        // Base case: a mixed module set (one free, one paid) — the ordinary shape of a new store.
+        // Tests 2 and 3 narrow this to paid-only and free-only respectively, so the three
+        // together cover every module shape the creation path can receive.
+        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
         try
         {
             (await ReadPaymentStartDateAsync(created.StoreId)).Should().Be(Start);
@@ -227,7 +230,8 @@ public sealed class StoreCreationTrialTests
     {
         using var clock = _fixture.Clock.Pin(AnchorInstant);
 
-        var created = await CreateStoreViaApiAsync(new[] { StoreSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
+        // Paid-only (PriceIncluded = false) module set.
+        var created = await CreateStoreViaApiAsync(new[] { BillingSeed.StatisticsModuleId });
         try
         {
             (await ReadPaymentStartDateAsync(created.StoreId)).Should().Be(Start);
