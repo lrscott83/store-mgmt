@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
+import { ownerErrorMessageId } from '~/admin/owners/lib/owner-error-message';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
@@ -215,10 +216,29 @@ export function OwnerEditPage() {
         return;
       }
 
-      // Re-snapshot after successful PUT — stay on page (ADR-5)
-      setSnapshot({ fullName, cellPhone, email, description, isActive, reSellerId });
-    } catch {
-      setServerError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+      // D4: rehydrate BOTH the form fields and the dirty-check snapshot from the
+      // persisted entity the server returned — not from local form state — so the
+      // dirty indicator reflects what was actually saved. setOwner(res.data) keeps
+      // the owner?.isActive/owner?.reSellerId fallbacks (lines 208, 210) reading the
+      // persisted entity on a second save. Stay on page (ADR-5).
+      const saved = res.data;
+      setOwner(saved);
+      setFullName(saved.fullName);
+      setCellPhone(saved.cellPhone);
+      setEmail(saved.email);
+      setDescription(saved.description);
+      setIsActive(saved.isActive);
+      setReSellerId(saved.reSellerId ?? '');
+      setSnapshot(makeSnapshot(saved));
+    } catch (error) {
+      setServerError(
+        intl.formatMessage({
+          id: ownerErrorMessageId(error, {
+            404: 'OWNER.NOT_FOUND',
+            403: 'OWNER.FORBIDDEN',
+          }),
+        })
+      );
     } finally {
       setIsSubmitting(false);
     }

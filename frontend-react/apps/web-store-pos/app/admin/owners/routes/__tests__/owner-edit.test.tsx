@@ -596,6 +596,111 @@ describe('OwnerEditPage — PUT failure inline error', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC3 — edit classifies its rejected business failures by HTTP status
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — FE-OC3: classified rejections', () => {
+  async function submitWithRejection(rejection: unknown) {
+    await setAuthUser(false);
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.getOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner(),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+    vi.mocked(ownerHttpService.updateOwner).mockRejectedValue(rejection);
+
+    const { OwnerEditPage } = await import('../owner-edit');
+    await act(async () => {
+      render(<Wrapper><OwnerEditPage /></Wrapper>);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+  }
+
+  it('shows OWNER.NOT_FOUND when updateOwner rejects with 404, form stays mounted', async () => {
+    await submitWithRejection({ response: { status: 404 } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.NOT_FOUND']);
+    });
+    expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
+  });
+
+  it('shows OWNER.FORBIDDEN when updateOwner rejects with 403', async () => {
+    await submitWithRejection({ response: { status: 403 } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.FORBIDDEN']);
+    });
+  });
+
+  it('shows OWNER.ERROR (generic) when updateOwner rejects with an unclassified status', async () => {
+    await submitWithRejection({ response: { status: 400 } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+  });
+
+  it('shows OWNER.ERROR when updateOwner rejects with no response (network failure)', async () => {
+    await submitWithRejection({ isNetworkError: true });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC4 — the update snapshot comes from the persisted entity (res.data)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerEditPage — FE-OC4: snapshot and form rehydrate from res.data', () => {
+  it('re-seeds fullName from the server response and clears dirty state', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    await renderPage(false);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
+    });
+
+    vi.mocked(ownerHttpService.updateOwner).mockResolvedValue({
+      succeeded: true,
+      data: makeOwner({ fullName: 'Server Normalised Name' }),
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
+      target: { value: 'Typed Name' },
+    });
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(esMessages['GENERAL.FULL_NAME']) as HTMLInputElement).value).toBe(
+        'Server Normalised Name'
+      );
+    });
+
+    const btn = screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] });
+    expect(btn).toBeDisabled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-EDIT-TABS-1 — SuperAdmin sees 3 tabs
 // ═══════════════════════════════════════════════════════════════════════════════
 

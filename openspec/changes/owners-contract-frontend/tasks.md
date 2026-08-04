@@ -53,12 +53,12 @@ Branch: create from the current HEAD (`main`), per project rule.
 
 ## Phase 4: Edit page (FE-OC3, FE-OC4) — WU4
 
-- [ ] 4.1 RED — `owner-edit.test.tsx`: `updateOwner` rejects with `status: 404` → `OWNER.NOT_FOUND` shown, form still mounted.
-- [ ] 4.2 RED — same, `status: 403` → `OWNER.FORBIDDEN`; `status: 400` → `OWNER.ERROR`; no `response` → `OWNER.ERROR`.
-- [ ] 4.3 RED — `updateOwner` resolves with an `Owner` whose `fullName` differs from the typed value → after save, the field shows the server value and the submit button is disabled (not dirty).
-- [ ] 4.4 GREEN — `owner-edit.tsx:220-222`: classify in the `catch` with `{ 404: 'OWNER.NOT_FOUND', 403: 'OWNER.FORBIDDEN' }`.
-- [ ] 4.5 GREEN — `owner-edit.tsx:218-219`: on success, re-seed `fullName`/`cellPhone`/`email`/`description`/`isActive`/`reSellerId` from `res.data`, call `setOwner(res.data)`, and replace the hand-built snapshot with `setSnapshot(makeSnapshot(res.data))` (D4).
-- [ ] 4.6 Regression — the stays-on-page behaviour (ADR-5) and the existing payload-shape tests pass unmodified; the `!res.succeeded` guard stays (D3).
+- [x] 4.1 RED — `owner-edit.test.tsx`: `updateOwner` rejects with `status: 404` → `OWNER.NOT_FOUND` shown, form still mounted.
+- [x] 4.2 RED — same, `status: 403` → `OWNER.FORBIDDEN`; `status: 400` → `OWNER.ERROR`; no `response` → `OWNER.ERROR`.
+- [x] 4.3 RED — `updateOwner` resolves with an `Owner` whose `fullName` differs from the typed value → after save, the field shows the server value and the submit button is disabled (not dirty).
+- [x] 4.4 GREEN — `owner-edit.tsx:220-222`: classify in the `catch` with `{ 404: 'OWNER.NOT_FOUND', 403: 'OWNER.FORBIDDEN' }`.
+- [x] 4.5 GREEN — `owner-edit.tsx:218-219`: on success, re-seed `fullName`/`cellPhone`/`email`/`description`/`isActive`/`reSellerId` from `res.data`, call `setOwner(res.data)`, and replace the hand-built snapshot with `setSnapshot(makeSnapshot(res.data))` (D4).
+- [x] 4.6 Regression — the stays-on-page behaviour (ADR-5) and the existing payload-shape tests pass unmodified; the `!res.succeeded` guard stays (D3).
 
 ## Phase 5: The paths that must NOT change (FE-OC6) — WU5
 
