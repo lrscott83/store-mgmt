@@ -68,7 +68,7 @@ Branch: create from the current HEAD (`main`), per project rule.
 
 ## Phase 6: Gates
 
-- [ ] 6.1 `pnpm typecheck` from `frontend-react/` — 0 errors.
-- [ ] 6.2 `pnpm test` from `frontend-react/` — full suite green, no reduction in count.
-- [ ] 6.3 `pnpm lint` from `frontend-react/` — clean.
-- [ ] 6.4 Commit per work unit (5 commits), conventional messages, no PR.
+- [x] 6.1 `pnpm typecheck` from `frontend-react/` — 0 errors.
+- [x] 6.2 `pnpm test` from `frontend-react/` — full suite green, no reduction in count.
+- [x] 6.3 `pnpm lint` from `frontend-react/` — clean.
+- [x] 6.4 Commit per work unit (5 commits), conventional messages, no PR.
