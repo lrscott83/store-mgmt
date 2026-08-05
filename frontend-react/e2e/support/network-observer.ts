@@ -1,5 +1,5 @@
 import type { Page, Request as PlaywrightRequest } from '@playwright/test';
-import { E2E_API_URL } from '../../playwright.config';
+import { E2E_API_URL } from './backend-url';
 
 const REGISTER_PATH_SUFFIX = '/v1/auth/register';
 

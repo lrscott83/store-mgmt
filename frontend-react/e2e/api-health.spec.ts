@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { E2E_API_URL } from './support/backend-url';
 
 /**
  * Connectivity check against the backend API.
@@ -7,26 +8,31 @@ import { expect, test } from '@playwright/test';
  * project: proving the API answers must not depend on the frontend dev server
  * building. Everything here uses the `request` fixture, so no browser launches.
  *
- * The base URL comes from `API_URL` in `frontend-react/.env` (the same variable
- * the app itself is built with, `app/shared/lib/http/api-client.ts:21`). It is
- * read at run time here rather than hardcoded, so this file carries no
- * environment-specific value.
+ * The base URL is `E2E_API_URL` (`e2e/support/backend-url.ts`) — the same
+ * backend the rest of the E2E suite targets, so a green ping here means the
+ * server the other specs will talk to is up. It deliberately does NOT read
+ * `API_URL` from the developer's `frontend-react/.env`: that file holds their
+ * own dev configuration, and pointing this check at one backend while the
+ * suite exercises another turns a health check into a lie.
  *
- * Both endpoints below sit under the `/api` prefix that `API_URL` already
+ * Both endpoints below sit under the `/api` prefix that `E2E_API_URL` already
  * carries (`BaseApiController.cs:11` → `api/v1/[controller]`), so they append
  * cleanly. Note the app ALSO exposes `/health` (`Program.cs:161`
  * `app.UseHealthChecks`), but that one is registered with no path base and
  * therefore lives at the server root, OUTSIDE `/api` — appending it to
- * `API_URL` would hit a 404.
+ * `E2E_API_URL` would hit a 404.
  */
 
-const API_URL = process.env['API_URL'];
+const API_URL = E2E_API_URL;
 
 test.beforeAll(() => {
-  expect(
-    API_URL,
-    'API_URL is not set. Define it in frontend-react/.env (e.g. API_URL=https://localhost:44320/api).',
-  ).toBeTruthy();
+  // Not a tautology: `E2E_API_URL` is overridable from the shell, and a value
+  // that is relative or missing the `/api` prefix would make every request
+  // below fail with a 404 that looks like a dead server instead of a typo.
+  expect(API_URL, `E2E_API_URL must be an absolute http(s) URL, got: ${API_URL}`).toMatch(
+    /^https?:\/\//,
+  );
+  expect(API_URL, `E2E_API_URL must carry the /api prefix, got: ${API_URL}`).toMatch(/\/api$/);
 });
 
 test('the API answers ping', async ({ request }) => {

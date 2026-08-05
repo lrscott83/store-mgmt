@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+import { E2E_API_URL } from './e2e/support/backend-url';
 
 // Config E2E del workspace frontend-react.
 // Documentación completa: https://playwright.dev/docs/test-configuration
@@ -39,20 +40,9 @@ function loadEnv(path: string) {
 // The register suite below does NOT rely on this loader — see E2E_API_URL.
 loadEnv(resolve(__dirname, '.env'));
 
-// Single source of truth for the backend the register suite (register.spec.ts,
-// register-rate-limit.spec.ts) targets. Deliberately independent of the `.env`
-// loader above and of the developer's own `frontend-react/.env`: that file
-// holds THEIR dev configuration (whatever backend they normally point at),
-// and the register suite creates real Owner+Store rows on every successful
-// run — it must never inherit an arbitrary dev API_URL.
-//
-// Zero-config default targets the local backend
-// (`dotnet run --project backend/src/SMCA.WebApi --launch-profile http`,
-// port from launchSettings.json:11). Override with `E2E_API_URL` in the
-// shell environment if you need to point the suite elsewhere. Both
-// `webServer.env` below and `e2e/support/network-observer.ts`'s guard import
-// this exact constant — never duplicate the literal.
-export const E2E_API_URL = process.env['E2E_API_URL'] ?? 'http://localhost:5019/api';
+// The backend every E2E spec targets. Defined in `e2e/support/backend-url.ts`
+// so specs never have to import this config module to reach it — see the
+// rationale there.
 
 // `webServer.env` must carry the rest of the ambient environment too — the
 // spawned `pnpm dev` (turbo -> vite) process needs PATH and friends, not just
