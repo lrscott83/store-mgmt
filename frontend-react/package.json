@@ -8,7 +8,9 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --grep-invert @rate-limit",
+    "test:e2e:rate-limit": "playwright test --grep @rate-limit",
+    "test:e2e:api": "playwright test --config playwright.api.config.ts",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "clean": "turbo run clean && rimraf node_modules/.cache .turbo"
   },
