@@ -18,6 +18,7 @@ const string Usage =
     "\n" +
     "  Examples:\n" +
     "    ... -- \"MyPassword\" Development   # for your local database\n" +
+    "    ... -- \"MyPassword\" Tests         # for the E2E database (smca_test)\n" +
     "    ... -- \"MyPassword\"               # for the VPS (Production)";
 
 if (args.Length is 0 or > 2 || string.IsNullOrWhiteSpace(args[0]))
