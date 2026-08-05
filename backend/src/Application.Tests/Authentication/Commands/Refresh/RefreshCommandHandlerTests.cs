@@ -36,7 +36,6 @@ public class RefreshCommandHandlerTests
         _authSettings = new AuthenticationSettings
         {
             Pepper = "test-pepper",
-            Iterations = 3,
             TokenLifetimeDays = 35,
             RefreshTokenExpirationDays = 7
         };

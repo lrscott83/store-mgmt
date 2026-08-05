@@ -59,7 +59,7 @@ namespace Application
             // Authentication: bind settings from config
             services.Configure<AuthenticationSettings>(
                 configuration.GetSection(AuthenticationSettings.SectionName));
-            services.AddScoped<IHashPasswordService, BcryptHashPasswordService>();
+            services.AddScoped<IHashPasswordService, Argon2idHashPasswordService>();
 
             return services;
         }

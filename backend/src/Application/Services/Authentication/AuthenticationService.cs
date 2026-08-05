@@ -47,14 +47,6 @@ namespace Application.Services.Authentication
                 return Result.Failure<Guid>(UserErrors.InvalidCredentials);
             }
 
-            // Password upgrade: detect legacy SHA256 hash, re-hash with BCrypt
-            if (!user.Password.StartsWith('$'))
-            {
-                _logger.LogInformation("Upgrading password hash for {Login} from legacy format to BCrypt", login);
-                user.Password = _hashPasswordService.HashPassword(password);
-                await _userRepository.UpdateAsync(user);
-            }
-
             ReSeller? reSeller = user.ReSeller;
             if (reSeller != null)
             {
