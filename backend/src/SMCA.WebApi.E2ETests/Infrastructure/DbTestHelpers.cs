@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
-using System.Text;
+using Application.Abstractions.Authentication;
+using Application.Services.Authentication;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
 using Domain.Entities.Owners;
@@ -12,14 +12,36 @@ using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
 using Infrastructure.Persistence.Contexts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace SMCA.WebApi.E2ETests.Infrastructure;
 
 public static class DbTestHelpers
 {
+    // Lazily built from the same appsettings.Tests.json the app-under-test loads last
+    // (AppTestFactory.cs:21-24), so the seeded hash and the app's verifier share one
+    // pepper and one parameter set. Signature of HashPassword is frozen — see ADR-5.
+    private static readonly Argon2idHashPasswordService Hasher = CreateHasher();
+
+    private static Argon2idHashPasswordService CreateHasher()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(
+                Path.Combine(AppContext.BaseDirectory, "appsettings.Tests.json"),
+                optional: false,
+                reloadOnChange: false)
+            .AddEnvironmentVariables()
+            .Build();
+
+        var settings = new AuthenticationSettings();
+        configuration.GetSection(AuthenticationSettings.SectionName).Bind(settings);
+        return new Argon2idHashPasswordService(Options.Create(settings));
+    }
+
     public static string HashPassword(string password)
-        => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(password)));
+        => Hasher.HashPassword(password);
 
     public static async Task<Guid> SeedSuperAdminAsync(AppTestFactory factory, string login, string password)
     {
