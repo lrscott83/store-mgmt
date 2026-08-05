@@ -959,6 +959,54 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() => expect(showToastSuccessMock).toHaveBeenCalledTimes(1));
       expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
+
+    // sdd-verify WARNING #1 (csv-import-cost-quantity-entries): each half of REQ-6 scenario 1
+    // (real non-zero counts, aggregated duplicate dialog) was independently pinned above, but the
+    // INTERACTION — does the toast still report correct non-zero counts when a duplicate dialog
+    // ALSO fires in the same import — was untested. The old pre-change test explicitly asserted
+    // showToastSuccessMock was called once alongside the dialog; that check was dropped during the
+    // succeeded->failed.length contract rewrite and not replaced. This restores it in the new
+    // counts-based shape, from ONE createCsvProducts response carrying both created and failed rows.
+    it('reports real non-zero counts AND shows the duplicate dialog together, from a single import (REQ-6 sc.1)', async () => {
+      mockCreateCsvProductsOnce(
+        [
+          { id: 'p10', category: 'Pizzas', name: 'Pizza de Queso', price: 150, cost: 120, quantity: 10 },
+          { id: 'p11', category: 'Pizzas', name: 'Pizza Especial', price: 200, cost: 150, quantity: 5 },
+          { id: 'p12', category: 'Confituras', name: 'Caramelo', price: 20, cost: undefined, quantity: undefined },
+        ],
+        [
+          { category: 'Pizzas', name: 'Pizza Vieja', price: 100 },
+          { category: 'Confituras', name: 'Chocolate', price: 30 },
+        ],
+      );
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFileWithCostQuantity()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      // Real counts: 3 products created (not 5 rows attempted), 2 entries (only the 2 rows
+      // carrying a qualifying quantity — the 3rd created row has no quantity).
+      await waitFor(() =>
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 3 productos y 2 entradas correctamente.'),
+      );
+      expect(showToastSuccessMock).toHaveBeenCalledTimes(1);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(2);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(1, 'p10', 10, 120);
+      expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(2, 'p11', 5, 150);
+
+      // The SAME import also aggregates the 2 duplicate rows into ONE dialog.
+      expect(showBlockingInfoMock).toHaveBeenCalledWith(
+        'Información',
+        'Algunos productos no fueron importados porque ya existen: Pizzas - Pizza Vieja, Confituras - Chocolate.',
+      );
+      expect(showBlockingInfoMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('category header gear menu (React-only enhancement)', () => {
