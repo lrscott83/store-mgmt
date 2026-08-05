@@ -1,7 +1,35 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 // Config E2E del workspace frontend-react.
 // Documentación completa: https://playwright.dev/docs/test-configuration
+
+// Minimal .env loader — `dotenv` is not a direct dependency of this workspace,
+// and Vite's own .env handling does not apply to a bare `playwright test` run.
+// Ported from `playwright.api.config.ts:11-29` so the default config also
+// resolves `API_URL` (needed by e2e/api-health.spec.ts's `beforeAll`, and by
+// e2e/register.spec.ts and e2e/register-rate-limit.spec.ts, which read
+// `API_URL` themselves to build diagnostics — see e2e/support/network-observer.ts).
+function loadEnv(path: string) {
+  let contents: string;
+  try {
+    contents = readFileSync(path, 'utf8');
+  } catch {
+    return; // No .env: existing env vars (or none at all) are used as-is.
+  }
+  for (const line of contents.split('\n')) {
+    const match = /^\s*([\w.-]+)\s*=\s*(.*)?\s*$/.exec(line);
+    if (!match) continue;
+    const key = match[1];
+    if (process.env[key] !== undefined) continue; // A real env var always wins.
+    process.env[key] = (match[2] ?? '').trim().replace(/^(['"])(.*)\1$/, '$2');
+  }
+}
+
+// This config is loaded as CommonJS by Playwright, so `__dirname` is available
+// and `import.meta` is not.
+loadEnv(resolve(__dirname, '.env'));
 
 export default defineConfig({
   // Los tests viven en e2e/ en la raíz del workspace, junto a esta config.
