@@ -111,3 +111,8 @@ Argon2id (no interim bcrypt patch) · `Isopoh.Cryptography.Argon2` 2.0.0 · pepp
 - [ ] `dotnet run --project backend/src/SMCA.PasswordHasher -- "Password123"` prints a hash that `POST /auth/login` accepts when seeded into the database.
 - [ ] Starting the API with no pepper configured fails at startup naming `Authentication:Pepper`, not at first registration.
 - [ ] `Pepper` no longer appears in `appsettings.json` or `appsettings.Development.json`. (`JwtSecretKey` at `appsettings.json:84` is the same class of problem but is **out of scope** here — flagged, not fixed.)
+
+> **Note added at archive time (2026-08-05, decision #1909):** several items above were superseded during `sdd-design` —
+> the pepper stays in `appsettings.json` (no user-secrets, no env-var relocation), and there is no
+> `IValidateOptions`/startup fail-fast mechanism. See `design.md`'s SUPERSEDED banner and `specs/password-hashing/spec.md`
+> for the authoritative, shipped shape. This file is preserved as the historical record of the original proposal.

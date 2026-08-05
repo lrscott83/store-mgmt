@@ -105,7 +105,7 @@ of time: the restore happens on the user's next build.
 ## Phase 5: Console tool (WU5)
 
 - [x] 5.1 Create `backend/src/SMCA.PasswordHasher/SMCA.PasswordHasher.csproj` — `Exe`, `net8.0`, no `UserSecretsId`. Packages: `Microsoft.Extensions.Configuration.Json/EnvironmentVariables/Binder` (8.0.0). `ProjectReference` to `Application` only. Link `..\SMCA.WebApi\appsettings.json`, `CopyToOutputDirectory=PreserveNewest`.
-- [x] 5.2 `Program.cs`: config = linked `appsettings.json` + optional `appsettings.Production.json` + env vars; bind `AuthenticationSettings`; construct `Argon2idHashPasswordService` directly (no `IHost`). Argv: exactly 1 non-whitespace arg → hash to stdout, diagnostics to stderr; 0 or 2+ args → usage to stderr, exit 1.
+- [x] 5.2 `Program.cs` (as shipped, commit `8df2659` — supersedes this task's original text): config = linked `appsettings.json` + optional `appsettings.{environment}.json` overlay + env vars; bind `AuthenticationSettings`; construct `Argon2idHashPasswordService` directly (no `IHost`). Argv: 1 non-whitespace arg → hash to stdout, diagnostics to stderr, environment resolved from `ASPNETCORE_ENVIRONMENT` falling back to `Production`; 1 non-whitespace arg + optional 2nd `[environment]` arg → same, with the 2nd arg overriding the environment; 0 args or `args[0]` blank or 3+ args → usage to stderr, exit 1. Refuses to hash (stderr message, exit 1) when no `Authentication:Pepper` resolves for the chosen environment. Reports which overlay file was applied/not found on stderr before hashing.
 - [x] 5.3 Register the project in `backend/src/SMCA.sln` by hand-editing the file: `Project(...)` GUID block (`{18433F62-FCE4-4B24-950B-FBF7F055A049}`), `ProjectConfigurationPlatforms` entries, and the `NestedProjects` line placing it under the `src` solution folder — mirroring the existing entries. No `dotnet sln add` invocation.
 - [ ] 5.4 Compile confirmation happens in Phase 6 (user-run — BLOCKED ON USER).
 - [x] 5.5 **Deliverable — the command the user runs to hash a password**, documented verbatim in `Program.cs` usage text and in the commit message:
@@ -115,7 +115,11 @@ of time: the restore happens on the user's next build.
 
 ## Phase 6: Verification (all BLOCKED ON USER — nobody but the user runs `dotnet`)
 
-- [ ] 6.1 `dotnet test backend/src/Application.Tests/Application.Tests.csproj`
-- [ ] 6.2 `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` (needs Postgres `localhost:5432`/`smca_test`)
-- [ ] 6.3 `dotnet test backend/src/SMCA.sln`
-- [ ] 6.4 Confirm the `admin`-account-out-of-scope consequence is stated in the final summary/commit message — no code task.
+- [x] 6.1 `dotnet test backend/src/Application.Tests/Application.Tests.csproj` — user-run, PASS.
+- [x] 6.2 `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` (needs Postgres `localhost:5432`/`smca_test`) — user-run, PASS.
+- [x] 6.3 `dotnet test backend/src/SMCA.sln` — user-run, PASS (also confirmed `dotnet build backend/src/SMCA.sln` succeeded).
+- [x] 6.4 Confirm the `admin`-account-out-of-scope consequence is stated in the final summary/commit message — stated in `sdd-verify`/`sdd-archive` reports; seeded `admin` cannot log in until the user regenerates its hash via the console tool + a manual `UPDATE "User" SET "Password" = '<hash>' WHERE "Login" = 'admin';`.
+
+> **Marked complete at archive time (2026-08-05):** the user separately ran the console tool, producing
+> `$argon2id$v=19$m=65536,t=3,p=2$df7wfdeYzyL1w1UzyZlozg$feDBN4XvRAfzO/peZiyCWl2eh7FnVDdxJogjFY5yH64`
+> — confirms Argon2id v19, 64 MiB, t=3, p=2, 16-byte salt, 32-byte hash at runtime.

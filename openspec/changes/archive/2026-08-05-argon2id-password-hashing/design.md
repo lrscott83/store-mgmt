@@ -451,47 +451,79 @@ pattern already used at `Application.Tests.csproj:33-37`:
 
 One file on disk, two consumers. No runtime path-walking up the directory tree, no copy to drift.
 
-**Composition** (`Program.cs`, no `IHost`, no `ServiceCollection`):
+**Composition** (`Program.cs`, no `IHost`, no `ServiceCollection`) — **as shipped, commit `8df2659`, which
+supersedes the draft below.** The draft only linked a hardcoded `appsettings.Production.json` overlay; the
+shipped tool takes an optional `[environment]` argv and links whichever `appsettings.{environment}.json`
+overlay that resolves to (`Program.cs:6-21,32-41`):
 
 ```
+var environment = args.Length == 2 && !string.IsNullOrWhiteSpace(args[1])
+    ? args[1]
+    : Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+
+var overlayPath = Path.Combine(basePath, $"appsettings.{environment}.json");
+
 var config = new ConfigurationBuilder()
     .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: false)
-    .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.Production.json"), optional: true)
+    .AddJsonFile(overlayPath, optional: true)
     .AddEnvironmentVariables()
     .Build();
 
 var settings = new AuthenticationSettings();
 config.GetSection(AuthenticationSettings.SectionName).Bind(settings);
 
+if (string.IsNullOrEmpty(settings.Pepper))
+{
+    // refuse to hash — stderr message naming the environment, exit 1 (Program.cs:48-54)
+}
+
 IHashPasswordService hasher = new Argon2idHashPasswordService(Options.Create(settings));  // no ctor validation (ADR-2 superseded)
 ```
 
-Source order: JSON (committed) → `appsettings.Production.json` (gitignored, optional — present only on the
-VPS) → environment. This mirrors `WebApplication.CreateBuilder`'s own default composition for a
-`Production`-environment host, minus user-secrets (dropped per ADR-8's correction note above).
+Source order: JSON (committed) → `appsettings.{environment}.json` overlay (gitignored for `Production`,
+git-tracked for `Development`; optional either way) → environment variables. `environment` defaults to
+`ASPNETCORE_ENVIRONMENT`, then to `Production`, mirroring `WebApplication.CreateBuilder`'s own default
+composition, minus user-secrets (dropped per ADR-8's correction note above). This fixes a real bug in the
+draft: a tool that only ever linked the `Production` overlay would silently hash under the wrong pepper
+when the caller actually wanted `Development`.
 
-**Arguments.**
-- exactly one argument → the plaintext password.
-- zero arguments, or a whitespace-only argument → usage to **stderr**, exit code `1`.
-- more than one argument → error to stderr, exit code `1`. (Do **not** silently hash `args[0]`: an unquoted
-  password containing a space would produce a hash for a truncated password. That is a silent-wrong-answer bug.)
+**Arguments — as shipped (`Program.cs:23-34`), supersedes the draft below.**
+- one non-whitespace argument → the plaintext password; environment resolved as above.
+- one non-whitespace argument plus a second non-whitespace argument → password, then `[environment]`
+  overriding the resolved environment.
+- zero arguments, `args[0]` whitespace-only, or more than two arguments → usage to **stderr**, exit code `1`.
+  (Do **not** silently hash `args[0]`: an unquoted password containing a space would produce a hash for a
+  truncated password. That is a silent-wrong-answer bug.)
+- no `Authentication:Pepper` resolved for the chosen environment → refuse to hash, stderr message naming the
+  environment, exit code `1` (`Program.cs:48-54`).
 - no `--verify` mode in this change. Out of scope; note it as a follow-up.
 
-**Output contract** — diagnostics to stderr, hash alone on stdout, so the tool is pipeable:
+*(Arguments draft, not implemented — exactly one argument, no environment override, no pepper refusal check.
+Superseded by the shipped shape above.)*
+
+**Output contract** — diagnostics to stderr, hash alone on stdout, so the tool is pipeable. As shipped
+(`Program.cs:56-63`), the diagnostics line also reports which environment and overlay file were applied:
 
 ```
-stderr:  argon2id  m=65536 KiB  t=3  p=2  salt=16B  hash=32B   pepper: present (source: appsettings.json)
+stderr:  environment: Development (appsettings.Development.json applied)
+         argon2id  m=65536 KiB  t=3  p=2  salt=16B  hash=32B
 stdout:  $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
 ```
 
-"pepper: present/absent" satisfies proposal:31 (a mismatch is visible, not silent). Printing the pepper *source*
-requires probing the providers; if that proves awkward, print presence only — do **not** print the pepper value.
+The environment/overlay line satisfies the same visibility goal proposal:31 asked for ("pepper:
+present/absent" in the draft below) more directly — it names which config layer produced the pepper the
+tool used, and the empty-pepper case is a hard refusal (above) rather than a silent "absent" note. Do
+**not** print the pepper value itself.
+
+*(Output contract draft, not implemented — printed "pepper: present/absent" instead of the environment/overlay
+line. Superseded by the shipped shape above.)*
 
 **Invocation the user types** (from the repo root — no user-secrets step; the pepper is
-already in `appsettings.json`):
+already in `appsettings.json`, and the `[environment]` argument is optional):
 
 ```bash
-dotnet run --project backend/src/SMCA.PasswordHasher -- "Password123"
+dotnet run --project backend/src/SMCA.PasswordHasher -- "Password123" Development   # local database
+dotnet run --project backend/src/SMCA.PasswordHasher -- "Password123"               # VPS (Production)
 ```
 
 **Solution registration** — the command for the user to run (I am not permitted to run it):
@@ -650,3 +682,18 @@ dotnet run --project backend/src/SMCA.PasswordHasher -- "Password123"
 3. **Should the tool grow a `--verify <hash>` mode?** Still deliberately out of scope. Flagged because the natural
    next question after "generate me a hash" is "does this hash match this password", and answering it needs the
    same composition already built.
+
+---
+
+## 10. Follow-up flagged at archive time (2026-08-05, not part of this change)
+
+`docs/backend/argon2id-password-hashing-migration.md` is stale relative to the shipped result in three places
+and was **not edited** by `sdd-archive` (out of scope for this phase — documentation-drift follow-up only):
+
+- §6 (pepper): the doc still proposes relocating the pepper out of `appsettings.json`. The final decision
+  (#1909, reflected throughout this design) keeps it exactly where it is.
+- §8: the doc claims there are no seeded SHA256 password hashes. False — the seeded `admin` account at
+  `UserEntityTypeConfiguration.cs:40-44` still holds a raw-SHA256 hash and cannot log in until the user
+  regenerates it with the console tool and a manual `UPDATE`.
+- §11: all three "pending decisions" listed there are now decided (see decision #1909 and this design's
+  SUPERSEDED banners).
