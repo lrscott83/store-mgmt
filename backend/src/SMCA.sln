@@ -27,6 +27,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Application.Tests", "Applic
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMCA.WebApi.E2ETests", "SMCA.WebApi.E2ETests\SMCA.WebApi.E2ETests.csproj", "{9D978F23-4602-483C-880C-047DAA5D3A23}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMCA.PasswordHasher", "SMCA.PasswordHasher\SMCA.PasswordHasher.csproj", "{18433F62-FCE4-4B24-950B-FBF7F055A049}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,10 @@ Global
 		{9D978F23-4602-483C-880C-047DAA5D3A23}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9D978F23-4602-483C-880C-047DAA5D3A23}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9D978F23-4602-483C-880C-047DAA5D3A23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18433F62-FCE4-4B24-950B-FBF7F055A049}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18433F62-FCE4-4B24-950B-FBF7F055A049}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18433F62-FCE4-4B24-950B-FBF7F055A049}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18433F62-FCE4-4B24-950B-FBF7F055A049}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -87,6 +93,7 @@ Global
 		{3A434033-8003-45A4-AE1B-D8ED455BAF32} = {79921FC4-A55E-468D-82F6-DC731768EE0C}
 		{EC8A6586-5A54-4824-B91F-BE630850BB54} = {8AD3EBFB-5D67-4742-8C01-A742D45B5C76}
 		{9D978F23-4602-483C-880C-047DAA5D3A23} = {8AD3EBFB-5D67-4742-8C01-A742D45B5C76}
+		{18433F62-FCE4-4B24-950B-FBF7F055A049} = {79921FC4-A55E-468D-82F6-DC731768EE0C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FB19D4F3-A3E7-4376-8DD8-F73904706E8F}
