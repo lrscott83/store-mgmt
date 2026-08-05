@@ -66,7 +66,7 @@ Alternativas descartadas para el 400, y por qué:
 | `frontend-react/e2e/support/identity.ts` | Generador de identidad única por corrida. | Nuevo |
 | `frontend-react/e2e/register.spec.ts` | A1–A9. Corre por defecto. | Nuevo |
 | `frontend-react/e2e/register-rate-limit.spec.ts` | Solo A10, etiquetado `@rate-limit`. | Nuevo |
-| `frontend-react/.env.example` | Documenta `API_URL`. Commiteable (`.gitignore` ignora `.env`, no `.env.example`). | Nuevo |
+| `frontend-react/.env.example` | ~~Documenta `API_URL`~~ **(superseded — ver nota en §10; eliminado, `git rm`)**. | Descartado |
 | `frontend-react/package.json` | 3 scripts (§8). | Editado |
 | `frontend-react/e2e/README.md` | Prerrequisitos, comandos, advertencia de cuota. **Es documentación, no un test.** | Editado |
 | `frontend-react/playwright.config.ts` | — | **SIN TOCAR** |
@@ -245,7 +245,7 @@ Sin esto, A8 fallaría así con la cuota agotada: la app pinta `TOO_MANY_ATTEMPT
 |---|---|
 | `response.status() === 429` | `Cuota de registros agotada para esta IP: 10 por ventana de 10 minutos (RateLimitPolicies.cs:26-35). Esperá hasta 10 minutos — el limitador libera permisos de a ~1 minuto (SegmentsPerWindow=10). Este fallo NO indica un defecto de la app.` |
 | `requestfailed` con `net::ERR_CONNECTION_REFUSED` / `ERR_NAME_NOT_RESOLVED` | `El backend no respondió en {url}. Levantalo con: dotnet run --project backend/src/SMCA.WebApi --launch-profile http` |
-| El origen de la petición **es el de la página** (`localhost:3333`) | `API_URL no está configurada: la llamada de registro fue al dev server, no al backend. Copiá frontend-react/.env.example a frontend-react/.env` |
+| La URL de la petición no empieza con `E2E_API_URL` (superseded — ver nota en §10; cubre tanto "se fue al dev server" como "el dev server reutilizado apuntaba a otro backend") | `La petición de registro salió a ... pero el backend esperado es .... Parná el dev server externo y volvé a correr la suite.` |
 | 404 con `content-type: text/html` | `API_URL apunta a una base equivocada — ¿le falta el sufijo /api? (BaseApiController.cs:11). Esperado: http://localhost:5019/api` |
 
 **Por qué el mensaje se deriva de la URL observada y no de una constante duplicada**: si el helper guardara su propia copia de `http://localhost:5019/api`, un día diría "el backend no respondió en …:5019" mientras la app llama a otro puerto. Derivarlo del evento real hace el diagnóstico **imposible de desincronizar** con lo que la app hace, y elimina la constante duplicada por completo. Es también la razón por la que este diseño **no** necesita leer `API_URL` desde el proceso de Playwright — con eso se evita tener que agregarle un cargador de `.env` a `playwright.config.ts`, que sería un cambio de config con efectos sobre specs existentes (§9).
@@ -400,31 +400,31 @@ O sea: **`pnpm test:e2e` ya está en rojo hoy**, antes de este cambio, por dos f
 
 > Decisión 2: el agente no corre nada de esto. Son **tus** comandos.
 
-**Paso 0 — una sola vez.** Crear `frontend-react/.env`:
+**Paso 0 — ninguno. No hay `.env` que crear.**
 
-```bash
-cp frontend-react/.env.example frontend-react/.env
-```
-
-Contenido que trae el ejemplo (`API_URL` con `/api` — ver H1):
-
-```
-# Base URL of the SMCA backend API. Injected into the browser bundle by Vite
-# (envPrefix ['VITE_','API_',...] -> apps/web-store-pos/vite.config.ts:65;
-# envDir is this directory -> vite.config.ts:64) and consumed as the axios
-# baseURL at app/shared/lib/http/api-client.ts:21.
-#
-# The path MUST end in /api: controllers are routed at api/v1/[controller]
-# (BaseApiController.cs:11) and the app posts to '/v1/auth/register'
-# (auth-http-service.ts:41).
-#
-# Use the HTTP port (launchSettings.json:11), never the HTTPS one:
-# playwright.config.ts does not set ignoreHTTPSErrors, so a real browser would
-# reject the self-signed development certificate on :7297.
-API_URL=http://localhost:5019/api
-```
-
-No lo commitees: `.gitignore` ya ignora `.env`, y así tiene que quedar.
+> **Actualización posterior al diseño inicial** (ver apply-progress): la idea original de
+> este §10 — commitear `.env.example` y pedir `cp .env.example .env` — quedó descartada
+> tras implementarla. Razón: el usuario tiene su **propio** `frontend-react/.env` con su
+> configuración de desarrollo; `cp .env.example .env` lo habría sobrescrito, y peor, la
+> suite de registro habría heredado el `API_URL` de **desarrollo** — creando filas reales
+> de Owner+Store en cualquier backend al que ese `.env` apunte, potencialmente compartido.
+> `.env.example` fue **eliminado** (`git rm`).
+>
+> Mecanismo actual: `playwright.config.ts` expone `export const E2E_API_URL =
+> process.env.E2E_API_URL ?? 'http://localhost:5019/api'` — zero-config por default, y
+> **completamente independiente** del loader de `.env` que ya vivía en `playwright.config.ts`
+> (ese loader sigue existiendo intacto, solo para `api-health.spec.ts`). Se inyecta como
+> `API_URL` en `webServer.env` (la variable que consume `import.meta.env.API_URL` vía Vite,
+> ver H1) cuando Playwright levanta el dev server. Override: exportar `E2E_API_URL` en el
+> shell antes de correr los tests.
+>
+> **La trampa que esto no resuelve por sí solo**: `reuseExistingServer: true` (deliberadamente
+> sin tocar — ver regla innegociable) significa que si el dev server de :3333 YA estaba
+> corriendo antes de Playwright, el `API_URL` inyectado nunca llega a ese proceso; la app
+> sigue hablando con lo que sea que ese server tenía configurado. Mitigado con un guard en
+> `e2e/support/network-observer.ts`: toda petición de registro observada se valida contra
+> `E2E_API_URL`; si no coincide, el test falla con un mensaje que nombra el problema (dev
+> server externo reutilizado) y la solución (pararlo y volver a correr). Ver `e2e/README.md`.
 
 **Paso 1 — backend (terminal 1).** Requiere PostgreSQL en `127.0.0.1:5432`, base `smca`; las migraciones las aplica el propio backend al arrancar (`Program.cs:128`).
 
@@ -464,10 +464,10 @@ cd frontend-react && pnpm test:e2e:api
 
 - [ ] `curl http://localhost:5019/health` responde (`Program.cs:161` — `/health` vive en la raíz, **fuera** de `/api`).
 - [ ] `curl http://localhost:5019/api/v1/auth/ping` devuelve `true` — confirma el sufijo `/api` de H1.
-- [ ] `frontend-react/.env` existe con `API_URL=http://localhost:5019/api`.
+- [ ] (superseded — ver nota al principio de §10) `frontend-react/.env` existe con `API_URL=http://localhost:5019/api`.
 - [ ] `pnpm test:e2e` pasa A1–A9 (recordá los 2 fallos preexistentes de `api-health.spec.ts`, §9).
 - [ ] Con el backend **abajo**, `pnpm test:e2e` **falla** con "El backend no respondió en…", nunca saltea.
-- [ ] Sin `.env`, falla con "API_URL no está configurada…".
+- [ ] (superseded) Sin `.env`, falla con "API_URL no está configurada…" → ahora: con un dev server externo reutilizado en :3333, falla con "La petición de registro salió a ... pero el backend esperado es ...".
 - [ ] `pnpm test:e2e:rate-limit` pasa por separado.
 
 ---

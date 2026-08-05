@@ -8,9 +8,11 @@ import { defineConfig, devices } from '@playwright/test';
 // Minimal .env loader — `dotenv` is not a direct dependency of this workspace,
 // and Vite's own .env handling does not apply to a bare `playwright test` run.
 // Ported from `playwright.api.config.ts:11-29` so the default config also
-// resolves `API_URL` (needed by e2e/api-health.spec.ts's `beforeAll`, and by
-// e2e/register.spec.ts and e2e/register-rate-limit.spec.ts, which read
-// `API_URL` themselves to build diagnostics — see e2e/support/network-observer.ts).
+// resolves `API_URL` from a developer's own `frontend-react/.env`, which is
+// what `e2e/api-health.spec.ts`'s `beforeAll` reads. The register suite
+// (register.spec.ts, register-rate-limit.spec.ts) does NOT read `API_URL`
+// from here — see `E2E_API_URL` below, which is deliberately independent of
+// this loader and of any developer `.env`.
 function loadEnv(path: string) {
   let contents: string;
   try {
@@ -29,7 +31,40 @@ function loadEnv(path: string) {
 
 // This config is loaded as CommonJS by Playwright, so `__dirname` is available
 // and `import.meta` is not.
+//
+// Kept exactly as-is on purpose: e2e/api-health.spec.ts's `beforeAll` reads
+// `process.env.API_URL` and depends on THIS loader populating it from a
+// developer's own `frontend-react/.env` (their dev configuration, which this
+// change must never overwrite, copy into, or read from for anything else).
+// The register suite below does NOT rely on this loader — see E2E_API_URL.
 loadEnv(resolve(__dirname, '.env'));
+
+// Single source of truth for the backend the register suite (register.spec.ts,
+// register-rate-limit.spec.ts) targets. Deliberately independent of the `.env`
+// loader above and of the developer's own `frontend-react/.env`: that file
+// holds THEIR dev configuration (whatever backend they normally point at),
+// and the register suite creates real Owner+Store rows on every successful
+// run — it must never inherit an arbitrary dev API_URL.
+//
+// Zero-config default targets the local backend
+// (`dotnet run --project backend/src/SMCA.WebApi --launch-profile http`,
+// port from launchSettings.json:11). Override with `E2E_API_URL` in the
+// shell environment if you need to point the suite elsewhere. Both
+// `webServer.env` below and `e2e/support/network-observer.ts`'s guard import
+// this exact constant — never duplicate the literal.
+export const E2E_API_URL = process.env['E2E_API_URL'] ?? 'http://localhost:5019/api';
+
+// `webServer.env` must carry the rest of the ambient environment too — the
+// spawned `pnpm dev` (turbo -> vite) process needs PATH and friends, not just
+// API_URL. `process.env` types values as `string | undefined`; Playwright's
+// `env` wants `Record<string, string>`, so undefined entries are dropped.
+function ambientEnv(): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) result[key] = value;
+  }
+  return result;
+}
 
 export default defineConfig({
   // Los tests viven en e2e/ en la raíz del workspace, junto a esta config.
@@ -62,11 +97,22 @@ export default defineConfig({
 
   // Levanta el dev server automáticamente con `pnpm dev` (turbo) y espera a que el puerto responda.
   // `reuseExistingServer: true` → si ya hay un server en 3333, lo reutiliza en vez de levantar otro.
+  //
+  // ⚠️ TRAMPA: si ya había un dev server en :3333 levantado A MANO antes de correr
+  // Playwright, `reuseExistingServer: true` lo reutiliza tal cual está — el `API_URL`
+  // que se inyecta acá abajo NUNCA llega a ese proceso. La suite de registro
+  // (e2e/register.spec.ts, e2e/register-rate-limit.spec.ts) detecta esto en runtime
+  // vía el guard de e2e/support/network-observer.ts, que falla con un mensaje
+  // accionable en vez de escribir filas reales en el backend equivocado.
   webServer: {
     command: 'pnpm dev',
     url: 'http://localhost:3333',
     reuseExistingServer: true,
     timeout: 120_000,
+    // `API_URL` (consumido por turbo -> vite -> import.meta.env, ver design.md)
+    // pisa lo que hubiera en el `.env` del dev server recién levantado — pero
+    // solo si Playwright efectivamente levanta el proceso (ver trampa arriba).
+    env: { ...ambientEnv(), API_URL: E2E_API_URL },
   },
 
   // Solo Chromium (ya descargado en la caché de Playwright).

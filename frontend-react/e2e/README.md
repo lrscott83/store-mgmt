@@ -17,16 +17,28 @@ Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
   PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright pnpm exec playwright install chromium
   ```
 
-- **Solo para la suite de registro** (`register.spec.ts`, `register-rate-limit.spec.ts`,
-  `api-health.spec.ts`) — pegan contra un backend real, no contra un mock:
+- **Solo para la suite de registro** (`register.spec.ts`, `register-rate-limit.spec.ts`) —
+  pegan contra un backend real, no contra un mock:
 
-  ```bash
-  # Paso 0 — una sola vez
-  cp .env.example .env
-  ```
+  **No hace falta crear, copiar ni editar ningún `.env`.** `playwright.config.ts` expone
+  `E2E_API_URL`, resuelto como `process.env.E2E_API_URL ?? 'http://localhost:5019/api'` —
+  ese default apunta al backend local con cero configuración. Se inyecta como `API_URL`
+  al proceso `pnpm dev` que Playwright levanta (`webServer.env`), así que la app siempre
+  se compila con el backend correcto sin tocar tu `.env` de desarrollo.
 
-  `.env` no se commitea (`.gitignore` lo ignora); `.env.example` documenta `API_URL`
-  con su valor esperado (`http://localhost:5019/api`, con el sufijo `/api`) y por qué.
+  Si necesitás que la suite pegue contra otro backend, exportá `E2E_API_URL` en tu shell
+  antes de correr los tests (ej. `E2E_API_URL=http://localhost:5050/api pnpm test:e2e`).
+  Esto es intencionalmente **distinto** de `frontend-react/.env`: ese archivo es tu
+  configuración de desarrollo (la que uses normalmente con `pnpm dev` a mano) y esta
+  suite nunca la lee ni la sobrescribe — crea filas reales de Owner+Store en cada
+  corrida exitosa, y heredar tu `API_URL` de dev podría escribirlas en un backend
+  compartido.
+
+  **Solo para `api-health.spec.ts`** (chequeo de conectividad, sin navegador) — ese test
+  existente sí lee `API_URL` desde tu propio `frontend-react/.env` (vía el loader que ya
+  vive en `playwright.config.ts`, sin tocar). Si ya tenés un `.env` con `API_URL` para tu
+  desarrollo normal, ese mismo archivo alcanza — no hay `.env.example` que copiar; si no
+  tenés uno, `pnpm test:e2e:api` falla con un mensaje que lo dice (`API_URL is not set...`).
 
   Backend levantado a mano, en otra terminal, con PostgreSQL en `127.0.0.1:5432` (base `smca`):
 
@@ -53,9 +65,11 @@ Desde `frontend-react/`:
 
 ## Cómo se levanta el servidor
 
-`webServer` en `playwright.config.ts` ejecuta `pnpm dev` (turbo) automáticamente antes de correr los tests y espera a que `http://localhost:3333` responda (timeout 120s).
+`webServer` en `playwright.config.ts` ejecuta `pnpm dev` (turbo) automáticamente antes de correr los tests y espera a que `http://localhost:3333` responda (timeout 120s). Cuando Playwright es quien lo levanta, le inyecta `API_URL=E2E_API_URL` (default `http://localhost:5019/api`, override con la variable de shell `E2E_API_URL`) — así la suite de registro siempre habla con el backend correcto sin tocar tu `.env`.
 
-Con `reuseExistingServer: true`, si ya hay un dev server corriendo en el puerto 3333, Playwright lo reutiliza en lugar de levantar otro. Útil para iterar contra un server ya levantado a mano.
+Con `reuseExistingServer: true`, si ya hay un dev server corriendo en el puerto 3333, Playwright lo reutiliza en lugar de levantar otro. Útil para iterar contra un server ya levantado a mano — **pero con una trampa**:
+
+> ⚠️ **Si tenías `pnpm dev` corriendo en :3333 desde ANTES de ejecutar Playwright**, el `API_URL` de arriba nunca llega a ese proceso — Playwright reutiliza el server tal cual está, con el `API_URL` que sea que tuviera (por ejemplo, tu `.env` de desarrollo apuntando a otro backend). La suite de registro lo detecta en runtime: en vez de escribir filas reales en el backend equivocado, falla con un mensaje que nombra el problema (`La petición de registro salió a ... pero el backend esperado es ...`) y la solución (parar ese dev server con `Ctrl+C` en su terminal y volver a correr la suite). Ver `e2e/support/network-observer.ts`.
 
 ## Service worker
 
@@ -85,8 +99,8 @@ configurada, el fallo lo dice así — no como un `expect` crudo indistinguible 
 | --- | --- | --- |
 | `Registration quota exhausted for this IP...` | Cuota de 10 registros/10min agotada | Esperar hasta 10 minutos |
 | `The backend did not respond at ...` | El backend está caído | Levantarlo (paso 1, arriba) |
-| `API_URL is not configured: the request went to the dev server...` | Falta `.env` | `cp .env.example .env` |
-| `API_URL points at the wrong base — is /api missing?` | `API_URL` sin el sufijo `/api` | Revisar `.env` |
+| `La petición de registro salió a ... pero el backend esperado es ...` | Había un dev server en :3333 levantado a mano ANTES de Playwright, con otro `API_URL` — `reuseExistingServer:true` lo reutilizó tal cual y la suite terminó hablando con el backend equivocado | Parar ese dev server (`Ctrl+C`) y volver a correr la suite |
+| `API_URL points at the wrong base — is /api missing?` | `E2E_API_URL` (si lo overrideaste) no termina en `/api` | Revisar el valor exportado en tu shell |
 
 Ninguno de estos 4 es un defecto de la aplicación — son fallos de entorno, y por eso el mensaje
 lo dice explícitamente en vez de dejarte adivinar.

@@ -1,13 +1,7 @@
 import type { Page, Request as PlaywrightRequest } from '@playwright/test';
+import { E2E_API_URL } from '../../playwright.config';
 
 const REGISTER_PATH_SUFFIX = '/v1/auth/register';
-
-// The origin the SPA dev server itself runs on (playwright.config.ts
-// `use.baseURL`). If a register POST resolves HERE instead of the backend,
-// `API_URL` was never picked up — the app's own baseURL fell back to `''`
-// (api-client.ts:21) and the relative path resolved against the page's own
-// origin. Design.md §6, diagnostic 3.
-const DEV_SERVER_ORIGIN = 'http://localhost:3333';
 
 export interface RegisterAttempt {
   url: string;
@@ -69,6 +63,39 @@ function isRegisterRequest(method: string, url: string): boolean {
   }
 }
 
+/**
+ * The guard: every register request must go to the backend this run
+ * actually asked for (`E2E_API_URL`, `playwright.config.ts`), not wherever an
+ * already-running dev server happened to be pointed at.
+ *
+ * This matters because of `reuseExistingServer: true`
+ * (`playwright.config.ts`): it is kept `true` on purpose so the two existing
+ * specs (`smoke.spec.ts`, `api-health.spec.ts`) keep running exactly as they
+ * do today — but the consequence is that if a dev server was ALREADY running
+ * on :3333 before Playwright started, Playwright reuses it as-is and the
+ * `API_URL` this config tries to inject into `webServer.env` never reaches
+ * that process. The app then silently talks to whatever backend that other
+ * dev server was configured for — writing real Owner+Store rows there.
+ *
+ * Deliberately does not need `page.route()` to enforce anything (design.md
+ * §3 already rejected that mechanism for a different reason): this only
+ * OBSERVES the request that already left and fails loud if its destination
+ * is wrong. Only applies to requests that actually happened — a
+ * client-validation test that makes no request (`expectNoAttempt()`) is
+ * untouched by this check.
+ */
+function wrongBackendMessage(actualUrl: string): string {
+  return (
+    `La petición de registro salió a ${actualUrl}, pero el backend esperado para esta ` +
+    `corrida es ${E2E_API_URL}. Esto pasa cuando ya había un dev server corriendo en ` +
+    ':3333 ANTES de arrancar Playwright, con otro API_URL (por ejemplo, tu .env de ' +
+    'desarrollo) — con reuseExistingServer:true, Playwright lo reutiliza tal cual está, y ' +
+    'nunca llega a inyectarle el backend correcto. Parná ese dev server (Ctrl+C en su ' +
+    'terminal) y volvé a correr la suite: Playwright va a levantar el suyo propio, ya ' +
+    'apuntando al backend correcto.'
+  );
+}
+
 export function installRegisterNetworkObserver(page: Page): RegisterNetworkObserver {
   const attempts: RegisterAttempt[] = [];
   const outcomes: Outcome[] = [];
@@ -90,6 +117,14 @@ export function installRegisterNetworkObserver(page: Page): RegisterNetworkObser
       postData = null;
     }
     attempts.push({ url: request.url(), postData });
+
+    // The guard (see wrongBackendMessage() above). Pushed as a 'failed'
+    // outcome as soon as the request is observed — before any response
+    // arrives — so `waitForResponse()` throws this instead of whatever the
+    // wrong backend happens to answer.
+    if (!request.url().startsWith(E2E_API_URL)) {
+      pushOutcome({ kind: 'failed', message: wrongBackendMessage(request.url()) });
+    }
   });
 
   page.on('requestfailed', (request) => {
@@ -127,13 +162,12 @@ export function installRegisterNetworkObserver(page: Page): RegisterNetworkObser
     expectNoAttempt: () => {
       if (attempts.length === 0) return;
       const first = attempts[0];
-      const misdirected = new URL(first.url).origin === DEV_SERVER_ORIGIN;
+      const misdirected = !first.url.startsWith(E2E_API_URL);
       throw new Error(
         `Expected zero requests to a URL ending in ${REGISTER_PATH_SUFFIX}, but observed ` +
           `${attempts.length} (first: ${first.url}).` +
           (misdirected
-            ? ' API_URL is not configured: the request went to the dev server, not the backend. ' +
-              'Copy frontend-react/.env.example to frontend-react/.env.'
+            ? ` ${wrongBackendMessage(first.url)}`
             : ' The client-side guard that should have blocked this submit did not run.')
       );
     },
@@ -160,11 +194,12 @@ export function installRegisterNetworkObserver(page: Page): RegisterNetworkObser
         );
       }
 
-      if (new URL(capture.url).origin === DEV_SERVER_ORIGIN) {
-        throw new Error(
-          'API_URL is not configured: the register response came from the dev server, not the ' +
-            'backend. Copy frontend-react/.env.example to frontend-react/.env.'
-        );
+      // Defensive fallback: normally the guard on the 'request' event above
+      // already pushed a 'failed' outcome (consumed before this one) for any
+      // request that did not go to E2E_API_URL. This only fires if a
+      // 'response' outcome somehow arrived first — same message either way.
+      if (!capture.url.startsWith(E2E_API_URL)) {
+        throw new Error(wrongBackendMessage(capture.url));
       }
 
       if (capture.status === 404) {
