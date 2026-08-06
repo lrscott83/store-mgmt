@@ -56,11 +56,11 @@ public class StoreKeyWrapServiceTests
     public void WrapDek_distinct_salt_iv_per_call()
     {
         var sut = new StoreKeyWrapService();
-        const string storedHash = "dGVzdC1oYXNo";
+        const string preHash = "dGVzdC1oYXNo";
         byte[] dek = RandomNumberGenerator.GetBytes(KeyBytes);
 
-        var resultA = sut.WrapDek(storedHash, dek);
-        var resultB = sut.WrapDek(storedHash, dek);
+        var resultA = sut.WrapDek(preHash, dek);
+        var resultB = sut.WrapDek(preHash, dek);
 
         resultA.WrapSalt.Should().NotBe(resultB.WrapSalt);
         resultA.WrapIv.Should().NotBe(resultB.WrapIv);

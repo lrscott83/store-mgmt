@@ -26,6 +26,7 @@ public class CreateOwnerServiceTests
     private readonly Mock<IUserRoleRepository> _mockUserRoleRepository;
     private readonly Mock<IHashPasswordService> _mockHashPasswordService;
     private readonly Mock<ITenantRepository> _mockTenantRepository;
+    private readonly Mock<IOfflinePreHashProtector> _mockPreHashProtector;
 
     // Test data
     private readonly Guid _testTenantId = Guid.NewGuid();
@@ -39,6 +40,7 @@ public class CreateOwnerServiceTests
         _mockUserRoleRepository = new Mock<IUserRoleRepository>();
         _mockHashPasswordService = new Mock<IHashPasswordService>();
         _mockTenantRepository = new Mock<ITenantRepository>();
+        _mockPreHashProtector = new Mock<IOfflinePreHashProtector>();
 
         // Default successful setups
         SetupDefaultSuccessfulScenarios();
@@ -51,7 +53,8 @@ public class CreateOwnerServiceTests
             _mockOwnerRepository.Object,
             _mockUserRoleRepository.Object,
             _mockHashPasswordService.Object,
-            _mockTenantRepository.Object);
+            _mockTenantRepository.Object,
+            _mockPreHashProtector.Object);
     }
 
     private void SetupDefaultSuccessfulScenarios()
@@ -59,6 +62,13 @@ public class CreateOwnerServiceTests
         _mockHashPasswordService
             .Setup(x => x.HashPassword(It.IsAny<string>()))
             .Returns("hashed_password");
+
+        // R20: CreateOwnerService.CreateOwnerAsync persists an offline pre-hash alongside the
+        // Argon2id password. Not this file's concern (covered by OfflinePreHashProtectorTests) —
+        // stub it so it's a harmless no-op here.
+        _mockPreHashProtector
+            .Setup(x => x.Protect(It.IsAny<string>(), It.IsAny<Guid>()))
+            .Returns("mock-envelope");
 
         _mockTenantRepository
             .Setup(x => x.AddAsync(It.IsAny<Tenant>()))

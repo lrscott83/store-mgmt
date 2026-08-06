@@ -27,6 +27,7 @@ public class AuthenticationServiceTests
     // Mock dependencies
     private readonly Mock<IUserRepository> _mockUserRepository;
     private readonly Mock<IHashPasswordService> _mockHashPasswordService;
+    private readonly Mock<IOfflinePreHashProtector> _mockPreHashProtector;
     private readonly Mock<ILogger<AuthenticationService>> _mockLogger;
 
     // Test data
@@ -38,6 +39,7 @@ public class AuthenticationServiceTests
     {
         _mockUserRepository = new Mock<IUserRepository>();
         _mockHashPasswordService = new Mock<IHashPasswordService>();
+        _mockPreHashProtector = new Mock<IOfflinePreHashProtector>();
         _mockLogger = new Mock<ILogger<AuthenticationService>>();
 
         // Default successful setups
@@ -49,6 +51,7 @@ public class AuthenticationServiceTests
         return new AuthenticationService(
             _mockUserRepository.Object,
             _mockHashPasswordService.Object,
+            _mockPreHashProtector.Object,
             _mockLogger.Object);
     }
 
@@ -68,6 +71,19 @@ public class AuthenticationServiceTests
         _mockHashPasswordService
             .Setup(x => x.HashPassword(It.IsAny<string>()))
             .Returns("hashed_password_new_format");
+
+        // R21 backfill: every test user here starts with OfflinePasswordPreHash == null
+        // (CreateActiveUser never sets it), so IsValidUserAsync's backfill branch always
+        // fires on a successful login. Stub it so it's a harmless no-op for tests whose
+        // concern is the login result, not the backfill itself (that's covered by
+        // ExportOfflineRosterQueryHandlerTests / OfflinePreHashProtectorTests).
+        _mockPreHashProtector
+            .Setup(x => x.Protect(It.IsAny<string>(), It.IsAny<Guid>()))
+            .Returns("mock-envelope");
+
+        _mockUserRepository
+            .Setup(x => x.SetOfflinePasswordPreHashIfNullAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
     }
 
     private User CreateActiveUserWithNavProps(string login = "testuser")
