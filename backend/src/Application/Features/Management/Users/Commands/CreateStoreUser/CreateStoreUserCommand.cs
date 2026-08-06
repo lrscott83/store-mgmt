@@ -30,6 +30,7 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
         private readonly IHttpContextService _httpContextService;
         private readonly IHashPasswordService _hashPasswordService;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IOfflinePreHashProtector _preHashProtector;
 
         public CreateStoreUserCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -39,7 +40,8 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
             IHttpContextService httpContextService,
             IStringLocalizer<I18n> localizer,
             IUserRoleRepository userRoleRepository,
-            IHashPasswordService hashPasswordService)
+            IHashPasswordService hashPasswordService,
+            IOfflinePreHashProtector preHashProtector)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _storeRepository = storeRepository;
@@ -49,6 +51,7 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
             _localizer = localizer;
             _userRoleRepository = userRoleRepository;
             _hashPasswordService = hashPasswordService;
+            _preHashProtector = preHashProtector;
         }
 
         public async Task<ResponseResult<bool>> Handle(CreateStoreUserCommand request, CancellationToken cancellationToken)
@@ -61,6 +64,7 @@ namespace Application.Features.Management.Users.Commands.CreateStoreUser
             var user = User.Create(request.Login, passwordHashed, request.FullName, request.CellPhone,
                 request.Email, store.TenantId);
             user.SelectedStoreId = request.StoreId;
+            user.OfflinePasswordPreHash = _preHashProtector.Protect(request.Password, user.Id);
             await _userRepository.AddAsync(user);
 
             var storeUser = StoreUser.Create(user.Id, store.Id, store.TenantId);

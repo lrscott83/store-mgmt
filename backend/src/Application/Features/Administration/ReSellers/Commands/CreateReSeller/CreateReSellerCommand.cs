@@ -35,6 +35,7 @@ namespace Application.Features.Administration.ReSellers.Commands.CreateReSeller
         private readonly IHashPasswordService _hashPasswordService;
         private readonly ISystemConfigurationRepository _systemConfigurationRepository;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IOfflinePreHashProtector _preHashProtector;
 
         public CreateReSellerCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
@@ -44,7 +45,8 @@ namespace Application.Features.Administration.ReSellers.Commands.CreateReSeller
             IHashPasswordService hashPasswordService,
             ISystemConfigurationRepository systemConfigurationRepository,
             IStringLocalizer<I18n> localizer,
-            IUserRoleRepository userRoleRepository)
+            IUserRoleRepository userRoleRepository,
+            IOfflinePreHashProtector preHashProtector)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -54,6 +56,7 @@ namespace Application.Features.Administration.ReSellers.Commands.CreateReSeller
             _hashPasswordService = hashPasswordService;
             _systemConfigurationRepository = systemConfigurationRepository;
             _userRoleRepository = userRoleRepository;
+            _preHashProtector = preHashProtector;
         }
 
         public async Task<ResponseResult<bool>> Handle(CreateReSellerCommand request, CancellationToken cancellationToken)
@@ -64,6 +67,7 @@ namespace Application.Features.Administration.ReSellers.Commands.CreateReSeller
             Guid tenantId = Guid.NewGuid();
             string password = _hashPasswordService.HashPassword(request.Password);
             var user = User.Create(request.Login, password, request.FullName, request.Cellphone, request.Email, tenantId);
+            user.OfflinePasswordPreHash = _preHashProtector.Protect(request.Password, user.Id);
             await _userRepository.AddAsync(user);
 
             float defaultPercentDiscountPrice = await _systemConfigurationRepository.GetReSellerPercentDiscountPriceAsync();

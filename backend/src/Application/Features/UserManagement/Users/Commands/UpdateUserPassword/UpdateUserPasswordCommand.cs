@@ -27,19 +27,22 @@ namespace Application.Features.UserManagement.Users.Commands.UpdateUserPassword
         private readonly IHashPasswordService _hashPasswordService;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly IOfflinePreHashProtector _preHashProtector;
 
         public UpdateUserPasswordCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IUserRepository userRepository,
             IHashPasswordService hashPasswordService,
             IHttpContextService httpContextService,
-            IStringLocalizer<I18n> localizer)
+            IStringLocalizer<I18n> localizer,
+            IOfflinePreHashProtector preHashProtector)
         {
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _userRepository = userRepository;
             _hashPasswordService = hashPasswordService;
             _localizer = localizer;
+            _preHashProtector = preHashProtector;
         }
 
         public async Task<ResponseResult<bool>> Handle(UpdateUserPasswordCommand request, CancellationToken cancellationToken)
@@ -60,6 +63,7 @@ namespace Application.Features.UserManagement.Users.Commands.UpdateUserPassword
                 && user.TenantId != _httpContextService.TenantId.ToGuid())
                 return ResponseResult.Failure<bool>(UserErrors.NotFound, 404);
 
+            user.OfflinePasswordPreHash = _preHashProtector.Protect(request.NewPassword, user.Id);
             user.Password = _hashPasswordService.HashPassword(request.NewPassword);
             await _userRepository.UpdateAsync(user);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);

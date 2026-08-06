@@ -14,15 +14,18 @@ namespace Application.Services.Authentication
     {
         private readonly IUserRepository _userRepository;
         private readonly IHashPasswordService _hashPasswordService;
+        private readonly IOfflinePreHashProtector _preHashProtector;
         private readonly ILogger<AuthenticationService> _logger;
 
         public AuthenticationService(
             IUserRepository userRepository,
             IHashPasswordService hashPasswordService,
+            IOfflinePreHashProtector preHashProtector,
             ILogger<AuthenticationService> logger)
         {
             _userRepository = userRepository;
             _hashPasswordService = hashPasswordService;
+            _preHashProtector = preHashProtector;
             _logger = logger;
         }
 
@@ -45,6 +48,21 @@ namespace Application.Services.Authentication
             {
                 _logger.LogWarning("Login failed for {Login}: invalid password", login);
                 return Result.Failure<Guid>(UserErrors.InvalidCredentials);
+            }
+
+            if (user.OfflinePasswordPreHash is null)
+            {
+                try
+                {
+                    string envelope = _preHashProtector.Protect(password, user.Id);
+                    await _userRepository.SetOfflinePasswordPreHashIfNullAsync(user.Id, envelope, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    // A backfill failure must never turn a valid login into a 500 — the pre-hash
+                    // is filled opportunistically; the user retries offline-provisioning on next login.
+                    _logger.LogWarning(ex, "Offline pre-hash backfill failed for {Login}", login);
+                }
             }
 
             ReSeller? reSeller = user.ReSeller;

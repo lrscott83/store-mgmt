@@ -16,16 +16,18 @@ namespace Application.Services.Owners
         private readonly IUserRoleRepository _userRoleRepository;
         private readonly IHashPasswordService _hashPasswordService;
         private readonly ITenantRepository _tenantRepository;
+        private readonly IOfflinePreHashProtector _preHashProtector;
 
-        public CreateOwnerService(IUserRepository userRepository, IOwnerRepository ownerRepository, 
-            IUserRoleRepository userRoleRepository, IHashPasswordService hashPasswordService, 
-            ITenantRepository tenantRepository)
+        public CreateOwnerService(IUserRepository userRepository, IOwnerRepository ownerRepository,
+            IUserRoleRepository userRoleRepository, IHashPasswordService hashPasswordService,
+            ITenantRepository tenantRepository, IOfflinePreHashProtector preHashProtector)
         {
             _userRepository = userRepository;
             _ownerRepository = ownerRepository;
             _userRoleRepository = userRoleRepository;
             _hashPasswordService = hashPasswordService;
             _tenantRepository = tenantRepository;
+            _preHashProtector = preHashProtector;
         }
 
         
@@ -37,6 +39,7 @@ namespace Application.Services.Owners
 
             string passwordHashed = _hashPasswordService.HashPassword(password);
             var user = User.Create(login, passwordHashed, fullName, cellPhone, email, tenant.Id);
+            user.OfflinePasswordPreHash = _preHashProtector.Protect(password, user.Id);
             await _userRepository.AddAsync(user);
 
             // Guest is always false for admin-created owners (OwnerAdmin/ReSeller).
