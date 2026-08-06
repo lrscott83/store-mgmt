@@ -33,7 +33,8 @@ namespace SMCA.WebApi.Extensions
             })
                 .AddJwtBearer(options =>
                 {
-                    options.IncludeErrorDetails = true;
+                    // Outside development this tells a caller *why* token validation failed.
+                    options.IncludeErrorDetails = builder.Environment.IsDevelopment();
                     options.TokenValidationParameters = new TokenValidationParameters()
                     {
                         ClockSkew = TimeSpan.Zero,

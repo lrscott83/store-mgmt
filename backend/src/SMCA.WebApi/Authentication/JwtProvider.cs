@@ -24,7 +24,10 @@ namespace SMCA.WebApi.Authentication
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
 
-            var key = Encoding.ASCII.GetBytes(_jwtOptions.SecretKey);
+            // UTF8, matching both validators (JwtBearerOptionsSetup and ServiceExtensions).
+            // ASCII agrees with UTF8 only while the key stays ASCII-only; a single accented
+            // character in the configured secret would make every issued token fail validation.
+            var key = Encoding.UTF8.GetBytes(_jwtOptions.SecretKey);
             var signingCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256);

@@ -11,15 +11,18 @@ namespace SMCA.WebApi.OptionsSetup
     public class JwtBearerOptionsSetup : IConfigureOptions<JwtBearerOptions>
     {
         private readonly JwtOptions _jwtOptions;
+        private readonly IWebHostEnvironment _environment;
 
-        public JwtBearerOptionsSetup(IOptions<JwtOptions> jwtOptions)
+        public JwtBearerOptionsSetup(IOptions<JwtOptions> jwtOptions, IWebHostEnvironment environment)
         {
             _jwtOptions = jwtOptions.Value;
+            _environment = environment;
         }
 
         public void Configure(JwtBearerOptions options)
         {
-            options.IncludeErrorDetails = true;
+            // Outside development this tells a caller *why* token validation failed.
+            options.IncludeErrorDetails = _environment.IsDevelopment();
             options.TokenValidationParameters = new()
             {
                 ValidateIssuer = true,
