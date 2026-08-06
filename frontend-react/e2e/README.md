@@ -53,8 +53,8 @@ Desde `frontend-react/`:
 
 | Comando | Qué hace |
 | --- | --- |
-| `pnpm test:e2e` | Corre la suite por defecto (smoke + register REQ-1..REQ-8), **excluye** el spec de rate-limit. Consume 2 registros reales. |
-| `pnpm test:e2e:rate-limit` | Corre solo `register-rate-limit.spec.ts` (REQ-9). Agota la cuota de registro de tu IP por hasta 10 min — a demanda, no en la corrida por defecto. |
+| `pnpm test:e2e` | Corre la suite por defecto (smoke + register REQ-1..REQ-8 + login A1-A7/D1-D6), **excluye** ambos specs de rate-limit. Consume 2 registros + 4 logins reales — ver la advertencia de cuota de login más abajo. |
+| `pnpm test:e2e:rate-limit` | Corre AMBOS specs de rate-limit (`register-rate-limit.spec.ts` REQ-9 y `login-rate-limit.spec.ts` REQ-8), filtrados por el tag `@rate-limit`. Agota la cuota de registro (~10 min) y la de login (~1 min) de tu IP — a demanda, no en la corrida por defecto. |
 | `pnpm test:e2e:api` | Chequeo de conectividad con la API, sin navegador (`playwright.api.config.ts`). |
 | `pnpm exec playwright test --ui` | Modo interactivo (UI) con el test runner |
 | `pnpm exec playwright test e2e/smoke.spec.ts` | Corre solo el archivo indicado |
@@ -104,10 +104,81 @@ lo dice explícitamente en vez de dejarte adivinar.
 
 ### Advertencia de datos, sin alarma
 
-Una corrida exitosa de `pnpm test:e2e` deja **2 filas permanentes** (`Owner` + `Store`) en tu base
-`smca` local; `pnpm test:e2e:rate-limit` deja **1 fila más**. No hay teardown alcanzable desde el
-navegador. Los logins llevan el prefijo `e2e-` + timestamp, así que son greppables y borrables a
-mano cuando quieras limpiar (`smca`, no `smca_test` — no contamina la suite .NET).
+Una corrida exitosa de `pnpm test:e2e` deja **3 filas permanentes** (`Owner` + `Store` + `User`,
+este último el StoreUser que la suite de login crea vía UI) en tu base `smca` local;
+`pnpm test:e2e:rate-limit` deja **1 fila más** (la del spec de rate-limit de registro; el de login
+no deja ninguna — ver más abajo). No hay teardown alcanzable desde el navegador. Los logins llevan
+el prefijo `e2e-` + timestamp, así que son greppables y borrables a mano cuando quieras limpiar
+(`smca`, no `smca_test` — no contamina la suite .NET).
+
+## Suite de login (`login.spec.ts`, `login-rate-limit.spec.ts`)
+
+Cubre las 14 aserciones de [S1-02] (`docs/testing/e2e-stage-1/S1-02.md`): las 8 de UI (A1-A8) y
+las 6 de destino post-login (D1-D6), contra un backend real. Capa de soporte adicional en
+`e2e/support/`:
+
+- `support/login-page.ts` — page object de `/login`.
+- `support/login-network-observer.ts` — observa `POST .../v1/auth/login` y `GET .../v1/auth/me`,
+  prueba su **orden causal** (no solo que ambas ocurrieron), y expone `LoginRateLimitError` con
+  los umbrales de `LoginPolicy`. Archivo propio, separado de `support/network-observer.ts` a
+  propósito (evita cualquier riesgo de regresión sobre `register.spec.ts`).
+- `support/store-seed.ts` — siembra una categoría + un producto activo/vendible navegando la UI
+  real de `/sales/products`, cero peticiones a la API (servicio offline).
+- `support/session.ts` — el motor detrás de la fixture `signedInPage` (ver abajo).
+
+### `signedInPage` — sesiones autenticadas reutilizables
+
+Diez de las catorce aserciones necesitan un usuario YA autenticado. En vez de loguear una vez por
+escenario, `support/test.ts` expone la fixture opt-in `signedInPage` (nunca `auto`) más la opción
+`persona`:
+
+```ts
+test.use({ persona: 'owner-admin-with-products' });
+
+test('...', async ({ signedInPage }) => {
+  // signedInPage.page === page (SIEMPRE el mismo objeto que la fixture `page`
+  // del propio test — nunca un contexto/página nueva).
+});
+```
+
+Las 4 personas disponibles:
+
+| Persona | Estado de la tienda | Home resuelto |
+| --- | --- | --- |
+| `owner-admin` (default) | Recién registrada, sin categorías ni productos | `/sales/products` |
+| `owner-admin-with-products` | +1 categoría activa, +1 producto activo/vendible | `/sales/new` |
+| `store-user` | Empleado de la MISMA tienda, acuñado antes de sembrar | `/sales/products` |
+| `store-user-with-products` | Snapshot de `store-user` + las claves de entidad sembradas | `/sales/new` |
+
+Invariantes que la fixture garantiza siempre:
+
+- **`signedInPage.page === page`** — nunca un `page`/contexto nuevo, así `registerNetwork`,
+  `loginNetwork` y cualquier observador futuro siguen mirando lo mismo que el test.
+- **Sin roster, jamás** — ninguna persona llama `importRoster`; `isRosterProvisioned()` queda
+  falso, así que el login siempre toma la rama ONLINE. Un roster convertiría esta suite en la de
+  [S1-03] (login offline) sin querer.
+
+**Costo amortizado — la corrida por defecto gasta exactamente 4 logins reales**: 1 para acuñar
+`owner-admin` (el mismo login que las aserciones de red/overlay observan en vivo), 1 para acuñar
+`store-user`, 1 más de `REQ-3` (contraseña incorrecta) y 1 más de `REQ-9`/D1 (relogin real tras
+`logout()`). Las variantes `*-with-products` no cuestan login extra — se derivan restaurando
+`localStorage` que la propia app ya escribió minutos antes (nunca escrito a mano).
+
+> ⚠️ **Margen de exactamente 1 login — no es una nota al pie.** El techo es **5 logins por minuto
+> por IP** (`RateLimitPolicies.cs:15-24`). Dos corridas de `pnpm test:e2e` dentro del **mismo
+> minuto** suman **8** logins y **se ponen rojas por cuota**, no por un defecto de la app. Si eso
+> te pasa, esperá un minuto y volvé a correr — el mensaje de error lo va a decir con esas palabras
+> (`Login quota exhausted...`), nunca como un `expect` mudo.
+
+### `pnpm test:e2e:rate-limit` — costo del spec de login
+
+`login-rate-limit.spec.ts` agota la cuota de login de tu IP en **~1 minuto** (no ~10 min como el
+de registro) y **deja 0 filas nuevas** en la base — usa una identidad que nunca se registró; el
+límite corre en el pipeline antes del endpoint, así que un intento fallido consume permiso igual.
+
+**Orden inverso al del hermano de registro**: correr `pnpm test:e2e:rate-limit` justo ANTES de
+`pnpm test:e2e` va a chocar — la ventana de login es corta pero la cuota queda agotada, y
+`pnpm test:e2e` va a ver 429 donde esperaba 200. Dejá pasar el minuto entre uno y otro.
 
 ## Dónde van los tests de features
 
