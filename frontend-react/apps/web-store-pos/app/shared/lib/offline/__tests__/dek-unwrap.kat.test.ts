@@ -1,23 +1,52 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { unwrapDek, DekUnwrapError, DEK_WRAP_ITERATIONS } from '../dek-unwrap';
 import { pbkdf2Base64, sha256Base64 } from '../offline-crypto';
 import { aesGcmDecrypt } from '../../storage/aes-gcm';
 import { bytesFromBase64 } from '../../storage/base64';
-import kat from './__fixtures__/dek-kat.json';
 
-// design §6 — the crypto path end to end, diffed against
-// StoreKeyWrapService.cs / StoreDataKeyProvider.cs line by line. The
-// fixture's "_header.provenance" is "node-transcription" (PLACEHOLDER, not
-// backend-proven) — see apply-progress.md for the WU3.3 deferral.
-describe('dek-unwrap — known-answer vector (fallback, node-transcription)', () => {
-  it('unwrapDek(knownPassword, fixtureEntry) equals the fixture expected 32-byte DEK', async () => {
+// design D6 — single source of truth for both stacks: `docs/contracts/offline-roster-dek-kat.json`
+// (provenance "dotnet-backend"). Reads via readFileSync, NOT a static import — Vitest's Vite root
+// is `apps/web-store-pos` and a static import 8 levels above it risks fs.strict denial.
+const katPath = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../'.repeat(8),
+  'docs/contracts/offline-roster-dek-kat.json',
+);
+const kat = JSON.parse(readFileSync(katPath, 'utf-8')) as {
+  password: string;
+  passwordPreHash: string;
+  wrapSalt: string;
+  wrapIv: string;
+  iterations: number;
+  wrappedDek: string;
+  expectedDek: string;
+  storeId: string;
+  masterSecret: string;
+  _header: { provenance: string; backendCommitSha: string; dotnetVersion: string };
+};
+
+describe('dek-unwrap — known-answer vector (dotnet-backend, cross-stack)', () => {
+  it('vector provenance is the real backend, not a node transcription', () => {
+    expect(kat._header.provenance).toBe('dotnet-backend');
+    expect(kat._header.backendCommitSha).toBeTruthy();
+  });
+
+  it('sha256Base64(password) independently reproduces the vector passwordPreHash', async () => {
+    const preHash = await sha256Base64(kat.password);
+    expect(preHash).toBe(kat.passwordPreHash);
+  });
+
+  it('unwrapDek(knownPassword, fixtureEntry) equals the vector expected 32-byte DEK', async () => {
     const dek = await unwrapDek(kat.password, {
       wrappedDek: kat.wrappedDek,
       wrapSalt: kat.wrapSalt,
       wrapIv: kat.wrapIv,
     });
 
-    const expected = Uint8Array.from(atob(kat.expectedDekBase64), (c) => c.charCodeAt(0));
+    const expected = Uint8Array.from(atob(kat.expectedDek), (c) => c.charCodeAt(0));
     expect(Array.from(dek)).toEqual(Array.from(expected));
     expect(dek.length).toBe(32);
   });

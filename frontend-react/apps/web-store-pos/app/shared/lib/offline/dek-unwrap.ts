@@ -9,7 +9,9 @@
 //
 // Step 2's input is the Base64 STRING from step 1 (UTF-8 bytes of that
 // text), NOT the raw password and NOT the raw digest bytes — this matches
-// `Encoding.UTF8.GetBytes(su.User.Password)` on the backend exactly.
+// `Encoding.UTF8.GetBytes(preHash)` on the backend exactly, where `preHash`
+// is the decrypted `User.OfflinePasswordPreHash` (NOT `User.Password`, the
+// Argon2id PHC string — see offline-password-verifier design D1).
 import { sha256Base64, pbkdf2Base64 } from './offline-crypto';
 import { aesGcmDecrypt } from '../storage/aes-gcm';
 import { bytesFromBase64 } from '../storage/base64';

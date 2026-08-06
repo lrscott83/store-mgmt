@@ -57,4 +57,34 @@ describe('roster-types — optional per-user wrap fields', () => {
     expect(stored?.users[0].wrapSalt).toBe('salt-base64');
     expect(stored?.users[0].wrapIv).toBe('iv-base64');
   });
+
+  // offline-roster-bundle delta: "v3 bundle with a null verifier is a valid shape" — the
+  // JSON-transparent serializer (roster-serializer.ts) must round-trip `null` losslessly,
+  // not coerce it to an empty object.
+  it('v3 bundle with a null verifier is a valid shape and round-trips null, not {}', () => {
+    const bundle: OfflineRosterBundle = {
+      bundleId: 'b3',
+      issuedAt: 1000,
+      expiresAt: 20_000,
+      formatVersion: 3,
+      storeId: 's1',
+      users: [baseUser({ verifier: null })],
+    };
+    importRoster(bundle, 10_000);
+    const stored = getRoster(10_000);
+    expect(stored?.users[0].verifier).toBeNull();
+  });
+
+  it('v3 bundle with every user carrying a non-null verifier is still valid', () => {
+    const bundle: OfflineRosterBundle = {
+      bundleId: 'b4',
+      issuedAt: 1000,
+      expiresAt: 20_000,
+      formatVersion: 3,
+      storeId: 's1',
+      users: [baseUser()],
+    };
+    importRoster(bundle, 10_000);
+    expect(getRoster(10_000)).toEqual(bundle);
+  });
 });

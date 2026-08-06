@@ -21,7 +21,14 @@ export interface OfflineRosterUser {
   isOwnerAdmin: boolean;
   isReSeller: boolean;
   selectedStoreId: string;
-  verifier: OfflineVerifier;
+  /**
+   * `null` when the backend has no persisted `OfflinePasswordPreHash` for this
+   * user yet (never logged in / never had a password set since the
+   * offline-password-verifier change shipped) — distinct from an absent or
+   * malformed field. `offline-auth-service.ts`'s `typeof` guard treats this
+   * exactly like a missing verifier and throws `OfflineVerifierError`.
+   */
+  verifier: OfflineVerifier | null;
   /**
    * Optional at-rest-encryption wrap fields, mirroring the backend's
    * `OfflineRosterUserDto`. Absent/empty on a `formatVersion: 1` bundle
