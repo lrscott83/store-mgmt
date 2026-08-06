@@ -8,12 +8,17 @@ import { defineConfig } from '@playwright/test';
 
 // Minimal .env loader — `dotenv` is not a direct dependency of this workspace,
 // and Vite's own .env handling does not apply to a bare `playwright test` run.
+//
+// api-health.spec.ts no longer reads `API_URL` from here: it resolves the backend
+// from `e2e/support/backend-url.ts`, so this config needs no `.env` key to run.
+// The loader stays because a developer's other `.env` values remain available to
+// anything added under this config later.
 function loadEnv(path: string) {
   let contents: string;
   try {
     contents = readFileSync(path, 'utf8');
   } catch {
-    return; // No .env: the spec's beforeAll reports the missing API_URL.
+    return; // No .env: an absent file is a supported state, not an error.
   }
   for (const line of contents.split('\n')) {
     const match = /^\s*([\w.-]+)\s*=\s*(.*)?\s*$/.exec(line);

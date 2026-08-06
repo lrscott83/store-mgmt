@@ -17,28 +17,25 @@ Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
   PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright pnpm exec playwright install chromium
   ```
 
-- **Solo para la suite de registro** (`register.spec.ts`, `register-rate-limit.spec.ts`) —
-  pegan contra un backend real, no contra un mock:
+- **Para los tests que pegan contra un backend real** (`register.spec.ts`,
+  `register-rate-limit.spec.ts` y `api-health.spec.ts`):
 
-  **No hace falta crear, copiar ni editar ningún `.env`.** `playwright.config.ts` expone
-  `E2E_API_URL`, resuelto como `process.env.E2E_API_URL ?? 'http://localhost:5019/api'` —
-  ese default apunta al backend local con cero configuración. Se inyecta como `API_URL`
-  al proceso `pnpm dev` que Playwright levanta (`webServer.env`), así que la app siempre
-  se compila con el backend correcto sin tocar tu `.env` de desarrollo.
+  **No hace falta crear, copiar ni editar ningún `.env`.** Los tres resuelven el backend
+  desde `E2E_API_URL` (`e2e/support/backend-url.ts`), calculado como
+  `process.env.E2E_API_URL ?? 'http://localhost:5019/api'` — ese default apunta al
+  backend local con cero configuración. `playwright.config.ts` lo inyecta además como
+  `API_URL` al proceso `pnpm dev` que levanta (`webServer.env`), así que la app se
+  compila contra el mismo backend que los tests interrogan.
 
-  Si necesitás que la suite pegue contra otro backend, exportá `E2E_API_URL` en tu shell
-  antes de correr los tests (ej. `E2E_API_URL=http://localhost:5050/api pnpm test:e2e`).
+  Si necesitás que peguen contra otro backend, exportá `E2E_API_URL` en tu shell antes de
+  correr los tests (ej. `E2E_API_URL=http://localhost:5050/api pnpm test:e2e`).
+
   Esto es intencionalmente **distinto** de `frontend-react/.env`: ese archivo es tu
-  configuración de desarrollo (la que uses normalmente con `pnpm dev` a mano) y esta
-  suite nunca la lee ni la sobrescribe — crea filas reales de Owner+Store en cada
-  corrida exitosa, y heredar tu `API_URL` de dev podría escribirlas en un backend
-  compartido.
-
-  **Solo para `api-health.spec.ts`** (chequeo de conectividad, sin navegador) — ese test
-  existente sí lee `API_URL` desde tu propio `frontend-react/.env` (vía el loader que ya
-  vive en `playwright.config.ts`, sin tocar). Si ya tenés un `.env` con `API_URL` para tu
-  desarrollo normal, ese mismo archivo alcanza — no hay `.env.example` que copiar; si no
-  tenés uno, `pnpm test:e2e:api` falla con un mensaje que lo dice (`API_URL is not set...`).
+  configuración de desarrollo (la que usás normalmente con `pnpm dev` a mano) y la suite
+  nunca lo lee para resolver el backend ni lo sobrescribe. La razón es concreta: cada
+  corrida exitosa crea filas reales de Owner+Store, y heredar tu `API_URL` de desarrollo
+  podría escribirlas en un backend compartido. No existe ningún `.env.example` que copiar,
+  y no tener `.env` es un estado soportado.
 
   Backend levantado a mano, en otra terminal, con PostgreSQL en `127.0.0.1:5432` (base `smca`):
 

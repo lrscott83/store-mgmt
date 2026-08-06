@@ -8,12 +8,13 @@ import { E2E_API_URL } from './e2e/support/backend-url';
 
 // Minimal .env loader — `dotenv` is not a direct dependency of this workspace,
 // and Vite's own .env handling does not apply to a bare `playwright test` run.
-// Ported from `playwright.api.config.ts:11-29` so the default config also
-// resolves `API_URL` from a developer's own `frontend-react/.env`, which is
-// what `e2e/api-health.spec.ts`'s `beforeAll` reads. The register suite
-// (register.spec.ts, register-rate-limit.spec.ts) does NOT read `API_URL`
-// from here — see `E2E_API_URL` below, which is deliberately independent of
-// this loader and of any developer `.env`.
+// Ported from `playwright.api.config.ts:11-25`.
+//
+// No spec reads `process.env.API_URL` any more: api-health.spec.ts resolves the
+// backend from `e2e/support/backend-url.ts` like every other spec does. What this
+// loader still does is carry the REST of a developer's `frontend-react/.env` into
+// `process.env`, from where `ambientEnv()` forwards it to the dev server Playwright
+// spawns. `API_URL` itself is overridden explicitly in `webServer.env` below.
 function loadEnv(path: string) {
   let contents: string;
   try {
@@ -33,11 +34,9 @@ function loadEnv(path: string) {
 // This config is loaded as CommonJS by Playwright, so `__dirname` is available
 // and `import.meta` is not.
 //
-// Kept exactly as-is on purpose: e2e/api-health.spec.ts's `beforeAll` reads
-// `process.env.API_URL` and depends on THIS loader populating it from a
-// developer's own `frontend-react/.env` (their dev configuration, which this
-// change must never overwrite, copy into, or read from for anything else).
-// The register suite below does NOT rely on this loader — see E2E_API_URL.
+// A developer's `frontend-react/.env` is their own dev configuration: read from,
+// never written to, copied, or overwritten. Nothing in the E2E suite depends on a
+// particular key being present there — an absent `.env` is a supported state.
 loadEnv(resolve(__dirname, '.env'));
 
 // The backend every E2E spec targets. Defined in `e2e/support/backend-url.ts`
