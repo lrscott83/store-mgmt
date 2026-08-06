@@ -50,6 +50,8 @@ public static class DbTestHelpers
 
         var user = User.Create(login, HashPassword(password), "E2E Super Admin", "0000000000", login,
             DataUtils.DefaultTenant.Id);
+        var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+        user.OfflinePasswordPreHash = preHashProtector.Protect(password, user.Id);
         db.Set<User>().Add(user);
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.SuperAdmin, DataUtils.DefaultTenant.Id));
         await db.SaveChangesAsync();
@@ -64,6 +66,8 @@ public static class DbTestHelpers
         var user = User.Create(login, HashPassword(password), "E2E Inactive User", "0000000000", login,
             DataUtils.DefaultTenant.Id);
         user.IsActive = false;
+        var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+        user.OfflinePasswordPreHash = preHashProtector.Protect(password, user.Id);
         db.Set<User>().Add(user);
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.SuperAdmin, DataUtils.DefaultTenant.Id));
         await db.SaveChangesAsync();

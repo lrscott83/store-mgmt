@@ -253,10 +253,12 @@ public sealed class ExportOfflineRosterTests
                 using (var scope = _f.Services.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    storedPasswordHash = await db.Set<User>().IgnoreQueryFilters()
+                    var encryptedPreHash = await db.Set<User>().IgnoreQueryFilters()
                         .Where(u => u.Id == user1.Id)
-                        .Select(u => u.Password)
+                        .Select(u => u.OfflinePasswordPreHash)
                         .SingleAsync();
+                    var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+                    storedPasswordHash = preHashProtector.Unprotect(encryptedPreHash, user1.Id)!;
                 }
 
                 var dek1 = UnwrapDek(storedPasswordHash, user1.WrappedDek, user1.WrapSalt, user1.WrapIv, user1.WrapIterations);
@@ -531,10 +533,12 @@ public sealed class ExportOfflineRosterTests
             using (var scope = _f.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                storedPasswordHash = await db.Set<User>().IgnoreQueryFilters()
+                var encryptedPreHash = await db.Set<User>().IgnoreQueryFilters()
                     .Where(u => u.Id == user.Id)
-                    .Select(u => u.Password)
+                    .Select(u => u.OfflinePasswordPreHash)
                     .SingleAsync();
+                var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+                storedPasswordHash = preHashProtector.Unprotect(encryptedPreHash, user.Id)!;
             }
 
             // Recover the DEK from wire fields ONLY (KEK from stored hash + salt + wire iterations)
@@ -614,6 +618,8 @@ public sealed class ExportOfflineRosterTests
         var login = $"{prefix}-{Guid.NewGuid():N}@test.com";
         var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), fullName, "0000000000", login, tenantId);
         user.SelectedStoreId = storeId;
+        var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+        user.OfflinePasswordPreHash = preHashProtector.Protect("Password123", user.Id);
         db.Set<User>().Add(user);
         db.Set<StoreUser>().Add(StoreUser.Create(user.Id, storeId, tenantId));
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.StoreUser, tenantId));
@@ -631,6 +637,8 @@ public sealed class ExportOfflineRosterTests
         var login = $"{prefix}-{Guid.NewGuid():N}@test.com";
         var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), fullName, "0000000000", login, tenantId);
         user.SelectedStoreId = storeId;
+        var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+        user.OfflinePasswordPreHash = preHashProtector.Protect("Password123", user.Id);
         db.Set<User>().Add(user);
         db.Set<StoreUser>().Add(StoreUser.Create(user.Id, storeId, tenantId));
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.StoreUser, tenantId));

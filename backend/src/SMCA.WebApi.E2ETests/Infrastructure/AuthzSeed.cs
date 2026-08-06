@@ -1,3 +1,4 @@
+using Application.Abstractions.Authentication;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
 using Domain.Entities.Owners;
@@ -28,6 +29,8 @@ public static class AuthzSeed
         var tenantId = DataUtils.DefaultTenant.Id;
         var login = $"oadmin-{Guid.NewGuid():N}@test.com";
         var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), "E2E OwnerAdmin", "0000000000", login, tenantId);
+        var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+        user.OfflinePasswordPreHash = preHashProtector.Protect("Password123", user.Id);
         db.Set<User>().Add(user);
         var owner = Owner.Create(user.Id, false, tenantId, "E2E OwnerAdmin owner");
         db.Set<Owner>().Add(owner);
@@ -52,6 +55,8 @@ public static class AuthzSeed
         var tenantId = DataUtils.DefaultTenant.Id;
         var login = $"mismatch-{Guid.NewGuid():N}@test.com";
         var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), "E2E Mismatch", "0000000000", login, tenantId);
+        var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+        user.OfflinePasswordPreHash = preHashProtector.Protect("Password123", user.Id);
         db.Set<User>().Add(user);
         var owner = Owner.Create(user.Id, false, tenantId, "E2E Mismatch owner");
         db.Set<Owner>().Add(owner);
@@ -74,6 +79,8 @@ public static class AuthzSeed
 
         var ownerLogin = $"suo-{Guid.NewGuid():N}@test.com";
         var ownerUser = User.Create(ownerLogin, DbTestHelpers.HashPassword("Password123"), "E2E SU Owner", "0000000000", ownerLogin, tenantId);
+        var preHashProtector = scope.ServiceProvider.GetRequiredService<IOfflinePreHashProtector>();
+        ownerUser.OfflinePasswordPreHash = preHashProtector.Protect("Password123", ownerUser.Id);
         db.Set<User>().Add(ownerUser);
         var owner = Owner.Create(ownerUser.Id, false, tenantId, "E2E SU owner");
         db.Set<Owner>().Add(owner);
@@ -85,6 +92,7 @@ public static class AuthzSeed
 
         var login = $"suser-{Guid.NewGuid():N}@test.com";
         var user = User.Create(login, DbTestHelpers.HashPassword("Password123"), "E2E StoreUser", "0000000000", login, tenantId);
+        user.OfflinePasswordPreHash = preHashProtector.Protect("Password123", user.Id);
         db.Set<User>().Add(user);
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.StoreUser, tenantId));
         db.Set<StoreUser>().Add(StoreUser.Create(user.Id, store.Id, tenantId));
