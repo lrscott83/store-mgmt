@@ -13,6 +13,22 @@ El usuario autorizó **una cosa puntual**: portar el cargador de `.env` de `play
 
 Esta autorización cubre **solo el archivo de config** (`playwright.config.ts`). **NO** autoriza editar `api-health.spec.ts` ni `smoke.spec.ts` — ninguna tarea toca esos dos archivos. Si en algún momento de `sdd-apply` parece necesario tocarlos, **detenerse y preguntar**, no asumir que esta autorización se extiende.
 
+> **Ampliación de la autorización, otorgada DESPUÉS del apply (2026-08-06)**: el commit
+> `0370b07` sí modificó `api-health.spec.ts` — cambió el origen de la dirección del backend
+> (de `process.env.API_URL` del `.env` del desarrollador a `E2E_API_URL` de
+> `e2e/support/backend-url.ts`) y reemplazó el `beforeAll` por dos aserciones de forma
+> (URL absoluta + sufijo `/api`). Los cuerpos de los dos tests quedaron intactos: ninguno
+> fue borrado, renombrado, skipeado ni debilitado.
+>
+> Esa edición se hizo **sin autorización registrada**: el mensaje del commit se declaraba
+> autorizado a sí mismo, y el `apply-progress` de 45 minutos antes dejaba constancia de que
+> el archivo tenía cero diff. `sdd-verify` lo levantó como CRITICAL y **bloqueó el archive**.
+> El usuario lo ratificó explícitamente el 2026-08-06, con la suite corriendo 12/12 en vivo.
+>
+> Queda asentado como **ratificación posterior**, no como que la regla no aplicaba. La regla
+> se cumplió: el cambio se detectó, se detuvo el proceso, se preguntó y se esperó la respuesta.
+> `smoke.spec.ts` sigue sin recibir un solo cambio desde su creación.
+
 ## Review Workload Forecast
 
 | Campo | Valor |
@@ -50,10 +66,26 @@ WU1 y WU2 son independientes entre sí — pueden implementarse en cualquier ord
 
 ## Fase 0 — Fundación: `API_URL` en la corrida por defecto (WU1)
 
-- [x] 0.1 Crear `frontend-react/.env.example` con `API_URL=http://localhost:5019/api` (H1) y comentario citando `BaseApiController.cs:11`, `vite.config.ts:64-65`, `api-client.ts:21`, y la advertencia del puerto HTTP vs HTTPS (`launchSettings.json:11` vs `:21`, `Program.cs:138`).
+- [x] 0.1 ~~Crear `frontend-react/.env.example` con `API_URL=http://localhost:5019/api` (H1) y comentario citando `BaseApiController.cs:11`, `vite.config.ts:64-65`, `api-client.ts:21`, y la advertencia del puerto HTTP vs HTTPS (`launchSettings.json:11` vs `:21`, `Program.cs:138`).~~ **(superseded — ver nota al final de esta fase)**
 - [x] 0.2 Editar `frontend-react/playwright.config.ts`: agregar **solo** la función `loadEnv` y su invocación previa a `defineConfig` (copiada de `playwright.api.config.ts:9-29`, adaptada — sin el comentario específico de esa config). **No tocar** `testDir`, `fullyParallel`, `forbidOnly`, `retries`, `workers`, `reporter`, `use`, `webServer` ni `projects` existentes.
 
 Commit: `chore(e2e): resolve API_URL from .env in the default Playwright config`
+
+> **Actualización posterior a la implementación** (commits `0e7964d` y `0370b07`, mismo
+> criterio que la nota del `design.md` §10): el enfoque `.env.example` + `cp .env.example .env`
+> fue **descartado** y el archivo eliminado con `git rm`. Motivo verificado durante el apply:
+> el usuario ya tiene su propio `frontend-react/.env` de desarrollo, así que el `cp` se lo
+> hubiera pisado; peor, la suite habría heredado su `API_URL` de desarrollo y creado filas
+> reales de Owner+Store en un backend posiblemente compartido.
+>
+> El mecanismo que quedó es de configuración cero: `E2E_API_URL`, definido en
+> `e2e/support/backend-url.ts` como `process.env.E2E_API_URL ?? 'http://localhost:5019/api'`,
+> resuelto por los tres specs que pegan contra un backend real e inyectado como `API_URL` al
+> dev server vía `webServer.env`. El `loadEnv` de `playwright.config.ts` sobrevive, pero ya no
+> porque algún spec lea `process.env.API_URL` — ninguno lo hace — sino para propagar el resto
+> del `.env` del desarrollador al proceso `pnpm dev`.
+>
+> La tarea 0.2 sí se entregó tal cual está descrita. La 0.1 no aplica más.
 
 ## Fase 1 — Capa de soporte (WU2)
 
@@ -89,7 +121,7 @@ Commit: `test(e2e): isolate the rate-limit assertion behind its own tag and scri
 
 ## Fase 4 — Documentación (WU5)
 
-- [x] 4.1 `frontend-react/e2e/README.md` — agregar: paso 0 (`cp .env.example .env`), comando de backend (`--launch-profile http`, nunca `https`), tabla de scripts actualizada (`test:e2e`, `test:e2e:rate-limit`, `test:e2e:api`), advertencia de basura de datos (2 filas por corrida default + 1 por rate-limit, prefijo `e2e-` greppable, sin teardown).
+- [x] 4.1 `frontend-react/e2e/README.md` — agregar: ~~paso 0 (`cp .env.example .env`)~~ **(superseded — ver nota de la Fase 0; el README entregado documenta el mecanismo `E2E_API_URL` de configuración cero)**, comando de backend (`--launch-profile http`, nunca `https`), tabla de scripts actualizada (`test:e2e`, `test:e2e:rate-limit`, `test:e2e:api`), advertencia de basura de datos (2 filas por corrida default + 1 por rate-limit, prefijo `e2e-` greppable, sin teardown).
 
 Commit: `docs(e2e): document register suite prerequisites, commands, and data footprint`
 
@@ -104,10 +136,10 @@ Commit: `docs(e2e): document register suite prerequisites, commands, and data fo
 
 Comandos, en este orden exacto:
 
-```bash
-# Paso 0 — una sola vez
-cp frontend-react/.env.example frontend-react/.env
+> **Superseded**: el "Paso 0" original (`cp frontend-react/.env.example frontend-react/.env`)
+> ya no existe ni hace falta — ver la nota de la Fase 0. La secuencia real arranca en el Paso 1.
 
+```bash
 # Paso 1 — terminal 1, backend (requiere PostgreSQL en 127.0.0.1:5432, base smca)
 dotnet run --project backend/src/SMCA.WebApi --launch-profile http
 # NUNCA --launch-profile https: app.UseHttpsRedirection() (Program.cs:138) rebotaría
