@@ -197,6 +197,42 @@ public class ExportOfflineRosterQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_NullPreHash_EmitsNullVerifierAndSkipsCreateVerifierAndWrapDek()
+    {
+        var mocks = CreateMocks();
+        SetupSuperAdmin(mocks);
+        SetupStoreModules(mocks, []);
+        SetupRoleFeatures(mocks, []);
+        SetupAllowedFeatures(mocks, []);
+        SetupBilling(mocks, StoreBillingStatusType.NoAplica);
+        SetupTtl(mocks, 35);
+
+        var fixedDek = new byte[32];
+        mocks.StoreDataKeyProvider.Setup(x => x.GetDek(_storeId)).Returns(fixedDek);
+
+        // Never logged in / never had a password set since this change shipped —
+        // OfflinePasswordPreHash is null, and Unprotect(null, ...) returns null (identity default).
+        var user = CreateUser(_userId1, "no-prehash-u", offlinePreHash: null, "No PreHash User", true);
+        mocks.StoreUserRepository.Setup(x => x.GetStoreUsersByStoreIdAsync(_storeId, true))
+            .ReturnsAsync(new List<StoreUser> { CreateStoreUser(user) });
+        SetupUserRoles(mocks, _userId1, isSuperAdmin: false, isStoreAdmin: false, isReSeller: false);
+
+        var handler = CreateHandler(mocks);
+
+        var result = await handler.Handle(new ExportOfflineRosterQuery(_storeId), CancellationToken.None);
+
+        var rosterUser = result.Data!.Users.Single();
+        rosterUser.Verifier.Should().BeNull();
+        rosterUser.WrappedDek.Should().BeEmpty();
+        rosterUser.WrapSalt.Should().BeEmpty();
+        rosterUser.WrapIv.Should().BeEmpty();
+        rosterUser.WrapIterations.Should().Be(0);
+
+        mocks.OfflineVerifierService.Verify(x => x.CreateVerifier(It.IsAny<string>()), Times.Never);
+        mocks.StoreKeyWrapService.Verify(x => x.WrapDek(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_VencidoStore_ExportsOnlyPriceIncludedModules()
     {
         var mocks = CreateMocks();
@@ -308,7 +344,7 @@ public class ExportOfflineRosterQueryHandlerTests
 
     private TestMocks CreateMocks()
     {
-        return new TestMocks
+        var mocks = new TestMocks
         {
             HttpContextService = new Mock<IHttpContextService>(),
             StoreUserRepository = new Mock<IStoreUserRepository>(),
@@ -320,11 +356,21 @@ public class ExportOfflineRosterQueryHandlerTests
             OfflineVerifierService = new Mock<IOfflineVerifierService>(),
             StoreKeyWrapService = new Mock<IStoreKeyWrapService>(),
             StoreDataKeyProvider = new Mock<IStoreDataKeyProvider>(),
+            OfflinePreHashProtector = new Mock<IOfflinePreHashProtector>(),
             DateTimeProvider = new Mock<IDateTimeProvider>(),
             SystemConfigurationRepository = new Mock<ISystemConfigurationRepository>(),
             BillingService = new Mock<IBillingService>(),
             Localizer = new Mock<IStringLocalizer<I18n>>()
         };
+
+        // Default: Unprotect passes the envelope through unchanged (identity) — in these tests
+        // "envelope" IS the pre-hash (Protect/encryption is exercised separately in
+        // OfflinePreHashProtectorTests). Tests that need a null pre-hash override this per-user.
+        mocks.OfflinePreHashProtector
+            .Setup(x => x.Unprotect(It.IsAny<string?>(), It.IsAny<Guid>()))
+            .Returns((string? envelope, Guid _) => envelope);
+
+        return mocks;
     }
 
     private ExportOfflineRosterQueryHandler CreateHandler(TestMocks mocks)
@@ -342,16 +388,25 @@ public class ExportOfflineRosterQueryHandlerTests
             mocks.OfflineVerifierService.Object,
             mocks.StoreKeyWrapService.Object,
             mocks.StoreDataKeyProvider.Object,
+            mocks.OfflinePreHashProtector.Object,
             mocks.DateTimeProvider.Object,
             mocks.SystemConfigurationRepository.Object,
             mocks.BillingService.Object,
             mocks.Localizer.Object);
     }
 
-    private static User CreateUser(Guid id, string login, string password, string fullName, bool isActive)
+    /// <summary>
+    /// <paramref name="offlinePreHash"/> stands in for the persisted, decrypted
+    /// <see cref="User.OfflinePasswordPreHash"/> — with the default identity Unprotect setup in
+    /// <see cref="CreateMocks"/>, whatever is set here is exactly what reaches
+    /// <see cref="IOfflineVerifierService.CreateVerifier"/> / <see cref="IStoreKeyWrapService.WrapDek"/>.
+    /// Pass <see langword="null"/> to exercise the "no pre-hash yet" export path (R5/R12).
+    /// </summary>
+    private static User CreateUser(Guid id, string login, string? offlinePreHash, string fullName, bool isActive)
     {
-        var user = User.Create(id, login, password, fullName, null, null, Guid.NewGuid());
+        var user = User.Create(id, login, "argon2id-placeholder-hash", fullName, null, null, Guid.NewGuid());
         user.IsActive = isActive;
+        user.OfflinePasswordPreHash = offlinePreHash;
         return user;
     }
 
@@ -451,6 +506,7 @@ public class ExportOfflineRosterQueryHandlerTests
         public Mock<IOfflineVerifierService> OfflineVerifierService { get; set; } = null!;
         public Mock<IStoreKeyWrapService> StoreKeyWrapService { get; set; } = null!;
         public Mock<IStoreDataKeyProvider> StoreDataKeyProvider { get; set; } = null!;
+        public Mock<IOfflinePreHashProtector> OfflinePreHashProtector { get; set; } = null!;
         public Mock<IDateTimeProvider> DateTimeProvider { get; set; } = null!;
         public Mock<ISystemConfigurationRepository> SystemConfigurationRepository { get; set; } = null!;
         public Mock<IBillingService> BillingService { get; set; } = null!;

@@ -1,6 +1,6 @@
 {
   "password": "Password123",
-  "storedPasswordHash": "AIxwOS46v70PpHu8LtlqqZvUnhWXJ/y6Dy5qvrOp1gE=",
+  "passwordPreHash": "AIxwOS46v70PpHu8LtlqqZvUnhWXJ/y6Dy5qvrOp1gE=",
   "wrapSalt": "ZEplHk8lSOPz7nX3fuk/LA==",
   "wrapIv": "zw/YuZDy7S4iQ0df",
   "iterations": 210000,

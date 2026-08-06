@@ -16,11 +16,13 @@ public class StoreKeyWrapServiceTests
     public void WrapDek_round_trip_reproduces_original_dek()
     {
         var sut = new StoreKeyWrapService();
-        const string storedHash = "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=";
+        // Input is the persisted, decrypted OfflinePasswordPreHash (Base64(SHA256(password))) —
+        // not User.Password (Argon2id PHC string). See design D1/R11.
+        const string preHash = "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=";
 
         byte[] originalDek = RandomNumberGenerator.GetBytes(KeyBytes);
 
-        var result = sut.WrapDek(storedHash, originalDek);
+        var result = sut.WrapDek(preHash, originalDek);
 
         // Verify output format
         Convert.FromBase64String(result.WrapSalt).Length.Should().Be(16);
@@ -32,7 +34,7 @@ public class StoreKeyWrapServiceTests
         byte[] wrapSalt = Convert.FromBase64String(result.WrapSalt);
         byte[] wrapIv = Convert.FromBase64String(result.WrapIv);
         byte[] kek = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(storedHash),
+            Encoding.UTF8.GetBytes(preHash),
             wrapSalt,
             210_000,
             HashAlgorithmName.SHA256,

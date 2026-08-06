@@ -15,9 +15,11 @@ public class OfflineVerifierServiceTests
     public void CreateVerifier_produces_16byte_salt_and_reproducible_pbkdf2()
     {
         var sut = new OfflineVerifierService();
-        const string storedHash = "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=";
+        // Input is the persisted, decrypted OfflinePasswordPreHash (Base64(SHA256(password))) —
+        // not User.Password (Argon2id PHC string). See design D1/R3.
+        const string preHash = "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg=";
 
-        var result = sut.CreateVerifier(storedHash);
+        var result = sut.CreateVerifier(preHash);
 
         result.Iterations.Should().Be(ExpectedIterations);
         Convert.FromBase64String(result.Salt).Length.Should().Be(16);
@@ -25,7 +27,7 @@ public class OfflineVerifierServiceTests
 
         // Recompute independently with the documented parameters and confirm equality.
         var expected = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(storedHash),
+            Encoding.UTF8.GetBytes(preHash),
             Convert.FromBase64String(result.Salt),
             ExpectedIterations,
             HashAlgorithmName.SHA256,

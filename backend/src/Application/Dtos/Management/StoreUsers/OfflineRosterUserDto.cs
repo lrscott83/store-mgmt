@@ -15,7 +15,7 @@ public sealed class OfflineRosterUserDto
     public bool IsOwnerAdmin { get; set; }
     public bool IsReSeller { get; set; }
     public Guid SelectedStoreId { get; set; }
-    public OfflineVerifierDto Verifier { get; set; } = new();
+    public OfflineVerifierDto? Verifier { get; set; }
     public string WrappedDek { get; set; } = string.Empty;
     public string WrapSalt { get; set; } = string.Empty;
     public string WrapIv { get; set; } = string.Empty;

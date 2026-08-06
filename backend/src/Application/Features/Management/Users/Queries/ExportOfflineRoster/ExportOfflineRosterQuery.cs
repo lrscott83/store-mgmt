@@ -32,6 +32,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
         private readonly IOfflineVerifierService _offlineVerifierService;
         private readonly IStoreKeyWrapService _storeKeyWrapService;
         private readonly IStoreDataKeyProvider _storeDataKeyProvider;
+        private readonly IOfflinePreHashProtector _preHashProtector;
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly ISystemConfigurationRepository _systemConfigurationRepository;
         private readonly IBillingService _billingService;
@@ -50,6 +51,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             IOfflineVerifierService offlineVerifierService,
             IStoreKeyWrapService storeKeyWrapService,
             IStoreDataKeyProvider storeDataKeyProvider,
+            IOfflinePreHashProtector preHashProtector,
             IDateTimeProvider dateTimeProvider,
             ISystemConfigurationRepository systemConfigurationRepository,
             IBillingService billingService,
@@ -65,6 +67,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             _offlineVerifierService = offlineVerifierService;
             _storeKeyWrapService = storeKeyWrapService;
             _storeDataKeyProvider = storeDataKeyProvider;
+            _preHashProtector = preHashProtector;
             _dateTimeProvider = dateTimeProvider;
             _systemConfigurationRepository = systemConfigurationRepository;
             _billingService = billingService;
@@ -112,8 +115,9 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                 var isOwnerAdmin = await _userRoleRepository.IsStoreAdmin(su.UserId);
                 var isReSeller = await _userRoleRepository.IsReSeller(su.UserId);
 
-                var verifier = _offlineVerifierService.CreateVerifier(su.User.Password);
-                var wrapped = _storeKeyWrapService.WrapDek(su.User.Password, dek);
+                var preHash = _preHashProtector.Unprotect(su.User.OfflinePasswordPreHash, su.UserId);
+                var verifier = preHash is null ? null : _offlineVerifierService.CreateVerifier(preHash);
+                var wrapped = preHash is null ? null : _storeKeyWrapService.WrapDek(preHash, dek);
 
                 rosterUsers.Add(new OfflineRosterUserDto
                 {
@@ -128,19 +132,19 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                     IsOwnerAdmin = isOwnerAdmin,
                     IsReSeller = isReSeller,
                     SelectedStoreId = su.User.SelectedStoreId,
-                    Verifier = new OfflineVerifierDto
+                    Verifier = verifier is null ? null : new OfflineVerifierDto
                     {
                         Hash = verifier.Hash,
                         Salt = verifier.Salt,
                         Iterations = verifier.Iterations
                     },
-                    WrappedDek = wrapped.WrappedDek,
-                    WrapSalt = wrapped.WrapSalt,
-                    WrapIv = wrapped.WrapIv,
+                    WrappedDek = wrapped?.WrappedDek ?? string.Empty,
+                    WrapSalt = wrapped?.WrapSalt ?? string.Empty,
+                    WrapIv = wrapped?.WrapIv ?? string.Empty,
                     PaymentDueDate = billing.NextDueDate,
                     IsInTrial = billing.IsInTrial,
                     PaymentStatus = billing.Status.ToString(),
-                    WrapIterations = wrapped.Iterations
+                    WrapIterations = wrapped?.Iterations ?? 0
                 });
             }
 

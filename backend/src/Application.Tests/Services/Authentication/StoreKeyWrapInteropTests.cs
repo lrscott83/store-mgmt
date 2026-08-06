@@ -23,7 +23,7 @@ public class StoreKeyWrapInteropTests
     private sealed class KatVector
     {
         public string Password { get; set; } = string.Empty;
-        public string StoredPasswordHash { get; set; } = string.Empty;
+        public string PasswordPreHash { get; set; } = string.Empty;
         public string WrapSalt { get; set; } = string.Empty;
         public string WrapIv { get; set; } = string.Empty;
         public int Iterations { get; set; }
@@ -51,9 +51,9 @@ public class StoreKeyWrapInteropTests
         v.Header.BackendCommitSha.Should().NotBeNullOrEmpty();
         v.Header.DotnetVersion.Should().NotBeNullOrEmpty();
 
-        // KEK from documented params only: storedPasswordHash + wrapSalt + iterations
+        // KEK from documented params only: passwordPreHash + wrapSalt + iterations
         byte[] kek = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(v.StoredPasswordHash),
+            Encoding.UTF8.GetBytes(v.PasswordPreHash),
             Convert.FromBase64String(v.WrapSalt),
             v.Iterations,
             HashAlgorithmName.SHA256,
@@ -88,13 +88,25 @@ public class StoreKeyWrapInteropTests
     }
 
     [Fact]
+    public void PasswordPreHash_independently_reproduces_from_password()
+    {
+        var v = LoadVector();
+
+        // Permanent guard (R18): the vector's persisted pre-hash field must independently equal
+        // Base64(SHA256(UTF8(password))) — the exact class of drift (backend and frontend agreeing
+        // on a wire format but disagreeing on what feeds it) that caused this defect.
+        Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(v.Password)))
+            .Should().Be(v.PasswordPreHash);
+    }
+
+    [Fact]
     public void Iteration_drift_210001_fails_unwrap()
     {
         var v = LoadVector();
 
         // One-off iteration drift (210001 vs 210000) must FAIL — proves the vector guards parameter drift (R18).
         byte[] driftedKek = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(v.StoredPasswordHash),
+            Encoding.UTF8.GetBytes(v.PasswordPreHash),
             Convert.FromBase64String(v.WrapSalt),
             v.Iterations + 1,
             HashAlgorithmName.SHA256,
