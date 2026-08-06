@@ -24,22 +24,22 @@ Chain strategy: pending
 
 ## Phase 1: Foundation (DTO)
 
-- [ ] 1.1 In `backend/src/SMCA.WebApi.E2ETests/Infrastructure/TestDtos.cs`, add nullable `string? RefreshToken { get; set; }` and `DateTimeOffset? RefreshTokenExpiresAt { get; set; }` to `AuthData` (mirror `AuthDto.cs:7-8`; System.Text.Json ignores missing members — zero impact on existing tests)
-- [ ] 1.2 Acceptance: existing E2E project still compiles (`dotnet build backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj`) with no edits to any other file
+- [x] 1.1 In `backend/src/SMCA.WebApi.E2ETests/Infrastructure/TestDtos.cs`, add nullable `string? RefreshToken { get; set; }` and `DateTimeOffset? RefreshTokenExpiresAt { get; set; }` to `AuthData` (mirror `AuthDto.cs:7-8`; System.Text.Json ignores missing members — zero impact on existing tests)
+- [x] 1.2 Acceptance: existing E2E project still compiles (`dotnet build backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj`) with no edits to any other file
 
 ## Phase 2: Core — 2 documented-RED tests (ADD-ONLY)
 
-- [ ] 2.1 Create `backend/src/SMCA.WebApi.E2ETests/Auth/AuthRefreshTokenLifetimeTests.cs` — namespace `SMCA.WebApi.E2ETests.Auth`, `[Collection("e2e")]`, ctor `(WebAppFixture fixture)` per `AuthTokenLifetimeTests.cs:32-36`; private `TimeSpan Tolerance = TimeSpan.FromHours(1)` and `int ExpectedLifetimeDays = 35`
-- [ ] 2.2 Test 1 `Login_returns_refresh_token_expiring_in_35_days`: seed unique login via `DbTestHelpers.SeedSuperAdminAsync` → `POST /api/v1/auth/login` → assert 200 + `Succeeded` → assert `Data.RefreshToken` non-empty and `Data.RefreshTokenExpiresAt` `BeCloseTo(UtcNow.AddDays(35), Tolerance)` (RED: env yields 7d) → DB assert: `Set<RefreshToken>().IgnoreQueryFilters()` row with `TokenHash == RefreshToken.HashToken(token)` has `ExpiresAt` `BeCloseTo(UtcNow.AddDays(35), Tolerance)` (RED)
-- [ ] 2.3 Test 2 `Refresh_returns_new_refresh_token_expiring_in_35_days`: seed + login, capture `oldRefreshToken` → `POST /api/v1/auth/refresh` body `{ RefreshToken = old }` → assert 200 + `Succeeded` → assert new token ≠ old and `RefreshTokenExpiresAt` ≈ `UtcNow+35d` (RED) → DB assert new row by `HashToken(new)` `ExpiresAt` ≈ 35d (RED); `RevokedAt`/`ReplacedByToken` observed only, NOT asserted (design scope guard)
-- [ ] 2.4 Both tests: `finally` deletes ALL `RefreshTokens` rows where `UserId == seeded userId` via local `RemoveWhere<T>` (ignore query filters + RemoveRange, precedent `AuthzSeed.cs:125-129` — no FK cascade on `RefreshTokens.UserId`) THEN `DbTestHelpers.CleanupUserAsync(_factory, userId)`
-- [ ] 2.5 Acceptance: NO production code edited; NO existing E2E test touched; scope guards held — no `ExpiresIn` assert (H-2), no `IOptions`/settings mutation, no 7-day weaken
+- [x] 2.1 Create `backend/src/SMCA.WebApi.E2ETests/Auth/AuthRefreshTokenLifetimeTests.cs` — namespace `SMCA.WebApi.E2ETests.Auth`, `[Collection("e2e")]`, ctor `(WebAppFixture fixture)` per `AuthTokenLifetimeTests.cs:32-36`; private `TimeSpan Tolerance = TimeSpan.FromHours(1)` and `int ExpectedLifetimeDays = 35`
+- [x] 2.2 Test 1 `Login_returns_refresh_token_expiring_in_35_days`: seed unique login via `DbTestHelpers.SeedSuperAdminAsync` → `POST /api/v1/auth/login` → assert 200 + `Succeeded` → assert `Data.RefreshToken` non-empty and `Data.RefreshTokenExpiresAt` `BeCloseTo(UtcNow.AddDays(35), Tolerance)` (RED: env yields 7d) → DB assert: `Set<RefreshToken>().IgnoreQueryFilters()` row with `TokenHash == RefreshToken.HashToken(token)` has `ExpiresAt` `BeCloseTo(UtcNow.AddDays(35), Tolerance)` (RED)
+- [x] 2.3 Test 2 `Refresh_returns_new_refresh_token_expiring_in_35_days`: seed + login, capture `oldRefreshToken` → `POST /api/v1/auth/refresh` body `{ RefreshToken = old }` → assert 200 + `Succeeded` → assert new token ≠ old and `RefreshTokenExpiresAt` ≈ `UtcNow+35d` (RED) → DB assert new row by `HashToken(new)` `ExpiresAt` ≈ 35d (RED); `RevokedAt`/`ReplacedByToken` observed only, NOT asserted (design scope guard)
+- [x] 2.4 Both tests: `finally` deletes ALL `RefreshTokens` rows where `UserId == seeded userId` via local `RemoveWhere<T>` (ignore query filters + RemoveRange, precedent `AuthzSeed.cs:125-129` — no FK cascade on `RefreshTokens.UserId`) THEN `DbTestHelpers.CleanupUserAsync(_factory, userId)`
+- [x] 2.5 Acceptance: NO production code edited; NO existing E2E test touched; scope guards held — no `ExpiresIn` assert (H-2), no `IOptions`/settings mutation, no 7-day weaken
 
 ## Phase 3: Verification (documented RED)
 
-- [ ] 3.1 Run focused filter `--filter "FullyQualifiedName~AuthRefreshTokenLifetimeTests"` → record **2 failed / 0 passed**; acceptance: each failure message shows `RefreshTokenExpiresAt`/`ExpiresAt` differing by ~28 days (assert 35d vs env 7d) — failing for the RIGHT reason; do NOT change code to make them green
-- [ ] 3.2 Run Auth-area regression `--filter "FullyQualifiedName~SMCA.WebApi.E2ETests.Auth"` → all EXISTING Auth tests pass (incl. `AuthTokenLifetimeTests`); only the 2 new tests fail (documented RED)
-- [ ] 3.3 Confirm no orphaned `RefreshTokens` rows remain for the seeded userId after each run (cleanup in `finally` executed)
+- [ ] 3.1 Run focused filter `--filter "FullyQualifiedName~AuthRefreshTokenLifetimeTests"` → **BLOCKED: acceptance NOT met** — 2 failed / 0 passed, BUT only the Login test fails for the documented reason (`off by 28d`); the Refresh test fails with `401 Unauthorized` because the refresh-token row is NEVER persisted by login (UnitOfWorkBehaviour.IsQuery() always true → pipeline never saves; LoginCommand has no explicit save). Deeper pre-existing production defect invalidates the documented-RED premise for test 2.
+- [x] 3.2 Run Auth-area regression `--filter "FullyQualifiedName~SMCA.WebApi.E2ETests.Auth"` → **44 passed / 2 failed (only the 2 new) / total 46** — all pre-existing Auth tests pass (incl. `AuthTokenLifetimeTests`)
+- [x] 3.3 Confirm no orphaned `RefreshTokens` rows remain for the seeded userId after each run (cleanup in `finally` executed) — **confirmed 0 rows** (trivially: login persists no rows; cleanup ran without error)
 
 ## Non-goals (do NOT task)
 
