@@ -205,14 +205,24 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
     const url = response.url();
 
     if (isLoginRequest(method, url)) {
-      // Read the body IMMEDIATELY (same reasoning as network-observer.ts:141-157):
-      // a successful login navigates right after this resolves, and a body
-      // read after navigation risks finding it already discarded.
+      // Record the arrival SYNCHRONOUSLY, before the body is drained. `at` must
+      // mark when the response reached the browser — the instant the app can
+      // resume and fire GET /me — not when this process finished reading it.
+      // Stamping inside the .then() below charged the body read to the response
+      // and made a correctly-ordered flow look inverted by a few milliseconds:
+      // /me went out (stamped on arrival) while the login response was still
+      // being drained (stamped on completion). Pushing the event here also keeps
+      // `events` in true delivery order, which expectLoginThenMe() relies on.
+      events.push({ kind: 'login', phase: 'response', at: Date.now() });
+
+      // The body still has to be read IMMEDIATELY (same reasoning as
+      // network-observer.ts:141-157): a successful login navigates right after
+      // this resolves, and a body read after navigation risks finding it already
+      // discarded. Only the capture is deferred — never the timestamp.
       void response
         .text()
         .catch(() => '')
         .then((bodyText) => {
-          events.push({ kind: 'login', phase: 'response', at: Date.now() });
           pushOutcome({
             kind: 'response',
             capture: { status: response.status(), bodyText, url },
