@@ -7,11 +7,14 @@ namespace Application.Features.Authentication.Commands.Login
 
         public LoginCommandValidator()
         {
+            // A login is a username, not an email address — the registration form
+            // collects `login` and `email` as two separate fields. Presence is the
+            // only rule, mirroring RegisterCommandValidator, which imposes no format
+            // either. Anything stricter here than there locks users out of accounts
+            // registration already created.
             RuleFor(x => x.Login)
                 .NotNull().WithMessage("'{PropertyName}' is required.")
-                .NotEmpty().WithMessage("'{PropertyName}' is required.")
-                .MaximumLength(100).WithMessage("'{PropertyName}' must not exceed 100 characters.")
-                .Matches(@"^[^@\s]+@[^@\s]+\.[^@\s]+$").WithMessage("'{PropertyName}' must be a valid email address.");
+                .NotEmpty().WithMessage("'{PropertyName}' is required.");
 
             RuleFor(x => x.Password)
                 .NotNull().WithMessage("'{PropertyName}' is required.")

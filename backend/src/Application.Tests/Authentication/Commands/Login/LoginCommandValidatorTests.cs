@@ -31,6 +31,36 @@ public class LoginCommandValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Regression: a login is a username, not an email address.
+    /// <para>
+    /// RegisterCommandValidator only requires Login to be present and unique — it
+    /// imposes no format. This validator used to additionally require an email
+    /// shape, so any account self-registered with a username-style login could be
+    /// created and then never authenticate: registration wrote the row, login
+    /// rejected the credentials during validation, before reaching the database.
+    /// </para>
+    /// <para>
+    /// The registration form makes the intent explicit by collecting `login` and
+    /// `email` as two separate fields. What registration accepts, login must accept.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("e2e-1770000000000-a1b2c3")]
+    [InlineData("storeowner")]
+    [InlineData("maria.perez")]
+    public async Task Validate_NonEmailLogin_ShouldPass(string login)
+    {
+        // Arrange
+        var command = new LoginCommand(login, "Password123");
+
+        // Act
+        var result = await _validator.ValidateAsync(command);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Validate_EmptyLogin_ShouldFail()
     {
