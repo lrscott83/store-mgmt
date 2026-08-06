@@ -1,5 +1,6 @@
 using Application.Abstractions.Authentication;
 using Application.Features.Authentication.Commands.Refresh;
+using Application.UnitOfWorks;
 using Domain.Entities.Authentication;
 using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
@@ -22,6 +23,7 @@ public class RefreshCommandHandlerTests
     private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepo;
     private readonly Mock<IJwtProvider> _mockJwtProvider;
     private readonly Mock<IUserRepository> _mockUserRepo;
+    private readonly Mock<IApplicationUnitOfWork> _mockUnitOfWork;
     private readonly Mock<ILogger<RefreshCommandHandler>> _mockLogger;
     private readonly AuthenticationSettings _authSettings;
     private readonly RefreshCommandHandler _handler;
@@ -31,7 +33,12 @@ public class RefreshCommandHandlerTests
         _mockRefreshTokenRepo = new Mock<IRefreshTokenRepository>();
         _mockJwtProvider = new Mock<IJwtProvider>();
         _mockUserRepo = new Mock<IUserRepository>();
+        _mockUnitOfWork = new Mock<IApplicationUnitOfWork>();
         _mockLogger = new Mock<ILogger<RefreshCommandHandler>>();
+
+        _mockUnitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         _authSettings = new AuthenticationSettings
         {
@@ -45,7 +52,8 @@ public class RefreshCommandHandlerTests
             _mockJwtProvider.Object,
             _mockUserRepo.Object,
             Options.Create(_authSettings),
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockUnitOfWork.Object);
     }
 
     [Fact]
@@ -159,7 +167,73 @@ public class RefreshCommandHandlerTests
         result.Errors.Should().Contain(e => e.Code == "Auth.InvalidRefreshToken");
     }
 
+    #region Persistence Tests
+
+    [Fact]
+    public async Task Refresh_rotatesToken_persistsChanges()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var rawToken = "old-raw-refresh-token";
+        var refreshToken = new RefreshToken(userId, rawToken, DateTimeOffset.UtcNow.AddDays(7));
+        var user = CreateTestUser(userId, "testuser@test.com");
+
+        SetupMocksForValidToken(refreshToken, user, "new-access-token", "new-raw-refresh-token");
+
+        // Act
+        var result = await _handler.Handle(new RefreshCommand(rawToken), CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        _mockRefreshTokenRepo.Verify(x => x.Update(refreshToken), Times.Once);
+        _mockRefreshTokenRepo.Verify(x => x.Add(It.IsAny<RefreshToken>()), Times.Once);
+        _mockUnitOfWork.Verify(
+            x => x.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Theory]
+    [InlineData("null-token")]
+    [InlineData("revoked-token")]
+    [InlineData("expired-token")]
+    public async Task Refresh_withInvalidToken_ShouldNotSave(string scenario)
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        RefreshToken? refreshToken = scenario switch
+        {
+            "revoked-token" => RevokedToken(userId),
+            "expired-token" => ExpiredToken(userId),
+            _ => null
+        };
+
+        _mockRefreshTokenRepo
+            .Setup(x => x.GetByTokenHashAsync(It.IsAny<string>()))
+            .ReturnsAsync(refreshToken);
+
+        // Act
+        var result = await _handler.Handle(new RefreshCommand(scenario), CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeFalse();
+        _mockUnitOfWork.Verify(
+            x => x.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    #endregion
+
     #region Helper Methods
+
+    private static RefreshToken RevokedToken(Guid userId)
+    {
+        var token = new RefreshToken(userId, "revoked-raw-token", DateTimeOffset.UtcNow.AddDays(7));
+        token.Revoke();
+        return token;
+    }
+
+    private static RefreshToken ExpiredToken(Guid userId)
+        => new(userId, "expired-raw-token", DateTimeOffset.UtcNow.AddDays(-1));
 
     private void SetupMocksForValidToken(
         RefreshToken refreshToken,
