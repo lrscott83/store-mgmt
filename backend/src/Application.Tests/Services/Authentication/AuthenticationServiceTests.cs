@@ -209,7 +209,6 @@ public class AuthenticationServiceTests
         var storeAdminUser = CreateActiveUserWithNavProps(login);
         storeAdminUser.Password = "$2a$11$stored_bcrypt_hash";
         storeAdminUser.ReSeller = null;
-        storeAdminUser.Owner = null;
 
         var ownerAdminRole = Role.Create((int)RoleType.OwnerAdmin, "OwnerAdmin", "", DateTimeOffset.UtcNow);
         storeAdminUser.UserRoles = new List<UserRole>
@@ -217,8 +216,15 @@ public class AuthenticationServiceTests
             CreateUserRole(storeAdminUser.Id, (int)RoleType.OwnerAdmin, ownerAdminRole)
         };
 
-        var store = CreateActiveStore(CreateActiveOwner(storeAdminUser));
-        storeAdminUser.StoreUser = CreateActiveStoreUser(storeAdminUser, store);
+        // An owner reaches their store through Owner.Stores. RegisterCommand creates
+        // Owner + Store and never a StoreUser row, because StoreUser is the employee
+        // table — so an OwnerAdmin with a null Owner and a populated StoreUser is a
+        // shape the database does not produce. This arrangement used to be the
+        // inverse, which is what let the production check resolve an owner's store
+        // through StoreUser and reject every self-registered owner with 403.
+        var owner = (Owner)storeAdminUser.Owner!;
+        owner.Stores.Add(CreateActiveStore(owner));
+        storeAdminUser.StoreUser = null;
 
         _mockUserRepository
             .Setup(x => x.GetByLoginWithRelatedAsync(login))
