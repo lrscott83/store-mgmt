@@ -102,15 +102,23 @@ namespace Application.Services.Authentication
             bool isStoreAdmin = user.UserRoles?.Any(ur => ur.Role?.Id == (int)RoleType.OwnerAdmin) ?? false;
             if (isStoreAdmin)
             {
-                // TODO (multi-store): When a store admin can manage multiple stores,
-                // replace the simplified check below with the original multi-store query:
-                // var stores = await _storeRepository.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync(user.Id);
-                // return stores.Any() ? Result.Success() : StoreErrors.Inactive;
-                if (user.StoreUser?.Store is not { } store)
+                // An owner reaches their store through the Owner relationship. Self
+                // registration creates Owner + Store and sets SelectedStoreId
+                // (RegisterCommand.cs:91); it never creates a StoreUser row, because
+                // StoreUser is the employee table. Resolving an owner's store through
+                // user.StoreUser therefore rejected every self-registered owner with
+                // 403 Store.Inactive — registration returned 201 and the account could
+                // never authenticate.
+                //
+                // This mirrors the predicate of
+                // StoreRepository.GetActiveStoresByUserIdAndIgnoreQueryFiltersAsync:
+                // Owner.IsActive AND Store.IsActive, matched by Owner.UserId. It already
+                // reads a collection, so it holds unchanged once an owner may run more
+                // than one store.
+                if (user.Owner is not { } ownerAccount || !ownerAccount.IsActive)
                     return StoreErrors.Inactive;
 
-                bool hasActiveStore = store.IsActive
-                    && store.Owner?.IsActive == true;
+                bool hasActiveStore = ownerAccount.Stores?.Any(s => s.IsActive) == true;
                 return hasActiveStore ? Result.Success() : StoreErrors.Inactive;
             }
 

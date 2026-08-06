@@ -86,6 +86,10 @@ namespace Infrastructure.Persistence.Repositories
                 .Where(u => u.Login == login)
                 .Include(u => u.ReSeller)
                 .Include(u => u.Owner)
+                    // An owner reaches their store through this collection, not through
+                    // StoreUser (the employee table). Without it the login store check
+                    // sees an owner with zero stores and rejects them.
+                    .ThenInclude(o => o.Stores)
                 .Include(u => u.StoreUser)
                     .ThenInclude(su => su.Store)
                     .ThenInclude(s => s.Owner)

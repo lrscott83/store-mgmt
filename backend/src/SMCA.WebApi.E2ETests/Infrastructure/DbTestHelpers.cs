@@ -143,6 +143,27 @@ public static class DbTestHelpers
         return new UserFixture(user.Id, login);
     }
 
+    /// <summary>
+    /// Deactivates the Owner row belonging to <paramref name="userId"/>.
+    /// <para>
+    /// Uses ExecuteUpdateAsync deliberately. ApplicationDbContext sets
+    /// QueryTrackingBehavior.NoTracking globally, so loading the Owner with a query,
+    /// mutating it and calling SaveChangesAsync writes nothing — silently, with no
+    /// exception. ExecuteUpdateAsync issues the UPDATE directly and cannot fall into
+    /// that trap.
+    /// </para>
+    /// </summary>
+    public static async Task DeactivateOwnerByUserIdAsync(AppTestFactory factory, Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        await db.Set<Owner>()
+            .IgnoreQueryFilters()
+            .Where(o => o.UserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.IsActive, false));
+    }
+
     public static HttpClient AuthedClient(AppTestFactory factory, Guid userId, string login)
     {
         var client = factory.CreateClient();
