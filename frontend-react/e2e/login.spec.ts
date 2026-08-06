@@ -88,6 +88,16 @@ test.describe('login — client-side validation, no session (A4, A5)', () => {
 // after reuses that single cached mint (design.md §2, exactly 4 real logins
 // for the whole file).
 test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', () => {
+  // The 30s default is a per-test budget sized for ONE flow. Every test in this
+  // block spends several: the first pays a full registration AND a full login
+  // before its first assertion; REQ-11 creates a StoreUser through the UI; REQ-9
+  // seeds a category and a product and then logs in again. That density is not
+  // incidental — the 4-login ceiling (design.md §2) is what forced 13 REQs into
+  // 8 tests, and fat tests are the price of a thin login budget. Raise the
+  // budget to match; do NOT split these tests to fit 30s, because splitting
+  // them is exactly what would spend a login the ceiling does not have.
+  test.describe.configure({ timeout: 120_000 });
+
   let ownerIdentity: TestIdentity;
   // Captured for REQ-14 (D6): the guard-rebound destinations asserted later
   // must agree with these two explicit-login destinations.
