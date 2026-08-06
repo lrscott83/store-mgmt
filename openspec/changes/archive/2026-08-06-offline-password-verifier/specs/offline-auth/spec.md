@@ -289,9 +289,13 @@ No assertion in any of these tests changes. `SuperAdmin_export_rawPassword_throw
 
 ## Verification Criteria
 
-- [ ] `dotnet test backend/src/SMCA.sln` green
-- [ ] `OfflineVerifierServiceTests` / `StoreKeyWrapServiceTests` updated for the new pre-hash input (not E2E, free to change)
-- [ ] `ExportOfflineRosterQueryHandlerTests` updated for conditional `CreateVerifier`/`WrapDek` calls (null pre-hash → not called)
-- [ ] The three authorized E2E tests pass with assertions unchanged
-- [ ] No other E2E test file is touched
-- [ ] KAT interop test asserts `preHash == Base64(SHA256(UTF8(password)))` in addition to the existing unwrap-and-compare assertion
+- [x] `dotnet test backend/src/SMCA.sln` green
+- [x] `OfflineVerifierServiceTests` / `StoreKeyWrapServiceTests` updated for the new pre-hash input (not E2E, free to change)
+- [x] `ExportOfflineRosterQueryHandlerTests` updated for conditional `CreateVerifier`/`WrapDek` calls (null pre-hash → not called)
+- [x] The three authorized E2E tests pass with assertions unchanged
+- [x] No other E2E test file is touched
+- [x] KAT interop test asserts `preHash == Base64(SHA256(UTF8(password)))` in addition to the existing unwrap-and-compare assertion
+
+---
+
+**Archive-time note (2026-08-06)**: all six criteria confirmed by `sdd-verify` (#1950, PASS WITH WARNINGS, 0 CRITICAL). Checkboxes updated from `[ ]` to `[x]`; content otherwise unchanged. This delta is merged verbatim into `openspec/specs/offline-auth/spec.md` as part of archiving.

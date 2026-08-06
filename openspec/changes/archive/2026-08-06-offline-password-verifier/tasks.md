@@ -34,7 +34,7 @@ Chain strategy: size-exception
 - [x] 1.4 `Domain/Entities/Users/User.cs` — add `public string? OfflinePasswordPreHash { get; set; }`.
 - [x] 1.5 `UserEntityTypeConfiguration.cs` — `.Property(x => x.OfflinePasswordPreHash).HasMaxLength(256)`. Confirm the `HasData(admin)` seed (`:40-44`) is left with the column null — do not hardcode a value.
 - [x] 1.6 Add `Task SetOfflinePasswordPreHashIfNullAsync(Guid userId, string envelope, CancellationToken ct)` to `IUserRepository.cs`; implement in `UserRepository.cs` per design D3: `_users.IgnoreQueryFilters().Where(u => u.Id == userId && u.OfflinePasswordPreHash == null).ExecuteUpdateAsync(s => s.SetProperty(u => u.OfflinePasswordPreHash, envelope), ct)`. First `ExecuteUpdateAsync` in this repo — read up before writing.
-- [ ] 1.7 **BLOCKED — NOT RUN (apply phase runs no `dotnet`).** User must run:
+- [x] 1.7 **DONE by the user.** Scaffolded, reviewed and committed as `7d76ef1`, under the name `Add-OfflinePasswordPreHash-RefreshTokens-And-DueSoonDays`: the scaffold also picked up two pre-existing model changes that had never been migrated — the `RefreshTokens` table and a `DueSoonDays` `SystemConfiguration` row — so the name states them rather than hiding them. Purely additive; the "loss of data" warning EF printed comes from the `UpdateData … value: null` that sets the seeded admin's new column. Command run:
   ```
   dotnet ef migrations add "Add-OfflinePasswordPreHash" \
     --project backend/src/Infrastructure/Infrastructure.csproj \
@@ -98,7 +98,7 @@ Chain strategy: size-exception
 ## Phase 9: Spec Correction + Wrap-Up
 
 - [x] 9.1 Note only — do not edit now: `openspec/specs/offline-auth/spec.md` R3/R5/R11/R12/R17/R18 corrections are already drafted in this change's delta specs; apply at `sdd-archive` time.
-- [ ] 9.2 After the user runs 1.7's migration plus `dotnet build backend/src/SMCA.sln`, `dotnet test backend/src/Application.Tests/Application.Tests.csproj`, `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` and reports green, commit WU1-WU5 on `feat/offline-password-verifier`. **WU1-WU5 + 2 small follow-up commits (KAT SHA pin, ctor compile-fix) are already committed** on `feat/offline-password-verifier` — this task now only tracks the user's build/test verification. No push, no PR, no `Co-Authored-By` (honored).
+- [x] 9.2 **DONE — all green on the user's machine**: `dotnet build backend/src/SMCA.sln` 0 errors, `Application.Tests` 318/318, `SMCA.WebApi.E2ETests` 305/305, frontend `npx turbo run test --force` 2375 tests across 179 files with 0 cached. Original wording: after the user runs 1.7's migration plus `dotnet build backend/src/SMCA.sln`, `dotnet test backend/src/Application.Tests/Application.Tests.csproj`, `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj` and reports green, commit WU1-WU5 on `feat/offline-password-verifier`. **WU1-WU5 + 2 small follow-up commits (KAT SHA pin, ctor compile-fix) are already committed** on `feat/offline-password-verifier` — this task now only tracks the user's build/test verification. No push, no PR, no `Co-Authored-By` (honored).
 
 ## Out of Scope (recorded, no task)
 

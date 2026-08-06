@@ -100,6 +100,8 @@ unprovisioned-device-unchanged invariant owned by `offline-auth-mode`.
 ### Requirement: Bundle carries optional per-user wrap fields; formatVersion stays a plain number
 `OfflineRosterBundle` MUST accept three additional optional per-user fields — `wrappedDek`, `wrapSalt`, `wrapIv` — mirroring the backend's `OfflineRosterUserDto`. `formatVersion` MUST remain typed as `number`, NOT narrowed to a `1 | 2` union: the bundle is deserialized with an unchecked cast, and narrowing would silently mistype a future `formatVersion: 3` bundle as a known value. Shape validation MUST continue to accept a bundle with the three wrap fields absent or empty.
 
+`OfflineRosterUser.verifier` MUST be typed `OfflineVerifier | null`, not the non-nullable `OfflineVerifier` it was before `formatVersion: 3`. Shape validation MUST additionally accept `verifier: null` on a `formatVersion: 3` bundle for a user with no server-side pre-hash yet (added by `offline-password-verifier`, archived 2026-08-06, corresponding to `offline-auth` R5).
+
 #### Scenario: v1 bundle without wrap fields is still a valid shape
 - GIVEN a stored bundle with `formatVersion: 1` and no `wrappedDek`/`wrapSalt`/`wrapIv` on any user
 - WHEN the bundle shape is validated
@@ -109,6 +111,52 @@ unprovisioned-device-unchanged invariant owned by `offline-auth-mode`.
 - GIVEN a stored bundle with `formatVersion: 2` and every user carrying non-empty `wrappedDek`/`wrapSalt`/`wrapIv`
 - WHEN the bundle shape is validated
 - THEN it is accepted as valid
+
+#### Scenario: v3 bundle with a null verifier is a valid shape
+- GIVEN a stored bundle with `formatVersion: 3` and one user whose `verifier` is `null`
+- WHEN the bundle shape is validated
+- THEN it is accepted as valid, and `verifier` remains `null` (not coerced to an empty object)
+
+#### Scenario: v3 bundle with a populated verifier is still valid
+- GIVEN a stored bundle with `formatVersion: 3` and every user carrying a non-null `verifier`
+- WHEN the bundle shape is validated
+- THEN it is accepted as valid, exactly as before this change
+
+### Requirement: Genuine cross-stack DEK-wrap known-answer vector (replaces the placeholder)
+
+The frontend KAT fixture consumed by `dek-unwrap.kat.test.ts`
+(`__tests__/__fixtures__/dek-kat.json`) MUST be replaced with the literal
+field values committed in `docs/contracts/offline-roster-dek-kat.json`
+(provenance `dotnet-backend`) — it MUST NOT remain a `node-transcription`
+placeholder that only proves the frontend's math is self-consistent. Both
+`dek-unwrap.kat.test.ts` (frontend) and `StoreKeyWrapInteropTests` (backend,
+`offline-auth` R18) MUST read their respective copy of the same committed
+values. Each side MUST additionally, independently, assert that the
+vector's persisted pre-hash field equals `Base64(SHA256(UTF8(vector.password)))`
+computed by that stack's own primitives — a permanent, cross-stack guard
+against the exact class of drift (backend and frontend agreeing on a wire
+format but disagreeing on what feeds it) that caused this defect.
+
+#### Scenario: Frontend KAT test unwraps the shared vector
+- GIVEN the committed vector's `wrapSalt`, `wrapIv`, `wrappedDek`, `iterations`, and pre-hash field
+- WHEN `unwrapDek` derives the KEK from the vector's pre-hash and decrypts `wrappedDek`
+- THEN the recovered bytes equal the vector's `expectedDek` byte for byte
+
+#### Scenario: Frontend independently verifies the pre-hash formula
+- GIVEN the committed vector's `password` and pre-hash field
+- WHEN the frontend computes `sha256Base64(vector.password)`
+- THEN it equals the vector's pre-hash field exactly
+
+#### Scenario: Backend independently verifies the same formula
+- GIVEN the same committed vector, read on the backend side
+- WHEN the backend computes `Base64(SHA256(UTF8(vector.password)))`
+- THEN it equals the vector's pre-hash field exactly (cross-referenced with `offline-auth` R18's
+  equivalent assertion — the same claim proven twice, once per stack, from the same file)
+
+#### Scenario: A frontend-only regression in sha256Base64 fails this test without a live backend
+- GIVEN a hypothetical change to `sha256Base64`'s encoding or digest step
+- WHEN the KAT test runs
+- THEN it fails locally, with no backend or network dependency required to catch the regression
 
 ### Requirement: getRawRoster() — expiry-ignoring raw bundle read
 The system MUST expose `getRawRoster()`, returning the shape-guarded stored bundle regardless of `expiresAt`, or `null` if absent/corrupt/malformed. It MUST never throw and MUST NOT take a `now` parameter. `getRoster()`'s existing contract (null past `expiresAt`) MUST be preserved unchanged, defined as `getRawRoster()` plus one expiry comparison.
@@ -155,3 +203,11 @@ The system MUST expose `isEncryptionProvisioned()`, true if and only if `getRawR
   above. Verify verdict: BLOCKED overridden by the orchestrator — see that
   change's archive report for the override rationale (WU3.3 backend-KAT
   provenance gap; not a code defect).
+- Source change (addendum): `offline-password-verifier` (archived
+  2026-08-06) widened "Bundle carries optional per-user wrap fields" to a
+  nullable `verifier`, and added "Genuine cross-stack DEK-wrap known-answer
+  vector" — closing the exact gap the previous addendum's override flagged
+  (no cross-stack KAT vector had ever existed; `dek-kat.json` was a
+  self-labelled `node-transcription` placeholder). Verify verdict: PASS
+  WITH WARNINGS, 0 CRITICAL (1 unrelated doc-drift WARNING on `tasks.md`,
+  resolved at archive time).

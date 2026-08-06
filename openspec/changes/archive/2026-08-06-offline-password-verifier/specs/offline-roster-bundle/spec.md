@@ -66,3 +66,7 @@ format but disagreeing on what feeds it) that caused this defect.
 - GIVEN a hypothetical change to `sha256Base64`'s encoding or digest step
 - WHEN the KAT test runs
 - THEN it fails locally, with no backend or network dependency required to catch the regression
+
+---
+
+**Archive-time note (2026-08-06)**: confirmed by `sdd-verify` (#1950) — `dek-unwrap.kat.test.ts:37-40` and `StoreKeyWrapInteropTests.cs:90-100` both independently assert the pre-hash formula against the same committed JSON. Merged verbatim into `openspec/specs/offline-roster-bundle/spec.md` as part of archiving.

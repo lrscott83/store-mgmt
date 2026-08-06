@@ -36,3 +36,7 @@ through to `verifyOfflinePassword` and MUST NOT produce
 - WHEN a user's verifier is `null` on the wire
 - THEN the existing `typeof` guard in `offline-auth-service.ts` correctly identifies it as
   missing and throws `OfflineVerifierError` before ever calling `verifyOfflinePassword`
+
+---
+
+**Archive-time note (2026-08-06)**: confirmed by `sdd-verify` (#1950) — `offline-auth-service.ts` had zero diff for this delta; the existing `!user.verifier` guard already implemented the behavior. Merged verbatim into `openspec/specs/offline-auth-mode/spec.md` as part of archiving.

@@ -84,8 +84,12 @@ Revert the commits and drop the column with a down-migration. The column is addi
 
 ## Success Criteria
 
-- [ ] A cross-stack KAT vector passes on .NET **and** TypeScript.
-- [ ] E2E proves a roster exported after an online login unwraps with `Base64(SHA256("Password123"))`.
-- [ ] A user with no pre-hash exports `Verifier: null` and the frontend raises `OfflineVerifierError`, not `OfflineInvalidPasswordError`.
-- [ ] `offline-auth/spec.md` no longer contradicts `offline-roster-bundle/spec.md:13-18`.
-- [ ] No existing E2E assertion changed.
+- [x] A cross-stack KAT vector passes on .NET **and** TypeScript.
+- [x] E2E proves a roster exported after an online login unwraps with `Base64(SHA256("Password123"))`.
+- [x] A user with no pre-hash exports `Verifier: null` and the frontend raises `OfflineVerifierError`, not `OfflineInvalidPasswordError`.
+- [x] `offline-auth/spec.md` no longer contradicts `offline-roster-bundle/spec.md:13-18`.
+- [x] No existing E2E assertion changed.
+
+---
+
+**Archive-time note (2026-08-06)**: all five success criteria confirmed by `sdd-verify` (Engram `sdd/offline-password-verifier/verify-report` #1950, PASS WITH WARNINGS, 0 CRITICAL) and re-checked at archive time against the merged specs. Checkboxes above updated from the working copy's `[ ]` to `[x]` to reflect completion; no other content changed.

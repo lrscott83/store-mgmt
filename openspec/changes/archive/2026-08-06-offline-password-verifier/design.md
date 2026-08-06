@@ -99,6 +99,8 @@ dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
 
 ⚠️ NOT VERIFIED: the exact `--project/--startup-project` paths (inferred from the solution layout, not executed), and whether EF regenerates the `HasData` seed row in the migration because the entity gained a property.
 
+**Archive-time note (2026-08-06)**: run and committed by the user as `7d76ef1`, under the name `Add-OfflinePasswordPreHash-RefreshTokens-And-DueSoonDays`. The scaffold picked up two pre-existing model changes that had never been migrated (`RefreshTokens` table, `DueSoonDays` `SystemConfiguration` row) — swept in and named honestly rather than hidden. `sdd-verify` confirmed `Up()` is purely additive (no drops/narrowing) and that both swept-in items are genuine pre-existing drift, not scope creep.
+
 ### D6 — One KAT vector, both sides
 
 Adopt `docs/contracts/offline-roster-dek-kat.json` as the single source. **All crypto values stay** — the vector is already correct under the new semantics; only the field name lied.
@@ -190,3 +192,7 @@ Additive column, `NULL` for every existing row. Deploy order: migration → API.
 - [ ] **Login persists nothing today.** `LoginCommandHandler` adds a `RefreshToken (:58)` that no `SaveChanges` ever commits (`UnitOfWorkBehaviour.cs:36-40` always short-circuits; grep found 0 `RefreshToken` references under `SMCA.WebApi.E2ETests`). Either refresh tokens are silently not persisted — a pre-existing bug outside this scope — or a save happens somewhere I did not find. D3 does not depend on the answer (it self-persists), but you should know.
 - [ ] **Key rotation.** Rotating `StoreEncryption:MasterSecret` invalidates every stored pre-hash with no re-derivation path (the plaintext is gone); recovery is "everyone re-logs in". Same failure mode as today's DEK. Recommendation: the leading version byte is enough — no extra column.
 - [ ] **AAD = userId** assumes user ids are never reassigned. ⚠️ NOT VERIFIED — I did not audit for a user-id remap operation.
+
+---
+
+**Archive-time note (2026-08-06)**: both open questions above remain genuinely open — recorded as out-of-scope follow-ups in the archive report, not resolved by this change. `sdd-verify` confirmed the shipped implementation matches D1-D7 exactly at every cited `file:line`.
