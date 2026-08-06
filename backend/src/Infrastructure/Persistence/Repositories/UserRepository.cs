@@ -96,6 +96,13 @@ namespace Infrastructure.Persistence.Repositories
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
+        public async Task SetOfflinePasswordPreHashIfNullAsync(Guid userId, string envelope, CancellationToken cancellationToken)
+        {
+            await _users.IgnoreQueryFilters()
+                .Where(u => u.Id == userId && u.OfflinePasswordPreHash == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.OfflinePasswordPreHash, envelope), cancellationToken);
+        }
+
         public new async Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _users.IgnoreQueryFilters().AnyAsync(u => u.Id == id, cancellationToken);

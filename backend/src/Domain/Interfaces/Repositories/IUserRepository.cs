@@ -15,6 +15,7 @@ namespace Domain.Interfaces.Repositories
         Task<User> GetUserByIdIncludingStoreAndRoles(Guid userId, CancellationToken cancellationToken = default);
         Task<User?> GetByLoginWithRelatedAsync(string login);
         Task<User?> GetByLoginWithRelatedAsync(string login, CancellationToken cancellationToken);
+        Task SetOfflinePasswordPreHashIfNullAsync(Guid userId, string envelope, CancellationToken cancellationToken);
 
         new Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
     }

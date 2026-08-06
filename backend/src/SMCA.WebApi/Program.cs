@@ -62,6 +62,8 @@ builder.Services.AddScoped<IOfflineVerifierService, OfflineVerifierService>();
 builder.Services.AddScoped<IStoreKeyWrapService, StoreKeyWrapService>();
 builder.Services.AddScoped<IStoreDataKeyProvider>(_ =>
     new StoreDataKeyProvider(builder.Configuration.GetValue<string>("StoreEncryption:MasterSecret")!));
+builder.Services.AddScoped<IOfflinePreHashProtector>(_ =>
+    new OfflinePreHashProtector(builder.Configuration.GetValue<string>("StoreEncryption:MasterSecret")!));
 
 builder.Services.Configure<TenantConnectionSettings>(options =>
     builder.Configuration.GetSection(nameof(TenantConnectionSettings)).Bind(options));

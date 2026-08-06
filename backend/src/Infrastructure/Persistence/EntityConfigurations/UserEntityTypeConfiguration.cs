@@ -27,6 +27,8 @@ namespace Infrastructure.Persistence.EntityConfigurations
             builder.HasKey(x => x.Id);
             builder.HasIndex(x => x.Login).IsUnique();
 
+            builder.Property(x => x.OfflinePasswordPreHash).HasMaxLength(256);
+
             builder.HasMany(c => c.UserRoles)
              .WithOne(e => e.User)
              .HasForeignKey(e => e.UserId)

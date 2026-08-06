@@ -13,6 +13,7 @@ namespace Domain.Entities.Users
     {
         public string Login { get; set; }
         public string Password { get; set; }
+        public string? OfflinePasswordPreHash { get; set; }
         public string FullName { get; set; }
         public string? CellPhone { get; set; }
         public string? Email { get; set; }
