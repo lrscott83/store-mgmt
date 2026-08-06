@@ -74,7 +74,7 @@ La app usa `vite-plugin-pwa` con `devOptions.enabled: true`, así que en dev se 
 
 ## Suite de registro (`register.spec.ts`, `register-rate-limit.spec.ts`)
 
-Cubre las 10 aserciones de UI de auto-registro (`docs/testing/e2e-catalog-stage-1.md`, [S1-01])
+Cubre las 10 aserciones de UI de auto-registro (`docs/testing/e2e-stage-1/S1-01.md`)
 contra un backend real, no contra un mock. Capa de soporte en `e2e/support/`:
 
 - `support/test.ts` — punto de entrada de la suite. Todo spec de registro importa `test`/`expect`

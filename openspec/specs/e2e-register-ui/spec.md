@@ -2,7 +2,7 @@
 
 **Capability**: e2e-register-ui — cobertura Playwright de negocio (browser) para [S1-01] Auto-registro, `frontend-react/e2e/`
 **Origin**: SDD change `e2e-playwright-register-s1-01`
-**Fuente**: `docs/testing/e2e-catalog-stage-1.md`, escenario [S1-01], líneas 77-124
+**Fuente**: `docs/testing/e2e-stage-1/S1-01.md` (antes `docs/testing/e2e-catalog-stage-1.md`, escenario [S1-01], líneas 77-124)
 **Status**: Active
 
 ## Purpose
