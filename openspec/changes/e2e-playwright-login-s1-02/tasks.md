@@ -170,6 +170,23 @@ e2e/login.spec.ts --list` enumera **8** tests (verificado), cubriendo los 13 REQ
 (1 owner-admin compartido con A1/A2/A6/D2/D5/A7[parcial]/D4[parcial]/D6[parcial], 1 store-user
 compartido con REQ-11 sin-productos, 1 REQ-3, 1 REQ-9/D1) — igual al de design.md §2, no más.
 
+**3. Fix post-verify (CRITICAL-1, no en el diseño original): `PersonaCache` acuñaba las 4 personas
+en un solo paso ansioso, no de forma perezosa por persona.** `sdd-verify` encontró que
+`ensureMinted()` disparaba la cadena COMPLETA en la primera llamada a `resolve()` de CUALQUIER
+persona — `login.spec.ts:189` (`restoreSignedInSession('owner-admin')` en el test REQ-11) disparaba
+así, de forma invisible, la creación+login de un StoreUser de respaldo ANTES de que `:210`
+(`primeStoreUser()`) pudiera ejecutarse, lo cual: (a) hacía que `primeStoreUser()` explotara por el
+guard de `prime()`, abortando el resto del bloque `describe.serial` (REQ-9, REQ-7, REQ-12+REQ-14);
+y (b) invalidaba la premisa "sin productos" de REQ-11 porque el respaldo sembraba productos antes
+de que el StoreUser propio de REQ-11 iniciara sesión. Arreglado en `session.ts` haciendo que las 4
+personas se memoicen y acuñen de forma INDEPENDIENTE (`getOwnerAdmin`/`getStoreUser`/
+`getOwnerAdminWithProducts`/`getStoreUserWithProducts`, cada una su propia promesa memoizada),
+nunca como un solo paso que acuña todo. `login.spec.ts` NO se tocó — el bug estaba en el
+acoplamiento del motor de acuñación entre personas, no en el orden de sentencias de un test.
+Presupuesto de 4 logins reales re-verificado contra el flujo de control corregido — ver
+`apply-progress.md` §"WU-G" para el trazado completo. `pnpm exec playwright test
+e2e/login.spec.ts --list` sigue enumerando 8 tests, mismos nombres/líneas.
+
 ---
 
 ## Hand-off para el usuario — el agente NO ejecuta nada de esto

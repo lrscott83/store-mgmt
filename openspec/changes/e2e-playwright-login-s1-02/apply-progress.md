@@ -3,9 +3,10 @@
 **Mode**: Strict TDD (RED → GREEN per work unit, proof commands adapted — see "Notas de
 implementación" in `tasks.md`).
 
-**Status**: 6/6 work units complete (WU-A through WU-F). All Fase 0-5 tasks in `tasks.md` marked
+**Status**: 7/7 work units complete (WU-A through WU-G). All Fase 0-5 tasks in `tasks.md` marked
 `[x]`. The 5 unchecked items are the user's own live-run hand-off checklist (backend required —
-not executed by this agent, per project rule D2).
+not executed by this agent, per project rule D2). WU-G is a targeted apply re-entry that fixes
+CRITICAL-1 from `verify-report.md` (see below) — it does not add new tasks.
 
 ## Work Units Delivered
 
@@ -18,6 +19,96 @@ not executed by this agent, per project rule D2).
 | E | `ceb7226` test(e2e): isolate the login rate-limit assertion behind its own spec | `login-rate-limit.spec.ts` | N/A (new file, no prior consumer) | `tsc` exit 0 + `playwright test e2e/login-rate-limit.spec.ts --list` → 1 test |
 | F | `9366558` docs(e2e): document signedInPage, the login quota budget, and coverage | `e2e/README.md` | N/A (docs) | Read-through: quota-margin warning is a blockquote, not buried |
 | tracking | `e53dc5f` docs(sdd): record planning artifacts and apply progress | `tasks.md` + proposal/design/specs (were untracked) | — | — |
+| G | (this pass) fix(e2e): mint each login persona independently, not as one eager chain | `support/session.ts` only | N/A — verify-driven fix, not TDD-drafted (deterministic control-flow bug, not a missing-behavior gap) | `tsc` exit 0 + both `--list` gates unchanged (20/4, 2/2) + `register.spec.ts --list` unchanged (8/8) |
+
+## WU-G — Fix for CRITICAL-1 (`verify-report.md`)
+
+**Finding**: `createPersonaCache()`'s `ensureMinted()` (old `session.ts:319-363`) minted the
+**entire 4-persona chain** on the first `resolve()` call for ANY persona, using whatever
+`primedOwnerAdmin`/`primedStoreUser` happened to be set at that instant. `login.spec.ts`'s REQ-11
+test restores `owner-admin` (already primed by S1) at line 189 — BEFORE it primes `store-user` at
+line 210 — so that restore triggered the chain's unprimed `store-user` fallback: an invisible
+StoreUser creation + live login + product seed, on top of REQ-11's own separate, real StoreUser
+creation. Two consequences: (1) `primeStoreUser()` at line 210 then threw, because `prime()`'s
+guard forbids priming after minting starts, aborting the rest of the `describe.serial` block
+(REQ-9, REQ-7, REQ-12+REQ-14 never run); (2) the fallback's product seeding ran before REQ-11's own
+"sin productos" StoreUser logged in, invalidating that half of D3's premise.
+
+**Fix chosen**: made persona minting genuinely lazy **per persona**, not reordering
+`login.spec.ts`'s statements. `session.ts` now memoizes FOUR independent promises
+(`ownerAdminPromise`, `storeUserPromise`, `ownerAdminWithProductsPromise`,
+`storeUserWithProductsPromise`), each built from a `get*()` accessor that pulls its own
+dependencies (also memoized) on demand:
+
+- `mintOwnerAdmin(browser, primed)` — resolves the primed snapshot with zero cost, or falls back to
+  a real register+login on a fresh ephemeral context.
+- `mintStoreUser(browser, primed, getOwnerAdmin)` — resolves the primed snapshot (after asserting
+  the R5 shared-storeId invariant against `getOwnerAdmin()`), or falls back to creating+logging in
+  a StoreUser from a *fresh* context restoring the owner's own (already-minted) session.
+- `mintOwnerAdminWithProducts(browser, getOwnerAdmin)` — seeds products via the UI on a fresh
+  ephemeral context derived from `getOwnerAdmin()`. Zero extra logins.
+- `mintStoreUserWithProducts(getStoreUser, getOwnerAdminWithProducts)` — merges the two, zero extra
+  logins.
+
+`createPersonaCache()`'s `prime()` guard now checks only the SLOT being primed
+(`ownerAdminPromise`/`storeUserPromise` independently), not one shared `mintingPromise` — priming
+`store-user` after `owner-admin` has already resolved is fine; priming `store-user` after
+`store-user` itself (or something derived from it) has started resolving still throws, same
+guarantee as before, scoped correctly this time.
+
+**Why this over reordering `login.spec.ts`**: reordering REQ-11's statements (prime `store-user`
+before restoring `owner-admin`) would have "fixed" this one call site but left the same trap armed
+for the next scenario that resolves a persona whose sibling isn't primed yet — the bug is in the
+minting engine's coupling between personas, not in one test's statement order. Ten scenarios
+compose off `signedInPage`/`personaCache`; a per-engine fix protects all of them, a per-call-site
+fix protects only the one that happened to be caught.
+
+**Login budget re-verified against the fixed code, by tracing `login.spec.ts`'s actual execution
+order** (not re-asserting the old claim):
+1. S1 test (`login.spec.ts:97`) — 1 real login (register+login), then `primeOwnerAdmin()`.
+   `ownerAdminPromise` is still `null` at this point (nothing has called `resolve()` yet) — guard
+   passes.
+2. REQ-3 (`:156`) — 1 real login (bad password). No persona calls.
+3. REQ-11 (`:183`) — `restoreSignedInSession('owner-admin')` at `:189` calls `getOwnerAdmin()` for
+   the FIRST time; `primedOwnerAdmin` is set (step 1), so `mintOwnerAdmin` returns it with **zero**
+   network cost — no fallback StoreUser, no product seed. REQ-11 then does its OWN real StoreUser
+   creation (zero-cost `POST /v1/storeusers`) + 1 real login (`:202-205`) BEFORE the "sin productos"
+   assertion at `:206` — the product-seeding step has not run yet at this point (it only runs
+   inside `mintOwnerAdminWithProducts`, not yet called), so the premise holds by construction.
+   `primeStoreUser()` at `:210` — `storeUserPromise` is still `null` (nothing has called
+   `getStoreUser()` yet) — guard passes. `restoreSignedInSession('store-user-with-products')` at
+   `:216` triggers `getStoreUser()` (primed, zero cost, R5 check passes) and
+   `getOwnerAdminWithProducts()` (first call — seeds products on a fresh ephemeral context off the
+   already-minted owner snapshot, zero login) — merge, zero cost. **Total this test: 1 real login.**
+4. REQ-9 (`:222`) — `restoreSignedInSession('owner-admin-with-products')` reuses the promise memoized
+   in step 3 — zero cost. Then a real logout+re-login — 1 real login.
+5. REQ-7 (`:246`) — `restoreSignedInSession('owner-admin')` reuses step 3's memoized promise — zero
+   cost, zero logins.
+6. REQ-12+REQ-14 (`:256`) — restores `owner-admin`, `store-user-with-products`, `store-user` — all
+   already memoized by steps 3-4 — zero cost, zero logins.
+
+**Real login count for the default run: exactly 4** (S1 + REQ-3 + REQ-11 + REQ-9), matching
+design.md §2's budget with no regression. Traced by reading the fixed control flow, not by running
+it (this agent still cannot run the backend).
+
+**R2/H-8 stop-and-ask gate**: untouched — `createStoreUserViaUi()` itself was not modified; both
+call sites that use it (`mintStoreUser`'s unprimed fallback and `login.spec.ts:192`'s REQ-11 body)
+still route through the same function with the same `/login`-bounce check.
+
+**Verification run this pass**:
+- `pnpm exec tsc --noEmit --strict --lib ES2022,DOM --types node --typeRoots
+  ./apps/web-store-pos/node_modules/@types --moduleResolution bundler --module ES2022 --target
+  ES2022 --skipLibCheck e2e/*.ts e2e/support/*.ts playwright.config.ts playwright.api.config.ts` →
+  **exit 0**.
+- `pnpm exec playwright test --grep-invert @rate-limit --list` → **20 tests in 4 files**, unchanged.
+- `pnpm exec playwright test --grep @rate-limit --list` → **2 tests in 2 files**, unchanged.
+- `pnpm exec playwright test e2e/register.spec.ts --list` → **8/8**, unchanged (blast-radius gate).
+- `login.spec.ts --list` still shows all 8 tests, same names/line numbers — `session.ts`'s internal
+  minting engine changed, `login.spec.ts` itself was NOT touched by this fix.
+
+**Still UNPROVEN, unchanged from before**: whether the fixed control flow actually behaves this way
+against a live backend (this agent never runs `dotnet`) — that remains the user's own
+`pnpm test:e2e` run, same posture as the sibling `e2e-playwright-register-s1-01`.
 
 ## TDD Cycle Evidence
 
@@ -114,8 +205,10 @@ openspec/changes/e2e-playwright-login-s1-02/*                    | (planning art
 
 ## Next Recommended
 
-`sdd-verify` — all 6 work units done, structural/static gates green. Verify should independently
-re-run the `tsc` command above and both `--list` gates, and explicitly flag the two UNPROVEN
-categories (live backend run, live rate-limit run) as declared gaps pending the user's own
-`pnpm test:e2e` / `pnpm test:e2e:rate-limit` execution — same pattern the archived
-`e2e-playwright-register-s1-01` verify report used for its own REQ-9.
+`sdd-verify` (re-run) — WU-G fixes CRITICAL-1 from the prior `verify-report.md`. Verify should
+independently re-trace `session.ts`'s new per-persona memoization against `login.spec.ts`'s actual
+call order (same method this fix used — static control-flow reading, deterministic, no backend
+needed), re-run the `tsc` command and both `--list` gates, and re-confirm the 4-login budget claim
+above before re-affirming the two UNPROVEN categories (live backend run, live rate-limit run) as
+still-declared gaps pending the user's own `pnpm test:e2e` / `pnpm test:e2e:rate-limit` execution —
+same pattern the archived `e2e-playwright-register-s1-01` verify report used for its own REQ-9.

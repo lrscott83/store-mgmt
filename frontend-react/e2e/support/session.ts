@@ -25,6 +25,18 @@ import { seedCategoryAndProduct } from './store-seed';
  * logins — they are derived by restoring/merging captured snapshots, never
  * by logging in again.
  *
+ * ## Each persona mints independently (fix for a real budget-breaking bug)
+ * `createPersonaCache()` memoizes FOUR separate promises, one per
+ * `PersonaKind`, each built from the others via plain function calls
+ * (`getOwnerAdmin`/`getStoreUser`/...). Resolving `owner-admin` NEVER
+ * triggers any work related to `store-user`, and vice versa — this is load
+ * bearing for the budget above: `login.spec.ts`'s REQ-11 test restores
+ * `owner-admin` (already primed by S1) BEFORE it has primed `store-user`,
+ * and that restore must not pay for an invisible fallback `store-user`
+ * mint+login+product-seed just because the other slot isn't primed yet. An
+ * earlier version of this file minted the whole 4-persona chain eagerly on
+ * the first `resolve()` call for ANY persona, which broke exactly that.
+ *
  * ## Never imports a roster
  * No step below calls `importRoster` — `isRosterProvisioned()` stays false
  * for every minted persona, so `login.tsx:106` always takes the ONLINE
@@ -171,159 +183,218 @@ export async function createStoreUserViaUi(ownerPage: Page, identity: TestIdenti
 }
 
 /**
- * The chain of design.md §3 "La cadena de acuñación, en orden", run at most
- * ONCE per worker (memoized by `createPersonaCache` below).
+ * Mints (or reuses a primed) `owner-admin` snapshot. Called at most once per
+ * worker — the caller (`createPersonaCache`) memoizes the returned promise.
  *
- * `primedOwnerAdmin`/`primedStoreUser`, when present, are sessions a test
- * ALREADY logged into live (via `PersonaCache.primeOwnerAdmin()` /
- * `primeStoreUser()`) — the chain then restores them onto fresh ephemeral
- * contexts (zero network) instead of registering+logging in again. The
- * unprimed fallback paths below keep this engine self-sufficient for a
- * future consumer that never primes it; `login.spec.ts` always primes both
- * before requesting any persona derived from them (design.md §2 budget,
- * exactly 4 real logins for the whole default run).
+ * If `primed` is set (a test already logged in live and called
+ * `PersonaCache.primeOwnerAdmin()`), this resolves it with ZERO extra
+ * network cost — it does not touch the browser at all. That is the fix for
+ * the bug verify caught (CRITICAL-1): resolving `owner-admin` must never pay
+ * for a second, invisible login just because some OTHER persona
+ * (`store-user`) has not been primed yet — each persona's cost is now
+ * independent of every other persona's priming state.
  */
-async function mintPersonaChain(
+async function mintOwnerAdmin(
   browser: Browser,
-  primedOwnerAdmin: CapturedSnapshot | null,
-  primedStoreUser: CapturedSnapshot | null
-): Promise<Map<PersonaKind, CapturedSnapshot>> {
-  const personas = new Map<PersonaKind, CapturedSnapshot>();
-
-  // 1-3. owner-admin.
-  const ownerContext = await browser.newContext();
-  const ownerPage = await ownerContext.newPage();
-
-  let ownerIdentity: TestIdentity;
-  let ownerStoreId: string;
-
-  if (primedOwnerAdmin) {
-    ownerIdentity = primedOwnerAdmin.identity;
-    ownerStoreId = primedOwnerAdmin.selectedStoreId;
-    await applySnapshot(ownerPage, primedOwnerAdmin);
-    personas.set('owner-admin', primedOwnerAdmin);
-  } else {
-    // Fallback: real registration + real login (its own login cost).
-    ownerIdentity = newTestIdentity();
-
-    const registerPage = new RegisterPage(ownerPage);
-    await registerPage.goto();
-    await registerPage.fillValidForm(ownerIdentity);
-    await registerPage.acceptTerms.check();
-    await registerPage.submit();
-    await ownerPage.waitForURL(/\/login$/);
-
-    const ownerLoginPage = new LoginPage(ownerPage);
-    await ownerLoginPage.fill(ownerIdentity);
-    await ownerLoginPage.submit();
-    await ownerPage.waitForURL(/\/sales\/products$/);
-
-    ownerStoreId = await readSelectedStoreId(ownerPage);
-    personas.set(
-      'owner-admin',
-      await captureSnapshot(ownerContext, ownerPage, ownerIdentity, ownerStoreId, '/sales/products')
-    );
+  primed: CapturedSnapshot | null
+): Promise<CapturedSnapshot> {
+  if (primed) {
+    return primed;
   }
 
-  // 4-5. store-user.
-  let storeUserSnapshot: CapturedSnapshot;
-  let storeUserStoreId: string;
+  // Fallback: real registration + real login (its own login cost) — keeps
+  // this engine self-sufficient for a future consumer that never primes it.
+  const context = await browser.newContext();
+  const page = await context.newPage();
 
-  if (primedStoreUser) {
-    storeUserSnapshot = primedStoreUser;
-    storeUserStoreId = primedStoreUser.selectedStoreId;
-    personas.set('store-user', primedStoreUser);
-  } else {
-    // Fallback: create the StoreUser from the owner's own session (zero
-    // logins, POST /v1/storeusers has no rate limit — design.md §2), then
-    // log in as that StoreUser for real, in ITS OWN context.
-    const storeUserIdentity = newTestIdentity();
-    await createStoreUserViaUi(ownerPage, storeUserIdentity);
+  const ownerIdentity = newTestIdentity();
+  const registerPage = new RegisterPage(page);
+  await registerPage.goto();
+  await registerPage.fillValidForm(ownerIdentity);
+  await registerPage.acceptTerms.check();
+  await registerPage.submit();
+  await page.waitForURL(/\/login$/);
 
-    const storeUserContext = await browser.newContext();
-    const storeUserPage = await storeUserContext.newPage();
-    const storeUserLoginPage = new LoginPage(storeUserPage);
-    await storeUserLoginPage.goto();
-    await storeUserLoginPage.fill(storeUserIdentity);
-    await storeUserLoginPage.submit();
-    await storeUserPage.waitForURL(/\/sales\/products$/);
-    storeUserStoreId = await readSelectedStoreId(storeUserPage);
-    storeUserSnapshot = await captureSnapshot(
-      storeUserContext,
-      storeUserPage,
-      storeUserIdentity,
-      storeUserStoreId,
-      '/sales/products'
-    );
-    personas.set('store-user', storeUserSnapshot);
-    await storeUserContext.close();
-  }
+  const loginPage = new LoginPage(page);
+  await loginPage.fill(ownerIdentity);
+  await loginPage.submit();
+  await page.waitForURL(/\/sales\/products$/);
 
-  // R5 (design.md §11): both personas MUST share a storeId by construction —
-  // the StoreUser is created from INSIDE the owner's own store
-  // (user-create.tsx:20,43). Asserted here, before the merge in step 7 below
-  // trusts it.
-  if (storeUserStoreId !== ownerStoreId) {
-    throw new Error(
-      `[persona:store-user-with-products] storeId mismatch: owner=${ownerStoreId}, ` +
-        `store-user=${storeUserStoreId}. design.md R5 assumed these always match because the ` +
-        "StoreUser is created inside the owner's own store (user-create.tsx:20,43)."
-    );
-  }
-
-  // 6. Back on the owner's session: seed one category + one sellable
-  // product via the real UI (store-seed.ts) — zero network requests
-  // (GlobalConfig.USE_ONLINE_SERVICE = false). Then re-derive the resulting
-  // home path the SAME way A7/D6 do at runtime (visit /login, let
-  // guestOnlyLoader's resolveUserHomePath decide) instead of hardcoding it —
-  // self-verifying, and it fails loudly if seeding silently didn't take.
-  await ownerPage.goto('/sales/products');
-  await seedCategoryAndProduct(ownerPage, `E2E Product ${ownerIdentity.login}`);
-  await ownerPage.goto('/login');
-  await ownerPage.waitForURL(/\/sales\/new$/);
-  const ownerWithProductsHomePath = new URL(ownerPage.url()).pathname;
-
-  const ownerWithProductsSnapshot = await captureSnapshot(
-    ownerContext,
-    ownerPage,
-    ownerIdentity,
-    ownerStoreId,
-    ownerWithProductsHomePath
-  );
-  personas.set('owner-admin-with-products', ownerWithProductsSnapshot);
-  await ownerContext.close();
-
-  // 7. store-user-with-products = the store-user's OWN session identity +
-  // the entity keys (categories/products) the owner's seeding just wrote,
-  // merged because both personas share `ownerStoreId` (asserted above).
-  // Both sides of this merge were produced by the app itself — never a
-  // hand-built key (design.md §3 "El paso 7 merece defensa explícita").
-  const entityEntries = ownerWithProductsSnapshot.localStorage.filter(
-    (entry) => entry.name.startsWith('lizoft.store-') && entry.name.endsWith(`-${ownerStoreId}`)
-  );
-  personas.set('store-user-with-products', {
-    ...storeUserSnapshot,
-    localStorage: [...storeUserSnapshot.localStorage, ...entityEntries],
-    homePath: ownerWithProductsHomePath,
-  });
-
-  return personas;
+  const ownerStoreId = await readSelectedStoreId(page);
+  const snapshot = await captureSnapshot(context, page, ownerIdentity, ownerStoreId, '/sales/products');
+  await context.close();
+  return snapshot;
 }
 
 /**
- * Worker-scoped cache (design.md §3 "Costo amortizado"): the chain above
- * runs at most once per worker, lazily, on the FIRST `resolve()` call — a
- * spec that never destructures `signedInPage` triggers zero registrations
- * and zero logins (REQ-5, opt-in).
+ * Mints (or reuses a primed) `store-user` snapshot. Depends on `owner-admin`
+ * ONLY when it actually needs to create the StoreUser via the UI (unprimed
+ * fallback) or to check the R5 storeId invariant below — `getOwnerAdmin` is
+ * itself memoized by the caller, so this dependency never costs a second
+ * `owner-admin` login.
+ */
+async function mintStoreUser(
+  browser: Browser,
+  primed: CapturedSnapshot | null,
+  getOwnerAdmin: () => Promise<CapturedSnapshot>
+): Promise<CapturedSnapshot> {
+  const ownerSnapshot = await getOwnerAdmin();
+
+  // R5 (design.md §11): both personas MUST share a storeId by construction —
+  // the StoreUser is created from INSIDE the owner's own store
+  // (user-create.tsx:20,43). Asserted for BOTH the primed and unprimed path,
+  // before step 7's merge (`mintStoreUserWithProducts`) trusts it.
+  const assertSharedStoreId = (storeUserStoreId: string): void => {
+    if (storeUserStoreId !== ownerSnapshot.selectedStoreId) {
+      throw new Error(
+        `[persona:store-user-with-products] storeId mismatch: owner=${ownerSnapshot.selectedStoreId}, ` +
+          `store-user=${storeUserStoreId}. design.md R5 assumed these always match because the ` +
+          "StoreUser is created inside the owner's own store (user-create.tsx:20,43)."
+      );
+    }
+  };
+
+  if (primed) {
+    assertSharedStoreId(primed.selectedStoreId);
+    return primed;
+  }
+
+  // Fallback: create the StoreUser from a fresh context restoring the
+  // owner's own (already-minted) session — zero logins, POST /v1/storeusers
+  // has no rate limit (design.md §2) — then log in as that StoreUser for
+  // real, in ITS OWN context.
+  const ownerContext = await browser.newContext();
+  const ownerPage = await ownerContext.newPage();
+  await applySnapshot(ownerPage, ownerSnapshot);
+
+  const storeUserIdentity = newTestIdentity();
+  await createStoreUserViaUi(ownerPage, storeUserIdentity);
+  await ownerContext.close();
+
+  const storeUserContext = await browser.newContext();
+  const storeUserPage = await storeUserContext.newPage();
+  const storeUserLoginPage = new LoginPage(storeUserPage);
+  await storeUserLoginPage.goto();
+  await storeUserLoginPage.fill(storeUserIdentity);
+  await storeUserLoginPage.submit();
+  await storeUserPage.waitForURL(/\/sales\/products$/);
+  const storeUserStoreId = await readSelectedStoreId(storeUserPage);
+  assertSharedStoreId(storeUserStoreId);
+
+  const snapshot = await captureSnapshot(
+    storeUserContext,
+    storeUserPage,
+    storeUserIdentity,
+    storeUserStoreId,
+    '/sales/products'
+  );
+  await storeUserContext.close();
+  return snapshot;
+}
+
+/**
+ * Derives `owner-admin-with-products` from the (memoized) `owner-admin`
+ * snapshot: seeds one category + one sellable product via the real UI
+ * (store-seed.ts) — zero network requests (GlobalConfig.USE_ONLINE_SERVICE =
+ * false) — on a fresh ephemeral context, then re-derives the resulting home
+ * path the SAME way A7/D6 do at runtime (visit /login, let
+ * guestOnlyLoader's resolveUserHomePath decide) instead of hardcoding it —
+ * self-verifying, and it fails loudly if seeding silently didn't take. Costs
+ * ZERO extra logins.
+ */
+async function mintOwnerAdminWithProducts(
+  browser: Browser,
+  getOwnerAdmin: () => Promise<CapturedSnapshot>
+): Promise<CapturedSnapshot> {
+  const ownerSnapshot = await getOwnerAdmin();
+
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await applySnapshot(page, ownerSnapshot);
+
+  await seedCategoryAndProduct(page, `E2E Product ${ownerSnapshot.identity.login}`);
+  await page.goto('/login');
+  await page.waitForURL(/\/sales\/new$/);
+  const homePath = new URL(page.url()).pathname;
+
+  const snapshot = await captureSnapshot(
+    context,
+    page,
+    ownerSnapshot.identity,
+    ownerSnapshot.selectedStoreId,
+    homePath
+  );
+  await context.close();
+  return snapshot;
+}
+
+/**
+ * `store-user-with-products` = the store-user's OWN session identity + the
+ * entity keys (categories/products) `owner-admin-with-products`'s seeding
+ * wrote, merged because both personas share a storeId (asserted by
+ * `mintStoreUser`'s R5 check). Both sides of this merge were produced by the
+ * app itself — never a hand-built key (design.md §3 "El paso 7 merece
+ * defensa explícita"). Costs ZERO extra logins — both dependencies are
+ * memoized promises.
+ */
+async function mintStoreUserWithProducts(
+  getStoreUser: () => Promise<CapturedSnapshot>,
+  getOwnerAdminWithProducts: () => Promise<CapturedSnapshot>
+): Promise<CapturedSnapshot> {
+  const [storeUserSnapshot, ownerWithProductsSnapshot] = await Promise.all([
+    getStoreUser(),
+    getOwnerAdminWithProducts(),
+  ]);
+
+  const entityEntries = ownerWithProductsSnapshot.localStorage.filter(
+    (entry) =>
+      entry.name.startsWith('lizoft.store-') && entry.name.endsWith(`-${storeUserSnapshot.selectedStoreId}`)
+  );
+  return {
+    ...storeUserSnapshot,
+    localStorage: [...storeUserSnapshot.localStorage, ...entityEntries],
+    homePath: ownerWithProductsSnapshot.homePath,
+  };
+}
+
+/**
+ * Worker-scoped cache (design.md §3 "Costo amortizado"). Fixes CRITICAL-1
+ * from the verify report: each of the four personas is memoized and minted
+ * INDEPENDENTLY, lazily, on its own first `resolve()`/derived-dependency
+ * call — never as a single eager "mint everything" step. Resolving
+ * `owner-admin` no longer has any side effect on `store-user` (or vice
+ * versa): a test may prime/resolve `owner-admin` and leave `store-user`
+ * completely untouched until it is primed or resolved on its own. A spec
+ * that never destructures `signedInPage` triggers zero registrations and
+ * zero logins (REQ-5, opt-in).
  */
 export function createPersonaCache(browser: Browser): PersonaCache {
-  let mintingPromise: Promise<Map<PersonaKind, CapturedSnapshot>> | null = null;
   let primedOwnerAdmin: CapturedSnapshot | null = null;
   let primedStoreUser: CapturedSnapshot | null = null;
 
-  function ensureMinted(): Promise<Map<PersonaKind, CapturedSnapshot>> {
-    mintingPromise ??= mintPersonaChain(browser, primedOwnerAdmin, primedStoreUser);
-    return mintingPromise;
+  let ownerAdminPromise: Promise<CapturedSnapshot> | null = null;
+  let storeUserPromise: Promise<CapturedSnapshot> | null = null;
+  let ownerAdminWithProductsPromise: Promise<CapturedSnapshot> | null = null;
+  let storeUserWithProductsPromise: Promise<CapturedSnapshot> | null = null;
+
+  function getOwnerAdmin(): Promise<CapturedSnapshot> {
+    ownerAdminPromise ??= mintOwnerAdmin(browser, primedOwnerAdmin);
+    return ownerAdminPromise;
+  }
+
+  function getStoreUser(): Promise<CapturedSnapshot> {
+    storeUserPromise ??= mintStoreUser(browser, primedStoreUser, getOwnerAdmin);
+    return storeUserPromise;
+  }
+
+  function getOwnerAdminWithProducts(): Promise<CapturedSnapshot> {
+    ownerAdminWithProductsPromise ??= mintOwnerAdminWithProducts(browser, getOwnerAdmin);
+    return ownerAdminWithProductsPromise;
+  }
+
+  function getStoreUserWithProducts(): Promise<CapturedSnapshot> {
+    storeUserWithProductsPromise ??= mintStoreUserWithProducts(getStoreUser, getOwnerAdminWithProducts);
+    return storeUserWithProductsPromise;
   }
 
   async function prime(
@@ -331,10 +402,12 @@ export function createPersonaCache(browser: Browser): PersonaCache {
     page: Page,
     identity: TestIdentity
   ): Promise<void> {
-    if (mintingPromise) {
+    const alreadyResolving = slot === 'owner-admin' ? ownerAdminPromise : storeUserPromise;
+    if (alreadyResolving) {
       throw new Error(
-        `prime${slot === 'owner-admin' ? 'OwnerAdmin' : 'StoreUser'}() called after the persona ` +
-          'chain already started minting — call it BEFORE any signedInPage(...)/resolve(...) call.'
+        `prime${slot === 'owner-admin' ? 'OwnerAdmin' : 'StoreUser'}() called after the "${slot}" ` +
+          'persona already started resolving — call it BEFORE any signedInPage(...)/resolve(...) call ' +
+          `that would trigger the "${slot}" persona (directly, or via a persona derived from it).`
       );
     }
     const selectedStoreId = await readSelectedStoreId(page);
@@ -351,13 +424,17 @@ export function createPersonaCache(browser: Browser): PersonaCache {
     primeOwnerAdmin: (page, identity) => prime('owner-admin', page, identity),
     primeStoreUser: (page, identity) => prime('store-user', page, identity),
 
-    async resolve(kind: PersonaKind): Promise<CapturedSnapshot> {
-      const personas = await ensureMinted();
-      const snapshot = personas.get(kind);
-      if (!snapshot) {
-        throw new Error(`Persona "${kind}" was never minted by the chain — internal session.ts bug.`);
+    resolve(kind: PersonaKind): Promise<CapturedSnapshot> {
+      switch (kind) {
+        case 'owner-admin':
+          return getOwnerAdmin();
+        case 'store-user':
+          return getStoreUser();
+        case 'owner-admin-with-products':
+          return getOwnerAdminWithProducts();
+        case 'store-user-with-products':
+          return getStoreUserWithProducts();
       }
-      return snapshot;
     },
   };
 }
