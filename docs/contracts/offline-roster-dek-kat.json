@@ -10,7 +10,7 @@
   "masterSecret": "KAT-TEST-ONLY-MASTER-SECRET-3F8E4A2C-9D4B-4E6A-B2C5-8F1D7A3E9B40",
   "_header": {
     "provenance": "dotnet-backend",
-    "backendCommitSha": "d784a0481a63c6d3f0eeb257dc51b4de925d72df",
+    "backendCommitSha": "176a98d382979c6fc27a2db4e63a6b627e3ce8d5",
     "dotnetVersion": "8.0.204"
   }
 }
