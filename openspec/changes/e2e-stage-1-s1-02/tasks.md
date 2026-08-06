@@ -24,12 +24,12 @@ Chain strategy: pending
 
 ## Phase 1: Test Implementation (ADD-ONLY)
 
-- [ ] 1.1 In `backend/src/SMCA.WebApi.E2ETests/Auth/AuthLoginFailureTests.cs` add `[Fact] Login_with_inactive_store_returns_403` mirroring `:42-61`; seed `var f = await UserSeed.SeedOwnerAdminWithStoreAsync(_factory)` — MANDATORY seed (creates the `StoreUser` row at `UserSeed.cs:61`; `StoreSeed.SeedStoresAdminUserAsync` omits it and would pass for the wrong reason)
-- [ ] 1.2 In `try`: `await StoreSeed.DeactivateStoreAsync(_factory, f.StoreId)`, then `POST /api/v1/auth/login` with `{ Login = f.Login, Password = "Password123" }`
-- [ ] 1.3 Assert `res.StatusCode == HttpStatusCode.Forbidden`, `body.Succeeded == false`, `body.Errors.ContainSingle(e => e.Code == "Store.Inactive")` — deserialize via `ApiResponse<object>(ApiResponse.Json)` per `:32-33` pattern
-- [ ] 1.4 In `finally`: `await AuthzSeed.CleanupStoreGraphAsync(_factory, f.StoreId, f.UserId)` — FK-safe; NOT `DbTestHelpers.CleanupUserAsync` (strands rows via FK `Owner_User_UserId`)
-- [ ] 1.5 Zero edits to existing Facts `:21-40, :42-61` and zero production code (CLAUDE.md rule) — confirm with `git diff` showing only additions
-- [ ] 1.6 Commit (conventional, test-only): `test(e2e): cover inactive-store login returning 403 Store.Inactive`
+- [x] 1.1 In `backend/src/SMCA.WebApi.E2ETests/Auth/AuthLoginFailureTests.cs` add `[Fact] Login_with_inactive_store_returns_403` mirroring `:42-61`; seed `var f = await UserSeed.SeedOwnerAdminWithStoreAsync(_factory)` — MANDATORY seed (creates the `StoreUser` row at `UserSeed.cs:61`; `StoreSeed.SeedStoresAdminUserAsync` omits it and would pass for the wrong reason)
+- [x] 1.2 In `try`: `await StoreSeed.DeactivateStoreAsync(_factory, f.StoreId)`, then `POST /api/v1/auth/login` with `{ Login = f.Login, Password = "Password123" }`
+- [x] 1.3 Assert `res.StatusCode == HttpStatusCode.Forbidden`, `body.Succeeded == false`, `body.Errors.ContainSingle(e => e.Code == "Store.Inactive")` — deserialize via `ApiResponse<object>(ApiResponse.Json)` per `:32-33` pattern
+- [x] 1.4 In `finally`: `await AuthzSeed.CleanupStoreGraphAsync(_factory, f.StoreId, f.UserId)` — FK-safe; NOT `DbTestHelpers.CleanupUserAsync` (strands rows via FK `Owner_User_UserId`)
+- [x] 1.5 Zero edits to existing Facts `:21-40, :42-61` and zero production code (CLAUDE.md rule) — confirm with `git diff` showing only additions
+- [x] 1.6 Commit (conventional, test-only): `test(e2e): cover inactive-store login returning 403 Store.Inactive`
 
 ## Phase 2: Verification
 
