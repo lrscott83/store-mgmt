@@ -10,6 +10,15 @@ namespace SMCA.WebApi.Middlewares
 {
     public class ErrorHandlerMiddleware
     {
+        // Every other response is serialized by MVC, which applies
+        // JsonSerializerDefaults.Web (camelCase). A bare JsonSerializer.Serialize
+        // call applies no naming policy at all, so error bodies used to travel as
+        // PascalCase ("Errors"/"Description") while success bodies were camelCase.
+        // Clients read `errors[0].description` and silently got `undefined`, falling
+        // back to a generic message that hid the server's own validation text.
+        private static readonly JsonSerializerOptions SerializerOptions =
+            new(JsonSerializerDefaults.Web);
+
         private readonly RequestDelegate _next;
         private ILogger<ErrorHandlerMiddleware> _logger;
 
@@ -62,7 +71,7 @@ namespace SMCA.WebApi.Middlewares
                         responseModel.ActionCode = (int)HttpStatusCode.InternalServerError;
                         break;
                 }
-                var result = JsonSerializer.Serialize(responseModel);
+                var result = JsonSerializer.Serialize(responseModel, SerializerOptions);
 
                 await response.WriteAsync(result);
             }
