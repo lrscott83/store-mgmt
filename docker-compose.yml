@@ -28,11 +28,25 @@ services:
     #   args:
     #     - configuration=Release
     environment:
-      - ASPNETCORE__ENVIRONMENT=${ENVIRONMENT}
-      - AppSettings__ConnectionStrings__DefaultConnection=Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Persist Security Info=True;Include Error Detail=True
-      - AppSettings__Secret=${JWT_SECRET}
-      - AppSettings__Issuer=${JWT_ISSUER}
-      - AppSettings__Audience=${JWT_AUDIENCE}
+      # Single underscore: ASPNETCORE__ENVIRONMENT is not a name the host recognises,
+      # so the environment silently fell back to Production regardless of ${ENVIRONMENT}.
+      - ASPNETCORE_ENVIRONMENT=${ENVIRONMENT}
+      # Double underscore maps to the ':' of a configuration key, and environment
+      # variables outrank every appsettings file. These keys are the ones the app
+      # actually reads; the previous AppSettings__* names matched nothing, so the
+      # database password and the signing key below were being discarded in silence.
+      #
+      # Persist Security Info is left off (defaults to false) so the password is not
+      # readable from the connection object once connected, and error detail is off so
+      # parameter values do not reach exception messages and logs.
+      - ConnectionStrings__Application=Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Include Error Detail=false
+      - Jwt__SecretKey=${JWT_SECRET}
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
+      - Authentication__Pepper=${AUTH_PEPPER}
+      - StoreEncryption__MasterSecret=${STORE_ENCRYPTION_MASTER_SECRET}
+      # Read by nothing in SMCA.WebApi — kept as-is pending a decision on whether the
+      # password-reset and SMTP features get wired up or dropped.
       - AppSettings__PasswordResetUrl=${PASSWORD_RESET_URL}
       - SmtpSettings__SmtpServer=${SMTP_SERVER}
       - SmtpSettings__Port=${SMTP_PORT}
