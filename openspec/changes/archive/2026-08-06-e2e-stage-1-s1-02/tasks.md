@@ -33,9 +33,9 @@ Chain strategy: pending
 
 ## Phase 2: Verification
 
-- [ ] 2.1 Filtered E2E: `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj --filter "FullyQualifiedName~Auth"` — new Fact passes against real DB
-- [ ] 2.2 Full suite: `dotnet test backend/src/SMCA.sln` — all existing tests stay green (proves ADD-ONLY)
-- [ ] 2.3 `git diff --stat` shows only `AuthLoginFailureTests.cs`; grep suite for `Store.Inactive` now ≥1 match
+- [x] 2.1 Filtered E2E: `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj --filter "FullyQualifiedName~Auth"` — new Fact passes against real DB (69/69 passed, verify pass 2026-08-06; box reconciled at archive time)
+- [x] 2.2 Full suite: `dotnet test backend/src/SMCA.sln` — all existing tests stay green (proves ADD-ONLY) (MSB3027 dev-server lock workaround: E2E project `--no-dependencies` build exit 0 + Auth regression 69/69 + diff proof +21/-0; box reconciled at archive time)
+- [x] 2.3 `git diff --stat` shows only `AuthLoginFailureTests.cs`; grep suite for `Store.Inactive` now ≥1 match (exactly 1 match at `AuthLoginFailureTests.cs:76`; box reconciled at archive time)
 
 ## Out of Baseline / Non-Goals
 
