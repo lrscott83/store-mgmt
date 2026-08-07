@@ -308,13 +308,14 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     personaCache,
     loginNetwork,
   }) => {
+    test.fail(); // MORDIDA (T1): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     // D1: restoreSignedInSession's own navigation already costs 0 /me
     // (currentUser.authToken === AUTH_MODEL.authToken from the real login) —
     // this reload re-checks the SAME cache-valid branch (auth-store.ts:127).
     await page.reload();
     await page.waitForURL(/\/sales\/products$/);
-    loginNetwork.expectMeRequestCount(0);
+    loginNetwork.expectMeRequestCount(1);
   });
 
   test('REQ-2: a cache mismatch fires exactly one /me and keeps the session (T2)', async ({
@@ -322,6 +323,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     personaCache,
     loginNetwork,
   }) => {
+    test.fail(); // MORDIDA (T2): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     // D3: mutating ONLY AUTH_MODEL.authToken desyncs it from
     // currentUser.authToken (mismatch branch, auth-store.ts:142-151) while
@@ -332,7 +334,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await loginNetwork.waitForMeRequest();
     await page.waitForLoadState('networkidle');
 
-    loginNetwork.expectMeRequestCount(1);
+    loginNetwork.expectMeRequestCount(0);
     await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
     expect(new URL(page.url()).pathname).not.toBe('/login');
   });
@@ -342,6 +344,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     personaCache,
     loginNetwork,
   }) => {
+    test.fail(); // MORDIDA (T3): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token-t3' });
     // D4's sibling for the cold-boot half: the honest simulation of "the
@@ -354,7 +357,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await page.waitForLoadState('networkidle');
 
     const authModel = await readRawAuthModel(page);
-    expect(authModel).not.toBeNull();
+    expect(authModel).toBeNull();
     expect(new URL(page.url()).pathname).not.toBe('/login');
     await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
   });
@@ -364,6 +367,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     personaCache,
     loginNetwork,
   }) => {
+    test.fail(); // MORDIDA (T5): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token-t5' });
     await page.route('**/v1/auth/me', (route) =>
@@ -383,7 +387,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await page.getByRole('button', { name: 'OK' }).click();
 
     const authModel = await readRawAuthModel(page);
-    expect(authModel).not.toBeNull();
+    expect(authModel).toBeNull();
     await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
   });
 
@@ -429,6 +433,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     page,
     personaCache,
   }) => {
+    test.fail(); // MORDIDA (T11): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     await writeRawAuthModel(page, '{"foo":1}');
 
@@ -441,7 +446,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await page.goto('/login');
 
     const raw = await readRawAuthModel(page);
-    expect(raw).toBe('{"foo":1}');
+    expect(raw).not.toBe('{"foo":1}');
   });
 
   test('REQ-4: a real 401 from /me ends the session and lands on /login (T4)', async ({
@@ -449,6 +454,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     personaCache,
     loginNetwork,
   }) => {
+    test.fail(); // MORDIDA (T4): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     // D3: T4 is the ONLY test that mutates BOTH keys — AUTH_MODEL.authToken
     // (forces the mismatch branch, so /me actually fires) AND `token` (the
@@ -464,13 +470,14 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await page.waitForURL(/\/login$/);
     loginNetwork.expectMeRequestCount(1);
     const authModel = await readRawAuthModel(page);
-    expect(authModel).toBeNull();
+    expect(authModel).not.toBeNull();
   });
 
   test('REQ-6: expiresIn exactly equal to "now" counts as expired (T6)', async ({
     page,
     personaCache,
   }) => {
+    test.fail(); // MORDIDA (T6): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
 
     // R3: freeze the clock at the NARROWEST scope that still covers the
@@ -483,10 +490,11 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
 
     await page.waitForURL(/\/login$/);
     const authModel = await readRawAuthModel(page);
-    expect(authModel).toBeNull();
+    expect(authModel).not.toBeNull();
   });
 
   test('REQ-7: logout() removes only AUTH_MODEL (T7)', async ({ page, personaCache }) => {
+    test.fail(); // MORDIDA (T7): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
 
     const before = await page.evaluate(() => ({
@@ -509,7 +517,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     }));
     // Decision 1 (auth-store.ts:352-356): token/currentUser stay stale on
     // purpose (Angular parity), not a bug — logout() removes ONLY AUTH_MODEL.
-    expect(after.token).toBe(before.token);
+    expect(after.token).not.toBe(before.token);
     expect(after.currentUser).toBe(before.currentUser);
   });
 
@@ -583,6 +591,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
   });
 
   test('REQ-9: a 401 outside /me leaves the session intact (T9)', async ({ page, personaCache }) => {
+    test.fail(); // MORDIDA (T9): assertion inverted below — MUST fail. Revert after the run.
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     await page.goto('/profile/edit');
 
@@ -607,7 +616,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     ).toBeVisible();
 
     const authModel = await readRawAuthModel(page);
-    expect(authModel).not.toBeNull();
+    expect(authModel).toBeNull();
 
     await page.goto('/sales/products');
     await page.waitForURL(/\/sales\/products$/);
