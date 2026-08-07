@@ -59,4 +59,25 @@ public sealed class AuthLoginFailureTests
             await DbTestHelpers.CleanupUserAsync(_factory, userId);
         }
     }
+
+    [Fact]
+    public async Task Login_with_inactive_store_returns_403()
+    {
+        var f = await UserSeed.SeedOwnerAdminWithStoreAsync(_factory);
+        try
+        {
+            await StoreSeed.DeactivateStoreAsync(_factory, f.StoreId);
+            var res = await _client.PostAsJsonAsync("/api/v1/auth/login",
+                new { Login = f.Login, Password = "Password123" });
+
+            res.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            var body = await res.Content.ReadFromJsonAsync<ApiResponse<object>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeFalse();
+            body.Errors.Should().ContainSingle(e => e.Code == "Store.Inactive");
+        }
+        finally
+        {
+            await AuthzSeed.CleanupStoreGraphAsync(_factory, f.StoreId, f.UserId);
+        }
+    }
 }
