@@ -101,11 +101,28 @@ export function installRegisterNetworkObserver(page: Page): RegisterNetworkObser
   const outcomes: Outcome[] = [];
   let waiters: Array<(outcome: Outcome) => void> = [];
 
+  // An outcome is delivered to exactly ONE consumer: a waiter if someone is
+  // already blocked on it, the queue otherwise. Never both.
+  //
+  // Doing both — queueing AND resolving every waiter — double-counts. The waiter
+  // returns the outcome while a copy stays in the queue, so the NEXT
+  // waitForResponse() shifts that stale copy and returns immediately, and the
+  // observer falls one response behind for the rest of the run.
+  //
+  // What that cost: REQ-9's flood asserts the 429 the limiter answers with. An
+  // early 429 is still caught while one behind, so this stayed invisible for as
+  // long as the quota happened to be partly spent when the spec started. Against
+  // a clean window the 429 lands on the LAST attempt, being one behind loses it,
+  // and the spec reports "never observed a 429" — accusing a limiter that had
+  // answered correctly. Verified 2026-08-07: the trace showed POST register 429
+  // while the loop reported none.
   function pushOutcome(outcome: Outcome): void {
+    const waiter = waiters.shift();
+    if (waiter) {
+      waiter(outcome);
+      return;
+    }
     outcomes.push(outcome);
-    const pending = waiters;
-    waiters = [];
-    pending.forEach((resolve) => resolve(outcome));
   }
 
   page.on('request', (request: PlaywrightRequest) => {
