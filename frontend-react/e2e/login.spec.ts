@@ -4,7 +4,12 @@ import { LoginPage } from './support/login-page';
 import { RegisterPage } from './support/register-page';
 import { newTestIdentity, type TestIdentity } from './support/identity';
 import { restoreSignedInSession, createStoreUserViaUi } from './support/session';
-import { mutateAuthModel, readRawAuthModel, writeRawAuthModel } from './support/auth-storage';
+import {
+  mutateAuthModel,
+  mutateBearerToken,
+  readRawAuthModel,
+  writeRawAuthModel,
+} from './support/auth-storage';
 
 // Literal Spanish copy asserted below, cited from
 // apps/web-store-pos/app/shared/lib/i18n/es.ts (design.md §5, §7). Hardcoded
@@ -417,5 +422,28 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
 
     const raw = await readRawAuthModel(page);
     expect(raw).toBe('{"foo":1}');
+  });
+
+  test('REQ-4: a real 401 from /me ends the session and lands on /login (T4)', async ({
+    page,
+    personaCache,
+    loginNetwork,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    // D3: T4 is the ONLY test that mutates BOTH keys — AUTH_MODEL.authToken
+    // (forces the mismatch branch, so /me actually fires) AND `token` (the
+    // key the Authorization header is built from) — so the real backend
+    // rejects the request with a genuine 401, not a 200.
+    await mutateAuthModel(page, {
+      authToken: 'e2e-invalid-auth-model-token-t4',
+      expiresIn: Date.now() + 60_000,
+    });
+    await mutateBearerToken(page, 'e2e-invalid-bearer-token-t4');
+    await page.reload();
+
+    await page.waitForURL(/\/login$/);
+    loginNetwork.expectMeRequestCount(1);
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).toBeNull();
   });
 });
