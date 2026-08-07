@@ -465,4 +465,61 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     const authModel = await readRawAuthModel(page);
     expect(authModel).toBeNull();
   });
+
+  test('REQ-7: logout() removes only AUTH_MODEL (T7)', async ({ page, personaCache }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+
+    const before = await page.evaluate(() => ({
+      token: window.localStorage.getItem('token'),
+      currentUser: window.localStorage.getItem('currentUser'),
+    }));
+    expect(before.token).not.toBeNull();
+    expect(before.currentUser).not.toBeNull();
+
+    await page.getByRole('button', { name: 'Menú de usuario' }).click();
+    await page.getByRole('button', { name: 'Salir' }).click();
+    await page.waitForURL(/\/login$/);
+
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).toBeNull();
+
+    const after = await page.evaluate(() => ({
+      token: window.localStorage.getItem('token'),
+      currentUser: window.localStorage.getItem('currentUser'),
+    }));
+    // Decision 1 (auth-store.ts:350-354): token/currentUser stay stale on
+    // purpose (Angular parity), not a bug — logout() removes ONLY AUTH_MODEL.
+    expect(after.token).toBe(before.token);
+    expect(after.currentUser).toBe(before.currentUser);
+  });
+
+  test('REQ-8: logout() while already on /login fires no extra navigation (T8)', async ({
+    page,
+    personaCache,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    await page.goto('/login');
+    await mutateAuthModel(page, { expiresIn: Date.now() - 1 });
+
+    const navigations: string[] = [];
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) navigations.push(frame.url());
+    });
+
+    // G2 (design.md D7, declared gap): logout()'s guard is
+    // `pathname !== '/login' && pathname !== '/'` (auth-store.ts:365). On a
+    // cold boot, `authRedirect` is still `undefined` at module-evaluation
+    // time — `root.tsx:89-91` wires it in a `useEffect`, which runs AFTER
+    // `auth-store.ts:388`'s synchronous `initialize()` — so
+    // `authRedirect?.('/login')` is a no-op REGARDLESS of pathname. This
+    // assertion cannot discriminate the pathname guard itself; that
+    // coverage lives in `auth-store.test.ts:297-315` (a real spy). What IS
+    // observable here: zero additional navigations after this reload.
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+
+    expect(navigations).toHaveLength(1);
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).toBeNull();
+  });
 });
