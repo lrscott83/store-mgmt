@@ -28,7 +28,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
 | [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **PARCIAL** — REQ-1…REQ-9 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); falta el destino post-registro | **CUBIERTO** |
-| [S1-02](S1-02.md) | Login online | CRÍTICA | **PENDIENTE** | **PARCIAL** — falta tienda inactiva → 403; el rate limit es inalcanzable bajo `Testing` (H-12) |
+| [S1-02](S1-02.md) | Login online | CRÍTICA | **PARCIAL** — REQ-1…REQ-7, REQ-9…REQ-16 implementados y verificados en vivo (`e2e/login.spec.ts`, 8 tests, backend real, 2026-08-07); REQ-8 (429) implementado y aislado (`e2e/login-rate-limit.spec.ts`) pero **NUNCA ejecutado** | **PARCIAL** — falta tienda inactiva → 403; el rate limit es inalcanzable bajo `Testing` (H-12) |
 | [S1-03](S1-03.md) | Login offline en dispositivo aprovisionado | CRÍTICA | **PENDIENTE** | **N/A** — cero HTTP; la contraparte de servidor es S3-01 |
 | [S1-04](S1-04.md) | Hidratación de sesión: la caché válida no llama al backend | CRÍTICA | **PENDIENTE** | **CUBIERTO** |
 
@@ -65,12 +65,14 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 1 PARCIAL · 11 PENDIENTE · 2 N/A (S1-03 lo tiene solo en la capa de dato; AUTH-INV-01 no aplica).
+- **E2E frontend**: 2 PARCIAL · 10 PENDIENTE · 2 N/A (S1-03 lo tiene solo en la capa de dato; AUTH-INV-01 no aplica).
 - **E2E backend**: 8 CUBIERTO · 3 PARCIAL · 1 PENDIENTE · 1 N/A.
 
 Ningún escenario está completo en ambas capas.
 
-**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` y `register-rate-limit.spec.ts` cubren S1-01; `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio.
+**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, y `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02; `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto son 20 tests (`pnpm test:e2e`); los dos specs de rate-limit quedan fuera a propósito y corren con `pnpm test:e2e:rate-limit`.
+
+**La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 5/min**, amortizados con `storageState`. Ese margen de uno es la restricción a respetar al escribir el próximo escenario.
 
 **Rate limiting hoy**: `SMCA.WebApi.E2ETests/RateLimiting/RateLimitPoliciesTests.cs` tiene 4 tests (`:38,49,72,83`) y **todos** son de la política **Register**. La política **Login** no tiene ninguno. Y ninguno de los cuatro es de extremo a extremo: son unitarios de la fábrica de políticas, con el limitador construido a mano (`RateLimitPoliciesTests.cs:24-35`), porque bajo `Testing` el middleware ni se registra (**H-12**).
 
