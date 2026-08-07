@@ -35,6 +35,9 @@ namespace Application.Behaviours
 
         private static bool IsQuery()
         {
+            // Do not rely on this pipeline behaviour to persist changes: it is intentionally
+            // dead code. Handlers MUST call IApplicationUnitOfWork.SaveChangesAsync explicitly
+            // (auth cluster broke by trusting this — see fix-refresh-token-persistence).
             //return !typeof(TRequest).Name.EndsWith("Command");
             return true;
         }

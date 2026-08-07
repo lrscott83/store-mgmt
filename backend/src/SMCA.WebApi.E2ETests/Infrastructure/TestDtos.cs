@@ -1,12 +1,16 @@
 namespace SMCA.WebApi.E2ETests.Infrastructure;
 
-// Mirrors Application.Dtos.Authentication.AuthDto (record Login, AuthToken, ExpiresIn),
-// deserialized from camelCase JSON.
+// Mirrors Application.Dtos.Authentication.AuthDto (record Login, AuthToken, ExpiresIn,
+// RefreshToken, RefreshTokenExpiresAt), deserialized from camelCase JSON.
+// The refresh-token fields are additive: System.Text.Json ignores missing members, so
+// responses that do not carry them deserialize with null values — zero impact on existing tests.
 public sealed class AuthData
 {
     public string Login { get; set; } = string.Empty;
     public string AuthToken { get; set; } = string.Empty;
     public DateTime ExpiresIn { get; set; }
+    public string? RefreshToken { get; set; }
+    public DateTimeOffset? RefreshTokenExpiresAt { get; set; }
 }
 
 public sealed class StoreData

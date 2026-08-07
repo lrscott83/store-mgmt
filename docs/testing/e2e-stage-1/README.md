@@ -59,14 +59,14 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
-| [AUTH-INV-01](AUTH-INV-01.md) | La expiración de autenticación debe ser 35 días | CRÍTICA | **N/A** — el refresh token no es observable desde la UI | **PENDIENTE** — 🔴 el test especificado **hoy falla**; el rojo es el defecto, no el test |
+| [AUTH-INV-01](AUTH-INV-01.md) | La expiración de autenticación debe ser 35 días | CRÍTICA | **N/A** — el refresh token no es observable desde la UI | **CUBIERTO** — 2 tests E2E (`AuthRefreshTokenLifetimeTests.cs`) fijan el 35d; producción ya emite 35d (`AuthenticationSettings.cs` default + `appsettings*.json`), tests verdes |
 
 ### Totales
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 2 PARCIAL · 10 PENDIENTE · 2 N/A (S1-03 lo tiene solo en la capa de dato; AUTH-INV-01 no aplica).
-- **E2E backend**: 8 CUBIERTO · 3 PARCIAL · 1 PENDIENTE · 1 N/A.
+- **E2E frontend**: 3 PARCIAL · 9 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Ningún escenario está completo en ambas capas.
 
