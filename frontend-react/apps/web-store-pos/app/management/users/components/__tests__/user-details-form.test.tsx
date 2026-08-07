@@ -76,8 +76,8 @@ describe('UserDetailsForm — EDIT-3: pre-fills from initialValues', () => {
   });
 });
 
-describe('UserDetailsForm — DET-CELL-REQ: cellPhone is required', () => {
-  it('shows required error and blocks submit when cellPhone is empty', async () => {
+describe('UserDetailsForm — PHONE-2: cellPhone is no longer required', () => {
+  it('calls onSubmit with an empty cellPhone and never shows a required error', async () => {
     const { UserDetailsForm } = await import('../UserDetailsForm');
     const onSubmit = vi.fn();
     render(
@@ -89,9 +89,9 @@ describe('UserDetailsForm — DET-CELL-REQ: cellPhone is required', () => {
     // Leave cellPhone empty
     fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
     await waitFor(() => {
-      expect(screen.getByText(/teléfono es obligatorio/i)).toBeInTheDocument();
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '' }));
     });
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByText(/teléfono es obligatorio/i)).not.toBeInTheDocument();
   });
 
   it('does not show required error when cellPhone is filled', async () => {
