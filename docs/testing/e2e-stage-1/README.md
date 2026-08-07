@@ -27,8 +27,8 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
-| [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **PARCIAL** — REQ-1…REQ-9 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); falta el destino post-registro | **CUBIERTO** |
-| [S1-02](S1-02.md) | Login online | CRÍTICA | **PARCIAL** — REQ-1…REQ-7, REQ-9…REQ-16 implementados y verificados en vivo (`e2e/login.spec.ts`, 8 tests, backend real, 2026-08-07); REQ-8 (429) implementado y aislado (`e2e/login-rate-limit.spec.ts`) pero **NUNCA ejecutado** | **PARCIAL** — falta tienda inactiva → 403; el rate limit es inalcanzable bajo `Testing` (H-12) |
+| [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **PARCIAL** — REQ-1…REQ-9 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); REQ-9 (429) **verificado en vivo** el 2026-08-07 — el spec lanza error explícito si nunca observa un 429, así que verde ⇒ el límite se disparó; falta el destino post-registro ([F-2](plan-frontend.md#f-2)) | **CUBIERTO** |
+| [S1-02](S1-02.md) | Login online | CRÍTICA | **CUBIERTO** — REQ-1…REQ-16 implementados y verificados en vivo contra backend real el 2026-08-07 (`e2e/login.spec.ts`; REQ-8/429 en `e2e/login-rate-limit.spec.ts`, que corre aparte con `pnpm test:e2e:rate-limit`) | **PARCIAL** — tienda inactiva → 403 **ya cubierta** (`Auth/AuthLoginFailureTests.cs:64`); falta el rate limit en la capa .NET. **H-12 queda refutada**: Playwright observó un 429 real bajo `Testing`, así que el límite sí es alcanzable |
 | [S1-03](S1-03.md) | Login offline en dispositivo aprovisionado | CRÍTICA | **PENDIENTE** | **N/A** — cero HTTP; la contraparte de servidor es S3-01 |
 | [S1-04](S1-04.md) | Hidratación de sesión: la caché válida no llama al backend | CRÍTICA | **PARCIAL** — REQ-1…REQ-11 implementados y verificados en vivo (`e2e/login.spec.ts`, T1-T11, capability `e2e-session-hydration`, backend real, 2026-08-07: 31 passed); la rama del 404 real de REQ-4 es brecha declarada (H-6, G1) y la guarda de pathname de REQ-8 no es discriminable en Playwright por timing de arranque (G2, cubierta en `auth-store.test.ts`) | **CUBIERTO** |
 
@@ -38,7 +38,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 |---|---|---|---|---|
 | [S2-01](S2-01.md) | DG-7 — El OwnerAdmin activa el plan pago una sola vez, en una sola dirección | CRÍTICA | **PENDIENTE** | **CUBIERTO** |
 | [S2-02](S2-02.md) | Regresión DG-7 — el candado no puede volver a colgarse de `paymentStartDate` | CRÍTICA | **PENDIENTE** | **CUBIERTO** |
-| [S2-03](S2-03.md) | Seguridad — un OwnerAdmin en `/management/stores/create` no puede crear una tienda | CRÍTICA | **PENDIENTE** | **PARCIAL** — `OwnerAdmin` sobre `POST /v1/stores` no tiene ningún test (H-10) |
+| [S2-03](S2-03.md) | Seguridad — un OwnerAdmin en `/management/stores/create` no puede crear una tienda | CRÍTICA | **PENDIENTE** | **PARCIAL** — ya hay tests (`Stores/StoreCreateAuthorizationGapTests.cs`), y **confirman que el requisito de seguridad NO se cumple**: un `OwnerAdmin` con la feature `Stores` crea la tienda igual (201 + repunta `selectedStoreId`), y un `StoreUser` recibe 400, no 403. H-10 confirmada como defecto de producción, no como hueco de cobertura |
 
 ### Bloque C — Gestión de usuarios
 
@@ -46,7 +46,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 |---|---|---|---|---|
 | [S3-01](S3-01.md) | Exportar el roster de aprovisionamiento | ALTA | **PENDIENTE** | **CUBIERTO** |
 | [S3-02](S3-02.md) | Crear cuenta StoreUser | ALTA | **PENDIENTE** | **CUBIERTO** |
-| [S3-03](S3-03.md) | Listar, editar, activar y dar de baja usuarios | ALTA | **PENDIENTE** | **PARCIAL** — falta el aislamiento cross-store / cross-tenant (H-11) |
+| [S3-03](S3-03.md) | Listar, editar, activar y dar de baja usuarios | ALTA | **PENDIENTE** | **PARCIAL** — aislamiento ya medido (`Users/UsersIsolationTests.cs`): **cross-tenant SÍ aísla** (envelope 404, el usuario ajeno no se modifica) pero **cross-store NO** (200, la edición se aplica). H-11 queda partida: la mitad de tenant está cerrada, la de tienda es un defecto abierto |
 
 ### Bloque D — Perfil propio
 
@@ -65,14 +65,14 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 3 PARCIAL · 9 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E frontend**: 1 CUBIERTO · 2 PARCIAL · 9 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
-- **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Ningún escenario está completo en ambas capas.
 
-**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, y `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto son 31 tests (`pnpm test:e2e`); los dos specs de rate-limit quedan fuera a propósito y corren con `pnpm test:e2e:rate-limit`.
+**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, y `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto son 31 tests (`pnpm test:e2e`); los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. Las dos corridas pasaron el 2026-08-07 contra backend real.
 
 **La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 5/min**, amortizados con `storageState`. Ese margen de uno es la restricción a respetar al escribir el próximo escenario.
 
@@ -266,7 +266,7 @@ Aplicadas vía `[EnableRateLimiting("LoginPolicy")]` (`AuthController.cs:27`) y 
 
 ### H-13 — `POST /v1/auth/refresh` y `POST /v1/auth/revoke` existen y no tienen rate limit
 
-`AuthController.cs:44` (`refresh`) y `:57` (`revoke`) no llevan `[EnableRateLimiting]`, a diferencia de `login` y `register`. Sumado a que `refresh` no tiene ningún test E2E (ver [AUTH-INV-01](AUTH-INV-01.md)), es superficie sin cobertura ni límite.
+`AuthController.cs:44` (`refresh`) y `:57` (`revoke`) no llevan `[EnableRateLimiting]`, a diferencia de `login` y `register`. El `refresh` ya tiene cobertura E2E desde entonces (`Auth/AuthRefreshTokenLifetimeTests.cs:86`, `Refresh_returns_new_refresh_token_expiring_in_35_days`, que golpea `POST /api/v1/auth/refresh`), así que lo que queda abierto no es la cobertura sino el **límite**: los dos endpoints siguen sin `[EnableRateLimiting]`.
 
 ---
 

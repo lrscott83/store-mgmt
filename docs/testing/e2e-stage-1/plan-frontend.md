@@ -14,7 +14,7 @@ Cada ítem declara si toca un test existente. Ninguno se ejecuta sin autorizaci�
 
 | # | Ítem | Severidad | ¿Bloquea hoy? | ¿Toca un E2E existente? |
 |---|---|---|---|---|
-| [F-1](#f-1) | El catálogo dice que el rate limit nunca corrió, y sí corrió | Baja | No — el dato está desactualizado | No — solo corre y documenta |
+| [F-1](#f-1) | Falta capturar la salida de la corrida de rate-limit | Baja | No — el catálogo ya está corregido | No — solo corre y guarda la evidencia |
 | [F-2](#f-2) | Falta la aserción del destino post-registro (S1-01) | Media | No — brecha declarada | **Sí** — encadena sobre `register.spec.ts` |
 | [F-3](#f-3) | La guarda de pathname de `logout()` no es verificable en navegador | Media | No — brecha G2, cubierta en vitest | No — pide un test nuevo |
 | [F-4](#f-4) | T8 es un flake latente, sin causa raíz | **Alta** | No — verde hoy | **Sí** — el arreglo vive dentro de T8 |
@@ -24,13 +24,15 @@ Cada ítem declara si toca un test existente. Ninguno se ejecuta sin autorizaci�
 
 ## F-1
 
-### El catálogo dice que el rate limit nunca corrió, y sí corrió
+### La corrida de rate-limit no dejó evidencia guardada
 
 `login-rate-limit.spec.ts` y `register-rate-limit.spec.ts` están fuera de la corrida por defecto (`test:e2e` usa `--grep-invert @rate-limit`) porque gastan decenas de intentos. El catálogo los daba por **no ejecutados**, y el backend por **inalcanzable bajo `Testing`** (H-12).
 
 **Eso ya no es cierto.** El usuario los corrió el 2026-08-07 y **los dos pasaron**. Y pasar no es ambiguo acá: si el bucle agota sus intentos sin ver un 429, el test **lanza un error explícito** (`login-rate-limit.spec.ts:68-72`, `register-rate-limit.spec.ts:70-74`). Verde ⇒ el 429 ocurrió ⇒ el banner de "demasiados intentos" se mostró.
 
-**Qué falta.** La salida de consola de esa corrida no quedó registrada, así que la evidencia es el reporte verbal y no un artefacto. Correr `pnpm test:e2e:rate-limit`, guardar la salida, y actualizar las filas de [S1-01](S1-01.md) y [S1-02](S1-02.md) en el [README](README.md) — hoy dicen "**NUNCA ejecutado**" y "el rate limit es inalcanzable bajo `Testing` (H-12)".
+**Qué se corrigió ya.** Las filas de [S1-01](S1-01.md) y [S1-02](S1-02.md) en el [README](README.md) y la sección de cobertura de `S1-02.md`: S1-02 pasa a **CUBIERTO** en frontend, y **H-12 queda refutada** — el límite sí es alcanzable bajo `Testing`.
+
+**Qué falta.** La salida de consola de esa corrida no quedó registrada, así que la evidencia es el reporte verbal y no un artefacto. Correr `pnpm test:e2e:rate-limit` y guardar la salida, para que el dato del catálogo pueda señalar su prueba.
 
 **Alcance.** No toca ningún test. Es correr y documentar.
 
