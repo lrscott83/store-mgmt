@@ -344,33 +344,6 @@ describe('OwnerCreatePage — password mismatch validation', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-OWNERS-CREATE-6 — phone format validation
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('OwnerCreatePage — phone format validation', () => {
-  it('shows OWNER.PHONE_FORMAT when phone is invalid', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
-    await renderPage(false);
-
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), { target: { value: 'Jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), { target: { value: 'jane' } });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), { target: { value: 'Password1' } });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), { target: { value: 'Password1' } });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), { target: { value: '12345' } });
-
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
-
-    await waitFor(() => {
-      expect(screen.getByText(esMessages['OWNER.PHONE_FORMAT'])).toBeInTheDocument();
-    });
-
-    expect(ownerHttpService.createOwner).not.toHaveBeenCalled();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-CREATE-7 — valid submit → createOwner + navigate /management/stores/create
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -718,5 +691,30 @@ describe('OwnerCreatePage — submit renders as fab (create-owner.component.html
     const submit = screen.getByRole('button', { name: esMessages['GENERAL.ADD'] });
     const path = submit.querySelector('svg path')?.getAttribute('d');
     expect(path).toBe('M12 4.5v15m7.5-7.5h-15');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC7 — create maps the 400 phone-required rejection to dedicated copy
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — FE-OC7: phone-required 400 rejection', () => {
+  it('shows OWNER.PHONE_REQUIRED when createOwner rejects with 400 and code "Cellphone"', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      response: { status: 400, data: { errors: [{ code: 'Cellphone' }] } },
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

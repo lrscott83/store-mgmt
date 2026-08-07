@@ -5,6 +5,7 @@ import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
 import { ownerErrorMessageId } from '~/admin/owners/lib/owner-error-message';
+import { API_ERROR_CODE_CELL_PHONE } from '~/shared/lib/http/api-error-message';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
@@ -22,9 +23,6 @@ import { confirmDialog } from '~/shared/lib/blocking-alert';
 import type { Owner, ReSeller, Store } from '@store-mgmt/domain';
 
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
-
-// ADR-4: Cuban +53 mobile format (from reseller-create.tsx:14)
-const PHONE_REGEX = /^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/;
 
 // D-3: one hoisted map shared by BOTH arms of the load effect — the resolved
 // succeeded:false envelope (actionCode) and the rejected .catch (response.status)
@@ -197,11 +195,6 @@ export function OwnerEditPage() {
     setValidationError('');
     setServerError('');
 
-    if (!PHONE_REGEX.test(cellPhone)) {
-      setValidationError(intl.formatMessage({ id: 'OWNER.PHONE_FORMAT' }));
-      return;
-    }
-
     if (!id) return;
 
     setIsSubmitting(true);
@@ -238,10 +231,14 @@ export function OwnerEditPage() {
     } catch (error) {
       setServerError(
         intl.formatMessage({
-          id: ownerErrorMessageId(error, {
-            404: 'OWNER.NOT_FOUND',
-            403: 'OWNER.FORBIDDEN',
-          }),
+          id: ownerErrorMessageId(
+            error,
+            {
+              404: 'OWNER.NOT_FOUND',
+              403: 'OWNER.FORBIDDEN',
+            },
+            { [API_ERROR_CODE_CELL_PHONE]: 'OWNER.PHONE_REQUIRED' }
+          ),
         })
       );
     } finally {

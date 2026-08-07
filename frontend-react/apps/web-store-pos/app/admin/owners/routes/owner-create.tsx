@@ -5,6 +5,7 @@ import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
 import { ownerErrorMessageId } from '~/admin/owners/lib/owner-error-message';
+import { API_ERROR_CODE_CELL_PHONE } from '~/shared/lib/http/api-error-message';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
@@ -16,9 +17,6 @@ export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
 
 // ADR-3: EXACT copy from management/users/components/UserCreateForm.tsx:4
 const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;
-
-// ADR-4: Cuban +53 mobile format (from reseller-create.tsx:14)
-const PHONE_REGEX = /^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/;
 
 export function OwnerCreatePage() {
   const navigate = useNavigate();
@@ -76,12 +74,6 @@ export function OwnerCreatePage() {
       return;
     }
 
-    // ADR-4: phone validation
-    if (!PHONE_REGEX.test(cellPhone)) {
-      setValidationError(intl.formatMessage({ id: 'OWNER.PHONE_FORMAT' }));
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const res = await ownerHttpService.createOwner({
@@ -103,10 +95,14 @@ export function OwnerCreatePage() {
     } catch (error) {
       setServerError(
         intl.formatMessage({
-          id: ownerErrorMessageId(error, {
-            409: 'OWNER.DUPLICATE_LOGIN',
-            403: 'OWNER.FORBIDDEN',
-          }),
+          id: ownerErrorMessageId(
+            error,
+            {
+              409: 'OWNER.DUPLICATE_LOGIN',
+              403: 'OWNER.FORBIDDEN',
+            },
+            { [API_ERROR_CODE_CELL_PHONE]: 'OWNER.PHONE_REQUIRED' }
+          ),
         })
       );
     } finally {

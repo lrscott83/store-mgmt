@@ -769,6 +769,7 @@ const messages: Record<string, string> = {
   'OWNER.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'OWNER.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'OWNER.PHONE_FORMAT': 'El teléfono debe tener formato cubano (+53 X XXX-XXXX).',
+  'OWNER.PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'OWNER.EDIT_TITLE_LABEL': 'Editar propietario',
   'OWNER.USERS_TAB_PLACEHOLDER': 'Gestión de usuarios próximamente.',
 

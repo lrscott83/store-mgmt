@@ -468,34 +468,6 @@ describe('OwnerEditPage — guest carried silently', () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-OWNERS-EDIT-DETAILS-7 — bad phone blocks PUT
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('OwnerEditPage — phone validation', () => {
-  it('shows OWNER.PHONE_FORMAT and does NOT call updateOwner when phone is invalid', async () => {
-    const { ownerHttpService } = await import(
-      '~/admin/owners/lib/services/owner-http-service'
-    );
-    await renderPage(false);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE'])).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
-      target: { value: 'bad-phone' },
-    });
-
-    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
-
-    await waitFor(() => {
-      expect(screen.getByText(esMessages['OWNER.PHONE_FORMAT'])).toBeInTheDocument();
-    });
-
-    expect(ownerHttpService.updateOwner).not.toHaveBeenCalled();
-  });
-});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-OWNERS-EDIT-DETAILS-8 — PUT success stays on page
@@ -656,6 +628,14 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+    });
+  });
+
+  it('shows OWNER.PHONE_REQUIRED when updateOwner rejects with 400 and code "CellPhone"', async () => {
+    await submitWithRejection({ response: { status: 400, data: { errors: [{ code: 'CellPhone' }] } } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
     });
   });
 });
