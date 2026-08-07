@@ -638,6 +638,18 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
       expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
     });
   });
+
+  // FE-OC7 #4 — update finds the phone code regardless of position in the errors
+  // array (FullName at errors[0] must not fool the classifier)
+  it('shows OWNER.PHONE_REQUIRED when updateOwner rejects with 400 and FullName occupies errors[0]', async () => {
+    await submitWithRejection({
+      response: { status: 400, data: { errors: [{ code: 'FullName' }, { code: 'CellPhone' }] } },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

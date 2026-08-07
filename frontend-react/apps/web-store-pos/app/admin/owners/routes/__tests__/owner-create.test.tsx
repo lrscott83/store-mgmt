@@ -718,3 +718,29 @@ describe('OwnerCreatePage — FE-OC7: phone-required 400 rejection', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC7 #4 — create finds the phone code regardless of position in the errors
+// array (FullName at errors[0] must not fool the classifier)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OwnerCreatePage — FE-OC7: array-scan finds phone code past errors[0]', () => {
+  it('shows OWNER.PHONE_REQUIRED when createOwner rejects with 400 and FullName occupies errors[0]', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
+      response: { status: 400, data: { errors: [{ code: 'FullName' }, { code: 'Cellphone' }] } },
+    });
+
+    await renderPage(false);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.PHONE_REQUIRED']);
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
