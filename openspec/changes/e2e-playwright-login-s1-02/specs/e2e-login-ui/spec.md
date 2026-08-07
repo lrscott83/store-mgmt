@@ -48,14 +48,17 @@ Un login exitoso MUST emitir exactamente dos peticiones, en este orden: `POST /v
 - WHEN se envía el formulario
 - THEN se observa `POST /v1/auth/login` seguido de `GET /v1/auth/me`, en ese orden, sin peticiones adicionales de autenticación
 
-### Requirement: REQ-3 — Credenciales inválidas: 200 con succeeded:false y texto literal (A3)
-Con credenciales inválidas el backend MUST responder HTTP 200 con `succeeded:false`, y la UI MUST mostrar `AUTH.INVALID_ERROR` interpolando literalmente `errors[0].description`. (`auth-store.ts:207-217`, `login.tsx:158-168`, `S1-02.md:33`)
+### Requirement: REQ-3 — Credenciales inválidas: 401 con envelope y texto literal (A3)
+Con credenciales inválidas el backend MUST responder HTTP 401 llevando el envelope habitual (`LoginCommand.MapErrorToStatusCode` mapea `Auth.InvalidCredentials` a `Unauthorized`), y la UI MUST mostrar `AUTH.INVALID_ERROR` interpolando literalmente `errors[0].description`. (`auth-store.ts`, `login.tsx:158-168`, `S1-02.md:33`)
 
 #### Scenario: El texto de error es el literal del backend
 - GIVEN credenciales incorrectas para una cuenta existente
 - WHEN se envía el formulario
-- THEN la respuesta HTTP es 200 con `succeeded:false`
-- AND la UI muestra el texto exacto de `errors[0].description` dentro de `AUTH.INVALID_ERROR`
+- THEN la respuesta HTTP es 401 y su cuerpo trae `errors[0].description`
+- AND la UI muestra ese texto exacto dentro de `AUTH.INVALID_ERROR`
+- AND la UI MUST NOT mostrar el mensaje estático `AUTH.INVALID_CREDENTIALS`
+
+> **Corregido tras la primera corrida real.** Este requisito decía "HTTP 200 con `succeeded:false`", premisa heredada de `S1-02.md:33` y del comentario de `auth-store.ts`, y contradicha por la aserción de dato del propio catálogo (*"Contraseña incorrecta → 401"*), ya cubierta y en verde por `AuthLoginFailureTests.cs:31`. El 401 esquivaba la rama `loginRejectionDescription`, así que la UI mostraba un mensaje estático donde Angular mostraba el del servidor. Se corrigió el código para restaurar la paridad; la intención del requisito —**texto literal del backend**— no cambió.
 
 ### Requirement: REQ-4 — Campos vacíos bloquean sin red (A4)
 Con campos vacíos, la validación MUST ser local y MUST NOT emitir ninguna petición. (`login.tsx:78-98`, `S1-02.md:34`)

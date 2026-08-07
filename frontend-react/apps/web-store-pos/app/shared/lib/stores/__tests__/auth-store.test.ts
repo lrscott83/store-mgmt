@@ -151,6 +151,86 @@ describe('useAuthStore', () => {
 
       vi.doUnmock('~/shared/lib/http/api-client');
     });
+
+    // The path the backend actually takes for a wrong password:
+    // LoginCommand.MapErrorToStatusCode maps Auth.InvalidCredentials to 401, so
+    // the envelope arrives as an axios rejection instead of a resolved body. The
+    // description must still reach login.tsx, or the user sees a static message
+    // where Angular showed the server's own text.
+    it('throws an error tagged with errors[0].description when the envelope arrives as a 401', async () => {
+      vi.resetModules();
+      const mockPost = vi.fn().mockRejectedValue({
+        response: {
+          status: 401,
+          data: {
+            data: null,
+            succeeded: false,
+            message: '',
+            actionCode: 401,
+            errors: [{ code: 'Auth.InvalidCredentials', description: 'usuario o contraseña incorrecta' }],
+          },
+        },
+      });
+      vi.doMock('~/shared/lib/http/api-client', () => ({
+        apiClient: {
+          post: mockPost,
+          get: vi.fn(),
+          interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+        },
+      }));
+
+      const { useAuthStore: freshStore } = await import('../auth-store');
+
+      await expect(
+        freshStore.getState().login('a@b.com', 'password123')
+      ).rejects.toMatchObject({
+        loginRejectionDescription: 'usuario o contraseña incorrecta',
+      });
+
+      vi.doUnmock('~/shared/lib/http/api-client');
+    });
+
+    // The narrowing is load-bearing: 403 and 429 carry an envelope too, but
+    // their messages are UI copy the app owns (ACCOUNT_INACTIVE,
+    // TOO_MANY_ATTEMPTS). Tagging them would replace that copy with server text.
+    it('does NOT tag a 403 rejection, leaving login.tsx its own ACCOUNT_INACTIVE copy', async () => {
+      vi.resetModules();
+      const mockPost = vi.fn().mockRejectedValue({
+        response: {
+          status: 403,
+          data: {
+            data: null,
+            succeeded: false,
+            message: '',
+            actionCode: 403,
+            errors: [{ code: 'Store.Inactive', description: 'la tienda no está activa' }],
+          },
+        },
+      });
+      vi.doMock('~/shared/lib/http/api-client', () => ({
+        apiClient: {
+          post: mockPost,
+          get: vi.fn(),
+          interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+        },
+      }));
+
+      const { useAuthStore: freshStore } = await import('../auth-store');
+
+      const rejection = await freshStore
+        .getState()
+        .login('a@b.com', 'password123')
+        .then(
+          () => undefined,
+          (err: unknown) => err
+        );
+
+      expect((rejection as { loginRejectionDescription?: string }).loginRejectionDescription)
+        .toBeUndefined();
+      expect((rejection as { response?: { status?: number } }).response?.status).toBe(403);
+
+      vi.doUnmock('~/shared/lib/http/api-client');
+    });
   });
 
   describe('logout', () => {

@@ -173,9 +173,10 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await loginPage.submit();
 
     const response = await loginNetwork.waitForLoginResponse();
-    // A genuine failure here: any status other than 200 — a bad password is
-    // a BODY-level rejection (auth-store.ts:207-217), not an HTTP error.
-    expect(response.status).toBe(200);
+    // 401, not 200: LoginCommand.MapErrorToStatusCode maps Auth.InvalidCredentials
+    // to Unauthorized. The envelope is the same either way, so the assertion that
+    // matters is the one below — the painted text is the server's own.
+    expect(response.status).toBe(401);
 
     const body = JSON.parse(response.bodyText) as { errors: Array<{ description: string }> };
     const banner = page.getByText(

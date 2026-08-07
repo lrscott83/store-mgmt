@@ -44,6 +44,30 @@ function isSessionRejection(err: unknown): boolean {
   return status === 401 || status === 404;
 }
 
+/**
+ * The server's own words for a rejected login, or undefined if this error is
+ * not that.
+ *
+ * A wrong password comes back as HTTP 401 carrying the ordinary response
+ * envelope — `LoginCommand.MapErrorToStatusCode` maps `Auth.InvalidCredentials`
+ * to Unauthorized, while the body keeps the same shape a `succeeded:false`
+ * response would have. Angular surfaces `errors[0].description` verbatim
+ * (auth.service.ts:60-70), and this is what lets `login()` do the same instead
+ * of falling through to a static message.
+ *
+ * Deliberately narrow. 403 and 429 also carry an envelope, but their messages
+ * are UI copy the app owns (ACCOUNT_INACTIVE, TOO_MANY_ATTEMPTS), not server
+ * text to be repeated.
+ */
+function invalidCredentialsDescription(err: unknown): string | undefined {
+  const response = (err as { response?: { status?: number; data?: unknown } } | null)?.response;
+  if (response?.status !== 401) return undefined;
+
+  const errors = (response.data as { errors?: Array<{ description?: string }> } | null)?.errors;
+  const description = errors?.[0]?.description;
+  return typeof description === 'string' && description.length > 0 ? description : undefined;
+}
+
 interface AuthState {
   user: UserModel | null;
   isAuthenticated: boolean;
@@ -194,10 +218,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const { authHttpService } = await import('../http/auth-http-service');
-      const response = await authHttpService.login({ login: email, password });
+      let response;
+      try {
+        response = await authHttpService.login({ login: email, password });
+      } catch (err: unknown) {
+        // The backend answers invalid credentials with HTTP 401, not with a
+        // 200 + `succeeded:false` body: LoginCommand.MapErrorToStatusCode maps
+        // Auth.InvalidCredentials to Unauthorized. The envelope is the same
+        // either way, so errors[0].description is there to be read.
+        //
+        // Without this, the axios rejection skipped the block below and landed
+        // on login.tsx's generic status branch, showing a static message where
+        // Angular showed the server's own text (auth.service.ts:60-70). Scoped
+        // to 401 on purpose: 403 keeps its ACCOUNT_INACTIVE message and 429 its
+        // TOO_MANY_ATTEMPTS one, which are UI copy, not server text.
+        const description = invalidCredentialsDescription(err);
+        if (description) {
+          const rejection = new Error(description) as Error & {
+            loginRejectionDescription?: string;
+          };
+          rejection.loginRejectionDescription = description;
+          throw rejection;
+        }
+        throw err;
+      }
 
-      // Mirror Angular auth.service.ts:60-70: the login endpoint always returns
-      // HTTP 200 (AuthController wraps every result in Ok()), so a failed login —
+      // Mirror Angular auth.service.ts:60-70: a login the handler rejects at the
+      // body level arrives as HTTP 200 with a `succeeded:false` envelope — so a failed login —
       // e.g. wrong credentials, where LoginCommandHandler returns
       // ResponseResult.Failure — arrives as a `succeeded:false` body carrying the
       // backend message in errors[0].description. Angular surfaces that exact text
