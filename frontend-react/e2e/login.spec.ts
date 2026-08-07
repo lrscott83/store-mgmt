@@ -391,10 +391,30 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     page,
     personaCache,
   }) => {
-    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    const session = await restoreSignedInSession(page, personaCache, 'owner-admin');
     // D4: no reload while offline — the document would never be served and
     // the assertion would run against the browser's own error page, not the
-    // app. A client-side <Link> navigation costs zero network requests.
+    // app. A client-side <Link> navigation costs zero network requests —
+    // but only once its route module is already in the module registry.
+    //
+    // The suite runs against the Vite dev server (playwright.config.ts:97) in
+    // SPA mode (react-router.config.ts:8, `ssr: false`) with the service
+    // worker blocked (playwright.config.ts:84), so every route module is an
+    // on-demand HTTP fetch on FIRST use. Cutting the network beforehand makes
+    // the navigation fail on a module that never arrives — an artifact of the
+    // dev server, not the invariant under test. So walk the route once while
+    // online, then come back through history: a popstate, NOT a document
+    // reload, which would throw the module registry away.
+    await page.getByRole('button', { name: 'Menú de usuario' }).click();
+    await page.getByRole('link', { name: 'Editar Perfil' }).click();
+    await page.waitForURL(/\/profile\/edit$/);
+    await page.goBack();
+    await page.waitForURL((url) => url.pathname === session.homePath);
+    // Precondition, asserted before the network is cut: the layout is mounted
+    // and the trigger exists. Without this, a timeout here cannot be told
+    // apart from the session dying, which is what the test actually claims.
+    await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
+
     await page.context().setOffline(true);
     await page.getByRole('button', { name: 'Menú de usuario' }).click();
     await page.getByRole('link', { name: 'Editar Perfil' }).click();
