@@ -707,7 +707,6 @@ const messages: Record<string, string> = {
   'USERS.DEACTIVATE': 'Desactivar',
   'USERS.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'USERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
-  'USERS.CELL_PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'USERS.ERROR': 'Ocurrió un error. Intente de nuevo.',
   'USERS.EDIT': 'Editar',
   'USERS.CREATE': 'Adicionar',
@@ -739,7 +738,6 @@ const messages: Record<string, string> = {
   'RESELLERS.DISCOUNT_PRICE': 'Descuento',
   'RESELLERS.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'RESELLERS.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
-  'RESELLERS.PHONE_FORMAT': 'El teléfono debe tener formato cubano (+53 X XXX-XXXX).',
   'RESELLERS.PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'RESELLERS.ERROR': 'Ocurrió un error. Intentá de nuevo.',
   // Angular's own literal key (edit-reseller.component.html:7 toolbar fab) —
@@ -769,7 +767,6 @@ const messages: Record<string, string> = {
   'OWNER.NOT_FOUND': 'El propietario no existe o fue eliminado.',
   'OWNER.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'OWNER.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
-  'OWNER.PHONE_FORMAT': 'El teléfono debe tener formato cubano (+53 X XXX-XXXX).',
   'OWNER.PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'OWNER.EDIT_TITLE_LABEL': 'Editar propietario',
   'OWNER.USERS_TAB_PLACEHOLDER': 'Gestión de usuarios próximamente.',
