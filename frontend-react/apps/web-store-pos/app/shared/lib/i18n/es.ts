@@ -64,7 +64,9 @@ const messages: Record<string, string> = {
   'AUTH.REGISTER': 'Crear cuenta',
   'AUTH.REGISTER_TITLE': 'Crear nueva cuenta',
   'AUTH.EMAIL': 'Email',
-  'AUTH.EMAIL_REQUIRED': 'El email es requerido',
+  // The sign-in credential is the LOGIN (a username), never the email — the
+  // two are different fields on a user. See docs/contracts/login-is-not-email.md.
+  'AUTH.LOGIN_REQUIRED': 'El usuario es requerido',
   'AUTH.PASSWORD': 'Contraseña',
   'AUTH.PASSWORD_REQUIRED': 'La contraseña es requerida',
   'AUTH.PASSWORD_CONFIRM': 'Confirmar contraseña',
@@ -77,7 +79,7 @@ const messages: Record<string, string> = {
   'AUTH.HAVE_ACCOUNT': '¿Ya tenés cuenta?',
   'AUTH.SIGNING_IN': 'Ingresando...',
   'AUTH.REGISTERING': 'Registrando...',
-  'AUTH.INVALID_CREDENTIALS': 'Email o contraseña inválidos',
+  'AUTH.INVALID_CREDENTIALS': 'Usuario o contraseña inválidos',
   'AUTH.ACCOUNT_INACTIVE': 'Tu cuenta está inactiva. Contactá soporte.',
   'AUTH.SERVER_ERROR': 'Algo salió mal. Intentá de nuevo.',
   'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Esperá un momento antes de volver a intentar.',

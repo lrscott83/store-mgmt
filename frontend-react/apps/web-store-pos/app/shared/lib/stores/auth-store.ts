@@ -77,7 +77,9 @@ interface AuthState {
   getUserByToken: () => Promise<UserModel | null>;
   setUser: (user: UserModel, token: string) => void;
   updateUser: (user: UserModel) => void;
-  login: (email: string, password: string) => Promise<UserModel>;
+  // First argument is the LOGIN — the username credential, not an email
+  // address. See docs/contracts/login-is-not-email.md.
+  login: (login: string, password: string) => Promise<UserModel>;
   loginOffline: (login: string, password: string) => Promise<UserModel>;
   logout: () => void;
 }
@@ -214,13 +216,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
-  login: async (email: string, password: string): Promise<UserModel> => {
+  login: async (login: string, password: string): Promise<UserModel> => {
     set({ isLoading: true, error: null });
     try {
       const { authHttpService } = await import('../http/auth-http-service');
       let response;
       try {
-        response = await authHttpService.login({ login: email, password });
+        response = await authHttpService.login({ login, password });
       } catch (err: unknown) {
         // The backend answers invalid credentials with HTTP 401, not with a
         // 200 + `succeeded:false` body: LoginCommand.MapErrorToStatusCode maps

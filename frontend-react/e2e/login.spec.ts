@@ -15,13 +15,13 @@ import {
 // apps/web-store-pos/app/shared/lib/i18n/es.ts (design.md §5, §7). Hardcoded
 // rather than imported: the browser is the black box under test, the app's
 // own source is not — same policy as register.spec.ts.
-const EMAIL_REQUIRED_TEXT = 'El email es requerido'; // es.ts:67
+const LOGIN_REQUIRED_TEXT = 'El usuario es requerido'; // es.ts:69
 const PASSWORD_REQUIRED_TEXT = 'La contraseña es requerida'; // es.ts:69
 const OFFLINE_LOGIN_TEXT = 'Estás offline. Se requiere conexión para iniciar sesión.'; // es.ts:85
 // The 401 branch's text (login.tsx:172). REQ-3's control negative must prove
 // the banner is NOT this — that would mean the body-level (200 +
 // succeeded:false) branch never ran.
-const INVALID_CREDENTIALS_TEXT = 'Email o contraseña inválidos'; // es.ts:80
+const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña inválidos'; // es.ts:82
 
 // Verified trap #3 (storage-keys.ts:5): AUTH_MODEL's key is
 // `${APP_VERSION}-authf496fc5a9f17`, version-prefixed. Never hardcode the
@@ -60,7 +60,7 @@ test.describe('login — client-side validation, no session (A4, A5)', () => {
     // Wait for the UI effect BEFORE asserting zero requests (same reasoning
     // as register.spec.ts REQ-2): login.tsx's validation branch (:94-98)
     // returns before ever calling `login()`.
-    await expect(page.getByText(EMAIL_REQUIRED_TEXT)).toBeVisible();
+    await expect(page.getByText(LOGIN_REQUIRED_TEXT)).toBeVisible();
     await expect(page.getByText(PASSWORD_REQUIRED_TEXT)).toBeVisible();
     loginNetwork.expectNoLoginAttempt();
   });
@@ -130,13 +130,13 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
       // REQ-1 (A1), sample 1 — anchored to the login request going out, not
       // a timeout (design.md §7 A1).
       await loginNetwork.waitForLoginRequest();
-      await expect(page.locator('#email')).toHaveCount(0);
+      await expect(page.locator('#login')).toHaveCount(0);
       await expect(loginPage.loadingOverlay).toBeVisible();
 
       // REQ-1 (A1), sample 2 — anchored to the /me request starting,
       // bracketing the second gap the assertion names.
       await loginNetwork.waitForMeRequest();
-      await expect(page.locator('#email')).toHaveCount(0);
+      await expect(page.locator('#login')).toHaveCount(0);
       await expect(loginPage.loadingOverlay).toBeVisible();
 
       await submitted;

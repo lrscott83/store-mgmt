@@ -9,7 +9,7 @@ import type { TestIdentity } from './identity';
  * production code.
  */
 export class LoginPage {
-  readonly email: Locator;
+  readonly login: Locator;
   readonly password: Locator;
   readonly togglePasswordVisibility: Locator;
   readonly submitButton: Locator;
@@ -23,7 +23,7 @@ export class LoginPage {
   readonly loadingOverlay: Locator;
 
   constructor(private readonly page: Page) {
-    this.email = page.locator('#email');
+    this.login = page.locator('#login');
     this.password = page.locator('#password');
     this.togglePasswordVisibility = page.getByRole('button', { name: 'Mostrar contraseña' });
     this.submitButton = page.getByRole('button', { name: 'Iniciar sesión' });
@@ -35,7 +35,7 @@ export class LoginPage {
   }
 
   async fill(identity: Pick<TestIdentity, 'login' | 'password'>): Promise<void> {
-    await this.email.fill(identity.login);
+    await this.login.fill(identity.login);
     await this.password.fill(identity.password);
   }
 

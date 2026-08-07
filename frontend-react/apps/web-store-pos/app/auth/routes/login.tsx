@@ -13,13 +13,17 @@ import { guestOnlyLoader } from './loaders';
 
 export const clientLoader = guestOnlyLoader;
 
+// `login` is the credential typed to sign in — a username, NOT an email
+// address. A user has both, and they are different fields: the login is
+// required, the email is optional and is never used to authenticate. See
+// `docs/contracts/login-is-not-email.md`.
 interface FormState {
-  email: string;
+  login: string;
   password: string;
 }
 
 interface FormErrors {
-  email?: string;
+  login?: string;
   password?: string;
   form?: string;
 }
@@ -64,7 +68,7 @@ export default function LoginPage() {
   // crash that suite.
   const { login, loginOffline, isLoading } = useAuthStore();
 
-  const [form, setForm] = useState<FormState>({ email: '', password: '' });
+  const [form, setForm] = useState<FormState>({ login: '', password: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isOffline, setIsOffline] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -77,8 +81,8 @@ export default function LoginPage() {
 
   function validate(): FormErrors {
     const errs: FormErrors = {};
-    if (!form.email.trim()) {
-      errs.email = intl.formatMessage({ id: 'AUTH.EMAIL_REQUIRED' });
+    if (!form.login.trim()) {
+      errs.login = intl.formatMessage({ id: 'AUTH.LOGIN_REQUIRED' });
     }
     if (!form.password) {
       errs.password = intl.formatMessage({ id: 'AUTH.PASSWORD_REQUIRED' });
@@ -106,7 +110,7 @@ export default function LoginPage() {
     if (isRosterProvisioned()) {
       setIsSubmitting(true);
       try {
-        const user = await loginOffline(form.email, form.password);
+        const user = await loginOffline(form.login, form.password);
         armTracking();
         preloadHeavyChunks();
         navigate(await resolveUserHomePath(user));
@@ -128,7 +132,7 @@ export default function LoginPage() {
 
     try {
       setIsSubmitting(true);
-      const user = await login(form.email, form.password);
+      const user = await login(form.login, form.password);
       // Arm the store-usage tracker on explicit login, mirroring Angular's
       // login.component.ts:169-170 (stopTracking() + startTracking()). This is
       // the ONLY place tracking arms — after a page reload it stays dormant,
@@ -212,21 +216,21 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="mb-4">
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-1">
             {intl.formatMessage({ id: 'GENERAL.LOGIN' })}
           </label>
           <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={form.email}
-            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            id="login"
+            type="text"
+            autoComplete="username"
+            value={form.login}
+            onChange={(e) => setForm((f) => ({ ...f, login: e.target.value }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            aria-describedby={errors.email ? 'email-error' : undefined}
+            aria-describedby={errors.login ? 'login-error' : undefined}
           />
-          {errors.email && (
-            <p id="email-error" className="mt-1 text-xs text-red-600">
-              {errors.email}
+          {errors.login && (
+            <p id="login-error" className="mt-1 text-xs text-red-600">
+              {errors.login}
             </p>
           )}
         </div>

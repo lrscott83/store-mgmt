@@ -146,7 +146,7 @@ describe('LoginPage — offline mode fork (offline-auth-mode: "Mode switch, not 
       await submit();
 
       await waitFor(() => {
-        expect(screen.getByText('Email o contraseña inválidos')).toBeInTheDocument();
+        expect(screen.getByText('Usuario o contraseña inválidos')).toBeInTheDocument();
       });
       expect(loginFn).not.toHaveBeenCalled();
     });

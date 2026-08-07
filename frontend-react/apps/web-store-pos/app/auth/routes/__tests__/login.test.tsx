@@ -76,9 +76,9 @@ describe('LoginPage (AUTH-01)', () => {
     vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
   });
 
-  it('renders login form with email and password fields', () => {
+  it('renders login form with login and password fields', () => {
     renderLogin();
-    // GENERAL.LOGIN = "Usuario" (view-text-parity: forced literal parity, not AUTH.EMAIL)
+    // GENERAL.LOGIN = "Usuario" — the credential is the login, never the email
     expect(screen.getByLabelText('Usuario')).toBeInTheDocument();
     // "Contraseña" is the Spanish label for password
     expect(screen.getByLabelText('Contraseña')).toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('LoginPage (AUTH-01)', () => {
     renderLogin();
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
     await waitFor(() => {
-      // AUTH.EMAIL_REQUIRED = "El email es requerido"
+      // AUTH.LOGIN_REQUIRED = "El usuario es requerido"
       // AUTH.PASSWORD_REQUIRED = "La contraseña es requerida"
       const errors = screen.getAllByText(/requerido|requerida/i);
       expect(errors.length).toBeGreaterThan(0);
@@ -164,10 +164,10 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
 
     await waitFor(() => {
-      // AUTH.INVALID_CREDENTIALS = "Email o contraseña inválidos". Assert the
+      // AUTH.INVALID_CREDENTIALS = "Usuario o contraseña inválidos". Assert the
       // exact error text — a loose /contraseña/i regex also matches the
       // "Contraseña" password label, which is ambiguous (multiple elements).
-      expect(screen.getByText('Email o contraseña inválidos')).toBeInTheDocument();
+      expect(screen.getByText('Usuario o contraseña inválidos')).toBeInTheDocument();
     });
   });
 
@@ -387,10 +387,17 @@ describe('LoginPage — view-text-parity: identifier label forced literal parity
     expect(screen.queryByText('Email')).not.toBeInTheDocument();
   });
 
-  it('keeps input type="email" and autoComplete="email" unchanged', () => {
+  // Superseded on 2026-08-07 by an explicit product decision: a user has a
+  // login AND an email, and the sign-in credential is the login. The previous
+  // pin held `type="email"`/`autoComplete="email"` as literal Angular parity
+  // while the label already read "Usuario" — a contradiction that only failed
+  // to break sign-in because the form carries `noValidate` (login.tsx). This
+  // now pins the opposite, on purpose. See docs/contracts/login-is-not-email.md.
+  it('types the identifier input as a username, not an email address', () => {
     renderLogin();
     const input = screen.getByLabelText('Usuario');
-    expect(input).toHaveAttribute('type', 'email');
-    expect(input).toHaveAttribute('autoComplete', 'email');
+    expect(input).toHaveAttribute('type', 'text');
+    expect(input).toHaveAttribute('autoComplete', 'username');
+    expect(input).toHaveAttribute('id', 'login');
   });
 });
