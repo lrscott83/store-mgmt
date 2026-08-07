@@ -528,16 +528,18 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // react-router.config.ts:8) and same-document history updates raise the
     // event too. Pinning an absolute count pins a framework detail nobody
     // measured, instead of the behavior under test.
-    const countNavigations = async (): Promise<number> => {
+    // The URLs are collected, not just counted, so a failure names the extra
+    // navigation instead of only reporting that there was one.
+    const recordNavigations = async (): Promise<string[]> => {
       const seen: string[] = [];
       const record = (frame: Frame) => {
-        if (frame === page.mainFrame()) seen.push(frame.url());
+        if (frame === page.mainFrame()) seen.push(new URL(frame.url()).pathname);
       };
       page.on('framenavigated', record);
       await page.goto('/login');
       await page.waitForLoadState('networkidle');
       page.off('framenavigated', record);
-      return seen.length;
+      return seen;
     };
 
     // G2 (design.md D7, declared gap): logout()'s guard is
@@ -545,11 +547,14 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // cold boot, `authRedirect` is still `undefined` at module-evaluation
     // time — `root.tsx:89-91` wires it in a `useEffect`, which runs AFTER
     // `auth-store.ts:388`'s synchronous `initialize()` — so
-    // `authRedirect?.('/login')` is a no-op REGARDLESS of pathname. This
-    // assertion cannot discriminate the pathname guard itself; that
-    // coverage lives in `auth-store.test.ts:297-315` (a real spy). What IS
-    // observable here: zero additional navigations after this reload.
-    const withLogout = await countNavigations();
+    // `authRedirect?.('/login')` should be a no-op REGARDLESS of pathname.
+    // (That last step is reasoning from the source, NOT something this test
+    // has confirmed — an earlier run of this scenario did observe a second
+    // navigation, which is exactly what the comparison below exists to
+    // localize.) This assertion cannot discriminate the pathname guard
+    // itself; that coverage lives in `auth-store.test.ts:297-315` (a real
+    // spy). What IS observable here: zero additional navigations.
+    const withLogout = await recordNavigations();
 
     const authModel = await readRawAuthModel(page);
     expect(authModel).toBeNull();
@@ -560,9 +565,9 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // the difference between the two counts is logout()'s own contribution,
     // which REQ-8 claims is zero. A logout that DID navigate would still be
     // caught: it would show up in the first count and not in the second.
-    const withoutLogout = await countNavigations();
+    const withoutLogout = await recordNavigations();
 
-    expect(withLogout).toBe(withoutLogout);
+    expect(withLogout).toEqual(withoutLogout);
   });
 
   test('REQ-9: a 401 outside /me leaves the session intact (T9)', async ({ page, personaCache }) => {
