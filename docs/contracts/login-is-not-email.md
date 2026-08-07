@@ -76,11 +76,34 @@ authorization the rule in `CLAUDE.md` stands: ask first, every time.
   genuine email field.
 - Every backend validator's optional-email rule.
 
-## Still open
+## Still open — the phone rules
 
-`CellPhone` **is** required today — `RegisterCommandValidator.cs:32`,
-`CreateOwnerCommandValidator.cs:35`, `UpdateOwnerCommandValidator.cs:22`,
-`UpdateReSellerCommandValidator.cs:32`, plus `register.tsx` and `UserDetailsForm.tsx`.
-`CreateStoreUserCommandValidator` does **not** require it, while the form that feeds it
-does — front and back disagree on that path. Making the phone optional is a separate,
-pending change.
+Decided 2026-08-07, **not yet implemented**. The email side is done; the phone is the
+remaining work. The phone stops being a global requirement and becomes an **owner and
+reseller** requirement.
+
+| Path | Target rule | Today | Action |
+|---|---|---|---|
+| Create/edit **owner** (frontend) | no validation | `PHONE_REGEX` `/^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/` at `owner-create.tsx:80`, `owner-edit.tsx:200` | drop the regex |
+| Create/edit **reseller** (frontend) | no validation | same regex at `reseller-create.tsx:59`, `reseller-edit.tsx:106` | drop the regex |
+| **Edit user** | never validated | frontend requires it (`UserDetailsForm.tsx:46`); backend has no rule | drop the frontend check |
+| **Create store user** | never validated | neither `UserCreateForm.tsx` nor `CreateStoreUserCommandValidator` validates | already correct — verify only |
+| **Edit own profile** | required **only when the user is an owner or a reseller** | `edit-profile-form.tsx:42` requires it always | make it conditional on the role |
+
+The regex is the reason: it forces a Cuban `+53` number on every phone, which is not a rule
+this product wants to make.
+
+### Two decisions left open, on purpose
+
+1. **Registration was not mentioned.** It requires the phone in both layers today
+   (`register.tsx:71`, `RegisterCommandValidator.cs:32`), and registration creates an
+   OwnerAdmin — which "required for owners" would keep. Assume it stays required unless
+   stated otherwise.
+2. **The backend `NotEmpty` rules for owner and reseller stay** (`CreateOwner:35`,
+   `UpdateOwner:22`, `CreateReSeller:48`, `UpdateReSeller:32`). Once the frontend stops
+   validating, the user meets a server error instead of an inline one. That is consistent
+   with the target rule, but the backend message has to render properly in those forms
+   before the work counts as done.
+
+Before touching any of it: check whether an existing E2E test asserts these validations.
+The rule in `CLAUDE.md` applies — ask first.
