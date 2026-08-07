@@ -15,7 +15,7 @@ La hidratación se arma **restaurando un snapshot ya acuñado** y mutando `local
 
 **Elegido**: `restoreSignedInSession(page, personaCache, 'owner-admin')` (`session.ts:467`) → mutar `localStorage` → `page.reload()`.
 **Rechazado**: `context.addInitScript` (se re-ejecuta en cada navegación y pisaría la mutación bajo prueba); `storageState` propio (desincroniza `loginNetwork` de la página del test, `test.ts:68-74`).
-**Razón**: `applySnapshot` (`session.ts:135-143`) hace `goto('/login')` → escribir → `goto(homePath)`. El snapshot viene de un login real, así que `currentUser.authToken === AUTH_MODEL.authToken` (`auth-store.ts:195-197`) y el arranque toma la rama de caché válida (`:125`): **cero `GET /me`**. La restauración no contamina ningún conteo.
+**Razón**: `applySnapshot` (`session.ts:135-143`) hace `goto('/login')` → escribir → `goto(homePath)`. El snapshot viene de un login real, así que `currentUser.authToken === AUTH_MODEL.authToken` (`auth-store.ts:197-199`) y el arranque toma la rama de caché válida (`:127`): **cero `GET /me`**. La restauración no contamina ningún conteo.
 
 ### D2 — El conteo de `/me` es absoluto, sin `reset()`
 
@@ -55,10 +55,10 @@ La hidratación se arma **restaurando un snapshot ya acuñado** y mutando `local
 **Lo que dice el código**:
 
 1. `/` es `index('home/routes/landing-deep.tsx')` (`routes.ts:20`) — **sin loader**. `guestOnlyLoader` está cableado únicamente a `/login` (`login.tsx:14`) y `/register` (`register.tsx:10`). `landing-deep.tsx` no exporta `clientLoader`, y eso ya está pineado en unit (`landing-deep.test.tsx:85-88`). ⇒ **nada rebota** en la raíz.
-2. `initialize()` tiene **un solo** call-site de producción: `auth-store.ts:388`, en evaluación de módulo.
+2. `initialize()` tiene **un solo** call-site de producción: `auth-store.ts:390`, en evaluación de módulo.
 3. `registerAuthRedirect(navigate)` corre en un `useEffect` (`root.tsx:89-91`), es decir **después** del montaje.
 
-**Conclusión**: en arranque en frío, cuando `logout()` evalúa `pathname !== '/login' && pathname !== '/'` (`auth-store.ts:365`), `authRedirect` **todavía es `undefined`** y el `?.()` de `:367` es no-op **cualquiera sea el pathname**. Un T8 de arranque en frío pasaría igual con la guarda borrada: **no muerde**.
+**Conclusión**: en arranque en frío, cuando `logout()` evalúa `pathname !== '/login' && pathname !== '/'` (`auth-store.ts:367`), `authRedirect` **todavía es `undefined`** y el `?.()` de `:368` es no-op **cualquiera sea el pathname**. Un T8 de arranque en frío pasaría igual con la guarda borrada: **no muerde**.
 
 **Decisión**: T8 se queda, pero afirma lo que sí es observable — `AUTH_MODEL` borrado, se sigue en `/` (o en `/login`), **cero navegaciones adicionales** contadas por `framenavigated` (R4) — y se documenta que **no** cubre la guarda de pathname. **Brecha declarada**: la cobertura discriminante de esa guarda vive en `vitest` (`auth-store.test.ts:297-315`, que registra un spy real). Exponer el store en `window` para forzarlo sería tocar producción — fuera de alcance.
 
@@ -105,7 +105,7 @@ export interface LoginNetworkObserver {
   /**
    * S1-04. Cuenta EXACTA de `GET .../v1/auth/me` observados en este test.
    * Absoluto, sin reset (D2): restaurar una persona cuesta 0 /me
-   * (session.ts:135-143 + auth-store.ts:125).
+   * (session.ts:135-143 + auth-store.ts:127).
    */
   expectMeRequestCount(expected: number): void;
 }
@@ -132,9 +132,28 @@ export interface LoginNetworkObserver {
 | # | Brecha | Causa |
 |---|---|---|
 | G1 | El **404 real** de `/me` no se verifica contra el backend | H-6: ninguna pantalla llama `activate(false)`. La rama de cliente **sí** queda cubierta por T4 (`auth-store.ts:44` evalúa 401 y 404 en la misma expresión) |
-| G2 | La guarda `pathname !== '/login' && pathname !== '/'` no queda pineada en navegador | D7: `authRedirect` es `undefined` en evaluación de módulo (`root.tsx:89-91` vs `auth-store.ts:388`) |
+| G2 | La guarda `pathname !== '/login' && pathname !== '/'` no queda pineada en navegador | D7: `authRedirect` es `undefined` en evaluación de módulo (`root.tsx:89-91` vs `auth-store.ts:390`) |
 
-## 7. Preguntas abiertas
+## 7. Preguntas abiertas — cerradas
 
-- [ ] **P1** (heredada): el título del `describe.serial` queda inexacto. Renombrarlo no está autorizado.
-- [ ] **P3** (heredada): ¿S1-04 queda **PARCIAL** o **CUBIERTO**? Se decide en WU-7 con los tests verdes.
+- [x] **P1** (heredada): el título del `describe.serial` queda inexacto. Renombrarlo no está autorizado. **CERRADA sin cambio** — la inexactitud queda declarada, no corregida.
+- [x] **P3** (heredada): ¿S1-04 queda **PARCIAL** o **CUBIERTO**? **CERRADA: PARCIAL**, con G1 y G2 nombradas en `docs/testing/e2e-stage-1/README.md`.
+
+## 8. Riesgo abierto al cierre — T8 es un flake latente
+
+G2 explica por qué T8 no puede discriminar la guarda de pathname. No explica lo que pasó
+después: T8 falló **tres corridas seguidas** reportando una navegación de más en el arranque
+con `logout()` (`["/login","/login"]` contra `["/login"]`), y en la cuarta pasó **sin que se
+arreglara su causa**.
+
+Leer el código no la explica. El redirect de `logout()` está guardado en `/login`
+(`auth-store.ts:367`), `guestOnlyLoader` devuelve `null` para un visitante no autenticado
+(`loaders.ts:42-58`), y las dos corridas —la que ejecuta `logout()` y la de control— dejan
+el store en el mismo `{user: null, isAuthenticated: false}`.
+
+El test quedó instrumentado para que el próximo rojo lo desambigüe: cuenta los requests de
+documento junto a las navegaciones. `documents: 1` con dos navegaciones significa que el
+router del cliente empujó la segunda; `documents: 2` significa que algo forzó una recarga
+dura. Causas distintas, arreglos distintos.
+
+**Esto no está resuelto. Está instrumentado.**

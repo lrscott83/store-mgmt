@@ -16,7 +16,7 @@ Llevar S1-04 de **PENDIENTE** a cubierto en la capa Playwright con **11 tests ad
 
 `docs/testing/e2e-stage-1/README.md:33` marca S1-04 como **PENDIENTE** en Playwright. La hidratación de sesión es CRÍTICA y hoy su única cobertura de navegador es **ninguna**: lo que existe es `vitest`/`jsdom` (`auth-store.test.ts`, `auth-store.session-rejected.test.ts`), y el plan de Etapa 1 es explícito en que eso **no cuenta** como E2E frontend (`README.md:24`).
 
-Encima hay un problema de segundo orden, más silencioso: el comportamiento *offline-first* de `getUserByToken()` está sostenido únicamente por **comentarios**. El propio código lo dice en `auth-store.ts:176-177`:
+Encima hay un problema de segundo orden, más silencioso: el comportamiento *offline-first* de `getUserByToken()` está sostenido únicamente por **comentarios**. El propio código lo dice en `auth-store.ts:178-179`:
 
 > *"clearing here breaks offline use, which is the whole product."*
 
@@ -73,7 +73,7 @@ Personas permitidas para los tests nuevos: `owner-admin` (la más barata), y si 
 
 | Fuera | Por qué |
 |---|---|
-| **Cambiar el comportamiento de producción** | El invariante **ya existe y funciona** (`auth-store.ts:187-188`, `api-client.ts:84-86`). Estos tests lo pinean; no lo crean. Cualquier hallazgo que pida tocar `auth-store.ts` o `api-client.ts` **para y pregunta** |
+| **Cambiar el comportamiento de producción** | El invariante **ya existe y funciona** (`auth-store.ts:189-190`, `api-client.ts:84-86`). Estos tests lo pinean; no lo crean. Cualquier hallazgo que pida tocar `auth-store.ts` o `api-client.ts` **para y pregunta** |
 | Tocar cualquier test existente, incluido el **título** del `describe.serial` | La autorización de la decisión #1 es **estrictamente aditiva**. Renombrar el título es tocar una línea existente y **no está autorizado** — ver pregunta abierta P1 |
 | El **404 real** de `GET /me` | Decisión #2. Depende del gap **H-6**: ninguna pantalla llama `activate(false)`, así que desactivar una cuenta desde la UI no es alcanzable |
 | Disparadores de logout #3 (rol), #5 (idle 1h) y #6 (post-cambio de contraseña) | Se **documentan** como parte de la lista cerrada, pero su cobertura E2E pertenece a S2-03/S3-03 (H-8), a un escenario de vida de sesión (H-4) y a S4-02 respectivamente |
@@ -99,7 +99,7 @@ Personas permitidas para los tests nuevos: `owner-admin` (la más barata), y si 
 | **T7** | `logout()` borra **solo** `AUTH_MODEL` | botón "Salir" real → `AUTH_MODEL` ausente, `token` y `currentUser` **presentes y obsoletos a propósito** | 0 |
 | **T8** | `logout()` **no** redirige en `/login` o `/` | escribir `AUTH_MODEL` vencido estando en `/login` → `goto('/login')` → `initialize()` dispara `logout()` con `pathname === '/login'` | 0 |
 
-**Por qué T4 es elegante y no un truco.** Una sola mutación produce las dos condiciones que el test necesita: al corromper `AUTH_MODEL.authToken`, el `cachedProfile.authToken` deja de coincidir (`auth-store.ts:125`) — así que se entra a la rama *best-effort* — y el token que viaja en el header es inválido, así que el backend **real** contesta 401. Cero mocks, decisión #2 respetada al pie.
+**Por qué T4 es elegante y no un truco.** Una sola mutación produce las dos condiciones que el test necesita: al corromper `AUTH_MODEL.authToken`, el `cachedProfile.authToken` deja de coincidir (`auth-store.ts:127`) — así que se entra a la rama *best-effort* — y el token que viaja en el header es inválido, así que el backend **real** contesta 401. Cero mocks, decisión #2 respetada al pie.
 
 **La brecha del 404, redactada con precisión** (refinamiento de la decisión #2). `isSessionRejection` evalúa `status === 401 || status === 404` en **la misma expresión** (`auth-store.ts:44`). Por lo tanto T4 ejercita **exactamente la rama de cliente** que un 404 recorrería. La brecha declarada **no** es "la reacción del cliente al 404 está sin cubrir" — es únicamente: *no está verificado en Playwright que el backend devuelva 404 para una cuenta desactivada*. Eso depende de **H-6**.
 
@@ -120,7 +120,7 @@ Personas permitidas para los tests nuevos: `owner-admin` (la más barata), y si 
 
 **T9: por qué `/profile/edit` y no otra pantalla.** Es la única pantalla verificada que un OwnerAdmin auto-registrado alcanza **sin riesgo de H-8**: usa `featureLoader([EFeatures.Profile])` (`edit-profile.tsx:10`), y `featureLoader` tiene el bypass de OwnerAdmin **antes** de cualquier chequeo de `featureIds` (`loaders.ts:89-91`). Las pantallas de `/management/*` usan `adminFeatureLoader`, que **no** tiene ese bypass (`loaders.ts:107-112`) y **desloguea** al OwnerAdmin sin la feature — un falso positivo catastrófico justo para el test que afirma "acá nadie desloguea". El envío del formulario dispara `PUT /v1/users/{id}` (`profile-http-service.ts:21`), que es real, es de usuario y no es `/me`.
 
-**T11: la afirmación exacta, que no es la obvia.** `auth-store.ts:110-113` hace `return null` **sin** llamar `logout()` y **sin** borrar nada. En arranque en frío, el estado queda en su default `{ user: null, isAuthenticated: false }`, así que los guards **sí** rebotan a `/login`. Decir "la sesión sobrevive" sería **falso**. Lo observable, y lo único que este test debe afirmar, es que **`AUTH_MODEL` sigue presente y `logout()` no corrió** — que es exactamente la fila del inventario. Escribirlo de la otra forma sería un test que no distingue el comportamiento correcto del incorrecto.
+**T11: la afirmación exacta, que no es la obvia.** `auth-store.ts:112-115` hace `return null` **sin** llamar `logout()` y **sin** borrar nada. En arranque en frío, el estado queda en su default `{ user: null, isAuthenticated: false }`, así que los guards **sí** rebotan a `/login`. Decir "la sesión sobrevive" sería **falso**. Lo observable, y lo único que este test debe afirmar, es que **`AUTH_MODEL` sigue presente y `logout()` no corrió** — que es exactamente la fila del inventario. Escribirlo de la otra forma sería un test que no distingue el comportamiento correcto del incorrecto.
 
 ### Bloque C — el único artefacto de soporte que se escribe
 
@@ -160,8 +160,8 @@ Esto es lo que hay que escribir en los dos READMEs. Sale del inventario **verifi
 
 | # | Sitio | Disparador | ¿Pineado en este cambio? |
 |---|---|---|---|
-| 1 | `auth-store.ts:115-118` | Token vencido **localmente** (`expiresIn <= Date.now()`) | ✅ T6, T8 |
-| 2 | `auth-store.ts:183-184` | **Veredicto** del `/me` de arranque: `SessionRejectedError`, 401 o 404 (`isSessionRejection:39-45`) | ◐ T4 (401 real; 404 = brecha, H-6) |
+| 1 | `auth-store.ts:117-120` | Token vencido **localmente** (`expiresIn <= Date.now()`) | ✅ T6, T8 |
+| 2 | `auth-store.ts:185-186` | **Veredicto** del `/me` de arranque: `SessionRejectedError`, 401 o 404 (`isSessionRejection:39-45`) | ◐ T4 (401 real; 404 = brecha, H-6) |
 | 3 | `auth/routes/loaders.ts:17` | Fallo de autorización por rol (**H-8**) | ❌ fuera de alcance (S2-03/S3-03) |
 
 **La termina el usuario o la UI — solo acá:**
@@ -177,8 +177,8 @@ Esto es lo que hay que escribir en los dos READMEs. Sale del inventario **verifi
 | Caso | Sitio que lo garantiza | ¿Pineado? |
 |---|---|---|
 | **Cualquier** 401 del interceptor HTTP compartido (diverge de Angular a propósito) | `api-client.ts:84-86` | ✅ T9 |
-| Error de red, DNS, timeout de 30s o **5xx** durante el `/me` de arranque | `auth-store.ts:187-188` | ✅ T3, T5, T10 |
-| `AUTH_MODEL` malformado pero parseable | `auth-store.ts:110-113` | ✅ T11 |
+| Error de red, DNS, timeout de 30s o **5xx** durante el `/me` de arranque | `auth-store.ts:189-190` | ✅ T3, T5, T10 |
+| `AUTH_MODEL` malformado pero parseable | `auth-store.ts:112-115` | ✅ T11 |
 
 ### Bloque E — decisión #4: las citas de `S1-04.md`
 
@@ -186,7 +186,7 @@ Trabajo mecánico contra el mapa ya corregido de la exploración (sección 2). L
 
 | Fila | Cadena en `S1-04.md` | Real |
 |---|---|---|
-| — (**nueva, no estaba en el mapa**) | `:23` → `auth-store.ts:74-166` | **`:98-190`** — `getUserByToken` abre en `:98` y cierra en `:190`, verificado de primera mano |
+| — (**nueva, no estaba en el mapa**) | `:23` → `auth-store.ts:74-168` | **`:98-190`** — `getUserByToken` abre en `:98` y cierra en `:190`, verificado de primera mano |
 | 1 | `:27` → `:75-76` | `:99-100` |
 | 2 | `:28` → `:79-84` | `:103-108` |
 | 3 | `:29` → `:86-89` | `:110-113` |
@@ -254,15 +254,21 @@ Está activo, y hay que aplicarlo con honestidad en vez de mecánicamente:
 
 ---
 
-## 7. Preguntas abiertas
+## 7. Preguntas abiertas — LAS TRES CERRADAS
 
-Anotadas acá dentro a propósito. **Ninguna bloquea `sdd-spec` ni `sdd-design`.**
+Anotadas acá dentro a propósito. Ninguna bloqueó `sdd-spec` ni `sdd-design`. Resueltas al cierre del ciclo (2026-08-07); el enunciado original se conserva y la resolución va debajo.
 
 **P1 — El título del `describe.serial`.** Hoy dice `'login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)'`. Con los 11 tests de S1-04 adentro deja de ser cierto. Renombrarlo es tocar una línea existente y **la autorización de la decisión #1 no lo cubre**, así que se deja como está y la inexactitud queda declarada. Si el usuario quiere que se corrija, lo dice y se hace en su propio work unit.
 
+> **CERRADA — sin cambio.** El título queda como está. La inexactitud está declarada acá y en el spec, no corregida.
+
 **P2 — La mitad `/` de la aserción 8.** El escenario de `logout()` en `/login` está resuelto. El de `/` depende de qué hace `guestOnlyLoader` en la raíz antes de que `initialize()` alcance a correr. Lo resuelve `sdd-design` leyendo `routes.ts:20` y `loaders.ts`; si resulta inalcanzable, se declara como brecha en vez de forzarlo.
 
+> **CERRADA por `sdd-design` (D7) — brecha G2.** `/` es `index('home/routes/landing-deep.tsx')` sin loader, así que nada rebota en la raíz. Pero apareció algo que esta propuesta no había visto: `initialize()` corre en evaluación de módulo (`auth-store.ts:392`) y `registerAuthRedirect` en un `useEffect` (`root.tsx:89-91`), así que en arranque en frío el redirect es no-op **cualquiera sea el pathname**. La guarda no es discriminable desde Playwright; su cobertura vive en `auth-store.test.ts:297-315`.
+
 **P3 — Estado final de S1-04 en la tabla del plan.** Con la brecha del 404 abierta, ¿la fila queda **PARCIAL** o **CUBIERTO**? La convención de `README.md:19-22` dice PARCIAL cuando faltan aserciones declaradas. Propuesta: **PARCIAL**, con la brecha nombrada. Se decide en WU-7, con los tests ya verdes.
+
+> **CERRADA — PARCIAL**, con G1 y G2 nombradas. Aplicado en `docs/testing/e2e-stage-1/README.md`.
 
 ---
 
@@ -270,8 +276,8 @@ Anotadas acá dentro a propósito. **Ninguna bloquea `sdd-spec` ni `sdd-design`.
 
 | | |
 |---|---|
-| **Status** | `done` — propuesta lista |
-| **Next recommended** | `sdd-spec` y `sdd-design` (paralelizables) |
+| **Status** | `done` — propuesta lista; ciclo completo (spec, design, tasks, apply, verify) al 2026-08-07 |
+| **Next recommended** | `sdd-archive` — con el CRITICAL de la mordida asumido a conciencia (ver `tasks.md` → "Estado de la mordida") |
 | **Artifact store** | hybrid — este fichero + engram `sdd/e2e-playwright-session-hydration-s1-04/proposal` |
 | **Entrega** | commits-only, rama `feat/e2e-playwright-session-hydration-s1-04` desde `feat/e2e-playwright-login-s1-02`. **La rama no se creó en esta fase** |
 | **Skill resolution** | `paths-injected` — `cognitive-doc-design` cargada; `work-unit-commits` corresponde a `sdd-apply` |

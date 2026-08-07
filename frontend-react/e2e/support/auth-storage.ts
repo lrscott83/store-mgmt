@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 /**
  * S1-04 (design.md D6). Mutation helpers for the two localStorage keys the
- * cold-boot flow reads: `AUTH_MODEL` (`auth-store.ts:99`) and `token`
+ * cold-boot flow reads: `AUTH_MODEL` (`auth-store.ts:101`) and `token`
  * (`storage-keys.ts:4`, the ONLY key `api-client.ts:37` reads for the
  * `Authorization` header — a separate key from `AUTH_MODEL.authToken`,
  * confirmed by design D3).

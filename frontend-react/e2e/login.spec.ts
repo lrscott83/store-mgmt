@@ -16,8 +16,8 @@ import {
 // rather than imported: the browser is the black box under test, the app's
 // own source is not — same policy as register.spec.ts.
 const LOGIN_REQUIRED_TEXT = 'El usuario es requerido'; // es.ts:69
-const PASSWORD_REQUIRED_TEXT = 'La contraseña es requerida'; // es.ts:69
-const OFFLINE_LOGIN_TEXT = 'Estás offline. Se requiere conexión para iniciar sesión.'; // es.ts:85
+const PASSWORD_REQUIRED_TEXT = 'La contraseña es requerida'; // es.ts:71
+const OFFLINE_LOGIN_TEXT = 'Estás offline. Se requiere conexión para iniciar sesión.'; // es.ts:87
 // The 401 branch's text (login.tsx:172). REQ-3's control negative must prove
 // the banner is NOT this — that would mean the body-level (200 +
 // succeeded:false) branch never ran.
@@ -311,7 +311,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     // D1: restoreSignedInSession's own navigation already costs 0 /me
     // (currentUser.authToken === AUTH_MODEL.authToken from the real login) —
-    // this reload re-checks the SAME cache-valid branch (auth-store.ts:125).
+    // this reload re-checks the SAME cache-valid branch (auth-store.ts:127).
     await page.reload();
     await page.waitForURL(/\/sales\/products$/);
     loginNetwork.expectMeRequestCount(0);
@@ -324,7 +324,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
   }) => {
     await restoreSignedInSession(page, personaCache, 'owner-admin');
     // D3: mutating ONLY AUTH_MODEL.authToken desyncs it from
-    // currentUser.authToken (mismatch branch, auth-store.ts:140-149) while
+    // currentUser.authToken (mismatch branch, auth-store.ts:142-151) while
     // the `token` key — what api-client.ts:37 actually sends — stays the
     // real, valid bearer, so the real backend answers /me with 200.
     await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token-t2' });
@@ -436,7 +436,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // purpose: authLoader's denyAccess() (loaders.ts:16-19) ALSO calls
     // logout() when unauthenticated, which WOULD remove AUTH_MODEL — but
     // that is a DIFFERENT code path than the one REQ-11 pins
-    // (auth-store.ts:110-113, getUserByToken()'s own malformed-but-parseable
+    // (auth-store.ts:112-115, getUserByToken()'s own malformed-but-parseable
     // branch). Reloading from /login isolates the claim under test.
     await page.goto('/login');
 
@@ -507,7 +507,7 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
       token: window.localStorage.getItem('token'),
       currentUser: window.localStorage.getItem('currentUser'),
     }));
-    // Decision 1 (auth-store.ts:350-354): token/currentUser stay stale on
+    // Decision 1 (auth-store.ts:352-356): token/currentUser stay stale on
     // purpose (Angular parity), not a bug — logout() removes ONLY AUTH_MODEL.
     expect(after.token).toBe(before.token);
     expect(after.currentUser).toBe(before.currentUser);
@@ -555,10 +555,10 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     };
 
     // G2 (design.md D7, declared gap): logout()'s guard is
-    // `pathname !== '/login' && pathname !== '/'` (auth-store.ts:365). On a
+    // `pathname !== '/login' && pathname !== '/'` (auth-store.ts:367). On a
     // cold boot, `authRedirect` is still `undefined` at module-evaluation
     // time — `root.tsx:89-91` wires it in a `useEffect`, which runs AFTER
-    // `auth-store.ts:388`'s synchronous `initialize()` — so
+    // `auth-store.ts:390`'s synchronous `initialize()` — so
     // `authRedirect?.('/login')` should be a no-op REGARDLESS of pathname.
     // (That last step is reasoning from the source, NOT something this test
     // has confirmed — an earlier run of this scenario did observe a second

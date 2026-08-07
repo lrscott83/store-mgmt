@@ -35,7 +35,7 @@ Mismo backend real que `e2e-login-ui`/`e2e-session-fixture`; ningún requisito a
 ## Requirements
 
 ### Requirement: REQ-1 — Caché válida en reload evita todo tráfico a /me (T1)
-Con un `AUTH_MODEL` vigente cuyo `cachedProfile.authToken` coincide, un `page.reload()` MUST resultar en **cero** peticiones `GET /v1/auth/me`. (`auth-store.ts:125-137`)
+Con un `AUTH_MODEL` vigente cuyo `cachedProfile.authToken` coincide, un `page.reload()` MUST resultar en **cero** peticiones `GET /v1/auth/me`. (`auth-store.ts:127-139`)
 
 #### Scenario: Reload con caché válida no llama a /me
 - GIVEN una persona ya autenticada con caché de perfil válida
@@ -43,7 +43,7 @@ Con un `AUTH_MODEL` vigente cuyo `cachedProfile.authToken` coincide, un `page.re
 - THEN se observan cero peticiones `GET /v1/auth/me`
 
 ### Requirement: REQ-2 — Sin caché usable, exactamente un /me y sesión best-effort (T2)
-Cuando `cachedProfile.authToken` no coincide con `AUTH_MODEL.authToken`, un reload MUST emitir **exactamente una** petición `GET /v1/auth/me` y MUST mantener al usuario autenticado por la vía best-effort. (`auth-store.ts:140-149`)
+Cuando `cachedProfile.authToken` no coincide con `AUTH_MODEL.authToken`, un reload MUST emitir **exactamente una** petición `GET /v1/auth/me` y MUST mantener al usuario autenticado por la vía best-effort. (`auth-store.ts:142-151`)
 
 #### Scenario: Mismatch de caché dispara una sola llamada
 - GIVEN `AUTH_MODEL` vigente pero `currentUser.authToken` desincronizado
@@ -52,7 +52,7 @@ Cuando `cachedProfile.authToken` no coincide con `AUTH_MODEL.authToken`, un relo
 - AND el usuario permanece autenticado
 
 ### Requirement: REQ-3 — Servidor inalcanzable sin caché preserva la sesión (T3)
-Ante el mismatch de REQ-2 y `GET /v1/auth/me` inalcanzable, el arranque MUST retener el usuario hidratado sincrónicamente y MUST NOT redirigir a `/login`. (`auth-store.ts:171-188`)
+Ante el mismatch de REQ-2 y `GET /v1/auth/me` inalcanzable, el arranque MUST retener el usuario hidratado sincrónicamente y MUST NOT redirigir a `/login`. (`auth-store.ts:173-190`)
 
 #### Scenario: Sin red, la sesión best-effort sobrevive
 - GIVEN el mismatch de caché de REQ-2 y `/me` abortado por la red
@@ -60,7 +60,7 @@ Ante el mismatch de REQ-2 y `GET /v1/auth/me` inalcanzable, el arranque MUST ret
 - THEN `AUTH_MODEL` permanece intacto y el usuario sigue autenticado, sin rebote a `/login`
 
 ### Requirement: REQ-4 — 401 real de /me cierra sesión y redirige (T4)
-Un `AUTH_MODEL.authToken` inválido que el backend real rechaza con 401 MUST disparar `logout()` y MUST terminar en `/login`. (`isSessionRejection:39-45`, `auth-store.ts:183-185`)
+Un `AUTH_MODEL.authToken` inválido que el backend real rechaza con 401 MUST disparar `logout()` y MUST terminar en `/login`. (`isSessionRejection:39-45`, `auth-store.ts:185-187`)
 
 #### Scenario: Token inválido produce 401 real y logout
 - GIVEN `AUTH_MODEL.authToken` corrupto con un JWT inválido y `expiresIn` futuro
@@ -69,7 +69,7 @@ Un `AUTH_MODEL.authToken` inválido que el backend real rechaza con 401 MUST dis
 - AND la sesión termina y el navegador aterriza en `/login`
 
 ### Requirement: REQ-5 — 500 de /me no cierra sesión (T5)
-Una respuesta 500 a `GET /v1/auth/me` MUST NOT disparar `logout()`; el usuario MUST permanecer autenticado. (`auth-store.ts:187-188`)
+Una respuesta 500 a `GET /v1/auth/me` MUST NOT disparar `logout()`; el usuario MUST permanecer autenticado. (`auth-store.ts:189-190`)
 
 #### Scenario: Error de servidor no desloguea
 - GIVEN el mismatch de caché de REQ-2 y `/me` mockeado a responder 500
@@ -77,7 +77,7 @@ Una respuesta 500 a `GET /v1/auth/me` MUST NOT disparar `logout()`; el usuario M
 - THEN el usuario sigue autenticado y `AUTH_MODEL` permanece
 
 ### Requirement: REQ-6 — Límite de expiración inclusivo (T6)
-Con `expiresIn` congelado exactamente en `Date.now()`, la sesión MUST tratarse como expirada. (`auth-store.ts:115-120`)
+Con `expiresIn` congelado exactamente en `Date.now()`, la sesión MUST tratarse como expirada. (`auth-store.ts:117-122`)
 
 #### Scenario: Igualdad exacta cuenta como vencida
 - GIVEN `page.clock` congelado y `AUTH_MODEL.expiresIn` igual al instante congelado
@@ -85,7 +85,7 @@ Con `expiresIn` congelado exactamente en `Date.now()`, la sesión MUST tratarse 
 - THEN la sesión se trata como expirada y se dispara `logout()`
 
 ### Requirement: REQ-7 — logout() borra únicamente AUTH_MODEL (T7)
-Invocar `logout()` MUST remover solo la clave `AUTH_MODEL`; `token` y `currentUser` MUST permanecer presentes y obsoletos a propósito. (`auth-store.ts:350-354`)
+Invocar `logout()` MUST remover solo la clave `AUTH_MODEL`; `token` y `currentUser` MUST permanecer presentes y obsoletos a propósito. (`auth-store.ts:352-356`)
 
 #### Scenario: Solo AUTH_MODEL desaparece
 - GIVEN una sesión autenticada con las tres claves en `localStorage`
@@ -93,9 +93,9 @@ Invocar `logout()` MUST remover solo la clave `AUTH_MODEL`; `token` y `currentUs
 - THEN `AUTH_MODEL` está ausente y `token`/`currentUser` siguen presentes
 
 ### Requirement: REQ-8 — logout() no navega si ya está en /login (T8)
-Cuando `logout()` se dispara estando en `/login`, el sistema MUST NOT generar una navegación adicional. (`auth-store.ts:362-367`)
+Cuando `logout()` se dispara estando en `/login`, el sistema MUST NOT generar una navegación adicional. (`auth-store.ts:364-369`)
 
-> Heredado sin resolver de la propuesta (P2): si el mismo no-rebote aplica estando en `/` depende de `guestOnlyLoader`/`loaders.ts`, a confirmar en `sdd-design`; si resulta inalcanzable, se declara como brecha allí en vez de forzarlo acá.
+> **P2 RESUELTA por `sdd-design` (D7).** La mitad `/` es alcanzable: `/` es `index('home/routes/landing-deep.tsx')` (`routes.ts:20`), **sin loader**, y `guestOnlyLoader` vive solo en `/login` y `/register`. Pero la guarda de pathname **no es discriminable desde Playwright**: `initialize()` corre en evaluación de módulo (`auth-store.ts:392`) y `registerAuthRedirect(navigate)` en un `useEffect` (`root.tsx:89-91`), así que en arranque en frío `authRedirect?.()` es no-op cualquiera sea el pathname. Un test de arranque en frío pasaría igual con la guarda borrada. Queda como **brecha G2**, con la cobertura discriminante en `auth-store.test.ts:297-315` (un spy real). REQ-8 afirma solo lo observable.
 
 #### Scenario: Sesión vencida en /login no navega dos veces
 - GIVEN `AUTH_MODEL` vencido escrito estando en `/login`
@@ -111,7 +111,7 @@ Un 401 del interceptor HTTP compartido en una llamada que NO es `/v1/auth/me` MU
 - THEN la sesión permanece intacta y una ruta protegida sigue accesible
 
 ### Requirement: REQ-10 — Arranque sin red preserva la sesión (T10)
-Con el contexto de navegador offline al arrancar, la app MUST retener al usuario best-effort y MUST NOT redirigir a `/login`. (`auth-store.ts:187-188`)
+Con el contexto de navegador offline al arrancar, la app MUST retener al usuario best-effort y MUST NOT redirigir a `/login`. (`auth-store.ts:189-190`)
 
 #### Scenario: Sin conectividad, la sesión sobrevive al arranque
 - GIVEN una persona ya autenticada y el contexto puesto offline
@@ -119,7 +119,7 @@ Con el contexto de navegador offline al arrancar, la app MUST retener al usuario
 - THEN `AUTH_MODEL` permanece y no hay rebote a `/login`
 
 ### Requirement: REQ-11 — AUTH_MODEL malformado pero parseable no borra nada (T11)
-Un JSON parseable que no tiene la forma de `AUTH_MODEL` MUST NOT disparar `logout()` ni remover ninguna clave. (`auth-store.ts:110-113`)
+Un JSON parseable que no tiene la forma de `AUTH_MODEL` MUST NOT disparar `logout()` ni remover ninguna clave. (`auth-store.ts:112-115`)
 
 #### Scenario: Objeto ajeno parseable no limpia storage
 - GIVEN `AUTH_MODEL` reemplazado por `{"foo":1}`
@@ -150,13 +150,19 @@ Toda cadena de cita de línea en `docs/testing/e2e-stage-1/S1-04.md` MUST apunta
 - WHEN se revisa cada cadena de cita en `S1-04.md`
 - THEN cada una coincide con el rango real del fichero citado
 
-## Preguntas heredadas (no bloquean esta spec)
-- P1: título del `describe.serial` queda desactualizado a propósito (sin autorización para tocarlo).
-- P2: ver REQ-8.
-- P3: estado final de la fila S1-04 (PARCIAL/CUBIERTO) se decide en WU-7, con los tests verdes.
+## Preguntas heredadas — las tres cerradas
+- **P1 — CERRADA, sin cambio.** El título del `describe.serial` queda desactualizado a propósito: renombrarlo es tocar una línea existente y la autorización era solo aditiva. La inexactitud queda declarada, no corregida.
+- **P2 — CERRADA por `sdd-design` (D7).** Ver la nota bajo REQ-8: brecha **G2** declarada.
+- **P3 — CERRADA: PARCIAL.** Con G1 (el 404 real de `/me`, atado a H-6) y G2 abiertas y nombradas, la convención de `docs/testing/e2e-stage-1/README.md:19-22` manda PARCIAL. Aplicado en la tabla del plan.
+
+## Brechas declaradas
+- **G1** — la rama del 404 real de `GET /me` no se ejerce contra el backend: depende de H-6 (¿devuelve 404 para cuenta desactivada?). La rama de cliente SÍ queda cubierta por REQ-4, porque `isSessionRejection` (`auth-store.ts:39-45`) evalúa 401 y 404 en la misma expresión.
+- **G2** — la guarda de pathname de `logout()` no es discriminable en Playwright (ver REQ-8). Cubierta en vitest.
 
 ## Verification Criteria
-- [ ] REQ-1..REQ-11 corren dentro del `describe.serial` existente, apendeados al final, sin alterar tests previos
-- [ ] REQ-12 verificado: `login.spec.ts` y `login-rate-limit.spec.ts` verdes sin diff en su propio código
-- [ ] La corrida por defecto sigue gastando exactamente 4 logins reales (sin `personaCache.prime*()` nuevo)
-- [ ] REQ-13 y REQ-14 verificados por lectura de los ficheros de documentación tras WU-7/WU-8
+- [x] REQ-1..REQ-11 corren dentro del `describe.serial` existente, apendeados al final, sin alterar tests previos — `login.spec.ts` +263/-0 en el diff de este cambio
+- [x] REQ-12 verificado: `login.spec.ts` y `login-rate-limit.spec.ts` verdes sin diff en su propio código — corrida en vivo 2026-08-07, backend real, **31 passed**
+- [x] La corrida por defecto sigue gastando exactamente 4 logins reales (sin `personaCache.prime*()` nuevo)
+- [x] REQ-13 y REQ-14 verificados por lectura de los ficheros de documentación tras WU-7/WU-8
+
+**Lo que estos criterios NO cubren, y `sdd-verify` marcó CRITICAL:** las 6 verificaciones de mordida (invertir la aserción, ver el rojo, revertir) nunca se ejecutaron. T8 y T10 sí se vieron rojos por causas genuinas durante el desarrollo; T1-T7, T9 y T11 no. Detalle y razón del costo en `tasks.md` → "Estado de la mordida".
