@@ -96,6 +96,12 @@ namespace Infrastructure.Persistence.Repositories
                     .ThenInclude(o => o.User)
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                // Owner.Stores and UserRoles are both collections, and EF's default
+                // SingleQuery joins them into one cartesian result: every store row
+                // repeated once per role. Splitting keeps each collection in its own
+                // query and silences the MultipleCollectionIncludeWarning this
+                // combination raises on every login.
+                .AsSplitQuery()
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(cancellationToken);
         }
