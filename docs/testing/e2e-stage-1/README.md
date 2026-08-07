@@ -30,7 +30,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 | [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **PARCIAL** — REQ-1…REQ-9 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); falta el destino post-registro | **CUBIERTO** |
 | [S1-02](S1-02.md) | Login online | CRÍTICA | **PARCIAL** — REQ-1…REQ-7, REQ-9…REQ-16 implementados y verificados en vivo (`e2e/login.spec.ts`, 8 tests, backend real, 2026-08-07); REQ-8 (429) implementado y aislado (`e2e/login-rate-limit.spec.ts`) pero **NUNCA ejecutado** | **PARCIAL** — falta tienda inactiva → 403; el rate limit es inalcanzable bajo `Testing` (H-12) |
 | [S1-03](S1-03.md) | Login offline en dispositivo aprovisionado | CRÍTICA | **PENDIENTE** | **N/A** — cero HTTP; la contraparte de servidor es S3-01 |
-| [S1-04](S1-04.md) | Hidratación de sesión: la caché válida no llama al backend | CRÍTICA | **PARCIAL** — REQ-1…REQ-11 implementados (`e2e/login.spec.ts`, T1-T11, capability `e2e-session-hydration`); **corrida en vivo pendiente** (sdd-apply no tuvo backend disponible para ejecutar Playwright); la rama del 404 real de REQ-4 es brecha declarada (H-6) | **CUBIERTO** |
+| [S1-04](S1-04.md) | Hidratación de sesión: la caché válida no llama al backend | CRÍTICA | **PARCIAL** — REQ-1…REQ-11 implementados y verificados en vivo (`e2e/login.spec.ts`, T1-T11, capability `e2e-session-hydration`, backend real, 2026-08-07: 31 passed); la rama del 404 real de REQ-4 es brecha declarada (H-6, G1) y la guarda de pathname de REQ-8 no es discriminable en Playwright por timing de arranque (G2, cubierta en `auth-store.test.ts`) | **CUBIERTO** |
 
 ### Bloque B — Ciclo de vida de tienda y plan
 
