@@ -93,6 +93,23 @@ requirement and became an **owner and reseller** requirement.
 The regex was the reason: it forced a Cuban `+53` number on every phone, which is not a rule
 this product wants to make.
 
+### The display mask, removed too
+
+Decided 2026-08-07, implemented as a follow-up on `feat/phone-validation-owner-reseller`. The
+`PHONE_REGEX` removal above only stopped the field from *blocking* submit on a non-Cuban
+number — `cell-phone-mask.ts` (`formatCellPhone` + `toDigits`) still forced every phone typed
+into `UserCreateForm.tsx`, `UserDetailsForm.tsx`, and `edit-profile-form.tsx` into the
+`+53 0 000-0000` display shape, silently truncating anything past 8 digits. Same Cuban
+assumption as the regex, just moved from validation into rendering instead of being removed
+with it.
+
+The mask is gone from all three forms; the field is now plain free text — whatever the user
+types is what gets stored and submitted, unmodified. `cell-phone-mask.ts` had no remaining
+importers once the three forms stopped calling it, so the module (and its dedicated test file)
+was deleted rather than left dead. `auth/routes/register.tsx` already worked this way — it
+never imported the mask — so this brings the other three forms in line with a shape that was
+already live in production, instead of inventing a new one.
+
 ### The gating clause, and how it was met
 
 The backend `NotEmpty` rules stayed, so once the frontend stopped validating, the user meets

@@ -105,19 +105,19 @@ describe('UserCreateForm — PRES-9: valid submit fires onSubmit with correct pa
   });
 });
 
-describe('UserCreateForm — CELL-MASK: cell-phone applies the +53 mask (Req: Cell-Phone Mask and Field Copy Match Angular)', () => {
-  it('displays the formatted +53 X XXX-XXXX mask as digits are typed', async () => {
+describe('UserCreateForm — FREE-TEXT: cellPhone has no Cuban mask (the product must not assume Cuban phone numbers)', () => {
+  it('renders exactly what was typed, including a non-Cuban international number, unmodified', async () => {
     const { UserCreateForm } = await import('../UserCreateForm');
     render(
       <Wrapper>
         <UserCreateForm {...baseProps} />
       </Wrapper>
     );
-    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
-    expect(screen.getByDisplayValue('+53 5 123-4567')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
+    expect(screen.getByDisplayValue('+1 555 123 4567')).toBeInTheDocument();
   });
 
-  it('submits raw digits (not the formatted mask string) as cellPhone', async () => {
+  it('submits exactly what was typed as cellPhone (no digit-stripping, no formatting)', async () => {
     const { UserCreateForm } = await import('../UserCreateForm');
     const onSubmit = vi.fn();
     render(
@@ -125,14 +125,14 @@ describe('UserCreateForm — CELL-MASK: cell-phone applies the +53 mask (Req: Ce
         <UserCreateForm {...baseProps} onSubmit={onSubmit} />
       </Wrapper>
     );
-    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Mask User' } });
-    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'maskuser' } });
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Free Text User' } });
+    fireEvent.change(screen.getByLabelText(/^usuario$/i), { target: { value: 'freetextuser' } });
     fireEvent.change(screen.getByLabelText(/^contraseña$/i), { target: { value: 'ValidPass1' } });
     fireEvent.change(screen.getByLabelText(/confirmar contraseña/i), { target: { value: 'ValidPass1' } });
-    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
     fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
     await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '51234567' }));
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '+1 555 123 4567' }));
     });
   });
 });

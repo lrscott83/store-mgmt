@@ -57,11 +57,11 @@ describe('UserDetailsForm — EDIT-5: isActive toggle hidden when canToggleActiv
 });
 
 describe('UserDetailsForm — EDIT-3: pre-fills from initialValues', () => {
-  it('populates inputs from initialValues prop, formatting cellPhone with the +53 mask', async () => {
+  it('populates inputs from initialValues prop, cellPhone unmodified (no Cuban mask)', async () => {
     const { UserDetailsForm } = await import('../UserDetailsForm');
     const initialValues = {
       fullName: 'Jane Doe',
-      cellPhone: '98765432',
+      cellPhone: '+1 555 987 6543',
       email: 'jane@test.com',
       isActive: true,
     };
@@ -71,7 +71,7 @@ describe('UserDetailsForm — EDIT-3: pre-fills from initialValues', () => {
       </Wrapper>
     );
     expect(screen.getByDisplayValue('Jane Doe')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('+53 9 876-5432')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('+1 555 987 6543')).toBeInTheDocument();
     expect(screen.getByDisplayValue('jane@test.com')).toBeInTheDocument();
   });
 });
@@ -132,19 +132,19 @@ describe('UserDetailsForm — PRES-9: valid submit fires onSubmit', () => {
   });
 });
 
-describe('UserDetailsForm — CELL-MASK: cell-phone applies the +53 mask (Req: Cell-Phone Mask and Field Copy Match Angular)', () => {
-  it('displays the formatted +53 X XXX-XXXX mask as digits are typed', async () => {
+describe('UserDetailsForm — FREE-TEXT: cellPhone has no Cuban mask (the product must not assume Cuban phone numbers)', () => {
+  it('renders exactly what was typed, including a non-Cuban international number, unmodified', async () => {
     const { UserDetailsForm } = await import('../UserDetailsForm');
     render(
       <Wrapper>
         <UserDetailsForm {...baseProps} />
       </Wrapper>
     );
-    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
-    expect(screen.getByDisplayValue('+53 5 123-4567')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
+    expect(screen.getByDisplayValue('+1 555 123 4567')).toBeInTheDocument();
   });
 
-  it('submits raw digits (not the formatted mask string) as cellPhone', async () => {
+  it('submits exactly what was typed as cellPhone (no digit-stripping, no formatting)', async () => {
     const { UserDetailsForm } = await import('../UserDetailsForm');
     const onSubmit = vi.fn();
     render(
@@ -152,11 +152,11 @@ describe('UserDetailsForm — CELL-MASK: cell-phone applies the +53 mask (Req: C
         <UserDetailsForm {...baseProps} onSubmit={onSubmit} />
       </Wrapper>
     );
-    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Mask User' } });
-    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '51234567' } });
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Free Text User' } });
+    fireEvent.change(screen.getByLabelText(/teléfono/i), { target: { value: '+1 555 123 4567' } });
     fireEvent.click(screen.getByRole('button', { name: /actualizar/i }));
     await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '51234567' }));
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ cellPhone: '+1 555 123 4567' }));
     });
   });
 });

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import { toDigits, formatCellPhone } from '~/management/users/lib/cell-phone-mask';
 
 interface EditProfileFormValues {
   fullName: string;
@@ -36,7 +35,7 @@ export function EditProfileForm({
 }: EditProfileFormProps) {
   const intl = useIntl();
   const [fullName, setFullName] = useState(initialValues.fullName);
-  const [cellPhone, setCellPhone] = useState(toDigits(initialValues.cellPhone));
+  const [cellPhone, setCellPhone] = useState(initialValues.cellPhone);
   const [email, setEmail] = useState(initialValues.email);
   const [validationError, setValidationError] = useState('');
 
@@ -102,8 +101,8 @@ export function EditProfileForm({
         <input
           id="cellPhone"
           type="text"
-          value={formatCellPhone(cellPhone)}
-          onChange={(e) => setCellPhone(toDigits(e.target.value))}
+          value={cellPhone}
+          onChange={(e) => setCellPhone(e.target.value)}
           disabled={isLoading}
           className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
         />

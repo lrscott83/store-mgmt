@@ -34,7 +34,7 @@ describe('EditProfileForm — renders with initialValues (EDIT-3)', () => {
     expect(nameInput).toBeInTheDocument();
   });
 
-  it('pre-fills cellPhone field masked as +53 0 000-0000 (Angular ngx-mask parity)', () => {
+  it('pre-fills cellPhone field unmodified, no Cuban mask (the product must not assume Cuban phone numbers)', () => {
     render(
       <Wrapper>
         <EditProfileForm
@@ -45,12 +45,12 @@ describe('EditProfileForm — renders with initialValues (EDIT-3)', () => {
         />
       </Wrapper>,
     );
-    expect(screen.getByDisplayValue('+53 5 123-4567')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('51234567')).toBeInTheDocument();
   });
 });
 
-describe('EditProfileForm — cellPhone mask (Req: cellPhone parity with UserDetailsForm)', () => {
-  it('strips non-digit characters as the user types, before storing/displaying', () => {
+describe('EditProfileForm — FREE-TEXT: cellPhone has no Cuban mask (the product must not assume Cuban phone numbers)', () => {
+  it('renders exactly what was typed, including a non-Cuban international number, unmodified', () => {
     render(
       <Wrapper>
         <EditProfileForm
@@ -62,8 +62,8 @@ describe('EditProfileForm — cellPhone mask (Req: cellPhone parity with UserDet
       </Wrapper>,
     );
     const input = screen.getByLabelText(/teléfono celular/i);
-    fireEvent.change(input, { target: { value: 'abc51234567xyz' } });
-    expect(input).toHaveValue('+53 5 123-4567');
+    fireEvent.change(input, { target: { value: '+1 555 123 4567' } });
+    expect(input).toHaveValue('+1 555 123 4567');
   });
 });
 
