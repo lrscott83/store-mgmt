@@ -105,6 +105,78 @@ se mantiene como orden de magnitud razonable.
   `RegisterCommandValidator.cs:32` (`RuleFor(x => x.CellPhone).NotNull().NotEmpty()`): intactos.
 - [x] 7.3 `git diff --stat -- frontend-react/e2e/` vacío. `git diff --stat -- backend/` vacío.
   Verificado.
-- [x] 7.4 `npx turbo run test --force` bajo `frontend-react/` — verde: 180 test files / 2392
-  tests en `@store-mgmt/web-store-pos`, más `@store-mgmt/domain` (11/95) y `@store-mgmt/web-common`,
-  todos passed, evidencia real (no cacheada, `cache bypass, force executing` en cada paquete).
+- [x] 7.4 `npx turbo run test --force` bajo `frontend-react/` — verde, evidencia real (no
+  cacheada, `cache bypass, force executing` en cada paquete). Desglose exacto por paquete
+  (corregido — la versión anterior de esta línea omitía `domain` y `web-common`):
+
+  | Paquete | Test files | Tests |
+  |---|---|---|
+  | `@store-mgmt/domain` | 11 | 95 |
+  | `@store-mgmt/web-common` | 1 | 11 |
+  | `@store-mgmt/web-store-pos` | 180 | 2392 |
+  | **Total** | **192** | **2498** |
+
+  Total real de la corrida completa: **2498 tests**, no 2392. Verificado corriendo el comando,
+  no copiado de un artefacto previo.
+
+## Fase 8 — Cierre de verify-report (batch de cierre, 2026-08-07)
+
+Cierra los 4 findings de `verify-report.md` (WARNING-1, WARNING-2, SUGGESTION-1, SUGGESTION-2).
+Ninguno queda diferido — instrucción explícita del user ("cerralo todo, arreglalo todo").
+
+- [x] 8.1 WARNING-1 + SUGGESTION-1: agregados 4 tests de componente en
+  `reseller-create.test.tsx` y `reseller-edit.test.tsx` (2 por fichero: fallback a
+  `RESELLERS.ERROR` con `errors:[{code:'FullName'}]`, y co-fallo con `errors:[{code:'FullName'},
+  {code:'Cellphone'/'CellPhone'}]` → `RESELLERS.PHONE_REQUIRED`), espejando la convención exacta
+  de `owner-create.test.tsx:702` / `owner-edit.test.tsx:634`. Casing verificado: `Cellphone` en
+  create, `CellPhone` en update — igual que el resto del cambio.
+  Probado que muerden con 2 mutaciones temporales distintas (revertidas antes de commitear,
+  `git diff --stat` vacío verificado):
+  1. Sacar el argumento `byCode` de `reseller-create.tsx`/`reseller-edit.tsx` → rompió los 2
+     tests de co-fallo (los que ya existían de casing simple también rompieron, como control).
+  2. Intercambiar el valor de `fallback` a `'RESELLERS.PHONE_REQUIRED'` → rompió los 2 tests de
+     fallback (unrelated 400), más 2 tests preexistentes de red (`HTTP throw`) como control
+     adicional de que la mutación era real.
+  Commit: `test(resellers): pin FE-OC8 #3/#4 component-level coverage` (ea4cfd8)
+- [x] 8.2 WARNING-2: tabla formal "TDD Cycle Evidence" reconstruida más abajo en este documento
+  y en el `apply-progress` mergeado (engram). Donde no se pudo confirmar un RED genuino desde
+  git (commits WU1-WU6 son squash de test+implementación, sin commit intermedio en rojo), se
+  documenta explícitamente como brecha de evidencia, no como RED inventado.
+- [x] 8.3 SUGGESTION-2: corregido arriba (Fase 7.4) — desglose completo por paquete, total real
+  2498.
+- [x] 8.4 Re-verificación completa tras WU7: `npx turbo run test --force` bajo `frontend-react/`
+  — verde, `--force` confirmado (`cache bypass, force executing` en los 3 paquetes):
+
+  | Paquete | Test files | Tests |
+  |---|---|---|
+  | `@store-mgmt/domain` | 11 | 95 |
+  | `@store-mgmt/web-common` | 1 | 11 |
+  | `@store-mgmt/web-store-pos` | 180 | 2396 (2392 + 4 nuevos de WU7) |
+  | **Total** | **192** | **2502** |
+- [x] 8.5 `git diff --stat main..HEAD -- frontend-react/e2e backend` vacío — verificado en el
+  cierre.
+
+### TDD Cycle Evidence
+
+**Salvedad metodológica**: los commits WU1-WU6 son cada uno un único commit que bundlea el test
+nuevo/modificado JUNTO con la implementación (no hay un commit intermedio en estado rojo). Por lo
+tanto, el historial de git **no puede** confirmar por sí solo que el test corrió en rojo antes del
+código de producción — esa evidencia existe solo como narración en `tasks.md` (Fases 1-6, escritas
+durante el propio `sdd-apply`). Se marca explícitamente abajo dónde el RED es "asertado en prosa,
+no re-verificable desde git" en vez de reclamarlo como confirmado.
+
+| Work Unit | RED | GREEN | TRIANGULATE | SAFETY NET | Commit |
+|---|---|---|---|---|---|
+| WU1 — helper compartido (`api-error-message.ts`) | ⚠️ Asertado en prosa (tarea 1.1: "10 casos... RED"); no re-verificable desde git — `343f3f5` bundlea el test de 10 casos y la implementación en un solo commit | ✅ `api-error-message.test.ts` (10 casos) verde en la corrida final | ✅ 10 casos: casing, escaneo de array completo, precedencia byCode→byStatus→fallback, envelope vs rejection, entradas malformadas | ✅ `owner-error-message.test.ts` (10 aserciones) verde sin editar (wrapper delegado) | `343f3f5` |
+| WU2 — formularios owner (FE-OC7) | ⚠️ Asertado en prosa (tarea 2.1: bloque de formato borrado + tests de 400-phone agregados antes del wiring); no re-verificable desde git — `c2b9053` bundlea tests y prod | ✅ verde en la corrida final | ⚠️ Parcial — 1 caso por casing/superficie (create `Cellphone`, update `CellPhone`); sin test de componente de co-fallo/array-scan para owner (mismo patrón que WARNING-1, lado owner — no estaba en el alcance de este batch de cierre, ver nota) | ✅ tests preexistentes "400 sin body → genérico" (`owner-create.test.tsx:471`, `owner-edit.test.tsx:618`) verdes sin editar | `c2b9053` |
+| WU3 — formularios reseller (FE-OC8) | misma salvedad que WU2; no re-verificable desde git | ✅ verde en la corrida final | Originalmente ⚠️ Parcial (1 caso por casing, sin test de array-scan/fallback) — **cerrado en este batch**, ver WU7 | ✅ tests preexistentes de red sin `response` (`reseller-create.test.tsx:295`, `reseller-edit.test.tsx:537`) verdes sin editar | `f04f7bf` |
+| WU4 — edit-user (PHONE-2) | ⚠️ Asertado en prosa (tarea 4.1: "dado vuelta... teléfono vacío"); no re-verificable desde git | ✅ verde en la corrida final | N/A — 1 solo escenario, corresponde a PHONE-2 #1 de la spec | N/A — sin comportamiento adyacente asertado por separado | `5a8c81a` |
+| WU5 — perfil (PHONE-3) | ⚠️ Asertado en prosa (tarea 5.1/5.2: 2 tests RED agregados antes del wiring — fail-safe de `EditProfileForm` y las 3 combinaciones de rol en `profile-routes`) | ✅ verde en la corrida final | ✅ 3 combinaciones de rol (owner/reseller/store-user) × 2 capas (default del componente, wiring de la ruta) | ✅ tests preexistentes de `edit-profile-form.test.tsx` sin la prop `phoneRequired` siguen verdes (default `true`, fail-safe) | `fa7eb3c` |
+| WU6 — limpieza i18n (ADR-5) | N/A — borrado puro, sin test nuevo (verificado con `rg` vacío sobre las 3 claves, no es un ciclo RED/GREEN) | N/A | N/A | ✅ suite completa verde después del borrado | `efd11ef` |
+| WU7 — cierre de cobertura reseller (este batch, cierra WARNING-1/SUGGESTION-1) | ✅ Verificado genuinamente — **no es TDD clásico** (el wiring de producción ya existía desde WU3); es un ciclo de test de caracterización + mutation testing: (1) los 4 tests nuevos se escribieron y corrieron verdes en primera pasada, (2) se sacó temporalmente el argumento `byCode` de `reseller-create.tsx`/`reseller-edit.tsx` → los 2 tests de co-fallo fallaron como se esperaba, (3) se intercambió temporalmente el valor de `fallback` a `'RESELLERS.PHONE_REQUIRED'` → los 2 tests de fallback fallaron como se esperaba, (4) ambas mutaciones revertidas con edits dirigidos, `git diff --stat` vacío en los 2 ficheros de componente confirmado antes de commitear | ✅ 43/43 verde en `reseller-create.test.tsx` + `reseller-edit.test.tsx` tras el revert | ✅ ahora simétrico con owner: fallback (400 no relacionado) + co-fallo (array-scan, `FullName` en índice 0) cubiertos a nivel de componente para create y edit | ✅ los 39 tests preexistentes de reseller quedaron verdes durante todo el ciclo | `ea4cfd8` |
+
+**Nota**: el mismo hueco de cobertura de co-fallo/array-scan a nivel de componente existe también
+del lado owner (WU2) — la spec lo da por cubierto vía inferencia (`owner-create.test.tsx:702` +
+`owner-edit.test.tsx:634` para el caso simple, `api-error-message.test.ts:22-28` para el
+escaneo). No estaba entre los 4 findings de `verify-report.md` a cerrar en este batch, así que no
+se tocó — se deja documentado acá para que quede visible, no oculto.
