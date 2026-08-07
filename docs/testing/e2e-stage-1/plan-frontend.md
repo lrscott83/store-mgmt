@@ -14,7 +14,7 @@ Cada ítem declara si toca un test existente. Ninguno se ejecuta sin autorizaci�
 
 | # | Ítem | Severidad | ¿Bloquea hoy? | ¿Toca un E2E existente? |
 |---|---|---|---|---|
-| [F-1](#f-1) | Falta capturar la salida de la corrida de rate-limit | Baja | No — el catálogo ya está corregido | No — solo corre y guarda la evidencia |
+| ~~[F-1](#f-1)~~ | ~~Falta capturar la salida de la corrida de rate-limit~~ | — | **CERRADO** 2026-08-07 | No |
 | [F-2](#f-2) | Falta la aserción del destino post-registro (S1-01) | Media | No — brecha declarada | **Sí** — encadena sobre `register.spec.ts` |
 | [F-3](#f-3) | La guarda de pathname de `logout()` no es verificable en navegador | Media | No — brecha G2, cubierta en vitest | No — pide un test nuevo |
 | [F-4](#f-4) | T8 es un flake latente, sin causa raíz | **Alta** | No — verde hoy | **Sí** — el arreglo vive dentro de T8 |
@@ -24,7 +24,7 @@ Cada ítem declara si toca un test existente. Ninguno se ejecuta sin autorizaci�
 
 ## F-1
 
-### La corrida de rate-limit no dejó evidencia guardada
+### ~~La corrida de rate-limit no dejó evidencia guardada~~ — CERRADO
 
 `login-rate-limit.spec.ts` y `register-rate-limit.spec.ts` están fuera de la corrida por defecto (`test:e2e` usa `--grep-invert @rate-limit`) porque gastan decenas de intentos. El catálogo los daba por **no ejecutados**, y el backend por **inalcanzable bajo `Testing`** (H-12).
 
@@ -32,7 +32,16 @@ Cada ítem declara si toca un test existente. Ninguno se ejecuta sin autorizaci�
 
 **Qué se corrigió ya.** Las filas de [S1-01](S1-01.md) y [S1-02](S1-02.md) en el [README](README.md) y la sección de cobertura de `S1-02.md`: S1-02 pasa a **CUBIERTO** en frontend, y **H-12 queda refutada** — el límite sí es alcanzable bajo `Testing`.
 
-**Qué falta.** La salida de consola de esa corrida no quedó registrada, así que la evidencia es el reporte verbal y no un artefacto. Correr `pnpm test:e2e:rate-limit` y guardar la salida, para que el dato del catálogo pueda señalar su prueba.
+**CERRADO el 2026-08-07.** La corrida quedó registrada:
+
+```
+> playwright test --grep @rate-limit
+
+Running 2 tests using 2 workers
+  2 passed (12.1s)
+```
+
+Los dos specs (`login-rate-limit.spec.ts` y `register-rate-limit.spec.ts`) en verde. Como cada uno lanza un error explícito si su bucle termina sin observar un 429, esos dos verdes **son** la prueba de que el límite se disparó en las dos superficies. El dato del catálogo ya puede señalar su evidencia.
 
 **Alcance.** No toca ningún test. Es correr y documentar.
 
