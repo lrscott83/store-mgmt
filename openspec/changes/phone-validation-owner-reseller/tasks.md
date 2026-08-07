@@ -155,6 +155,56 @@ Ninguno queda diferido — instrucción explícita del user ("cerralo todo, arre
   | **Total** | **192** | **2502** |
 - [x] 8.5 `git diff --stat main..HEAD -- frontend-react/e2e backend` vacío — verificado en el
   cierre.
+- [x] 8.6 **Segunda ronda de cierre** (mismo día, hallazgo del coordinador confirmado por
+  `rg -n "FullName"` sobre los 4 ficheros de test admin: hits solo en los 2 de reseller, cero en
+  los 2 de owner): la brecha de co-fallo/array-scan documentada como "fuera de alcance" en la
+  nota de WU7 en realidad SÍ estaba cubierta por la instrucción "cerralo todo, arreglalo todo, no
+  dejes nada para despues". Cerrada — ver WU8 abajo. El test de fallback ("400 sin código
+  conocido") de owner (`owner-create.test.tsx:471`, `owner-edit.test.tsx:618`) se verificó que
+  sigue existiendo y NO se duplicó.
+- [x] 8.7 Chequeo de familia: `rg -n "apiErrorMessageId|ownerErrorMessageId|byCode:"` sobre
+  `frontend-react/apps/web-store-pos/app` (fuera de `__tests__/`) confirma que solo hay 4 call
+  sites con clasificación `byCode` de teléfono (`reseller-create.tsx:76-77`,
+  `reseller-edit.tsx:128-129`, `owner-create.tsx:98-104`, `owner-edit.tsx:234-240`) — los 4 ya
+  tienen test de array-scan a nivel de componente tras WU7+WU8. Los otros 2 usos de
+  `ownerErrorMessageId` en `owner-edit.tsx:153,170` son del path de CARGA (`getOwner`), sin
+  clasificación por código de teléfono — no aplica el mismo patrón ahí. No queda ninguna
+  instancia del mismo hueco sin cerrar dentro del alcance de este cambio.
+- [x] 8.8 Total de tests corregido de nuevo tras WU8 (+2): **2504**. Ver Fase 9 abajo.
+- [x] 8.9 `git diff --stat main..HEAD -- frontend-react/e2e backend` vacío — re-verificado tras
+  WU8.
+
+## Fase 9 — Cierre de la brecha simétrica en owner (WU8, segunda ronda del mismo batch de cierre)
+
+- [x] 9.1 Agregados 2 tests de componente: `owner-create.test.tsx` (`errors:[{code:'FullName'},
+  {code:'Cellphone'}]` → `OWNER.PHONE_REQUIRED`) y `owner-edit.test.tsx` (mismo, casing
+  `CellPhone`), espejando exactamente los de reseller (WU7). El test de fallback existente
+  (`owner-create.test.tsx:471`, `owner-edit.test.tsx:618`) NO se tocó ni se duplicó — se verificó
+  que sigue intacto antes de agregar los nuevos.
+  Nota de implementación: en `owner-edit.test.tsx` el test nuevo se agregó DENTRO del mismo
+  `describe('OwnerEditPage — FE-OC3: classified rejections', ...)` que ya existía (no en un
+  `describe` nuevo), porque reutiliza el helper local `submitWithRejection` que solo vive en el
+  scope de ese bloque — un `describe` separado producía `ReferenceError: submitWithRejection is
+  not defined` (detectado y corregido en la primera pasada de la corrida verde).
+  Probado que muerden con 1 mutación temporal (revertida antes de commitear, `git diff --stat`
+  vacío verificado): sacar el 4to argumento `byCode` del objeto pasado a `ownerErrorMessageId` en
+  `owner-create.tsx:104` y `owner-edit.tsx:240` → rompió los 2 tests nuevos de array-scan MÁS los
+  2 tests preexistentes de casing simple (`owner-create.test.tsx:702`, `owner-edit.test.tsx:634`)
+  como control de que la mutación era real (4 tests fallidos de 79, el resto — incluidos los 2
+  tests de fallback preexistentes — se mantuvo verde, sin tocar).
+  Commit: `test(owners): pin FE-OC7 #4 component-level array-scan coverage` (faef857)
+- [x] 9.2 Re-verificación completa final: `npx turbo run test --force` bajo `frontend-react/` —
+  verde, `--force` confirmado (`cache bypass, force executing` en los 3 paquetes):
+
+  | Paquete | Test files | Tests |
+  |---|---|---|
+  | `@store-mgmt/domain` | 11 | 95 |
+  | `@store-mgmt/web-common` | 1 | 11 |
+  | `@store-mgmt/web-store-pos` | 180 | 2398 (2396 + 2 nuevos de WU8) |
+  | **Total** | **192** | **2504** |
+
+- [x] 9.3 `git diff --stat main..HEAD -- frontend-react/e2e backend` vacío. `git status --short`
+  limpio tras el commit de este WU. Verificado.
 
 ### TDD Cycle Evidence
 
@@ -168,15 +218,18 @@ no re-verificable desde git" en vez de reclamarlo como confirmado.
 | Work Unit | RED | GREEN | TRIANGULATE | SAFETY NET | Commit |
 |---|---|---|---|---|---|
 | WU1 — helper compartido (`api-error-message.ts`) | ⚠️ Asertado en prosa (tarea 1.1: "10 casos... RED"); no re-verificable desde git — `343f3f5` bundlea el test de 10 casos y la implementación en un solo commit | ✅ `api-error-message.test.ts` (10 casos) verde en la corrida final | ✅ 10 casos: casing, escaneo de array completo, precedencia byCode→byStatus→fallback, envelope vs rejection, entradas malformadas | ✅ `owner-error-message.test.ts` (10 aserciones) verde sin editar (wrapper delegado) | `343f3f5` |
-| WU2 — formularios owner (FE-OC7) | ⚠️ Asertado en prosa (tarea 2.1: bloque de formato borrado + tests de 400-phone agregados antes del wiring); no re-verificable desde git — `c2b9053` bundlea tests y prod | ✅ verde en la corrida final | ⚠️ Parcial — 1 caso por casing/superficie (create `Cellphone`, update `CellPhone`); sin test de componente de co-fallo/array-scan para owner (mismo patrón que WARNING-1, lado owner — no estaba en el alcance de este batch de cierre, ver nota) | ✅ tests preexistentes "400 sin body → genérico" (`owner-create.test.tsx:471`, `owner-edit.test.tsx:618`) verdes sin editar | `c2b9053` |
+| WU2 — formularios owner (FE-OC7) | ⚠️ Asertado en prosa (tarea 2.1: bloque de formato borrado + tests de 400-phone agregados antes del wiring); no re-verificable desde git — `c2b9053` bundlea tests y prod. **Este marcador NO se actualiza retroactivamente** aunque la columna TRIANGULATE de esta fila sí cambió (WU8, abajo) — el RED de WU2 en sí sigue sin ser re-verificable desde git, cerrar WU8 no lo confirma ni lo invalida | ✅ verde en la corrida final | Originalmente ⚠️ Parcial (1 caso por casing/superficie, sin test de componente de co-fallo/array-scan) — **cerrado en una segunda ronda de este mismo batch**, ver WU8 | ✅ tests preexistentes "400 sin body → genérico" (`owner-create.test.tsx:471`, `owner-edit.test.tsx:618`) verdes sin editar — confirmado que siguen intactos tras WU8 | `c2b9053` |
 | WU3 — formularios reseller (FE-OC8) | misma salvedad que WU2; no re-verificable desde git | ✅ verde en la corrida final | Originalmente ⚠️ Parcial (1 caso por casing, sin test de array-scan/fallback) — **cerrado en este batch**, ver WU7 | ✅ tests preexistentes de red sin `response` (`reseller-create.test.tsx:295`, `reseller-edit.test.tsx:537`) verdes sin editar | `f04f7bf` |
 | WU4 — edit-user (PHONE-2) | ⚠️ Asertado en prosa (tarea 4.1: "dado vuelta... teléfono vacío"); no re-verificable desde git | ✅ verde en la corrida final | N/A — 1 solo escenario, corresponde a PHONE-2 #1 de la spec | N/A — sin comportamiento adyacente asertado por separado | `5a8c81a` |
 | WU5 — perfil (PHONE-3) | ⚠️ Asertado en prosa (tarea 5.1/5.2: 2 tests RED agregados antes del wiring — fail-safe de `EditProfileForm` y las 3 combinaciones de rol en `profile-routes`) | ✅ verde en la corrida final | ✅ 3 combinaciones de rol (owner/reseller/store-user) × 2 capas (default del componente, wiring de la ruta) | ✅ tests preexistentes de `edit-profile-form.test.tsx` sin la prop `phoneRequired` siguen verdes (default `true`, fail-safe) | `fa7eb3c` |
 | WU6 — limpieza i18n (ADR-5) | N/A — borrado puro, sin test nuevo (verificado con `rg` vacío sobre las 3 claves, no es un ciclo RED/GREEN) | N/A | N/A | ✅ suite completa verde después del borrado | `efd11ef` |
 | WU7 — cierre de cobertura reseller (este batch, cierra WARNING-1/SUGGESTION-1) | ✅ Verificado genuinamente — **no es TDD clásico** (el wiring de producción ya existía desde WU3); es un ciclo de test de caracterización + mutation testing: (1) los 4 tests nuevos se escribieron y corrieron verdes en primera pasada, (2) se sacó temporalmente el argumento `byCode` de `reseller-create.tsx`/`reseller-edit.tsx` → los 2 tests de co-fallo fallaron como se esperaba, (3) se intercambió temporalmente el valor de `fallback` a `'RESELLERS.PHONE_REQUIRED'` → los 2 tests de fallback fallaron como se esperaba, (4) ambas mutaciones revertidas con edits dirigidos, `git diff --stat` vacío en los 2 ficheros de componente confirmado antes de commitear | ✅ 43/43 verde en `reseller-create.test.tsx` + `reseller-edit.test.tsx` tras el revert | ✅ ahora simétrico con owner: fallback (400 no relacionado) + co-fallo (array-scan, `FullName` en índice 0) cubiertos a nivel de componente para create y edit | ✅ los 39 tests preexistentes de reseller quedaron verdes durante todo el ciclo | `ea4cfd8` |
+| WU8 — cierre de la brecha simétrica en owner (segunda ronda del mismo batch, cierra el hueco documentado en la nota de WU7) | ✅ Verificado genuinamente — mismo tipo de ciclo que WU7 (test de caracterización + mutation testing, no TDD clásico: el wiring `byCode` de owner ya existía desde WU2): (1) los 2 tests nuevos se escribieron y corrieron verdes en primera pasada, (2) se sacó temporalmente el 4to argumento `byCode` de `ownerErrorMessageId(...)` en `owner-create.tsx:104` y `owner-edit.tsx:240` → los 2 tests nuevos fallaron como se esperaba, junto con los 2 tests preexistentes de casing simple (control), (3) mutación revertida con `git checkout --`, `git diff --stat` vacío confirmado antes de commitear | ✅ 79/79 verde en `owner-create.test.tsx` + `owner-edit.test.tsx` tras el revert | ✅ ahora los 4 formularios (owner create/edit, reseller create/edit) tienen test de array-scan a nivel de componente — chequeo de familia (`rg` sobre los 4 call sites de `byCode`) confirma que no queda ninguna instancia del mismo patrón sin cubrir dentro del alcance de este cambio | ✅ los 77 tests preexistentes de owner quedaron verdes durante todo el ciclo (incluido el test de fallback `owner-create.test.tsx:471`/`owner-edit.test.tsx:618`, confirmado sin tocar) | `faef857` |
 
-**Nota**: el mismo hueco de cobertura de co-fallo/array-scan a nivel de componente existe también
-del lado owner (WU2) — la spec lo da por cubierto vía inferencia (`owner-create.test.tsx:702` +
-`owner-edit.test.tsx:634` para el caso simple, `api-error-message.test.ts:22-28` para el
-escaneo). No estaba entre los 4 findings de `verify-report.md` a cerrar en este batch, así que no
-se tocó — se deja documentado acá para que quede visible, no oculto.
+**Nota (actualizada tras WU8)**: el hueco de cobertura de co-fallo/array-scan a nivel de
+componente del lado owner, documentado en la versión anterior de esta nota como "fuera de
+alcance de este batch", quedó **cerrado** en una segunda ronda del mismo batch de cierre, a
+pedido explícito del coordinador tras verificar el hallazgo (`rg -n "FullName"` sobre los 4
+ficheros de test admin devolvía hits solo en los 2 de reseller antes de este WU). Chequeo de
+familia realizado (tarea 8.7): no queda ninguna otra instancia del mismo patrón sin test de
+array-scan dentro del alcance de `phone-validation-owner-reseller`.
