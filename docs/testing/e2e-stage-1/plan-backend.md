@@ -2,6 +2,8 @@
 
 > Trabajo **diferido**. Nada de acá se ejecuta sin decisión explícita del usuario.
 >
+> Contraparte de [plan-frontend.md](plan-frontend.md), que reúne lo diferido de la capa Playwright.
+>
 > Este documento reúne lo que apareció en el backend mientras se implementaba la cobertura Playwright de [S1-02](S1-02.md). No es una lista de deseos: cada ítem tiene causa raíz verificada con `archivo:línea`, y donde hay un cálculo, el cálculo está escrito para que se pueda refutar.
 
 ## Regla que gobierna este plan

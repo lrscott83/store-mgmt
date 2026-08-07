@@ -8,7 +8,7 @@ Toda aserción de esta etapa está anclada a código leído, con `archivo:línea
 
 Este fichero contiene **solo lo general y el estado**. El detalle de cada User Story —flujo, precondiciones y aserciones— vive en su fichero propio.
 
-> **Trabajo diferido de backend**: [plan-backend.md](plan-backend.md) reúne lo que apareció en el servidor mientras se implementaba esta etapa — un test E2E vencido por calendario, otras 20 fechas hardcodeadas con la misma bomba, y el hueco de método que dejó pasar dos bugs de producción. Nada de eso se ejecuta sin decisión explícita.
+> **Trabajo diferido**, uno por capa: [plan-frontend.md](plan-frontend.md) reúne lo abierto en Playwright — un flake sin causa raíz, una guarda que el navegador no puede discriminar y dos brechas declaradas. [plan-backend.md](plan-backend.md) reúne lo que apareció en el servidor mientras se implementaba esta etapa — un test E2E vencido por calendario, otras 20 fechas hardcodeadas con la misma bomba, y el hueco de método que dejó pasar dos bugs de producción. Nada de eso se ejecuta sin decisión explícita.
 
 ---
 
@@ -66,6 +66,8 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 12 User Stories + 1 invariante transversal.
 
 - **E2E frontend**: 3 PARCIAL · 9 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+
+Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
 - **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Ningún escenario está completo en ambas capas.
