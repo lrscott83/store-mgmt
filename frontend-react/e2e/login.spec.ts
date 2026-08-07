@@ -4,7 +4,7 @@ import { LoginPage } from './support/login-page';
 import { RegisterPage } from './support/register-page';
 import { newTestIdentity, type TestIdentity } from './support/identity';
 import { restoreSignedInSession, createStoreUserViaUi } from './support/session';
-import { mutateAuthModel } from './support/auth-storage';
+import { mutateAuthModel, readRawAuthModel, writeRawAuthModel } from './support/auth-storage';
 
 // Literal Spanish copy asserted below, cited from
 // apps/web-store-pos/app/shared/lib/i18n/es.ts (design.md §5, §7). Hardcoded
@@ -330,5 +330,92 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     loginNetwork.expectMeRequestCount(1);
     await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
     expect(new URL(page.url()).pathname).not.toBe('/login');
+  });
+
+  test('REQ-3: /me unreachable without a usable cache retains the session (T3)', async ({
+    page,
+    personaCache,
+    loginNetwork,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token-t3' });
+    // D4's sibling for the cold-boot half: the honest simulation of "the
+    // server is not there" is cutting the request at the origin, not
+    // reloading offline (that traps the browser's own error page, not the
+    // app — same pitfall as login.spec.ts:68-71 for a plain reload).
+    await page.route('**/v1/auth/me', (route) => route.abort());
+    await page.reload();
+    await loginNetwork.waitForMeRequest();
+    await page.waitForLoadState('networkidle');
+
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).not.toBeNull();
+    expect(new URL(page.url()).pathname).not.toBe('/login');
+    await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
+  });
+
+  test('REQ-5: a 500 from /me shows the blocking dialog but keeps the session (T5)', async ({
+    page,
+    personaCache,
+    loginNetwork,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token-t5' });
+    await page.route('**/v1/auth/me', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+    );
+    await page.reload();
+    await loginNetwork.waitForMeRequest();
+
+    // D5: the dialog is part of the assertion, not an obstacle —
+    // api-client.ts:88-95 opens a blocking Swal on every 500.
+    await expect(page.getByRole('heading', { name: 'Error' })).toBeVisible();
+    await expect(
+      page.getByText(
+        'Por favor, vuelva a intentarlo y si persiste el error contacte al equipo de soporte técnico.'
+      )
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'OK' }).click();
+
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).not.toBeNull();
+    await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
+  });
+
+  test('REQ-10: an internal navigation while offline keeps the session alive (T10)', async ({
+    page,
+    personaCache,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    // D4: no reload while offline — the document would never be served and
+    // the assertion would run against the browser's own error page, not the
+    // app. A client-side <Link> navigation costs zero network requests.
+    await page.context().setOffline(true);
+    await page.getByRole('button', { name: 'Menú de usuario' }).click();
+    await page.getByRole('link', { name: 'Editar Perfil' }).click();
+    await page.waitForURL(/\/profile\/edit$/);
+
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).not.toBeNull();
+    expect(new URL(page.url()).pathname).not.toBe('/login');
+  });
+
+  test('REQ-11: a parseable non-AUTH_MODEL payload is never removed nor triggers logout() (T11)', async ({
+    page,
+    personaCache,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    await writeRawAuthModel(page, '{"foo":1}');
+
+    // Reloading from /login (guestOnlyLoader), not a protected route, on
+    // purpose: authLoader's denyAccess() (loaders.ts:16-19) ALSO calls
+    // logout() when unauthenticated, which WOULD remove AUTH_MODEL — but
+    // that is a DIFFERENT code path than the one REQ-11 pins
+    // (auth-store.ts:110-113, getUserByToken()'s own malformed-but-parseable
+    // branch). Reloading from /login isolates the claim under test.
+    await page.goto('/login');
+
+    const raw = await readRawAuthModel(page);
+    expect(raw).toBe('{"foo":1}');
   });
 });
