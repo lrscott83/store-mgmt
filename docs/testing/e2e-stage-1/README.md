@@ -70,6 +70,19 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
 
+**Planes de backend por US** — salen de la auditoría del 2026-08-07, que contrastó cada aserción declarada contra el código real de `SMCA.WebApi.E2ETests`, no contra la sección "Estado de cobertura" de cada US:
+
+| Plan | Qué encontró |
+|---|---|
+| [S1-01-backend.md](S1-01-backend.md) | 6 aserciones marcadas cubiertas que **ningún test afirma** |
+| [S1-02-backend.md](S1-02-backend.md) | La única aserción abierta **ya está cubierta** |
+| [S2-01-backend.md](S2-01-backend.md) | 4 aserciones marcadas cubiertas sin test |
+| [S2-03-backend.md](S2-03-backend.md) | 3 aserciones ya cubiertas, y confirman un **defecto de producción** |
+| [S3-03-backend.md](S3-03-backend.md) | Aislamiento medido: cross-tenant sí, **cross-store no** |
+| [AUTH-INV-01-backend.md](AUTH-INV-01-backend.md) | El fichero de la US **se contradice con este catálogo** |
+
+Sin plan propio, porque su cobertura se verificó y coincide con lo declarado: S1-03 (N/A), S1-04, S2-02, S3-01, S3-02, S4-01, S4-02.
+
 Ningún escenario está completo en ambas capas.
 
 **Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, y `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto son 31 tests (`pnpm test:e2e`); los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. Las dos corridas pasaron el 2026-08-07 contra backend real: 31 tests en la corrida por defecto y `2 passed (12.1s)` en la de rate-limit.
