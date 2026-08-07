@@ -37,7 +37,7 @@ Chain strategy: pending
 
 ## Phase 3: Verification (documented RED)
 
-- [ ] 3.1 Run focused filter `--filter "FullyQualifiedName~AuthRefreshTokenLifetimeTests"` → **BLOCKED: acceptance NOT met** — 2 failed / 0 passed, BUT only the Login test fails for the documented reason (`off by 28d`); the Refresh test fails with `401 Unauthorized` because the refresh-token row is NEVER persisted by login (UnitOfWorkBehaviour.IsQuery() always true → pipeline never saves; LoginCommand has no explicit save). Deeper pre-existing production defect invalidates the documented-RED premise for test 2.
+- [x] 3.1 Run focused filter `--filter "FullyQualifiedName~AuthRefreshTokenLifetimeTests"` → **documented RED held** — 2 failed / 0 passed, BOTH failing for the documented reason (`off by 28d` at `AuthRefreshTokenLifetimeTests.cs:62` Login and `:113` Refresh). Both tests reach 200 OK through login→persist→refresh→rotation; the earlier 401 (refresh row never persisted by login + tenant query filter hiding the user lookup) was resolved by the merged production fixes (`fix-refresh-token-persistence`, `fix-refresh-user-tenant-fetch`). RED premise confirmed: both flip green UNTOUCHED when the 7→35 production change ships.
 - [x] 3.2 Run Auth-area regression `--filter "FullyQualifiedName~SMCA.WebApi.E2ETests.Auth"` → **44 passed / 2 failed (only the 2 new) / total 46** — all pre-existing Auth tests pass (incl. `AuthTokenLifetimeTests`)
 - [x] 3.3 Confirm no orphaned `RefreshTokens` rows remain for the seeded userId after each run (cleanup in `finally` executed) — **confirmed 0 rows** (trivially: login persists no rows; cleanup ran without error)
 
