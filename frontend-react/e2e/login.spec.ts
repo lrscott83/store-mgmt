@@ -522,4 +522,35 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     const authModel = await readRawAuthModel(page);
     expect(authModel).toBeNull();
   });
+
+  test('REQ-9: a 401 outside /me leaves the session intact (T9)', async ({ page, personaCache }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    await page.goto('/profile/edit');
+
+    await page.route('**/v1/users/*', (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      return route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ succeeded: false, errors: [{ description: 'unauthorized' }] }),
+      });
+    });
+
+    await page.locator('#fullName').fill('E2E Updated Name T9');
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+
+    // api-client.ts:84-86 (OFFLINE-FIRST DIVERGENCE): a 401 outside /me is
+    // NOT special-cased, it falls through to the generic reject — so
+    // edit-profile.tsx's own catch shows its OWN error copy, never a
+    // session-ending redirect.
+    await expect(
+      page.getByText('No se pudo actualizar el perfil. Intentá de nuevo.')
+    ).toBeVisible();
+
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).not.toBeNull();
+
+    await page.goto('/sales/products');
+    await page.waitForURL(/\/sales\/products$/);
+  });
 });
