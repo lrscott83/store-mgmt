@@ -3,15 +3,13 @@ import { useParams } from 'react-router';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
+import { apiErrorMessageId, API_ERROR_CODE_CELL_PHONE } from '~/shared/lib/http/api-error-message';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
 import type { ReSeller } from '@store-mgmt/domain';
 
 export const clientLoader = superAdminLoader;
-
-// ADR-4: Cuban +53 mobile format
-const PHONE_REGEX = /^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/;
 
 interface Snapshot {
   fullName: string;
@@ -103,11 +101,6 @@ export function ResellerEditPage() {
     setValidationError('');
     setServerError('');
 
-    if (!PHONE_REGEX.test(cellPhone)) {
-      setValidationError(formatMessage({ id: 'RESELLERS.PHONE_FORMAT' }));
-      return;
-    }
-
     if (!id) return;
 
     setIsSubmitting(true);
@@ -129,8 +122,15 @@ export function ResellerEditPage() {
 
       // Re-snapshot after successful PUT — stay on page
       setSnapshot({ fullName, cellPhone, email, percentDiscountPrice, discountPrice, isActive, description });
-    } catch {
-      setServerError(formatMessage({ id: 'RESELLERS.ERROR' }));
+    } catch (error) {
+      setServerError(
+        formatMessage({
+          id: apiErrorMessageId(error, {
+            byCode: { [API_ERROR_CODE_CELL_PHONE]: 'RESELLERS.PHONE_REQUIRED' },
+            fallback: 'RESELLERS.ERROR',
+          }),
+        })
+      );
     } finally {
       setIsSubmitting(false);
     }

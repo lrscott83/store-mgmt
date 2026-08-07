@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
+import { apiErrorMessageId, API_ERROR_CODE_CELL_PHONE } from '~/shared/lib/http/api-error-message';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
 import { EyeIcon, EyeOffIcon, PlusIcon } from '~/shared/components/ui/icons';
@@ -11,9 +12,6 @@ export const clientLoader = superAdminLoader;
 
 // ADR-3: EXACT copy from management/users/components/UserCreateForm.tsx:4
 const PASSWORD_REGEX = /(?=\D*\d)(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z]).{8,30}/;
-
-// ADR-4: Cuban +53 mobile format
-const PHONE_REGEX = /^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/;
 
 export function ResellerCreatePage() {
   const navigate = useNavigate();
@@ -55,12 +53,6 @@ export function ResellerCreatePage() {
       return;
     }
 
-    // ADR-4: phone validation
-    if (!PHONE_REGEX.test(cellPhone)) {
-      setValidationError(formatMessage({ id: 'RESELLERS.PHONE_FORMAT' }));
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const res = await resellerHttpService.createReseller({
@@ -78,8 +70,15 @@ export function ResellerCreatePage() {
       }
 
       navigate('/admin/resellers');
-    } catch {
-      setServerError(formatMessage({ id: 'RESELLERS.ERROR' }));
+    } catch (error) {
+      setServerError(
+        formatMessage({
+          id: apiErrorMessageId(error, {
+            byCode: { [API_ERROR_CODE_CELL_PHONE]: 'RESELLERS.PHONE_REQUIRED' },
+            fallback: 'RESELLERS.ERROR',
+          }),
+        })
+      );
     } finally {
       setIsSubmitting(false);
     }

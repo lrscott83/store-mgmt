@@ -196,39 +196,27 @@ describe('ResellerCreatePage — password mismatch validation', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-RESELLERS-CREATE-5 — bad phone → RESELLERS.PHONE_FORMAT, no call
+// FE-OC8 — create maps the 400 phone-required rejection to dedicated copy
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('ResellerCreatePage — phone format validation', () => {
-  it('shows PHONE_FORMAT error and does NOT call createReseller when phone is invalid', async () => {
+describe('ResellerCreatePage — FE-OC8: phone-required 400 rejection', () => {
+  it('shows RESELLERS.PHONE_REQUIRED when createReseller rejects with 400 and code "Cellphone"', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
-    await renderPage();
+    vi.mocked(resellerHttpService.createReseller).mockRejectedValue({
+      response: { status: 400, data: { errors: [{ code: 'Cellphone' }] } },
+    });
 
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.FULL_NAME']), {
-      target: { value: 'Jane' },
-    });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.LOGIN']), {
-      target: { value: 'jane' },
-    });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.PASSWORD']), {
-      target: { value: 'Password1' },
-    });
-    fireEvent.change(screen.getByLabelText(esMessages['USERS.CONFIRM_PASSWORD']), {
-      target: { value: 'Password1' },
-    });
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
-      target: { value: '12345' }, // invalid phone
-    });
+    await renderPage();
+    fillValidForm();
 
     fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
-      expect(screen.getByText(esMessages['RESELLERS.PHONE_FORMAT'])).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.PHONE_REQUIRED']);
     });
-
-    expect(resellerHttpService.createReseller).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
 

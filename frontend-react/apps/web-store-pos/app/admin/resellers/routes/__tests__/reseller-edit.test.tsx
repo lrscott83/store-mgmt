@@ -406,11 +406,11 @@ describe('ResellerEditPage — discount fields min=0', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-RESELLERS-EDIT-6 — bad phone blocks PUT
+// FE-OC8 — update maps the 400 phone-required rejection to dedicated copy
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('ResellerEditPage — phone validation blocks PUT', () => {
-  it('shows PHONE_FORMAT error and does NOT call updateReseller when phone invalid', async () => {
+describe('ResellerEditPage — FE-OC8: phone-required 400 rejection', () => {
+  it('shows RESELLERS.PHONE_REQUIRED when updateReseller rejects with 400 and code "CellPhone"', async () => {
     const { resellerHttpService } = await import(
       '~/admin/resellers/lib/services/reseller-http-service'
     );
@@ -421,24 +421,21 @@ describe('ResellerEditPage — phone validation blocks PUT', () => {
       actionCode: 0,
       errors: [],
     });
+    vi.mocked(resellerHttpService.updateReseller).mockRejectedValue({
+      response: { status: 400, data: { errors: [{ code: 'CellPhone' }] } },
+    });
 
     await renderPage();
 
     await waitFor(() => {
-      expect(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE'])).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByLabelText(esMessages['GENERAL.CELL_PHONE']), {
-      target: { value: 'badphone' },
+      expect(screen.getByLabelText(esMessages['GENERAL.FULL_NAME'])).toBeInTheDocument();
     });
 
     fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.UPDATE'] }).closest('form')!);
 
     await waitFor(() => {
-      expect(screen.getByText(esMessages['RESELLERS.PHONE_FORMAT'])).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.PHONE_REQUIRED']);
     });
-
-    expect(resellerHttpService.updateReseller).not.toHaveBeenCalled();
   });
 });
 
