@@ -54,8 +54,11 @@ internal sealed class RefreshCommandHandler : ICommandHandler<RefreshCommand, Au
                     (int)HttpStatusCode.Unauthorized);
             }
 
-            // 2. Look up the user associated with the refresh token
-            var user = await _userRepository.GetByIdAsync(existingToken.UserId);
+            // 2. Look up the user associated with the refresh token. The refresh endpoint is
+            // AllowAnonymous: the caller carries no tenant claims, so the tenant query filter on
+            // User would hide the token's owner (`GetByIdAsync` -> FindAsync applies the filter).
+            // Resolve WITHOUT the tenant filter — same as login's GetByLoginWithRelatedAsync.
+            var user = await _userRepository.GetUserByIdIgnoreQueryFiltersAsync(existingToken.UserId.ToString());
             if (user is null)
             {
                 return ResponseResult.Failure<AuthDto>(
