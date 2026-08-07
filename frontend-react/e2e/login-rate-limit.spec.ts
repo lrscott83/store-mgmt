@@ -43,10 +43,12 @@ test.describe('login — rate limit (REQ-8)', { tag: '@rate-limit' }, () => {
 
       try {
         const response = await loginNetwork.waitForLoginResponse();
-        // A genuine failure at this point: any status other than 200 — an
-        // unregistered login is a BODY-level rejection (succeeded:false),
-        // never an HTTP error status.
-        expect(response.status).toBe(200);
+        // An unregistered login is Auth.InvalidCredentials, which
+        // LoginCommand.MapErrorToStatusCode maps to 401 — not a 200 with a
+        // `succeeded:false` body. A genuine failure at this point is any OTHER
+        // status: it would mean the flood is being rejected for a reason this
+        // spec never anticipated, and counting it as an attempt would be wrong.
+        expect(response.status).toBe(401);
       } catch (err) {
         if (err instanceof LoginRateLimitError) {
           // The limiter tripped — this IS the scenario under test, not an
