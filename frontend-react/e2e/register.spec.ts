@@ -154,7 +154,7 @@ test.describe.serial('register — one real registration + one duplicate 400 (RE
     // loaders.ts:42-59) redirects an ALREADY-authenticated visitor away to
     // their home path; landing here and seeing the login form is proof, not
     // an assumption, that no session exists.
-    await expect(page.locator('input#email')).toBeVisible();
+    await expect(page.locator('input#login')).toBeVisible();
     await expect(page.locator('input#password')).toBeVisible();
   });
 

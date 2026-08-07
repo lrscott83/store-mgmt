@@ -12,7 +12,7 @@ test.describe('infra smoke', () => {
   test('/login renderiza el formulario', async ({ page }) => {
     await page.goto('/login');
 
-    await expect(page.locator('input#email')).toBeVisible();
+    await expect(page.locator('input#login')).toBeVisible();
     await expect(page.locator('input#password')).toBeVisible();
   });
 

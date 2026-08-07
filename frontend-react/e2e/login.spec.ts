@@ -1,4 +1,4 @@
-import type { Frame, Page } from '@playwright/test';
+import type { Frame, Page, Request } from '@playwright/test';
 import { test, expect } from './support/test';
 import { LoginPage } from './support/login-page';
 import { RegisterPage } from './support/register-page';
@@ -529,17 +529,29 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // event too. Pinning an absolute count pins a framework detail nobody
     // measured, instead of the behavior under test.
     // The URLs are collected, not just counted, so a failure names the extra
-    // navigation instead of only reporting that there was one.
-    const recordNavigations = async (): Promise<string[]> => {
-      const seen: string[] = [];
-      const record = (frame: Frame) => {
-        if (frame === page.mainFrame()) seen.push(new URL(frame.url()).pathname);
+    // navigation instead of only reporting that there was one. Document
+    // requests are counted alongside them because the two together say WHICH
+    // KIND of navigation the extra one is: `framenavigated` fires for
+    // same-document history updates as well as real document loads, so
+    // `documents: 1` with two navigations means the client router pushed the
+    // second one, while `documents: 2` means something forced a hard reload.
+    // Those have different causes and different fixes.
+    const recordNavigations = async (): Promise<{ navigations: string[]; documents: number }> => {
+      const navigations: string[] = [];
+      let documents = 0;
+      const onNavigated = (frame: Frame) => {
+        if (frame === page.mainFrame()) navigations.push(new URL(frame.url()).pathname);
       };
-      page.on('framenavigated', record);
+      const onRequest = (request: Request) => {
+        if (request.resourceType() === 'document') documents++;
+      };
+      page.on('framenavigated', onNavigated);
+      page.on('request', onRequest);
       await page.goto('/login');
       await page.waitForLoadState('networkidle');
-      page.off('framenavigated', record);
-      return seen;
+      page.off('framenavigated', onNavigated);
+      page.off('request', onRequest);
+      return { navigations, documents };
     };
 
     // G2 (design.md D7, declared gap): logout()'s guard is
