@@ -76,34 +76,67 @@ authorization the rule in `CLAUDE.md` stands: ask first, every time.
   genuine email field.
 - Every backend validator's optional-email rule.
 
-## Still open — the phone rules
+## The phone rules — DONE
 
-Decided 2026-08-07, **not yet implemented**. The email side is done; the phone is the
-remaining work. The phone stops being a global requirement and becomes an **owner and
-reseller** requirement.
+Decided 2026-08-07, implemented the same day on `feat/phone-validation-owner-reseller`
+(SDD change `phone-validation-owner-reseller`). The phone stopped being a global
+requirement and became an **owner and reseller** requirement.
 
-| Path | Target rule | Today | Action |
-|---|---|---|---|
-| Create/edit **owner** (frontend) | no validation | `PHONE_REGEX` `/^\+53\s?[0-9]\s?[0-9]{3}-?[0-9]{4}$/` at `owner-create.tsx:80`, `owner-edit.tsx:200` | drop the regex |
-| Create/edit **reseller** (frontend) | no validation | same regex at `reseller-create.tsx:59`, `reseller-edit.tsx:106` | drop the regex |
-| **Edit user** | never validated | frontend requires it (`UserDetailsForm.tsx:46`); backend has no rule | drop the frontend check |
-| **Create store user** | never validated | neither `UserCreateForm.tsx` nor `CreateStoreUserCommandValidator` validates | already correct — verify only |
-| **Edit own profile** | required **only when the user is an owner or a reseller** | `edit-profile-form.tsx:42` requires it always | make it conditional on the role |
+| Path | Rule | What shipped |
+|---|---|---|
+| Create/edit **owner** (frontend) | no validation | `PHONE_REGEX` removed from `owner-create.tsx`, `owner-edit.tsx` |
+| Create/edit **reseller** (frontend) | no validation | same regex removed from `reseller-create.tsx`, `reseller-edit.tsx` |
+| **Edit user** | never validated | frontend check removed from `UserDetailsForm.tsx` |
+| **Create store user** | never validated | already correct — verified, unchanged |
+| **Edit own profile** | required **only when the user is an owner or a reseller** | `edit-profile.tsx` computes `phoneRequired` from `isOwnerAdmin(user) \|\| isReSeller(user)` and passes it to `edit-profile-form.tsx` |
 
-The regex is the reason: it forces a Cuban `+53` number on every phone, which is not a rule
+The regex was the reason: it forced a Cuban `+53` number on every phone, which is not a rule
 this product wants to make.
 
-### Two decisions left open, on purpose
+### The gating clause, and how it was met
 
-1. **Registration was not mentioned.** It requires the phone in both layers today
-   (`register.tsx:71`, `RegisterCommandValidator.cs:32`), and registration creates an
-   OwnerAdmin — which "required for owners" would keep. Assume it stays required unless
-   stated otherwise.
+The backend `NotEmpty` rules stayed, so once the frontend stopped validating, the user meets
+a server error instead of a local one. This document required that error to render properly
+before the work counted as done. It did not render at all: `api-client.ts` has no
+`validateStatus` override, so axios **rejects** on 400 and the `!res.succeeded` branch in
+those four forms was dead code for validation failures — every 400 fell through to the
+generic "Ocurrió un error. Intentá de nuevo."
+
+What shipped instead: `shared/lib/http/api-error-message.ts`, which maps the backend's error
+**code** to our own i18n copy and renders it in the single top-of-form `role="alert"` banner
+these forms already had. Two traps it has to survive, both pinned by tests:
+
+- **The code is not at a fixed index.** `FullName` is declared before the phone in all four
+  validators (`CreateOwner:31/:35`, `CreateReSeller:44/:48`, `UpdateOwner:18/:22`,
+  `UpdateReSeller:28/:32`), and FluentValidation's default `Continue` cascade collects every
+  failure in declaration order. Reading `errors[0]` would miss the phone. The mapping scans
+  the whole array.
+- **The code's casing differs between create and update** — `Cellphone` vs `CellPhone` —
+  because the DTOs declare it differently (`CreateOwnerCommand.cs:20` vs
+  `UpdateOwnerCommand.cs:24`). Matching is case-insensitive.
+
+Discriminating by HTTP status would have been wrong: every backend validation failure arrives
+as 400, so a status-keyed map would announce a phone problem when the name was what failed.
+
+**No inline per-field UI was added.** The four admin forms show every error — password policy,
+password mismatch, server errors — in one banner above the form, and the old phone-format
+error already rendered there. Adding a per-field slot would have been new UI for a message
+the form already knew how to show.
+
+### Two decisions that were closed on purpose
+
+1. **Registration keeps requiring the phone** in both layers (`register.tsx:71`,
+   `RegisterCommandValidator.cs:32`). Registration creates an OwnerAdmin, which "required for
+   owners" preserves anyway.
 2. **The backend `NotEmpty` rules for owner and reseller stay** (`CreateOwner:35`,
-   `UpdateOwner:22`, `CreateReSeller:48`, `UpdateReSeller:32`). Once the frontend stops
-   validating, the user meets a server error instead of an inline one. That is consistent
-   with the target rule, but the backend message has to render properly in those forms
-   before the work counts as done.
+   `UpdateOwner:22`, `CreateReSeller:48`, `UpdateReSeller:32`). Zero backend production code
+   changed.
 
-Before touching any of it: check whether an existing E2E test asserts these validations.
-The rule in `CLAUDE.md` applies — ask first.
+### What this cost in tests
+
+No Playwright E2E asserts any of this, so the rule in `CLAUDE.md` never fired — verified, not
+assumed, and `frontend-react/e2e/` shows no diff. Five existing vitest component tests that
+pinned the old behavior were updated. Six more were added afterwards to close a coverage
+asymmetry — the four admin forms delegate to one shared function, so a form could lose its own
+wiring without any component test noticing. Each of those six was proven to bite by
+temporarily breaking the wiring and watching it fail.
