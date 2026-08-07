@@ -7,14 +7,17 @@
 // `error.response.data.actionCode`. The two channels are structurally disjoint
 // (an axios rejection has no top-level `actionCode`; a resolved envelope has no
 // `response`), so precedence only matters for the synthetic case that pins it.
+//
+// ADR-1 (design.md): this function is now a thin wrapper over the shared
+// `apiErrorMessageId` (`shared/lib/http/api-error-message.ts`). Signature and the 4
+// existing call sites are unchanged; `byCode` is a new optional 3rd param used by
+// FE-OC7's phone-required mapping.
+import { apiErrorMessageId } from '~/shared/lib/http/api-error-message';
+
 export function ownerErrorMessageId(
   error: unknown,
-  byStatus: Record<number, string>
+  byStatus: Record<number, string>,
+  byCode?: Record<string, string>
 ): string {
-  const src = error as
-    | { response?: { status?: number }; succeeded?: boolean; actionCode?: number | null }
-    | null
-    | undefined;
-  const status = src?.response?.status ?? (src?.succeeded === false ? src?.actionCode : undefined);
-  return (typeof status === 'number' && byStatus[status]) || 'OWNER.ERROR';
+  return apiErrorMessageId(error, { byStatus, byCode, fallback: 'OWNER.ERROR' });
 }
