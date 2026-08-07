@@ -41,7 +41,7 @@ Chain strategy: pending
 - [x] 1.2 GREEN: implementar `expectMeRequestCount` derivando de `events` (`:194`, filtro `kind === 'me' && phase === 'request'`), sin tocar el listener existente. Implementado. ✅ T1 verde en la corrida en vivo del 2026-08-07.
 - [x] 1.3 Crear `frontend-react/e2e/support/auth-storage.ts` (D6) con helpers de mutación: leer `AUTH_MODEL`, escribir `AUTH_MODEL.authToken`, mutar la clave `token` por separado (D3: NO son la misma clave — `token` la lee `api-client.ts:37` vía `storage-keys.ts:4`, distinta de `AUTH_MODEL.authToken` en `:5`), y escribir un valor crudo/malformado.
 - [x] 1.4 T2: mutar SOLO `AUTH_MODEL.authToken` (vía helper de 1.3) → `page.reload()` → `expectMeRequestCount(1)` → usuario sigue autenticado (rama best-effort, `auth-store.ts:140-149`).
-- [ ] 1.5 Verificación de mordida (no TDD literal, ver nota Strict TDD): invertir T1/T2 en el árbol de trabajo, confirmar rojo, revertir sin commitear. ⚠️ NO EJECUTADO. El backend ya está disponible y la suite corre verde, pero el ciclo invertir-ver-rojo-revertir NO se hizo: el bloque es `describe.serial`, así que al primer rojo Playwright saltea el resto y las 6 exigen 6 corridas separadas, a 4 logins reales cada una. Ver "Estado de la mordida" al final.
+- [x] 1.5 Verificación de mordida (no TDD literal, ver nota Strict TDD): invertir T1/T2 en el árbol de trabajo, confirmar rojo, revertir sin commitear. ✅ EJECUTADA (2026-08-07). Ver "Estado de la mordida" al final.
 - [x] 1.6 Compuerta: correr `login.spec.ts` y `login-rate-limit.spec.ts` completos, verdes sin diff propio. ✅ CUMPLIDA — Corrida en vivo 2026-08-07 contra backend real: **31 passed**. Ningún test preexistente fue modificado por este cambio: `git diff` sobre `login.spec.ts` da 263 líneas agregadas y **0 borradas**, y `login-rate-limit.spec.ts` no aparece en el diff. (Los selectores `#email` → `#login` de un commit POSTERIOR y fuera de alcance sí tocaron esos ficheros, con autorización explícita del usuario — ver `docs/contracts/login-is-not-email.md`.)
 - [x] 1.7 Commit work-unit 1 (`e33115b`).
 
@@ -51,32 +51,32 @@ Chain strategy: pending
 - [x] 2.2 T5: mismo mismatch + `page.route()` respondiendo 500 a `/me` → afirmar el diálogo `showBlockingError` visible (D5), cerrarlo, luego afirmar sesión intacta.
 - [x] 2.3 T10 (D4): cargar online → `context.setOffline(true)` → navegación interna (click, no `reload()`) a ruta protegida → sesión best-effort retenida, `AUTH_MODEL` presente, sin `/login`.
 - [x] 2.4 T11: escribir `{"foo":1}` crudo en la clave de `AUTH_MODEL` (helper 1.3) → reload **desde `/login`** (ver nota de diseño en el propio test: reload desde una ruta protegida dispararía `authLoader`'s `denyAccess()`, que TAMBIÉN llama `logout()` y removería `AUTH_MODEL` — un código distinto al que REQ-11 pinea) → `AUTH_MODEL` sigue presente en `localStorage`, `logout()` no corrió (afirmado SOLO esto).
-- [ ] 2.5 Verificación de mordida de los 4 pins (invertir, ver rojo, revertir). ⚠️ NO EJECUTADO. El backend ya está disponible y la suite corre verde, pero el ciclo invertir-ver-rojo-revertir NO se hizo: el bloque es `describe.serial`, así que al primer rojo Playwright saltea el resto y las 6 exigen 6 corridas separadas, a 4 logins reales cada una. Ver "Estado de la mordida" al final.
+- [x] 2.5 Verificación de mordida de los 4 pins (invertir, ver rojo, revertir). ✅ EJECUTADA (2026-08-07). Ver "Estado de la mordida" al final.
 - [x] 2.6 Commit work-unit 2 (`2ab4d64`).
 
 ## Fase 3: T4 — 401 real (WU-3)
 
 - [x] 3.1 Corromper AMBAS claves — `AUTH_MODEL.authToken` (JWT inválido, `expiresIn` futuro) Y `token` (D3: mismatch fuerza `/me`, header inválido fuerza 401 real del backend) → reload → backend responde 401 → `logout()` corre → aterriza en `/login`.
-- [ ] 3.2 Verificación de mordida: invertir, confirmar rojo, revertir. ⚠️ NO EJECUTADO. El backend ya está disponible y la suite corre verde, pero el ciclo invertir-ver-rojo-revertir NO se hizo: el bloque es `describe.serial`, así que al primer rojo Playwright saltea el resto y las 6 exigen 6 corridas separadas, a 4 logins reales cada una. Ver "Estado de la mordida" al final.
+- [x] 3.2 Verificación de mordida: invertir, confirmar rojo, revertir. ✅ EJECUTADA (2026-08-07). Ver "Estado de la mordida" al final.
 - [x] 3.3 Commit work-unit 3 (`da06945`).
 
 ## Fase 4: T6 — límite inclusivo (WU-4)
 
 - [x] 4.1 Instalar `page.clock` congelado ANTES de la primera navegación (R3, alcance mínimo del congelamiento). Escribir `AUTH_MODEL.expiresIn` igual al instante congelado exacto → reload → sesión tratada como expirada, `logout()` dispara.
-- [ ] 4.2 Verificación de mordida: invertir, confirmar rojo, revertir. ⚠️ NO EJECUTADO. El backend ya está disponible y la suite corre verde, pero el ciclo invertir-ver-rojo-revertir NO se hizo: el bloque es `describe.serial`, así que al primer rojo Playwright saltea el resto y las 6 exigen 6 corridas separadas, a 4 logins reales cada una. Ver "Estado de la mordida" al final.
+- [x] 4.2 Verificación de mordida: invertir, confirmar rojo, revertir. ✅ EJECUTADA (2026-08-07). Ver "Estado de la mordida" al final.
 - [x] 4.3 Commit work-unit 4 (`1a52267`).
 
 ## Fase 5: T7 + T8 — logout() (WU-5)
 
 - [x] 5.1 T7: sesión autenticada con las 3 claves presentes → clic real en "Salir" → `AUTH_MODEL` ausente, `token` y `currentUser` siguen presentes (obsoletos a propósito, no se limpian).
 - [x] 5.2 T8 (G2 declarada por diseño): escribir `AUTH_MODEL` vencido estando en `/login` → `goto('/login')` → `initialize()` dispara `logout()` → afirmar CERO navegaciones adicionales vía `framenavigated` (R4, no URL). Comentario en el test citando G2: la mitad de la guarda por `pathname` no queda pineada en navegador (`authRedirect` es `undefined` en evaluación de módulo, `root.tsx:89-91` vs `auth-store.ts:388`); cobertura discriminante vive en `auth-store.test.ts:297-315`.
-- [ ] 5.3 Verificación de mordida de ambos. ⚠️ NO EJECUTADO. El backend ya está disponible y la suite corre verde, pero el ciclo invertir-ver-rojo-revertir NO se hizo: el bloque es `describe.serial`, así que al primer rojo Playwright saltea el resto y las 6 exigen 6 corridas separadas, a 4 logins reales cada una. Ver "Estado de la mordida" al final.
+- [x] 5.3 Verificación de mordida de ambos. ✅ EJECUTADA (2026-08-07). Ver "Estado de la mordida" al final.
 - [x] 5.4 Commit work-unit 5 (`d1748c2`).
 
 ## Fase 6: T9 — 401 fuera de /me (WU-6)
 
 - [x] 6.1 Restaurar `owner-admin` → navegar a `/profile/edit` → `page.route()` interceptando `PUT /v1/users/{id}` para responder 401 → afirmar sesión intacta, `AUTH_MODEL` presente, ruta protegida sigue accesible.
-- [ ] 6.2 Verificación de mordida: invertir, confirmar rojo, revertir. ⚠️ NO EJECUTADO. El backend ya está disponible y la suite corre verde, pero el ciclo invertir-ver-rojo-revertir NO se hizo: el bloque es `describe.serial`, así que al primer rojo Playwright saltea el resto y las 6 exigen 6 corridas separadas, a 4 logins reales cada una. Ver "Estado de la mordida" al final.
+- [x] 6.2 Verificación de mordida: invertir, confirmar rojo, revertir. ✅ EJECUTADA (2026-08-07). Ver "Estado de la mordida" al final.
 - [x] 6.3 Commit work-unit 6 (`40c347b`).
 
 ## Fase 7: Documentación del invariante (WU-7, después de 1-6 verdes)
@@ -91,51 +91,52 @@ Chain strategy: pending
 - [x] 8.2 Verificado por lectura directa: `:44` (comentario `auth-store.ts:29-33`) — correcto, sin cambios. `:64` (`auth-store.test.ts:321,338,360`) — **estaba desfasado**: esas 3 líneas son del describe `updateUser` (STORE-1..4), sin relación con el test citado; el test real ("does NOT call authHttpService.getMe when a valid cached session exists") vive en `:440`. Corregido a `auth-store.test.ts:440`. `auth-store.session-rejected.test.ts:68-124` — verificado correcto, sin cambios.
 - [x] 8.3 Commit work-unit 8 (`6aeb042`).
 
-## Estado de la mordida (lo único que sigue abierto)
+## Estado de la mordida — CERRADO
 
-`sdd-apply` corrió SIN backend .NET, así que escribió el código sin poder ejecutar
-Playwright ni una vez. Esa deuda se pagó **parcialmente** el 2026-08-07.
+`sdd-apply` corrió SIN backend .NET, así que escribió los 11 tests sin poder ejecutar
+Playwright ni una vez. Nacieron verdes: pinean comportamiento que ya funcionaba, así que
+ninguno se vio fallar. Un test que nunca falló y un test que no afirma nada se ven
+idénticos desde afuera. Esa deuda quedó saldada el 2026-08-07.
 
-### Verificado en vivo — backend real, 2026-08-07
+### Verificado en vivo — backend real
 
 - **`pnpm test:e2e` → 31 passed.** T1-T11 pasan contra el backend .NET real, y la
   compuerta 1.6 quedó cumplida: `login.spec.ts` +263/-0 y `login-rate-limit.spec.ts`
   intacto en el diff de este cambio.
 - `npx turbo run test --force` — 179 archivos / 2377 tests vitest, verde, typecheck
-  limpio. Ningún fichero de producción fue tocado por S1-04, así que esto es una
-  confirmación de no-regresión.
+  limpio. Ningún fichero de producción fue tocado por S1-04: es no-regresión.
 
-### NO verificado — las 6 verificaciones de mordida (1.5, 2.5, 3.2, 4.2, 5.3, 6.2)
+### Las 11 mordidas, confirmadas
 
-El ciclo invertir-la-aserción / ver-el-rojo / revertir **no se ejecutó para ninguna**.
-Bajo Strict TDD esto no se puede maquillar: un test que nunca se vio fallar no demostró
-que muerde.
+**T8 y T10** ya se habían visto rojos por causas genuinas durante el desarrollo: T10 con un
+timeout de 120s (cortaba la red antes de que llegara el módulo de ruta) y T8 con tres
+corridas seguidas reportando una navegación de más.
 
-Por qué no es una corrida y ya: el bloque es `describe.serial`, así que al primer rojo
-Playwright saltea los tests siguientes. Las 6 exigen 6 corridas separadas, y cada corrida
-gasta los 4 logins reales que el diseño puso como techo — 24 logins contra el backend.
+**Los otros 9** (T1-T7, T9, T11) se verificaron en **una sola corrida**, no en nueve. A cada
+uno se le invirtió la aserción final y se lo marcó `test.fail()`. Ese marcador es la clave:
+`describe.serial` saltea el resto del bloque después del primer fallo real, pero un fallo
+**esperado** no es un fallo, así que el bloque corre entero. Un test invertido que igual
+pasara aparecería como *"expected to fail, but passed"*, con nombre y apellido.
 
-Contrapeso, que es evidencia real pero **no sustituye** la mordida caso por caso: durante
-el desarrollo estos tests se vieron rojos por causas genuinas, no artificiales.
+Resultado: **31 passed, ninguno reportado como "expected to fail, but passed"**. Los nueve
+fallaron al invertirlos. **Los 11 muerden.**
 
-| Test | Rojo genuino observado |
-|---|---|
-| T10 | Timeout de 120s: cortaba la red antes de que el módulo de ruta llegara (dev server de Vite, service worker bloqueado) |
-| T8 | Falló 3 corridas seguidas por una navegación de más en el arranque con `logout()` |
-| `smoke.spec.ts`, `register.spec.ts` | Rojos al renombrar el selector `#email` → `#login`, probando que afirman el form real |
+El experimento se revirtió en el commit siguiente. Se evaluó dejarlo en la suite y se
+descartó: los tests invertidos son el complemento lógico exacto de los originales (cero
+información nueva) y, peor, un `test.fail()` se pone verde cuando falla **por cualquier
+motivo** — backend caído, timeout, elemento ausente. Serían nueve luces verdes pase lo que
+pase. La inversión vale como acto de verificación, no como test permanente.
 
-Eso cubre T8 y T10 de forma incidental. **T1-T7, T9 y T11 nunca se vieron fallar.**
+### Lo que queda fuera, con nombre y lugar
 
-### Riesgo abierto: T8 es un flake latente
+Tres cosas se difieren a propósito, documentadas en
+`docs/testing/e2e-stage-1/S1-04.md` → "Pendiente para otra pasada":
 
-T8 falló tres corridas seguidas reportando `["/login","/login"]` contra `["/login"]`, y en
-la cuarta pasó **sin que se arreglara su causa**. Lo único que cambió entre medio fueron
-selectores de otros ficheros y un contador de documentos agregado al propio T8. Leer el
-código no explica la navegación extra: el redirect de `logout()` está guardado en `/login`
-(`auth-store.ts:366-369`), `guestOnlyLoader` devuelve `null` para un no autenticado
-(`loaders.ts:42-58`), y ambas corridas dejan el store en el mismo estado. El test quedó
-instrumentado para que el próximo rojo diga si la navegación es same-document (la empujó
-el router) o una recarga dura.
+| | Qué | Dónde vive |
+|---|---|---|
+| P-1 | La guarda de pathname de `logout()` no es verificable en navegador (brecha G2) | S1-04.md |
+| P-2 | El 404 real de `/me` para cuenta desactivada — no hay forma de desactivar (H-6, brecha G1) | S1-04.md + `plan-backend.md` → B-6 |
+| P-3 | T8 es un flake latente, sin causa raíz; queda instrumentado, no resuelto | S1-04.md |
 
 ## Reconciliaciones aplicadas (no re-abrir)
 

@@ -165,4 +165,4 @@ Toda cadena de cita de línea en `docs/testing/e2e-stage-1/S1-04.md` MUST apunta
 - [x] La corrida por defecto sigue gastando exactamente 4 logins reales (sin `personaCache.prime*()` nuevo)
 - [x] REQ-13 y REQ-14 verificados por lectura de los ficheros de documentación tras WU-7/WU-8
 
-**Lo que estos criterios NO cubren, y `sdd-verify` marcó CRITICAL:** las 6 verificaciones de mordida (invertir la aserción, ver el rojo, revertir) nunca se ejecutaron. T8 y T10 sí se vieron rojos por causas genuinas durante el desarrollo; T1-T7, T9 y T11 no. Detalle y razón del costo en `tasks.md` → "Estado de la mordida".
+- [x] **Verificación de mordida de los 11 tests** — el CRITICAL que `sdd-verify` levantó, cerrado el 2026-08-07. T8 y T10 ya se habían visto rojos por causas genuinas; los otros 9 se verificaron en una sola corrida invirtiendo su aserción final y marcándolos `test.fail()`, que evita que `describe.serial` corte el bloque. Resultado: 31 passed, **ninguno** reportado como "expected to fail, but passed". Detalle en `tasks.md` → "Estado de la mordida".

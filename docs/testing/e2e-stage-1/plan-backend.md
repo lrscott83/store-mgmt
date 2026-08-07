@@ -19,6 +19,7 @@ Varios ítems de acá **tocan tests E2E existentes**. Cada uno declara si necesi
 | [B-3](#b-3) | `MintToken` saltea el endpoint de login | Alta | No | No — solo agrega tests nuevos |
 | [B-4](#b-4) | `GetPagedReponseAsync`: `Skip`/`Take` sin `OrderBy` | Media | No — código muerto | No |
 | [B-5](#b-5) | Rechazos esperados logueados como `Unhandled exception` | Baja | No | No |
+| [B-6](#b-6) | No hay forma de desactivar una cuenta, así que el 404 de `/me` no se ejerce | Media | No — brecha declarada | No — solo agrega tests nuevos |
 
 Lo ya cerrado en la rama `feat/e2e-playwright-login-s1-02` está en [Antecedentes](#antecedentes) — leerlo primero, porque explica por qué esta lista existe.
 
@@ -169,6 +170,34 @@ Ambos son comportamiento **correcto y esperado**:
 **Riesgo**: bajo, pero no nulo — bajar el nivel de una excepción esconde información si algún día una `ValidationException` sí indica un defecto. Mitigación: conservar el mensaje y los campos que fallaron, y quitar solo el stack.
 
 **Autorización**: no requerida. No toca tests.
+
+---
+
+## B-6
+
+### No hay forma de desactivar una cuenta, así que el 404 de `/me` nunca se ejerce
+
+**Qué pasa.** `GetMeQuery` usa 404 para dos casos distintos: *NotFound* y *AccountInactive*.
+El frontend los trata igual — `isSessionRejection` (`auth-store.ts:39-45`) evalúa
+`status === 401 || status === 404` en la **misma expresión** — así que la reacción del
+cliente al 404 ya está cubierta por el test del 401 (S1-04, T4).
+
+Lo que **no** está verificado es el lado del servidor: que `/me` devuelva efectivamente 404
+cuando la cuenta está desactivada.
+
+**Por qué no se cubrió en S1-04.** Para montar el escenario hay que desactivar una cuenta, y
+**ninguna pantalla llama `activate(false)`** (H-6). Desde la UI no se llega. Un test E2E de
+Playwright no tiene forma de producir el estado.
+
+**Qué haría falta.** Desactivar la cuenta por fuera de la UI — endpoint directo o seed en
+base — y después pedir `/me` con el token de esa cuenta. Encaja mejor como test E2E de .NET
+(`SMCA.WebApi.E2ETests`) que como Playwright: el sujeto es la respuesta del servidor, no lo
+que hace el navegador con ella.
+
+**Alcance.** Solo agrega tests nuevos. No toca ningún E2E existente.
+
+**Origen.** Brecha G1 declarada en el cambio `e2e-playwright-session-hydration-s1-04`, ver
+[S1-04.md](S1-04.md) → "Pendiente para otra pasada", P-2.
 
 ---
 
