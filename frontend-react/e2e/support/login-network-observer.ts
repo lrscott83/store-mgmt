@@ -149,11 +149,21 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
   let loginRequestSeen = false;
   let meRequestSeen = false;
 
+  // An outcome is delivered to exactly ONE consumer: a waiter if someone is
+  // already blocked on it, the queue otherwise. Never both.
+  //
+  // Doing both — queueing AND resolving every waiter — double-counts. The waiter
+  // returns the outcome while a copy stays in the queue, so the NEXT
+  // waitForLoginResponse() shifts that stale copy and returns immediately, and
+  // the observer falls one response behind for the rest of the run. In a loop
+  // that only cares about the LAST response, being one behind loses it entirely.
   function pushOutcome(outcome: Outcome): void {
+    const waiter = waiters.shift();
+    if (waiter) {
+      waiter(outcome);
+      return;
+    }
     outcomes.push(outcome);
-    const pending = waiters;
-    waiters = [];
-    pending.forEach((resolve) => resolve(outcome));
   }
 
   page.on('request', (request: PlaywrightRequest) => {
