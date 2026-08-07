@@ -8,6 +8,8 @@ Toda aserción de esta etapa está anclada a código leído, con `archivo:línea
 
 Este fichero contiene **solo lo general y el estado**. El detalle de cada User Story —flujo, precondiciones y aserciones— vive en su fichero propio.
 
+> **Trabajo diferido de backend**: [plan-backend.md](plan-backend.md) reúne lo que apareció en el servidor mientras se implementaba esta etapa — un test E2E vencido por calendario, otras 20 fechas hardcodeadas con la misma bomba, y el hueco de método que dejó pasar dos bugs de producción. Nada de eso se ejecuta sin decisión explícita.
+
 ---
 
 ## 1. Estado por User Story
