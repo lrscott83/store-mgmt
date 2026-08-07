@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Frame, Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { LoginPage } from './support/login-page';
 import { RegisterPage } from './support/register-page';
@@ -521,10 +521,24 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     await page.goto('/login');
     await mutateAuthModel(page, { expiresIn: Date.now() - 1 });
 
-    const navigations: string[] = [];
-    page.on('framenavigated', (frame) => {
-      if (frame === page.mainFrame()) navigations.push(frame.url());
-    });
+    // REQ-8 claims "no navigation ADDITIONAL to the initial load", so the
+    // baseline is MEASURED, not assumed. A cold boot of this SPA does not
+    // necessarily cost exactly one `framenavigated` on the main frame: the
+    // client router initializes after the document load (`ssr: false`,
+    // react-router.config.ts:8) and same-document history updates raise the
+    // event too. Pinning an absolute count pins a framework detail nobody
+    // measured, instead of the behavior under test.
+    const countNavigations = async (): Promise<number> => {
+      const seen: string[] = [];
+      const record = (frame: Frame) => {
+        if (frame === page.mainFrame()) seen.push(frame.url());
+      };
+      page.on('framenavigated', record);
+      await page.goto('/login');
+      await page.waitForLoadState('networkidle');
+      page.off('framenavigated', record);
+      return seen.length;
+    };
 
     // G2 (design.md D7, declared gap): logout()'s guard is
     // `pathname !== '/login' && pathname !== '/'` (auth-store.ts:365). On a
@@ -535,12 +549,20 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // assertion cannot discriminate the pathname guard itself; that
     // coverage lives in `auth-store.test.ts:297-315` (a real spy). What IS
     // observable here: zero additional navigations after this reload.
-    await page.goto('/login');
-    await page.waitForLoadState('networkidle');
+    const withLogout = await countNavigations();
 
-    expect(navigations).toHaveLength(1);
     const authModel = await readRawAuthModel(page);
     expect(authModel).toBeNull();
+
+    // The control: the same reload of the same route, but `AUTH_MODEL` is
+    // already gone, so `initialize()` has nothing to expire and `logout()`
+    // never runs. Whatever the framework spends on boot it spends here too —
+    // the difference between the two counts is logout()'s own contribution,
+    // which REQ-8 claims is zero. A logout that DID navigate would still be
+    // caught: it would show up in the first count and not in the second.
+    const withoutLogout = await countNavigations();
+
+    expect(withLogout).toBe(withoutLogout);
   });
 
   test('REQ-9: a 401 outside /me leaves the session intact (T9)', async ({ page, personaCache }) => {
