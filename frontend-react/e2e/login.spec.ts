@@ -446,4 +446,23 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     const authModel = await readRawAuthModel(page);
     expect(authModel).toBeNull();
   });
+
+  test('REQ-6: expiresIn exactly equal to "now" counts as expired (T6)', async ({
+    page,
+    personaCache,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+
+    // R3: freeze the clock at the NARROWEST scope that still covers the
+    // reload under test — installed right before mutating/reloading, not
+    // around the whole test.
+    const frozenNow = Date.now();
+    await page.clock.install({ time: frozenNow });
+    await mutateAuthModel(page, { expiresIn: frozenNow });
+    await page.reload();
+
+    await page.waitForURL(/\/login$/);
+    const authModel = await readRawAuthModel(page);
+    expect(authModel).toBeNull();
+  });
 });
