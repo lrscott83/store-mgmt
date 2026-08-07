@@ -221,6 +221,51 @@ describe('ResellerCreatePage — FE-OC8: phone-required 400 rejection', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FE-OC8 #3/#4 — create falls back to the generic message on an unrelated 400,
+// and finds the phone code regardless of position in the errors array (FullName
+// at errors[0] must not fool the classifier)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('ResellerCreatePage — FE-OC8: unrelated 400 and array-scan fallback', () => {
+  it('shows RESELLERS.ERROR when createReseller rejects with 400 and an unrelated code', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.createReseller).mockRejectedValue({
+      response: { status: 400, data: { errors: [{ code: 'FullName' }] } },
+    });
+
+    await renderPage();
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.ERROR']);
+    });
+  });
+
+  it('shows RESELLERS.PHONE_REQUIRED when createReseller rejects with 400 and FullName occupies errors[0]', async () => {
+    const { resellerHttpService } = await import(
+      '~/admin/resellers/lib/services/reseller-http-service'
+    );
+    vi.mocked(resellerHttpService.createReseller).mockRejectedValue({
+      response: { status: 400, data: { errors: [{ code: 'FullName' }, { code: 'Cellphone' }] } },
+    });
+
+    await renderPage();
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['RESELLERS.PHONE_REQUIRED']);
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // S-ADMIN-RESELLERS-CREATE-6 — valid → createReseller + navigate /admin/resellers
 // ═══════════════════════════════════════════════════════════════════════════════
 
