@@ -204,6 +204,58 @@ describe('EditProfilePage — S-EDIT-1: successful submit calls updateProfile an
   });
 });
 
+describe('EditProfilePage — PHONE-3: phone required only for owner/reseller', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsOnline = true;
+    mockUpdateUser = vi.fn();
+    mockUpdateProfile = vi.fn().mockResolvedValue({ data: makeUser({ cellPhone: '' }) });
+  });
+
+  it('saves with an empty phone when the user is neither owner nor reseller', async () => {
+    mockUser = makeUser({ cellPhone: '', isOwnerAdmin: false, isReSeller: false });
+    const { EditProfilePage } = await import('../edit-profile');
+    render(
+      <Wrapper>
+        <EditProfilePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    await waitFor(() => {
+      expect(mockUpdateProfile).toHaveBeenCalledWith('u1', expect.objectContaining({ cellPhone: '' }));
+    });
+  });
+
+  it('blocks submit with an empty phone when the user is owner admin', async () => {
+    mockUser = makeUser({ cellPhone: '', isOwnerAdmin: true, isReSeller: false });
+    const { EditProfilePage } = await import('../edit-profile');
+    render(
+      <Wrapper>
+        <EditProfilePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('blocks submit with an empty phone when the user is a reseller', async () => {
+    mockUser = makeUser({ cellPhone: '', isOwnerAdmin: false, isReSeller: true });
+    const { EditProfilePage } = await import('../edit-profile');
+    render(
+      <Wrapper>
+        <EditProfilePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+    expect(mockUpdateProfile).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+});
+
 describe('EditProfilePage — S-EDIT-2: error response shows inline error (ERR-1)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

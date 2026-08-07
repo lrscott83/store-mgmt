@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { isOwnerAdmin, isReSeller } from '~/shared/lib/auth/authorization-service';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { profileHttpService } from '~/profile/lib/services/profile-http-service';
 import { EditProfileForm } from '~/profile/components/edit-profile-form';
@@ -22,6 +23,11 @@ export function EditProfilePage() {
     cellPhone: user?.cellPhone ?? '',
     email: user?.email ?? '',
   };
+
+  // ADR-6 (design.md): phone stays required for owner/reseller; everyone else can
+  // save with it empty. A null user (no session) never reaches submit — handleSubmit
+  // returns early below — so `false` here enables nothing unsafe.
+  const phoneRequired = user ? isOwnerAdmin(user) || isReSeller(user) : false;
 
   async function handleSubmit(values: {
     fullName: string;
@@ -68,6 +74,7 @@ export function EditProfilePage() {
         onSubmit={handleSubmit}
         error={error}
         successMessage={successMessage}
+        phoneRequired={phoneRequired}
       />
     </div>
   );

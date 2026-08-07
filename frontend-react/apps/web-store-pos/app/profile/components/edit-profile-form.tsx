@@ -15,6 +15,10 @@ interface EditProfileFormProps {
   onSubmit: (values: EditProfileFormValues) => void;
   error?: string;
   successMessage?: string;
+  /** ADR-6 (design.md): required for owner/reseller, optional for everyone else.
+   *  Defaults to `true` — the strictest rule — so a call site that forgets to pass
+   *  it keeps today's behavior instead of silently relaxing validation. */
+  phoneRequired?: boolean;
 }
 
 function isValidEmail(email: string): boolean {
@@ -28,6 +32,7 @@ export function EditProfileForm({
   onSubmit,
   error,
   successMessage,
+  phoneRequired = true,
 }: EditProfileFormProps) {
   const intl = useIntl();
   const [fullName, setFullName] = useState(initialValues.fullName);
@@ -39,7 +44,7 @@ export function EditProfileForm({
     e.preventDefault();
     setValidationError('');
 
-    if (!fullName.trim() || !cellPhone.trim()) {
+    if (!fullName.trim() || (phoneRequired && !cellPhone.trim())) {
       setValidationError(intl.formatMessage({ id: 'PROFILE.REQUIRED' }));
       return;
     }

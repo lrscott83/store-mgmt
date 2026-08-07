@@ -100,6 +100,43 @@ describe('EditProfileForm — cellPhone is required (new check, Angular parity)'
   });
 });
 
+describe('EditProfileForm — PHONE-3: phoneRequired={false} lets an empty phone through', () => {
+  it('calls onSubmit when cellPhone is empty and phoneRequired is false', () => {
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <EditProfileForm
+          initialValues={{ fullName: 'Juan Pérez', cellPhone: '', email: 'juan@test.com' }}
+          isOnline
+          isLoading={false}
+          onSubmit={onSubmit}
+          phoneRequired={false}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+    expect(onSubmit).toHaveBeenCalled();
+  });
+});
+
+describe('EditProfileForm — PHONE-3 fail-safe: phoneRequired omitted keeps the strictest default', () => {
+  it('does not call onSubmit when cellPhone is empty and phoneRequired is not passed', () => {
+    const onSubmit = vi.fn();
+    render(
+      <Wrapper>
+        <EditProfileForm
+          initialValues={{ fullName: 'Juan Pérez', cellPhone: '', email: 'juan@test.com' }}
+          isOnline
+          isLoading={false}
+          onSubmit={onSubmit}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
 describe('EditProfileForm — EDIT-8: blocks submit when fullName is empty', () => {
   it('does not call onSubmit when fullName is empty', () => {
     const onSubmit = vi.fn();
