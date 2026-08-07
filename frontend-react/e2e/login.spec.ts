@@ -4,6 +4,7 @@ import { LoginPage } from './support/login-page';
 import { RegisterPage } from './support/register-page';
 import { newTestIdentity, type TestIdentity } from './support/identity';
 import { restoreSignedInSession, createStoreUserViaUi } from './support/session';
+import { mutateAuthModel } from './support/auth-storage';
 
 // Literal Spanish copy asserted below, cited from
 // apps/web-store-pos/app/shared/lib/i18n/es.ts (design.md §5, §7). Hardcoded
@@ -290,4 +291,44 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
       expect(page.url()).not.toMatch(/\/admin\/owners$/);
     }
   );
+
+  // S1-04 (e2e-session-hydration): T1-T11, appended after the live-login
+  // block above. Every test below restores an ALREADY-MINTED persona
+  // (design.md D1, spec's R8 note) — none of them acuña a new one, so this
+  // block spends zero additional real logins against the 4-login ceiling
+  // (design.md §2).
+
+  test('REQ-1: a reload with a valid cache makes zero /me requests (T1)', async ({
+    page,
+    personaCache,
+    loginNetwork,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    // D1: restoreSignedInSession's own navigation already costs 0 /me
+    // (currentUser.authToken === AUTH_MODEL.authToken from the real login) —
+    // this reload re-checks the SAME cache-valid branch (auth-store.ts:125).
+    await page.reload();
+    await page.waitForURL(/\/sales\/products$/);
+    loginNetwork.expectMeRequestCount(0);
+  });
+
+  test('REQ-2: a cache mismatch fires exactly one /me and keeps the session (T2)', async ({
+    page,
+    personaCache,
+    loginNetwork,
+  }) => {
+    await restoreSignedInSession(page, personaCache, 'owner-admin');
+    // D3: mutating ONLY AUTH_MODEL.authToken desyncs it from
+    // currentUser.authToken (mismatch branch, auth-store.ts:140-149) while
+    // the `token` key — what api-client.ts:37 actually sends — stays the
+    // real, valid bearer, so the real backend answers /me with 200.
+    await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token-t2' });
+    await page.reload();
+    await loginNetwork.waitForMeRequest();
+    await page.waitForLoadState('networkidle');
+
+    loginNetwork.expectMeRequestCount(1);
+    await expect(page.getByRole('button', { name: 'Menú de usuario' })).toBeVisible();
+    expect(new URL(page.url()).pathname).not.toBe('/login');
+  });
 });

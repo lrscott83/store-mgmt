@@ -91,6 +91,12 @@ export interface LoginNetworkObserver {
    * offline product service, never the API.
    */
   expectNoProductApiCall(): void;
+  /**
+   * S1-04. Cuenta EXACTA de `GET .../v1/auth/me` observados en este test.
+   * Absoluto, sin reset (design.md D2): restaurar una persona cuesta 0 /me
+   * (session.ts:135-143 + auth-store.ts:125).
+   */
+  expectMeRequestCount(expected: number): void;
 }
 
 function isLoginRequest(method: string, url: string): boolean {
@@ -350,6 +356,15 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
           `${productApiRequests.length}: ${urls}. resolveUserHomePath must resolve from the ` +
           'offline product service, never the API (user-home.ts:2,24).'
       );
+    },
+
+    expectMeRequestCount: (expected: number) => {
+      const meRequests = events.filter((e) => e.kind === 'me' && e.phase === 'request');
+      if (meRequests.length !== expected) {
+        throw new Error(
+          `Expected exactly ${expected} GET .../v1/auth/me request(s), observed ${meRequests.length}.`
+        );
+      }
     },
   };
 }
