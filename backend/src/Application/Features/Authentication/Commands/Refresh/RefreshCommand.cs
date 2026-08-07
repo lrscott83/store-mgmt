@@ -2,6 +2,7 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
 using Application.ResponseModels;
+using Application.UnitOfWorks;
 using Domain.Common.Results;
 using Domain.Entities.Authentication;
 using Domain.Interfaces.Repositories;
@@ -20,19 +21,22 @@ internal sealed class RefreshCommandHandler : ICommandHandler<RefreshCommand, Au
     private readonly IUserRepository _userRepository;
     private readonly AuthenticationSettings _authSettings;
     private readonly ILogger<RefreshCommandHandler> _logger;
+    private readonly IApplicationUnitOfWork _applicationUnitOfWork;
 
     public RefreshCommandHandler(
         IRefreshTokenRepository refreshTokenRepository,
         IJwtProvider jwtProvider,
         IUserRepository userRepository,
         IOptions<AuthenticationSettings> authSettings,
-        ILogger<RefreshCommandHandler> logger)
+        ILogger<RefreshCommandHandler> logger,
+        IApplicationUnitOfWork applicationUnitOfWork)
     {
         _refreshTokenRepository = refreshTokenRepository;
         _jwtProvider = jwtProvider;
         _userRepository = userRepository;
         _authSettings = authSettings.Value;
         _logger = logger;
+        _applicationUnitOfWork = applicationUnitOfWork;
     }
 
     public async Task<ResponseResult<AuthDto>> Handle(RefreshCommand request, CancellationToken cancellationToken)
@@ -70,9 +74,10 @@ internal sealed class RefreshCommandHandler : ICommandHandler<RefreshCommand, Au
             // 5. Revoke old refresh token
             existingToken.Revoke(rawRefreshToken);
 
-            // 6. Persist changes (saved by UnitOfWorkBehaviour pipeline)
+            // 6. Persist rotation explicitly — do NOT rely on UnitOfWorkBehaviour: it never saves.
             _refreshTokenRepository.Update(existingToken);
             _refreshTokenRepository.Add(newRefreshToken);
+            await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
             return ResponseResult.Success(new AuthDto(
                 user.Login,

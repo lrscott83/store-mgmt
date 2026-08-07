@@ -2,6 +2,7 @@
 using Application.Abstractions.Messaging;
 using Application.Dtos.Authentication;
 using Application.ResponseModels;
+using Application.UnitOfWorks;
 using Domain.Common.Results;
 using Domain.Entities.Authentication;
 using Domain.Interfaces.Repositories;
@@ -21,6 +22,7 @@ namespace Application.Features.Authentication.Commands.Login
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly AuthenticationSettings _authSettings;
         private readonly ILogger<LoginCommandHandler> _logger;
+        private readonly IApplicationUnitOfWork _applicationUnitOfWork;
 
         public LoginCommandHandler(
             IAuthenticationService authenticationService,
@@ -28,7 +30,8 @@ namespace Application.Features.Authentication.Commands.Login
             IAuthTokenConfig authTokenConfig,
             IRefreshTokenRepository refreshTokenRepository,
             IOptions<AuthenticationSettings> authSettings,
-            ILogger<LoginCommandHandler> logger)
+            ILogger<LoginCommandHandler> logger,
+            IApplicationUnitOfWork applicationUnitOfWork)
         {
             _authenticationService = authenticationService;
             _jwtProvider = jwtProvider;
@@ -36,6 +39,7 @@ namespace Application.Features.Authentication.Commands.Login
             _refreshTokenRepository = refreshTokenRepository;
             _authSettings = authSettings.Value;
             _logger = logger;
+            _applicationUnitOfWork = applicationUnitOfWork;
         }
 
         public async Task<ResponseResult<AuthDto>> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -56,6 +60,7 @@ namespace Application.Features.Authentication.Commands.Login
                 var refreshExpiry = DateTimeOffset.UtcNow.AddDays(_authSettings.RefreshTokenExpirationDays);
                 var refreshToken = new RefreshToken(authResult.Data, rawRefreshToken, refreshExpiry);
                 _refreshTokenRepository.Add(refreshToken);
+                await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
                 return ResponseResult.Success(new AuthDto(
                     request.Login,

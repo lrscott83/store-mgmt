@@ -1,6 +1,7 @@
 using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.ResponseModels;
+using Application.UnitOfWorks;
 using Domain.Common.Extensions;
 using Domain.Common.Results;
 using Domain.Entities.Authentication;
@@ -17,15 +18,18 @@ internal sealed class RevokeCommandHandler : ICommandHandler<RevokeCommand, bool
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IHttpContextService _httpContextService;
     private readonly ILogger<RevokeCommandHandler> _logger;
+    private readonly IApplicationUnitOfWork _applicationUnitOfWork;
 
     public RevokeCommandHandler(
         IRefreshTokenRepository refreshTokenRepository,
         IHttpContextService httpContextService,
-        ILogger<RevokeCommandHandler> logger)
+        ILogger<RevokeCommandHandler> logger,
+        IApplicationUnitOfWork applicationUnitOfWork)
     {
         _refreshTokenRepository = refreshTokenRepository;
         _httpContextService = httpContextService;
         _logger = logger;
+        _applicationUnitOfWork = applicationUnitOfWork;
     }
 
     public async Task<ResponseResult<bool>> Handle(RevokeCommand request, CancellationToken cancellationToken)
@@ -42,6 +46,7 @@ internal sealed class RevokeCommandHandler : ICommandHandler<RevokeCommand, bool
                 {
                     token.Revoke();
                     _refreshTokenRepository.Update(token);
+                    await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
                 }
 
                 return ResponseResult.Success(true);
@@ -57,6 +62,10 @@ internal sealed class RevokeCommandHandler : ICommandHandler<RevokeCommand, bool
                     token.Revoke();
                     _refreshTokenRepository.Update(token);
                 }
+
+                // Save only when something was staged — idempotent no-op otherwise.
+                if (activeTokens.Count > 0)
+                    await _applicationUnitOfWork.SaveChangesAsync(cancellationToken);
 
                 return ResponseResult.Success(true);
             }

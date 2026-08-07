@@ -1,5 +1,6 @@
 using Application.Abstractions.HttpContext;
 using Application.Features.Authentication.Commands.Revoke;
+using Application.UnitOfWorks;
 using Domain.Common.Extensions;
 using Domain.Entities.Authentication;
 using Domain.Interfaces.Repositories;
@@ -19,6 +20,7 @@ public class RevokeCommandHandlerTests
 {
     private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepo;
     private readonly Mock<IHttpContextService> _mockHttpContextService;
+    private readonly Mock<IApplicationUnitOfWork> _mockUnitOfWork;
     private readonly Mock<ILogger<RevokeCommandHandler>> _mockLogger;
     private readonly RevokeCommandHandler _handler;
 
@@ -26,12 +28,18 @@ public class RevokeCommandHandlerTests
     {
         _mockRefreshTokenRepo = new Mock<IRefreshTokenRepository>();
         _mockHttpContextService = new Mock<IHttpContextService>();
+        _mockUnitOfWork = new Mock<IApplicationUnitOfWork>();
         _mockLogger = new Mock<ILogger<RevokeCommandHandler>>();
+
+        _mockUnitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         _handler = new RevokeCommandHandler(
             _mockRefreshTokenRepo.Object,
             _mockHttpContextService.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockUnitOfWork.Object);
     }
 
     [Fact]
@@ -56,6 +64,29 @@ public class RevokeCommandHandlerTests
         // Token should now be revoked
         refreshToken.IsRevoked.Should().BeTrue();
         _mockRefreshTokenRepo.Verify(x => x.Update(refreshToken), Times.Once);
+    }
+
+    [Fact]
+    public async Task Revoke_specificToken_persistsRevocation()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var rawToken = "token-to-revoke";
+        var refreshToken = new RefreshToken(userId, rawToken, DateTimeOffset.UtcNow.AddDays(7));
+
+        _mockRefreshTokenRepo
+            .Setup(x => x.GetByTokenHashAsync(It.IsAny<string>()))
+            .ReturnsAsync(refreshToken);
+
+        // Act
+        var result = await _handler.Handle(new RevokeCommand(rawToken), CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        _mockRefreshTokenRepo.Verify(x => x.Update(refreshToken), Times.Once);
+        _mockUnitOfWork.Verify(
+            x => x.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -113,6 +144,9 @@ public class RevokeCommandHandlerTests
 
         // Update should NOT be called because token was already revoked
         _mockRefreshTokenRepo.Verify(x => x.Update(It.IsAny<RefreshToken>()), Times.Never);
+        _mockUnitOfWork.Verify(
+            x => x.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
