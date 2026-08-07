@@ -30,6 +30,35 @@ On successful edit save, the system MUST navigate the admin back to the Users li
 - THEN the app navigates to the Users list route
 - AND no inline "stay on form" behavior remains
 
+### Requirement: Edit User No Longer Requires A Phone
+
+Added by `phone-validation-owner-reseller` (archived 2026-08-07). `UserDetailsForm.tsx` is
+reachable only from `user-edit.tsx` (its sole caller). Its `handleSubmit` used to block submission
+when `cellPhone` was empty, showing `USERS.CELL_PHONE_REQUIRED` (`UserDetailsForm.tsx:46-49`).
+Neither Angular parity nor the backend requires this — the backend has no `CellPhone` rule for
+user update (verified: no `RuleFor(x => x.CellPhone)` in `UpdateUserCommandValidator.cs`). This
+requirement removes the frontend-only block.
+
+(Previously: any empty `cellPhone` unconditionally set `cellPhoneError` to
+`USERS.CELL_PHONE_REQUIRED` and prevented `onSubmit` from firing.)
+
+#### Scenario: Empty phone saves in edit-user
+- GIVEN the edit-user form has `cellPhone` empty
+- WHEN the admin submits
+- THEN `onSubmit` is called with `cellPhone: ''`
+- AND `cellPhoneError` is never set
+
+#### Scenario: A non-empty phone still saves as before
+- GIVEN the edit-user form has a non-empty `cellPhone`, any format
+- WHEN the admin submits
+- THEN `onSubmit` is called with that `cellPhone` value, unchanged from today
+
+### Requirement: Create Store User Never Required A Phone
+
+`UserCreateForm.tsx` has no phone validation today and gets none added by `phone-validation-owner-reseller`.
+This is a verification checkpoint only — see the `phone-requirement` capability's PHONE-4
+requirement for the full scenario.
+
 ### Requirement: Cell-Phone Mask and Field Copy Match Angular
 Create and Edit User forms MUST apply the Angular cell-phone mask (`+53 0 000-0000`) and use Angular's email placeholder text.
 
