@@ -221,6 +221,48 @@ public class RefreshCommandHandlerTests
             Times.Never);
     }
 
+    [Fact]
+    public async Task Refresh_withValidToken_resolvesUser_ignoringTenantQueryFilters()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var rawToken = "valid-raw-refresh-token";
+        var refreshToken = new RefreshToken(userId, rawToken, DateTimeOffset.UtcNow.AddDays(7));
+        var user = CreateTestUser(userId, "testuser@test.com");
+
+        _mockRefreshTokenRepo
+            .Setup(x => x.GetByTokenHashAsync(It.IsAny<string>()))
+            .ReturnsAsync(refreshToken);
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateToken(It.IsAny<Guid>(), It.IsAny<string>()))
+            .Returns("new-access-token");
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateRefreshToken())
+            .Returns("new-raw-refresh-token");
+
+        _mockUnitOfWork
+            .Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // The refresh endpoint is AllowAnonymous: the caller carries no tenant claims, so the
+        // tenant query filter on User would hide the token's owner unless the lookup ignores
+        // filters. The fix must resolve the user WITHOUT the tenant filter.
+        _mockUserRepo
+            .Setup(x => x.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString()))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _handler.Handle(new RefreshCommand(rawToken), CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        _mockUserRepo.Verify(
+            x => x.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString()),
+            Times.Once);
+    }
+
     #endregion
 
     #region Helper Methods
@@ -246,7 +288,7 @@ public class RefreshCommandHandlerTests
             .ReturnsAsync(refreshToken);
 
         _mockUserRepo
-            .Setup(x => x.GetByIdAsync(user.Id))
+            .Setup(x => x.GetUserByIdIgnoreQueryFiltersAsync(user.Id.ToString()))
             .ReturnsAsync(user);
 
         _mockJwtProvider
