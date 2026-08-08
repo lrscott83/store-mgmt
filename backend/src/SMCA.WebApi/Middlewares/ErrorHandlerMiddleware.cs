@@ -36,6 +36,27 @@ namespace SMCA.WebApi.Middlewares
             {
                 await _next(context);
             }
+            catch (Exception error) when (IsClientDisconnect(context, error))
+            {
+                // The client hung up mid-request. This is NOT a server fault, and
+                // there is nobody left to answer: falling through to the generic
+                // branch below would (a) log a routine network event at Error
+                // level, which in production reads as an outage, and (b) call
+                // response.WriteAsync on a dead connection, which can throw a
+                // SECOND exception that escapes this middleware entirely and gets
+                // logged by Kestrel instead.
+                //
+                // Observed in the Playwright suite as
+                // `BadHttpRequestException: Unexpected end of request content`,
+                // logged as "Unhandled exception". The likeliest source is the
+                // fire-and-forget usage POST (`store-usage-tracker.ts` posts to
+                // /v1/usages/store-daily-usage with `void`, so nothing awaits it):
+                // when the browser context closes, that request dies mid-body.
+                // That client is behaving correctly — a background telemetry send
+                // that loses a race with page teardown is normal, and the tracker
+                // already resets its own state in a `finally`, so nothing is lost.
+                _logger.LogDebug(error, "Client disconnected mid-request: {Message}", error.Message);
+            }
             catch (Exception error)
             {
                 _logger.LogError(error, "Unhandled exception: {Message}", error.Message);
@@ -75,6 +96,35 @@ namespace SMCA.WebApi.Middlewares
 
                 await response.WriteAsync(result);
             }
+        }
+
+        /// <summary>
+        /// Did the client go away, rather than the server fail?
+        /// </summary>
+        /// <remarks>
+        /// Two signals, and both are needed. <see cref="HttpContext.RequestAborted"/>
+        /// covers the general case of a client that vanished. A
+        /// <see cref="BadHttpRequestException"/> covers the one Kestrel raises while
+        /// reading a body that ended early ("Unexpected end of request content"):
+        /// that body cannot be completed by anyone, so the request is over whether
+        /// or not the abort token has been signalled yet.
+        ///
+        /// Deliberately NOT widened beyond that: a <see cref="BadHttpRequestException"/>
+        /// on a live connection is a genuinely malformed request and today still
+        /// falls through to the generic branch, which answers 500. That is arguably
+        /// wrong — a malformed request deserves 400 — but changing a status code is a
+        /// contract change with its own decision to make, so it is left alone here
+        /// and recorded rather than quietly altered.
+        /// </remarks>
+        private static bool IsClientDisconnect(HttpContext context, Exception error)
+        {
+            if (context.RequestAborted.IsCancellationRequested)
+            {
+                return true;
+            }
+
+            return error is BadHttpRequestException
+                && error.Message.Contains("Unexpected end of request content", StringComparison.Ordinal);
         }
     }
 }
