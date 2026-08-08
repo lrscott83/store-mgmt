@@ -103,6 +103,9 @@ public sealed class ToCollectTests
     [Fact]
     public async Task ReSeller_sees_own_stores_only()
     {
+        // Pin "today" to 2026-07-30 so the store seeded with PaymentStartDate = 2026-06-01
+        // resolves to PorVencer (window 2026-07-27..2026-08-01 with trial=1, grace=5, dueSoon=5).
+        using var _ = _fixture.Clock.Pin(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
         // Arrange: seed a ReSeller with a store, and another store not owned by the ReSeller
         var reSeller = await SeedReSellerOwnedStoreAsync($"Own-Store-{Guid.NewGuid():N}");
         var otherStore = await BillingSeed.SeedPaidStoreAsync(
