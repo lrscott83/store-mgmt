@@ -53,7 +53,7 @@ Desde `frontend-react/`:
 
 | Comando | Qué hace |
 | --- | --- |
-| `pnpm test:e2e` | Corre la suite por defecto (smoke + register REQ-1..REQ-8 + login A1-A7/D1-D6), **excluye** ambos specs de rate-limit. Consume 2 registros + 4 logins reales — ver la advertencia de cuota de login más abajo. |
+| `pnpm test:e2e` | Corre la suite por defecto (smoke + register REQ-1..REQ-8 + login A1-A7/D1-D6 + login offline S1-03), **excluye** ambos specs de rate-limit. Consume 2 registros + 4 logins reales — ver la advertencia de cuota de login más abajo. `login-offline.spec.ts` no agrega a ese costo: cero peticiones reales de red. |
 | `pnpm test:e2e:rate-limit` | Corre AMBOS specs de rate-limit (`register-rate-limit.spec.ts` REQ-9 y `login-rate-limit.spec.ts` REQ-8), filtrados por el tag `@rate-limit`. Agota la cuota de registro (~10 min) y la de login (~1 min) de tu IP — a demanda, no en la corrida por defecto. |
 | `pnpm test:e2e:api` | Chequeo de conectividad con la API, sin navegador (`playwright.api.config.ts`). |
 | `pnpm exec playwright test --ui` | Modo interactivo (UI) con el test runner |
@@ -179,6 +179,39 @@ límite corre en el pipeline antes del endpoint, así que un intento fallido con
 **Orden inverso al del hermano de registro**: correr `pnpm test:e2e:rate-limit` justo ANTES de
 `pnpm test:e2e` va a chocar — la ventana de login es corta pero la cuota queda agotada, y
 `pnpm test:e2e` va a ver 429 donde esperaba 200. Dejá pasar el minuto entre uno y otro.
+
+## Suite de login offline (`login-offline.spec.ts`)
+
+Cubre las 12 aserciones de UI de [S1-03] (`docs/testing/e2e-stage-1/S1-03.md`): login contra un
+roster provisionado localmente, sin red — `authenticateOffline` resuelve contra `bundle.users` en
+`localStorage`, nunca contra el backend. Corre en la suite por defecto (`pnpm test:e2e`, sin el tag
+`@rate-limit`) y **no necesita ningún backend levantado**: es el único spec de todo `e2e/` que puede
+correrse solo, con `pnpm exec playwright test e2e/login-offline.spec.ts`, sin `dotnet run` en otra
+terminal.
+
+Capa de soporte:
+
+- `support/network-observer-core.ts` — núcleo compartido (cola de outcomes, `createDeferred`,
+  matcher de sufijo de pathname, mensajes de backend equivocado/caído/404, `resolveCapture`) que
+  `network-observer.ts` y `login-network-observer.ts` importan ahora en vez de duplicar. Genérico
+  por construcción, blindado de umbrales de rate-limit y de las clases de error (esas siguen
+  viviendo, separadas, en cada observer).
+- `support/any-request-observer.ts` — el tercer observer: afirma cero peticiones HTTP a
+  **cualquier** endpoint (no solo login/me/product), la garantía que REQ-1 necesita y que los otros
+  dos observers no dan por diseño (están scopeados a paths específicos).
+- `support/roster-fixture.ts` — siembra el dispositivo aprovisionado escribiendo directo a
+  `localStorage` (`ROSTER_STORAGE_KEY`, `plantRoster()`), nunca vía `importRoster()`. El verifier y
+  el wrap de DEK se calculan en Node con `node:crypto`'s `webcrypto`, verificados contra
+  `docs/contracts/offline-roster-dek-kat.json` (un tripwire falla ruidoso si la derivación se
+  desvía del backend real, antes de sembrar nada).
+
+Descubrimiento verificado al escribir este spec: `login.tsx` arma el store-usage tracker
+(`armTracking()`) en sus dos ramas de éxito, offline y online — el tracker dispara un
+`POST /v1/usages/store-daily-usage` de fondo en el siguiente cambio de ruta, ortogonal a la
+autenticación. Ya pasaba en el login online (`login-network-observer.ts`'s `PRODUCT_API_PATTERN` ya
+lo anticipaba), pero nunca se había afirmado antes contra un observer genuinamente genérico. Los
+tests que completan un login exitoso toleran explícitamente esa única llamada conocida; el resto
+del tráfico se sigue exigiendo en cero.
 
 ## Dónde van los tests de features
 

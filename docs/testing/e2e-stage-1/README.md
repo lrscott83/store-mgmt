@@ -29,7 +29,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 |---|---|---|---|---|
 | [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **PARCIAL** — REQ-1…REQ-9 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); REQ-9 (429) **verificado en vivo** el 2026-08-07 — el spec lanza error explícito si nunca observa un 429, así que verde ⇒ el límite se disparó; falta el destino post-registro ([F-2](plan-frontend.md#f-2)) | **CUBIERTO** |
 | [S1-02](S1-02.md) | Login online | CRÍTICA | **CUBIERTO** — REQ-1…REQ-16 implementados y verificados en vivo contra backend real el 2026-08-07 (`e2e/login.spec.ts`; REQ-8/429 en `e2e/login-rate-limit.spec.ts`, que corre aparte con `pnpm test:e2e:rate-limit`) | **PARCIAL** — tienda inactiva → 403 **ya cubierta** (`Auth/AuthLoginFailureTests.cs:64`); falta el rate limit en la capa .NET. **H-12 queda refutada**: Playwright observó un 429 real bajo `Testing`, así que el límite sí es alcanzable |
-| [S1-03](S1-03.md) | Login offline en dispositivo aprovisionado | CRÍTICA | **PENDIENTE** | **N/A** — cero HTTP; la contraparte de servidor es S3-01 |
+| [S1-03](S1-03.md) | Login offline en dispositivo aprovisionado | CRÍTICA | **CUBIERTO** — 11 tests / 12 aserciones implementados y verificados el 2026-08-08 sin backend levantado (`e2e/login-offline.spec.ts`), corre en la suite por defecto | **N/A** — cero HTTP; la contraparte de servidor es S3-01 |
 | [S1-04](S1-04.md) | Hidratación de sesión: la caché válida no llama al backend | CRÍTICA | **PARCIAL** — REQ-1…REQ-11 implementados y verificados en vivo (`e2e/login.spec.ts`, T1-T11, capability `e2e-session-hydration`, backend real, 2026-08-07: 31 passed); la rama del 404 real de REQ-4 es brecha declarada (H-6, G1) y la guarda de pathname de REQ-8 no es discriminable en Playwright por timing de arranque (G2, cubierta en `auth-store.test.ts`) | **CUBIERTO** |
 
 ### Bloque B — Ciclo de vida de tienda y plan
@@ -65,7 +65,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 1 CUBIERTO · 2 PARCIAL · 9 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E frontend**: 2 CUBIERTO · 2 PARCIAL · 8 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
 - **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
@@ -85,7 +85,7 @@ Sin plan propio, porque su cobertura se verificó y coincide con lo declarado: S
 
 Ningún escenario está completo en ambas capas.
 
-**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, y `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto son 31 tests (`pnpm test:e2e`); los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. Las dos corridas pasaron el 2026-08-07 contra backend real: 31 tests en la corrida por defecto y `2 passed (12.1s)` en la de rate-limit.
+**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`), y `login-offline.spec.ts` cubre S1-03 (11 tests, capability `e2e-offline-login-ui`, corre sin backend levantado — verificado sin proceso `dotnet` activo el 2026-08-08); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto pasa de 31 a **42 tests** (`pnpm test:e2e`) — 31 + los 11 de `login-offline.spec.ts`, aritmética sobre el conteo ya verificado, no una corrida del total observada acá (el total de 42 necesita el backend real que sostiene los 31 preexistentes; `login-offline.spec.ts` en solitario sí se corrió sin backend y dio 11/11 verdes). Los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. Las dos corridas de 31+2 contra backend real siguen documentadas al 2026-08-07: 31 tests en la corrida por defecto y `2 passed (12.1s)` en la de rate-limit; no se re-corrieron en esta sesión.
 
 **La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 5/min**, amortizados con `storageState`. Ese margen de uno es la restricción a respetar al escribir el próximo escenario.
 
