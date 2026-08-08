@@ -75,8 +75,26 @@ El refactor MUST NOT requerir ninguna modificación a `register.spec.ts`, `regis
 - WHEN se corre `git diff` sobre los 4 spec files y `support/test.ts`
 - THEN el diff de los 4 spec files es vacío y `support/test.ts` solo muestra cambios aditivos, si los hay
 
+### Requirement: REQ-7 — Cualquier ampliación de ObserverSubject es estrictamente aditiva
+Toda ampliación de `ObserverSubject` (`network-observer-core.ts:96`) MUST ser estrictamente aditiva: agregar un miembro al union, nunca cambiar una firma, un mensaje ni un comportamiento observable. Los productores existentes del tipo (`network-observer.ts:130,138` con `'registro'`; `login-network-observer.ts:231,284` con `'login'`; `store-network-observer.ts:170` con `'tienda'`) MUST conservar firma y comportamiento, y los specs existentes que dependen de las fixtures `auto: true` de `test.ts:63,74` MUST seguir verdes **sin ninguna modificación** — porque modificarlos requeriría autorización explícita del usuario, que es justamente lo que este requisito protege.
+
+Por qué la ampliación es segura y no un acto de fe: ningún consumidor hace `switch` exhaustivo ni `Record<ObserverSubject, …>` sobre el tipo. Los tres son **productores** del literal, no consumidores exhaustivos, así que un miembro nuevo no rompe la compilación de ninguno. Esa propiedad es la que hay que re-verificar antes de ampliar otra vez, no el resultado de la vez anterior.
+
+S2-01 ejercitó este requisito: amplió el union a `'registro' | 'login' | 'tienda'` en **una sola línea de diff**, y `playwright test --list` confirmó que los 6 ficheros de spec siguen descubriéndose (44 tests).
+
+#### Scenario: Los 5 specs existentes no ven ningún cambio de comportamiento
+- GIVEN `ObserverSubject` ampliado con un tercer miembro
+- WHEN se corren `register.spec.ts`, `register-rate-limit.spec.ts`, `login.spec.ts`, `login-rate-limit.spec.ts` y `login-offline.spec.ts`
+- THEN los 5 pasan igual que antes de la ampliación
+
+#### Scenario: El nuevo miembro no participa en ningún switch exhaustivo
+- GIVEN el código de `network-observer-core.ts` y sus dos consumidores actuales, verificado sin ningún `switch` exhaustivo sobre `subject` (grep de `subject` en `e2e/support/`)
+- WHEN se agrega el tercer miembro al union
+- THEN ningún consumidor existente deja de compilar por el caso nuevo, porque ambos son productores del valor, no consumidores exhaustivos del tipo
+
 ## Verification Criteria
 - [ ] REQ-1, REQ-2 verificados: `pnpm test:e2e` (31 tests) y `pnpm test:e2e:rate-limit` (2 tests) verdes antes y después del refactor
 - [ ] REQ-3, REQ-4 verificados por lectura del diff del núcleo compartido
 - [ ] REQ-5 consumido por `e2e-offline-login-ui` REQ-1
 - [ ] REQ-6 verificado: `git diff` vacío para los 4 `*.spec.ts` existentes
+- [ ] REQ-7 verificado: `git diff main..HEAD -- network-observer-core.ts` muestra una sola línea (el union ensanchado con `'tienda'`); `pnpm exec playwright test --list --grep-invert @rate-limit` confirma 44 tests en 6 files (`e2e-playwright-store-plan-activation-s2-01` verify-report §2)
