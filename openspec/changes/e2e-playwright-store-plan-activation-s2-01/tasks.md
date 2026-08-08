@@ -84,7 +84,7 @@
 - **Rollback**: revertir solo este commit — fichero nuevo, cero consumidores hasta WU-5.
 - **Commit**: `feat(e2e-support): add store-network-observer (PUT body + /me + document count)`
 
-### WU-4 — Spec, parte 1: aserciones 1,2,3,8,9,10 (corregida) + guarda REQ-13
+### WU-4 — Spec, parte 1: aserciones 1,2,3,8,9,10 (corregida) + guarda REQ-13 ✅
 
 - **Intención**: primer bloque del `test()` #1 — desde `signedInPage` hasta las 6 aserciones DOM-dado-el-estado del plan gratuito, sin aún activar el plan pago.
 - **Fichero**: `frontend-react/e2e/store-plan-activation.spec.ts` — **NUEVO**, SÍ es fichero de test (agregar tests nuevos está permitido; no es un test existente). Nombre fijado por `design.md` D8 — no `e2e/stores.spec.ts` (reservado a S2-03, `e2e/README.md:220`).
