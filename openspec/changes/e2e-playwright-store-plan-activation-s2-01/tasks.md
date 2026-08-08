@@ -108,7 +108,7 @@
 - **Rollback**: revertir solo este commit — el `test()` que agrega no tiene aún el bloque de guardado, así que revertirlo no deja nada a medio construir para otro commit.
 - **Commit**: `test(e2e): cover S2-01 free-plan DOM assertions (1,2,3,8,9,10) + featureIds guard`
 
-### WU-5 — Spec, parte 2: aserciones 4 y 5 (round-trip de guardado)
+### WU-5 — Spec, parte 2: aserciones 4 y 5 (round-trip de guardado) ✅
 
 - **Intención**: extender el MISMO `test()` de WU-4 con el click en pago, el guardado, y las dos aserciones que exigen mirar la red.
 - **Fichero**: `frontend-react/e2e/store-plan-activation.spec.ts` — **MODIFICADO** dentro de la misma rama, mismo fichero nuevo creado en WU-4 (no es un test *existente* al momento del `sdd-apply` — todo el cambio vive en una rama no mergeada; el fichero pasa a existir recién con WU-4). No requiere autorización.

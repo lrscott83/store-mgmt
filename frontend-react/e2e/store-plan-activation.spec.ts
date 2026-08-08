@@ -1,5 +1,6 @@
 import { test, expect } from './support/test';
 import { assertStoresFeature, degradeStoreToFreePlan } from './support/store-fixture';
+import { installStoreNetworkObserver } from './support/store-network-observer';
 
 /**
  * [S2-01] DG-7 — El OwnerAdmin activa el plan pago una sola vez, en una sola
@@ -28,7 +29,7 @@ const ACTIVE_BADGE_TEXT = 'Activo'; // es.ts:639
 
 test.use({ persona: 'owner-admin' });
 
-test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage }) => {
+test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, loginNetwork }) => {
   const { page, selectedStoreId } = signedInPage;
 
   // REQ-13/D9 — asserted BEFORE anything else: turns a silent logout
@@ -41,7 +42,7 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage }) => 
   // limited to the catalog's priceIncluded ids, never hardcoded. H-1 means
   // the auto-registered store starts on the PAID plan, so this seed is what
   // makes the free-plan half of DG-7 reachable at all.
-  await degradeStoreToFreePlan(page, selectedStoreId);
+  const { allIds } = await degradeStoreToFreePlan(page, selectedStoreId);
 
   await page.goto('/management/stores');
 
@@ -87,4 +88,32 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage }) => 
   // `ModuleEntityTypeConfiguration.cs:39`). See H-16
   // (docs/testing/e2e-stage-1/README.md).
   await expect(page.locator('#store-owner')).toHaveCount(0);
+
+  // WU-5 — save round-trip. Installed AFTER the DOM assertions above so the
+  // PUT it watches for is unambiguously the save click below, not some
+  // earlier request (same pattern as any-request-observer.ts in
+  // login-offline.spec.ts).
+  const storeObserver = installStoreNetworkObserver(page, selectedStoreId);
+  storeObserver.markDocumentBaseline();
+
+  await page.getByRole('button', { name: 'Guardar' }).click();
+
+  const putCapture = await storeObserver.waitForPutResponse();
+  // Aserción 4 (REQ-4): the PUT's moduleIds is the FULL union of free+paid
+  // modules, not just the paid ones — getPlanModuleIds(modules, 'paid')
+  // returns modules.map(m => m.id) unfiltered (plan-picker.tsx:26-27,49).
+  expect([...putCapture.moduleIds].sort((a, b) => a - b)).toEqual(
+    [...allIds].sort((a, b) => a - b)
+  );
+
+  await loginNetwork.waitForMeRequest();
+  await page.waitForURL(/\/management\/stores$/);
+
+  // Aserción 5 (REQ-5): session refreshed via GET /v1/auth/me strictly
+  // AFTER the PUT response (not merely "both happened"), exactly once, and
+  // with zero full-page reloads — measured via the document-request
+  // counter (D6), never assumed from reading edit-store.tsx's source.
+  storeObserver.expectPutThenMe();
+  storeObserver.expectNoDocumentSince('tras guardar el plan pago');
+  loginNetwork.expectMeRequestCount(1);
 });
