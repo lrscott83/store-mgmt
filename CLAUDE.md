@@ -1,5 +1,14 @@
 # store-mgmt — Agent Instructions
 
+## Backend scope rule — NON-NEGOTIABLE (user-mandated 2026-08-08)
+
+**In this backend test-coverage work, the agent may only ADD new E2E tests.** If the work would require modifying **production source code** or **existing E2E tests** (backend), the agent MUST stop and notify the user for review and approval before touching anything. This is not optional, not bypassable, and applies to sub-agents and delegated phases too — any delegation that could reach backend production code or existing E2E tests must carry this rule verbatim in its prompt.
+
+- Adding **new** E2E tests: allowed.
+- Modifying backend production source code: requires explicit notification + approval.
+- Touching **existing** backend E2E tests: requires explicit notification + approval.
+- A failing existing E2E test is information, not an obstacle: stop, name it, explain, ask.
+
 ## E2E tests are untouchable — NON-NEGOTIABLE
 
 **Never modify, delete, rename, skip, weaken, or "fix" an existing E2E test without explicit authorization from the user.**
