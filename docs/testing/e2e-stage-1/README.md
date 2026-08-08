@@ -323,6 +323,29 @@ Mientras tanto, `adminLoader` (`auth/routes/loaders.ts:101`) mira una cosa compl
 
 **Segundo orden, digno de su propia nota — dos defectos se cancelan**: si `isOwnerAdmin` en `edit-store.tsx` usara la primera definición (el flag `user.isOwnerAdmin`, `true` para esta persona), `edit-store.tsx:52` llamaría `listOwners()`. `OwnersController.cs:18` lleva `[HasPermission(StoreRoleFeatures.OwnersAdmin)]`, y `OwnersAdmin` (`StoreRoleFeatures.cs:12-14`) admite `SuperAdmin`/`ReSeller`, **no** `OwnerAdmin` — esa llamada respondería 403. El 403 caería en el `.catch()` de `edit-store.tsx:80-82`, `loadError` se setearía, y `<StoreForm>` nunca montaría — matando 10 de las 11 aserciones de [S2-01](S2-01.md). Es `false` por la definición real, así que el tercer miembro del `Promise.all` es `Promise.resolve(success([]))` y en modo edición solo salen 2 GET reales. Cambiar cualquiera de los dos defectos por separado (la definición de `isOwnerAdmin` en `edit-store.tsx`, o el permiso de `OwnersController`) rompería la otra mitad de esta US — es su propio cambio, con su propia decisión de producto, no un "arreglo" de esta pasada.
 
+### H-17 — El "refresco de sesión" tras guardar una tienda no refresca nada del servidor
+
+Encontrado el 2026-08-08 por la **primera corrida real** de la cobertura de [S2-01](S2-01.md) contra backend: el test se colgó los 30 segundos completos del timeout esperando una petición que la app nunca emite.
+
+`edit-store.tsx:132-139` guarda y después llama `await getUserByToken()`, con un comentario que dice *"refresh user session via the consolidated getUserByToken() action"*. Leído así, parece un `GET /v1/auth/me`. **No lo es.** `getUserByToken()` corta por caché:
+
+```ts
+const cachedProfile = StorageService.getCurrentUser();
+if (cachedProfile && cachedProfile.authToken === auth.authToken) {
+  // OFFLINE-FIRST: a valid cached session is authoritative — make NO backend call.
+  set({ user: userWithExpiry, isAuthenticated: true, error: null });
+  return userWithExpiry;
+}
+```
+
+(`auth-store.ts:126-140`.) Con una sesión válida —el caso normal tras guardar— toma esa rama y **cero peticiones salen**. El corto es deliberado y está justificado en `:133-137`: Angular sí disparaba un `/me` de fondo acá (`auth.service.ts:159`), y se quitó porque el 401 de ese `/me` lo convertía en `logout()` el interceptor de errores compartido, rompiendo el uso offline.
+
+**Por qué es un hallazgo y no un detalle.** El servidor **sí** recalcula los `featureIds` al cambiar los módulos: `UpdateStoreCommand.cs:124-130` desactiva las `StoreRoleFeature` de los módulos dados de baja, y `:163-171` genera las de los nuevos. Pero el cliente sigue con los `featureIds` que trajo del último login real, y nada los invalida. Después de activar el plan pago, un OwnerAdmin queda con permisos calculados sobre el plan **anterior** hasta que vuelva a loguearse. La intención de refrescar la sesión está escrita en el código; lo que falta es el efecto.
+
+⚠️ **NO VERIFICADO**: qué consecuencia observable tiene esa desincronización — si alguna pantalla se comporta distinto con `featureIds` viejos tras activar el plan. No se midió, y no se dedujo. Es candidato a US propia.
+
+**Consecuencia sobre la cobertura**: la aserción 5 de S2-01 afirmaba el `/me`. Corregida para afirmar el comportamiento real —cero `/me`, cero recarga— con un anclaje explícito: se espera a que el botón "Guardar" vuelva a habilitarse (`edit-store.tsx:118,153-154` + `store-form.tsx:70,124`), lo que prueba que el `await getUserByToken()` ya corrió. Sin ese anclaje la aserción sería vacua, porque la ausencia de una petición no prueba nada si el código que la emitiría todavía no se ejecutó. `page.waitForURL` no sirve como ancla acá: el guardado navega a `/management/stores` estando ya en esa URL.
+
 ---
 
 ## 6. ⚠️ No verificado

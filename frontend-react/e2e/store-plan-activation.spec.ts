@@ -103,7 +103,8 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
   const storeObserver = installStoreNetworkObserver(page, selectedStoreId);
   storeObserver.markDocumentBaseline();
 
-  await page.getByRole('button', { name: 'Guardar' }).click();
+  const saveButton = page.getByRole('button', { name: 'Guardar' });
+  await saveButton.click();
 
   const putCapture = await storeObserver.waitForPutResponse();
   // Aserción 4 (REQ-4): the PUT's moduleIds is the FULL union of free+paid
@@ -113,16 +114,44 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
     [...allIds].sort((a, b) => a - b)
   );
 
-  await loginNetwork.waitForMeRequest();
-  await page.waitForURL(/\/management\/stores$/);
+  // ANCHOR for the two negative assertions below. edit-store.tsx wraps the
+  // whole save in try/finally (`setIsLoading(true)` at :118, `setIsLoading(false)`
+  // at :153-154) and `submitDisabled = isLoading || externalSubmitDisabled`
+  // drives the button (store-form.tsx:70,124). So the button returning to
+  // ENABLED proves the entire handler ran to completion — including the
+  // awaited `getUserByToken()` at :135.
+  //
+  // This anchor is what makes "zero /me" mean something. Absence of a request
+  // proves nothing if the code that would emit it has not run yet: without
+  // this line the assertion would pass just as happily on a handler that
+  // never started. Do not remove it.
+  //
+  // `page.waitForURL` is NOT usable as that anchor here: the save navigates to
+  // `/management/stores` (edit-store.tsx:139) and the test is ALREADY on that
+  // URL, so the wait resolves instantly and anchors nothing.
+  await expect(saveButton).toBeEnabled();
 
-  // Aserción 5 (REQ-5): session refreshed via GET /v1/auth/me strictly
-  // AFTER the PUT response (not merely "both happened"), exactly once, and
-  // with zero full-page reloads — measured via the document-request
-  // counter (D6), never assumed from reading edit-store.tsx's source.
-  storeObserver.expectPutThenMe();
+  // Aserción 5 (REQ-5), en su forma VERDADERA — corregida el 2026-08-08 tras
+  // el primer fallo real contra backend. La US afirmaba que tras guardar la app
+  // "refresca la sesión vía getUserByToken()", y de ahí se dedujo un
+  // `GET /v1/auth/me`. Ese /me NO EXISTE: getUserByToken() corta por caché
+  // cuando el perfil guardado coincide con el authToken vigente y retorna sin
+  // tocar el backend (auth-store.ts:126-140). El corto es deliberado — el
+  // comentario en :133-137 explica que Angular sí disparaba un /me de fondo y
+  // que se quitó porque su 401 destruía la sesión de un usuario offline.
+  //
+  // Así que el "refresco de sesión" del guardado es una re-lectura de caché
+  // local, no un round-trip. Lo que este test afirma es eso, medido:
+  // cero /me y cero recargas de documento.
+  //
+  // CONSECUENCIA ABIERTA, no cubierta acá: el servidor recalcula los featureIds
+  // al cambiar los módulos (UpdateStoreCommand.cs:124-130 desactiva las
+  // StoreRoleFeature de los módulos dados de baja), pero el cliente se queda con
+  // los featureIds viejos hasta el próximo login real. Ver el hallazgo en
+  // docs/testing/e2e-stage-1/README.md.
+  loginNetwork.expectMeRequestCount(0);
+  storeObserver.expectExactlyOnePut();
   storeObserver.expectNoDocumentSince('tras guardar el plan pago');
-  loginNetwork.expectMeRequestCount(1);
 
   // WU-6 — the flow's own explicit "reload the screen" step (S2-01.md's
   // flow, step 4). This is a SEPARATE act from assertion 5 above, which

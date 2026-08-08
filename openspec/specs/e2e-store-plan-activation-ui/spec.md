@@ -65,14 +65,19 @@ Guardar con el plan pago elegido MUST emitir `PUT /v1/stores/{id}` con `moduleId
 - WHEN el OwnerAdmin guarda
 - THEN el `PUT /v1/stores/{id}` observado lleva `moduleIds` con la unión completa de módulos gratis y pagos del catálogo
 
-### Requirement: REQ-5 — Refresco de sesión y navegación sin recarga (aserción 5)
-Tras guardar, la app MUST refrescar la sesión emitiendo `GET /v1/auth/me` y MUST navegar a `/management/stores` sin recargar la página (sin `location.reload()`). (`edit-store.tsx:132-139`)
+### Requirement: REQ-5 — El guardado no recarga ni emite `/me` (aserción 5)
+Tras guardar, la app MUST navegar a `/management/stores` sin recargar la página (sin `location.reload()`), y el "refresco de sesión" MUST NOT emitir ningún `GET /v1/auth/me`. (`edit-store.tsx:132-139`)
 
-#### Scenario: Sesión refrescada y navegación sin reload
-- GIVEN el guardado de REQ-4 ya emitido
-- WHEN la respuesta del `PUT` llega exitosa
-- THEN se observa `GET /v1/auth/me` inmediatamente después
-- AND el navegador termina en `/management/stores` sin ningún evento de recarga de página completa
+**Corregido el 2026-08-08 tras el primer fallo real contra backend.** Este requisito decía que la app "MUST refrescar la sesión emitiendo `GET /v1/auth/me`". Ese `/me` no existe: `getUserByToken()` corta por caché cuando el perfil guardado coincide con el `authToken` vigente y retorna sin tocar el backend (`auth-store.ts:126-140`), y el corto es deliberado — `:133-137` explica que Angular sí disparaba un `/me` de fondo y que se quitó porque su 401 destruía la sesión de un usuario offline. El requisito original venía de leer la intención de `edit-store.tsx` sin seguir la función hasta el final, y el test que lo implementaba se colgó los 30 segundos completos esperando una petición que nunca sale. Ver **H-17**.
+
+#### Scenario: El guardado no emite `/me` ni recarga el documento
+- GIVEN el guardado de REQ-4 ya emitido y su respuesta recibida
+- WHEN el handler de guardado termina — observable porque el botón MUST volver a estar habilitado (`edit-store.tsx:118,153-154` con `store-form.tsx:70,124`), lo que prueba que el `await getUserByToken()` de `:135` ya corrió
+- THEN el conteo de `GET /v1/auth/me` es CERO
+- AND el conteo de peticiones de documento desde el guardado es CERO
+- AND el navegador está en `/management/stores`
+
+**El anclaje del escenario es normativo, no decorativo.** Una aserción de ausencia de red MUST anclarse en una señal positiva de que el código que emitiría la petición ya corrió. `page.waitForURL` NO sirve acá: el guardado navega a `/management/stores` estando ya en esa URL, así que resuelve al instante y no ancla nada.
 
 ### Requirement: REQ-6 — Plan pago: el botón no existe en el DOM (aserción 6)
 Con al menos un módulo pago activo, el botón `STORES.PLAN.ACTIVATE` MUST NOT existir en el DOM para un OwnerAdmin, en ninguna pestaña. (`plan-picker.tsx:100`)

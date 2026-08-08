@@ -44,13 +44,17 @@ export interface StoreNetworkObserver {
   /** Resolves with the PUT response's body, captured at response time (never re-read after navigation). */
   waitForPutResponse(): Promise<StorePutCapture>;
   /**
-   * REQ-5. Asserts the causal claim: exactly one PUT request/response to
-   * THIS store, at least one `/me` request, and the first `/me` request's
-   * timestamp is >= the PUT response's timestamp — `edit-store.tsx:134-139`
-   * only calls `getUserByToken()` (which fires `/me`) after `updateStore()`
-   * has already resolved.
+   * REQ-5. Asserts exactly one PUT request and one PUT response to THIS store.
+   *
+   * This used to also assert that a `GET /v1/auth/me` followed the PUT — the
+   * ordering `edit-store.tsx:134-139` looks like it produces. **That /me does
+   * not exist**: `getUserByToken()` short-circuits on a valid cached profile
+   * and returns without touching the backend (`auth-store.ts:126-140`), so the
+   * "session refresh" after a save is a local cache re-read. The /me half was
+   * removed on 2026-08-08 after it hung a real run for the full 30s test
+   * timeout, waiting for a request the app never sends.
    */
-  expectPutThenMe(): void;
+  expectExactlyOnePut(): void;
   /**
    * D4: a PUT to a DIFFERENT store is detected, never silently folded into
    * this count — the suffix is parametrized by `storeId`, not a generic
@@ -177,10 +181,9 @@ export function installStoreNetworkObserver(page: Page, storeId: string): StoreN
       });
     },
 
-    expectPutThenMe: () => {
+    expectExactlyOnePut: () => {
       const putRequests_ = events.filter((e) => e.kind === 'put' && e.phase === 'request');
       const putResponses = events.filter((e) => e.kind === 'put' && e.phase === 'response');
-      const meRequests = events.filter((e) => e.kind === 'me' && e.phase === 'request');
 
       if (putRequests_.length !== 1) {
         throw new Error(
@@ -191,19 +194,6 @@ export function installStoreNetworkObserver(page: Page, storeId: string): StoreN
         throw new Error(
           `Expected exactly one response for PUT .../v1/stores/${storeId}, observed ` +
             `${putResponses.length}.`
-        );
-      }
-      if (meRequests.length === 0) {
-        throw new Error('Expected at least one GET .../v1/auth/me, observed none.');
-      }
-
-      const putResponse = putResponses[0];
-      const firstMeRequest = meRequests[0];
-      if (firstMeRequest.at < putResponse.at) {
-        throw new Error(
-          `GET .../v1/auth/me started at ${firstMeRequest.at}, before the PUT response arrived at ` +
-            `${putResponse.at}. Expected /me to start AFTER the PUT response, not merely at some ` +
-            'point during the flow (edit-store.tsx:134-139).'
         );
       }
     },
