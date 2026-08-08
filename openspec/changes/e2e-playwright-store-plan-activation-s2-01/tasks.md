@@ -56,7 +56,7 @@
 - **Rollback**: revertir solo este commit — fichero nuevo, cero consumidores hasta WU-4.
 - **Commit**: `feat(e2e-support): add degradeStoreToFreePlan store-fixture for S2-01`
 
-### WU-3 — `store-network-observer.ts`: cuarto observer
+### WU-3 — `store-network-observer.ts`: cuarto observer ✅
 
 - **Intención**: capturar el `PUT /v1/stores/{id}` (body + timestamp) y `GET /v1/auth/me` (timestamp) para las aserciones 4 y 5, y contar documentos para la aserción 5 (sin recarga).
 - **Fichero**: `frontend-react/e2e/support/store-network-observer.ts` — NUEVO, no es fichero de test. Plantilla: `login-network-observer.ts` (patrón `page.on('request')`/`page.on('response')`, `createOutcomeQueue`, `resolveCapture`).
