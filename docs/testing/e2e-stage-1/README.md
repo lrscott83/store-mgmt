@@ -281,6 +281,18 @@ Aplicadas vía `[EnableRateLimiting("LoginPolicy")]` (`AuthController.cs:27`) y 
 
 `AuthController.cs:44` (`refresh`) y `:57` (`revoke`) no llevan `[EnableRateLimiting]`, a diferencia de `login` y `register`. El `refresh` ya tiene cobertura E2E desde entonces (`Auth/AuthRefreshTokenLifetimeTests.cs:86`, `Refresh_returns_new_refresh_token_expiring_in_35_days`, que golpea `POST /api/v1/auth/refresh`), así que lo que queda abierto no es la cobertura sino el **límite**: los dos endpoints siguen sin `[EnableRateLimiting]`.
 
+### H-14 — Un login **offline** arma telemetría que intenta un `POST`, sin ninguna guarda de conectividad
+
+Encontrado al implementar la cobertura Playwright de [S1-03](S1-03.md), no por lectura previa: el login offline **no es HTTP-cero**.
+
+`login.tsx` llama `armTracking()` en **las dos** ramas de éxito — la offline (`login.tsx:114`, dentro del bloque que retorna en `:123`) y la online (`:140`). Es la misma función, importada de `store-usage-tracker` (`login.tsx:11`). Una vez armada, `use-store-usage-tracker.ts` la dispara al renderizar la ruta siguiente, y el tracker emite `POST /v1/usages/store-daily-usage` (`store-usage-tracker.ts:104-107`) con los días sin guardar.
+
+**Lo que convierte esto en hallazgo y no en detalle**: `store-usage-tracker.ts` y `use-store-usage-tracker.ts` **no consultan la conectividad en ningún punto** — cero referencias a `isOnline`, `ConnectivityService` o `navigator.onLine`. Así que un dispositivo aprovisionado que entra sin red arma la telemetría igual y la petición sale igual, a fallar.
+
+No es una regresión: el mismo camino ya existía para los logins online, y el `POST` es telemetría de background que deliberadamente no maneja el overlay de carga global (`store-usage-tracker.ts:108-110`). Pero desmiente la lectura intuitiva de que un login offline no toca la red.
+
+**Consecuencia para la capa Playwright**: la aserción "cero peticiones" de S1-03 no puede ser literal. `e2e/support/any-request-observer.ts` se mantuvo genérico y la tolerancia vive donde corresponde, en el spec: `expectOnlyKnownTelemetry()` en `e2e/login-offline.spec.ts`. Un observer que tolerara esto por dentro habría escondido el hallazgo en vez de declararlo.
+
 ---
 
 ## 6. ⚠️ No verificado
