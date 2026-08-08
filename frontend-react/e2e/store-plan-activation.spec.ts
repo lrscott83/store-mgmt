@@ -31,6 +31,31 @@ const STORES_ERROR_TEXT = 'Ocurrió un error. Intente de nuevo.'; // es.ts:632
 
 test.use({ persona: 'owner-admin' });
 
+// SERIAL, and this is a budget constraint, not a style choice. The persona
+// cache is scoped PER WORKER (session.ts:187), so two tests spread across two
+// workers mint `owner-admin` TWICE — two real registrations and, fatally, two
+// real logins against `LoginPolicy`'s ceiling of 5 per minute per IP
+// (RateLimitPolicies.cs:15-24, H-12). One worker means ONE mint for the file.
+//
+// Learned the hard way on 2026-08-08: without this, the full suite pushed
+// login.spec.ts's REQ-9 re-login past the ceiling and it was answered with a
+// 429 — a PRE-EXISTING test turned red by this file's parallelism, with a
+// banner reading `AUTH.TOO_MANY_ATTEMPTS`. login.spec.ts:88-96 already
+// documented the rule ("ONE worker ... serializing this block is what
+// guarantees the persona chain mints exactly [once]"); this file simply had
+// not followed it.
+//
+// The suite's documented budget is 4 real logins against that ceiling of 5.
+// This file spends THE remaining one. Anything added here that mints another
+// persona breaks a different file's test, not this one — which is the failure
+// mode that makes it worth spelling out.
+//
+// The 120s timeout mirrors login.spec.ts:97-105 for the same reason it does:
+// the first test pays a mint, three seeding round-trips and a full save cycle
+// before its last assertion. Do NOT split it to fit 30s — splitting is exactly
+// what would spend a login the ceiling does not have.
+test.describe.configure({ mode: 'serial', timeout: 120_000 });
+
 test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, loginNetwork }) => {
   const { page, selectedStoreId } = signedInPage;
 
