@@ -213,6 +213,52 @@ lo anticipaba), pero nunca se había afirmado antes contra un observer genuiname
 tests que completan un login exitoso toleran explícitamente esa única llamada conocida; el resto
 del tráfico se sigue exigiendo en cero.
 
+## Suite de activación de plan (`store-plan-activation.spec.ts`)
+
+Cubre las 11 aserciones de UI de [S2-01] (`docs/testing/e2e-stage-1/S2-01.md`)
+(DG-7 — el OwnerAdmin activa el plan pago una sola vez, en una sola dirección),
+contra un backend real. Dos tests: uno continuo que recorre las 10 aserciones
+DOM+red del plan (gratuito → activación → guardado → recarga en plan pago), y
+uno independiente para el fallo de carga (aserción 11). Capa de soporte
+adicional en `e2e/support/`:
+
+- `support/store-fixture.ts` — siembra de SERVIDOR, no flujo de usuario:
+  degrada la tienda de `owner-admin` al plan gratuito con un `PUT
+  /v1/stores/{id}` real (los `moduleIds` salen del catálogo real
+  `GET /v1/modules/ToStore`, nunca hardcodeados), y re-lee la tienda para
+  pinear la precondición antes de devolver el control — mismo patrón que
+  `roster-fixture.ts`'s `plantRoster()`. También expone `assertStoresFeature()`,
+  la guarda temprana y ruidosa de `featureIds ⊇ {73}` (Stores).
+- `support/store-network-observer.ts` — el cuarto observer: cuerpo + timestamp
+  del `PUT /v1/stores/{id}` (parametrizado por `storeId`, no un regex
+  genérico — un PUT a otra tienda se detecta, no se cuenta junto), un matcher
+  local de `/me` (4 líneas, no importado de `login-network-observer.ts`) para
+  el orden causal PUT→`/me`, y un contador de peticiones `resourceType() ===
+  'document'` para medir la ausencia de recarga en vez de asumirla.
+
+**Costo**: **0 logins nuevos** — reusa la persona `owner-admin` existente
+(REQ-14). **4 peticiones de siembra reales** vía `page.request` (`GET
+/v1/modules/ToStore`, `GET /v1/stores/{id}`, `PUT /v1/stores/{id}`, y un
+re-`GET /v1/stores/{id}` para pinear la precondición) — ninguna lleva
+`[EnableRateLimiting]` en `StoresController.cs`/`ModulesController.cs`, así
+que no consumen ningún presupuesto de cuota.
+
+> ⚠️ **Este spec SÍ necesita backend real levantado** — a diferencia de
+> `login-offline.spec.ts`, que es el único de todo `e2e/` que corre sin
+> `dotnet run` en otra terminal. Diez de las once aserciones dependen de la
+> siembra por `PUT` y del guardado real contra la API.
+
+Reachable únicamente porque el backend no tiene candado de dirección única
+para el plan de una tienda — ver **H-15**
+(`docs/testing/e2e-stage-1/README.md`). El selector de dueño no se renderiza
+para un OwnerAdmin (no "deshabilitado", como decía una versión anterior de
+`S2-01.md`) — ver **H-16**, misma nota.
+
+**Sin teardown alcanzable, mismo criterio ya documentado para `Owner`/`Store`/
+`User`** (`e2e/README.md:107-112`): la tienda de `owner-admin` termina el spec
+en **plan pago**, con `PaymentStartDate` no-nulo y los módulos pagos
+re-activos, y así queda para cualquier corrida posterior.
+
 ## Dónde van los tests de features
 
 Los tests viven en `e2e/` (carpeta configurada en `testDir`). Crea un archivo por feature, p.ej.:

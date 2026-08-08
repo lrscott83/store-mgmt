@@ -36,7 +36,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
-| [S2-01](S2-01.md) | DG-7 — El OwnerAdmin activa el plan pago una sola vez, en una sola dirección | CRÍTICA | **PENDIENTE** | **CUBIERTO** |
+| [S2-01](S2-01.md) | DG-7 — El OwnerAdmin activa el plan pago una sola vez, en una sola dirección | CRÍTICA | **CUBIERTO** — 11 aserciones, 2 tests (`e2e/store-plan-activation.spec.ts`); G1 (rama `succeeded===false` no cubierta) y G2 (`Stores=73` sin re-observar tras la degradación) quedan declaradas, no disfrazadas | **CUBIERTO** |
 | [S2-02](S2-02.md) | Regresión DG-7 — el candado no puede volver a colgarse de `paymentStartDate` | CRÍTICA | **PENDIENTE** | **CUBIERTO** |
 | [S2-03](S2-03.md) | Seguridad — un OwnerAdmin en `/management/stores/create` no puede crear una tienda | CRÍTICA | **PENDIENTE** | **PARCIAL** — ya hay tests (`Stores/StoreCreateAuthorizationGapTests.cs`), y **confirman que el requisito de seguridad NO se cumple**: un `OwnerAdmin` con la feature `Stores` crea la tienda igual (201 + repunta `selectedStoreId`), y un `StoreUser` recibe 400, no 403. H-10 confirmada como defecto de producción, no como hueco de cobertura |
 
@@ -65,7 +65,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 2 CUBIERTO · 2 PARCIAL · 8 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E frontend**: 3 CUBIERTO · 2 PARCIAL · 7 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
 - **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
@@ -85,7 +85,7 @@ Sin plan propio, porque su cobertura se verificó y coincide con lo declarado: S
 
 Ningún escenario está completo en ambas capas.
 
-**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`), y `login-offline.spec.ts` cubre S1-03 (11 tests, capability `e2e-offline-login-ui`, corre sin backend levantado — verificado sin proceso `dotnet` activo el 2026-08-08); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto pasa de 31 a **42 tests** (`pnpm test:e2e`) — 31 + los 11 de `login-offline.spec.ts` — y ese total **se observó verde contra backend real el 2026-08-08**: `42 passed (55.3s)` con 8 workers, corrido por el usuario. Deja de ser la aritmética que este párrafo declaraba y pasa a ser una corrida. Además, `login-offline.spec.ts` en solitario se corrió **sin backend levantado** y dio 11/11 verdes, lo que sostiene aparte que S1-03 no necesita servidor.
+**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`), `login-offline.spec.ts` cubre S1-03 (11 tests, capability `e2e-offline-login-ui`, corre sin backend levantado — verificado sin proceso `dotnet` activo el 2026-08-08), y `store-plan-activation.spec.ts` cubre S2-01 (2 tests: un `test()` continuo con las 10 aserciones DOM+red del plan, y un `test()` independiente para el fallo de carga — SÍ necesita backend real levantado, a diferencia de `login-offline.spec.ts`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto pasó de 31 a **42 tests** (31 + los 11 de `login-offline.spec.ts`), observada verde contra backend real el 2026-08-08 (`42 passed (55.3s)`, 8 workers, corrido por el usuario). Con `store-plan-activation.spec.ts` la corrida por defecto pasa de 42 a **44 tests** (`pnpm test:e2e`) — aritmética **42 + 2 = 44**, confirmada por `pnpm exec playwright test --list --grep-invert @rate-limit` (`Total: 44 tests in 6 files`, no necesita backend ni navegador), pero **no** es una corrida observada: quien implementó S2-01 no tuvo backend disponible en su sesión para correr Playwright de verdad, así que si esos 44 pasan en verde queda pendiente de confirmación por el usuario. Además, `login-offline.spec.ts` en solitario se corrió **sin backend levantado** y dio 11/11 verdes, lo que sostiene aparte que S1-03 no necesita servidor.
 
 Los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. También se corrieron el **2026-08-08 tras el refactor del núcleo de observers**: `2 passed (18.2s)`. Eso importa más que un verde cualquiera: cada uno de esos specs lanza un error explícito si su bucle termina sin observar un 429, así que verde ⇒ el límite se disparó ⇒ las dos clases de error (`RegisterRateLimitError` con su umbral 10/10min y `LoginRateLimitError` con su 5/1min) siguen construyéndose bien cada una en su módulo. Es la única evidencia por ejecución de que el núcleo compartido no las unificó.
 
@@ -296,6 +296,32 @@ Encontrado al implementar la cobertura Playwright de [S1-03](S1-03.md), no por l
 No es una regresión: el mismo camino ya existía para los logins online, y el `POST` es telemetría de background que deliberadamente no maneja el overlay de carga global (`store-usage-tracker.ts:108-110`). Pero desmiente la lectura intuitiva de que un login offline no toca la red.
 
 **Consecuencia para la capa Playwright**: la aserción "cero peticiones" de S1-03 no puede ser literal. `e2e/support/any-request-observer.ts` se mantuvo genérico y la tolerancia vive donde corresponde, en el spec: `expectOnlyKnownTelemetry()` en `e2e/login-offline.spec.ts`. Un observer que tolerara esto por dentro habría escondido el hallazgo en vez de declararlo.
+
+### H-15 — El backend no tiene candado de dirección única para el plan de una tienda
+
+Encontrado al implementar la cobertura Playwright de [S2-01](S2-01.md). `UpdateStoreCommandHandler.Handle` (`UpdateStoreCommand.cs:69-106`) tiene un único guard de autorización — `IsSuperAdminOrOwnerAdmin` (`:71-72`) — y ninguna otra rama compara el `moduleIds` entrante contra el conjunto actual de la tienda, ni consulta `PaymentStartDate` para rechazar una bajada de plan. DG-7 ("el OwnerAdmin activa el plan pago una sola vez") es, del lado servidor, una garantía que **no existe**: es exclusivamente una barrera de UI, documentada en prosa en `plan-picker.tsx:9-15` (`readOnly` no renderiza el botón de activación, pero nada impide un `PUT` directo con cualquier conjunto de módulos).
+
+Misma forma que **H-10** (el backend permite crear tiendas como OwnerAdmin, la única barrera es un accidente del frontend), con una diferencia que vale la pena escribir: en H-10 la barrera de frontend es **emergente** — un colapso de `??` que nadie diseñó a propósito. Acá la barrera de frontend es **deliberada y documentada** (`store-form.tsx:72-83` cita explícitamente DG-7). Lo que falta no es intención — es la mitad de servidor de una intención que sí existe del lado cliente.
+
+La ironía conviene escribirla explícita, no dejarla implícita: **la ausencia de este candado del lado servidor es la única razón por la que la cobertura Playwright de [S2-01](S2-01.md) puede existir** — `e2e/support/store-fixture.ts` degrada una tienda real a plan gratuito con un `PUT` directo precisamente porque el servidor lo permite sin objeción. Si H-15 se arreglara algún día, ese `PUT` de siembra empezaría a fallar y la precondición de S2-01 dejaría de ser alcanzable con el Approach A actual.
+
+### H-16 — Dos nociones distintas de "owner admin" en el mismo código
+
+Encontrado al implementar la cobertura Playwright de [S2-01](S2-01.md), y corrigió una aserción de esa US que estaba mal escrita (`S2-01.md:62`, ver abajo).
+
+`management/stores/routes/edit-store.tsx:37` calcula:
+
+```ts
+const isOwnerAdmin = isSuperAdmin || hasOwnersAvailableFeature(user);
+```
+
+`hasOwnersAvailableFeature` (`authorization-service.ts:44-46`) exige que `user.featureIds` contenga la feature `Owners` (`authorization-service.ts:31`, rama OwnerAdmin de `isUserAuthorized`). Ese `featureIds` de nivel usuario viene de `GetMeQuery.cs:83` → `AllowedFeaturesService.GetAllowedFeatureIdsForCurrentUserAsync` → para un OwnerAdmin, `GetAllowedFeatureIdsByRoleAsync(RoleType.OwnerAdmin, storeModuleIds)` (`AllowedFeaturesService.cs:27-28,41-47`), que filtra el enum `StoreRoleFeatures` por `GetRoles().Any(r => r == OwnerAdmin) && GetModuleType().HasValue && storeModuleIds.Contains(...)`. `Owners` cae del filtro **por dos razones independientes**: `OwnersAdmin` (`StoreRoleFeatures.cs:12-14`) lleva `[HasRoles(SuperAdmin, ReSeller)]` — **nunca** `OwnerAdmin` — y no lleva ningún `[HasModule]`, así que `GetModuleType()` es `null`. Cualquiera de las dos ya la excluye. Por si hiciera falta un tercer cierre: la feature `Owners` (`FeatureEntityTypeConfiguration.cs:56-64`) cuelga de `ModuleType.Administration`, sembrado `availableToStore: false` (`ModuleEntityTypeConfiguration.cs:39`) — `StoreModuleRepository.cs:22` filtra por `sm.Module.AvailableToStore`, así que ninguna tienda porta nunca ese módulo tampoco. **Ninguna de las tres puertas se abre nunca para un OwnerAdmin real**, así que `isOwnerAdmin` en `edit-store.tsx` es `false` para cualquiera de ellos, incluida la persona `owner-admin` de la suite Playwright.
+
+Mientras tanto, `adminLoader` (`auth/routes/loaders.ts:101`) mira una cosa completamente distinta: el flag `user.isOwnerAdmin`, que viene de `GetMeQuery.cs:96` (`IsOwnerAdmin = _httpContextService.IsOwnerAdmin`). Ese flag SÍ es `true` para un OwnerAdmin real — es lo que deja pasar la ruta `/management/stores` en primer lugar.
+
+**Consecuencia sobre [S2-01](S2-01.md)**: la aserción "el selector de dueño está deshabilitado en modo edición" (`S2-01.md:62`, versión anterior a este cambio) era falsa. El selector no está deshabilitado — **no se renderiza en absoluto**, porque todo el bloque está gateado por `isAdminUser = isSuperAdmin || isOwnerAdmin` (`store-form.tsx:69,179`), y ese `isOwnerAdmin` es el de `edit-store.tsx:37`, no el flag. Corregido en `S2-01.md` y cubierto en su forma verdadera por `e2e/store-plan-activation.spec.ts`.
+
+**Segundo orden, digno de su propia nota — dos defectos se cancelan**: si `isOwnerAdmin` en `edit-store.tsx` usara la primera definición (el flag `user.isOwnerAdmin`, `true` para esta persona), `edit-store.tsx:52` llamaría `listOwners()`. `OwnersController.cs:18` lleva `[HasPermission(StoreRoleFeatures.OwnersAdmin)]`, y `OwnersAdmin` (`StoreRoleFeatures.cs:12-14`) admite `SuperAdmin`/`ReSeller`, **no** `OwnerAdmin` — esa llamada respondería 403. El 403 caería en el `.catch()` de `edit-store.tsx:80-82`, `loadError` se setearía, y `<StoreForm>` nunca montaría — matando 10 de las 11 aserciones de [S2-01](S2-01.md). Es `false` por la definición real, así que el tercer miembro del `Promise.all` es `Promise.resolve(success([]))` y en modo edición solo salen 2 GET reales. Cambiar cualquiera de los dos defectos por separado (la definición de `isOwnerAdmin` en `edit-store.tsx`, o el permiso de `OwnersController`) rompería la otra mitad de esta US — es su propio cambio, con su propia decisión de producto, no un "arreglo" de esta pasada.
 
 ---
 

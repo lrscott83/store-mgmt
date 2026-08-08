@@ -154,7 +154,7 @@
 - **Rollback**: revertir solo este commit deja el `test()` #1 en el estado de WU-5 (funcional, sin las aserciones de plan-pago) y sin `test()` #2 — estado coherente.
 - **Commit**: `test(e2e): cover S2-01 paid-plan assertions (6,7) and load-failure assertion (11)`
 
-### WU-7 — Documentación: `S2-01.md`, `README.md` ×2, H-15, H-16
+### WU-7 — Documentación: `S2-01.md`, `README.md` ×2, H-15, H-16 ✅
 
 - **Intención**: cerrar el catálogo de cobertura y registrar los dos hallazgos nuevos.
 - **Ficheros** (ninguno es de test):
