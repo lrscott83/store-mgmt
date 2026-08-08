@@ -60,9 +60,11 @@ Nada más cambió: sin normalización de escaping, sin re-wrap de prosa, sin edi
 | `pnpm exec playwright test e2e/login-offline.spec.ts` | 11/11 verdes, sin backend levantado | Agente (sesión de verify) | 2026-08-08 |
 | `npx turbo run test --force` | 179 archivos / 2392 tests verdes, 0 errores de tipo | Agente (sesión de verify) | 2026-08-08 |
 | `pnpm test:e2e` | **42 passed (55.3s), 8 workers** | **Usuario** | 2026-08-08 |
-| `pnpm test:e2e:rate-limit` | ⚠️ **PENDIENTE** — corriendo del lado del usuario al momento de este archive, resultado aún no reportado | Usuario (aún sin reportar) | — |
+| `pnpm test:e2e:rate-limit` | **2 passed (18.2s), 2 workers** | **Usuario** | 2026-08-08 |
 
-La corrida del usuario de `pnpm test:e2e` (42 verdes) confirma en ejecución la aritmética 31 (preexistentes) + 11 (nuevos) = 42 que hasta ahora solo estaba afirmada como aritmética en `tasks.md` (checklist WU3, "⚠️ NO VERIFICADO... es aritmética, no una corrida observada") y en `verify-report.md` §5. **No se debe registrar `pnpm test:e2e:rate-limit` como aprobado.** Queda ⚠️ PENDIENTE, expectativa 2 verdes, sin cambio de umbral respecto de antes del cambio.
+La corrida del usuario de `pnpm test:e2e` (42 verdes) confirma en ejecución la aritmética 31 (preexistentes) + 11 (nuevos) = 42 que hasta ahora solo estaba afirmada como aritmética en `tasks.md` (checklist WU3, "⚠️ NO VERIFICADO... es aritmética, no una corrida observada") y en `verify-report.md` §5.
+
+**Actualización posterior al archive** (2026-08-08): `pnpm test:e2e:rate-limit` quedó registrado como ⚠️ PENDIENTE cuando se escribió este reporte, con la instrucción explícita de no darlo por aprobado. El usuario lo corrió después y dio `2 passed (18.2s)`. Ambos gates de backend están ahora observados, no inferidos. Los dos specs de rate-limit lanzan un error explícito si su bucle termina sin ver un 429, así que esos dos verdes son la prueba de que el límite se disparó — y de que el refactor del núcleo no rompió ninguna de las dos clases de error, que es justamente lo que `verify-report.md` no podía comprobar por ejecución en su momento.
 
 **Limitación declarada, sin re-verificar en este archive**: la línea base WU0 (31+2 verdes antes del refactor) nunca se re-corrió en esta rama. Solo existe la corrida documentada el 2026-08-07 (`docs/testing/e2e-stage-1/README.md:88`), previa a este cambio. `verify-report.md` §9 ya lo declaraba como limitación, no como pass; este archive lo hereda sin reabrirlo ni disfrazarlo.
 
@@ -78,10 +80,12 @@ Registrado en `docs/testing/e2e-stage-1/README.md`. Un login offline exitoso arm
 
 La tolerancia por ese endpoint conocido vive exclusivamente en el spec de test (`expectOnlyKnownTelemetry()`), nunca dentro de `any-request-observer.ts`, que se mantuvo genérico — decisión de diseño D2, verificada en código por `sdd-verify` §7. `REQ-1`/`REQ-2` de `e2e-offline-login-ui`, tal como quedaron en el spec canónico recién sincronizado, ya reflejan esta excepción por endpoint (era precisamente el WARNING que `verify-report.md` §"WARNING" cerró en el commit `610e794`, previo a este archive).
 
-## Dos ítems que se llevan al siguiente lector
+## Dos ítems que se llevaban al siguiente lector — los dos CERRADOS
 
-1. **OPEN AUTHORIZATION (no defecto)**: `login-rate-limit.spec.ts:6` cita `es.ts:83` para `AUTH.TOO_MANY_ATTEMPTS`; la línea real es `es.ts:85`. Es un archivo de test — **no tocado**, tal como exige la frontera de autorización del cambio. Requiere autorización explícita del usuario si algún día se quiere corregir.
-2. **SUGGESTION**: la técnica de "warm-up" de Vite en T11 (un submit online antes del submit offline real, porque cortar la red antes de que el chunk ES de una ruta se haya pedido cuelga el fetch del dev server indefinidamente) está documentada inline en `login-offline.spec.ts:341-350`, pero no está reflejada en `design.md` §D4. No bloquea nada; vale la pena incorporarla a `design.md` si el change se retoma alguna vez.
+Ambos se resolvieron el 2026-08-08, después de escribir este reporte y en la misma rama, por decisión explícita del usuario ("las dos cosas las puedes incluir aquí mismo en esta misma rama"). Se resolvieron sin abrir un ciclo SDD: son una línea de comentario y un addendum de documento, sin ninguna decisión de arquitectura que sostener.
+
+1. **CERRADO — OPEN AUTHORIZATION**: `login-rate-limit.spec.ts:6` citaba `es.ts:83` para `AUTH.TOO_MANY_ATTEMPTS`; la línea real es `es.ts:85`, verificada de nuevo antes de escribirla. Al ser un `*.spec.ts` existente estuvo bloqueado hasta la autorización explícita del usuario, que llegó. **El cambio es la línea de comentario y nada más: cero lógica de test tocada.** De paso el comentario ahora desambigua la clave, porque existe un `REGISTRATION.TOO_MANY_ATTEMPTS` distinto en `es.ts:128` con copy propio — exactamente el tipo de confusión que una cita desfasada invita.
+2. **CERRADO — SUGGESTION**: el warm-up de Vite de T11 quedó incorporado a `design.md` §D4 como *"Addendum post-archive — el paso 0 que esta secuencia le faltaba"*, marcado como agregado después de archivar y no como parte del diseño original. Deja escrita la regla que faltaba: cortar la red antes de que el chunk de una ruta se haya pedido **alguna vez** en ese contexto no falla, **cuelga el fetch para siempre**, así que hay que calentar la ruta **destino**, no solo la actual.
 
 ## Lo que S1-03 deja para el futuro
 
@@ -91,4 +95,4 @@ El round-trip real de `provision.tsx` (subida de archivo `.smcabundle`, `deseria
 
 El cambio quedó completamente planeado (explore → proposal → spec → design → tasks), implementado, verificado (PASS WITH WARNINGS, warning cerrado) y ahora archivado. El árbol canónico de specs (`openspec/specs/e2e-offline-login-ui/spec.md`, `openspec/specs/e2e-network-observer-core/spec.md`) refleja el comportamiento nuevo, con la excepción de telemetría de H-14 ya incorporada al texto del requirement, no solo a comentarios sueltos.
 
-**Pendiente fuera de este agente**: `pnpm test:e2e:rate-limit` (2 esperados) sigue sin resultado reportado por el usuario al momento de este archive. El orquestador debería confirmarlo antes de dar el cambio por cerrado en el sentido operativo completo (el ciclo SDD en sí ya está cerrado).
+**Cierre operativo completo** (2026-08-08, posterior a la escritura de este reporte): el único pendiente era `pnpm test:e2e:rate-limit`, y el usuario lo corrió — `2 passed (18.2s)`. Con eso los cuatro gates están observados y los dos ítems que se llevaban al siguiente lector quedaron cerrados en esta misma rama. Lo único que sigue sin observación directa es la línea base WU0 de "verde ANTES del refactor", que permanece como la limitación declarada de arriba: existe la corrida documentada del 2026-08-07, no una fresca.

@@ -90,6 +90,16 @@ Paso 3 después del 2: mismo motivo que `session.ts:135-141` (`goto('/login')` a
 
 **Rechazado**: plantar con `page.addInitScript` — se re-ejecuta en cada navegación y re-plantaría el roster tras un logout/recarga, contaminando T8/T9/T10 (mismo motivo ya registrado en `session.ts:453-455` para `AUTH_MODEL`). **Rechazado**: fingir `navigator.onLine` en vez de cortar la red — solo simula conectividad, así que una petición real fugada pasaría inadvertida justo en la aserción que debe cazarla.
 
+#### Addendum post-archive — el paso 0 que esta secuencia le faltaba
+
+> Agregado el 2026-08-08, después de archivar, para cerrar la SUGGESTION del `verify-report.md` §8. No formaba parte del diseño original: se descubrió implementando T11 y hasta ahora solo vivía inline en `login-offline.spec.ts:341-350`.
+
+La secuencia de arriba asume que el chunk de la ruta **destino** ya se pidió alguna vez en ese contexto de navegador. Cuando no es así, el paso 6 no falla: **cuelga el fetch para siempre**. Es una variante más fina del gotcha que fundamenta el paso 6 — `goBack()` vs `goto()` resuelve el caso de *volver* a una ruta ya cargada, pero no dice nada sobre *llegar por primera vez* a una con la red cortada, que es lo que T11 necesita (`/sales/products`).
+
+Por eso T11 antepone un paso 0: un submit **con conexión** que aterriza en `/sales/products` —y por lo tanto carga su chunk—, después logout, y solo entonces la secuencia de arriba con el corte real. Notar que ese primer submit **no cuesta un login real**: con roster plantado toma la vía offline igual, por la razón estructural de todo este cambio (`login.tsx:109-110` retorna en `:123`, antes del chequeo de conectividad de `:128`). Es el mismo patrón de dos submits que T2 ya usaba por otro motivo.
+
+**Regla para el próximo escenario que corte la red**: calentar la ruta **destino**, no solamente la actual.
+
 ### D5 — Probar la rama online sin gastar cupo (H-12)
 
 Bundle **vencido** ⇒ `isRosterProvisioned()` falso (`roster-store.ts:148`) ⇒ el submit cae al `login()` online (`login.tsx:128,133-135`). Se intercepta con `page.route('**/v1/auth/login', route => route.fulfill({ status: 429, ... }))` — precedente de `route.fulfill`/`route.abort` en `login.spec.ts:351,369`. La petición nunca sale del browser: **0 de los 5/min del `LoginPolicy`**.
