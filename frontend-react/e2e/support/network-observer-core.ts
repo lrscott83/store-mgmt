@@ -109,9 +109,16 @@ export type ObserverSubject = 'registro' | 'login' | 'tienda';
  * talks to whatever backend that other dev server was configured for —
  * writing real rows there.
  *
- * `subject` is the ONE parameter that varies between the two observers
- * (design.md D1) — the resulting text is byte-identical otherwise, typo
- * included (`Parná`, quoted verbatim by `e2e/README.md`).
+ * `subject` is the ONE parameter that varies between the observers
+ * (design.md D1) — the resulting text is byte-identical otherwise, the
+ * `Parná` typo included.
+ *
+ * That typo is preserved deliberately, but NOT because a doc quotes it
+ * literally: `e2e/README.md:69,99` paraphrases this message and elides the
+ * clause the typo lives in. It is preserved because the S1-03 core
+ * extraction was contractually byte-for-byte, and changing user-visible
+ * copy inside a refactor is how a "pure" refactor stops being one. Fix it
+ * on purpose or not at all.
  */
 export function wrongBackendMessage(subject: ObserverSubject, actualUrl: string): string {
   return (
