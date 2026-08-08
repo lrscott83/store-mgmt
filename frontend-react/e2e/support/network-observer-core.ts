@@ -93,7 +93,7 @@ export function matchesPathSuffix(url: string, suffix: string): boolean {
   }
 }
 
-export type ObserverSubject = 'registro' | 'login';
+export type ObserverSubject = 'registro' | 'login' | 'tienda';
 
 /**
  * The guard: every request must go to the backend this run actually asked

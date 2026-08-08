@@ -88,6 +88,18 @@ export async function mutateAuthModel(page: Page, overrides: Partial<AuthModel>)
 }
 
 /**
+ * Reads the RAW `token` key — separate from `AUTH_MODEL.authToken` by design
+ * (D3, same distinction `mutateBearerToken` below documents): `api-client.ts:37`
+ * builds the `Authorization` header from THIS key. Added for `store-fixture.ts`
+ * (S2-01, D2): its server-side seeding PUT/GET calls go through `page.request`,
+ * not `apiClient`, so the Bearer header has to be assembled by hand from the
+ * same already-authenticated session's token.
+ */
+export async function readBearerToken(page: Page): Promise<string | null> {
+  return page.evaluate((key) => window.localStorage.getItem(key), TOKEN_KEY);
+}
+
+/**
  * Mutates ONLY the `token` key — separate from `AUTH_MODEL.authToken` by
  * design (D3): `api-client.ts:37` builds the `Authorization` header from
  * THIS key, not from `AUTH_MODEL`. Mutating them independently is what lets

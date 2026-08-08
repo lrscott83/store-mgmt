@@ -18,7 +18,7 @@
 
 ## 1. Unidades de trabajo (una por commit)
 
-### WU-1 — Ensanchar `ObserverSubject` + `readBearerToken`
+### WU-1 — Ensanchar `ObserverSubject` + `readBearerToken` ✅
 
 - **Intención**: habilitar que el cuarto observer use los helpers de `network-observer-core.ts` (diagnóstico de backend equivocado) y leer el Bearer token de la sesión ya autenticada.
 - **Ficheros**:
