@@ -26,6 +26,8 @@ import { installStoreNetworkObserver } from './support/store-network-observer';
 const PAID_ACTIVATE_TEXT = 'Activar este plan'; // es.ts:643
 const WILL_ACTIVATE_TEXT = 'Se activará al guardar'; // es.ts:644
 const ACTIVE_BADGE_TEXT = 'Activo'; // es.ts:639
+const SELECTED_TEXT = 'Plan seleccionado'; // es.ts:642
+const STORES_ERROR_TEXT = 'Ocurrió un error. Intente de nuevo.'; // es.ts:632
 
 test.use({ persona: 'owner-admin' });
 
@@ -42,6 +44,11 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
   // limited to the catalog's priceIncluded ids, never hardcoded. H-1 means
   // the auto-registered store starts on the PAID plan, so this seed is what
   // makes the free-plan half of DG-7 reachable at all.
+  //
+  // G2 — DECLARED GAP, not assumed: no /me runs between this degrade and
+  // the save below, so whether `Stores=73` survives the downgrade is never
+  // observed here — neither broken nor confirmed. See
+  // docs/testing/e2e-stage-1/S2-01.md.
   const { allIds } = await degradeStoreToFreePlan(page, selectedStoreId);
 
   await page.goto('/management/stores');
@@ -116,4 +123,69 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
   storeObserver.expectPutThenMe();
   storeObserver.expectNoDocumentSince('tras guardar el plan pago');
   loginNetwork.expectMeRequestCount(1);
+
+  // WU-6 — the flow's own explicit "reload the screen" step (S2-01.md's
+  // flow, step 4). This is a SEPARATE act from assertion 5 above, which
+  // demonstrated the save itself never reloads — the two are not in
+  // contradiction; the US just performs its own reload afterward.
+  await page.reload();
+
+  // Aserción 6 (REQ-6): once truly on the paid plan, the ACTIVATE button no
+  // longer exists in the DOM in EITHER tab — isOnPaidPlan is now true, so
+  // `readOnly` hides it unconditionally (plan-picker.tsx:100), regardless
+  // of which tab is selected.
+  await expect(page.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toHaveCount(0);
+  await freeTab.click();
+  await expect(page.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toHaveCount(0);
+  await paidTab.click();
+  await expect(page.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toHaveCount(0);
+
+  // Aserción 7 (REQ-7, design.md D7): the tabs stay clickable — clicking
+  // changes `aria-selected` and the visible panel — but no click mutates
+  // `moduleIds`. `onChange` hangs only off the (now permanently absent)
+  // ACTIVATE button, so there is no event to observe directly; the negative
+  // is shown through the panel's content and the badge's position instead.
+  await freeTab.click();
+  await expect(freeTab).toHaveAttribute('aria-selected', 'true');
+  const tabPanel = page.getByRole('tabpanel');
+  await expect(tabPanel.getByText(SELECTED_TEXT)).toHaveCount(0);
+  await expect(tabPanel.getByRole('button', { name: PAID_ACTIVATE_TEXT })).toHaveCount(0);
+  await expect(tabPanel.getByText(WILL_ACTIVATE_TEXT)).toHaveCount(0);
+  await expect(paidTab.getByText(ACTIVE_BADGE_TEXT)).toBeVisible();
+  await expect(freeTab.getByText(ACTIVE_BADGE_TEXT)).toHaveCount(0);
+
+  // Back to the paid tab: SELECTED reappears there — proof `selected` never
+  // moved when the free tab was clicked above.
+  await paidTab.click();
+  await expect(tabPanel.getByText(SELECTED_TEXT)).toBeVisible();
+});
+
+/**
+ * Aserción 11 (REQ-11) — isolated from `test()` #1: `route.abort()` does
+ * not touch the store's data (D5), so no shared state, no ordering
+ * dependency between the two tests.
+ *
+ * Intercepts `GET /v1/modules/ToStore` — the narrowest of the three
+ * `Promise.all` requests (`edit-store.tsx:49-53`) — and aborts it at the
+ * origin. This is NOT a mock: `abort()` fabricates no response body; it
+ * reproduces a network condition a real environment produces every day
+ * (design.md D5, precedent `login.spec.ts:351`: "the honest simulation of
+ * 'the server is not there' is cutting the request at the origin").
+ *
+ * Covers the `.catch()` branch at `edit-store.tsx:80-82`.
+ *
+ * G1 — DECLARED GAP, not disguised: this does NOT cover the
+ * `succeeded === false` branch (`edit-store.tsx:55-58`) that S2-01.md's
+ * assertion 11 literally cites. Reaching that branch needs a fabricated
+ * 200 response body — a real mock — which design.md D5 rejects. See
+ * docs/testing/e2e-stage-1/S2-01.md and README.md.
+ */
+test('fallo de carga muestra STORES.ERROR y no monta el formulario', async ({ signedInPage }) => {
+  const { page } = signedInPage;
+
+  await page.route('**/v1/modules/ToStore', (route) => route.abort());
+  await page.goto('/management/stores');
+
+  await expect(page.getByRole('alert')).toHaveText(STORES_ERROR_TEXT);
+  await expect(page.locator('#store-name')).toHaveCount(0);
 });

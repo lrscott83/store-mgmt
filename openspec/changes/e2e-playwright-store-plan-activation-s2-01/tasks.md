@@ -126,7 +126,7 @@
 - **Rollback**: revertir solo este commit vuelve el spec al estado de WU-4 (test funcional, sin el tramo de guardado) — estado coherente, no rompe nada.
 - **Commit**: `test(e2e): cover S2-01 save round-trip assertions (PUT body + session refresh, no reload)`
 
-### WU-6 — Spec, parte 3: aserciones 6, 7 (plan ya pago) + test nuevo para aserción 11 (fallo de carga)
+### WU-6 — Spec, parte 3: aserciones 6, 7 (plan ya pago) + test nuevo para aserción 11 (fallo de carga) ✅
 
 - **Intención**: cerrar el `test()` #1 con las dos aserciones de plan-ya-pago, y agregar el `test()` #2 independiente para la aserción 11.
 - **Fichero**: `frontend-react/e2e/store-plan-activation.spec.ts` — MODIFICADO (mismo fichero nuevo de esta rama).
