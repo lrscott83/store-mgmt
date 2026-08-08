@@ -29,7 +29,7 @@
 - **Rollback**: revertir este commit solo — dos líneas aditivas, ningún consumidor existente las requiere todavía (WU-2/WU-3 son quienes las usan).
 - **Commit**: `feat(e2e-support): widen ObserverSubject to admit 'tienda' and add readBearerToken`
 
-### WU-2 — `store-fixture.ts`: `degradeStoreToFreePlan`, `readModuleCatalog`, `assertStoresFeature`
+### WU-2 — `store-fixture.ts`: `degradeStoreToFreePlan`, `readModuleCatalog`, `assertStoresFeature` ✅
 
 - **Intención**: el helper de siembra que degrada una tienda real a plan gratuito por `PUT` real, y la aserción temprana de `featureIds`.
 - **Fichero**: `frontend-react/e2e/support/store-fixture.ts` — NUEVO, no es fichero de test (es soporte, igual que `store-seed.ts`, `roster-fixture.ts`).
