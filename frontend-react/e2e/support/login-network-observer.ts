@@ -1,6 +1,22 @@
 import type { Page, Request as PlaywrightRequest } from '@playwright/test';
 import { E2E_API_URL } from './backend-url';
+import {
+  backendUnreachableMessage,
+  createDeferred,
+  createOutcomeQueue,
+  expectNoAttemptMessage,
+  matchesPathSuffix,
+  resolveCapture,
+  wrongBackendMessage,
+  type Deferred,
+  type Outcome,
+} from './network-observer-core';
 
+// Debt PAID (was: "Duplicated from network-observer.ts on purpose... extract
+// a shared core when a THIRD observer appears (rule of three)" at the old
+// local `wrongBackendMessage()` in this file) — see
+// `network-observer-core.ts` for the shared implementation both this module
+// and `network-observer.ts` now import.
 const LOGIN_PATH_SUFFIX = '/v1/auth/login';
 const ME_PATH_SUFFIX = '/v1/auth/me';
 // D5 (REQ-13): scoped to product-service traffic, not "any other request" —
@@ -23,6 +39,12 @@ export interface LoginResponseCapture {
  * Verified trap #2: these are the LOGIN thresholds — 5 attempts per minute,
  * sliding window of 3 segments — NOT `RegisterPolicy`'s 10/10min/10. Never
  * copy the sibling's constants into this file.
+ *
+ * Constructed HERE, never in `network-observer-core.ts` — same reasoning as
+ * `RegisterRateLimitError` in `network-observer.ts` (`e2e-network-observer-core`
+ * REQ-4): the core receives a `rateLimitError` factory instead, so this
+ * class's identity and its own 5/1min threshold text stay owned by this
+ * module alone, never merged with the register sibling's.
  */
 export class LoginRateLimitError extends Error {}
 
@@ -33,23 +55,6 @@ interface ObservedEvent {
   kind: EventKind;
   phase: EventPhase;
   at: number;
-}
-
-type Outcome =
-  | { kind: 'response'; capture: LoginResponseCapture }
-  | { kind: 'failed'; message: string };
-
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-}
-
-function createDeferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
 }
 
 export interface LoginNetworkObserver {
@@ -101,20 +106,12 @@ export interface LoginNetworkObserver {
 
 function isLoginRequest(method: string, url: string): boolean {
   if (method !== 'POST') return false;
-  try {
-    return new URL(url).pathname.endsWith(LOGIN_PATH_SUFFIX);
-  } catch {
-    return false;
-  }
+  return matchesPathSuffix(url, LOGIN_PATH_SUFFIX);
 }
 
 function isMeRequest(method: string, url: string): boolean {
   if (method !== 'GET') return false;
-  try {
-    return new URL(url).pathname.endsWith(ME_PATH_SUFFIX);
-  } catch {
-    return false;
-  }
+  return matchesPathSuffix(url, ME_PATH_SUFFIX);
 }
 
 function isProductApiRequest(url: string): boolean {
@@ -126,51 +123,15 @@ function isProductApiRequest(url: string): boolean {
   }
 }
 
-/**
- * Duplicated from `network-observer.ts:87-97` on purpose (design.md §4,
- * §9) — modifying that file would put two EXISTING specs (`register.spec.ts`,
- * `register-rate-limit.spec.ts`) at regression risk for a cosmetic DRY gain.
- * Debt is declared: extract a shared core when a THIRD observer appears
- * (rule of three), gated on `register.spec.ts` staying green.
- */
-function wrongBackendMessage(actualUrl: string): string {
-  return (
-    `La petición de login salió a ${actualUrl}, pero el backend esperado para esta corrida ` +
-    `es ${E2E_API_URL}. Esto pasa cuando ya había un dev server corriendo en :3333 ANTES de ` +
-    "arrancar Playwright, con otro API_URL (por ejemplo, tu .env de desarrollo) — con " +
-    'reuseExistingServer:true, Playwright lo reutiliza tal cual está, y nunca llega a ' +
-    'inyectarle el backend correcto. Parná ese dev server (Ctrl+C en su terminal) y volvé a ' +
-    'correr la suite: Playwright va a levantar el suyo propio, ya apuntando al backend correcto.'
-  );
-}
-
 export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
   const events: ObservedEvent[] = [];
   const loginAttempts: Array<{ url: string }> = [];
   const productApiRequests: Array<{ url: string }> = [];
-  const outcomes: Outcome[] = [];
-  let waiters: Array<(outcome: Outcome) => void> = [];
+  const queue = createOutcomeQueue<LoginResponseCapture>();
   let loginRequestDeferred: Deferred<void> | null = null;
   let meRequestDeferred: Deferred<void> | null = null;
   let loginRequestSeen = false;
   let meRequestSeen = false;
-
-  // An outcome is delivered to exactly ONE consumer: a waiter if someone is
-  // already blocked on it, the queue otherwise. Never both.
-  //
-  // Doing both — queueing AND resolving every waiter — double-counts. The waiter
-  // returns the outcome while a copy stays in the queue, so the NEXT
-  // waitForLoginResponse() shifts that stale copy and returns immediately, and
-  // the observer falls one response behind for the rest of the run. In a loop
-  // that only cares about the LAST response, being one behind loses it entirely.
-  function pushOutcome(outcome: Outcome): void {
-    const waiter = waiters.shift();
-    if (waiter) {
-      waiter(outcome);
-      return;
-    }
-    outcomes.push(outcome);
-  }
 
   page.on('request', (request: PlaywrightRequest) => {
     const method = request.method();
@@ -186,12 +147,12 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
       loginRequestSeen = true;
       loginRequestDeferred?.resolve();
 
-      // Guard (see wrongBackendMessage() above): pushed as soon as the
-      // request is observed, before any response arrives, so
-      // waitForLoginResponse() throws this instead of whatever the wrong
-      // backend happens to answer.
+      // Guard (see wrongBackendMessage() in network-observer-core.ts):
+      // pushed as soon as the request is observed, before any response
+      // arrives, so waitForLoginResponse() throws this instead of whatever
+      // the wrong backend happens to answer.
       if (!url.startsWith(E2E_API_URL)) {
-        pushOutcome({ kind: 'failed', message: wrongBackendMessage(url) });
+        queue.push({ kind: 'failed', message: wrongBackendMessage('login', url) });
       }
       return;
     }
@@ -208,11 +169,9 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
     const url = request.url();
     if (!isLoginRequest(method, url) && !isMeRequest(method, url)) return;
     const errorText = request.failure()?.errorText ?? 'unknown network error';
-    pushOutcome({
+    queue.push({
       kind: 'failed',
-      message:
-        `The backend did not respond at ${url} (${errorText}). Start it with: ` +
-        'dotnet run --project backend/src/SMCA.WebApi --launch-profile http',
+      message: backendUnreachableMessage(url, errorText),
     });
   });
 
@@ -232,14 +191,15 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
       events.push({ kind: 'login', phase: 'response', at: Date.now() });
 
       // The body still has to be read IMMEDIATELY (same reasoning as
-      // network-observer.ts:141-157): a successful login navigates right after
-      // this resolves, and a body read after navigation risks finding it already
-      // discarded. Only the capture is deferred — never the timestamp.
+      // network-observer.ts:101-117): a successful login navigates right
+      // after this resolves, and a body read after navigation risks finding
+      // it already discarded. Only the capture is deferred — never the
+      // timestamp.
       void response
         .text()
         .catch(() => '')
         .then((bodyText) => {
-          pushOutcome({
+          queue.push({
             kind: 'response',
             capture: { status: response.status(), bodyText, url },
           });
@@ -266,39 +226,17 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
     },
 
     waitForLoginResponse: async () => {
-      const outcome =
-        outcomes.shift() ??
-        (await new Promise<Outcome>((resolve) => {
-          waiters.push(resolve);
-        }));
-
-      if (outcome.kind === 'failed') {
-        throw new Error(outcome.message);
-      }
-
-      const { capture } = outcome;
-
-      if (capture.status === 429) {
-        throw new LoginRateLimitError(
-          'Login quota exhausted for this IP: 5 login attempts per 1-minute sliding window, ' +
-            '3 segments (RateLimitPolicies.cs:15-24, LoginPolicy). Wait roughly a minute — the ' +
-            'window releases permits gradually, not all at once. This failure does NOT indicate ' +
-            'an app defect.'
-        );
-      }
-
-      if (!capture.url.startsWith(E2E_API_URL)) {
-        throw new Error(wrongBackendMessage(capture.url));
-      }
-
-      if (capture.status === 404) {
-        throw new Error(
-          'API_URL points at the wrong base — is /api missing? (BaseApiController.cs:11). ' +
-            `Expected something like http://localhost:5019/api. Got a 404 from ${capture.url}.`
-        );
-      }
-
-      return capture;
+      const outcome: Outcome<LoginResponseCapture> = await queue.take();
+      return resolveCapture(outcome, {
+        subject: 'login',
+        rateLimitError: () =>
+          new LoginRateLimitError(
+            'Login quota exhausted for this IP: 5 login attempts per 1-minute sliding window, ' +
+              '3 segments (RateLimitPolicies.cs:15-24, LoginPolicy). Wait roughly a minute — the ' +
+              'window releases permits gradually, not all at once. This failure does NOT indicate ' +
+              'an app defect.'
+          ),
+      });
     },
 
     expectLoginThenMe: () => {
@@ -338,13 +276,13 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
     expectNoLoginAttempt: () => {
       if (loginAttempts.length === 0) return;
       const first = loginAttempts[0];
-      const misdirected = !first.url.startsWith(E2E_API_URL);
       throw new Error(
-        `Expected zero requests to a URL ending in ${LOGIN_PATH_SUFFIX}, but observed ` +
-          `${loginAttempts.length} (first: ${first.url}).` +
-          (misdirected
-            ? ` ${wrongBackendMessage(first.url)}`
-            : ' The client-side guard that should have blocked this submit did not run.')
+        expectNoAttemptMessage({
+          suffix: LOGIN_PATH_SUFFIX,
+          observedCount: loginAttempts.length,
+          firstUrl: first.url,
+          subject: 'login',
+        })
       );
     },
 

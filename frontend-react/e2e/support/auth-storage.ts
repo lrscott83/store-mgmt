@@ -11,7 +11,9 @@ import type { Page } from '@playwright/test';
  * `readAuthModel` (`login.spec.ts:30-43`): inserting here would force a
  * non-append edit to that already-green spec file. Duplicating
  * `AUTH_MODEL_KEY_SUFFIX` is accepted debt, same "rule of three" criterion
- * the observer already documents (`login-network-observer.ts:123-129`).
+ * `login-network-observer.ts` used to document before its own debt was paid
+ * off by `network-observer-core.ts` — see the "Debt PAID" note at
+ * `login-network-observer.ts:15-19`.
  */
 
 // Verified trap (storage-keys.ts:5): AUTH_MODEL's key is
