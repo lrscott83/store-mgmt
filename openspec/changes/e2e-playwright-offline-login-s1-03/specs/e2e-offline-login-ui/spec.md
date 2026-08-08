@@ -27,17 +27,33 @@ Definir, como criterios de aceptación verificables, las 12 aserciones de UI de 
 - Cualquier edición a un `*.spec.ts` existente.
 
 ### Supuestos operativos
-El spec corre en la suite por defecto (`pnpm test:e2e`), sin tag `@rate-limit`, y no depende de un backend levantado (cero HTTP en el camino de éxito). La única aserción con una petición sale por `page.route()` interceptada, nunca hacia el backend real.
+El spec corre en la suite por defecto (`pnpm test:e2e`), sin tag `@rate-limit`, y no depende de un backend levantado: ninguna petición de **autenticación** sale en el camino de éxito. La única aserción con una petición de auth sale por `page.route()` interceptada, nunca hacia el backend real.
+
+### La excepción de telemetría — hallazgo H-14, no permiso adquirido
+El camino de éxito **no es HTTP-cero en sentido literal**, y este spec no puede afirmar que lo sea. `login.tsx` llama `armTracking()` en las dos ramas de éxito —offline `:114` y online `:140`, importado en `:11`—, y ni `store-usage-tracker.ts` ni `use-store-usage-tracker.ts` consultan la conectividad en ningún punto: cero referencias a `isOnline`, `ConnectivityService` o `navigator.onLine`. Así que tras un login offline exitoso sale un `POST /v1/usages/store-daily-usage` de background al renderizar la ruta siguiente (`store-usage-tracker.ts:104-107`).
+
+Se descubrió implementando esta cobertura y quedó registrado como **H-14** en `docs/testing/e2e-stage-1/README.md`. Consecuencias que este spec impone:
+
+- La tolerancia se declara por endpoint conocido y vive en el spec de test (`expectOnlyKnownTelemetry()`), **nunca dentro de `any-request-observer.ts`**, que MUST quedar genérico. Un observer que tolerara esto por dentro escondería el hallazgo en vez de declararlo.
+- La tolerancia aplica SOLO a los escenarios que completan un login. Los que nunca lo completan MUST seguir exigiendo cero peticiones sin excepción alguna.
 
 ## Requirements
 
-### Requirement: REQ-1 — Cero peticiones HTTP durante el submit offline exitoso (A1)
-Un submit exitoso en un dispositivo aprovisionado MUST NOT emitir ninguna petición HTTP, ni siquiera a `/v1/auth/login` o `/v1/auth/me`. (`login.tsx:109-123` retorna antes de cualquier rama online, `:128`)
+### Requirement: REQ-1 — Cero peticiones de autenticación durante el submit offline exitoso (A1)
+Un submit exitoso en un dispositivo aprovisionado MUST NOT emitir ninguna petición de autenticación — ni a `/v1/auth/login` ni a `/v1/auth/me`. (`login.tsx:109-123` retorna antes de cualquier rama online, `:128`)
 
-#### Scenario: Login offline exitoso no toca la red
+La única petición HTTP admitida en el camino de éxito es el `POST /v1/usages/store-daily-usage` de telemetría de background descrito arriba (H-14), y MUST declararse explícitamente por endpoint. Cualquier otra petición MUST hacer fallar el test.
+
+#### Scenario: Login offline exitoso no emite tráfico de autenticación
 - GIVEN un dispositivo con roster provisionado no vencido y un usuario válido en `bundle.users`
 - WHEN se envía login+password correctos
-- THEN no se observa ninguna petición HTTP durante todo el flujo
+- THEN no se observa ninguna petición de autenticación durante todo el flujo
+- AND la única petición tolerada es la de telemetría conocida, nombrada por su endpoint
+
+#### Scenario: Un submit que falla no emite ninguna petición, sin excepciones
+- GIVEN un dispositivo con roster provisionado y credenciales que no autentican
+- WHEN se envía el formulario
+- THEN no se observa NINGUNA petición HTTP — la tolerancia de telemetría no aplica, porque el tracker nunca se arma
 
 ### Requirement: REQ-2 — Roster provisionado + navegador online igual usa la vía offline (A2)
 Con roster provisionado, el navegador MUST tomar la vía offline incluso estando online — mismo `return` de REQ-1. (`login.tsx:109-110,123`)
@@ -45,7 +61,7 @@ Con roster provisionado, el navegador MUST tomar la vía offline incluso estando
 #### Scenario: Online no cambia la rama tomada
 - GIVEN un dispositivo con roster provisionado y el navegador en estado online
 - WHEN se envía login+password válidos del roster
-- THEN se autentica por `loginOffline`, no por `login` online, sin petición HTTP
+- THEN se autentica por `loginOffline`, no por `login` online, sin ninguna petición de autenticación
 
 ### Requirement: REQ-3 — Login ausente y contraseña incorrecta producen el mismo mensaje (A3)
 Un login ausente del roster MUST mostrar el mismo mensaje `AUTH.INVALID_CREDENTIALS` que una contraseña incorrecta — indistinguibles. (`login.tsx:39-41`; `offline-auth-service.ts:102,117`)
