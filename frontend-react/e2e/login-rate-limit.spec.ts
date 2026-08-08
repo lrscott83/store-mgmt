@@ -3,7 +3,9 @@ import { LoginPage } from './support/login-page';
 import { newTestIdentity } from './support/identity';
 import { LoginRateLimitError } from './support/login-network-observer';
 
-const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Esperá un momento antes de volver a intentar.'; // es.ts:83
+// `AUTH.TOO_MANY_ATTEMPTS` at es.ts:85 — NOT `REGISTRATION.TOO_MANY_ATTEMPTS`
+// at es.ts:128, which is a different key with different copy.
+const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Esperá un momento antes de volver a intentar.';
 
 // Verified trap #4 / constants that SHRINK, never get copied from the
 // sibling (design.md §8): `LoginPolicy` is 5 attempts / 1 minute / 3
