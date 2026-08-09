@@ -23,9 +23,13 @@ public sealed class WebAppFixture : IAsyncLifetime
 
         Factory = new AppTestFactory();
         // Force host build and apply EF migrations to smca_test (env "Testing" skips the app's dev-only auto-migrate).
+        // Per-run reset (spec R2): DATA-ONLY cleanup — the database is never dropped (user-approved 2026-08-08).
+        // MigrateAsync applies missing migrations + HasData seeds; ResetDataAsync then deletes accumulated
+        // test rows in FK order, preserving seed rows. Keeps the User table under the Take(1000) cap.
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Database.MigrateAsync();
+        await db.Database.MigrateAsync();        // apply migrations + HasData seeds
+        await DbTestHelpers.ResetDataAsync(db);  // delete accumulated data rows, keep seed rows
     }
 
     public Task DisposeAsync()

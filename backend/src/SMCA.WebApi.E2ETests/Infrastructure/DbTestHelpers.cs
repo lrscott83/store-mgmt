@@ -3,14 +3,19 @@ using Application.Abstractions.Authentication;
 using Application.Services.Authentication;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
+using Domain.Entities.Authentication;
 using Domain.Entities.Owners;
 using Domain.Entities.Stores;
 using Domain.Entities.StoreModules;
+using Domain.Entities.StorePayments;
 using Domain.Entities.StoreRoleFeatures;
+using Domain.Entities.StoreUsages;
+using Domain.Entities.StoreUsers;
 using Domain.Entities.Tenants;
 using Domain.Entities.UserRoles;
 using Domain.Entities.Users;
 using Infrastructure.Persistence.Contexts;
+using Infrastructure.Persistence.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -127,6 +132,62 @@ public static class DbTestHelpers
         var rows = await db.Set<T>().IgnoreQueryFilters()
             .Where(x => EF.Property<Guid>(x, "TenantId") == tenantId).ToListAsync();
         db.Set<T>().RemoveRange(rows);
+    }
+
+    /// <summary>
+    /// Data-only reset for the shared e2e database (spec R2). Deletes accumulated test rows
+    /// from every business/data table in FK-safe order (children before parents — every FK in
+    /// the model is DeleteBehavior.Restrict, so order matters), preserving the migration seed
+    /// rows (DefaultTenant, seeded admin User + its UserRole, Role, Feature, Module,
+    /// StorePaymentStatus, SystemConfiguration). The database itself is never dropped —
+    /// replaces the DROP DATABASE mechanism (user-approved 2026-08-08).
+    /// <para>
+    /// Uses ExecuteDeleteAsync deliberately: it issues DELETE SQL directly, so it neither
+    /// loads entities nor falls into the NoTracking trap (ApplicationDbContext sets
+    /// QueryTrackingBehavior.NoTracking globally). IgnoreQueryFilters is required because the
+    /// tenant query filters would otherwise hide rows from the DELETE.
+    /// </para>
+    /// </summary>
+    public static async Task ResetDataAsync(ApplicationDbContext db)
+    {
+        // FK-free / leaf tables first.
+        await db.Set<RefreshToken>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<OutboxMessage>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<StoreUsage>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
+        // Store children (before Store).
+        await db.Set<StorePayment>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<StoreModule>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<StoreRoleFeature>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<StoreUser>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
+        // Commerce subtree (empty in E2E, but keep the reset complete): InventoryEntryCost
+        // references both InventoryEntry and OrderItem, so it must go before both.
+        await db.Set<Domain.Entities.InventoryEntryCosts.InventoryEntryCost>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.OrderItems.OrderItem>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.Orders.Order>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.InventoryEntries.InventoryEntry>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.Products.Product>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.ProductCategories.ProductCategory>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
+        // Owner subtree (before Owner/User).
+        await db.Set<Domain.Entities.ReSellerOwners.ReSellerOwner>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Store>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<Domain.Entities.ReSellers.ReSeller>().IgnoreQueryFilters().ExecuteDeleteAsync();
+
+        // UserRole → Owner → User: keep the migration-seeded admin user and its SuperAdmin role.
+        await db.Set<UserRole>().IgnoreQueryFilters()
+            .Where(ur => ur.UserId != DataUtils.SuperAdminUser.Id || ur.RoleId != (int)RoleType.SuperAdmin)
+            .ExecuteDeleteAsync();
+        await db.Set<Owner>().IgnoreQueryFilters().ExecuteDeleteAsync();
+        await db.Set<User>().IgnoreQueryFilters()
+            .Where(u => u.Id != DataUtils.SuperAdminUser.Id)
+            .ExecuteDeleteAsync();
+
+        // Tenant: tests create tenants; keep only the migration-seeded DefaultTenant.
+        await db.Set<Tenant>().IgnoreQueryFilters()
+            .Where(t => t.Id != DataUtils.DefaultTenant.Id)
+            .ExecuteDeleteAsync();
     }
 
     public sealed record UserFixture(Guid UserId, string Login);

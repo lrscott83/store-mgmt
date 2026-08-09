@@ -216,3 +216,18 @@ Lo que ya se arregló en la rama `feat/e2e-playwright-login-s1-02`, porque expli
 | `ad316a7` | El backend responde 401 a credenciales inválidas, no 200 con `succeeded:false`. El frontend, el catálogo y el spec derivado arrastraban la premisa vieja, y el usuario veía un mensaje estático donde Angular mostraba el del servidor |
 
 Los tres primeros son la misma historia contada tres veces: **un test que inventa un mundo que la base de datos nunca produce mantiene verde un bug de producción**. `CLAUDE.md` ya registraba el precedente con `BillingService` y `store.StoreModules`. Volvió a pasar con `user.StoreUser`.
+
+---
+
+## Pendiente: orden de las listas de usuarios y owners (decisión de producto, no de query)
+
+**Origen.** Durante el cierre del cambio `e2e-stage-1-userslist-flake` (2026-08-08) se agregó `OrderBy` determinístico a los 6 sitios `Take(1000)` de las queries de listado (`UserRepository.cs:33/:42/:53`, `OwnerRepository.cs:27/:79`). El objetivo era eliminar el warning de EF *"row limiting operator ('Skip'/'Take') without an 'OrderBy'"* y volver determinística la ventana de 1000 filas. Se eligió `OrderBy(u => u.Id)` / `OrderBy(o => o.Id)` por ser PK, único, indexado y sin empates.
+
+**Qué pasa hoy.** Las listas se devuelven en orden de `Id` ascendente, es decir **los más viejos primero**:
+
+- `GetAllUsersQuery` (`GetAllUsersQuery.cs:37-45`) NO reordena: la salida es el orden del repo.
+- `GetAllOwnersQuery` SÍ reordena en memoria (`GetAllOwnersQuery.cs:48`): `OrderByDescending(o => o.Approved)` — el `OrderBy(Id)` de la query solo define el desempate dentro del mismo estado `Approved`.
+
+**Por qué queda pendiente.** No hay contrato de orden en la UI ni en los tests E2E, así que nada se rompe. Pero si el producto quiere **"los más recientes primero"** en las listas de usuarios/owners, el orden correcto sería `OrderByDescending(u => u.CreatedAt)` (o por `Id` descendente si el Id se genera secuencialmente) — eso es una decisión de producto con el frontend, no un cambio de query.
+
+**Alcance cuando se analice.** Revisar cómo consume el frontend el orden actual de `/users/all` y `/owners/all` antes de decidir el criterio. No toca ningún test E2E existente; si cambia el orden de salida, verificar que ningún test asuma el orden viejo.
