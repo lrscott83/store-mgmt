@@ -12,7 +12,7 @@ describe('Spinner', () => {
 
   it('has accessible label', () => {
     render(<Spinner />);
-    expect(screen.getByLabelText('Loading')).toBeInTheDocument();
+    expect(screen.getByLabelText('Cargando')).toBeInTheDocument();
   });
 
   it('applies size classes for sm', () => {
@@ -46,7 +46,7 @@ describe('LoadingOverlay', () => {
 
   it('renders default loading text', () => {
     render(<LoadingOverlay />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText('Cargando...')).toBeInTheDocument();
   });
 });
 

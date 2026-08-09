@@ -187,7 +187,7 @@ export default function LoginPage() {
   // While the login flow runs, show ONLY the loading overlay — never the form —
   // so it can't flash back between the login/me/home-resolve calls.
   if (isSubmitting) {
-    return <LoadingOverlay />;
+    return <LoadingOverlay label={intl.formatMessage({ id: 'GENERAL.LOADING' })} />;
   }
 
   return (

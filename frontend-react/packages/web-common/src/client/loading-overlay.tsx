@@ -4,7 +4,7 @@ interface LoadingOverlayProps {
   label?: string;
 }
 
-export function LoadingOverlay({ label = 'Loading...' }: LoadingOverlayProps) {
+export function LoadingOverlay({ label = 'Cargando...' }: LoadingOverlayProps) {
   return (
     <div
       role="status"

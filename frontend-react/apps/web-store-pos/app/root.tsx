@@ -99,7 +99,7 @@ export default function App() {
     <>
       {/* Angular app.component.html:2-6 — global overlay renders above the
           router outlet whenever loadingService's request count > 0. */}
-      {isLoading && <LoadingOverlay />}
+      {isLoading && <LoadingOverlay label={messages['GENERAL.LOADING']} />}
       <Outlet />
       {/* Angular app.component.html — the "Instalar App" pwa-install-btn is
           hosted by AppComponent, which renders <router-outlet> for the WHOLE
