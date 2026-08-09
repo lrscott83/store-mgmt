@@ -8,7 +8,7 @@ Toda aserción de esta etapa está anclada a código leído, con `archivo:línea
 
 Este fichero contiene **solo lo general y el estado**. El detalle de cada User Story —flujo, precondiciones y aserciones— vive en su fichero propio.
 
-> **Trabajo diferido**, uno por capa: [plan-frontend.md](plan-frontend.md) reúne lo abierto en Playwright — un flake sin causa raíz, una guarda que el navegador no puede discriminar y dos brechas declaradas. [plan-backend.md](plan-backend.md) reúne lo que apareció en el servidor mientras se implementaba esta etapa — un test E2E vencido por calendario, otras 20 fechas hardcodeadas con la misma bomba, y el hueco de método que dejó pasar dos bugs de producción. Nada de eso se ejecuta sin decisión explícita.
+> **Trabajo diferido**, uno por capa: [plan-frontend.md](plan-frontend.md) reúne lo abierto en Playwright — un flake sin causa raíz, una guarda que el navegador no puede discriminar y dos brechas declaradas. [plan-backend.md](plan-backend.md) reúne lo que apareció en el servidor mientras se implementaba esta etapa — el hueco de método que dejó pasar dos bugs de producción, el vencimiento por calendario de `ToCollectTests` (**ya resuelto** en `fb273edb` con pin de reloj) y las demás fechas hardcodeadas (**pineadas en su mayoría** durante `store-creation-trial` y el roster offline). Nada de lo que queda abierto se ejecuta sin decisión explícita.
 
 ---
 

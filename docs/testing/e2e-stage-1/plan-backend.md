@@ -16,8 +16,8 @@ Varios ítems de acá **tocan tests E2E existentes**. Cada uno declara si necesi
 
 | # | Ítem | Severidad | ¿Bloquea hoy? | ¿Toca un E2E existente? |
 |---|---|---|---|---|
-| [B-1](#b-1) | `ToCollectTests` vencido por fecha hardcodeada | **Alta** | **Sí** — suite en rojo | **Sí** — autorización requerida |
-| [B-2](#b-2) | 20 fechas hardcodeadas más, sin reloj congelado | Alta | No — latente | **Sí** — autorización requerida |
+| [B-1](#b-1) | `ToCollectTests` vencido por fecha hardcodeada | **Alta** | **RESUELTO** — `fb273edb` | Fue sí — autorización otorgada, pin aplicado |
+| [B-2](#b-2) | 20 fechas hardcodeadas más, sin reloj congelado | Alta | **RESUELTO EN SU MAYORÍA** — la ola de pins llegó; los archivos citados ya pinan el reloj | Fue sí — pins aplicados en los archivos de "ventana móvil" |
 | [B-3](#b-3) | `MintToken` saltea el endpoint de login | Alta | No | No — solo agrega tests nuevos |
 | [B-4](#b-4) | `GetPagedReponseAsync`: `Skip`/`Take` sin `OrderBy` | Media | No — código muerto | No |
 | [B-5](#b-5) | Rechazos esperados logueados como `Unhandled exception` | Baja | No | No |
@@ -29,71 +29,54 @@ Lo ya cerrado en la rama `feat/e2e-playwright-login-s1-02` está en [Antecedente
 
 ## B-1
 
-### `ToCollectTests.ReSeller_sees_own_stores_only` vence por calendario
+### `ToCollectTests.ReSeller_sees_own_stores_only` vence por calendario — **RESUELTO**
 
-**Síntoma**: `Expected ownInResult not to be <null>` en `ToCollectTests.cs:123`. La suite E2E pasa de 307/307 a 306/307 sin que nadie haya tocado nada.
-
-**Causa raíz, calculada**
-
-El test siembra la tienda con `PaymentStartDate = 2026-06-01` (`ToCollectTests.cs:65`). La configuración vigente viene de la semilla de migración (`SystemConfigurationEntityTypeConfiguration.cs:27,33,36`): `TestingPeriodInMonths = 1`, `PaymentGraceDays = 5`, `DueSoonDays = 5`.
-
-```
-GetNextDueDate(2026-06-01, trial=1, sin pagos)
-  = paymentStartDate.AddMonths(trialMonths + 1)      // StoreBillingUtils.cs:28
-  = 2026-08-01
-
-GetStatus(...)                                        // StoreBillingUtils.cs:31-39
-  today > due.AddDays(graceDays)  → Vencido           // today > 2026-08-06
-  today > due                     → EnGracia          // 2026-08-02 .. 2026-08-06
-  today >= due.AddDays(-dueSoon)  → PorVencer         // 2026-07-27 .. 2026-08-01
-```
-
-Y el handler descarta todo lo que no sea `PorVencer` o `EnGracia` (`GetStoresToCollectQuery.cs:87-88`).
-
-**La ventana en la que este test podía pasar era 2026-07-27 a 2026-08-06.** Fuera de ella la tienda cae en `Vencido` y desaparece del resultado. El test no se rompió: se venció.
-
-**Por qué nadie lo vio venir**: el test no congela el reloj. `_dateTimeProvider.UtcNow` devuelve la hora real del sistema (`MutableDateTimeProvider.cs:9` — `_pinned ?? DateTimeOffset.UtcNow`), así que el resultado depende del día en que se corra.
-
-**Arreglo propuesto**: congelar el reloj, **no** mover la fecha de siembra.
-
-Mover la fecha solo corre la bomba unos meses y garantiza que esto vuelva. Congelar el reloj la desactiva. La infraestructura ya tiene la herramienta: `_fixture.Clock.Pin(...)` (`MutableDateTimeProvider.cs:11`).
+**Verificado el 2026-08-09**: el pin está aplicado en `ToCollectTests.cs:105-108` y **no se tocó ninguna aserción** (las de `ownInResult`/`otherInResult` siguen intactas, `:125-130`).
 
 ```csharp
-// Dentro de la ventana PorVencer para PaymentStartDate = 2026-06-01
-using var clock = _fixture.Clock.Pin(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
+// ToCollectTests.cs:105-108
+// Pin "today" to 2026-07-30 so the store seeded with PaymentStartDate = 2026-06-01
+// resolves to PorVencer (window 2026-07-27..2026-08-01 with trial=1, grace=5, dueSoon=5).
+using var _ = _fixture.Clock.Pin(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
 ```
 
-> ⚠️ **Trampa del doble Pin**, ya documentada en `StoreCreationTrialTests.cs:24-31`: el `Dispose` de `Pin` resetea a la hora real, no a la anterior. Si un test necesita dos instantes distintos, se llama a `Pin` de nuevo y ambos scopes se liberan al salir del método. No anidar esperando un stack.
+**Commit**: `fb273edb` — `test(e2e): pin clock in ReSeller_sees_own_stores_only (B-1)`.
 
-**Aserción que NO debe cambiar**: `ownInResult.Should().NotBeNull()` y `otherInResult.Should().BeNull()`. La intención del test —un ReSeller ve sus tiendas y solo las suyas— es correcta y no está en discusión. Lo único que se corrige es el instante contra el que se evalúa.
+**Qué hizo el arreglo**: exactamente lo que proponía este plan — congelar el reloj, no mover la fecha de siembra. La infancia de la ventana (2026-07-27 a 2026-08-01) ya no depende del día en que se corra la suite. La aserción NO cambió: la intención del test —un ReSeller ve sus tiendas y solo las suyas— sigue intacta.
 
-**Autorización**: **requerida**. Es un test E2E existente.
+**Resumen del diagnóstico original (histórico)**: el test sembraba `PaymentStartDate = 2026-06-01` (`ToCollectTests.cs:65`), corría contra el reloj real (`MutableDateTimeProvider.cs:9`), y `GetNextDueDate` + `GetStatus` lo llevaban a `Vencido` fuera del 27-jul/06-ago, desapareciendo del resultado de `GetStoresToCollectQuery`. No se rompió: se venció.
 
 ---
 
 ## B-2
 
-### Otras 20 fechas hardcodeadas, y un solo test que congela el reloj
+### Otras 20 fechas hardcodeadas, sin reloj congelado — **RESUELTO EN SU MAYORÍA**
 
-`ToCollectTests` no es un caso aislado: es el primero en explotar. El escaneo sobre `SMCA.WebApi.E2ETests/` encontró 21 literales `new DateOnly(...)`, y **un solo archivo** usa el `MutableDateTimeProvider`: `StoreCreationTrialTests.cs`. El resto corre contra el reloj real.
+**Verificado el 2026-08-09**: el barrido de pins llegó a **mucho más** que el único archivo que este plan conocía. Hoy hay `Clock.Pin` en 8+ archivos de la suite:
 
-**Clasificación por riesgo**
-
-Una fecha hardcodeada es peligrosa según *dónde* cae respecto de hoy, no por estar hardcodeada:
-
-| Clase | Ejemplos | Riesgo |
+| Archivo | Pins | Qué cubren |
 |---|---|---|
-| **Ancla antigua deliberada** — siempre `Vencido`, el estado no cambia nunca más | `ExportOfflineRosterTests.cs:283`, `ToCollectTests.cs:176`, `StoreCreationTrialTests.cs:277,318` (`2020-01-01`) | **Estable.** No tocar |
-| **Aserción de valor literal** — compara un campo, no un estado calculado contra hoy | `StoreActivationTests.cs:61`, `StoreUpdateTests.cs:89,117` | **Estable** mientras la fecha no la derive el sistema |
-| **Ventana móvil** — siembra un `PaymentStartDate` cuyo estado depende de hoy | `ToCollectTests.cs:65,109,145`, `PaymentMoneyTests.cs:34,66,104,141`, `ExportOfflineRosterTests.cs:315,384`, `ResellerCommissionsTests.cs:59` | **Bomba de tiempo** |
+| `Billing/StoreCreationTrialTests.cs` | ~24 | Grupos A–E de `store-creation-trial` (`f6fae11d`, `7950a5ad`, `a6e1e7ab`, `8f93d1aa`, `8c16d2db`, `61089680`) — trial/due/PorVencer/EnGracia/Vencido, pagos de tiendas auto-registradas, `BillingConfigSeed` |
+| `Billing/ToCollectTests.cs` | 3 (`:108,:142,:203`) | Los tres tests que dependen de ventana: B-1, `AlDia_stores_excluded`, `PorVencer_and_EnGracia_included` |
+| `Billing/PaymentMoneyTests.cs` | 2 (`:98,:135`) | `Payment_due_date_advances_one_month`, `Two_consecutive_payments_advance_two_months` |
+| `Users/ExportOfflineRosterTests.cs` | 3 (`:282,:314,:383`) | Los tres tests con siembras de `PaymentStartDate` en ventana móvil |
+| `Billing/StoreActivationTests.cs` | 3 (`:39,:73,:107`) | Ciclos de activación contra ventanas móviles |
+| `Billing/GetMeBillingStatesTests.cs` | 2 (`:68,:100`) | Estados de `/me` según ventana |
+| `Stores/StoreUpdateTests.cs` | 1 (`:97`) | `PaymentStartDate` derivado de reloj |
 
-Cada una de la última fila tiene su propia fecha de vencimiento, calculable con la fórmula de B-1 y la configuración que ese test tenga sembrada. Ojo: `BillingConfigSeed` permite override de `trialMonths`/`graceDays`/`dueSoonDays` (`BillingConfigSeed.cs:39-50`), así que **la ventana se calcula por test**, no de una vez para todos.
+**Qué distancia hay entre el plan y la realidad**: este documento se escribió cuando el único archivo que congelaba el reloj era `StoreCreationTrialTests.cs`. Eso quedó obsoleto — el patrón se extendió y los tests que el plan clasificaba como "bomba de tiempo" hoy están pineados con exactamente el patrón propuesto (congelar el reloj, sin tocar aserciones). La categorización histórica de las 21 fechas quedó así:
 
-**Arreglo propuesto**: congelar el reloj en cada test de la última fila, con el mismo patrón de B-1. No cambiar ninguna aserción.
+| Clase | Estado real |
+|---|---|
+| **Ancla antigua deliberada** (`2020-01-01` y similares) | **Estable.** Sin cambios — así debe quedar (`ExportOfflineRosterTests.cs:283`, `ToCollectTests.cs:179`, `StoreCreationTrialTests.cs:277,318`, `GetMeBillingTests.cs:118`) |
+| **Aserción de valor literal** (compara un campo) | **Estable.** `StoreActivationTests.cs:61,112`, `StoreUpdateTests.cs:89,117` — esas fechas son *el valor esperado*, no una ventana contra hoy |
+| **Ventana móvil** (siembra un `PaymentStartDate` cuyo estado depende de hoy) | **Pineada** en los 4 archivos citados originalmente. **Restan sin pin**: `PaymentMoneyTests.cs:34,66` (test de monto puro: `Payment_amount_equals_module_sum` asevera `Price = 1500`; `Reseller_commission_is_persisted` asevera `ReSellerAmount = 500`) y `PaymentHappyPathTests.cs:27` (`SuperAdmin_pays_any_store_returns_200`) |
 
-**Decisión abierta** — preguntar antes de ejecutar: ¿se hacen los diez de una, o solo a medida que van venciendo? Hacerlos todos de una toca diez archivos de test existentes en un solo cambio, lo que es mucho blast radius; dejarlos venir de a uno significa que la suite se va a poner roja sin aviso cada tantas semanas, siempre por la misma razón, y siempre pareciendo un bug nuevo.
+**Por qué los que quedan sin pin no son bomba**: el handler de pagos no evalúa el estado contra hoy para nada que el test afirme — `RegisterStorePaymentCommandHandler` calcula `amount` como suma de precios (`:72-74`), deriva `newDue` de `PaymentStartDate` + meses (`:86-92`), y usa `now` solo para sellar la fila (`:95`), no para decidir el resultado. El único `GetStatus` que depende del reloj vive en las queries de *listado* (`GetStoresToCollectQuery.cs:60`, `BillingService.cs:72`), no en el registro de pagos. Por eso `SuperAdmin_pays_any_store_returns_200` y los dos tests de monto corren contra el reloj real sin riesgo.
 
-**Autorización**: **requerida**, y conviene pedirla test por test o por lote explícito.
+**Decisión abierta que ya no aplica**: este plan preguntaba si pinear los diez de una o a medida que vencen. La realidad eligió sola: los tests con aserciones dependientes de hoy se pinearon en el trabajo de `store-creation-trial` y del roster offline, sin tocar aserciones. Lo único decidible hoy es si los **tres tests de monto puro** (`PaymentMoneyTests.cs:34,66`, `PaymentHappyPathTests.cs:27`) merecen un pin preventivo por documentación — no es necesario para estabilidad (ver arriba, el handler no usa el reloj para decidir).
+
+**Autorización**: lo que ya se aplicó **fue autorizado** (pins en tests existentes: `store-creation-trial`). Los tres tests de monto restantes son aditivos si se prefiere el pin por consistencia, pero no requieren decisión de estabilidad.
 
 ---
 
