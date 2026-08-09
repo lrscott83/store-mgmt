@@ -21,7 +21,7 @@ coverage, not new product capabilities.
 ### In Scope
 
 - One new `[Fact]` in `backend/src/SMCA.WebApi.E2ETests/Auth/AuthLoginFailureTests.cs` covering the inactive-store login rejection — Requirement 1, the baseline deliverable.
-- Optional sibling `[Fact]` covering the StoreUser persona branch (`AuthenticationService.cs:127-128`) — Requirement 2, OPTIONAL and NOT part of the baseline deliverable; included only if both personas are to be covered in the change.
+- StoreUser persona roundtrip (`AuthenticationService.cs:125-144`) — Requirement 2, DELIVERED by change `e2e-b3-auth-login-roundtrip` (previously archived 2026-08-06 as OPTIONAL / NOT delivered in the baseline). Now covered by new `AuthLoginStoreUserTests.cs`: 1 positive + 2 negative `[Fact]`s.
 
 ### Out of Scope
 
@@ -66,26 +66,45 @@ the file MUST NOT be modified, and no production code MUST be changed.
 - THEN Store, StoreUser, Owner, and User rows are removed in FK-safe order
 - AND `DbTestHelpers.CleanupUserAsync` alone is NOT used (it strands rows via FK `Owner_User_UserId`)
 
-### Requirement: E2E coverage — inactive store login as StoreUser (optional sibling)
+### Requirement: E2E coverage — StoreUser login roundtrip
 
-The E2E suite MAY include a sibling `[Fact]` covering the StoreUser persona
-branch (`AuthenticationService.cs:127-128`): a StoreUser whose store is
-deactivated MUST receive the same rejection as the OwnerAdmin — HTTP 403,
-`Succeeded == false`, single error `Code == "Store.Inactive"`. This requirement
-is OPTIONAL and NOT part of the baseline deliverable; include it only if both
-personas are to be covered in this change.
+The E2E suite MUST include a new `AuthLoginStoreUserTests` class covering the
+StoreUser persona branch (`AuthenticationService.cs:125-144`) over HTTP: a
+StoreUser with an active store MUST receive HTTP 200 with `Succeeded == true`
+and a non-empty `Data.AuthToken`; a StoreUser whose store — or whose store's
+owner — is deactivated MUST receive HTTP 403, `Succeeded == false`, and exactly
+one error whose `Code == "Store.Inactive"`. The tests MUST be purely additive:
+existing tests MUST NOT be modified, and no production code MUST be changed.
+
+#### Scenario: StoreUser logs in to an active store
+
+- GIVEN a StoreUser seeded via `AuthzSeed.SeedStoreUserAsync` with an active Store and an active store Owner (a different user)
+- WHEN `POST /api/v1/auth/login` is called with the StoreUser's credentials
+- THEN the response status is HTTP 200 with `Succeeded == true`
+- AND `Data.Login` matches the seeded login and `Data.AuthToken` is non-empty
 
 #### Scenario: StoreUser logs in to a deactivated store
 
-- GIVEN a StoreUser seeded via `AuthzSeed.SeedStoreUserAsync` whose store is deactivated
+- GIVEN a StoreUser seeded via `AuthzSeed.SeedStoreUserAsync` whose store is deactivated via `StoreSeed.DeactivateStoreAsync`
 - WHEN `POST /api/v1/auth/login` is called with the StoreUser's credentials
 - THEN the response status is HTTP 403 with `Succeeded == false`
-- AND `Errors` contains exactly one entry with `Code == "Store.Inactive"`
+- AND `Errors` contains exactly one entry with `Code == "Store.Inactive"` — not `Auth.AccountInactive` (the user row itself stays active)
 
-> **Archive note (2026-08-06)**: OPTIONAL requirement — NOT delivered in change
-> `e2e-stage-1-s1-02` (user did not opt in; baseline is OwnerAdmin-only per the
-> settled scope, design decision D2). If both personas are wanted later, it is a
-> separate ~25-line additive change. See `archive-report.md` of the change.
+#### Scenario: StoreUser logs in when the store's owner is deactivated
+
+- GIVEN a StoreUser graph whose store's Owner is deactivated
+- WHEN `POST /api/v1/auth/login` is called with the StoreUser's credentials
+- THEN the response status is HTTP 403 with `Succeeded == false`
+- AND `Errors` contains exactly one entry with `Code == "Store.Inactive"` (the `!owner.IsActive` branch of the six-condition chain)
+
+#### Scenario: Cleanup removes the full store graph
+
+- GIVEN any StoreUser test completes
+- WHEN cleanup runs `AuthzSeed.CleanupStoreGraphAsync(fixture.StoreId, fixture.UserId)`
+- THEN Store, StoreUser, Owner, and User rows are removed in FK-safe order
+
+> **Delivery note (2026-08-09)**: DELIVERED by change `e2e-b3-auth-login-roundtrip`.
+> Previously archived 2026-08-06 as OPTIONAL / NOT delivered in `e2e-stage-1-s1-02`.
 
 ## Verification Criteria
 
@@ -93,4 +112,4 @@ personas are to be covered in this change.
 - [x] Filtered run `FullyQualifiedName~AuthLoginFailureTests`: 3/3 passed against real PostgreSQL `smca_test`
 - [x] Auth regression filter `FullyQualifiedName~Auth`: 69/69 passed, no regression
 - [x] Server log confirms the `store.IsActive == false` branch was exercised (`Store.Inactive` error, "no active store")
-- [ ] Requirement 2 (StoreUser sibling): not delivered — OPTIONAL, excluded by settled scope
+- [x] Requirement 2 (StoreUser sibling): DELIVERED by change `e2e-b3-auth-login-roundtrip` (new `AuthLoginStoreUserTests.cs`, 1 positive + 2 negatives) — verification run pending in that change's sdd-verify
