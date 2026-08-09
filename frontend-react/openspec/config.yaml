@@ -1,0 +1,53 @@
+schema: spec-driven
+
+project: store-mgmt-frontend
+strict_tdd: true
+
+context: |
+  pnpm + Turborepo monorepo (frontend-react/): React 19 / React Router v7 SSR app
+  (apps/web-store-pos) with shared packages (domain, web-common, eslint-config,
+  typescript-config). Stack: Vite 6, TypeScript strict 5.8, Tailwind v4, react-intl,
+  zustand. Migration target from the legacy Angular 21 frontend (../frontend/, parity
+  source of truth). Tests: Vitest 3 (unit/integration, jsdom + Testing Library),
+  Playwright 1.62 E2E in e2e/. Lint: ESLint v9 flat config; typecheck: tsc; format:
+  Prettier. Conventions: strict TDD for frontend work, no any, feature-based routes.
+
+testing:
+  test: pnpm test
+  test_e2e: pnpm test:e2e
+  test_e2e_rate_limit: pnpm test:e2e:rate-limit
+  test_e2e_api: pnpm test:e2e:api
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  format: pnpm format
+  coverage_command: pnpm --filter @store-mgmt/web-store-pos exec vitest run --coverage
+  coverage_threshold: 0
+
+rules:
+  global:
+    - Never modify, delete, rename, skip, weaken, or "fix" an existing E2E test (Playwright e2e/ or backend SMCA.WebApi.E2ETests) without explicit user authorization. Adding NEW E2E tests is allowed.
+  proposal:
+    - Include rollback plan for risky changes
+    - Frontend changes must state the Angular parity source (mirror, never improve)
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Strict TDD: every implementation task pairs with a RED test task first
+  apply:
+    guidelines:
+      - Follow existing code patterns (feature-based routes, shared packages, no any)
+      - No AI attribution; conventional commits only
+    tdd: true
+    test_command: pnpm test
+  verify:
+    test_command: pnpm test
+    build_command: pnpm build
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
