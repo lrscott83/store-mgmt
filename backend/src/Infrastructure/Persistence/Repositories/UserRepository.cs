@@ -39,7 +39,7 @@ namespace Infrastructure.Persistence.Repositories
 
             query = IncludeStoreAndRoles(query);
 
-            return await query.IgnoreQueryFilters().Take(1000).ToListAsync(cancellationToken);
+            return await query.IgnoreQueryFilters().OrderBy(u => u.Id).Take(1000).ToListAsync(cancellationToken);
         }
 
         public async Task<IEnumerable<User>> GetAllUsersIncludingStoreAndRolesAsync(bool includeInactive, CancellationToken cancellationToken = default)
