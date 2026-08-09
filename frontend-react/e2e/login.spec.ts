@@ -518,8 +518,14 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     personaCache,
   }) => {
     await restoreSignedInSession(page, personaCache, 'owner-admin');
-    await page.goto('/login');
-    await mutateAuthModel(page, { expiresIn: Date.now() - 1 });
+
+    // A public route with NO `clientLoader` — neither `auth-layout.tsx` nor
+    // `provision.tsx` declares one, and provision.tsx:12-13 says so on
+    // purpose: provisioning must work in ANY auth state. That is why the
+    // neutral hop below is this route and not `/register` or the persona's
+    // home. Both measured boots have to reach it identically, with a session
+    // and without one, and neither may be bounced.
+    const NEUTRAL_ROUTE = '/auth/provision';
 
     // REQ-8 claims "no navigation ADDITIONAL to the initial load", so the
     // baseline is MEASURED, not assumed. A cold boot of this SPA does not
@@ -536,11 +542,45 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // `documents: 1` with two navigations means the client router pushed the
     // second one, while `documents: 2` means something forced a hard reload.
     // Those have different causes and different fixes.
-    const recordNavigations = async (): Promise<{ navigations: string[]; documents: number }> => {
+    //
+    // EVERY boot starts from `NEUTRAL_ROUTE`, and that symmetry IS the fix for
+    // P-3 (docs/testing/e2e-stage-1/S1-04.md). React Router stamps its state
+    // onto a history entry with a `replaceState` the first time it hydrates
+    // there (`createBrowserHistory` -> `getUrlBasedHistory`), and a same-URL
+    // `goto` is a reload that reuses the entry along with that stamp. So a
+    // cross-URL boot costs exactly one navigation more than a reload, for
+    // reasons that have nothing to do with `logout()`. This test used to
+    // compare a cross-URL boot — it arrived from the persona's home, bounced
+    // off /login by `guestOnlyLoader` — against a reload, and charged the
+    // difference to logout(). Measured by `t8-navigation-source.spec.ts`: 8/8
+    // cross-URL boots pay the stamp, 0/7 reloads do.
+    //
+    // `expireSession` is the only thing the two runs now differ by, and it
+    // must fire AFTER the neutral hop, never before. An expired AUTH_MODEL is
+    // consumed by the FIRST boot that sees it, so expiring earlier would let
+    // the neutral boot call `logout()` itself and leave the measured boot
+    // nothing to expire — which would still satisfy the assertion below,
+    // vacuously.
+    const recordNavigations = async (
+      expireSession: boolean
+    ): Promise<{ navigations: string[]; documents: number }> => {
+      await page.goto(NEUTRAL_ROUTE);
+      await page.waitForLoadState('networkidle');
+      if (expireSession) {
+        await mutateAuthModel(page, { expiresIn: Date.now() - 1 });
+      }
+
       const navigations: string[] = [];
       let documents = 0;
       const onNavigated = (frame: Frame) => {
-        if (frame === page.mainFrame()) navigations.push(new URL(frame.url()).pathname);
+        if (frame !== page.mainFrame()) return;
+        const pathname = new URL(frame.url()).pathname;
+        // The neutral hop is scaffolding, not measurement, and its
+        // `framenavigated` can still arrive after these listeners attach —
+        // the probe observed exactly that in 2 of 8 boots. Dropping it cannot
+        // hide a logout redirect: that one lands on /login.
+        if (pathname === NEUTRAL_ROUTE) return;
+        navigations.push(pathname);
       };
       const onRequest = (request: Request) => {
         if (request.resourceType() === 'document') documents++;
@@ -559,25 +599,29 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     // cold boot, `authRedirect` is still `undefined` at module-evaluation
     // time — `root.tsx:89-91` wires it in a `useEffect`, which runs AFTER
     // `auth-store.ts:390`'s synchronous `initialize()` — so
-    // `authRedirect?.('/login')` should be a no-op REGARDLESS of pathname.
-    // (That last step is reasoning from the source, NOT something this test
-    // has confirmed — an earlier run of this scenario did observe a second
-    // navigation, which is exactly what the comparison below exists to
-    // localize.) This assertion cannot discriminate the pathname guard
-    // itself; that coverage lives in `auth-store.test.ts:297-315` (a real
-    // spy). What IS observable here: zero additional navigations.
-    const withLogout = await recordNavigations();
+    // `authRedirect?.('/login')` is a no-op REGARDLESS of pathname. That is
+    // now backed by measurement rather than by reading: across the probe's 16
+    // boots the only history push ever recorded came from react-router's own
+    // hydration, never from application code. This assertion still cannot
+    // discriminate the pathname guard itself; that coverage lives in
+    // `auth-store.test.ts:297-315` (a real spy). What IS observable here:
+    // zero additional navigations.
+    const withLogout = await recordNavigations(true);
 
+    // Not vacuous: the measured boot above is the one that consumed the
+    // expired AUTH_MODEL, so a null here proves `logout()` really ran inside
+    // the window that was measured.
     const authModel = await readRawAuthModel(page);
     expect(authModel).toBeNull();
 
-    // The control: the same reload of the same route, but `AUTH_MODEL` is
-    // already gone, so `initialize()` has nothing to expire and `logout()`
-    // never runs. Whatever the framework spends on boot it spends here too —
-    // the difference between the two counts is logout()'s own contribution,
-    // which REQ-8 claims is zero. A logout that DID navigate would still be
-    // caught: it would show up in the first count and not in the second.
-    const withoutLogout = await recordNavigations();
+    // The control: the same cross-URL boot of the same route, from the same
+    // neutral origin, but `AUTH_MODEL` is already gone — so `initialize()`
+    // has nothing to expire and `logout()` never runs. Both runs pay the
+    // framework's hydration stamp now, so what is left between them is
+    // logout()'s own contribution, which REQ-8 claims is zero. A logout that
+    // DID navigate would still be caught: it would show up in the first count
+    // and not in the second.
+    const withoutLogout = await recordNavigations(false);
 
     expect(withLogout).toEqual(withoutLogout);
   });
