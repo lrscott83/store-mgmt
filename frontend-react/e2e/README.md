@@ -43,6 +43,9 @@ Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
   dotnet run --project backend/src/SMCA.WebApi --launch-profile http
   ```
 
+  Si preferís que la suite escriba en la BD de test en vez de la dev, ver la
+  sección [Modo BD de test (`smca_test`)](#modo-bd-de-test-smca_test) más abajo.
+
   **Nunca** `--launch-profile https`: `app.UseHttpsRedirection()` (`Program.cs:138`) redirigiría
   al puerto HTTPS con un certificado autofirmado que un navegador real rechaza; esta suite no
   configura `ignoreHTTPSErrors`.
@@ -71,6 +74,70 @@ Con `reuseExistingServer: true`, si ya hay un dev server corriendo en el puerto 
 ## Service worker
 
 La app usa `vite-plugin-pwa` con `devOptions.enabled: true`, así que en dev se registra un service worker que cachea respuestas. Los tests lo bloquean (`contextOptions: { serviceWorkers: 'block' }` en la config) para evitar resultados falsos por respuestas cacheadas.
+
+## Modo BD de test (`smca_test`)
+
+Por defecto el backend dev (`--launch-profile http`) usa la base `smca` y la suite deja filas `e2e-*` ahí. Para que Playwright escriba en la BD de test (`smca_test`), se sobreescribe la connection string **sin tocar código**: la variable de entorno `ConnectionStrings__Application` tiene prioridad máxima sobre `appsettings.Development.json` (la misma técnica que usa `WebAppFixture.cs:21-22` para la suite .NET).
+
+Levantar el backend así, en la terminal del backend:
+
+```powershell
+# PowerShell
+$env:ConnectionStrings__Application = "Host=localhost;Port=5432;Database=smca_test;Username=postgres;Password=postgres;Persist Security Info=True;Include Error Detail=True"
+dotnet run --project backend/src/SMCA.WebApi --launch-profile http
+```
+
+o en bash:
+
+```bash
+export ConnectionStrings__Application="Host=localhost;Port=5432;Database=smca_test;Username=postgres;Password=postgres;Persist Security Info=True;Include Error Detail=True"
+dotnet run --project backend/src/SMCA.WebApi --launch-profile http
+```
+
+Los tests no cambian nada: `E2E_API_URL` ya apunta al backend (`http://localhost:5019/api` por defecto).
+
+> ⚠️ **No uses `ASPNETCORE_ENVIRONMENT=Testing` para esto.** Ese entorno existe para la suite .NET y **apaga el rate limiter** (`Program.cs:112-121`): los specs `register-rate-limit.spec.ts` (REQ-9) y `login-rate-limit.spec.ts` (REQ-8) dependen de recibir 429 y se romperían. El modo correcto es **perfil `http` (Development) + env var de conexión**: rate limits ON, BD `smca_test`.
+
+### Restricción de corrida paralela
+
+La suite .NET E2E y Playwright **no deben correr en paralelo contra `smca_test`**: al iniciar, `WebAppFixture` ejecuta `ResetDataAsync` (`DbTestHelpers.cs:151`) que borra TODAS las filas de datos de la BD (en orden FK, preservando los seeds de migración). Ese borrado es la limpieza automática que se describe abajo, pero si corre a mitad de una corrida de Playwright, elimina las filas vivas que los tests del frontend están usando. Correrlas en secuencia es seguro.
+
+### Limpieza automática
+
+`smca_test` se limpia sola en cada corrida de la suite .NET: `WebAppFixture.InitializeAsync` (`WebAppFixture.cs:29-32`) corre `MigrateAsync` + `ResetDataAsync`, que borra filas de datos acumuladas (incluidas las `e2e-*` del Playwright) en orden FK, sin tocar los seeds ni hacer DROP. Requisito: PostgreSQL en `localhost:5432`, base `smca_test` (la suite .NET aplica las migraciones ella misma):
+
+```bash
+dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
+```
+
+### Limpieza manual (solo si no corrés la suite .NET)
+
+Una corrida de Playwright contra `smca_test` deja filas `e2e-*` igual que contra `smca` (no hay teardown alcanzable desde el navegador). Para limpiarlas sin correr los 320+ tests .NET, borrá solo las filas con el prefijo `e2e-` en el **mismo orden FK** que `ResetDataAsync` (los FKs son `DeleteBehavior.Restrict`; children primero). Ejemplo con `psql`:
+
+```sql
+-- Conectado a smca_test. Borra SOLO filas e2e-* (Owner/Store/User del Playwright)
+-- y todos sus hijos, en el mismo orden FK que ResetDataAsync
+-- (FKs DeleteBehavior.Restrict: children primero).
+DELETE FROM "StoreUsage"     USING "Store" s, "Owner" o, "User" u
+  WHERE "StoreUsage"."StoreId" = s."Id" AND s."OwnerId" = o."Id" AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "StorePayment"   USING "Store" s, "Owner" o, "User" u
+  WHERE "StorePayment"."StoreId" = s."Id" AND s."OwnerId" = o."Id" AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "StoreModule"    USING "Store" s, "Owner" o, "User" u
+  WHERE "StoreModule"."StoreId" = s."Id" AND s."OwnerId" = o."Id" AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "StoreRoleFeature" USING "Store" s, "Owner" o, "User" u
+  WHERE "StoreRoleFeature"."StoreId" = s."Id" AND s."OwnerId" = o."Id" AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "StoreUser"      USING "Store" s, "Owner" o, "User" u
+  WHERE "StoreUser"."StoreId" = s."Id" AND s."OwnerId" = o."Id" AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "Store"          USING "Owner" o, "User" u
+  WHERE "Store"."OwnerId" = o."Id" AND o."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "UserRole"       USING "User" u
+  WHERE "UserRole"."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "Owner"          USING "User" u
+  WHERE "Owner"."UserId" = u."Id" AND u."Login" LIKE 'e2e-%';
+DELETE FROM "User" WHERE "Login" LIKE 'e2e-%';
+```
+
+Mismo criterio que la suite .NET: **son las filas `e2e-`** las que se borran; los seeds de migración (admin, roles, features) no matchean ese prefijo y quedan intactos. Si dudas del estado, corré la suite .NET (limpieza automática) y listo.
 
 ## Suite de registro (`register.spec.ts`, `register-rate-limit.spec.ts`)
 
