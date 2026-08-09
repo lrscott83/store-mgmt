@@ -24,6 +24,7 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
                 .Include(o => o.ReSellerOwner).ThenInclude(ro => ro.ReSeller).ThenInclude(r => r.User)
                 .IgnoreQueryFilters()
+                .OrderBy(o => o.Id)
                 .Take(1000)
                 .ToListAsync(cancellationToken);
         }
@@ -76,6 +77,7 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(o => o.User)
                 .Include(o => o.Stores.Where(s => includeInactive || s.IsActive)).ThenInclude(s => s.StoreModules.Where(sm => sm.IsActive))
                 .IgnoreQueryFilters()
+                .OrderBy(o => o.Id)
                 .Take(1000)
                 .ToListAsync(cancellationToken);
         }
