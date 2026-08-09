@@ -18,14 +18,12 @@ function renderLayout() {
 }
 
 describe('AuthLayout — guest footer (Req: parity with guest-footer.component.html)', () => {
-  it('renders the 3 legal links, each opening in a new tab (target="_blank")', () => {
+  it('renders the legal links, each opening in a new tab (target="_blank")', () => {
     renderLayout();
-    const cookies = screen.getByText(esMessages['FOOTER.COOKIES_POLICE']).closest('a');
     const privacy = screen.getByText(esMessages['FOOTER.PRIVACY_POLICE']).closest('a');
     const terms = screen.getByText(esMessages['FOOTER.TERMS_CONDITIONS']).closest('a');
 
-    expect(cookies).toHaveAttribute('href', '/cookies-private');
-    expect(cookies).toHaveAttribute('target', '_blank');
+    expect(screen.queryByText('Políticas de Cookies')).not.toBeInTheDocument();
     expect(privacy).toHaveAttribute('href', '/private-police');
     expect(privacy).toHaveAttribute('target', '_blank');
     expect(terms).toHaveAttribute('href', '/terms-conditions');

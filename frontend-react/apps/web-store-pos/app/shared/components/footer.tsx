@@ -24,11 +24,11 @@ interface FooterProps {
 /**
  * Matches Angular's `client-footer.component.html` (and the near-identical
  * `guest-footer.component.html`, reused here for the auth layout too via
- * `variant="guest"`): a legal-link row (Cookies/Privacy/Terms/Contact)
- * followed by a two-line copyright block. Legal routes (/cookies-private,
- * /private-police, /terms-conditions) do not exist yet in React — links point
+ * `variant="guest"`): a legal-link row (Privacy/Terms/Contact)
+ * followed by a two-line copyright block. Legal routes (/private-police,
+ * /terms-conditions) do not exist yet in React — links point
  * at the Angular paths as a placeholder; see apply-progress for the
- * deferred-routes note. The 3 legal links open in a new tab
+ * deferred-routes note. The 2 legal links open in a new tab
  * (`target="_blank"`), matching Angular's `[routerLink]` + `target="_blank"`
  * on every one of these anchors. Contact Us is a no-op trigger — Angular's own
  * `showEmailDialog()` handler is empty.
@@ -41,15 +41,6 @@ export function Footer({ variant = 'client' }: FooterProps = {}) {
   return (
     <footer className="shrink-0 border-t border-gray-200 bg-white px-4 py-2">
       <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 list-none m-0 p-0 text-xs">
-        <li>
-          <Link
-            to="/cookies-private"
-            target="_blank"
-            className="underline text-gray-500 hover:text-primary transition-colors"
-          >
-            {intl.formatMessage({ id: 'FOOTER.COOKIES_POLICE' })}
-          </Link>
-        </li>
         <li>
           <Link
             to="/private-police"

@@ -23,9 +23,9 @@ describe('Footer — parity with Angular client-footer.component.html', () => {
     expect(screen.getByText('Todos los derechos reservados')).toBeInTheDocument();
   });
 
-  it('shows the four legal links with Angular exact text', () => {
+  it('shows the legal links with Angular exact text', () => {
     renderFooter();
-    expect(screen.getByText('Políticas de Cookies')).toBeInTheDocument();
+    expect(screen.queryByText('Políticas de Cookies')).not.toBeInTheDocument();
     expect(screen.getByText('Políticas de Privacidad')).toBeInTheDocument();
     expect(screen.getByText('Términos y Condiciones')).toBeInTheDocument();
     expect(screen.getByText('Contáctanos')).toBeInTheDocument();
@@ -33,14 +33,12 @@ describe('Footer — parity with Angular client-footer.component.html', () => {
 
   it('legal links point to the Angular-equivalent paths', () => {
     renderFooter();
-    expect(screen.getByText('Políticas de Cookies').closest('a')).toHaveAttribute('href', '/cookies-private');
     expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute('href', '/private-police');
     expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute('href', '/terms-conditions');
   });
 
   it('legal links open in a new tab, matching Angular target="_blank"', () => {
     renderFooter();
-    expect(screen.getByText('Políticas de Cookies').closest('a')).toHaveAttribute('target', '_blank');
     expect(screen.getByText('Políticas de Privacidad').closest('a')).toHaveAttribute('target', '_blank');
     expect(screen.getByText('Términos y Condiciones').closest('a')).toHaveAttribute('target', '_blank');
   });

@@ -575,7 +575,6 @@ const messages: Record<string, string> = {
   // Footer (exact Angular FOOTER.* strings from vocabs/es.ts)
   'FOOTER.COPYRIGHT1': '© AutoBusinessPro - {year}',
   'FOOTER.COPYRIGHT2': 'Todos los derechos reservados',
-  'FOOTER.COOKIES_POLICE': 'Políticas de Cookies',
   'FOOTER.PRIVACY_POLICE': 'Políticas de Privacidad',
   'FOOTER.TERMS_CONDITIONS': 'Términos y Condiciones',
   'FOOTER.CONTACT_US': 'Contáctanos',

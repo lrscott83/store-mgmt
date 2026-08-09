@@ -89,8 +89,8 @@ export function AppLayout() {
             and NO bottom padding — so the vertical padding is top-only (pt-*), not py-*. */}
         <main className="flex-1 overflow-y-auto px-2 pt-4 md:px-12 md:pt-6">
           <Outlet />
+          <Footer />
         </main>
-        <Footer />
       </div>
     </div>
   );
