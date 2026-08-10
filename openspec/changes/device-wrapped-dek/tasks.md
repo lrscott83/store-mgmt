@@ -67,12 +67,12 @@ Finish/rollback: module complete, imported by nothing else yet → `git revert` 
 
 ### WU2 — `storage/device-dek-table.ts`
 Files: NEW `device-dek-table.ts`, NEW `__tests__/device-dek-table.test.ts`.
-- [ ] 2.1 RED — `readDeviceDekTable()` → `null` for absent/non-JSON/wrong-shape; `hasDeviceDekWrap()` false in each case (mirrors `roster-store.test.ts:186-196`).
-- [ ] 2.2 GREEN — implement `hasValidShape`-guarded reader + `hasDeviceDekWrap`.
-- [ ] 2.3 RED — `writeDeviceDekTable`/`clearDeviceDekTable` round-trip.
-- [ ] 2.4 GREEN — implement writer/clearer (localStorage key `lizoft.device-dek`).
-- [ ] 2.5 RED — structural purity: every `import` line in the file is `import type` (copy `roster-store.purity.test.ts:48-60`).
-- [ ] 2.6 GREEN — only `import type { WrappedDekEntry } from '../offline/dek-unwrap'` remains.
+- [x] 2.1 RED — `readDeviceDekTable()` → `null` for absent/non-JSON/wrong-shape; `hasDeviceDekWrap()` false in each case (mirrors `roster-store.test.ts:186-196`).
+- [x] 2.2 GREEN — implement `hasValidShape`-guarded reader + `hasDeviceDekWrap`.
+- [x] 2.3 RED — `writeDeviceDekTable`/`clearDeviceDekTable` round-trip.
+- [x] 2.4 GREEN — implement writer/clearer (localStorage key `lizoft.device-dek`).
+- [x] 2.5 RED — structural purity: every `import` line in the file is `import type` (copy `roster-store.purity.test.ts:48-60`).
+- [x] 2.6 GREEN — only `import type { WrappedDekEntry } from '../offline/dek-unwrap'` remains.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Finish/rollback: zero import edges from production code yet → clean delete.
 
