@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unwrapDek, DekUnwrapError, DEK_WRAP_ITERATIONS } from '../dek-unwrap';
+import { unwrapDek, wrapDekWithPassword, DekUnwrapError, DEK_WRAP_ITERATIONS } from '../dek-unwrap';
 import { pbkdf2Base64, sha256Base64 } from '../offline-crypto';
 import { aesGcmDecrypt } from '../../storage/aes-gcm';
 import { bytesFromBase64 } from '../../storage/base64';
@@ -80,5 +80,33 @@ describe('dek-unwrap — known-answer vector (dotnet-backend, cross-stack)', () 
     expect(() =>
       aesGcmDecrypt(driftedKek, bytesFromBase64(kat.wrapIv), bytesFromBase64(kat.wrappedDek)),
     ).toThrow();
+  });
+});
+
+// design D3 / §7 — the client-minted (Q2) direction, added to the SAME
+// module and the SAME KAT file so the mint and unwrap directions cannot
+// drift apart. Existing assertions above are untouched.
+describe('dek-unwrap — wrapDekWithPassword (D3, client mint direction)', () => {
+  it('round trip: unwrapDek(pwd, await wrapDekWithPassword(pwd, dek)) returns dek byte-for-byte', async () => {
+    const password = 'a fresh local password';
+    const dek = crypto.getRandomValues(new Uint8Array(32));
+
+    const entry = await wrapDekWithPassword(password, dek);
+    const unwrapped = await unwrapDek(password, entry);
+
+    expect(Array.from(unwrapped)).toEqual(Array.from(dek));
+  });
+
+  it('mint against the frozen KAT wrapSalt/wrapIv reproduces the KAT wrappedDek exactly', async () => {
+    const expected = Uint8Array.from(atob(kat.expectedDek), (c) => c.charCodeAt(0));
+
+    const entry = await wrapDekWithPassword(kat.password, expected, {
+      wrapSalt: kat.wrapSalt,
+      wrapIv: kat.wrapIv,
+    });
+
+    expect(entry.wrappedDek).toBe(kat.wrappedDek);
+    expect(entry.wrapSalt).toBe(kat.wrapSalt);
+    expect(entry.wrapIv).toBe(kat.wrapIv);
   });
 });

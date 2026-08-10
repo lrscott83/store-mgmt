@@ -12,9 +12,15 @@
 // `Encoding.UTF8.GetBytes(preHash)` on the backend exactly, where `preHash`
 // is the decrypted `User.OfflinePasswordPreHash` (NOT `User.Password`, the
 // Argon2id PHC string — see offline-password-verifier design D1).
-import { sha256Base64, pbkdf2Base64 } from './offline-crypto';
-import { aesGcmDecrypt } from '../storage/aes-gcm';
-import { bytesFromBase64 } from '../storage/base64';
+//
+// device-wrapped-dek design D3 (Q2, engram #2117): `wrapDekWithPassword`
+// below is the MINT direction of the same steps 1-3 run backwards
+// (encrypt instead of decrypt, fresh random salt/iv instead of stored
+// ones), living in this same file and sharing `DEK_WRAP_ITERATIONS` so the
+// two directions cannot drift apart — see the constant's own comment.
+import { sha256Base64, pbkdf2Base64, PBKDF2_SALT_BYTES } from './offline-crypto';
+import { aesGcmDecrypt, aesGcmEncrypt, AES_GCM_IV_BYTES } from '../storage/aes-gcm';
+import { bytesFromBase64, base64FromBytes } from '../storage/base64';
 
 // StoreKeyWrapService.cs:15-41 — NOT carried on the wire, unlike
 // `verifier.iterations` (which travels per-user in the roster bundle and
@@ -61,4 +67,34 @@ export async function unwrapDek(password: string, entry: WrappedDekEntry): Promi
     if (err instanceof DekUnwrapError) throw err;
     throw new DekUnwrapError();
   }
+}
+
+/**
+ * D3 / Q2 (engram #2117) — the client-minted MINT direction, deliberately
+ * living in this same module and sharing `DEK_WRAP_ITERATIONS` with
+ * `unwrapDek` above, so the two directions cannot drift apart. Produces a
+ * `WrappedDekEntry` in the EXACT shape the backend emits
+ * (`StoreKeyWrapService.cs`), so `unwrapDek()` stays the single unwrap path
+ * for backend-issued and client-issued wraps alike.
+ *
+ * `fixedSaltIv` is exposed ONLY for the KAT pin (`dek-unwrap.kat.test.ts`)
+ * — production callers never pass it, always minting fresh random values.
+ */
+export async function wrapDekWithPassword(
+  password: string,
+  dek: Uint8Array,
+  fixedSaltIv?: { wrapSalt: string; wrapIv: string },
+): Promise<WrappedDekEntry> {
+  const wrapSalt =
+    fixedSaltIv?.wrapSalt ?? base64FromBytes(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
+  const wrapIv =
+    fixedSaltIv?.wrapIv ?? base64FromBytes(crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES)));
+
+  const preHash = await sha256Base64(password);
+  const kekBase64 = await pbkdf2Base64(preHash, wrapSalt, DEK_WRAP_ITERATIONS);
+  const kek = bytesFromBase64(kekBase64);
+  const iv = bytesFromBase64(wrapIv);
+  const wrappedDek = base64FromBytes(aesGcmEncrypt(kek, iv, dek));
+
+  return { wrappedDek, wrapSalt, wrapIv };
 }
