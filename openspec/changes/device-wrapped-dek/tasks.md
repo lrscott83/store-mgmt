@@ -102,53 +102,57 @@ Finish/rollback: complete, still unwired from loaders/auth-store → clean delet
 
 ### WU5 — `offline/dek-provisioning.ts`
 Files: NEW `dek-provisioning.ts`, NEW `__tests__/dek-provisioning.test.ts`. Depends on WU2, WU3, WU4. Mock `storage/device-key-store` via `vi.mock(...)` for branch coverage — do NOT pull `fake-indexeddb` into this layer (design §7).
-- [ ] 5.1 RED — no roster, no table → `getDek()` non-null, `dekSource:'local'`, `users[login]` present, `unwrapDek(password, users[login])` returns the same bytes (Q2's whole contract).
-- [ ] 5.2 GREEN — implement steps 1-3c (mint branch) + step 5 persist.
-- [ ] 5.3 RED — roster wrap present, no table → adopts the roster's bytes, `dekSource:'roster'`.
-- [ ] 5.4 GREEN — implement step 3b.
-- [ ] 5.5 RED — device DEK X + roster yielding Y≠X → `getDek()` still X, `conflictDetectedAt`/`conflictStoreId` set, no throw (D6).
-- [ ] 5.6 GREEN — implement step 4 reconciliation + conflict record.
-- [ ] 5.7 RED — device DEK X + a roster wrap that fails to unwrap → resolves, `users[login]` refreshed (F9; the explicit boundary against 11.4, which has no device table by construction).
-- [ ] 5.8 GREEN — implement step 4's `catch` branch.
-- [ ] 5.9 RED — table with wraps but none for this login, device key unusable → rejects `DekUnwrapError` (F5, step 3a dead end).
-- [ ] 5.10 GREEN — implement step 3a's throw.
-- [ ] 5.11 RED — `rewrapDeviceDekForPassword` REPLACES (not adds) `users[login]`.
-- [ ] 5.12 GREEN — implement rewrap fn.
+- [x] 5.1 RED — no roster, no table → `getDek()` non-null, `dekSource:'local'`, `users[login]` present, `unwrapDek(password, users[login])` returns the same bytes (Q2's whole contract).
+- [x] 5.2 GREEN — implement steps 1-3c (mint branch) + step 5 persist.
+- [x] 5.3 RED — roster wrap present, no table → adopts the roster's bytes, `dekSource:'roster'`.
+- [x] 5.4 GREEN — implement step 3b.
+- [x] 5.5 RED — device DEK X + roster yielding Y≠X → `getDek()` still X, `conflictDetectedAt`/`conflictStoreId` set, no throw (D6).
+- [x] 5.6 GREEN — implement step 4 reconciliation + conflict record.
+- [x] 5.7 RED — device DEK X + a roster wrap that fails to unwrap → resolves, `users[login]` refreshed (F9; the explicit boundary against 11.4, which has no device table by construction).
+- [x] 5.8 GREEN — implement step 4's `catch` branch.
+- [x] 5.9 RED — table with wraps but none for this login, device key unusable → rejects `DekUnwrapError` (F5, step 3a dead end).
+- [x] 5.10 GREEN — implement step 3a's throw.
+- [x] 5.11 RED — `rewrapDeviceDekForPassword` REPLACES (not adds) `users[login]`.
+- [x] 5.12 GREEN — implement rewrap fn.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Finish/rollback: complete, still unwired → safe to revert alone (nothing calls it yet).
+**DONE 2026-08-10, commit `77aef56c`.** Also handled: `getDek()` already non-null on entry with no table yet (the offline path, `authenticateOffline`'s own unchanged roster unwrap running before this call) — treated as roster-sourced, `tableStoreId = getDekStoreId()`. Step 5's `table.users[login]` write is UNCONDITIONAL (not `if (!table.users[login])` as the compressed pseudocode shows) — follows the device-dek-wrap spec's explicit "Out-of-band password change recovers via the device DEK" scenario (regenerate on every login), which is more precise than §5's sketch. Both deviations disclosed in the apply-progress artifact.
 
 ### WU6 — `entity-crypto.ts` + `entity-migration.ts` guard flip
 Files: MODIFIED `entity-crypto.ts` (1 line), MODIFIED `__tests__/entity-crypto.test.ts:70-87` (**AUTHORIZED #2** — red-first rewrite, the ONLY edit allowed in that file), MODIFIED `entity-migration.ts` (guard+scope), `entity-migration.test.ts` (ADD 1 new test only — its 4 existing suites stay untouched). Depends on WU2 only.
-- [ ] 6.1 RED (authorized rewrite) — rewrite `entity-crypto.test.ts:70-87` to: with a device DEK/table set (via `setDek`+`writeDeviceDekTable`), `encryptEntity` returns `enc:v1:` regardless of roster state; passthrough re-scoped to no-DEK-and-no-device-table-and-no-roster only. Confirm it FAILS against current code first.
-- [ ] 6.2 GREEN — `if (!isEncryptionProvisioned() && !hasDeviceDekWrap()) return plaintext;`
-- [ ] 6.3 RED (new test) — local-DEK device (`setDek(dek,'s1')`, no roster) → `products` key becomes `enc:v1:` after `runEntityMigration()` (today a no-op — this is the RED).
-- [ ] 6.4 GREEN — `entity-migration.ts` guard/scope → `getDekStoreId()`, drop the `roster-store` import.
-- [ ] 6.5 Regression check (no new test) — confirm unedited: `entity-crypto.test.ts:108-121`, the six `*.crypto.test.ts` plaintext-mode suites, all 4 `entity-migration.test.ts` suites.
+- [x] 6.1 RED (authorized rewrite) — rewrite `entity-crypto.test.ts:70-87` to: with a device DEK/table set (via `setDek`+`writeDeviceDekTable`), `encryptEntity` returns `enc:v1:` regardless of roster state; passthrough re-scoped to no-DEK-and-no-device-table-and-no-roster only. Confirm it FAILS against current code first.
+- [x] 6.2 GREEN — `if (!isEncryptionProvisioned() && !hasDeviceDekWrap()) return plaintext;`
+- [x] 6.3 RED (new test) — local-DEK device (`setDek(dek,'s1')`, no roster) → `products` key becomes `enc:v1:` after `runEntityMigration()` (today a no-op — this is the RED).
+- [x] 6.4 GREEN — `entity-migration.ts` guard/scope → `getDekStoreId()`, drop the `roster-store` import.
+- [x] 6.5 Regression check (no new test) — confirm unedited: `entity-crypto.test.ts:108-121`, the six `*.crypto.test.ts` plaintext-mode suites, all 4 `entity-migration.test.ts` suites.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Finish/rollback: behaviorally inert alone in production (`hasDeviceDekWrap()`/`getDekStoreId()` are false/null until WU7 wires provisioning) — but MUST precede WU7, not follow it.
+**DONE 2026-08-10, commit `55ebe55a`.** The authorized rewrite touched 3 assertions in the 70-87 block plus one import line (needed to reference `writeDeviceDekTable`/`hasDeviceDekWrap`); no other test in the file was touched.
 
 ### WU7 — `auth-store.ts` wiring, both login paths
 Files: MODIFIED `stores/auth-store.ts` (`login` block `:296-317`, `loginOffline` block `:332-350`), MODIFIED `stores/__tests__/auth-store.dek.test.ts:140-149` (**AUTHORIZED #3**, 11.3 only — 11.1 and 11.4 stay untouched), NEW `stores/__tests__/auth-store.offline.test.ts` (D4 — the offline DEK test lives HERE, never in `offline-auth-service.test.ts`). Depends on WU5, WU6.
-- [ ] 7.1 RED (authorized rewrite) — 11.3: no roster entry for this login → login still resolves AND `getDek()` is **non-null** (was: stays null). No `fake-indexeddb` needed here — IndexedDB is absent under plain jsdom, which correctly exercises the F1 local-mint path. Confirm it FAILS against current code first.
-- [ ] 7.2 GREEN — replace the `login` roster-unwrap block with `await resolveDekForLogin({ login, password, sessionStoreId })` via dynamic import (D6: zero static `offline/` imports in `auth-store.ts`); drop the now-redundant direct `runEntityMigration` call (step 6 lives inside `resolveDekForLogin`).
-- [ ] 7.3 RED (new file) — `loginOffline()` on a v1 roster → `getDek()` non-null (the offline twin of 11.3).
-- [ ] 7.4 GREEN — after `authenticateOffline` resolves and before `setUser`, `await resolveDekForLogin(...)`.
-- [ ] 7.5 Regression check — confirm unedited: `auth-store.dek.test.ts` 11.1 and 11.4, `auth-store.test.ts:253-259`, `offline-auth-service.test.ts:98` and `:216-222`.
+- [x] 7.1 RED (authorized rewrite) — 11.3: no roster entry for this login → login still resolves AND `getDek()` is **non-null** (was: stays null). No `fake-indexeddb` needed here — IndexedDB is absent under plain jsdom, which correctly exercises the F1 local-mint path. Confirm it FAILS against current code first.
+- [x] 7.2 GREEN — replace the `login` roster-unwrap block with `await resolveDekForLogin({ login, password, sessionStoreId })` via dynamic import (D6: zero static `offline/` imports in `auth-store.ts`); drop the now-redundant direct `runEntityMigration` call (step 6 lives inside `resolveDekForLogin`).
+- [x] 7.3 RED (new file) — `loginOffline()` on a v1 roster → `getDek()` non-null (the offline twin of 11.3).
+- [x] 7.4 GREEN — after `authenticateOffline` resolves and before `setUser`, `await resolveDekForLogin(...)`.
+- [x] 7.5 Regression check — confirm unedited: `auth-store.dek.test.ts` 11.1 and 11.4, `auth-store.test.ts:253-259`, `offline-auth-service.test.ts:98` and `:216-222`.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Finish/rollback: online AND offline login now provision a device DEK. **Data-affecting rollback from here on** (design §8) — once a real device logs in under this code, reverting is not clean; the wrap table + IDB entry must be cleared on that device before/after any revert.
+**DONE 2026-08-10, commit `4ce199e8`.** `NOTE: "NEW stores/__tests__/auth-store.offline.test.ts"` — this file already existed (pre-dates this change, from an unrelated auth-session change); the offline DEK test (7.3) was appended to it, not created fresh. `sessionStoreId` for both call sites resolved to `user.selectedStoreId` (the repo's existing "current store" convention, e.g. `user-home.ts:24`) — not specified explicitly by design/tasks.
 
 ### WU8 — `unlock-gate.ts` + `auth/routes/loaders.ts` device-wrap-first
 Files: MODIFIED `unlock-gate.ts` (+1 branch), MODIFIED `loaders.ts` (`authLoader`, `guestOnlyLoader`), `unlock-gate.test.ts` (ADD 1 row only — existing 9 rows untouched), NEW loader-ordering tests. Depends on WU4, WU7.
-- [ ] 8.1 RED (new row, append only) — device table with a device wrap + no DEK → `needsUnlock` **true** even with no roster entry.
-- [ ] 8.2 GREEN — `if (hasDeviceDekWrap()) return true;` above the existing roster check.
-- [ ] 8.3 RED — `authLoader` does not resolve before `getDek()` is non-null (mock `device-key-store.getDeviceKey` deferred/delayed; assert DEK set at the moment the loader promise settles).
-- [ ] 8.4 GREEN — `await bootstrapDeviceDek()` before `unlockGate(user)` in `authLoader`.
-- [ ] 8.5 RED — `guestOnlyLoader` bootstraps before calling `resolveUserHomePath` (spy on the product service; assert DEK non-null when first invoked).
-- [ ] 8.6 GREEN — `await bootstrapDeviceDek()` before both `needsUnlock` and `resolveUserHomePath` in `guestOnlyLoader`.
-- [ ] 8.7 RED (optional structural guard) — the set of route module paths outside the `app-layout` block equals the frozen 7-item list (`routes.ts`). No production change if it already holds — this test only guards regressions to §3's proof.
-- [ ] 8.8 Regression check — confirm all 9 existing `unlock-gate.test.ts` rows still pass.
+- [x] 8.1 RED (new row, append only) — device table with a device wrap + no DEK → `needsUnlock` **true** even with no roster entry.
+- [x] 8.2 GREEN — `if (hasDeviceDekWrap()) return true;` above the existing roster check.
+- [x] 8.3 RED — `authLoader` does not resolve before `getDek()` is non-null (mock `device-key-store.getDeviceKey` deferred/delayed; assert DEK set at the moment the loader promise settles).
+- [x] 8.4 GREEN — `await bootstrapDeviceDek()` before `unlockGate(user)` in `authLoader`.
+- [x] 8.5 RED — `guestOnlyLoader` bootstraps before calling `resolveUserHomePath` (spy on the product service; assert DEK non-null when first invoked).
+- [x] 8.6 GREEN — `await bootstrapDeviceDek()` before both `needsUnlock` and `resolveUserHomePath` in `guestOnlyLoader`.
+- [x] 8.7 RED (optional structural guard) — the set of route module paths outside the `app-layout` block equals the frozen 7-item list (`routes.ts`). No production change if it already holds — this test only guards regressions to §3's proof.
+- [x] 8.8 Regression check — confirm all 9 existing `unlock-gate.test.ts` rows still pass.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Finish/rollback: THIS is where the flip becomes end-to-end observable — reload with a working device wrap no longer bounces to `/login?unlock=1`. **Slice B checkpoint.** Same data-affecting caveat as WU7.
+**DONE 2026-08-10, commit `0ef45392`.** SLICE B COMPLETE. Full suite: 185 test files, 2429 tests, 0 failures (`npx turbo run test --force --filter=@store-mgmt/web-store-pos`). Batch boundary — Slice C (WU9-WU10) is out of scope for this batch by explicit instruction; not started.
 
 ---
 
