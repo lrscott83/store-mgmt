@@ -281,40 +281,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error('AUTH: failed to load user after login');
       }
 
-      // design §11 (dek-lifecycle-and-unlock-gate, WU11 — first behavior
-      // change): unwrap + set the DEK when this login has a v2 roster entry.
-      // Dynamic imports (D6): `roster-store`/`dek-unwrap` are `offline/`
-      // modules and this file is evaluated on every page load.
-      // NOT wrapped in a swallowing try/catch — a DekUnwrapError here (wrong
-      // password relative to the roster's wrap, parameter drift, tampered
-      // bundle) MUST fail this login call, never be swallowed. Swallowing it
-      // would authenticate the user with `needsUnlock` permanently true,
-      // looping authLoader -> /login -> "successful" login -> authLoader.
-      // No roster entry for this login, or a device not
-      // encryption-provisioned, skips the unwrap entirely: no error, DEK
-      // stays null (the online-auth-only majority case).
-      const { getRawRoster } = await import('../offline/roster-store');
-      const bundle = getRawRoster();
-      const entry = bundle?.users.find((u) => u.login === user.login);
-      if (entry?.wrappedDek && entry.wrapSalt && entry.wrapIv) {
-        const { unwrapDek } = await import('../offline/dek-unwrap');
-        const dek = await unwrapDek(password, {
-          wrappedDek: entry.wrappedDek,
-          wrapSalt: entry.wrapSalt,
-          wrapIv: entry.wrapIv,
-        });
-        setDek(dek, bundle!.storeId);
-        // design §12 (entity-migration, WU13): eager migration fires right
-        // after a successful DEK unwrap. Swallowed — its failure must NEVER
-        // block login; the worst outcome is "still plaintext", never
-        // "cannot log in".
-        try {
-          const { runEntityMigration } = await import('../storage/entity-migration');
-          runEntityMigration();
-        } catch {
-          // intentionally swallowed — see comment above.
-        }
-      }
+      // device-wrapped-dek design §5 (dek-provisioning, D4/D6): resolve
+      // THIS DEVICE's DEK for this login — an existing device DEK, else
+      // this login's own roster wrap, else a freshly minted local DEK
+      // (Q2). Dynamic import (D6): `dek-provisioning` is an `offline/`
+      // module and this file is evaluated on every page load.
+      // NOT wrapped in a swallowing try/catch — a DekUnwrapError here (the
+      // step 3b hard-fail: no device table yet, and this login's roster
+      // wrap fails to unwrap with the password just used) MUST fail this
+      // login call, never be swallowed. Swallowing it would authenticate
+      // the user with `needsUnlock` permanently true, looping authLoader
+      // -> /login -> "successful" login -> authLoader. `resolveDekForLogin`
+      // also runs the eager entity migration pass itself (design §5 step
+      // 6), so the old direct call here is gone.
+      const { resolveDekForLogin } = await import('../offline/dek-provisioning');
+      await resolveDekForLogin({ login: user.login, password, sessionStoreId: user.selectedStoreId });
 
       set({ isLoading: false });
       return user;
@@ -334,6 +315,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { authenticateOffline } = await import('../offline/offline-auth-service');
       const user = await authenticateOffline(login, password);
+      // device-wrapped-dek design §5 (D4): resolve THIS DEVICE's DEK for
+      // this login, same as the online path — an existing device DEK,
+      // else this login's own roster wrap, else a freshly minted local
+      // DEK (Q2). `authenticateOffline` itself is UNTOUCHED (D4) and may
+      // already have set a DEK for a v2-roster login with wrap fields;
+      // `resolveDekForLogin` accounts for that (structural note 1) and is
+      // idempotent either way. Not swallowed, same rationale as the
+      // online path above.
+      const { resolveDekForLogin } = await import('../offline/dek-provisioning');
+      await resolveDekForLogin({ login: user.login, password, sessionStoreId: user.selectedStoreId });
       // The ONE hydration seam (auth-session spec: "loginOffline hydrates
       // through the existing setUser seam") — writes TOKEN/CURRENT_USER/
       // AUTH_MODEL exactly like online login().
