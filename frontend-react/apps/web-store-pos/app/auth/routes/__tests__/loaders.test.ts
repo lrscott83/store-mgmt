@@ -10,6 +10,18 @@ vi.mock('~/shared/lib/pwa/preload-heavy-chunks', () => ({
   preloadHeavyChunks: vi.fn(),
 }));
 
+// device-wrapped-dek design §3/§7 (WU8, ordering tests below): wraps the
+// REAL module so every OTHER test in this file keeps the real,
+// IndexedDB-absent-under-jsdom behavior (`getDeviceKey` resolves `null`,
+// exactly F1) — only the ordering tests override `getDeviceKey` with a
+// deferred/controllable implementation.
+vi.mock('~/shared/lib/storage/device-key-store', async () => {
+  const actual = await vi.importActual<typeof import('~/shared/lib/storage/device-key-store')>(
+    '~/shared/lib/storage/device-key-store',
+  );
+  return { ...actual, getDeviceKey: vi.fn(actual.getDeviceKey) };
+});
+
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
 import {
@@ -23,7 +35,11 @@ import {
   resellerFeatureLoader,
 } from '../loaders';
 import { importRoster } from '~/shared/lib/offline/roster-store';
-import { setDek, clearDek } from '~/shared/lib/storage/data-key-store';
+import { getDek, setDek, clearDek } from '~/shared/lib/storage/data-key-store';
+import { getDeviceKey } from '~/shared/lib/storage/device-key-store';
+import { writeDeviceDekTable, clearDeviceDekTable } from '~/shared/lib/storage/device-dek-table';
+import { wrapDekForDevice } from '~/shared/lib/storage/dek-bootstrap';
+import * as productServiceFactory from '~/sales/lib/services/product-service.factory';
 import type { OfflineRosterBundle } from '~/shared/lib/offline/roster-types';
 import type { UserModel } from '@store-mgmt/domain';
 
@@ -254,6 +270,84 @@ describe('Route Loaders (AUTH-04)', () => {
       const result = await authLoader();
 
       expect(result).toBeNull();
+    });
+  });
+
+  // device-wrapped-dek design §3 (WU8): the bootstrap-ordering guarantee,
+  // asserted, not assumed — `authLoader`/`guestOnlyLoader` MUST await
+  // `bootstrapDeviceDek()` BEFORE evaluating `needsUnlock`/calling
+  // `resolveUserHomePath`, since those are the only two seams §3's proof
+  // relies on to reach every sync `encryptEntity`/`decryptEntity` call site.
+  describe('authLoader + guestOnlyLoader — device DEK bootstrap ordering (design §3)', () => {
+    const ORDERING_LOGIN = 'ordering@test.com';
+
+    async function establishDeviceWrap(dek: Uint8Array, storeId: string): Promise<CryptoKey> {
+      const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+        'encrypt',
+        'decrypt',
+      ]);
+      const wrap = await wrapDekForDevice(dek, key);
+      writeDeviceDekTable({ formatVersion: 1, dekSource: 'local', storeId, device: wrap, users: {} });
+      return key;
+    }
+
+    beforeEach(() => {
+      localStorage.clear();
+      clearDek();
+      vi.mocked(getDeviceKey).mockReset();
+    });
+
+    afterEach(() => {
+      localStorage.clear();
+      clearDek();
+      clearDeviceDekTable();
+      vi.mocked(getDeviceKey).mockReset();
+    });
+
+    it('authLoader — does not resolve before getDek() is non-null (a deferred device-key recovery is awaited)', async () => {
+      const dek = new Uint8Array(32).fill(0x44);
+      const key = await establishDeviceWrap(dek, 's1');
+      vi.mocked(getDeviceKey).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(key), 10)),
+      );
+      setAuthState(makeUser({ login: ORDERING_LOGIN }));
+
+      await authLoader();
+
+      expect(getDek()).not.toBeNull();
+      expect(Array.from(getDek()!)).toEqual(Array.from(dek));
+    });
+
+    it('guestOnlyLoader — bootstraps the device DEK before resolveUserHomePath (product service) is invoked', async () => {
+      const dek = new Uint8Array(32).fill(0x55);
+      const key = await establishDeviceWrap(dek, 's1');
+      vi.mocked(getDeviceKey).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(key), 10)),
+      );
+
+      let dekWhenProductServiceCalled: Uint8Array | null = null;
+      const spy = vi
+        .spyOn(productServiceFactory, 'createProductService')
+        .mockImplementation(() => {
+          dekWhenProductServiceCalled = getDek();
+          return {
+            hasAnyAvailableToSaleProduct: vi.fn().mockResolvedValue({
+              data: false,
+              succeeded: true,
+              message: '',
+              actionCode: 200,
+              errors: [],
+            }),
+          } as unknown as ReturnType<typeof productServiceFactory.createProductService>;
+        });
+
+      setAuthState(makeUser({ login: ORDERING_LOGIN }));
+      await guestOnlyLoader();
+
+      expect(dekWhenProductServiceCalled).not.toBeNull();
+      expect(Array.from(dekWhenProductServiceCalled!)).toEqual(Array.from(dek));
+
+      spy.mockRestore();
     });
   });
 

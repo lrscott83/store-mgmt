@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { needsUnlock } from '../unlock-gate';
 import { importRoster } from '../roster-store';
 import { setDek, clearDek } from '../../storage/data-key-store';
+import { writeDeviceDekTable } from '../../storage/device-dek-table';
 import type { OfflineRosterBundle } from '../roster-types';
 
 function makeBundle(overrides: Partial<OfflineRosterBundle> = {}): OfflineRosterBundle {
@@ -101,6 +102,20 @@ describe('needsUnlock — per-user, all four combinations (design §5)', () => {
       'lizoft.offline-roster',
       JSON.stringify(makeBundle({ expiresAt: Date.now() - 1_000 })),
     );
+    expect(needsUnlock({ login: 'ana' })).toBe(true);
+  });
+
+  // device-wrapped-dek design §4/§7 (new row, append only — the nine rows
+  // above are untouched): the device-wrap fast path is independent of
+  // roster state entirely.
+  it('device-wrapped-dek: a local wrap table exists, no DEK -> true, even with no roster entry for this user', () => {
+    writeDeviceDekTable({
+      formatVersion: 1,
+      dekSource: 'local',
+      storeId: 's1',
+      device: null,
+      users: { 'someone-else': { wrappedDek: 'ct', wrapSalt: 'salt', wrapIv: 'iv' } },
+    });
     expect(needsUnlock({ login: 'ana' })).toBe(true);
   });
 });
