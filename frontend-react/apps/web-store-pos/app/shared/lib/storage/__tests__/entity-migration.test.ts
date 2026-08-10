@@ -178,3 +178,28 @@ describe('runEntityMigration — scoped to the roster store, not the active stor
     expect(localStorage.getItem(storeBKey)).toBe('[{"id":2}]'); // untouched, still plaintext
   });
 });
+
+// device-wrapped-dek design §4: guard and scope now derive from
+// `getDekStoreId()` instead of `isEncryptionProvisioned()`/`getRawRoster()`,
+// so a local-DEK device (no roster at all) also gets migrated — today this
+// is a no-op, which is the RED.
+describe('runEntityMigration — local-DEK device with no roster (device-wrapped-dek §4)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+    clearRoster();
+  });
+
+  it('a local-DEK device (setDek only, no roster) converts its own store keys', () => {
+    setDek(DEK, STORE_A);
+    const productsRaw = '[{"id":1,"name":"widget"}]';
+    localStorage.setItem(StorageKeys.entityKey('products', STORE_A), productsRaw);
+
+    runEntityMigration();
+
+    const after = localStorage.getItem(StorageKeys.entityKey('products', STORE_A));
+    expect(after).not.toBeNull();
+    expect(isEncrypted(after!)).toBe(true);
+    expect(decryptEntity(after)).toBe(productsRaw);
+  });
+});

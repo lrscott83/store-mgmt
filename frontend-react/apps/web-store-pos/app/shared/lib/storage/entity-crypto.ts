@@ -18,6 +18,7 @@ import { aesGcmEncrypt, aesGcmDecrypt, AES_GCM_IV_BYTES } from './aes-gcm';
 import { base64FromBytes, bytesFromBase64 } from './base64';
 import { getDek } from './data-key-store';
 import { isEncryptionProvisioned } from '../offline/roster-store';
+import { hasDeviceDekWrap } from './device-dek-table';
 
 export const ENTITY_ENVELOPE_PREFIX = 'enc:v1:';
 
@@ -41,18 +42,24 @@ export function isEncrypted(stored: string): boolean {
 
 /**
  * `encryptEntity(plaintext)`, in order (design §1/§7 — the hard constraint
- * from the entity-at-rest-encryption spec):
+ * from the entity-at-rest-encryption spec; device-wrapped-dek design §4
+ * narrows step 2):
  *   1. DEK present in memory -> encrypt: `enc:v1:` + base64(iv‖ct‖tag),
  *      fresh random 12-byte iv. Checked FIRST — the roster is never read
  *      on this path.
- *   2. else not encryption-provisioned -> return plaintext unchanged,
- *      NEVER throw. This is the permanent, first-class "absence of
- *      encryption" mode (hard constraint, engram obs #1549): a device
- *      that never imported a roster must behave exactly as before this
- *      change.
- *   3. else (provisioned but locked) -> throw MissingDataKeyError. The
- *      unlock gate (WU12) is what should prevent reaching this branch in
- *      normal use.
+ *   2. else not encryption-provisioned (roster) AND this device holds no
+ *      device wrap table -> return plaintext unchanged, NEVER throw. This
+ *      is the permanent, first-class "absence of encryption" mode (hard
+ *      constraint, engram obs #1549), narrowed by device-wrapped-dek to its
+ *      only honest meaning: no DEK, and this device has never held one —
+ *      the pre-bootstrap window. A device that has never completed a login
+ *      (no roster wrap, no device wrap table) behaves exactly as before
+ *      this change.
+ *   3. else (provisioned — by roster OR by an established device wrap —
+ *      but locked) -> throw MissingDataKeyError. Without this line a device
+ *      already holding `enc:v1:` values would silently write plaintext
+ *      over them during a failed bootstrap; the unlock gate is what should
+ *      prevent reaching this branch in normal use.
  */
 export function encryptEntity(plaintext: string): string {
   const dek = getDek();
@@ -64,7 +71,7 @@ export function encryptEntity(plaintext: string): string {
     envelope.set(ciphertextWithTag, iv.length);
     return ENTITY_ENVELOPE_PREFIX + base64FromBytes(envelope);
   }
-  if (!isEncryptionProvisioned()) {
+  if (!isEncryptionProvisioned() && !hasDeviceDekWrap()) {
     return plaintext;
   }
   throw new MissingDataKeyError();

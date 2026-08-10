@@ -16,9 +16,16 @@
 // both in WU11) wraps this call in `try {} catch {}`. Per-key isolation
 // below means a single quota/storage failure never aborts the other five —
 // the worst outcome is "still plaintext", never "cannot log in".
+//
+// device-wrapped-dek design §4: guard and scope now derive from the SAME
+// single source, `getDekStoreId()`, replacing BOTH `isEncryptionProvisioned()`
+// (guard) and `getRawRoster().storeId` (scope) — so a local-DEK device (no
+// roster at all) also migrates its own pre-existing plaintext, which the
+// old roster-only guard could never do. This module drops its `roster-store`
+// import entirely.
 import { StorageKeys } from './storage-keys';
 import { isEncrypted, encryptEntity } from './entity-crypto';
-import { getRawRoster, isEncryptionProvisioned } from '../offline/roster-store';
+import { getDekStoreId } from './data-key-store';
 
 /**
  * The six business-entity names migrated, in the same order the seams
@@ -35,18 +42,21 @@ const MIGRATED_ENTITY_NAMES = [
 ] as const;
 
 /**
- * Runs the eager migration pass for the CURRENT device's roster store.
+ * Runs the eager migration pass for the CURRENT device's DEK store.
  *
- * Guard: no-op (zero reads, zero writes) when `isEncryptionProvisioned()`
- * is false — a device that never imported a v2 roster is left byte-for-byte
- * untouched.
+ * Guard (device-wrapped-dek §4): no-op (zero reads, zero writes) when
+ * `getDekStoreId()` is `null` — no DEK in memory this page load, so there
+ * is nothing to encrypt with. Covers both the pre-bootstrap window (no DEK
+ * at all) and a device that never completed any login.
  *
- * Scope: `getRawRoster().storeId` — NOT the current user's
- * `selectedStoreId` (design correction 6). This is the roster's own store,
- * the one the just-unwrapped DEK actually belongs to, so a super-admin
- * whose active store differs from the roster's store can never have a
- * foreign store's data mass-encrypted under a key that isn't theirs. This
- * module never reads `selectedStoreId` at all.
+ * Scope (device-wrapped-dek §4): `getDekStoreId()` — the store the
+ * in-memory DEK actually belongs to, NOT the current user's
+ * `selectedStoreId` (design correction 6). On the roster path this is the
+ * SAME value `auth-store.ts` already passes to `setDek(dek, bundle.storeId)`,
+ * so a super-admin whose active store differs from the roster's store can
+ * never have a foreign store's data mass-encrypted under a key that isn't
+ * theirs. On a local-DEK device (no roster) it is the DEK's own store —
+ * this module never reads `selectedStoreId` at all.
  *
  * Idempotent: a key already carrying the `enc:v1:` marker is left
  * untouched (no `setItem` call). Absent keys are skipped, never created.
@@ -59,11 +69,8 @@ const MIGRATED_ENTITY_NAMES = [
  * next successful unlock.
  */
 export function runEntityMigration(): void {
-  if (!isEncryptionProvisioned()) return;
-
-  const bundle = getRawRoster();
-  if (!bundle) return;
-  const storeId = bundle.storeId;
+  const storeId = getDekStoreId();
+  if (!storeId) return;
 
   for (const entity of MIGRATED_ENTITY_NAMES) {
     const key = StorageKeys.entityKey(entity, storeId);
