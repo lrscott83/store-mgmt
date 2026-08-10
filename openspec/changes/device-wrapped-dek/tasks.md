@@ -51,17 +51,17 @@ Slice C (9-10) needs Slice B live to be meaningful.
 
 ### WU1 — IndexedDB feasibility gate + `storage/device-key-store.ts`
 Files: `apps/web-store-pos/package.json` (+`fake-indexeddb` devDep), NEW `storage/device-key-store.ts`, NEW `storage/__tests__/device-key-store.test.ts`.
-- [ ] 1.0 **Blocking gate, not app behavior**: in the new test file, `import 'fake-indexeddb/auto'` first line, assert `typeof globalThis.structuredClone === 'function'`. If it fails, add the documented polyfill fallback at the top of every `fake-indexeddb`-importing test file (same per-file discipline as the import itself — do NOT add to `vitest.setup.ts`, that changes every test file's blast radius).
-- [ ] 1.1 RED — `getOrCreateDeviceKey()` called twice returns the same key; `key.extractable === false`; `crypto.subtle.exportKey('raw', key)` rejects.
-- [ ] 1.2 GREEN — implement mint (`AES-GCM`, 256, `extractable:false`) + IDB persist/read.
-- [ ] 1.3 RED — `globalThis.indexedDB` deleted → `getOrCreateDeviceKey()` resolves `null`, never throws (F1).
-- [ ] 1.4 GREEN — wrap every IDB call so failure resolves `null`, never throws.
-- [ ] 1.5 RED — a never-settling `open()` stub resolves `null` within `DEVICE_KEY_OPEN_TIMEOUT_MS` (3000ms fake timers) — the white-screen guard (F2).
-- [ ] 1.6 GREEN — bound `open()` with a race against the timeout.
-- [ ] 1.7 RED — `deleteDeviceKey()` clears the record; a subsequent `getOrCreateDeviceKey()` mints fresh.
-- [ ] 1.8 GREEN — implement `deleteDeviceKey`.
-- [ ] 1.9 RED — `getDeviceKey()` (read-only) never creates: called on an empty DB, resolves `null`, DB stays empty.
-- [ ] 1.10 GREEN — implement `getDeviceKey` as a strict read.
+- [x] 1.0 **Blocking gate, not app behavior**: in the new test file, `import 'fake-indexeddb/auto'` first line, assert `typeof globalThis.structuredClone === 'function'`. If it fails, add the documented polyfill fallback at the top of every `fake-indexeddb`-importing test file (same per-file discipline as the import itself — do NOT add to `vitest.setup.ts`, that changes every test file's blast radius). **RESULT: verified TRUE — no polyfill needed.**
+- [x] 1.1 RED — `getOrCreateDeviceKey()` called twice returns the same key; `key.extractable === false`; `crypto.subtle.exportKey('raw', key)` rejects.
+- [x] 1.2 GREEN — implement mint (`AES-GCM`, 256, `extractable:false`) + IDB persist/read.
+- [x] 1.3 RED — `globalThis.indexedDB` deleted → `getOrCreateDeviceKey()` resolves `null`, never throws (F1).
+- [x] 1.4 GREEN — wrap every IDB call so failure resolves `null`, never throws.
+- [x] 1.5 RED — a never-settling `open()` stub resolves `null` within `DEVICE_KEY_OPEN_TIMEOUT_MS` (3000ms fake timers) — the white-screen guard (F2).
+- [x] 1.6 GREEN — bound `open()` with a race against the timeout.
+- [x] 1.7 RED — `deleteDeviceKey()` clears the record; a subsequent `getOrCreateDeviceKey()` mints fresh.
+- [x] 1.8 GREEN — implement `deleteDeviceKey`.
+- [x] 1.9 RED — `getDeviceKey()` (read-only) never creates: called on an empty DB, resolves `null`, DB stays empty.
+- [x] 1.10 GREEN — implement `getDeviceKey` as a strict read.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Finish/rollback: module complete, imported by nothing else yet → `git revert` is a clean delete.
 
