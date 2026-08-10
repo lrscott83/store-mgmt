@@ -31,11 +31,24 @@ async function unlockGate(user: UserModel): Promise<Response | null> {
   return needsUnlock(user) ? redirect('/login?unlock=1') : null;
 }
 
+// device-wrapped-dek design §3 (seams 1/2, WU8): the ONLY two chokepoints
+// through which every route under `app-layout` (seam 1) and the
+// already-authenticated `/login` visitor (seam 2) reach the 16 sync
+// `encryptEntity`/`decryptEntity` call sites — see design §3's grep-verified
+// proof. Dynamic import for the same D1/D4 reason as `unlockGate` above.
+async function bootstrapDeviceDekForRoute(): Promise<void> {
+  const { bootstrapDeviceDek } = await import('~/shared/lib/storage/dek-bootstrap');
+  await bootstrapDeviceDek();
+}
+
 export async function authLoader(): Promise<Response | null> {
   const { user, isAuthenticated } = getAuthState();
   if (!user || !isAuthenticated) {
     return denyAccess();
   }
+  // MUST precede `unlockGate` — a working device-key wrap recovers the DEK
+  // silently here, before `needsUnlock` ever sees a null DEK.
+  await bootstrapDeviceDekForRoute();
   return unlockGate(user);
 }
 
@@ -46,6 +59,10 @@ export async function guestOnlyLoader(): Promise<Response | null> {
   // heavy route chunks here, mirroring Angular's second navigateToUserHome()
   // call-site (login.component.ts:50, the constructor's already-authenticated redirect).
   if (isAuthenticated && user) {
+    // MUST precede both `needsUnlock` and `resolveUserHomePath` below —
+    // the latter reaches business-entity storage seams that throw
+    // MissingDataKeyError while locked (design §3 seam 2).
+    await bootstrapDeviceDekForRoute();
     // design §5: a locked-but-provisioned visitor at /login must see the
     // unlock form (return null), NOT get bounced home — resolveUserHomePath
     // reads business-entity storage seams that throw MissingDataKeyError
