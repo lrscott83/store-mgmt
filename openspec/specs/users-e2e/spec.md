@@ -83,9 +83,16 @@ Define backend E2E test scenarios that validate all Users and StoreUsers API end
 | Deactivate with IsActive=false body | SuperAdmin | 200, IsActive=false |
 | Activate as OwnerAdmin+UsersAdmin | OwnerAdmin+Management | 200 |
 | Activate as StoreUser | StoreUser | 403 (handler-level DontHavePermission guard, even with Users feature) |
+| Deactivate same-tenant StoreUser, then /me 404 chain (B-6) | OwnerAdmin+Management | 200; target real-login /me → 404, ActionCode=404, single error `Auth.AccountInactive` |
+| Cross-tenant deactivate (B-6 isolation) | OwnerAdmin+Management | 404 envelope failed (tenant filter via FindAsync; `App.Unexpected`, NOT `User.NotFound`) |
 | Non-existent id | SuperAdmin | 404 |
 | Activate without token | Anonymous | 401 |
 | POST verb to GET-only route | SuperAdmin | 405 (verb mismatch) |
+
+> **Delivery note (2026-08-10)**: The two B-6 rows above are DELIVERED by change
+> `e2e-b6-me-inactive-404` (spec-time main-spec update, B-3 precedent) — new
+> `AuthMeDeactivationTests.cs` (positive same-tenant chain + cross-tenant 404).
+> Verification run pending in that change's sdd-verify.
 
 ## R6: Add User Roles (POST AddUserRoles)
 
