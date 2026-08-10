@@ -8,6 +8,7 @@ import {
 } from '../entity-crypto';
 import { setDek, clearDek } from '../data-key-store';
 import { importRoster, clearRoster } from '../../offline/roster-store';
+import { writeDeviceDekTable, clearDeviceDekTable, hasDeviceDekWrap } from '../device-dek-table';
 import type { OfflineRosterBundle } from '../../offline/roster-types';
 
 function v2Bundle(overrides: Partial<OfflineRosterBundle> = {}): OfflineRosterBundle {
@@ -60,18 +61,25 @@ describe('entity-crypto — permanent marker-based passthrough (decryptEntity)',
   });
 });
 
-describe('entity-crypto — encryption absence is a permanent, first-class mode (hard constraint)', () => {
+// device-wrapped-dek design §4 (AUTHORIZED rewrite #2, engram
+// sdd/device-wrapped-dek/design-decisions): encryption absence is a
+// permanent, first-class mode ONLY while this device has never completed a
+// login — i.e. no roster AND no device wrap table. Once either is true, the
+// plaintext passthrough no longer applies.
+describe('entity-crypto — encryption absence is a permanent mode ONLY while this device has never completed a login (device-wrapped-dek)', () => {
   beforeEach(() => {
     localStorage.clear();
     clearDek();
     clearRoster();
+    clearDeviceDekTable();
   });
 
-  it('no roster ever imported: encryptEntity returns input unchanged and does NOT throw', () => {
+  it('no roster ever imported AND no device wrap table: encryptEntity returns input unchanged and does NOT throw', () => {
+    expect(hasDeviceDekWrap()).toBe(false);
     expect(encryptEntity('[{"a":1}]')).toBe('[{"a":1}]');
   });
 
-  it('v1-roster device: encryptEntity returns input unchanged, no throw', () => {
+  it('a device DEK/table is set: encryptEntity encrypts to enc:v1:, regardless of roster state (v1 roster here)', () => {
     importRoster(
       {
         bundleId: 'b0',
@@ -83,7 +91,27 @@ describe('entity-crypto — encryption absence is a permanent, first-class mode 
       },
       500,
     );
-    expect(encryptEntity('[{"a":1}]')).toBe('[{"a":1}]');
+    const dek = new Uint8Array(32).fill(0x09);
+    setDek(dek, 's1');
+    writeDeviceDekTable({ formatVersion: 1, dekSource: 'local', storeId: 's1', device: null, users: {} });
+
+    expect(encryptEntity('[{"a":1}]')).toMatch(/^enc:v1:/);
+  });
+
+  // The one-line guard flip (device-wrapped-dek §4): this is what fails
+  // against the pre-change code, which only checked `isEncryptionProvisioned()`
+  // (roster-only) and would silently pass this value through as plaintext.
+  it('no DEK, but this device holds a wrap table (bootstrap did not recover it) and no roster: MissingDataKeyError, NOT plaintext', () => {
+    writeDeviceDekTable({
+      formatVersion: 1,
+      dekSource: 'local',
+      storeId: 's1',
+      device: null,
+      users: { ana: { wrappedDek: 'ct', wrapSalt: 'salt', wrapIv: 'iv' } },
+    });
+    expect(hasDeviceDekWrap()).toBe(true);
+
+    expect(() => encryptEntity('[{"a":1}]')).toThrow(MissingDataKeyError);
   });
 });
 
