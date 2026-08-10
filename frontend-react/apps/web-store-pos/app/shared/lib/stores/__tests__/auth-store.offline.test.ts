@@ -3,7 +3,7 @@ import { useAuthStore } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
 import { importRoster, isRosterProvisioned } from '../../offline/roster-store';
 import { sha256Base64, pbkdf2Base64 } from '../../offline/offline-crypto';
-import { clearDek } from '../../storage/data-key-store';
+import { getDek, clearDek } from '../../storage/data-key-store';
 import type { OfflineRosterBundle } from '../../offline/roster-types';
 
 const FIXED_SALT = 'AAAAAAAAAAAAAAAAAAAAAA==';
@@ -144,5 +144,25 @@ describe('useAuthStore.logout() — preserves the offline roster (auth-session M
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(isRosterProvisioned()).toBe(true);
+  });
+});
+
+// device-wrapped-dek design §5/§7: DEK provisioning for the offline path
+// lives HERE, never in `offline-auth-service.test.ts` (D4's whole
+// purpose — `authenticateOffline` stays untouched, its own
+// `getDek()===null` assertion for a v1 roster survives unmodified).
+describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek design §5)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+  });
+
+  it('loginOffline() on a v1 roster (no wrap fields) -> getDek() is non-null (offline twin of 11.3, Q2 mint)', async () => {
+    await seedRoster();
+
+    await useAuthStore.getState().loginOffline('ana', 'secret');
+
+    expect(getDek()).not.toBeNull();
   });
 });

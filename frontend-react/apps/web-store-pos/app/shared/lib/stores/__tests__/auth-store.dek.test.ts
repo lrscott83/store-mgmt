@@ -137,13 +137,19 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
     vi.doUnmock('~/shared/lib/http/auth-http-service');
   });
 
-  it('11.3: no roster entry for this login -> login still resolves and getDek() stays null (majority case)', async () => {
+  // AUTHORIZED rewrite (device-wrapped-dek design §5/§7): "no roster entry"
+  // no longer leaves the DEK null — `resolveDekForLogin`'s Q2 mint branch
+  // (step 3c) gives every device a DEK after its first login. IndexedDB is
+  // absent under plain jsdom (no `fake-indexeddb` import in this file),
+  // which correctly exercises the F1 local-mint path (no device-key wrap,
+  // password wrap only) — no crypto mocking needed.
+  it('11.3: no roster entry for this login -> login still resolves and getDek() is non-null (device-wrapped-dek Q2 mint)', async () => {
     mockAuthHttp(successEnvelope(), makeAuthUser());
 
     const user = await useAuthStore.getState().login('ana@example.com', 'secret');
 
     expect(user).toBeDefined();
-    expect(getDek()).toBeNull();
+    expect(getDek()).not.toBeNull();
 
     vi.doUnmock('~/shared/lib/http/auth-http-service');
   });
