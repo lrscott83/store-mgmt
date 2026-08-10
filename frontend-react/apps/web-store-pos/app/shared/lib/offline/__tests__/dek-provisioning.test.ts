@@ -155,4 +155,39 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     const recovered = await unwrapDek('new-secret', table.users['ana']);
     expect(Array.from(recovered)).toEqual(Array.from(dek));
   });
+
+  // GAP 3 (batch-2 apply-progress, obs #2123): design §5's compressed
+  // pseudocode step 5 shows `if (!table.users[login]) table.users[login] =
+  // ...` (write only when absent). The previous batch implemented it
+  // UNCONDITIONALLY, citing the device-dek-wrap spec's "Out-of-band
+  // password change recovers via the device DEK" scenario (a fresh
+  // password wrap MUST be regenerated for this user). This test isolates
+  // the choice from that scenario entirely: NO roster is imported at any
+  // point, so step 4's reconciliation/F9 branches never run and this
+  // login's own table entry is never stale by any measure — the only
+  // question is whether an ordinary repeated login (DEK cleared, e.g. by a
+  // reload, then logged in again with the SAME, still-valid password)
+  // rewrites an entry that was already perfectly recoverable. Under the
+  // literal `if (!table.users[login])` pseudocode this would be a no-op
+  // (same wrapSalt both times); the shipped behavior always rewrites.
+  it('5.13: a repeated login with no roster involved and a non-stale entry still rewrites this login\'s table entry (step 5 is unconditional, not "if absent")', async () => {
+    await resolveDekForLogin({ login: 'ana', password: 'secret', sessionStoreId: STORE_ID });
+    const dek1 = getDek()!;
+    const firstWrapSalt = readDeviceDekTable()!.users['ana'].wrapSalt;
+    clearDek();
+
+    // Precondition for the SECOND call: the table already holds a valid
+    // entry for 'ana' under the SAME password used again — step 3a's "own"
+    // branch will recover it directly, no roster, no staleness anywhere.
+    expect(readDeviceDekTable()?.users['ana']).toBeDefined();
+
+    await resolveDekForLogin({ login: 'ana', password: 'secret', sessionStoreId: STORE_ID });
+
+    // Same DEK bytes recovered — not re-minted.
+    expect(Array.from(getDek()!)).toEqual(Array.from(dek1));
+    const table = readDeviceDekTable()!;
+    expect(table.users['ana'].wrapSalt).not.toBe(firstWrapSalt);
+    const recovered = await unwrapDek('secret', table.users['ana']);
+    expect(Array.from(recovered)).toEqual(Array.from(dek1));
+  });
 });

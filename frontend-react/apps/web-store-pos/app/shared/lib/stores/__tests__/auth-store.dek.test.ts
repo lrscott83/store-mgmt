@@ -6,7 +6,8 @@
 // was called.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../auth-store';
-import { getDek, clearDek } from '../../storage/data-key-store';
+import { getDek, getDekStoreId, clearDek } from '../../storage/data-key-store';
+import { readDeviceDekTable } from '../../storage/device-dek-table';
 import { importRoster } from '../../offline/roster-store';
 import { sha256Base64, pbkdf2Base64 } from '../../offline/offline-crypto';
 import { aesGcmEncrypt } from '../../storage/aes-gcm';
@@ -34,7 +35,7 @@ async function wrapDek(
   return { wrappedDek: base64FromBytes(ciphertextWithTag), wrapSalt, wrapIv };
 }
 
-function makeAuthUser(): UserModel {
+function makeAuthUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
     id: 'u1',
     login: 'ana@example.com',
@@ -56,6 +57,7 @@ function makeAuthUser(): UserModel {
     paymentDueDate: null,
     isInTrial: false,
     paymentStatus: 'NoAplica',
+    ...overrides,
   };
 }
 
@@ -165,6 +167,28 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
       useAuthStore.getState().login('ana@example.com', 'secret'),
     ).rejects.toMatchObject({ name: 'DekUnwrapError' });
     expect(getDek()).toBeNull();
+
+    vi.doUnmock('~/shared/lib/http/auth-http-service');
+  });
+
+  // GAP 2 (batch-2 apply-progress, obs #2123): `sessionStoreId` was inferred
+  // as `user.selectedStoreId` (repo convention: `user-home.ts:24`,
+  // `authorization-service.ts:35`), never specified explicitly by
+  // design/tasks. This pins the ONLINE call site's Q2 mint branch (11.3's
+  // scenario — no roster entry for this login), where `sessionStoreId` is
+  // the ONLY store id design §5 step 3c has to work with. A distinctive,
+  // non-default id catches a wrong binding (e.g. a hardcoded fallback or a
+  // dropped argument) that a coincidentally-matching 's1' fixture would not.
+  it('11.5: login() Q2 mint branch (no roster) -> the table storeId is user.selectedStoreId', async () => {
+    mockAuthHttp(successEnvelope(), makeAuthUser({ selectedStoreId: 'online-session-id' }));
+
+    await useAuthStore.getState().login('ana@example.com', 'secret');
+
+    expect(getDek()).not.toBeNull();
+    expect(getDekStoreId()).toBe('online-session-id');
+    const table = readDeviceDekTable();
+    expect(table?.dekSource).toBe('local');
+    expect(table?.storeId).toBe('online-session-id');
 
     vi.doUnmock('~/shared/lib/http/auth-http-service');
   });
