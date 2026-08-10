@@ -81,6 +81,18 @@ vi.mock('react-router', () => ({
   useNavigate: () => mockNavigate,
 }));
 
+// ─── offline/dek-provisioning mock (WU10: change-password re-wrap seam) ───────
+// `change-password.tsx` reaches this via a DYNAMIC import (same D6 rationale
+// as `auth-store.ts`'s own dynamic imports of this module) — `vi.mock` still
+// intercepts it: Vitest's module mocking works at module-resolution level,
+// not at the static/dynamic-import syntax level.
+
+let mockRewrapDeviceDekForPassword = vi.fn();
+
+vi.mock('~/shared/lib/offline/dek-provisioning', () => ({
+  rewrapDeviceDekForPassword: (...args: unknown[]) => mockRewrapDeviceDekForPassword(...args),
+}));
+
 // ─── featureLoader mock ───────────────────────────────────────────────────────
 
 vi.mock('~/auth/routes/loaders', () => ({
@@ -490,5 +502,75 @@ describe('ChangePasswordPage — S-PWD-4: error response shows inline error with
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
     expect(mockLogout).not.toHaveBeenCalled();
+  });
+});
+
+// device-wrapped-dek WU10: the re-wrap seam MUST run strictly between the
+// HTTP POST and logout() — after logout() the DEK is gone
+// (auth-store.ts's logout() calls clearDek()), so this is the seam's last
+// chance to read it.
+describe('ChangePasswordPage — WU10: device DEK re-wrap seam (device-wrapped-dek design §5/§10)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = makeUser();
+    mockIsOnline = true;
+    mockLogout = vi.fn();
+    mockChangePassword = vi.fn().mockResolvedValue({ data: null });
+    mockRewrapDeviceDekForPassword = vi.fn().mockResolvedValue(undefined);
+  });
+
+  it('calls rewrapDeviceDekForPassword(user.login, newPassword), strictly after the POST and before logout()', async () => {
+    const { ChangePasswordPage } = await import('../change-password');
+    render(
+      <Wrapper>
+        <ChangePasswordPage />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText(/contraseña actual/i), {
+      target: { value: 'OldPass1' },
+    });
+    fireEvent.change(screen.getByLabelText(/^nueva contraseña$/i), {
+      target: { value: 'ValidPass2' },
+    });
+    fireEvent.change(screen.getByLabelText(/confirmar nueva contraseña/i), {
+      target: { value: 'ValidPass2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
+
+    await waitFor(() => {
+      expect(mockLogout).toHaveBeenCalled();
+    });
+    expect(mockRewrapDeviceDekForPassword).toHaveBeenCalledWith('juan@test.com', 'ValidPass2');
+
+    const changePasswordOrder = mockChangePassword.mock.invocationCallOrder[0];
+    const rewrapOrder = mockRewrapDeviceDekForPassword.mock.invocationCallOrder[0];
+    const logoutOrder = mockLogout.mock.invocationCallOrder[0];
+    expect(changePasswordOrder).toBeLessThan(rewrapOrder);
+    expect(rewrapOrder).toBeLessThan(logoutOrder);
+  });
+
+  it('still calls logout() when rewrapDeviceDekForPassword rejects (swallowed, matches entity-migration.ts:15-18 doctrine)', async () => {
+    mockRewrapDeviceDekForPassword = vi.fn().mockRejectedValue(new Error('rewrap failed'));
+    const { ChangePasswordPage } = await import('../change-password');
+    render(
+      <Wrapper>
+        <ChangePasswordPage />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByLabelText(/contraseña actual/i), {
+      target: { value: 'OldPass1' },
+    });
+    fireEvent.change(screen.getByLabelText(/^nueva contraseña$/i), {
+      target: { value: 'ValidPass2' },
+    });
+    fireEvent.change(screen.getByLabelText(/confirmar nueva contraseña/i), {
+      target: { value: 'ValidPass2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
+
+    await waitFor(() => {
+      expect(mockLogout).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
