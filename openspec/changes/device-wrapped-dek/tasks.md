@@ -87,14 +87,14 @@ Finish/rollback: pure function addition, unused elsewhere → clean delete.
 
 ### WU4 — `storage/dek-bootstrap.ts`
 Files: NEW `dek-bootstrap.ts`, NEW `__tests__/dek-bootstrap.test.ts`. Depends on WU1, WU2.
-- [ ] 4.1 RED — device wrap present + device key present → `getDek()` non-null, exact original bytes (real WebCrypto + `fake-indexeddb`, no crypto mocks).
-- [ ] 4.2 GREEN — implement `bootstrapDeviceDek` (read table → `getDeviceKey` → unwrap → `setDek`).
-- [ ] 4.3 RED — device key missing → `getDek()` stays `null`, no throw (F4 half 1).
-- [ ] 4.4 GREEN — swallow unwrap/getDeviceKey failure.
-- [ ] 4.5 RED — called twice concurrently → the key-open path is observed once (single-flight memo). Reset via `vi.resetModules()` + dynamic `import()`, no test-only export.
-- [ ] 4.6 GREEN — module-level `inFlight: Promise<void> | null` memo.
+- [x] 4.1 RED — device wrap present + device key present → `getDek()` non-null, exact original bytes (real WebCrypto + `fake-indexeddb`, no crypto mocks).
+- [x] 4.2 GREEN — implement `bootstrapDeviceDek` (read table → `getDeviceKey` → unwrap → `setDek`).
+- [x] 4.3 RED — device key missing → `getDek()` stays `null`, no throw (F4 half 1).
+- [x] 4.4 GREEN — swallow unwrap/getDeviceKey failure.
+- [x] 4.5 RED — called twice concurrently → the key-open path is observed once (single-flight memo). Reset via `vi.resetModules()` + dynamic `import()`, no test-only export.
+- [x] 4.6 GREEN — module-level `inFlight: Promise<void> | null` memo.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
-Finish/rollback: complete, still unwired from loaders/auth-store → clean delete. **Slice A checkpoint: full suite green, zero behavior change vs. baseline.**
+Finish/rollback: complete, still unwired from loaders/auth-store → clean delete. **Slice A checkpoint: full suite green, zero behavior change vs. baseline. VERIFIED 2026-08-10: 183 test files, 2416 tests, 0 failures.**
 
 ---
 
