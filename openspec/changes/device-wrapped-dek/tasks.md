@@ -78,10 +78,10 @@ Finish/rollback: zero import edges from production code yet → clean delete.
 
 ### WU3 — `offline/dek-unwrap.ts` mint direction (D3)
 Files: MODIFIED `dek-unwrap.ts` (+`wrapDekWithPassword`, same `DEK_WRAP_ITERATIONS`), MODIFIED `dek-unwrap.kat.test.ts` (ADD tests only — this file is not in the authorized-3 list, existing 6 assertions stay untouched).
-- [ ] 3.1 RED — round trip: `unwrapDek(pwd, await wrapDekWithPassword(pwd, dek))` returns `dek` byte-for-byte.
-- [ ] 3.2 GREEN — implement `wrapDekWithPassword` (preHash → PBKDF2 KEK → AES-GCM encrypt).
-- [ ] 3.3 RED (new KAT test, appended) — mint against the frozen KAT `wrapSalt`/`wrapIv` reproduces the KAT's `wrappedDek` exactly.
-- [ ] 3.4 GREEN — confirm/adjust to accept injectable salt/iv for the KAT pin.
+- [x] 3.1 RED — round trip: `unwrapDek(pwd, await wrapDekWithPassword(pwd, dek))` returns `dek` byte-for-byte.
+- [x] 3.2 GREEN — implement `wrapDekWithPassword` (preHash → PBKDF2 KEK → AES-GCM encrypt).
+- [x] 3.3 RED (new KAT test, appended) — mint against the frozen KAT `wrapSalt`/`wrapIv` reproduces the KAT's `wrappedDek` exactly.
+- [x] 3.4 GREEN — confirm/adjust to accept injectable salt/iv for the KAT pin.
 Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Finish/rollback: pure function addition, unused elsewhere → clean delete.
 
