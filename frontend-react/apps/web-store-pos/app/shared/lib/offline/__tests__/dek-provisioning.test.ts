@@ -156,21 +156,30 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(Array.from(recovered)).toEqual(Array.from(dek));
   });
 
-  // GAP 3 (batch-2 apply-progress, obs #2123): design §5's compressed
-  // pseudocode step 5 shows `if (!table.users[login]) table.users[login] =
-  // ...` (write only when absent). The previous batch implemented it
-  // UNCONDITIONALLY, citing the device-dek-wrap spec's "Out-of-band
-  // password change recovers via the device DEK" scenario (a fresh
-  // password wrap MUST be regenerated for this user). This test isolates
-  // the choice from that scenario entirely: NO roster is imported at any
-  // point, so step 4's reconciliation/F9 branches never run and this
-  // login's own table entry is never stale by any measure — the only
-  // question is whether an ordinary repeated login (DEK cleared, e.g. by a
-  // reload, then logged in again with the SAME, still-valid password)
-  // rewrites an entry that was already perfectly recoverable. Under the
-  // literal `if (!table.users[login])` pseudocode this would be a no-op
-  // (same wrapSalt both times); the shipped behavior always rewrites.
-  it('5.13: a repeated login with no roster involved and a non-stale entry still rewrites this login\'s table entry (step 5 is unconditional, not "if absent")', async () => {
+  // GAP 3 REVISITED (this batch — device-wrapped-dek verify WARNING, "narrow
+  // the unconditional password-wrap rewrite"). The previous batch (WU8.1,
+  // apply-progress obs #2123) pinned step 5's write as unconditional in
+  // EVERY branch, arguing design §5/§7's own prose justified it as a
+  // general policy. Re-read against the delta spec
+  // (specs/device-dek-wrap/spec.md:73-94, "Password wraps stay synchronized
+  // with the device DEK"), mandatory regeneration is scoped to the
+  // stale-wrap-recovery case (F9, 5.7) — not to an ordinary repeated login
+  // whose own wrap is already, demonstrably, valid.
+  //
+  // This test's own scenario is exactly that demonstrable case: the SECOND
+  // call's `dek` is derived by decrypting THIS LOGIN'S OWN existing table
+  // entry with the SAME password (step 3a's "own" branch) — the successful
+  // `unwrapDek` call there IS the proof the entry is still correct for this
+  // password and this DEK, established at zero extra cost. Re-wrapping it
+  // again would pay a SECOND, fully redundant 210,000-iteration PBKDF2
+  // (`wrapDekWithPassword` costs exactly what the `unwrapDek` call that
+  // produced `dek` already cost — see `dek-unwrap.ts`) to produce a
+  // cryptographically equivalent entry under a fresh salt/iv. No roster is
+  // imported here at all, which isolates "own wrap already valid" from
+  // F9/D6 entirely — 5.7 (F9) and 5.5 (D6) both involve a roster entry for
+  // this login and both still rewrite, unchanged by this batch (see
+  // `dek-provisioning.ts` step 5's own comment for the exact condition).
+  it('5.13: a repeated login whose own table entry is already valid, with no roster involved, SKIPS the redundant rewrite', async () => {
     await resolveDekForLogin({ login: 'ana', password: 'secret', sessionStoreId: STORE_ID });
     const dek1 = getDek()!;
     const firstWrapSalt = readDeviceDekTable()!.users['ana'].wrapSalt;
@@ -186,7 +195,10 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     // Same DEK bytes recovered — not re-minted.
     expect(Array.from(getDek()!)).toEqual(Array.from(dek1));
     const table = readDeviceDekTable()!;
-    expect(table.users['ana'].wrapSalt).not.toBe(firstWrapSalt);
+    // CHANGED this batch: was `.not.toBe(firstWrapSalt)` (pinning the old
+    // unconditional rewrite). Now pins the narrowed behavior — the entry is
+    // left byte-for-byte alone because it was already proven valid.
+    expect(table.users['ana'].wrapSalt).toBe(firstWrapSalt);
     const recovered = await unwrapDek('secret', table.users['ana']);
     expect(Array.from(recovered)).toEqual(Array.from(dek1));
   });
