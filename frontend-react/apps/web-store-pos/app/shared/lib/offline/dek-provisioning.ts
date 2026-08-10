@@ -9,11 +9,12 @@
 // This module decides THIS DEVICE's DEK for THIS login, once per device,
 // then makes every subsequent login/reload on this device reuse it. The
 // six-step algorithm below is design §5's pseudocode, transcribed as
-// literally as possible; the two structural notes inline mark the two
-// places this implementation had to make an explicit choice where §5's
-// compressed pseudocode underspecified the outcome (see design §6's F5/F9
-// rows and the device-dek-wrap spec's own Given/When/Then scenarios, which
-// this code follows where the two disagree in detail).
+// literally as possible; the three structural notes inline (plus the
+// `ownWrapValidatedThisCall` gate documented at step 5) mark the places
+// this implementation had to make an explicit choice where §5's compressed
+// pseudocode underspecified the outcome (see design §6's F5/F9 rows and the
+// device-dek-wrap spec's own Given/When/Then scenarios, which this code
+// follows where the two disagree in detail).
 import { bootstrapDeviceDek, wrapDekForDevice } from '../storage/dek-bootstrap';
 import { getDek, setDek, getDekStoreId } from '../storage/data-key-store';
 import {
@@ -82,6 +83,21 @@ export async function resolveDekForLogin(args: {
   let source: DeviceDekTable['dekSource'] | undefined;
   let tableStoreId: string | undefined;
 
+  // Piece 1 (this batch — verify WARNING, "narrow the unconditional
+  // password-wrap rewrite"): true only when `dek` below is derived by
+  // successfully decrypting THIS LOGIN'S OWN existing table entry with
+  // the password just used (the `own` branch a few lines down). That
+  // successful `unwrapDek` call IS free proof the entry is still valid for
+  // this password and this DEK — step 5 uses this flag to skip a
+  // provably-redundant rewrite. See step 5's own comment for why every
+  // other branch (roster-derivation, local-mint, the common steady-state
+  // case where step 1's device-key bootstrap alone recovers `dek`, and
+  // structural note 1's offline roster-sourced case) is NOT touched: none
+  // of them ever validates `table.users[login]` against the current
+  // password, so the only sound check there costs exactly one PBKDF2 —
+  // the same as just rewriting.
+  let ownWrapValidatedThisCall = false;
+
   if (dek === null) {
     if (table) {
       // Step 3a — a table exists, but step 1's bootstrap did not recover a
@@ -90,6 +106,7 @@ export async function resolveDekForLogin(args: {
       if (own) {
         dek = await unwrapDek(password, own);
         setDek(dek, table.storeId);
+        ownWrapValidatedThisCall = true;
       } else if (rosterEntry) {
         dek = await unwrapDek(password, rosterEntry);
         setDek(dek, table.storeId);
@@ -180,16 +197,41 @@ export async function resolveDekForLogin(args: {
       workingTable.device = await wrapDekForDevice(dek, deviceKey);
     }
   }
-  // Structural note 2: unconditionally (re)written, not only when absent.
-  // The device-dek-wrap spec's "Out-of-band password change recovers via
-  // the device DEK" scenario requires a stale entry to be REGENERATED under
-  // the credentials just used, not left in place — §5's pseudocode
-  // (`if (!table.users[login])`) is a compressed sketch of the common case
-  // (first-ever entry); this follows the spec's explicit Given/When/Then
-  // over the compressed sketch where the two differ. The extra PBKDF2 cost
-  // per login is already accepted by design §7's own note on
+  // Structural note 2 (narrowed this batch — verify WARNING, "narrow the
+  // unconditional password-wrap rewrite"): (re)written in every branch
+  // EXCEPT one, provably free case. §5's pseudocode sketch
+  // (`if (!table.users[login])`, write only when absent) was already
+  // rejected once (WU5's own note: tried literally, broke 5.7/F9 and
+  // 11.4) — this is NOT that sketch. It is narrower and gated on TWO
+  // things at once: (a) `ownWrapValidatedThisCall` — this call's `dek`
+  // came from successfully decrypting THIS LOGIN'S OWN table entry, which
+  // already proves it valid, for free; AND (b) `rosterEntry === undefined`
+  // — no roster entry exists to reconcile against this call. (b) matters
+  // because F9 (a roster wrap that fails to unwrap) and D6 (a roster DEK
+  // that disagrees) both involve `own`-derived `dek` alongside a roster
+  // entry, and the device-dek-wrap spec's "Out-of-band password change
+  // recovers via the device DEK" scenario requires F9's stale entry to be
+  // REGENERATED — so any call where a roster entry is in play keeps
+  // rewriting unconditionally, same as before this batch.
+  //
+  // Every other branch — roster-derivation (3b), local-mint (3c),
+  // structural note 1's offline roster-sourced case, and the common
+  // steady-state case where step 1's device-key bootstrap alone already
+  // recovered `dek` (this device is provisioned, the device key still
+  // works) — also keeps rewriting unconditionally. That last case is the
+  // dominant one in production (every ordinary login on a healthy,
+  // provisioned device), and it was measured, not assumed: the only sound
+  // way to check `table.users[login]`'s validity there is
+  // `unwrapDek(password, own)`, which costs exactly one
+  // `DEK_WRAP_ITERATIONS` PBKDF2 — the SAME cost as `wrapDekWithPassword`
+  // below. A check that costs as much as the write it would save is not an
+  // optimization, so that case is deliberately left as-is (see
+  // apply-progress for the full writeup). The extra PBKDF2 cost per login
+  // in those branches is already accepted by design §7's own note on
   // `auth-store.dek.test.ts`'s wall time.
-  workingTable.users[login] = await wrapDekWithPassword(password, dek);
+  if (!(ownWrapValidatedThisCall && rosterEntry === undefined)) {
+    workingTable.users[login] = await wrapDekWithPassword(password, dek);
+  }
   writeDeviceDekTable(workingTable);
 
   // Step 6 — unchanged doctrine (entity-migration.ts:15-18): never blocks login.
