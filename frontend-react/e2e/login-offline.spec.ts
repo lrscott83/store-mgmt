@@ -542,12 +542,22 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // products entity to answer.
     await page.waitForURL(/\/sales\/new$/);
 
-    // Same DEK bytes recovered -> the data seeded before the device key was
-    // destroyed is still transparently readable, not corrupted. Asserted on
-    // the products screen, which is where that copy renders.
-    await page.goto('/sales/products');
-    await page.waitForURL(/\/sales\/products$/);
-    await expectProductVisibleInCategory(page, name);
+    // Asserted HERE, on the screen the recovery already landed on — NEVER via
+    // `page.goto()`. A `goto` is a fresh document, and the DEK is a
+    // module-level `let` that no document inherits (data-key-store.ts:10-14).
+    // With this test's device key destroyed, that new document has nothing to
+    // bootstrap from, so the unlock gate correctly demands the password again
+    // and the products screen unmounts mid-assertion. Client-side state is the
+    // only state that survives here, so the assertion has to live where the
+    // recovery left us.
+    //
+    // The sale screen loads its categories through
+    // `getAvailableProductCategories()` (sale.tsx:40-41), so rendering this
+    // text AT ALL means the categories entity decrypted under the recovered
+    // DEK — a second entity beyond the products one that `/sales/new` already
+    // proved. `.first()` because `seedCategoryAndProduct` gave the category
+    // and the product the same name (store-seed.ts:33,44).
+    await expect(page.getByText(name).first()).toBeVisible();
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
     expectOnlyKnownTelemetry(anyRequest, 'F4 clave de dispositivo destruida, wrap de contraseña intacto');
