@@ -311,40 +311,41 @@ build-time drift gate (WU3)`). Revert = `build` unblocked immediately, `add_head
 image; a **running** container keeps serving the stale header until rebuilt — cosmetic wait, since
 report-only never blocks.
 
-### 3.7 — NOT verifiable by any frontend gate (manual, LOCAL run of the production image)
+### 3.7 — The console sweep (manual, run on `pnpm dev` — NOT docker)
 
-**This is a local docker run on the user's machine, not a deployment.** Nothing live is touched. What
-makes it meaningful is that the container carries the same artefact that ships: `Dockerfile:27` copies
-`deploy/nginx.conf` verbatim to `/etc/nginx/nginx.conf` and `:28` serves the real `react-router build`
-static output. No automated gate can reach that surface — `playwright.config.ts:103-112` hardcodes
-`pnpm dev`, there is no `vite preview` project, and no `.github/workflows/`.
+**Corrected 2026-08-11 against how this repo is actually developed.** The plan originally specified a
+`docker compose up -d --build web-store-pos` + `curl -sI http://localhost:8085/login` run of the
+production image. The user does not work that way — he runs `pnpm dev` with the backend up. The docker
+step is dropped; what follows is the equivalent that fits the real workflow.
 
-**What this local run CANNOT verify**: `Dockerfile:16` defaults `ARG API_URL=/api` — same-origin, so
-`connect-src 'self'` covers every API call and no network violation can appear. A real deployment built
-with `--build-arg API_URL=https://some-other-host/...` would violate `connect-src` on EVERY API call.
-Harmless under report-only, but it must be resolved before the enforcing change: either the deploy
-bakes a same-origin `/api` (as `deploy/nginx.conf`'s `location /api` proxy already assumes), or
-`connect-src` gains that origin the same way dev derives it (`deriveApiOrigin`, `csp-policy.mjs`).
+**Split the step in two, because two different things were bundled into one:**
 
-Nothing in this repo's automated suite can observe the header nginx actually emits
-(`playwright.config.ts:103-112` hardcodes `pnpm dev`; no `vite preview` project; no `.github/workflows/`).
-Run one command at a time, from the repo root, after WU3 is committed:
+**(a) The exact nginx header string.** Unobservable without running nginx — no `pnpm dev`, no
+`vite preview`, no Playwright project reaches it (`playwright.config.ts:103-112` hardcodes `pnpm dev`;
+no `.github/workflows/`). **This is precisely what WU3's build-time gate replaces.** `verify-csp.mjs`
+compares `deploy/nginx.conf`'s `add_header` against `buildCspHeaderValue('prod')` on every `build`, and
+`csp-nginx.test.mjs` proves the comparison in both directions: it FAILS on a missing header, a
+duplicate header, a missing `always`, a changed directive value, and an extra undeclared `add_header`;
+it PASSES on a reordered-but-token-equivalent policy (proving multiset comparison, not byte
+comparison). No manual `curl` is required for this half, and none is scheduled.
 
-```
-docker compose up -d --build web-store-pos
-```
+**(b) The console sweep — this is the part that still needs a human, and `pnpm dev` serves it fine.**
+The dev policy differs from prod in `connect-src` ONLY (`ALLOWED_ENV_DELTA_DIRECTIVES`,
+`csp-policy.mjs:19`); `script-src` and `style-src` are byte-identical. Since the sweep hunts inline
+script/style violations, dev is an equivalent surface for it.
 
-```
-curl -sI http://localhost:8085/login
-```
+With the backend running, `pnpm dev`, a logged-in session and DevTools open, walk: statistics/charts
+(recharts), the today-sale PDF export (**read the NEW TAB's console** — the `blob:` document is its own
+console context), CSV import, roster export, and the install button. Zero `[Report Only] Refused to…`
+console entries is the signal the enforcing change (separate, future) waits for.
 
-Expect a `content-security-policy-report-only:` line, byte-identical to the canonical string
-`buildCspHeaderValue('prod')` produces. Port `8085` is `docker-compose.yml:120`.
-
-Then, with DevTools open on `http://localhost:8085`, manually walk: statistics/charts (recharts), the
-today-sale PDF export (**read the NEW TAB's console** — the `blob:` document is its own console context),
-CSV import, roster export, and the install button. Zero `[Report Only] Refused to…` console entries is the
-signal the enforcing change (separate, future) waits for. This step has no vitest/Playwright equivalent.
+**Still NOT VERIFIED after this sweep, and out of scope here** — the cross-origin `API_URL` case. The
+prod table has `connect-src 'self'`, and dev derives extra origins via `deriveApiOrigin`, so a
+deployment whose API is genuinely cross-origin would violate `connect-src` on EVERY API call. Harmless
+under report-only; must be resolved before the enforcing change, either by baking a same-origin `/api`
+(which `deploy/nginx.conf`'s `location /api` proxy already assumes) or by teaching the prod policy the
+same origin derivation dev uses. `verify-csp.mjs` already emits a non-fatal WARNING when the build's
+`API_URL` is cross-origin — that warning is the reminder, not an error.
 
 ---
 
