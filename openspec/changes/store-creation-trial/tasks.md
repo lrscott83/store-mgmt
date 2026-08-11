@@ -375,14 +375,55 @@ migrations itself.
 
 ## Success Criteria (copied from proposal, unchanged)
 
-- [ ] Admin-created and self-registered stores both persist `PaymentStartDate = today`, free-only
+- [x] Admin-created and self-registered stores both persist `PaymentStartDate = today`, free-only
       modules included
-- [ ] A non-SuperAdmin cannot seed `PaymentStartDate` through either creation or update
-- [ ] `GET /auth/me` returns `PlanType` alongside the existing billing fields
-- [ ] Trial/due/PorVencer/EnGracia/Vencido boundaries hold end-to-end under a pinned clock **and
+  - Evidence: `SMCA.WebApi.E2ETests/Billing/StoreCreationTrialTests.cs:214-230` (admin base, asserts
+    `Start` at `:224`), `:233-247` (admin paid, `:241`), `:250-265` (admin free-only — the
+    discriminator vs. the update-only conditional, `:259`), `:332-345` (self-registration, `:339`);
+    production `Application/Services/Stores/CreateStoreService.cs:42-43`. Observed: filtered E2E run
+    **24/24 green** (2026-08-11).
+- [x] A non-SuperAdmin cannot seed `PaymentStartDate` through either creation or update
+  - Evidence: `StoreCreationTrialTests.cs:268-283` (creation — stray `paymentStartDate: 2020-01-01`
+    dropped, persisted stays `Start`, `:275-277`), `:286-325` (update — OwnerAdmin `PUT` asserts
+    `200 OK` first `:314`, then `PaymentStartDate` unchanged `:316-318`); production gate
+    `Application/.../UpdateStore/UpdateStoreCommand.cs:100-101` (SuperAdmin-only). Observed: filtered
+    E2E run **24/24 green** (2026-08-11).
+- [x] `GET /auth/me` returns `PlanType` alongside the existing billing fields
+  - Evidence: `StoreCreationTrialTests.cs:348-369` — asserts `IsInTrial=true` `:358`,
+    `PlanType == "Paid"` `:361`, `PaymentStatus="AlDia"` `:362`, `PaymentDueDate == Start.AddMonths(2)`
+    `:363`; production `Application/Dtos/Authentication/CurrentUserDto.cs:23` (`PlanType` default
+    `"Free"`), `Application/.../GetMe/GetMeQuery.cs:104` (`PlanType = billing.PlanType`),
+    `Application/Services/Billing/BillingService.cs:53` (store-not-found early return `"Free"`) and
+    `:104`. Observed: filtered E2E run **24/24 green** (2026-08-11).
+- [x] Trial/due/PorVencer/EnGracia/Vencido boundaries hold end-to-end under a pinned clock **and
       pinned config**
-- [ ] `RegisterStorePayment` accepts a brand-new store and advances from `start + 2 months`, price
+  - Evidence: `StoreCreationTrialTests.cs:380-396` (day one: trial + AlDia), `:399-416` (trial ends
+    at +1mo+1d), `:419-434` (first due = start+2mo), `:437-453` (PorVencer at due-5), `:456-476`
+    (EnGracia, both boundary instants `:467`/`:470`), `:479-495` (Vencido at due+6), `:498-527`
+    (Vencido keeps only free modules, `Contains`/`NotContain` pair `:520-521`) — every test under
+    `BillingConfigSeed.PinAsync` + `_fixture.Clock.Pin`. Observed: filtered E2E run **24/24 green**
+    (2026-08-11).
+- [x] `RegisterStorePayment` accepts a brand-new store and advances from `start + 2 months`, price
       `3000`
-- [ ] Legacy null-start rows untouched; `UpdateStore` activation still works for them
-- [ ] `StoreActivationTests` still has all three tests, all passing
-- [ ] User confirms the local `dotnet test` runs green
+  - Evidence: `StoreCreationTrialTests.cs:596-653` — HTTP 200 `:612`, `Price == 6 * 500f` `:628`
+    (derived inline `:624-627`), `PaymentBeforeDate == Start.AddMonths(3)` `:631` (due + 1 month),
+    `Year`/`Month` `:632-633`, `StorePaymentStatusId == Paid` `:634`, `ByReSeller == false` `:635`.
+    Observed: filtered E2E run **24/24 green** (2026-08-11).
+- [x] Legacy null-start rows untouched; `UpdateStore` activation still works for them
+  - Evidence: `StoreCreationTrialTests.cs:660-674` (legacy row seeded via `BillingSeed`, persisted
+    `PaymentStartDate` stays `null`, `:668`); the legacy activation path is proven by the unchanged
+    `StoreActivationTests.cs:37,71,105` (all observed passing); production guard
+    `RegisterStorePaymentCommand.cs:68` (`PaymentStartDate is null` → 400) intact and
+    `UpdateStoreCommand.cs:96-97` (activation-on-first-paid) survives. Observed: filtered E2E run
+    **24/24 green** (2026-08-11).
+- [x] `StoreActivationTests` still has all three tests, all passing
+  - Evidence: `git diff main -- backend/src/SMCA.WebApi.E2ETests/Billing/StoreActivationTests.cs` is
+    **empty** (file byte-identical to main); the three tests at `StoreActivationTests.cs:37,71,105`
+    were observed passing in the filtered E2E run (**24/24 green**, 2026-08-11).
+- [x] User confirms the local `dotnet test` runs green
+  - Evidence: 2026-08-11 implementer ran `dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
+    --filter "FullyQualifiedName~StoreCreationTrial|FullyQualifiedName~StoreActivation|FullyQualifiedName~RegisterStorePayment"`
+    against real PostgreSQL (`smca_test`) → **24 passed / 0 failed / 0 skipped**, and
+    `dotnet test backend/src/Application.Tests --filter "FullyQualifiedName~CreateStoreServiceTests"`
+    → **28 passed / 0 failed**. User (2026-08-11) confirmed: "Confirmo: sigo a verify" — user accepts
+    the observed green evidence as the task-8 sign-off.
