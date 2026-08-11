@@ -77,6 +77,9 @@ Satisfies spec: `pwa-install-capture-script` — "Runs Before Hydration, Not Blo
   **DONE** — 3/3 passed. Overall process exit code is 1 solely from `global-teardown.ts`'s Postgres
   connectivity check (`ECONNREFUSED 127.0.0.1:5432` — no local Postgres in this sandbox); no test in this
   spec touches the DB, and `global-teardown.ts` is an existing E2E support file, untouched.
+  ✅ **USER-VERIFIED 2026-08-11**: re-run by the user on his own machine (Windows checkout, real dev
+  server) → **3 passed**, twice. Playwright is not runnable in the agent's environment; this is the
+  authoritative run for WU1.
 - [x] 1.3 **[WU gate]** `cd frontend-react && npx turbo run lint typecheck --filter=@store-mgmt/web-store-pos --force`
   **DONE — green, after clearing unrelated baseline debt in its own commit first.** The gate was
   initially red on 9 pre-existing errors in 3 files WU1 never touches (`auth-store.ts:9` unused `setDek`
@@ -210,9 +213,11 @@ The user was shown the tradeoff and chose to close it.
   test --filter=@store-mgmt/web-store-pos --force` 12/12, 186 files / 2453 tests, 0 type errors; and,
   because the type gate does not cover `e2e/`, an ad-hoc
   `tsc --noEmit --strict --lib es2022,dom,dom.iterable` over the three new e2e files → exit 0.
-  ⚠️ **PENDING USER VERIFICATION**: `npx playwright test e2e/csp-report-only.spec.ts --project=chromium`.
-  Playwright is not runnable in the agent's environment; the sample prefix matching against a live
-  Chromium report is unverified until that run.
+  ✅ **USER-VERIFIED 2026-08-11**: `npx playwright test e2e/csp-report-only.spec.ts --project=chromium`
+  → **3 passed (13.4s)**, run by the user on his own machine (Windows checkout, real dev server).
+  Playwright is not runnable in the agent's environment, so this run is the only evidence that the
+  `samplePrefix` matches a live Chromium violation report — and it does. The zero-violation sweep
+  passes across `/`, `/login` and `/register` with the narrowed allowlist.
 
 **Finish/rollback boundary**: one commit (`feat(content-security-policy): policy generator + dev header +
 Playwright coverage (WU2)`), plus a follow-up commit for 2.6. Revert = dev header disappears, nothing
