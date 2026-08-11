@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/test';
 import { LoginPage } from './support/login-page';
 import { plantRoster, KAT_PASSWORD } from './support/roster-fixture';
@@ -78,6 +79,68 @@ function expectOnlyKnownTelemetry(anyRequest: AnyRequestObserver, context: strin
         '.'
     );
   }
+}
+
+/**
+ * device-wrapped-dek (WU9). Two literals mirrored here from production
+ * source, never imported — same "the browser is the black box under test"
+ * policy the Spanish copy constants above already follow:
+ *   - `ENTITY_ENVELOPE_PREFIX` (entity-crypto.ts:23) — the on-disk ciphertext
+ *     marker; a stored entity value begins with this iff `encryptEntity` ran
+ *     with a non-null DEK.
+ *   - the entity storage key shape (storage-keys.ts:8-9,
+ *     `StorageKeys.entityKey`) — `lizoft.store-{entity}-{storeId}`, no
+ *     `APP_VERSION` prefix (unlike `AUTH_MODEL`, see `auth-storage.ts:19-22`).
+ */
+const ENTITY_ENVELOPE_PREFIX = 'enc:v1:';
+
+/** Raw (still-serialized) localStorage value for the `products` entity of
+ * `storeId`, or `null` if absent. Used to prove an entity write actually
+ * produced ciphertext (`enc:v1:` prefix), not merely that no UI error
+ * appeared. */
+async function readProductsEntityRaw(page: Page, storeId: string): Promise<string | null> {
+  return page.evaluate((key) => window.localStorage.getItem(key), `lizoft.store-products-${storeId}`);
+}
+
+/**
+ * Polls (not a one-shot read) until the `products` entity for `storeId` is
+ * present AND `enc:v1:`-prefixed. `seedCategoryAndProduct`'s own `await`
+ * only resolves once its LAST click settles, which is a UI event, not a
+ * guarantee that the underlying localStorage write has landed yet — polling
+ * here removes that race instead of assuming it away.
+ */
+async function expectProductsEntityEncrypted(page: Page, storeId: string): Promise<void> {
+  await expect
+    .poll(async () => {
+      const raw = await readProductsEntityRaw(page, storeId);
+      return raw?.startsWith(ENTITY_ENVELOPE_PREFIX) ?? false;
+    })
+    .toBe(true);
+}
+
+// device-key-store.ts:24 (`DEVICE_KEY_DB`) — the ONE IndexedDB database this
+// change adds, mirrored here as a literal for the same reason as the two
+// constants above.
+const DEVICE_KEY_DB = 'lizoft-device-key';
+
+/** Destroys ONLY the device-key IndexedDB database — the localStorage wrap
+ * table (`device-dek-table.ts`, `lizoft.device-dek`) is untouched (F4,
+ * design §6: "device key destroyed after prior provisioning recovers via
+ * this user's own password wrap"). `onblocked` resolves rather than hangs —
+ * same bounded-wait discipline `device-key-store.ts`'s own `openDb()`
+ * follows for `DEVICE_KEY_OPEN_TIMEOUT_MS`, applied here so a stray open
+ * connection can never stall the test indefinitely. */
+async function deleteDeviceKeyDatabase(page: Page): Promise<void> {
+  await page.evaluate(
+    (dbName) =>
+      new Promise<void>((resolve, reject) => {
+        const request = window.indexedDB.deleteDatabase(dbName);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => resolve();
+      }),
+    DEVICE_KEY_DB
+  );
 }
 
 test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
@@ -303,7 +366,15 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     loginNetwork.expectNoLoginAttempt();
   });
 
-  test('T10: recarga con roster v2 y DEK perdida redirige a /login?unlock=1 con AUTH.UNLOCK_REQUIRED', async ({
+  // T10 REWRITTEN (device-wrapped-dek, WU9 — AUTHORIZED test modification
+  // #3 of 3). The OLD assertion (`/login?unlock=1` + AUTH.UNLOCK_REQUIRED
+  // after any reload) pinned the pre-device-wrap world: the DEK lived only
+  // in a module-level `let` (data-key-store.ts), so any reload lost it and
+  // forced a password prompt. That is exactly the behavior this whole
+  // change replaces — WU8's own checkpoint made "reload recovers silently"
+  // observable end to end, and this is its only E2E proof. Preserved
+  // verbatim below (git history) for anyone auditing what changed and why.
+  test('T10: recarga con roster v2 recupera el DEK del wrap de dispositivo, sigue en /sales/products, sin AUTH.UNLOCK_REQUIRED', async ({
     page,
     loginNetwork,
   }) => {
@@ -312,21 +383,104 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     const login = uniqueLogin('t10');
 
     await loginPage.goto();
-    await plantRoster(page, { users: [{ login, wrap: 'kat' }] });
+    const bundle = await plantRoster(page, { users: [{ login, wrap: 'kat' }] });
     await loginPage.fill({ login, password: KAT_PASSWORD });
     await loginPage.submit();
     await page.waitForURL(/\/sales\/products$/);
 
+    // Precondition (repo discipline: pin the state a test's later assertion
+    // depends on, before acting): an entity written under THIS login's DEK,
+    // BEFORE the reload — the reload's whole claim is that this same data
+    // is still transparently readable afterwards, under the SAME device DEK
+    // recovered silently, not a different one.
+    const beforeName = `E2E T10 antes del reload ${login}`;
+    await seedCategoryAndProduct(page, beforeName);
+    await expect(page.getByText(beforeName)).toBeVisible();
+    await expectProductsEntityEncrypted(page, bundle.storeId);
+
     // The DEK lives only in a module-level `let` (data-key-store.ts) — ANY
-    // reload loses it. This reload runs ONLINE on purpose (design.md D6):
-    // getUserByToken()'s cached-profile branch (auth-store.ts:126-140)
-    // still costs zero HTTP, so this is not combined with a network cut.
+    // reload loses it FROM MEMORY. This reload runs ONLINE on purpose
+    // (design.md D6, unchanged from the old test): getUserByToken()'s
+    // cached-profile branch (auth-store.ts:126-140) still costs zero HTTP,
+    // so this is not combined with a network cut.
     await page.reload();
 
+    // No redirect, no unlock prompt — the working device-key wrap
+    // (design §3/§5) recovers the DEK silently.
+    await page.waitForURL(/\/sales\/products$/);
+    await expect(page.getByText(UNLOCK_REQUIRED_TEXT)).not.toBeVisible();
+
+    // Same-DEK proof #1: data encrypted BEFORE the reload is still
+    // transparently readable NOW. `decryptEntity` throws
+    // `MissingDataKeyError` on a null DEK, and an AES-GCM tag mismatch on
+    // any OTHER key — rendering this back out is what a byte-for-byte
+    // identical recovered DEK looks like from the outside, stronger proof
+    // than "no prompt appeared" alone.
+    await expect(page.getByText(beforeName)).toBeVisible();
+
+    // Same-DEK proof #2: a FRESH entity write after the reload still
+    // produces ciphertext (`enc:v1:`), not plaintext — the recovered DEK is
+    // live and functional for new writes, not merely cached for old reads.
+    const afterName = `E2E T10 después del reload ${login}`;
+    await seedCategoryAndProduct(page, afterName);
+    await expect(page.getByText(afterName)).toBeVisible();
+    await expectProductsEntityEncrypted(page, bundle.storeId);
+
+    expectOnlyKnownTelemetry(anyRequest, 'T10 reload con recuperación silenciosa del DEK');
+    loginNetwork.expectNoLoginAttempt();
+  });
+
+  // F4 (design §6, NEW test — WU9): "device key gone, password wrap
+  // intact → /login?unlock=1 → recovers". The unlock path T10 used to
+  // exercise unconditionally does NOT vanish with this change — it narrows
+  // to exactly this failure mode (device-key/IndexedDB loss), proven here
+  // end to end: destroy only the IndexedDB half, keep the localStorage wrap
+  // table, and confirm the app degrades to a password prompt (never to
+  // plaintext, never a crash) and recovers the SAME data afterwards.
+  test('F4: clave de dispositivo destruida con wrap de contraseña intacto exige contraseña en /login?unlock=1 y recupera los mismos datos', async ({
+    page,
+    loginNetwork,
+  }) => {
+    const anyRequest = installAnyRequestObserver(page);
+    const loginPage = new LoginPage(page);
+    const login = uniqueLogin('f4');
+
+    await loginPage.goto();
+    const bundle = await plantRoster(page, { users: [{ login }] });
+    await loginPage.fill({ login, password: KAT_PASSWORD });
+    await loginPage.submit();
+    await page.waitForURL(/\/sales\/products$/);
+
+    const name = `E2E F4 ${login}`;
+    await seedCategoryAndProduct(page, name);
+    await expect(page.getByText(name)).toBeVisible();
+    await expectProductsEntityEncrypted(page, bundle.storeId);
+
+    // F4's precondition: destroy ONLY the device key (IndexedDB) — the
+    // localStorage wrap table stays intact, including this login's own
+    // password wrap (design §5 step 5 / Q2: every provisioned login gets
+    // one, roster-adopted or locally-minted alike).
+    await deleteDeviceKeyDatabase(page);
+
+    await page.reload();
+
+    // Device-key recovery fails (F1: no key) -> unlock-gate's device-wrap
+    // branch still sees the localStorage table -> degrades to a password
+    // prompt, never to plaintext, never a crash (design §6 F1/F4).
     await page.waitForURL(/\/login\?unlock=1$/);
     await expect(page.getByText(UNLOCK_REQUIRED_TEXT)).toBeVisible();
 
-    expectOnlyKnownTelemetry(anyRequest, 'T10 reload sin DEK en memoria');
+    // Recovers via this login's OWN password wrap (step 3a's "own" branch).
+    await loginPage.fill({ login, password: KAT_PASSWORD });
+    await loginPage.submit();
+    await page.waitForURL(/\/sales\/products$/);
+
+    // Same DEK bytes recovered -> the data seeded before the device key was
+    // destroyed is still transparently readable, not corrupted.
+    await expect(page.getByText(name)).toBeVisible();
+    await expectProductsEntityEncrypted(page, bundle.storeId);
+
+    expectOnlyKnownTelemetry(anyRequest, 'F4 clave de dispositivo destruida, wrap de contraseña intacto');
     loginNetwork.expectNoLoginAttempt();
   });
 
