@@ -126,7 +126,28 @@ async function captureSnapshot(
         'this snapshot depends on may have failed silently.'
     );
   }
-  return { localStorage: originState.localStorage, identity, selectedStoreId, homePath };
+  // `lizoft.device-dek` (device-dek-table.ts:16) is deliberately NOT captured.
+  //
+  // It is the localStorage HALF of the device wrap: the other half is a
+  // non-extractable `CryptoKey` in IndexedDB (device-key-store.ts), which
+  // `context.storageState()` does not carry and which no fixture can ever
+  // replay — non-extractable means the bytes are unreachable from JS, by
+  // design, permanently.
+  //
+  // Capturing it produced a restored session that is provisioned on paper and
+  // unrecoverable in fact: `getDek()` null + `hasDeviceDekWrap()` true makes
+  // `needsUnlock` return true (unlock-gate.ts:21), so every snapshot-restored
+  // page landed on the unlock prompt instead of its route. That is the app
+  // behaving CORRECTLY — it is scenario F4, a device whose key is gone — but
+  // it is a lie about this snapshot, which is simply a different browser
+  // context that was never provisioned at all. Dropping the key makes the
+  // restored session honest about that, and costs no coverage: the
+  // device-wrap paths are covered end to end by T10/F4 in
+  // login-offline.spec.ts, which run in their own real context.
+  const localStorage = originState.localStorage.filter(
+    (entry) => entry.name !== 'lizoft.device-dek'
+  );
+  return { localStorage, identity, selectedStoreId, homePath };
 }
 
 /** Replays a captured snapshot's localStorage onto `page` — the shared core
