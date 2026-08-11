@@ -2,7 +2,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore, registerAuthRedirect } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
 import { getDek, setDek, clearDek } from '../../storage/data-key-store';
+import { authHttpService } from '../../http/auth-http-service';
+import { allowUnmockedHttpReporting } from '../../testing/block-real-http';
 import type { UserModel } from '@store-mgmt/domain';
+
+// `initialize()` is fire-and-forget by design, and several tests below call it
+// (or `getUserByToken()`) without awaiting, on purpose — they pin the
+// SYNCHRONOUS hydration. Their foreground /me tail therefore outlives them and
+// lands in whatever test is running when it resolves. Unmocked, that tail
+// reached the network: with no backend under vitest, Vite's middleware answered
+// 404, which this app correctly reads as a session verdict (the backend returns
+// 404 for AccountInactive), so the store logged itself out in the middle of an
+// unrelated test. That is what made (h) fail roughly one run in four while
+// passing every time this file ran alone.
+//
+// The `vi.spyOn` in `beforeEach` neutralizes that tail for every test holding
+// the module singleton. It cannot cover the three tests that `vi.resetModules()`
+// and re-import a fresh store: those build a fresh `authHttpService` object the
+// spy never saw. Mocking the module instead of the object does not fix it
+// either — those same tests mock `api-client` one layer underneath, and a
+// module-level mock pins its own `importOriginal` copy of that chain, serving
+// them a stale `api-client`.
+//
+// So one tail still escapes, and it lands in whichever test runs when it
+// resolves — never the one that created it. `block-real-http` still BLOCKS it
+// (which is what kept the 404 verdict out), and this file opts out of the
+// per-test report it cannot attribute. Every other file keeps the report.
 
 const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
 
@@ -32,6 +57,8 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   };
 }
 
+allowUnmockedHttpReporting();
+
 describe('useAuthStore', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -41,6 +68,7 @@ describe('useAuthStore', () => {
       isLoading: false,
       error: null,
     });
+    vi.spyOn(authHttpService, 'getMe').mockRejectedValue(new Error('no backend under vitest'));
   });
 
   describe('AUTH-03: Valid token on startup', () => {
@@ -531,7 +559,9 @@ describe('useAuthStore', () => {
         JSON.stringify({ authToken: user.authToken, expiresIn: user.expiresIn })
       );
 
-      // Deliberately NOT awaited — state must already be set before this line returns.
+      // Deliberately NOT awaited — state must already be set before this line
+      // returns. The /me tail this leaves behind is neutralized by the
+      // file-level `vi.doMock` in `beforeEach`.
       void useAuthStore.getState().getUserByToken();
 
       expect(useAuthStore.getState().isAuthenticated).toBe(true);

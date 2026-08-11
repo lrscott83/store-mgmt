@@ -42,10 +42,23 @@ function makeUser(overrides: Partial<UserModel> = {}): UserModel {
 describe('Cold-boot session restoration (real auth-store + authLoader)', () => {
   beforeEach(() => {
     localStorage.clear();
-    // Avoid the AUTH-03 background /me fetch during these loader-focused
-    // assertions — it is already covered by auth-store.test.ts.
-    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
     vi.resetModules();
+    // Neutralize the AUTH-03 foreground /me fetch during these loader-focused
+    // assertions — it is already covered by auth-store.test.ts.
+    //
+    // This used to set `navigator.onLine = false`, which neutralized nothing:
+    // neither auth-store nor auth-http-service nor api-client reads that flag,
+    // so the request went out anyway. With no backend under vitest, Vite's own
+    // middleware answered 404 — the exact status the app treats as a session
+    // verdict (the backend returns 404 for AccountInactive), so the store
+    // logged itself out and the loader below saw a guest. A rejected getMe is
+    // the honest stand-in for "no backend": the store's catch retains the
+    // synchronously-hydrated user, which is precisely what cold boot must do.
+    vi.doMock('~/shared/lib/http/auth-http-service', () => ({
+      authHttpService: {
+        getMe: vi.fn().mockRejectedValue(new Error('no backend under vitest')),
+      },
+    }));
   });
 
   afterEach(() => {

@@ -1,4 +1,27 @@
 import '@testing-library/jest-dom';
+import { afterEach } from 'vitest';
+import { installHttpBlocker, isReportingSuppressed } from './app/shared/lib/testing/block-real-http';
+
+// No unit test may reach the network. See block-real-http.ts for why a silent
+// real request is worse than a failing one: the app catches its own network
+// errors, so an unmocked request does not fail the test that made it — it
+// lands later, in a different file, as a session that logged itself out.
+//
+// Draining the recording here (rather than only throwing at call time) is what
+// makes that visible: the attempt is reported even when application code
+// swallowed the error it raised.
+const httpBlocker = installHttpBlocker();
+
+afterEach(() => {
+  const attempts = httpBlocker.takeAttempts();
+  if (attempts.length > 0 && !isReportingSuppressed()) {
+    throw new Error(
+      `This test made ${attempts.length} unmocked HTTP request(s):\n` +
+        attempts.map((attempt) => `  - ${attempt}`).join('\n') +
+        "\nMock the module that issues them — see app/shared/lib/testing/block-real-http.ts."
+    );
+  }
+});
 
 // jsdom's Blob implementation is minimal (no `.arrayBuffer()`/`.text()` —
 // see https://github.com/jsdom/jsdom/issues/2555). Real browsers implement
