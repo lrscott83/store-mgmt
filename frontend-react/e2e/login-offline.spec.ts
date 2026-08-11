@@ -143,6 +143,29 @@ async function deleteDeviceKeyDatabase(page: Page): Promise<void> {
   );
 }
 
+/** Adds one product to the category that ALREADY exists in this store.
+ *
+ * `seedCategoryAndProduct` cannot be called twice against the same store:
+ * its own contract (store-seed.ts:36-39) is that "exactly one category
+ * exists in this fresh store", which is what makes its
+ * `[data-testid^="category-actions-toggle-"]` prefix locator unambiguous. A
+ * second call creates a second category and the locator then resolves to two
+ * elements (Playwright strict mode violation).
+ *
+ * T10's post-reload proof does not need a second category — it needs a fresh
+ * PRODUCT write, since `expectProductsEntityEncrypted` reads the products
+ * entity. So this mirrors store-seed.ts:40-46 only, leaving the single
+ * seeded category in place and the prefix locator unambiguous. Local to this
+ * spec on purpose: store-seed.ts is shared with other specs and outside this
+ * change's authorization boundary. */
+async function addProductToExistingCategory(page: Page, name: string): Promise<void> {
+  await page.locator('[data-testid^="category-actions-toggle-"]').click();
+  await page.getByTestId('add-product-button').click();
+  await page.getByTestId('product-name-input').fill(name);
+  await page.getByTestId('product-price-input').fill('10');
+  await page.getByTestId('create-product-submit').click();
+}
+
 test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
   test('T1: golden path — cero HTTP, online-igual-offline, localStorage hidratado, destino sin productos', async ({
     page,
@@ -422,7 +445,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // produces ciphertext (`enc:v1:`), not plaintext — the recovered DEK is
     // live and functional for new writes, not merely cached for old reads.
     const afterName = `E2E T10 después del reload ${login}`;
-    await seedCategoryAndProduct(page, afterName);
+    await addProductToExistingCategory(page, afterName);
     await expect(page.getByText(afterName)).toBeVisible();
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
@@ -473,10 +496,20 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // Recovers via this login's OWN password wrap (step 3a's "own" branch).
     await loginPage.fill({ login, password: KAT_PASSWORD });
     await loginPage.submit();
-    await page.waitForURL(/\/sales\/products$/);
+
+    // NOT `/sales/products` — unlike the first login above, the store now
+    // holds a sellable product (seeded before the device key was destroyed),
+    // so `resolveUserHomePath` (user-home.ts:24-25) resolves to the sale
+    // screen instead. Landing here is itself evidence the DEK came back: that
+    // branch calls `hasAnyAvailableToSaleProduct()`, which has to DECRYPT the
+    // products entity to answer.
+    await page.waitForURL(/\/sales\/new$/);
 
     // Same DEK bytes recovered -> the data seeded before the device key was
-    // destroyed is still transparently readable, not corrupted.
+    // destroyed is still transparently readable, not corrupted. Asserted on
+    // the products screen, which is where that copy renders.
+    await page.goto('/sales/products');
+    await page.waitForURL(/\/sales\/products$/);
     await expect(page.getByText(name)).toBeVisible();
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
