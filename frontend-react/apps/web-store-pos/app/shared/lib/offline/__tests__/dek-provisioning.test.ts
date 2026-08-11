@@ -202,4 +202,57 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     const recovered = await unwrapDek('secret', table.users['ana']);
     expect(Array.from(recovered)).toEqual(Array.from(dek1));
   });
+
+  // 5.15 (verify-report WARNING, compound-failure lockout in step 3a). Two
+  // independent rare events compounding, per the report's failure-mode
+  // analysis: (a) WU10's `rewrapDeviceDekForPassword` silently failed
+  // during a real password change, leaving THIS login's own table entry
+  // wrapped under the OLD password; (b) the device key is unusable this
+  // page load (this file's own `getDeviceKey -> null` mock already
+  // guarantees step 1's `bootstrapDeviceDek()` never recovers `dek` here,
+  // so step 3a's `own` branch is the first one actually reached). A roster
+  // arrives carrying a FRESH wrap of the SAME device DEK under the NEW
+  // (correct, current) password -- exactly "any other still-valid wrap in
+  // the table" the spec names (specs/device-dek-wrap/spec.md:73-81,
+  // "Password wraps stay synchronized with the device DEK").
+  it('5.15: own table entry stale (rewrap silently failed) + device key unusable + a fresh roster wrap present -> falls through and recovers, self-healing the stale entry', async () => {
+    // First login under the OLD password establishes the device DEK and
+    // this login's own table entry, wrapped under 'old-secret'.
+    await resolveDekForLogin({ login: 'ana', password: 'old-secret', sessionStoreId: STORE_ID });
+    const x = getDek()!;
+    clearDek();
+
+    // (a) is already true here: nothing has re-wrapped 'ana''s table entry
+    // since the first call, so it is still wrapped under 'old-secret'.
+    // (b) is already true here, by this file's own module mock.
+    const freshRosterWrap = await wrapDekWithPassword('new-secret', x);
+    importRoster(v2Bundle('ana', freshRosterWrap));
+
+    // PRECONDITION -- assert both halves of the compound scenario are
+    // genuinely present BEFORE exercising recovery, so a pass below can't
+    // be "never took the fallback branch at all" in disguise.
+    const staleOwn = readDeviceDekTable()!.users['ana'];
+    expect(staleOwn).toBeDefined();
+    await expect(unwrapDek('new-secret', staleOwn)).rejects.toMatchObject({ name: 'DekUnwrapError' }); // genuinely stale under the new password
+    const rosterCheck = await unwrapDek('new-secret', freshRosterWrap); // genuinely fresh and valid under the new password
+    expect(Array.from(rosterCheck)).toEqual(Array.from(x));
+
+    // Login with the OBJECTIVELY CORRECT new password must still succeed,
+    // by falling through to the roster wrap instead of hard-failing on the
+    // stale own entry.
+    await expect(
+      resolveDekForLogin({ login: 'ana', password: 'new-secret', sessionStoreId: STORE_ID }),
+    ).resolves.toBeUndefined();
+
+    expect(Array.from(getDek()!)).toEqual(Array.from(x));
+
+    // Self-healing: this login's table entry is refreshed under the new
+    // password, so the NEXT login recovers directly via the (now-valid)
+    // own branch, without needing the roster again.
+    const table = readDeviceDekTable()!;
+    const healedOwn = table.users['ana'];
+    expect(healedOwn.wrapSalt).not.toBe(staleOwn.wrapSalt);
+    const recovered = await unwrapDek('new-secret', healedOwn);
+    expect(Array.from(recovered)).toEqual(Array.from(x));
+  });
 });
