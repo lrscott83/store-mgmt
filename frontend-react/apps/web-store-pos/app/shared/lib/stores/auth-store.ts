@@ -6,7 +6,7 @@ import { StorageService } from '../auth/storage-service';
 // `storage/`, NOT `offline/` — a STATIC import here is legal by
 // construction. `logout()` is synchronous and must call `clearDek()`
 // synchronously, so a dynamic import is not an option for that call site.
-import { setDek, clearDek } from '../storage/data-key-store';
+import { clearDek } from '../storage/data-key-store';
 // Static, and NOT from `auth-http-service`: tests mock that module, and Vitest
 // throws on a named export a mock factory omits. `getUserByToken` imports the
 // service dynamically inside a try, so such a throw is swallowed as if it were

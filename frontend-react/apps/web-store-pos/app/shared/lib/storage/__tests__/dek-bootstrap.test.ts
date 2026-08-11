@@ -10,7 +10,7 @@ import { getDek, getDekStoreId, clearDek } from '../data-key-store';
 
 describe('dek-bootstrap — wrapDekForDevice / unwrapDekFromDevice round trip', () => {
   beforeEach(() => {
-    indexedDB = new IDBFactory();
+    globalThis.indexedDB = new IDBFactory();
   });
 
   it('unwraps exactly what was wrapped, byte-for-byte', async () => {
@@ -26,7 +26,7 @@ describe('dek-bootstrap — wrapDekForDevice / unwrapDekFromDevice round trip', 
 
 describe('dek-bootstrap — bootstrapDeviceDek recovers the DEK (task 4.1)', () => {
   beforeEach(() => {
-    indexedDB = new IDBFactory();
+    globalThis.indexedDB = new IDBFactory();
     localStorage.clear();
     clearDek();
   });
@@ -77,7 +77,7 @@ describe('dek-bootstrap — bootstrapDeviceDek recovers the DEK (task 4.1)', () 
 
 describe('dek-bootstrap — device key missing (task 4.3, F4 half 1)', () => {
   beforeEach(() => {
-    indexedDB = new IDBFactory(); // fresh, empty DB -> getDeviceKey() resolves null
+    globalThis.indexedDB = new IDBFactory(); // fresh, empty DB -> getDeviceKey() resolves null
     localStorage.clear();
     clearDek();
   });
@@ -104,7 +104,7 @@ describe('dek-bootstrap — device key missing (task 4.3, F4 half 1)', () => {
 describe('dek-bootstrap — single-flight memo (task 4.5)', () => {
   beforeEach(() => {
     vi.resetModules();
-    indexedDB = new IDBFactory();
+    globalThis.indexedDB = new IDBFactory();
     localStorage.clear();
   });
 

@@ -22,7 +22,7 @@ describe('device-key-store — feasibility gate (task 1.0)', () => {
 
 describe('device-key-store — getOrCreateDeviceKey (task 1.1)', () => {
   beforeEach(() => {
-    indexedDB = new IDBFactory();
+    globalThis.indexedDB = new IDBFactory();
   });
 
   it('returns the SAME key on a second call, extractable:false, raw export rejects', async () => {
@@ -67,7 +67,7 @@ describe('device-key-store — bounded open (task 1.5, F2 white-screen guard)', 
   let originalOpen: typeof indexedDB.open;
 
   beforeEach(() => {
-    indexedDB = new IDBFactory();
+    globalThis.indexedDB = new IDBFactory();
     originalOpen = indexedDB.open.bind(indexedDB);
     vi.useFakeTimers();
   });
@@ -101,7 +101,7 @@ describe('device-key-store — bounded open (task 1.5, F2 white-screen guard)', 
 
 describe('device-key-store — deleteDeviceKey (task 1.7)', () => {
   beforeEach(() => {
-    indexedDB = new IDBFactory();
+    globalThis.indexedDB = new IDBFactory();
   });
 
   it('clears the record; a subsequent getOrCreateDeviceKey() mints a DIFFERENT key', async () => {
@@ -132,7 +132,7 @@ describe('device-key-store — deleteDeviceKey (task 1.7)', () => {
 
 describe('device-key-store — getDeviceKey never creates (task 1.9)', () => {
   beforeEach(() => {
-    indexedDB = new IDBFactory();
+    globalThis.indexedDB = new IDBFactory();
   });
 
   it('resolves null on an empty DB and leaves the DB empty', async () => {
