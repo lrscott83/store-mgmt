@@ -116,14 +116,15 @@ export default async function globalTeardown(): Promise<void> {
   }
 
   if (total === 0) {
-    // NOT a hard failure: a run of a spec that registers nobody (api-health,
-    // smoke) legitimately deletes zero rows, and teardown cannot tell those
-    // apart from a misdirected backend. Loud enough to notice, quiet enough
-    // not to fail a green run on a heuristic.
+    // NOT a hard failure, and NOT necessarily a problem: a spec that registers
+    // nobody (smoke, api-health) legitimately deletes zero rows, and so does a
+    // run whose rows a previous teardown already swept. Teardown cannot tell
+    // those apart from a backend writing to another database, so this stays a
+    // one-line note — short enough to survive a terminal without wrapping,
+    // which the first version of this message did not.
     console.warn(
-      `[e2e teardown] 0 filas e2e-* borradas en "${database}". Si esta corrida registró usuarios, ` +
-        'el backend está escribiendo en OTRA base — mirá la sección "Modo BD de test (smca_test)" ' +
-        'del README y arrancalo con ConnectionStrings__Application.'
+      `[e2e teardown] nada que borrar en "${database}" ` +
+        '(si esta corrida registró usuarios, el backend apunta a otra base)'
     );
     return;
   }
