@@ -34,8 +34,17 @@ export function ChangePasswordPage() {
       try {
         const { rewrapDeviceDekForPassword } = await import('~/shared/lib/offline/dek-provisioning');
         await rewrapDeviceDekForPassword(user.login, payload.newPassword);
-      } catch {
-        // intentionally swallowed — see comment above.
+      } catch (err) {
+        // intentionally swallowed — see comment above; logged only
+        // (verify-report SUGGESTION, this batch), matching
+        // dek-provisioning.ts's own D6/step-6 console.error precedent. Does
+        // NOT change the swallow's guarantee — logout() below still always
+        // runs. Makes the login-side compound-failure WARNING diagnosable:
+        // this is the earliest point a stale table entry originates from.
+        console.error(
+          '[change-password] device DEK re-wrap failed after password change (non-fatal, logout proceeds)',
+          err,
+        );
       }
       // Decision 2 (auth-service-parity, Slice 3): logout() now owns the
       // conditional redirect itself (Angular parity) — no manual navigate here.
