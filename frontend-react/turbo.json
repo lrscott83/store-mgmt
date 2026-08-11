@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
+  "globalDependencies": ["deploy/nginx.conf"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

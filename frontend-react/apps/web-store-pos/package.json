@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs",
+    "build": "react-router build && node scripts/build-sw.mjs && node scripts/verify-sw-precache.mjs && node scripts/verify-csp.mjs",
     "dev": "react-router dev",
     "dev:local": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",

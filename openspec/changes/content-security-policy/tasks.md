@@ -234,28 +234,46 @@ Satisfies spec: `content-security-policy` — "Dev/Prod Policy Parity" (nginx ha
 mechanism that keeps "script-src Excludes Unsafe Keywords" / "style-src Permanent Carve-out" true on the
 surface no automated test can reach.
 
-- [ ] 3.1 **[vitest RED]** Write `scripts/__tests__/csp-nginx.test.mjs` fixtures against not-yet-existing
+- [x] 3.1 **[vitest RED]** Write `scripts/__tests__/csp-nginx.test.mjs` fixtures against not-yet-existing
   `checkNginxConf`: missing header, missing `always`, an extra undeclared `add_header`, a
   reordered-but-equivalent policy (must **PASS** — proves token-set comparison, not byte comparison), and
   the cross-origin `API_URL` warn path (warning, not an error — design §3 non-fatal check). Run — expect
   FAIL (module does not exist).
   Verify: `cd frontend-react && pnpm --filter @store-mgmt/web-store-pos exec vitest run scripts/__tests__/csp-nginx.test.mjs`
-- [ ] 3.2 **[GREEN]** Create `scripts/csp-nginx.mjs`: `extractAddHeaders(conf)`, `parseCspHeaderValue(text)`,
+  **DONE** — RED confirmed: `Failed to resolve import "../csp-nginx.mjs"`, exactly the expected
+  module-does-not-exist failure. 22 assertions written: the required fixtures (missing header, missing
+  `always`, extra undeclared `add_header`, reordered-but-equivalent PASS, cross-origin `API_URL` warn
+  path) plus extras traced to design §3 — an ambiguous-header (declared twice) case, `extractAddHeaders`/
+  `parseCspHeaderValue`/`diffPolicies` unit coverage in isolation, and the real-file assertion from 3.3
+  written in the same pass (also RED at this point, for the same reason).
+- [x] 3.2 **[GREEN]** Create `scripts/csp-nginx.mjs`: `extractAddHeaders(conf)`, `parseCspHeaderValue(text)`,
   `diffPolicies(a,b)`, `checkNginxConf(conf)` — the 5 checks from design §3 (presence; `always`; text
   equality as directive-name-set + per-directive token-multiset; delta axis restricted to
   `ALLOWED_ENV_DELTA_DIRECTIVES`, no file I/O; `EXPECTED_ADD_HEADERS` set-equality).
   Verify: same vitest command → all fixture cases green.
-- [ ] 3.3 **[vitest RED, real-file assertion]** Add to the same test file:
+  **DONE** — 21/22 green (only the real-file test from 3.3 still red, as expected — see 3.3). Also added
+  `checkConnectSrcCoverage(apiUrl)`, a pure function (not named in the task list, but required by 3.1's
+  cross-origin-warn fixture and design §3's "Non-fatal check": deliberately separate from the 5
+  `checkNginxConf` checks, since it compares a build-time `API_URL` against the generator's
+  `connect-src`, not the nginx file text). Delta-axis probe uses `buildCspDirectives('dev')` with no
+  options — the default dev server origin alone already diverges `connect-src` from prod (the ws HMR
+  origin is unconditional), so no synthetic `apiUrl` probe was needed to exercise design §3 check 4.
+- [x] 3.3 **[vitest RED, real-file assertion]** Add to the same test file:
   `it('deploy/nginx.conf carries the exact production policy', ...)` reading the real file and asserting
   `checkNginxConf(conf) === []`. Run — expect FAIL (`nginx.conf` has no `add_header` yet).
   Verify: same vitest command → only this test red.
-- [ ] 3.4 **[GREEN]** Edit `deploy/nginx.conf`: insert
+  **DONE** — confirmed exactly 1/22 red after 3.2's implementation landed: "the production policy is
+  missing" + "nginx.conf is missing declared add_header(s)", precisely the two errors expected before
+  `nginx.conf` is touched.
+- [x] 3.4 **[GREEN]** Edit `deploy/nginx.conf`: insert
   `add_header Content-Security-Policy-Report-Only "<canonical prod value from csp-policy.mjs>" always;`
   in the `server` block after `index index.html;` (currently `nginx.conf:40`) — **server level, not inside
   `location /`** (nginx does not merge `add_header` into a child block that declares its own; today
   `location /api` at 44-50 and `location /` at 53-55 declare none).
   Verify: same vitest command → all green, including 3.3.
-- [ ] 3.5 **[mechanical wiring, no new test]** Create `scripts/verify-csp.mjs` (I/O + `process.exitCode`,
+  **DONE** — 22/22 green. Value copied verbatim from `buildCspHeaderValue('prod')`'s canonical string
+  (byte-for-byte, including `'report-sample'` from follow-up 2.6).
+- [x] 3.5 **[mechanical wiring, no new test]** Create `scripts/verify-csp.mjs` (I/O + `process.exitCode`,
   shape of `verify-sw-precache.mjs:125-132`; resolves `deploy/nginx.conf` via `import.meta.url`, not
   `process.cwd()`). Edit `package.json:6`: append `&& node scripts/verify-csp.mjs` to `build`. Edit
   `turbo.json`: add top-level `"globalDependencies": ["deploy/nginx.conf"]` (repo-root-relative to
@@ -266,15 +284,47 @@ surface no automated test can reach.
   `cd frontend-react && npx turbo run build --filter=@store-mgmt/web-store-pos --dry=json` → confirm
   `deploy/nginx.conf` appears among the task's resolved inputs (proves D8's cache-invalidation fix, not
   header content).
-- [ ] 3.6 **[WU gate]** `cd frontend-react && npx turbo run lint typecheck test build --filter=@store-mgmt/web-store-pos --force`
+  **DONE, with one live discovery the design didn't anticipate**: this sandbox has an untracked,
+  gitignored `frontend-react/.env` with `API_URL=https://localhost:44320/api` (a local dev leftover, not
+  from Docker). Reading it through `verify-csp.mjs`'s `dotenv.config()` call exercised the non-fatal warn
+  path for real, not just via the vitest fixture: `verify-csp: WARNING — the build-time API_URL
+  ("https://localhost:44320/api") resolves to the cross-origin value "https://localhost:44320", which the
+  production connect-src ("'self'") does not cover. Harmless under report-only ... but the enforcing
+  change must promote this to a hard failure.` — build still exited 0. Also added `quiet: true` to the
+  `dotenv.config()` call (dotenv ≥17 prints a promotional tip line to stdout otherwise); confirmed with a
+  version check (`dotenv@17.4.2` resolved for this package) that `quiet` is a supported option in that
+  version. `npx turbo run build --filter=@store-mgmt/web-store-pos --dry=json`'s
+  `globalCacheInputs.files` includes `"deploy/nginx.conf": "<hash>"` — confirms D8's fix: any edit to the
+  file changes the global hash and invalidates cached `build`/`test` runs for every package.
+- [x] 3.6 **[WU gate]** `cd frontend-react && npx turbo run lint typecheck test build --filter=@store-mgmt/web-store-pos --force`
   and rerun `e2e/pwa-install-capture.spec.ts` + `e2e/csp-report-only.spec.ts` (regression check on WU1/WU2).
+  **DONE for the automatable half** — 13/13 tasks green: 187 test files / 2475 tests passed (WU2's
+  baseline 186/2453 + this WU's 22-test `csp-nginx.test.mjs` = exact match), `Type Errors: no errors`,
+  `lint` clean across all 4 lint tasks, `build` exits 0 with `verify-sw-precache: OK` and `verify-csp: OK`
+  (plus the WARNING above). ⏳ **PENDING USER VERIFICATION** — the agent's environment prohibits
+  Playwright/docker; the regression rerun of `e2e/pwa-install-capture.spec.ts` and
+  `e2e/csp-report-only.spec.ts` was not run this session. Exact commands for the user:
+  `cd frontend-react && npx playwright test e2e/pwa-install-capture.spec.ts e2e/csp-report-only.spec.ts --project=chromium`.
 
 **Finish/rollback boundary**: one commit (`feat(content-security-policy): production nginx header +
 build-time drift gate (WU3)`). Revert = `build` unblocked immediately, `add_header` gone from the next
 image; a **running** container keeps serving the stale header until rebuilt — cosmetic wait, since
 report-only never blocks.
 
-### 3.7 — NOT verifiable by any frontend gate (manual, production only)
+### 3.7 — NOT verifiable by any frontend gate (manual, LOCAL run of the production image)
+
+**This is a local docker run on the user's machine, not a deployment.** Nothing live is touched. What
+makes it meaningful is that the container carries the same artefact that ships: `Dockerfile:27` copies
+`deploy/nginx.conf` verbatim to `/etc/nginx/nginx.conf` and `:28` serves the real `react-router build`
+static output. No automated gate can reach that surface — `playwright.config.ts:103-112` hardcodes
+`pnpm dev`, there is no `vite preview` project, and no `.github/workflows/`.
+
+**What this local run CANNOT verify**: `Dockerfile:16` defaults `ARG API_URL=/api` — same-origin, so
+`connect-src 'self'` covers every API call and no network violation can appear. A real deployment built
+with `--build-arg API_URL=https://some-other-host/...` would violate `connect-src` on EVERY API call.
+Harmless under report-only, but it must be resolved before the enforcing change: either the deploy
+bakes a same-origin `/api` (as `deploy/nginx.conf`'s `location /api` proxy already assumes), or
+`connect-src` gains that origin the same way dev derives it (`deriveApiOrigin`, `csp-policy.mjs`).
 
 Nothing in this repo's automated suite can observe the header nginx actually emits
 (`playwright.config.ts:103-112` hardcodes `pnpm dev`; no `vite preview` project; no `.github/workflows/`).
