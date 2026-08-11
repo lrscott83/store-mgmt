@@ -104,19 +104,24 @@ Satisfies spec: `content-security-policy` — "Dev Header Delivery", "script-src
 generator half of "Dev/Prod Policy Parity"; `pwa-install-capture-script` — "Script load produces no
 violation" scenario.
 
-- [ ] 2.1 **[vitest RED]** Write `scripts/__tests__/csp-policy.test.mjs`: prod `script-src` is exactly
+- [x] 2.1 **[vitest RED]** Write `scripts/__tests__/csp-policy.test.mjs`: prod `script-src` is exactly
   `'self'` (no `unsafe-inline`/`unsafe-eval`); `style-src` contains `'self' 'unsafe-inline'`;
   `deriveApiOrigin` over the 4-row table (`'http://localhost:5019/api'`→origin, `'/api'`→`null`,
   `''`/`undefined`→`null`, unparseable→`null`); canonical serialization is stable across two calls (no
   trailing `;`, single spaces, fixed order); dev-vs-prod directives differ only in
   `ALLOWED_ENV_DELTA_DIRECTIVES`. Run — expect FAIL (module does not exist).
   Verify: `cd frontend-react && pnpm --filter @store-mgmt/web-store-pos exec vitest run scripts/__tests__/csp-policy.test.mjs`
-- [ ] 2.2 **[GREEN]** Create `scripts/csp-policy.mjs`: the canonical prod directive table (design D3),
+  **DONE** — RED confirmed: `Failed to resolve import "../csp-policy.mjs"`, exactly the expected
+  module-does-not-exist failure. 16 assertions written (3 more than the task's minimum list: a
+  byte-exact canonical-string check, a directive-order-identity check, and a no-apiUrl connect-src
+  case), all traced to design D3/D4.
+- [x] 2.2 **[GREEN]** Create `scripts/csp-policy.mjs`: the canonical prod directive table (design D3),
   `buildCspDirectives(env, options)`, `buildCspHeaderValue(env, options)`, `deriveApiOrigin(apiUrl)`,
   `ALLOWED_ENV_DELTA_DIRECTIVES = ['connect-src']`, `CSP_HEADER_NAME`. Create the 6-line
   `scripts/csp-policy.d.mts` sibling declaration (design D2).
   Verify: same vitest command → green.
-- [ ] 2.3 **[Playwright RED]** Write `e2e/support/csp-violations.ts` (observer, same shape as
+  **DONE** — 16/16 green. `csp-policy.d.mts` copied verbatim from design D2's snippet.
+- [x] 2.3 **[Playwright RED]** Write `e2e/support/csp-violations.ts` (observer, same shape as
   `e2e/support/store-network-observer.ts`) and `e2e/csp-report-only.spec.ts`: (a) header presence —
   `content-security-policy-report-only` defined and contains `script-src 'self'`, `frame-ancestors 'none'`,
   `object-src 'none'`, `base-uri 'self'`, **and** `content-security-policy` (enforcing) is `undefined`;
@@ -125,15 +130,55 @@ violation" scenario.
   violations across `/`, `/login`, `/register` with an explicit **empty** `KNOWN_DEV_ONLY_VIOLATIONS`
   allowlist. Run — expect FAIL (no header served; `vite.config.ts` untouched).
   Verify: `cd frontend-react && npx playwright test e2e/csp-report-only.spec.ts --project=chromium`
-- [ ] 2.4 **[GREEN]** Edit `vite.config.ts`: wrap in `defineConfig(({mode}) => ...)`, call `loadEnv` with
+  **DONE** — RED confirmed: 2/3 failed (header presence, real-violation-reported), exactly the two
+  assertions that need a live header; the zero-violation sweep passed vacuously (no policy → no
+  violations possible), which is fine — GREEN re-tests it meaningfully once the header exists. The
+  observer bridges the in-page `securitypolicyviolation` listener to a Node-side array via
+  `page.exposeFunction`, not a `window.__cspViolations` global — a document-scoped global resets on
+  every `page.goto()`, which would defeat isolating one route's violations from the next.
+- [x] 2.4 **[GREEN]** Edit `vite.config.ts`: wrap in `defineConfig(({mode}) => ...)`, call `loadEnv` with
   the existing `envDir`/`envPrefix` (`vite.config.ts:64-65`), import `buildCspHeaderValue`/`CSP_HEADER_NAME`
   from `./scripts/csp-policy.mjs`, set `server.headers[CSP_HEADER_NAME]` to the dev value (`connect-src`
   derived from `API_URL` + explicit `ws://localhost:3333`).
   Verify (mandatory acceptance gate, design D2 — proven to pass, no fallback needed):
   `cd frontend-react && pnpm --filter @store-mgmt/web-store-pos typecheck`
   Then rerun 2.3's Playwright command → 3/3 green.
-- [ ] 2.5 **[WU gate]** `cd frontend-react && npx turbo run lint typecheck test --filter=@store-mgmt/web-store-pos --force`
+  **DONE, with TWO corrections to design D2/D4 found empirically in this repo** (see engram
+  `sdd/content-security-policy/apply-progress` for the full findings):
+  1. **`server.headers[CSP_HEADER_NAME]` is a no-op for every real page load.** `typecheck` passed
+     (exit 0, confirming D2's `.d.mts` resolution claim), but curling `http://localhost:3333/` directly
+     after wiring `server.headers` still showed no CSP header. Root cause, traced in
+     `@react-router/dev@7.15.1/dist/vite.js:3804-3840`: in SPA mode (`react-router.config.ts` `ssr:
+     false`), the dev server still SSRs the initial HTML (only the *build* skips SSR), and it does so
+     via a `configureServer` **post-hook** — the closure *returned* from `configureServer`, which Vite
+     runs strictly *after* its own internal middlewares. Vite's only internal middleware that applies
+     `config.server.headers` is `indexHtmlMiddleware`, and only for URLs literally ending in `.html`.
+     `/`, `/login`, `/register` never match, fall through every internal middleware, and are answered
+     directly by react-router's handler via `sendResponse(nodeRes, response)` — a plain
+     `Response`→Node bridge carrying none of `server.headers`. **Fix**: register the header in a small
+     inline Vite plugin's `configureServer(server)` hook *without* returning a closure — that runs
+     synchronously, in plugin order, strictly before every internal middleware and before
+     react-router's deferred handler (`server.middlewares.use((_req, res, next) => { res.setHeader(...);
+     next(); })`); Node's `res.writeHead(status, headers)` (used by `sendResponse`) *merges* with
+     headers already set via `setHeader` rather than clearing them, so it survives. `server.headers`
+     itself was removed from the config as dead code.
+  2. **The zero-violation sweep's first real run found a genuine dev-only violation, exactly as design
+     §6.7 predicted** ("the single most likely thing to force a revision of §4.4"): react-router's dev
+     SSR document inlines the client hydration payload as three bare `<script>` tags (`curl`-verified,
+     not a Playwright artifact) — `window.__reactRouterContext = {...}` plus two
+     `.streamController.enqueue()`/`.close()` calls. Chrome reports all three identically
+     (`effectiveDirective: 'script-src-elem'`, `blockedURI: 'inline'` — no finer-grained id without the
+     `report-sample` keyword, which this change's directive table does not declare). Resolved exactly
+     per design's prescription: one entry added to `KNOWN_DEV_ONLY_VIOLATIONS` (not
+     `'unsafe-inline'` on `script-src`), with a comment naming the injector and an explicit **NOT
+     VERIFIED** note on whether the production static build carries the same payload (out of WU2's
+     scope; flagged for WU3 §3.7's manual pass).
+  Both `typecheck` and the Playwright rerun are green: `tsc` exit 0; `csp-report-only.spec.ts` 3/3.
+- [x] 2.5 **[WU gate]** `cd frontend-react && npx turbo run lint typecheck test --filter=@store-mgmt/web-store-pos --force`
   and rerun `e2e/pwa-install-capture.spec.ts` (regression check on WU1).
+  **DONE** — 12/12 tasks green, 186 test files / 2452 tests passed (WU1 baseline 185/2436 + this WU's
+  16-test `csp-policy.test.mjs` = exact match), `Type Errors: no errors`. WU1 regression check:
+  `e2e/pwa-install-capture.spec.ts --project=chromium` → 3/3 green, no regression.
 
 **Finish/rollback boundary**: one commit (`feat(content-security-policy): policy generator + dev header +
 Playwright coverage (WU2)`). Revert = dev header disappears, nothing else changes — **must be reverted
