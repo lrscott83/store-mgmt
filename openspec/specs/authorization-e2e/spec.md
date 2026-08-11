@@ -27,6 +27,13 @@ Define backend E2E test scenarios that validate the authorization engine through
 - **R1.4**: StoreUser with feature → IsSuperAdmin=false, IsOwnerAdmin=false, SelectedStoreId matches
 - **R1.5**: ReSeller → IsReSeller=true
 - **R1.6**: UserRole tenant mismatch → IsOwnerAdmin=false (not recognized)
+- **R1.7**: Deactivated account (real-flow) → HTTP 404, `Succeeded=false`, `ActionCode=404`, single error `Auth.AccountInactive` (B-6, delivered by `e2e-b6-me-inactive-404` — `AuthMeDeactivationTests.cs`)
+
+> **Delivery note (2026-08-10)**: R1.7 is DELIVERED by change `e2e-b6-me-inactive-404`
+> (spec-time main-spec update, B-3 precedent) — closes the B-6 declared gap: no flow
+> ever deactivated an account over HTTP, so the server-side `/me` 404 for a
+> deactivated account was never exercised end-to-end. Verification run pending in
+> that change's sdd-verify.
 
 ### R2: Stores enforcement window
 - **R2.1**: No token → 401
@@ -77,7 +84,7 @@ The system MUST document via an E2E test that a StoreUser granted the Stores fea
 1. All 4 requirement groups have passing tests (19 test scenarios total — 17 baseline + R2.10 + R2.11)
 2. Authorization matrix is verified across all role types (SuperAdmin, OwnerAdmin, StoreUser, ReSeller)
 3. Enforcement denials return HTTP 403 (not 200-wrapped)
-4. /me failures return HTTP 200 with `succeeded=false`, `actionCode=404`
+4. /me failures return HTTP 404 with `succeeded=false`, `actionCode=404` (real HTTP status — see `AuthMeFailureTests`; includes `Auth.AccountInactive` for deactivated accounts, R1.7)
 5. SuperAdmin bypasses the stores filter entirely
 6. approve/disapprove is SuperAdmin-only (method-level `[HasPermission(SuperAdmin)]`)
 7. OwnerAdmin recognition requires `UserRole.TenantId == User.TenantId`

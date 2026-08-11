@@ -8,7 +8,7 @@ Toda aserción de esta etapa está anclada a código leído, con `archivo:línea
 
 Este fichero contiene **solo lo general y el estado**. El detalle de cada User Story —flujo, precondiciones y aserciones— vive en su fichero propio.
 
-> **Trabajo diferido**, uno por capa: [plan-frontend.md](plan-frontend.md) reúne lo abierto en Playwright — un flake sin causa raíz, una guarda que el navegador no puede discriminar y dos brechas declaradas. [plan-backend.md](plan-backend.md) reúne lo que apareció en el servidor mientras se implementaba esta etapa — un test E2E vencido por calendario, otras 20 fechas hardcodeadas con la misma bomba, y el hueco de método que dejó pasar dos bugs de producción. Nada de eso se ejecuta sin decisión explícita.
+> **Trabajo diferido**, uno por capa: [plan-frontend.md](plan-frontend.md) reúne lo abierto en Playwright — un flake sin causa raíz, una guarda que el navegador no puede discriminar y dos brechas declaradas. [plan-backend.md](plan-backend.md) reúne lo que apareció en el servidor mientras se implementaba esta etapa — el hueco de método que dejó pasar dos bugs de producción, el vencimiento por calendario de `ToCollectTests` (**ya resuelto** en `fb273edb` con pin de reloj) y las demás fechas hardcodeadas (**pineadas en su mayoría** durante `store-creation-trial` y el roster offline). Nada de lo que queda abierto se ejecuta sin decisión explícita.
 
 ---
 
@@ -93,7 +93,7 @@ Una limitación que conviene no perder: **la línea base de los 31 verdes ANTES 
 
 **La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 5/min**, amortizados con `storageState`. Ese margen de uno es la restricción a respetar al escribir el próximo escenario.
 
-**Rate limiting hoy**: `SMCA.WebApi.E2ETests/RateLimiting/RateLimitPoliciesTests.cs` tiene 4 tests (`:38,49,72,83`) y **todos** son de la política **Register**. La política **Login** no tiene ninguno. Y ninguno de los cuatro es de extremo a extremo: son unitarios de la fábrica de políticas, con el limitador construido a mano (`RateLimitPoliciesTests.cs:24-35`), porque bajo `Testing` el middleware ni se registra (**H-12**).
+**Rate limiting hoy**: `SMCA.WebApi.E2ETests/RateLimiting/RateLimitPoliciesTests.cs` tiene 4 tests (`:38,49,72,83`) y **todos** son de la política **Register**. La política **Login** está cubierta por 4 tests .NET (`LoginRateLimitPoliciesTests.cs`, fábrica: options+partición); el 429 HTTP lo sigue probando Playwright. Y ninguno de los ocho es de extremo a extremo: son unitarios de la fábrica de políticas, con el limitador construido a mano (`RateLimitPoliciesTests.cs:24-35`), porque bajo `Testing` el middleware ni se registra (**H-12**).
 
 ---
 

@@ -24,4 +24,4 @@ Marcar ese checkbox en `[x]` con su cita, y borrar el párrafo que dice que `Sto
 
 ## Nota aparte
 
-**H-12 quedó refutada.** Decía que el rate limit era inalcanzable bajo `Testing`; la corrida de Playwright del 2026-08-07 observó un 429 real contra ese entorno. Lo que sigue faltando es un test .NET que lo fije — el límite hoy solo lo prueba el navegador.
+**H-12 quedó refutada.** Decía que el rate limit era inalcanzable bajo `Testing`; la corrida de Playwright del 2026-08-07 observó un 429 real contra ese entorno. El test .NET ya lo fija (`LoginRateLimitPoliciesTests.cs`, fábrica: options/partición); el 429 HTTP sigue probándolo solo Playwright.
