@@ -48,6 +48,14 @@ function findRosterWrapEntry(login: string): WrappedDekEntry | undefined {
 
 const CONFLICT_LOG_MARKER = '[dek-provisioning] roster DEK disagrees with the established device DEK';
 
+// SUGGESTION (verify-report, this batch): logging only, matching the D6
+// precedent above — does NOT change the swallow's guarantee (step 6 must
+// still never block login). Makes the WARNING fix's compound scenario
+// diagnosable: if entity migration keeps failing here, that is visible in
+// the console instead of silently vanishing.
+const ENTITY_MIGRATION_SWALLOW_LOG_MARKER =
+  '[dek-provisioning] entity migration failed after login (non-fatal, login proceeds)';
+
 /**
  * Resolves and sets THIS DEVICE's DEK for `args.login`, in order:
  * an already-recovered device DEK > this login's own table wrap >
@@ -257,8 +265,10 @@ export async function resolveDekForLogin(args: {
   // Step 6 — unchanged doctrine (entity-migration.ts:15-18): never blocks login.
   try {
     runEntityMigration();
-  } catch {
-    // intentionally swallowed — see comment above.
+  } catch (err) {
+    // intentionally swallowed — see comment above; logged only, per the
+    // SUGGESTION above `CONFLICT_LOG_MARKER`.
+    console.error(ENTITY_MIGRATION_SWALLOW_LOG_MARKER, err);
   }
 }
 
