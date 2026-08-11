@@ -9,8 +9,9 @@
 // This module decides THIS DEVICE's DEK for THIS login, once per device,
 // then makes every subsequent login/reload on this device reuse it. The
 // six-step algorithm below is design §5's pseudocode, transcribed as
-// literally as possible; the three structural notes inline (plus the
-// `ownWrapValidatedThisCall` gate documented at step 5) mark the places
+// literally as possible; the structural notes inline (plus the
+// `ownWrapValidatedThisCall` gate documented at step 5, and step 3a's
+// own-unwrap-failure fallback documented at that `catch`) mark the places
 // this implementation had to make an explicit choice where §5's compressed
 // pseudocode underspecified the outcome (see design §6's F5/F9 rows and the
 // device-dek-wrap spec's own Given/When/Then scenarios, which this code
@@ -104,18 +105,37 @@ export async function resolveDekForLogin(args: {
       // DEK from `table.device` (missing, unusable, or corrupt).
       const own = table.users[login];
       if (own) {
-        dek = await unwrapDek(password, own);
-        setDek(dek, table.storeId);
-        ownWrapValidatedThisCall = true;
-      } else if (rosterEntry) {
-        dek = await unwrapDek(password, rosterEntry);
-        setDek(dek, table.storeId);
-        dekSourcedFromRosterThisCall = true;
-      } else {
-        // F5 — the genuine dead end: nothing in the table for this login,
-        // nothing in the roster either. Narrower than, and strictly better
-        // than, the uncaught MissingDataKeyError this replaces.
-        throw new DekUnwrapError();
+        try {
+          dek = await unwrapDek(password, own);
+          setDek(dek, table.storeId);
+          ownWrapValidatedThisCall = true;
+        } catch {
+          // Piece 2 (this batch — verify WARNING, compound-failure lockout):
+          // this login's own table entry no longer matches this password.
+          // Compounds two independently rare events — WU10's
+          // `rewrapDeviceDekForPassword` silently failed during an earlier
+          // password change (change-password.tsx's swallowed catch), so
+          // this entry is still wrapped under the OLD password, AND the
+          // device-key wrap didn't recover `dek` at step 1 either. Per the
+          // spec ("Password wraps stay synchronized with the device DEK":
+          // a login MUST succeed by recovering the DEK "from the device-key
+          // wrap, OR FROM ANY OTHER STILL-VALID WRAP IN THE TABLE"), `dek`
+          // stays `null` here and falls through to the roster attempt below
+          // instead of propagating — this branch must NOT itself throw.
+        }
+      }
+      if (dek === null) {
+        if (rosterEntry) {
+          dek = await unwrapDek(password, rosterEntry);
+          setDek(dek, table.storeId);
+          dekSourcedFromRosterThisCall = true;
+        } else {
+          // F5 — the genuine dead end: nothing in the table for this login
+          // (absent, or present but no longer opens with this password),
+          // nothing in the roster either. Narrower than, and strictly
+          // better than, the uncaught MissingDataKeyError this replaces.
+          throw new DekUnwrapError();
+        }
       }
     } else if (rosterEntry) {
       // Step 3b — no table yet, this login has a roster wrap: adopt those
