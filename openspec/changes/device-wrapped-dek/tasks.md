@@ -163,24 +163,37 @@ Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos` — 185 
 Finish/rollback: pure test-coverage addition; revertible independently of Slice B's production code (nothing here is imported by production code).
 **DONE 2026-08-10.** All three gaps disclosed in the Slice B apply-progress (obs #2123) closed. Batch boundary — Slice C (WU9-WU10) remains out of scope, not started.
 
+### WU8.2 — Narrow step 5's unconditional password-wrap rewrite (verify WARNING)
+Files: MODIFIED `dek-provisioning.ts` (step 5's condition), MODIFIED `dek-provisioning.test.ts` (test 5.13 only — 5.1/5.3/5.5/5.7/5.9/5.11 byte-identical). Depends on WU8.1.
+- [x] 8.2.1 Re-scoped step 5's rewrite: skip ONLY when `ownWrapValidatedThisCall && rosterEntry === undefined` — this call's DEK came from successfully decrypting THIS LOGIN'S OWN existing table entry (step 3a's "own" branch, free validity proof) AND no roster entry is in play to reconcile against. Every other branch (roster-derivation 3b, local-mint 3c, structural-note-1's offline roster-sourced case, F9/D6's roster-involved cases, and the dominant steady-state case where step 1's device-key bootstrap alone recovers `dek`) keeps rewriting unconditionally — the steady-state case was measured, not assumed: the only sound validity check there costs one PBKDF2, the same as the write it would save, so it is not a real optimization.
+- [x] 8.2.2 Test 5.13 updated (not left pinning the old blanket-unconditional behavior): `wrapSalt` assertion flipped from `.not.toBe(firstWrapSalt)` to `.toBe(firstWrapSalt)`, description and inline comment rewritten to state exactly what changed and why. Test 5.7 (F9) untouched — still pins the roster-involved rewrite.
+Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos` — 185 test files, 2433 tests, 0 failures (same count as WU8.1 — 5.13 modified in place, no test added/removed).
+Finish/rollback: pure narrowing of an existing, already-shipped algorithm branch; revertible alone.
+**DONE 2026-08-10, commit `b545eec2`.**
+
 ---
 
 ## Phase C — E2E + password-change seam
 
 ### WU9 — E2E: T10 rewrite + NEW F4 test — **NOT verifiable via `npx turbo run test`**
-Files: MODIFIED `e2e/login-offline.spec.ts:306-331` (**AUTHORIZED #1**, T10 only), same file — ADD 1 new test.
-- [ ] 9.1 RED (authorized rewrite) — invert T10: after `page.reload()`, stay on `/sales/products`, no `AUTH.UNLOCK_REQUIRED`; an entity write after reload still yields `enc:v1:` (same-DEK proof, not just "no prompt"); keep `expectOnlyKnownTelemetry` + `expectNoLoginAttempt` (reload stays HTTP-quiet).
-- [ ] 9.2 (ADD, new test) — `indexedDB.deleteDatabase('lizoft-device-key')` (localStorage intact) → reload → `/login?unlock=1` → password → back in, data readable (F4 — the unlock path proven NOT to vanish with T10).
-- [ ] 9.3 Regression check — T9 and T11 (adjacent tests in the same file) still pass unedited.
-**FLAG — hand off to the user**: requires a real Chromium via Playwright AND the .NET backend running (T10's reload is deliberately ONLINE — `getUserByToken()`'s cached-profile branch). Per project convention this repo's agent does not run `dotnet`; verify: `pnpm test:e2e` (or `pnpm --filter web-store-pos exec playwright test login-offline.spec.ts --grep-invert @rate-limit` to scope it) — run by the user, with the backend already up.
+Files: MODIFIED `e2e/login-offline.spec.ts` (**AUTHORIZED #3 of 3**, T10 only), same file — ADD 1 new test (F4).
+- [x] 9.1 (authorized rewrite) — inverted T10: after `page.reload()`, stays on `/sales/products`, no `AUTH.UNLOCK_REQUIRED`; two same-DEK proofs — data written BEFORE the reload stays readable, and a fresh entity write AFTER the reload still yields `enc:v1:` (not just "no prompt"); kept `expectOnlyKnownTelemetry` + `loginNetwork.expectNoLoginAttempt()` (reload stays HTTP-quiet).
+- [x] 9.2 (ADD, new test) — F4: `indexedDB.deleteDatabase('lizoft-device-key')` (localStorage wrap table intact) → reload → `/login?unlock=1` → password → back in, both same-DEK proofs repeated post-recovery.
+- [x] 9.3 Regression check — T1-T9 and T11 confirmed byte-for-byte unchanged (`git diff` shows only T10's old body removed, nothing else touched).
+**FLAG — hand off to the user, UNVERIFIED**: requires a real Chromium via Playwright AND the .NET backend running (T10's reload is deliberately ONLINE — `getUserByToken()`'s cached-profile branch). Per project convention this repo's agent does not run `dotnet` and did not run Playwright. `playwright test e2e/login-offline.spec.ts --list` confirms the file parses/compiles and all imports resolve (12 tests listed) — this is NOT proof the assertions pass. Verify with:
+```
+pnpm test:e2e
+```
 Finish/rollback: revertible only together with Slice B (T10's original assertion fails against WU5-8).
+**DONE (implementation) 2026-08-10, commit `300ca3be`.** Test execution status: UNVERIFIED — hand off to user per above.
 
 ### WU10 — `profile/routes/change-password.tsx` re-wrap seam
-Files: MODIFIED `change-password.tsx` (between line 25 POST and line 28 `logout()`), `profile/routes/__tests__/profile-routes.test.tsx` (ADD 1 new test only — existing `ChangePasswordPage` suites untouched). Depends on WU5. Mandatory per Q2 (#2117) — not conditional.
-- [ ] 10.1 RED — on successful `changePassword`, `rewrapDeviceDekForPassword(user.login, payload.newPassword)` is called (dynamic import) BEFORE `logout()`; a rejected rewrap does not prevent `logout()` from being called (swallowed, matching `entity-migration.ts:15-18`'s doctrine).
-- [ ] 10.2 GREEN — wire the dynamic import + `try { await rewrapDeviceDekForPassword(...) } catch {}` before `logout()`.
-Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
+Files: MODIFIED `change-password.tsx` (between line 25 POST and line 28 `logout()`), `profile/routes/__tests__/profile-routes.test.tsx` (ADD 2 new tests only — existing `ChangePasswordPage` suites untouched). Depends on WU5. Mandatory per Q2 (#2117) — not conditional.
+- [x] 10.1 RED — on successful `changePassword`, `rewrapDeviceDekForPassword(user.login, payload.newPassword)` is called (dynamic import) BEFORE `logout()`; a rejected rewrap does not prevent `logout()` from being called (swallowed, matching `entity-migration.ts:15-18`'s doctrine).
+- [x] 10.2 GREEN — wired the dynamic import + `try { await rewrapDeviceDekForPassword(...) } catch {}` before `logout()`.
+Verify: `npx turbo run test --force --filter=@store-mgmt/web-store-pos` — 185 test files, 2435 tests, 0 failures (+2 over WU8.2's 2433).
 Finish/rollback: revertible alone (unused-but-harmless if reverted without Slice B) or together with WU5.
+**DONE 2026-08-10, commit `c36a8a85`.**
 
 ---
 
