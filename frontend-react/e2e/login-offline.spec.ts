@@ -158,6 +158,29 @@ async function deleteDeviceKeyDatabase(page: Page): Promise<void> {
  * seeded category in place and the prefix locator unambiguous. Local to this
  * spec on purpose: store-seed.ts is shared with other specs and outside this
  * change's authorization boundary. */
+/** Asserts a product name is rendered in the category list, expanding the
+ * panel first if it is closed.
+ *
+ * `products.tsx:316,358` renders the product list only under
+ * `{isExpanded && ...}`, and `expandedCategoryIds` starts as an EMPTY Set on
+ * every mount — so every category is collapsed after any reload or
+ * navigation, and only the chevron/header toggle
+ * (`category-panel-toggle-{id}`) opens it. The gear deliberately does NOT
+ * (products.tsx:323-326).
+ *
+ * A bare `getByText(name)` therefore proves nothing about the stored data:
+ * it can match transient copy while the list itself is closed. Going through
+ * the panel is what makes this a real decryption proof — the rendered row
+ * can only come from `decryptEntity` succeeding on the products entity.
+ * Idempotent: safe to call with the panel already open. */
+async function expectProductVisibleInCategory(page: Page, name: string): Promise<void> {
+  const panelToggle = page.locator('[data-testid^="category-panel-toggle-"]');
+  if ((await panelToggle.getAttribute('aria-expanded')) !== 'true') {
+    await panelToggle.click();
+  }
+  await expect(page.getByText(name)).toBeVisible();
+}
+
 async function addProductToExistingCategory(page: Page, name: string): Promise<void> {
   await page.locator('[data-testid^="category-actions-toggle-"]').click();
   await page.getByTestId('add-product-button').click();
@@ -418,7 +441,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // recovered silently, not a different one.
     const beforeName = `E2E T10 antes del reload ${login}`;
     await seedCategoryAndProduct(page, beforeName);
-    await expect(page.getByText(beforeName)).toBeVisible();
+    await expectProductVisibleInCategory(page, beforeName);
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
     // The DEK lives only in a module-level `let` (data-key-store.ts) — ANY
@@ -439,14 +462,14 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // any OTHER key — rendering this back out is what a byte-for-byte
     // identical recovered DEK looks like from the outside, stronger proof
     // than "no prompt appeared" alone.
-    await expect(page.getByText(beforeName)).toBeVisible();
+    await expectProductVisibleInCategory(page, beforeName);
 
     // Same-DEK proof #2: a FRESH entity write after the reload still
     // produces ciphertext (`enc:v1:`), not plaintext — the recovered DEK is
     // live and functional for new writes, not merely cached for old reads.
     const afterName = `E2E T10 después del reload ${login}`;
     await addProductToExistingCategory(page, afterName);
-    await expect(page.getByText(afterName)).toBeVisible();
+    await expectProductVisibleInCategory(page, afterName);
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
     expectOnlyKnownTelemetry(anyRequest, 'T10 reload con recuperación silenciosa del DEK');
@@ -476,7 +499,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
 
     const name = `E2E F4 ${login}`;
     await seedCategoryAndProduct(page, name);
-    await expect(page.getByText(name)).toBeVisible();
+    await expectProductVisibleInCategory(page, name);
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
     // F4's precondition: destroy ONLY the device key (IndexedDB) — the
@@ -510,7 +533,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // the products screen, which is where that copy renders.
     await page.goto('/sales/products');
     await page.waitForURL(/\/sales\/products$/);
-    await expect(page.getByText(name)).toBeVisible();
+    await expectProductVisibleInCategory(page, name);
     await expectProductsEntityEncrypted(page, bundle.storeId);
 
     expectOnlyKnownTelemetry(anyRequest, 'F4 clave de dispositivo destruida, wrap de contraseña intacto');
