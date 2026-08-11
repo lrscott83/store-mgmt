@@ -197,5 +197,19 @@ Finish/rollback: revertible alone (unused-but-harmless if reverted without Slice
 
 ---
 
+## Phase D — Final verify closure (WARNING + SUGGESTION)
+
+### WU11 — Close the final `sdd-verify` WARNING + SUGGESTION
+Files: MODIFIED `offline/dek-provisioning.ts` (step 3a's `own` branch, + step 6's swallow), MODIFIED `profile/routes/change-password.tsx` (rewrap swallow), MODIFIED (append-only) `offline/__tests__/dek-provisioning.test.ts` (new test 5.15 only — 5.1-5.13 byte-identical). Depends on WU8.2/WU10 (verify-report obs #2128).
+- [x] 11.1 RED — new test `dek-provisioning.test.ts` 5.15 reproduces the compound-failure lockout: this login's own table entry stale (simulates WU10's rewrap having silently failed — table entry still wrapped under the OLD password) + device key unusable (this test file's own `getDeviceKey -> null` mock) + a FRESH roster wrap of the SAME device DEK present under the NEW (correct) password. Asserts the precondition (stale own entry genuinely rejects under the new password; fresh roster wrap genuinely accepts it) before asserting recovery. Confirmed failing for the right reason: `resolveDekForLogin` rejected with the uncaught `DekUnwrapError` from `own`'s failed unwrap at `dek-provisioning.ts:107`, never reaching the roster.
+- [x] 11.2 GREEN (the WARNING) — step 3a's `if (own)` unwrap is now wrapped in `try/catch`; on failure, `dek` stays `null` and control falls through to the same "try roster, else F5 dead end" logic that already existed for the `own`-absent case (restructured as a shared `if (dek === null) { ... }` block right after, avoiding duplicating the roster/F5 logic). Preserves the hard F5 fail when NEITHER `own` NOR the roster can open the DEK. Matches spec `device-dek-wrap/spec.md:73-81` ("...MUST succeed by recovering the DEK ... or from any other still-valid wrap in the table") and `at-rest-encryption-errors/spec.md` ("DekUnwrapError only when NEITHER the local wrap table NOR the roster holds any wrap recoverable").
+- [x] 11.3 Verified untouched and green, unaffected by 11.2 (all take a code path this change never edits — `table === null` for 11.4, or `own`'s unwrap SUCCEEDS for 5.7/5.13/5.5, so the new `catch` never fires): `auth-store.dek.test.ts` 11.3 and 11.4, `dek-provisioning.test.ts` 5.7 (F9) and 5.13, `offline-auth-service.test.ts`, `roster-store.test.ts`, `roster-store.purity.test.ts`, `entity-crypto.test.ts`, `profile-routes.test.tsx` (WU10's 2 tests).
+- [x] 11.4 GREEN (the SUGGESTION) — added `console.error` on both previously-silent swallows, matching the D6 `CONFLICT_LOG_MARKER` precedent 12 lines above the first one: `dek-provisioning.ts` step 6 (`runEntityMigration()` catch) now logs `ENTITY_MIGRATION_SWALLOW_LOG_MARKER` + the error; `change-password.tsx`'s rewrap catch now logs a matching marker + the error. Logging only — neither swallow's guarantee changed (step 6 still never blocks login; the rewrap catch still never blocks the mandatory `logout()`); no i18n key, no UI.
+Verify: `npx turbo run test --force` (frontend-react/) — 185 test files, 2436 tests, 0 failures, `Cached: 0 cached, 3 total` (+1 over WU10's 2435, test 5.15). One transient failure (`store-creation-trial.test.tsx`, unrelated file, not touched this batch) on the first `--force` run — confirmed a pre-existing flake, not a regression: passed in isolation and passed clean on an immediate re-run of the full `--force` gate (185/2436/0 failures both times after).
+Finish/rollback: revertible alone; does not touch WU8.2's narrowing condition or WU10's seam ordering.
+**DONE 2026-08-11, commit(s): see apply-progress `sdd/device-wrapped-dek/apply-progress`.**
+
+---
+
 ## Full-suite gate (run after every Work Unit)
 `npx turbo run test --force` from `frontend-react/` — full regression, not scoped. Cite this output, never a cached run, as evidence a Work Unit is done.
