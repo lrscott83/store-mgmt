@@ -37,19 +37,17 @@ Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
   podría escribirlas en un backend compartido. No existe ningún `.env.example` que copiar,
   y no tener `.env` es un estado soportado.
 
-  **No hace falta levantar el backend a mano.** `playwright.config.ts` lo arranca él
-  mismo, apuntado a la base de test `smca_test`, y espera a que `/api/v1/auth/ping`
-  conteste antes de correr un solo test. Solo necesitás PostgreSQL escuchando en
-  `localhost:5432` con la base `smca_test` creada.
+  Backend levantado a mano, en otra terminal, con PostgreSQL en `localhost:5432` y la
+  base `smca_test` creada:
 
-  Como Playwright es el dueño del proceso, el puerto `5019` tiene que estar **libre**:
-  la entrada del backend usa `reuseExistingServer: false` a propósito, para que un
-  backend levantado a mano contra `smca` no sea reutilizado en silencio. Si ya tenés uno
-  corriendo, bajalo antes.
+  ```bash
+  dotnet run --project backend/src/SMCA.WebApi --launch-profile http-e2e
+  ```
 
-  **Nunca** `--launch-profile https`: `app.UseHttpsRedirection()` (`Program.cs:138`) redirigiría
-  al puerto HTTPS con un certificado autofirmado que un navegador real rechaza; esta suite no
-  configura `ignoreHTTPSErrors`.
+  **`http-e2e`, no `http`.** Ese perfil existe exactamente para esto: ya trae la
+  connection string a `smca_test`, así que no hay ninguna variable de entorno que
+  exportar. El perfil `http` apunta a la base de desarrollo `smca` y la suite le deja
+  filas `e2e-*` que nadie limpia — ver [Modo BD de test (`smca_test`)](#modo-bd-de-test-smca_test).
 
   **Nunca** `--launch-profile https`: `app.UseHttpsRedirection()` (`Program.cs:138`) redirigiría
   al puerto HTTPS con un certificado autofirmado que un navegador real rechaza; esta suite no
@@ -82,24 +80,19 @@ La app usa `vite-plugin-pwa` con `devOptions.enabled: true`, así que en dev se 
 
 ## Modo BD de test (`smca_test`)
 
-Por defecto el backend dev (`--launch-profile http`) usa la base `smca` y la suite deja filas `e2e-*` ahí. Para que Playwright escriba en la BD de test (`smca_test`), se sobreescribe la connection string **sin tocar código**: la variable de entorno `ConnectionStrings__Application` tiene prioridad máxima sobre `appsettings.Development.json` (la misma técnica que usa `WebAppFixture.cs:21-22` para la suite .NET).
-
-Levantar el backend así, en la terminal del backend:
-
-```powershell
-# PowerShell
-$env:ConnectionStrings__Application = "Host=localhost;Port=5432;Database=smca_test;Username=postgres;Password=postgres;Persist Security Info=True;Include Error Detail=True"
-dotnet run --project backend/src/SMCA.WebApi --launch-profile http
-```
-
-o en bash:
+El perfil `http` apunta a la base de desarrollo `smca`. **Para Playwright hay un perfil propio, `http-e2e`**, que es igual pero con la connection string a `smca_test` ya puesta:
 
 ```bash
-export ConnectionStrings__Application="Host=localhost;Port=5432;Database=smca_test;Username=postgres;Password=postgres;Persist Security Info=True;Include Error Detail=True"
-dotnet run --project backend/src/SMCA.WebApi --launch-profile http
+dotnet run --project backend/src/SMCA.WebApi --launch-profile http-e2e
 ```
 
+Eso es todo: **no hay ninguna variable de entorno que exportar**. El perfil vive en `backend/src/SMCA.WebApi/Properties/launchSettings.json` y define `ConnectionStrings__Application`, que tiene prioridad sobre `appsettings.Development.json` (la misma técnica que usa `WebAppFixture.cs:21-22` para la suite .NET). Trae además `launchBrowser: false`, porque para una corrida de tests no hace falta que se abra Swagger.
+
+Antes esto era una variable de entorno que había que exportar a mano en cada corrida, y nada en el repo lo forzaba. Olvidarla mandaba las filas `e2e-*` a `smca`, donde se acumulaban sin teardown hasta hacer fallar por timeout specs que estaban verdes en el mismo commit. El perfil existe para que ese olvido no sea posible.
+
 Los tests no cambian nada: `E2E_API_URL` ya apunta al backend (`http://localhost:5019/api` por defecto).
+
+> Si igual arrancás con `--launch-profile http`, la suite corre pero ensucia `smca`. La señal es el aviso del `globalTeardown` al final: **`0 filas e2e-* borradas`** (borra en `smca_test`, que en ese caso quedó vacía).
 
 > ⚠️ **No uses `ASPNETCORE_ENVIRONMENT=Testing` para esto.** Ese entorno existe para la suite .NET y **apaga el rate limiter** (`Program.cs:112-121`): los specs `register-rate-limit.spec.ts` (REQ-9) y `login-rate-limit.spec.ts` (REQ-8) dependen de recibir 429 y se romperían. El modo correcto es **perfil `http` (Development) + env var de conexión**: rate limits ON, BD `smca_test`.
 

@@ -10,6 +10,16 @@
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:5019"
     },
+    "http-e2e": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__Application": "Host=localhost;Port=5432;Database=smca_test;Username=postgres;Password=postgres;Persist Security Info=True;Include Error Detail=True"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5019"
+    },
     "https": {
       "commandName": "Project",
       "launchBrowser": true,
