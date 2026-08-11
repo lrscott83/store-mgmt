@@ -178,7 +178,21 @@ async function expectProductVisibleInCategory(page: Page, name: string): Promise
   if ((await panelToggle.getAttribute('aria-expanded')) !== 'true') {
     await panelToggle.click();
   }
-  await expect(page.getByText(name)).toBeVisible();
+  // Scoped to the expanded panel, NOT the whole page, and that is not
+  // defensive styling — `seedCategoryAndProduct` names the category and the
+  // product with the SAME string (store-seed.ts:33,44), so a page-wide
+  // `getByText(name)` matches the category header too and Playwright rejects
+  // it as a strict-mode violation once the panel is open.
+  //
+  // `products.tsx:327-366` renders the header row as a div holding the
+  // `category-panel-toggle-{id}` button as a DIRECT child, and the expanded
+  // panel as that div's NEXT SIBLING. Selecting the sibling reaches the
+  // product list and nothing else, without adding a `data-testid` to
+  // production for a test's convenience (the rule store-seed.ts:6-7 states).
+  const expandedPanel = page.locator(
+    'div:has(> [data-testid^="category-panel-toggle-"]) + div'
+  );
+  await expect(expandedPanel.getByText(name)).toBeVisible();
 }
 
 async function addProductToExistingCategory(page: Page, name: string): Promise<void> {
