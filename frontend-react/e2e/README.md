@@ -37,14 +37,19 @@ Tests end-to-end del frontend React con [Playwright](https://playwright.dev/).
   podría escribirlas en un backend compartido. No existe ningún `.env.example` que copiar,
   y no tener `.env` es un estado soportado.
 
-  Backend levantado a mano, en otra terminal, con PostgreSQL en `127.0.0.1:5432` (base `smca`):
+  **No hace falta levantar el backend a mano.** `playwright.config.ts` lo arranca él
+  mismo, apuntado a la base de test `smca_test`, y espera a que `/api/v1/auth/ping`
+  conteste antes de correr un solo test. Solo necesitás PostgreSQL escuchando en
+  `localhost:5432` con la base `smca_test` creada.
 
-  ```bash
-  dotnet run --project backend/src/SMCA.WebApi --launch-profile http
-  ```
+  Como Playwright es el dueño del proceso, el puerto `5019` tiene que estar **libre**:
+  la entrada del backend usa `reuseExistingServer: false` a propósito, para que un
+  backend levantado a mano contra `smca` no sea reutilizado en silencio. Si ya tenés uno
+  corriendo, bajalo antes.
 
-  Si preferís que la suite escriba en la BD de test en vez de la dev, ver la
-  sección [Modo BD de test (`smca_test`)](#modo-bd-de-test-smca_test) más abajo.
+  **Nunca** `--launch-profile https`: `app.UseHttpsRedirection()` (`Program.cs:138`) redirigiría
+  al puerto HTTPS con un certificado autofirmado que un navegador real rechaza; esta suite no
+  configura `ignoreHTTPSErrors`.
 
   **Nunca** `--launch-profile https`: `app.UseHttpsRedirection()` (`Program.cs:138`) redirigiría
   al puerto HTTPS con un certificado autofirmado que un navegador real rechaza; esta suite no
