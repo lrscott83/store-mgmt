@@ -231,6 +231,17 @@ The user was shown the tradeoff and chose to close it.
   first 40 characters, so no literal prefix can match it. Verified without Playwright: the three real
   samples each match exactly their own pattern, and a control (`alert("soy nuevo")`) matches none.
   `tsc --noEmit --strict` over the two e2e files → exit 0.
+  ✅ **USER-VERIFIED 2026-08-11, after the fix**: `npx playwright test e2e/csp-report-only.spec.ts
+  --project=chromium` → **3 passed (13.4s)**. The zero-violation sweep is green across `/`, `/login`
+  and `/register` with all three narrow entries in place.
+
+  **Unrelated failures seen in the same full-suite run, exonerated — do NOT chase them here.**
+  `login.spec.ts:113` and `store-plan-activation.spec.ts:59` both timed out at 120s. They fail
+  identically on `main`, which predates this branch, so this change is not the cause — and it could not
+  be: a report-only header blocks nothing. Root cause is the documented environment trap: the dev
+  backend was pointed at the `smca` database instead of `smca_test`, so the seeded OwnerAdmin does not
+  authenticate and the login submit bounces back to `/login`. Fix is an env var on the backend launch,
+  not a code change.
   Playwright is not runnable in the agent's environment, so this run is the only evidence that the
   `samplePrefix` matches a live Chromium violation report — and it does. The zero-violation sweep
   passes across `/`, `/login` and `/register` with the narrowed allowlist.
