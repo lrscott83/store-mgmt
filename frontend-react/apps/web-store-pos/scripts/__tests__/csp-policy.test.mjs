@@ -21,6 +21,18 @@ describe('csp-policy', () => {
       expect(value).not.toMatch(/unsafe-eval/);
     });
 
+    it("script-src declares 'report-sample' so a report says WHICH inline script violated", () => {
+      // Not a relaxation: 'report-sample' grants no source any permission, it
+      // only makes the violation report carry the first ~40 chars of the
+      // offending script. Without it Chrome reports every inline script
+      // identically (`blockedURI: 'inline'`), so the Playwright sweep's
+      // KNOWN_DEV_ONLY_VIOLATIONS allowlist could only be written broadly
+      // enough to swallow a genuinely new inline script too. See
+      // e2e/support/csp-violations.ts.
+      const value = buildCspHeaderValue('prod');
+      expect(value).toMatch(/script-src [^;]*'report-sample'/);
+    });
+
     it('style-src carries the permanent unsafe-inline carve-out', () => {
       const value = buildCspHeaderValue('prod');
       expect(value).toContain("style-src 'self' 'unsafe-inline'");
@@ -29,7 +41,8 @@ describe('csp-policy', () => {
     it('matches the canonical production string byte-for-byte (design.md D3)', () => {
       expect(buildCspHeaderValue('prod')).toBe(
         "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
-          "form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; " +
+          "form-action 'self'; script-src 'self' 'report-sample'; " +
+          "style-src 'self' 'unsafe-inline'; img-src 'self'; " +
           "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'"
       );
     });

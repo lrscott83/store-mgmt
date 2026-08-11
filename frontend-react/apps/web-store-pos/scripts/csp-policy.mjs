@@ -28,7 +28,13 @@ const BASE_DIRECTIVES = [
   ['object-src', ["'none'"]],
   ['frame-ancestors', ["'none'"]],
   ['form-action', ["'self'"]],
-  ['script-src', ["'self'"]],
+  // 'report-sample' grants nothing — it is a reporting flag, not a source
+  // expression. With it, a blocked inline script's violation report carries a
+  // `sample` (the first ~40 chars); without it every inline script reports
+  // identically as `blockedURI: 'inline'`, which is too coarse for the
+  // zero-violation sweep to tell react-router's dev hydration payload apart
+  // from a genuinely new inline script. See e2e/support/csp-violations.ts.
+  ['script-src', ["'self'", "'report-sample'"]],
   ['style-src', ["'self'", "'unsafe-inline'"]], // permanent carve-out, spec.md — chart tooltip inline styles
   ['img-src', ["'self'"]],
   ['font-src', ["'self'"]],

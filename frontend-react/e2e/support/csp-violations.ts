@@ -23,11 +23,24 @@ export interface CspViolationRecord {
   disposition: string;
   blockedURI: string;
   violatedDirective: string;
+  /**
+   * First ~40 chars of the offending script. Populated ONLY because
+   * `script-src` declares `'report-sample'` (scripts/csp-policy.mjs). Empty
+   * string when the browser has nothing to sample.
+   */
+  sample: string;
 }
 
 export interface KnownDevOnlyViolation {
   effectiveDirective: string;
   blockedURI: string;
+  /**
+   * The violation's `sample`, after trimming leading whitespace, must START
+   * with this. This is what keeps the allowlist narrow: without it, an entry
+   * for `blockedURI: 'inline'` would swallow every inline script on every
+   * route, including one a future change introduces by accident.
+   */
+  samplePrefix: string;
 }
 
 /**
@@ -44,25 +57,32 @@ export interface KnownDevOnlyViolation {
  * `window.__reactRouterContext.streamController.enqueue(...)` /
  * `.close()` calls (verified by curling `http://localhost:3333/` directly
  * and inspecting the raw HTML — NOT a Playwright artifact). Chrome reports
- * all three identically: `effectiveDirective: 'script-src-elem'`,
- * `blockedURI: 'inline'` — the browser gives no finer-grained identifier for
- * a blocked inline script without the `report-sample` CSP keyword, which
- * this change's directive table does not declare, so one entry covers all
- * three.
+ * all three identically as `effectiveDirective: 'script-src-elem'`,
+ * `blockedURI: 'inline'` — so those two fields alone cannot tell this
+ * payload apart from a genuinely new inline script. `script-src` therefore
+ * declares `'report-sample'` (scripts/csp-policy.mjs), which grants no
+ * source any permission and only makes the report carry a `sample`. All
+ * three scripts are emitted from string literals that begin with
+ * `window.__reactRouterContext` (react-router@7.15.1
+ * `dist/development/chunk-4N6VE7H7.mjs:8189, 8201, 9983` — read from the
+ * package on disk, not inferred from a run), so ONE prefix covers all three
+ * and nothing else.
  *
  * Never fixed by adding `'unsafe-inline'` to `script-src` — that deletes the
  * reason this change exists (spec.md, "script-src Excludes Unsafe
- * Keywords"). **NOT VERIFIED**: whether `react-router build`'s static output
- * (SPA mode, prerendered once at build time) carries the same inline
- * payload — this sweep only reaches the dev server (design.md §5, "NOT
- * PROVEN ... only the dev document is observable"). If it does, the
- * production build carries the same, harmless-in-report-only violation,
- * subject to WU3's §3.7 manual pass.
+ * Keywords").
+ *
+ * **NOT VERIFIED**: whether `react-router build`'s static output (SPA mode,
+ * prerendered once at build time) carries the same inline payload — this
+ * sweep only reaches the dev server (design.md §5, "NOT PROVEN ... only the
+ * dev document is observable"). If it does, production carries the same,
+ * harmless-in-report-only violation, subject to WU3's §3.7 manual pass.
  */
 export const KNOWN_DEV_ONLY_VIOLATIONS: readonly KnownDevOnlyViolation[] = [
   {
     effectiveDirective: 'script-src-elem',
     blockedURI: 'inline',
+    samplePrefix: 'window.__reactRouterContext',
   },
 ];
 
@@ -82,7 +102,10 @@ const BINDING_NAME = '__reportCspViolation';
 
 function isKnownDevOnly(record: CspViolationRecord): boolean {
   return KNOWN_DEV_ONLY_VIOLATIONS.some(
-    (known) => known.effectiveDirective === record.effectiveDirective && known.blockedURI === record.blockedURI
+    (known) =>
+      known.effectiveDirective === record.effectiveDirective &&
+      known.blockedURI === record.blockedURI &&
+      record.sample.trimStart().startsWith(known.samplePrefix)
   );
 }
 
@@ -101,6 +124,7 @@ export async function installCspViolationObserver(page: Page): Promise<CspViolat
         disposition: event.disposition,
         blockedURI: event.blockedURI,
         violatedDirective: event.violatedDirective,
+        sample: event.sample ?? '',
       };
       (window as unknown as Record<string, (record: unknown) => void>)[bindingName](report);
     });
@@ -116,8 +140,18 @@ export async function installCspViolationObserver(page: Page): Promise<CspViolat
     expectZeroViolations: (context?: string) => {
       const unexpected = records.filter((record) => !isKnownDevOnly(record));
       if (unexpected.length === 0) return;
+      // The sample is in the message on purpose: it is the one field that
+      // says WHICH inline script this was, and it is what a new
+      // KNOWN_DEV_ONLY_VIOLATIONS entry would have to be written against. An
+      // empty sample on an inline violation means `'report-sample'` went
+      // missing from script-src (scripts/csp-policy.mjs) — that breaks this
+      // allowlist by design, loudly, instead of silently widening it.
       const summary = unexpected
-        .map((r) => `${r.effectiveDirective} blocked ${r.blockedURI} on ${r.documentURI} (${r.disposition})`)
+        .map(
+          (r) =>
+            `${r.effectiveDirective} blocked ${r.blockedURI} on ${r.documentURI} (${r.disposition})` +
+            `${r.sample ? ` sample: ${JSON.stringify(r.sample)}` : ' sample: <empty>'}`
+        )
         .join('; ');
       throw new Error(
         `Expected zero CSP violations${context ? ` (${context})` : ''}, observed ${unexpected.length}: ${summary}.`

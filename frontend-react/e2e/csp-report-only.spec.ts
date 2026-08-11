@@ -76,8 +76,10 @@ test.describe('CSP report-only header (dev)', () => {
     // KNOWN_DEV_ONLY_VIOLATIONS started empty and gained exactly one entry
     // once this sweep actually ran (design.md §6.7's predicted "single most
     // likely thing to force a revision of §4.4" — see the comment on the
-    // constant in csp-violations.ts for the full finding). Any OTHER
-    // violation still fails this test.
+    // constant in csp-violations.ts for the full finding). That entry is
+    // pinned to a `samplePrefix`, so it covers react-router's dev hydration
+    // payload and NOTHING else: a new inline script added by a future change
+    // carries a different sample and still fails this test.
     const observer = await installCspViolationObserver(page);
 
     for (const route of ['/', '/login', '/register']) {

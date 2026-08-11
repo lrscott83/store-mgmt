@@ -180,9 +180,44 @@ violation" scenario.
   16-test `csp-policy.test.mjs` = exact match), `Type Errors: no errors`. WU1 regression check:
   `e2e/pwa-install-capture.spec.ts --project=chromium` → 3/3 green, no regression.
 
+### 2.6 — `'report-sample'` added to `script-src` (user decision, after WU2's commit)
+
+Not in the original plan. WU2 shipped `KNOWN_DEV_ONLY_VIOLATIONS` with a single entry keyed on
+`{effectiveDirective: 'script-src-elem', blockedURI: 'inline'}` — correct for react-router's dev
+hydration payload, but **too wide**: those two fields are identical for EVERY inline script, so the
+entry would also swallow a genuinely new inline script introduced by a future change, silently. The
+zero-violation sweep would keep passing while the thing it exists to catch walked past it.
+
+The user was shown the tradeoff and chose to close it.
+
+- [x] 2.6 **[vitest RED → GREEN]** Add `'report-sample'` to `script-src` in `scripts/csp-policy.mjs` and
+  narrow the allowlist entry with a `samplePrefix`.
+  `'report-sample'` is a **reporting flag, not a source expression** — it grants no origin any
+  permission; it only makes the violation report carry the offending script's first ~40 chars in
+  `SecurityPolicyViolationEvent.sample`. `spec.md`'s "script-src Excludes Unsafe Keywords" is untouched:
+  the excluded keywords are `'unsafe-inline'`/`'unsafe-eval'`, and both remain absent.
+  RED first: the new `'report-sample'` assertion plus the byte-for-byte canonical-string test failed
+  2/17 for exactly the expected reason (`script-src 'self'` vs `script-src 'self' 'report-sample'`).
+  GREEN: 17/17.
+  The prefix is **read from the package on disk, not inferred from a run** — all three inline scripts
+  are emitted from literals starting with `window.__reactRouterContext`
+  (`react-router@7.15.1/dist/development/chunk-4N6VE7H7.mjs:8189`, `:8201`, `:9983`). `isKnownDevOnly`
+  now requires `sample.trimStart().startsWith(samplePrefix)` on top of the two original fields, and the
+  failure message prints the sample so a future entry can be written against real evidence. If
+  `'report-sample'` ever disappears from `script-src`, every sample goes empty and the allowlist stops
+  matching — the sweep fails loudly instead of silently widening.
+  Verified here: `vitest run scripts/__tests__/csp-policy.test.mjs` 17/17; `turbo run lint typecheck
+  test --filter=@store-mgmt/web-store-pos --force` 12/12, 186 files / 2453 tests, 0 type errors; and,
+  because the type gate does not cover `e2e/`, an ad-hoc
+  `tsc --noEmit --strict --lib es2022,dom,dom.iterable` over the three new e2e files → exit 0.
+  ⚠️ **PENDING USER VERIFICATION**: `npx playwright test e2e/csp-report-only.spec.ts --project=chromium`.
+  Playwright is not runnable in the agent's environment; the sample prefix matching against a live
+  Chromium report is unverified until that run.
+
 **Finish/rollback boundary**: one commit (`feat(content-security-policy): policy generator + dev header +
-Playwright coverage (WU2)`). Revert = dev header disappears, nothing else changes — **must be reverted
-after WU3** (`verify-csp.mjs` imports `csp-policy.mjs`; reverting WU2 alone breaks `build`).
+Playwright coverage (WU2)`), plus a follow-up commit for 2.6. Revert = dev header disappears, nothing
+else changes — **must be reverted after WU3** (`verify-csp.mjs` imports `csp-policy.mjs`; reverting WU2
+alone breaks `build`).
 
 ---
 
