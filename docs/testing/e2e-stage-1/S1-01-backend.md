@@ -1,10 +1,8 @@
 # S1-01 — Plan de backend
 
-> Trabajo **diferido**. Nada de acá se ejecuta sin decisión explícita del usuario.
+> Trabajo **EJECUTADO y MERGEADO el 2026-08-08/09** — este plan quedó obsoleto. Las 6 aserciones se cubrieron en `Auth/AuthRegisterDataAssertionsTests.cs` (commit `edcf7397`, merge `af304402`, cambio `e2e-stage-1-s1-01-backend`, archivado en `openspec/changes/archive/2026-08-07-e2e-stage-1-s1-01-backend/`, verify PASS 6/6). Se conserva como registro histórico del diagnóstico.
 >
-> Plan de backend específico de [S1-01](S1-01.md). Sale de una auditoría del 2026-08-07 que contrastó **cada aserción declarada en la US** contra el código real de `backend/src/SMCA.WebApi.E2ETests/`. No sale de leer la sección "Estado de cobertura" de la US: esa sección es justamente lo que estaba mal.
->
-> **Regla del proyecto (`CLAUDE.md`, innegociable)**: tocar un test E2E existente requiere autorización explícita. Agregar tests nuevos está permitido.
+> Regla del proyecto (`CLAUDE.md`, innegociable): tocar un test E2E existente requiere autorización explícita. Agregar tests nuevos está permitido.
 
 ## Qué encontró la auditoría
 
@@ -26,6 +24,8 @@ Todo lo demás que la US declara **no lo afirma nadie**. Los checkboxes describe
 **Sí está cubierto**, para que no se re-verifique: `PaymentStartDate = hoy` → `Billing/StoreCreationTrialTests.cs:332` (`Register_creates_store_with_paymentStartDate_today`). Y el `ExpiresIn` del token → `Auth/AuthTokenLifetimeTests.cs:69`.
 
 ## Qué hacer
+
+> **SUPERSEDED 2026-08-08**: las 6 aserciones quedaron cubiertas por `Auth/AuthRegisterDataAssertionsTests.cs` (6 `[Fact]`s, verify PASS 6/6, archivado). No queda acción de código. El plan se conserva por el diagnóstico: los checkboxes de `S1-01.md` describían comportamiento de producción, no cobertura de test.
 
 Extender `Auth/AuthRegisterSuccessTests.cs` —o agregar un fichero nuevo al lado— para afirmar los 6 puntos. Todos son verificables leyendo la base después del `POST /v1/auth/register`, que es lo que ese test ya hace para `Owner` y `Store`.
 
