@@ -12,10 +12,10 @@ export interface TestIdentity {
  *
  * `login` shape: `e2e-{YYYYMMDD}T{HHmmss}-{6 base36 chars}` — three parts,
  * each earning its place:
- * - `e2e-` prefix: makes the resulting `Owner`/`Store` rows greppable and
- *   deletable by hand in the local `smca` database. There is no teardown
- *   reachable from the browser (see e2e/README.md) — this prefix is the
- *   entire mitigation for that.
+ * - `e2e-` prefix: the cleanup contract. No teardown is reachable from the
+ *   browser, so `support/global-teardown.ts` sweeps the database once after
+ *   the whole run and matches rows by exactly this prefix. A login that does
+ *   not start with `e2e-` is never cleaned up — it leaks permanently.
  * - Timestamp: orderable, so "delete everything before yesterday" is a
  *   trivial filter later.
  * - 6-char random suffix: avoids collisions between parallel workers landing

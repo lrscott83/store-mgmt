@@ -110,9 +110,17 @@ La suite .NET E2E y Playwright **no deben correr en paralelo contra `smca_test`*
 dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
 ```
 
-### Limpieza manual (solo si no corrés la suite .NET)
+### Limpieza automática de la propia suite (`globalTeardown`)
 
-Una corrida de Playwright contra `smca_test` deja filas `e2e-*` igual que contra `smca` (no hay teardown alcanzable desde el navegador). Para limpiarlas sin correr los 320+ tests .NET, borrá solo las filas con el prefijo `e2e-` en el **mismo orden FK** que `ResetDataAsync` (los FKs son `DeleteBehavior.Restrict`; children primero). Ejemplo con `psql`:
+Playwright borra sus propias filas `e2e-*` al terminar la corrida, vía `globalTeardown` (`e2e/support/global-teardown.ts`, cableado en `playwright.config.ts`). No hay que hacer nada a mano.
+
+Va **una sola vez al final**, y no por spec, a propósito: con `fullyParallel: true` un borrado per-spec eliminaría las filas vivas de los specs que siguen corriendo — el mismo peligro que el `ResetDataAsync` descrito arriba. `globalTeardown` corre cuando ya no queda ningún worker, así que es el único lugar seguro para un borrado por prefijo.
+
+Se conecta a `postgresql://postgres:postgres@localhost:5432/smca_test` por defecto; sobreescribí con la variable `E2E_DB_URL` si tu backend apunta a otra base. Si **no puede conectarse**, la corrida falla con un mensaje explícito: no conectarse significa que la limpieza no ocurrió, y acumular en silencio es justamente lo que esto viene a evitar. Si conecta y borra **cero** filas, avisa por consola — normalmente eso significa que el backend está escribiendo en otra base.
+
+### Limpieza manual (solo si necesitás limpiar fuera de una corrida)
+
+Para borrar filas acumuladas sin correr Playwright ni los 320+ tests .NET — por ejemplo las que quedaron en `smca` de corridas viejas — borrá solo las filas con el prefijo `e2e-` en el **mismo orden FK** que `ResetDataAsync` (los FKs son `DeleteBehavior.Restrict`; children primero). Es el mismo orden que ejecuta `global-teardown.ts`. Ejemplo con `psql`:
 
 ```sql
 -- Conectado a smca_test. Borra SOLO filas e2e-* (Owner/Store/User del Playwright)

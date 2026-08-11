@@ -65,6 +65,13 @@ export default defineConfig({
   // En CI falla si queda un `.only` olvidado; localmente no aplica.
   forbidOnly: !!process.env.CI,
 
+  // Borra las filas `e2e-*` que la suite deja en la BD, una sola vez, cuando
+  // ya no queda ningún worker corriendo. Va acá y no por spec a propósito:
+  // con `fullyParallel` un borrado per-spec eliminaría filas vivas de los
+  // specs que siguen corriendo (mismo peligro que el `ResetDataAsync` de la
+  // suite .NET, README.md:103). Ver e2e/support/global-teardown.ts.
+  globalTeardown: './e2e/support/global-teardown.ts',
+
   // En CI reintenta tests fallidos (2 veces); localmente 0 para iterar rápido.
   retries: process.env.CI ? 2 : 0,
 
