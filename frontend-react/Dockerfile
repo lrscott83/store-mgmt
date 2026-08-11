@@ -10,9 +10,14 @@ WORKDIR /app
 COPY . .
 # Bake the API base URL into the client bundle. web-store-pos is a static SPA
 # (react-router.config.ts -> ssr:false), so Vite reads API_URL at BUILD time
-# via envDir (vite.config.ts -> '../..', i.e. /app here). Default '/api' is
-# same-origin — deploy/nginx.conf proxies `location /api` to api:8000. Override
-# per-environment with `docker build --build-arg API_URL=...`.
+# via envDir (vite.config.ts -> '../..', i.e. /app here). '/api' is
+# same-origin — deploy/nginx.conf proxies `location /api` to api:8000.
+# This value is NOT freely overridable per environment: `scripts/verify-csp.mjs`
+# (run by the `pnpm build` below) FAILS the image build if it resolves to a
+# cross-origin URL, because the production `connect-src 'self'` would block
+# every API call the moment the CSP header flips from report-only to enforcing.
+# Serving the API from another origin means teaching connect-src that origin
+# first, in apps/web-store-pos/scripts/csp-policy.mjs.
 ARG API_URL=/api
 RUN echo "API_URL=${API_URL}" > .env
 # Build web-store-pos AND its workspace deps (domain, web-common) in

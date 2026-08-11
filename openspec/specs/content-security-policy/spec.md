@@ -90,6 +90,31 @@ dev-only backend origin. Any other difference is a defect.
 - WHEN every directive except `connect-src` is compared between them
 - THEN all other directives are identical
 
+### Requirement: Production Build Rejects a Cross-Origin API Base
+
+The production build MUST fail when the build-time API base URL resolves to
+an origin the production `connect-src` does not cover. The deployed app
+serves its API same-origin; a bundle pointed at another origin is a deploy
+that the move to enforcing mode would break on every API call, and the build
+is the last step that can still refuse it.
+
+The failure MUST name the offending value, the origin it resolved to, and
+the same-origin base to build with instead.
+
+#### Scenario: Cross-origin API base fails the build
+
+- GIVEN a production build whose API base URL is an absolute URL on a host
+  the production `connect-src` does not list
+- WHEN the build runs
+- THEN the build fails
+- AND the failure names that value and the same-origin base to use instead
+
+#### Scenario: Same-origin API base builds
+
+- GIVEN a production build whose API base URL is a same-origin path
+- WHEN the build runs
+- THEN the build succeeds
+
 ### Requirement: No Violations on Real Routes
 
 Navigating the app's primary **unauthenticated** routes with the policy

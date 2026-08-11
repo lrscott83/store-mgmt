@@ -10,7 +10,7 @@ import { config as loadDotenv } from 'dotenv';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkConnectSrcCoverage, checkNginxConf } from './csp-nginx.mjs';
+import { checkNginxConf } from './csp-nginx.mjs';
 
 // scripts/ -> web-store-pos/ -> apps/ -> frontend-react/, then deploy/nginx.conf.
 // Resolved from this file's own location, NOT process.cwd() — unlike
@@ -37,7 +37,11 @@ async function main() {
     return;
   }
 
-  const errors = checkNginxConf(conf);
+  // The build-time API_URL is checked alongside the file itself, and fails the
+  // build the same way (csp-nginx.mjs check 6) — a cross-origin bundle is a
+  // deploy that the enforcing flip would break, and this is the last place
+  // that can still say so.
+  const errors = checkNginxConf(conf, { apiUrl: process.env.API_URL });
   if (errors.length > 0) {
     console.error('verify-csp: FAILED\n');
     for (const error of errors) {
@@ -45,14 +49,6 @@ async function main() {
     }
     process.exitCode = 1;
     return;
-  }
-
-  // Non-fatal by design (design.md §3): a cross-origin build-time API_URL
-  // cannot harm a user under report-only, so it warns and does not fail the
-  // build. The enforcing change must promote this to a hard failure.
-  const warning = checkConnectSrcCoverage(process.env.API_URL);
-  if (warning) {
-    console.warn(`verify-csp: WARNING — ${warning}`);
   }
 
   console.log(`verify-csp: OK — ${NGINX_CONF_PATH} carries the exact production policy.`);

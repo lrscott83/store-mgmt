@@ -167,7 +167,7 @@ describe('csp-nginx', () => {
     });
   });
 
-  describe('checkConnectSrcCoverage — design.md §3 non-fatal warn path', () => {
+  describe('checkConnectSrcCoverage — the build-failing coverage check', () => {
     it('returns null for a same-origin apiUrl', () => {
       expect(checkConnectSrcCoverage('/api')).toBeNull();
     });
@@ -177,11 +177,34 @@ describe('csp-nginx', () => {
       expect(checkConnectSrcCoverage(undefined)).toBeNull();
     });
 
-    it('returns a warning string (not throwing, not an error object) for a cross-origin apiUrl not covered by prod connect-src', () => {
-      const warning = checkConnectSrcCoverage('https://api.example.com/api');
-      expect(typeof warning).toBe('string');
-      expect(warning).toMatch(/api\.example\.com/);
-      expect(warning).toMatch(/connect-src/);
+    it('returns an error string (not throwing, not an error object) for a cross-origin apiUrl not covered by prod connect-src', () => {
+      const error = checkConnectSrcCoverage('https://api.example.com/api');
+      expect(typeof error).toBe('string');
+      expect(error).toMatch(/api\.example\.com/);
+      expect(error).toMatch(/connect-src/);
+    });
+
+    it('names the same-origin fix, so the failing build tells the operator what to do', () => {
+      const error = checkConnectSrcCoverage('https://api.example.com/api');
+      expect(error).toMatch(/API_URL=\/api/);
+    });
+  });
+
+  describe('checkNginxConf — cross-origin API_URL is a build failure, not a warning', () => {
+    const validConf = () => fixtureConf(`    add_header ${CSP_HEADER_NAME} "${CANONICAL_PROD_VALUE}" always;`);
+
+    it('reports an error when the build-time apiUrl is cross-origin', () => {
+      const errors = checkNginxConf(validConf(), { apiUrl: 'https://api.example.com/api' });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatch(/api\.example\.com/);
+    });
+
+    it('reports no error when the build-time apiUrl is the same-origin default', () => {
+      expect(checkNginxConf(validConf(), { apiUrl: '/api' })).toEqual([]);
+    });
+
+    it('reports no error when no apiUrl is supplied at all', () => {
+      expect(checkNginxConf(validConf())).toEqual([]);
     });
   });
 

@@ -82,11 +82,17 @@ export function diffPolicies(a, b) {
 }
 
 /**
- * The five checks from design.md §3, in order. Returns an array of
+ * The five checks from design.md §3, in order, plus check 6 — the build-time
+ * `apiUrl` coverage check, promoted from a non-fatal warning to a hard
+ * failure (see `checkConnectSrcCoverage`). Returns an array of
  * human-readable error strings; empty means pass. Never rewrites the config
  * — "a gate that fixes the thing it guards is not a gate".
+ *
+ * `options.apiUrl` is optional: callers with no build-time API_URL in hand
+ * (the fixture tests, the `deploy/nginx.conf` drift test) get checks 1-5
+ * exactly as before.
  */
-export function checkNginxConf(conf) {
+export function checkNginxConf(conf, options = {}) {
   const errors = [];
   const addHeaders = extractAddHeaders(conf);
   const cspHeaders = addHeaders.filter((header) => header.name === CSP_HEADER_NAME);
@@ -173,29 +179,44 @@ export function checkNginxConf(conf) {
     errors.push(`nginx.conf is missing declared add_header(s): ${missingDeclared.join(', ')}`);
   }
 
+  // 6. Build-time API_URL coverage. Lives here, in the pure layer, rather
+  // than as a second verdict `verify-csp.mjs` has to interpret: the fatality
+  // decision is then unit-tested like every other check, and the script keeps
+  // its single failure path.
+  const connectSrcError = checkConnectSrcCoverage(options.apiUrl);
+  if (connectSrcError) errors.push(connectSrcError);
+
   return errors;
 }
 
 /**
- * design.md §3 "Non-fatal check": if the build-time API_URL resolves to a
- * cross-origin value the production connect-src does not cover, returns a
- * warning STRING (never throws, never an error object) — the caller decides
- * whether to print it and, deliberately, must NOT turn it into a failing
- * exit code (a wrong connect-src cannot harm a user under report-only; a
- * broken build can). Pure and file-I/O-free so the warn path is real,
+ * If the build-time API_URL resolves to a cross-origin value the production
+ * connect-src does not cover, returns an error STRING (never throws, never an
+ * error object). Pure and file-I/O-free so the failure path is real,
  * unit-tested code rather than a decorative comment.
+ *
+ * This was design.md §3's "non-fatal check", and shipped as a warning because
+ * a wrong connect-src cannot harm a user while the header is report-only.
+ * It is fatal now: the bundle that a cross-origin API_URL produces is one
+ * `Report-Only` -> `Content-Security-Policy` flip away from an app whose every
+ * API call is blocked, and a build is the last place that can still say so.
+ * The deploy is same-origin by construction — `Dockerfile`'s `ARG API_URL=/api`
+ * default, proxied by `deploy/nginx.conf`'s `location /api` — so nothing that
+ * exists today trips this. Pointing the bundle at another host stays possible,
+ * but it now costs a deliberate edit here instead of an unnoticed `--build-arg`.
  */
 export function checkConnectSrcCoverage(apiUrl) {
   const apiOrigin = deriveApiOrigin(apiUrl);
-  if (!apiOrigin) return null; // same-origin, empty, undefined, or unparseable — nothing to warn about
+  if (!apiOrigin) return null; // same-origin, empty, undefined, or unparseable — nothing to report
 
   const prodConnectSrc = buildCspDirectives('prod').get('connect-src') ?? [];
   if (prodConnectSrc.includes(apiOrigin)) return null;
 
   return (
     `the build-time API_URL ("${apiUrl}") resolves to the cross-origin value "${apiOrigin}", which the ` +
-    `production connect-src ("${prodConnectSrc.join(' ')}") does not cover. Harmless under report-only — a ` +
-    'wrong connect-src cannot harm a user, while a broken build can — but the enforcing change must promote ' +
-    'this to a hard failure (design.md §3).'
+    `production connect-src ("${prodConnectSrc.join(' ')}") does not cover — every API call the deployed app ` +
+    'makes would violate the policy. This deploy serves the API same-origin: build with API_URL=/api (the ' +
+    'Dockerfile default), which deploy/nginx.conf proxies to the backend. Serving the API from another origin ' +
+    'is a deliberate change: connect-src in scripts/csp-policy.mjs has to learn that origin first.'
   );
 }
