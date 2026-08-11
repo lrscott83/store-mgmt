@@ -215,6 +215,22 @@ The user was shown the tradeoff and chose to close it.
   `tsc --noEmit --strict --lib es2022,dom,dom.iterable` over the three new e2e files → exit 0.
   ✅ **USER-VERIFIED 2026-08-11**: `npx playwright test e2e/csp-report-only.spec.ts --project=chromium`
   → **3 passed (13.4s)**, run by the user on his own machine (Windows checkout, real dev server).
+
+  **Follow-up on the same run of the FULL suite: the narrowing did its job and found two more.** With
+  the whole suite running (not just this spec), the sweep failed on `/` with two violations the WU2-era
+  wide entry had been silently swallowing:
+  - `console.log(\n   "💿 Hey dev…` — react-router's `RemixRootDefaultHydrateFallback` console warning,
+    an inline `dangerouslySetInnerHTML` script gated on `ENABLE_DEV_WARNINGS`
+    (`chunk-4N6VE7H7.mjs:8903-8917`, read on disk). Absent from any production build.
+  - `import "/@id/__x00__virtual:react-router…` — Vite's dev-only virtual-module injection for
+    `@react-router/dev` (`@react-router/dev/dist/vite.js`). Resolved at bundle time in production.
+
+  This is the mechanism working as designed, not a regression: a wide allowlist hid them, a narrow one
+  surfaced them. Both added as entries. `samplePrefix: string` was replaced by `sampleMatch: RegExp`
+  plus a required `reason` — the HydrateFallback sample carries a newline and 16 spaces inside its
+  first 40 characters, so no literal prefix can match it. Verified without Playwright: the three real
+  samples each match exactly their own pattern, and a control (`alert("soy nuevo")`) matches none.
+  `tsc --noEmit --strict` over the two e2e files → exit 0.
   Playwright is not runnable in the agent's environment, so this run is the only evidence that the
   `samplePrefix` matches a live Chromium violation report — and it does. The zero-violation sweep
   passes across `/`, `/login` and `/register` with the narrowed allowlist.

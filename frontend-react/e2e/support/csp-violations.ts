@@ -35,12 +35,19 @@ export interface KnownDevOnlyViolation {
   effectiveDirective: string;
   blockedURI: string;
   /**
-   * The violation's `sample`, after trimming leading whitespace, must START
-   * with this. This is what keeps the allowlist narrow: without it, an entry
-   * for `blockedURI: 'inline'` would swallow every inline script on every
-   * route, including one a future change introduces by accident.
+   * The violation's `sample` (leading whitespace trimmed) must match this.
+   * This is what keeps the allowlist narrow: without it, an entry for
+   * `blockedURI: 'inline'` would swallow every inline script on every route,
+   * including one a future change introduces by accident.
+   *
+   * A RegExp rather than a plain prefix because the browser samples the
+   * script's raw source — react-router's HydrateFallback warning carries a
+   * newline and 16 spaces inside the first 40 characters, so no literal
+   * prefix survives contact with it. Anchor every pattern with `^`.
    */
-  samplePrefix: string;
+  sampleMatch: RegExp;
+  /** Why this is dev-only. Required — an entry nobody can justify is an entry nobody can retire. */
+  reason: string;
 }
 
 /**
@@ -82,7 +89,29 @@ export const KNOWN_DEV_ONLY_VIOLATIONS: readonly KnownDevOnlyViolation[] = [
   {
     effectiveDirective: 'script-src-elem',
     blockedURI: 'inline',
-    samplePrefix: 'window.__reactRouterContext',
+    sampleMatch: /^window\.__reactRouterContext/,
+    reason:
+      "react-router's dev SSR hydration payload — three inline scripts emitted from literals starting " +
+      'with this (react-router@7.15.1 dist/development/chunk-4N6VE7H7.mjs:8189, :8201, :9983). The ' +
+      'production build ships its state differently; NOT VERIFIED whether it inlines the same payload.',
+  },
+  {
+    effectiveDirective: 'script-src-elem',
+    blockedURI: 'inline',
+    sampleMatch: /^console\.log\(\s*"\u{1F4BF} Hey dev/u,
+    reason:
+      "react-router's RemixRootDefaultHydrateFallback console warning " +
+      '(chunk-4N6VE7H7.mjs:8903-8917), an inline `dangerouslySetInnerHTML` script gated on ' +
+      '`ENABLE_DEV_WARNINGS` — it does not exist in a production build.',
+  },
+  {
+    effectiveDirective: 'script-src-elem',
+    blockedURI: 'inline',
+    sampleMatch: /^import "\/@id\/__x00__virtual:react-router/,
+    reason:
+      "Vite's dev-only module injection for @react-router/dev's virtual modules " +
+      '(@react-router/dev/dist/vite.js). The production build resolves these at bundle time and ' +
+      'emits no inline import.',
   },
 ];
 
@@ -105,7 +134,7 @@ function isKnownDevOnly(record: CspViolationRecord): boolean {
     (known) =>
       known.effectiveDirective === record.effectiveDirective &&
       known.blockedURI === record.blockedURI &&
-      record.sample.trimStart().startsWith(known.samplePrefix)
+      known.sampleMatch.test(record.sample.trimStart())
   );
 }
 
