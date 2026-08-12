@@ -78,17 +78,18 @@ export class ProductCategoryOfflineService implements ProductCategoryService {
    * `isActive && availableToSale` predicate). See
    * `openspec/changes/catalog-show-all-and-clear-data/superpowers-design.md` §D1.
    *
-   * The product catalog (`products.tsx:53`) is the SOLE production consumer of
-   * this method, so widening it reaches no other screen. It must show every
-   * category, inactive included — `isActive` travels on each row so the UI can
-   * mark them.
+   * `ProductsPage`'s `loadData` in `products.tsx` is the sole production
+   * consumer of this method, so widening it reaches no other screen. It must
+   * show every category, inactive included — `isActive` travels on each row
+   * so the UI can mark them.
    *
    * `productsCount` deliberately resolves through the SAME repository method
    * the catalog uses for its per-category list,
-   * `ProductRepository.getProductsByCategoryId` (`products.tsx:58` ->
-   * `ProductOfflineService.getAvailableProductsByCategoryId`). Two different
-   * predicates are exactly how the badge came to disagree with the rows below
-   * it; sharing one makes them agree by construction. Never fails.
+   * `ProductRepository.getProductsByCategoryId` (reached from that same sole
+   * consumer via `ProductOfflineService.getAvailableProductsByCategoryId`).
+   * Two different predicates are exactly how the badge came to disagree with
+   * the rows below it; sharing one makes them agree by construction. Never
+   * fails.
    */
   getProductCategoriesView(): Promise<BaseResponseModel<ProductCategoryView[]>> {
     const categories = this.categoryRepository.getProductCategories();

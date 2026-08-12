@@ -396,13 +396,22 @@ export function ProductsPage() {
             return (
               <div
                 key={category.id}
-                className={`rounded-lg border border-border bg-surface ${category.isActive ? '' : 'opacity-60'}`.trim()}
+                className="rounded-lg border border-border bg-surface"
               >
                 {/* Header row: name+count toggle the panel; a gear menu sits to the LEFT of
                     the chevron and exposes the category actions WITHOUT expanding — clicking
                     the gear must not toggle. The chevron is its own toggle button so the gear
-                    can be a sibling (nested <button>s are invalid HTML). */}
-                <div className="flex w-full items-center gap-3 px-4 py-3">
+                    can be a sibling (nested <button>s are invalid HTML).
+                    The dim lives HERE, not on the panel wrapper above: CSS opacity on a parent
+                    cannot be undone by a child, so putting it on the wrapper would stack with
+                    an inactive PRODUCT row's own opacity-60 (0.6 x 0.6 = 0.36) and push the
+                    "Inactivo" badge's text-danger below usable contrast — the one element that
+                    must not be dimmed twice, since it is the affordance carrying the meaning
+                    colour and opacity alone cannot. It is also more accurate: a category's own
+                    products are not necessarily inactive just because the category is. */}
+                <div
+                  className={`flex w-full items-center gap-3 px-4 py-3 ${category.isActive ? '' : 'opacity-60'}`.trim()}
+                >
                   <button
                     type="button"
                     onClick={() => togglePanel(category.id)}

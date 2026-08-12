@@ -63,10 +63,11 @@ export class ProductOfflineService implements ProductService {
    * (`product-offline.service.ts:123-126`, isActive-only). See
    * `openspec/changes/catalog-show-all-and-clear-data/superpowers-design.md` §D1.
    *
-   * The product catalog (`products.tsx:58`) is the SOLE production consumer, so
-   * widening it reaches no other screen — the sale path and the inventory
-   * egress path both go through `getProductsToSaleByCategoryId`, which keeps
-   * its `isActive && availableToSale` filter untouched.
+   * `ProductsPage`'s `loadData` in `products.tsx` is the sole production
+   * consumer, so widening this method reaches no other screen — the sale path
+   * and the inventory egress path both go through
+   * `getProductsToSaleByCategoryId`, which keeps its
+   * `isActive && availableToSale` filter untouched.
    *
    * The name is now inaccurate ("Available" returns everything). Renaming would
    * mean editing `packages/domain`'s `ProductService` interface and

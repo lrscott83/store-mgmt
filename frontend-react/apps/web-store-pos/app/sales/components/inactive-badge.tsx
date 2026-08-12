@@ -9,8 +9,9 @@
  * opacity its container applies — colour and opacity say nothing to a screen
  * reader and little on a dim display.
  *
- * Copy stays hardcoded Spanish, matching the CSV-import strings in
- * `products.tsx:184,269`.
+ * Copy stays hardcoded Spanish, matching the other hardcoded-Spanish strings
+ * already in `products.tsx` (e.g. the CSV-import success toast and duplicate-
+ * rows dialog in its `handleCsvImport`).
  */
 export function InactiveBadge() {
   return (
