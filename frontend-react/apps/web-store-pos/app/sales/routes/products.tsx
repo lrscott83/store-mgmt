@@ -504,6 +504,7 @@ export function ProductsPage() {
       {modal?.type === 'category' && (
         <EditProductCategoryModal
           category={modal.category}
+          defaultOrder={1}
           onSave={handleCategorySave}
           onClose={() => setModal(null)}
         />

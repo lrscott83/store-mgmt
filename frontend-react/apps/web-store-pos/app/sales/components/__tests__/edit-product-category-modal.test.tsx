@@ -20,7 +20,7 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
   it('shows "Nombre es requerido" when name is empty', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: '' } });
@@ -31,7 +31,7 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
   it('shows "Orden es requerido" when order is cleared', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas' } });
@@ -44,7 +44,7 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
     const onSave = vi.fn();
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={onSave} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas' } });
@@ -58,7 +58,7 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
   it('renders the order field label as "Orden" (GENERAL.ORDER), not the hardcoded English "Order"', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     expect(screen.getByText('Orden')).toBeInTheDocument();
@@ -70,7 +70,7 @@ describe('EditProductCategoryModal — validation text parity (GENERAL.VALIDATIO
   it('renders the active-checkbox label as "Activo" (GENERAL.ACTIVE), not the hardcoded English "Active"', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     expect(screen.getByText('Activo')).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe('EditProductCategoryModal — name field autofocus', () => {
   it('focuses the name input on mount in create-mode', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     expect(screen.getByTestId('category-name-input')).toHaveFocus();
@@ -93,6 +93,7 @@ describe('EditProductCategoryModal — name field autofocus', () => {
       <Wrapper>
         <EditProductCategoryModal
           category={{ id: 'cat-1', name: 'Bebidas', order: 1, isActive: true }}
+          defaultOrder={1}
           onSave={vi.fn()}
           onClose={vi.fn()}
         />
@@ -106,7 +107,7 @@ describe('EditProductCategoryModal — footer icons/labels parity', () => {
   it('close button reads "Cerrar" (not "Cancelar") and renders a close icon', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     const closeButton = screen.getByRole('button', { name: 'Cerrar' });
@@ -118,7 +119,7 @@ describe('EditProductCategoryModal — footer icons/labels parity', () => {
   it('confirm button reads "Salvar" in create-mode and renders a save icon', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     const saveButton = screen.getByTestId('category-save-button');
@@ -131,6 +132,7 @@ describe('EditProductCategoryModal — footer icons/labels parity', () => {
       <Wrapper>
         <EditProductCategoryModal
           category={{ id: 'cat-1', name: 'Bebidas', order: 1, isActive: true }}
+          defaultOrder={1}
           onSave={vi.fn()}
           onClose={vi.fn()}
         />
@@ -144,10 +146,47 @@ describe('EditProductCategoryModal — footer icons/labels parity', () => {
   it('footer buttons use the purple fab pill style (Angular mat-fab parity)', () => {
     render(
       <Wrapper>
-        <EditProductCategoryModal onSave={vi.fn()} onClose={vi.fn()} />
+        <EditProductCategoryModal defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     expect(screen.getByRole('button', { name: 'Cerrar' }).className).toContain('rounded-full');
     expect(screen.getByTestId('category-save-button').className).toContain('rounded-full');
+  });
+});
+
+describe('EditProductCategoryModal — default order', () => {
+  it('prefills the order field with defaultOrder in create-mode', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal defaultOrder={8} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('category-order-input')).toHaveValue(8);
+  });
+
+  it('submits defaultOrder untouched when the user only types a name', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <EditProductCategoryModal defaultOrder={8} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Galletas' } });
+    fireEvent.click(screen.getByTestId('category-save-button'));
+    expect(onSave).toHaveBeenCalledWith({ id: undefined, name: 'Galletas', order: 8, isActive: true });
+  });
+
+  it('ignores defaultOrder in edit-mode and shows the category own order', () => {
+    render(
+      <Wrapper>
+        <EditProductCategoryModal
+          category={{ id: 'cat-1', name: 'Bebidas', order: 3, isActive: true }}
+          defaultOrder={99}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('category-order-input')).toHaveValue(3);
   });
 });

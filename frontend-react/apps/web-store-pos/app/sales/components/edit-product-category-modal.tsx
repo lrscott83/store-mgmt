@@ -6,17 +6,30 @@ import { Button } from '~/shared/components/ui/button';
 
 interface EditProductCategoryModalProps {
   category?: ProductCategory;
+  /**
+   * Create-mode prefill for `Orden`, resolved by the caller as
+   * `ProductCategoryService.getMaxOrder() + 1` so a new category lands last. Ignored in
+   * edit-mode, which shows the category's own order. Angular patches this value into the
+   * form after opening (edit-product-category-modal.component.ts:37-39); React resolves it
+   * before opening, matching the sibling CreateProductModal.
+   */
+  defaultOrder: number;
   onSave: (category: { name: string; order: number; isActive: boolean; id?: string }) => void;
   onClose: () => void;
 }
 
-export function EditProductCategoryModal({ category, onSave, onClose }: EditProductCategoryModalProps) {
+export function EditProductCategoryModal({
+  category,
+  defaultOrder,
+  onSave,
+  onClose,
+}: EditProductCategoryModalProps) {
   const intl = useIntl();
   const isEditing = !!category;
 
   const [form, setForm] = useState({
     name: category?.name ?? '',
-    order: category?.order.toString() ?? '1',
+    order: category?.order.toString() ?? defaultOrder.toString(),
     isActive: category?.isActive ?? true,
   });
   const [errors, setErrors] = useState<{ name?: string; order?: string }>({});
