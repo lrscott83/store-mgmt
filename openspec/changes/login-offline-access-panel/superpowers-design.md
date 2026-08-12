@@ -100,7 +100,9 @@ Both buttons use the shared `Button` component with `variant="outline"`, matchin
 
 Every module the panel reaches for is loaded through a dynamic `import()` — `offline/roster-store`, `offline/roster-import` and `storage/device-dek-table` alike. `device-dek-table` sits outside `offline/` but is pulled in for the same reason: nothing that exists to serve offline authentication should be evaluated on a login screen that may never need it.
 
-The two success messages (`OFFLINE_ACCESS.ENABLED`, `OFFLINE_ACCESS.DISABLED`) are shown with `showBlockingSuccess()` from `shared/lib/blocking-alert.ts`, the app's standard success surface. The app has no toast system, and inventing an inline banner here would add a fourth notification style to a screen that already carries three (`isOffline`, `isUnlockRequired`, `errors.form`).
+The two success messages (`OFFLINE_ACCESS.ENABLED`, `OFFLINE_ACCESS.DISABLED`) are shown with `showToastSuccess()` from `shared/lib/toast.tsx` — non-blocking, and the established precedent for exactly this shape: `sync/components/import-form.tsx:57` fires a toast after importing a file, having been moved there from an inline banner by the toast-notifications-parity work. `ToastContainer` is mounted in `root.tsx:63`, above the router, so toasts render on `/login` like anywhere else.
+
+An inline banner is deliberately not used: the login screen already carries three (`isOffline`, `isUnlockRequired`, `errors.form`) and a fourth would compete with them for the same space.
 
 **`app/auth/components/import-roster-modal.tsx`** — the dialog.
 
