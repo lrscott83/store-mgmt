@@ -126,6 +126,8 @@ const messages: Record<string, string> = {
   'OFFLINE_ACCESS.DISABLE_MESSAGE_DATA_LOSS':
     'Este equipo va a necesitar internet para entrar. Para volver a activarlo vas a tener que pedir un archivo nuevo: el que usaste ya no sirve. Además, los datos guardados en este equipo van a quedar ilegibles.',
   'OFFLINE_ACCESS.DISABLE_CONFIRM': 'Sí, desactivar',
+  'OFFLINE_ACCESS.ERROR_UNAVAILABLE':
+    'No pudimos completar la acción. Recargá la página e intentá de nuevo.',
 
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)

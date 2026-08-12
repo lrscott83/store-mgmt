@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
@@ -132,5 +132,48 @@ describe('ImportRosterModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancelar/i }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ImportRosterModal — roster-import chunk fails to load (Finding 2)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.doUnmock('~/shared/lib/offline/roster-import');
+    vi.resetModules();
+  });
+
+  it('shows the recoverable-error message and re-enables the controls instead of staying stuck busy', async () => {
+    vi.resetModules();
+    vi.doMock('~/shared/lib/offline/roster-import', () => {
+      throw new Error('chunk load failed');
+    });
+
+    const { ImportRosterModal: FreshModal } = await import('../import-roster-modal');
+    const payload = await serializeRoster(makeBundle(), 'master', STORE_ID);
+    const onImported = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <IntlProvider locale="es" messages={messages}>
+        <FreshModal onImported={onImported} onCancel={onCancel} />
+      </IntlProvider>,
+    );
+
+    selectFile(payload);
+    typePasswordAndSubmit('master');
+
+    expect(
+      await screen.findByText(
+        'No pudimos completar la acción. Recargá la página e intentá de nuevo.',
+      ),
+    ).toBeInTheDocument();
+    expect(onImported).not.toHaveBeenCalled();
+
+    // Not stuck busy: every control is usable again.
+    expect(screen.getByLabelText(/contraseña de activación/i)).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /cancelar/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /^activar$/i })).not.toBeDisabled();
   });
 });

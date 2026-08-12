@@ -41,20 +41,29 @@ export function ImportRosterModal({ onImported, onCancel }: ImportRosterModalPro
     }
 
     setBusy(true);
-    // Dynamic import: this is the login screen, and a device that never
-    // activates offline access must not pay for the offline modules
-    // (design D4).
-    const { importRosterFile, rosterImportErrorMessageId } = await import(
-      '~/shared/lib/offline/roster-import'
-    );
     try {
-      await importRosterFile({ file, master });
-      onImported();
-    } catch (err: unknown) {
-      // Stay open on failure — the chosen file and typed password survive,
-      // so the user retries the one thing that was wrong.
+      // Dynamic import: this is the login screen, and a device that never
+      // activates offline access must not pay for the offline modules
+      // (design D4). Inside the try: if the chunk itself fails to load, the
+      // outer catch below handles it distinctly from an import failure.
+      const { importRosterFile, rosterImportErrorMessageId } = await import(
+        '~/shared/lib/offline/roster-import'
+      );
+      try {
+        await importRosterFile({ file, master });
+        onImported();
+      } catch (err: unknown) {
+        // Stay open on failure — the chosen file and typed password survive,
+        // so the user retries the one thing that was wrong.
+        setBusy(false);
+        setError(intl.formatMessage({ id: rosterImportErrorMessageId(err) }));
+      }
+    } catch {
+      // The chunk itself never loaded, so `rosterImportErrorMessageId` was
+      // never reached — mapping this to the corrupt-file message would
+      // misreport what actually happened. Surface it plainly instead.
       setBusy(false);
-      setError(intl.formatMessage({ id: rosterImportErrorMessageId(err) }));
+      setError(intl.formatMessage({ id: 'OFFLINE_ACCESS.ERROR_UNAVAILABLE' }));
     }
   }
 
