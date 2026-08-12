@@ -116,21 +116,32 @@ than either behavior on its own.
 In practice the branch is reachable, and not through the network path the name
 `getMaxOrder` suggests. The offline `getMaxOrder()` only *resolves* at its
 tail; its body runs `categoryRepository.getProductCategories()` first, which
-reads through `getCategoriesJson()` (`product-category-repository.ts:208`) to
-`decryptEntity(...)` (`entity-crypto.ts:91-98`). With no data-encryption key in
-memory, that call **throws** `MissingDataKeyError` synchronously. Because
-`handleAddCategory` is `async`, the throw becomes a rejected promise that
-`onClick` drops silently — the FAB would become a no-op. `categoryService` is
-also reconstructed on every render (`products.tsx:54`), so there is no warm
-cache to route around this: the decrypt path runs on every click.
+reaches the private `getProductCategoriesFromLocalStorage()`
+(`product-category-repository.ts:237-249`).
+
+The escaping throw is **not** the decrypt. That method wraps `decryptEntity(...)`
+in a `try/catch` that swallows `MissingDataKeyError` and falls through to
+auto-init — and auto-init writes: `setProductCategoriesLocalStorage(new Map())`
+(line 247) calls `encryptEntity(...)` (line 229), which throws
+`MissingDataKeyError` (`entity-crypto.ts:77`) when there is no data-encryption
+key in memory and encryption is provisioned (or a device wrap exists). That
+throw is uncaught. Because `handleAddCategory` is `async`, it becomes a rejected
+promise that `onClick` drops silently — the FAB would become a no-op.
+`categoryService` is also reconstructed on every render (`products.tsx:54`), so
+there is no warm cache to route around it: the read-then-auto-init path runs on
+every click.
 
 That said, this is not a reason to add a `try/catch` here. The failure is
 route-wide and pre-existing: `loadData()` in the mount effect
-(`products.tsx:62-80`) walks the same decrypt path with no catch, so with no
+(`products.tsx:62-80`) walks the same storage path with no catch, so with no
 DEK the page is already empty before the user can reach the FAB, and
 `handleAddProduct` has the identical gap. Catching it in one handler buys
 nothing while the other two remain exposed; the right seam is a single
 route-level error boundary, left as a separate follow-up.
+
+(Note that the file is *not* uniformly catch-free — `handleClearData`,
+`products.tsx:328-350`, does use `try/catch`. The reason to leave this handler
+bare is the route-wide scope of the failure, not a house style.)
 
 ### Behavior on an empty store is unchanged
 
