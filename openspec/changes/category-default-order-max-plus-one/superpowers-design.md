@@ -113,10 +113,24 @@ We keep the React shape, because `handleAddProduct` in this same file already
 works that way and two sibling modals with different failure behavior is worse
 than either behavior on its own.
 
-In practice the branch is unreachable: `GlobalConfig.USE_ONLINE_SERVICE` is
-`false` (`global-config.ts:2`), so `createProductCategoryService` always returns
-the offline implementation, whose `getMaxOrder()` is
-`Promise.resolve(success(...))` and never rejects.
+In practice the branch is reachable, and not through the network path the name
+`getMaxOrder` suggests. The offline `getMaxOrder()` only *resolves* at its
+tail; its body runs `categoryRepository.getProductCategories()` first, which
+reads through `getCategoriesJson()` (`product-category-repository.ts:208`) to
+`decryptEntity(...)` (`entity-crypto.ts:91-98`). With no data-encryption key in
+memory, that call **throws** `MissingDataKeyError` synchronously. Because
+`handleAddCategory` is `async`, the throw becomes a rejected promise that
+`onClick` drops silently — the FAB would become a no-op. `categoryService` is
+also reconstructed on every render (`products.tsx:54`), so there is no warm
+cache to route around this: the decrypt path runs on every click.
+
+That said, this is not a reason to add a `try/catch` here. The failure is
+route-wide and pre-existing: `loadData()` in the mount effect
+(`products.tsx:62-80`) walks the same decrypt path with no catch, so with no
+DEK the page is already empty before the user can reach the FAB, and
+`handleAddProduct` has the identical gap. Catching it in one handler buys
+nothing while the other two remain exposed; the right seam is a single
+route-level error boundary, left as a separate follow-up.
 
 ### Behavior on an empty store is unchanged
 
