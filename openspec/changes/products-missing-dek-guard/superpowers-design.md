@@ -205,20 +205,27 @@ unit-test coverage only, and no E2E test asserts on this failure mode.
 - `handleClearData`'s existing three-way error handling
   (`products.tsx:328-378`). Already correct for its own scenario, not
   touched.
-- `products.tsx`'s five other bare `loadData()` repaint calls, at the end of
-  `handleCreateProduct`, `handleEditProduct`, `handleDeactivateProduct`,
-  `handleBulkSave`, and `handleCategorySave`. Each of these already awaits
-  its mutating call (`createProduct`, `updateProduct`, `deleteProduct`,
-  `createProducts`, `createProductCategory`/`updateProductCategory`) and
-  handles that call's own `{succeeded: false}` failure through the existing
-  `showBlockingError` envelope path — so a `MissingDataKeyError` from the
-  mutation itself is already covered. What is not covered is the trailing,
-  unguarded `loadData()` repaint that runs after a successful mutation: if
-  the DEK goes missing between the mutation and that repaint, the rejection
-  is unhandled, the same failure shape this change just fixed for the mount
-  effect. These five are deferred rather than folded into this change
-  because they are post-mutation repaints, not pre-mutation reads — closer
-  in spirit to `handleClearData`'s already-separately-solved repaint problem
-  than to the three call sites this change addresses — and that distinction
-  deserves its own look rather than a mechanical copy-paste of this change's
-  pattern.
+- `products.tsx`'s five other unguarded call sites: `handleCreateProduct`,
+  `handleEditProduct`, `handleDeactivateProduct`, `handleBulkSave`, and
+  `handleCategorySave`. Each awaits a mutating call (`createProduct`,
+  `updateProduct`, `deleteProduct`, `createProducts`,
+  `createProductCategory`/`updateProductCategory`) and then a bare, unguarded
+  `loadData()` repaint. Unlike the three call sites this change fixes, the
+  risk here is not confined to the repaint: the mutating call itself can
+  throw `MissingDataKeyError`, because every repository write —
+  `setProductsLocalStorage` (`product-repository.ts:402`) and
+  `setProductCategoriesLocalStorage` (`product-category-repository.ts:229`) —
+  calls `encryptEntity` before persisting, the same throw site as the three
+  already-fixed reads. `deleteProduct` makes this worse, not equal:
+  `ProductOfflineService.deleteProduct` is documented "never fails"
+  (`product-offline-service.ts:101`) and its call site
+  (`handleDeactivateProduct`, `products.tsx:210-213`) does not check
+  `succeeded` at all — there is no existing envelope check for a
+  `MissingDataKeyError` to hide behind on that path. These five are deferred
+  rather than folded into this change because guarding them correctly means
+  deciding what a caller does when the MUTATION itself half-fails — e.g. a
+  wipe or an update that may or may not have persisted — which is a
+  different, harder design question than the three read-only sites this
+  change addresses (where failing before any state changed is unambiguous).
+  That question deserves its own look, not a mechanical copy-paste of this
+  change's pattern.
