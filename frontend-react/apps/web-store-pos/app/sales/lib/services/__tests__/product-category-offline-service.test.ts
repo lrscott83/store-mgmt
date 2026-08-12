@@ -153,42 +153,47 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
     });
   });
 
-  describe('CAT-12: getProductCategoriesView', () => {
-    it('projects active categories with productsCount using isActive && availableToSale (STRICTER than getAvailableProductsByCategoryId)', async () => {
+  describe('CAT-12: getProductCategoriesView (catalog view — everything)', () => {
+    // catalog-show-all-and-clear-data: this view feeds the product catalog and
+    // nothing else, and the catalog must show every category and count every
+    // product. The sale path keeps its own stricter methods (CAT-10,
+    // PROD-17), which this change does not touch.
+    it('counts EVERY product of the category, including inactive and non-sellable ones', async () => {
       await service.createProductCategory('Bebidas', 1, true);
       await service.createProductCategory('Snacks', 2, true);
-      await service.createProductCategory('Inactive', 3, true);
-      const [bebidas, snacks, inactive] = categoryRepository.getProductCategories();
-      await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
+      const [bebidas, snacks] = categoryRepository.getProductCategories();
 
       const productRepository = new ProductRepository(storeId, categoryRepository);
-      // isActive && availableToSale -> counted (getAvailableToSaleProductsByCategoryId)
+      // isActive && availableToSale
       productRepository.addProduct(bebidas.id, 'Coca Cola', 1, 'biz', 1, true, true, false, '1');
-      // isActive but NOT availableToSale -> excluded from the view's stricter count
+      // isActive but NOT availableToSale — counted now, excluded before
       productRepository.addProduct(bebidas.id, 'Fanta', 1, 'biz', 2, true, false, false, '2');
-      void snacks;
+      // not active at all — counted now, excluded before
+      productRepository.addProduct(bebidas.id, 'Sprite', 1, 'biz', 3, false, true, false, '3');
 
       const view = await service.getProductCategoriesView();
       expect(view.succeeded).toBe(true);
       const viewData = unwrap(view);
-      expect(viewData.map((v) => v.name)).toEqual(['Bebidas', 'Snacks']);
       const bebidasView = viewData.find((v) => v.id === bebidas.id)!;
-      expect(bebidasView.productsCount).toBe(1);
-      const snacksView = viewData.find((v) => v.name === 'Snacks')!;
+      expect(bebidasView.productsCount).toBe(3);
+      const snacksView = viewData.find((v) => v.id === snacks.id)!;
       expect(snacksView.productsCount).toBe(0);
     });
 
-    it('excludes inactive categories entirely from the view result', async () => {
+    it('includes inactive categories in the view result, flagged by isActive', async () => {
       await service.createProductCategory('ActiveCat', 1, true);
       await service.createProductCategory('InactiveCat', 2, true);
       const [active, inactive] = categoryRepository.getProductCategories();
       await service.updateProductCategory(inactive.id, inactive.name, inactive.order, false);
 
       const view = await service.getProductCategoriesView();
-      expect(unwrap(view).map((v) => v.id)).toEqual([active.id]);
+      const viewData = unwrap(view);
+      expect(viewData.map((v) => v.id)).toEqual([active.id, inactive.id]);
+      expect(viewData.find((v) => v.id === active.id)!.isActive).toBe(true);
+      expect(viewData.find((v) => v.id === inactive.id)!.isActive).toBe(false);
     });
 
-    it('resolves an empty array when there are no active categories', async () => {
+    it('resolves an empty array when there are no categories at all', async () => {
       const view = await service.getProductCategoriesView();
       expect(view).toEqual({ data: [], succeeded: true, message: '', actionCode: 200, errors: [] });
     });

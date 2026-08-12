@@ -70,19 +70,34 @@ export class ProductCategoryOfflineService implements ProductCategoryService {
   }
 
   /**
-   * 1:1 port of Angular `getProductCategoriesView` (product-category-offline.service.ts:50-65) —
-   * never fails. `productsCount` uses the STRICTER `isActive && availableToSale` predicate via
-   * `ProductRepository.getAvailableToSaleProductsByCategoryId` (Angular-source-confirmed,
-   * product-category-offline.service.ts:55).
+   * Catalog view projection — ALL categories, each with its TOTAL product count.
+   *
+   * DIVERGES DELIBERATELY from the Angular 1:1 port
+   * (`product-category-offline.service.ts:50-65`, which projects only
+   * `getAvailableProductCategories()` and counts with the stricter
+   * `isActive && availableToSale` predicate). See
+   * `openspec/changes/catalog-show-all-and-clear-data/superpowers-design.md` §D1.
+   *
+   * The product catalog (`products.tsx:53`) is the SOLE production consumer of
+   * this method, so widening it reaches no other screen. It must show every
+   * category, inactive included — `isActive` travels on each row so the UI can
+   * mark them.
+   *
+   * `productsCount` deliberately resolves through the SAME repository method
+   * the catalog uses for its per-category list,
+   * `ProductRepository.getProductsByCategoryId` (`products.tsx:58` ->
+   * `ProductOfflineService.getAvailableProductsByCategoryId`). Two different
+   * predicates are exactly how the badge came to disagree with the rows below
+   * it; sharing one makes them agree by construction. Never fails.
    */
   getProductCategoriesView(): Promise<BaseResponseModel<ProductCategoryView[]>> {
-    const categories = this.categoryRepository.getAvailableProductCategories();
+    const categories = this.categoryRepository.getProductCategories();
     const categoriesView: ProductCategoryView[] = categories.map((category) => ({
       id: category.id,
       name: category.name,
       order: category.order,
       isActive: category.isActive,
-      productsCount: this.productRepository.getAvailableToSaleProductsByCategoryId(category.id).length,
+      productsCount: this.productRepository.getProductsByCategoryId(category.id).length,
     }));
     return Promise.resolve(success(categoriesView));
   }

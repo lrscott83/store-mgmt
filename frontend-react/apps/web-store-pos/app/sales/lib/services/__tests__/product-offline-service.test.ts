@@ -81,8 +81,11 @@ describe('ProductOfflineService', () => {
     });
   });
 
-  describe('PROD-11: getAvailableProductsByCategoryId (async)', () => {
-    it('resolves only isActive products for the given category, regardless of availableToSale', async () => {
+  describe('PROD-11: getAvailableProductsByCategoryId (catalog list — everything)', () => {
+    // catalog-show-all-and-clear-data: sole consumer is the product catalog
+    // (products.tsx:58), which must list inactive products too. The sale path
+    // uses getProductsToSaleByCategoryId (PROD-17), untouched by this change.
+    it('resolves every product of the category regardless of isActive/availableToSale, sorted by order', async () => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       service = new ProductOfflineService(storeId, productRepository, categoryRepository);
@@ -94,9 +97,21 @@ describe('ProductOfflineService', () => {
 
       const result = await service.getAvailableProductsByCategoryId(categoryId);
       const data = unwrap(result);
-      expect(data).toHaveLength(2);
-      expect(data.map((p) => p.name)).toEqual(['B', 'A']);
-      expect(data.map((p) => p.order)).toEqual([1, 2]);
+      expect(data).toHaveLength(3);
+      expect(data.map((p) => p.name)).toEqual(['B', 'A', 'C']);
+      expect(data.map((p) => p.order)).toEqual([1, 2, 3]);
+    });
+
+    it('does not leak products from another category', async () => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductOfflineService(storeId, productRepository, categoryRepository);
+      const bebidasId = categoryRepository.addProductCategoryByName('Bebidas');
+      const snacksId = categoryRepository.addProductCategoryByName('Snacks');
+      productRepository.addProduct(bebidasId, 'Coca Cola', 1, '', 1, false, false, true);
+
+      const result = await service.getAvailableProductsByCategoryId(snacksId);
+      expect(unwrap(result)).toEqual([]);
     });
 
     it('resolves an empty array when no products match', async () => {

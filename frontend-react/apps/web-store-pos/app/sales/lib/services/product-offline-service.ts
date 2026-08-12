@@ -56,10 +56,25 @@ export class ProductOfflineService implements ProductService {
     return success(Math.max(...products.map((p) => p.order), 0));
   }
 
-  /** 1:1 port of Angular `getAvailableProductsByCategoryId` (product-offline.service.ts:123-126) — async, isActive-only. */
+  /**
+   * Catalog product list — ALL products of the category, sorted by `order`.
+   *
+   * DIVERGES DELIBERATELY from the Angular 1:1 port
+   * (`product-offline.service.ts:123-126`, isActive-only). See
+   * `openspec/changes/catalog-show-all-and-clear-data/superpowers-design.md` §D1.
+   *
+   * The product catalog (`products.tsx:58`) is the SOLE production consumer, so
+   * widening it reaches no other screen — the sale path and the inventory
+   * egress path both go through `getProductsToSaleByCategoryId`, which keeps
+   * its `isActive && availableToSale` filter untouched.
+   *
+   * The name is now inaccurate ("Available" returns everything). Renaming would
+   * mean editing `packages/domain`'s `ProductService` interface and
+   * `ProductOnlineService` — i.e. leaving the catalog, which this change's scope
+   * rule forbids (design §D3).
+   */
   async getAvailableProductsByCategoryId(categoryId: string): Promise<BaseResponseModel<Product[]>> {
-    const products = this.productRepository.getProductsByCategoryId(categoryId);
-    return success(products.filter((p) => p.isActive));
+    return success(this.productRepository.getProductsByCategoryId(categoryId));
   }
 
   /** 1:1 port of Angular `hasAnyAvailableToSaleProduct` (product-offline.service.ts:25-27) — never fails. */
