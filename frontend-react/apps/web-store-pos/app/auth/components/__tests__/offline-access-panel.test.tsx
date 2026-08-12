@@ -93,7 +93,7 @@ describe('OfflineAccessPanel', () => {
     renderPanel();
 
     expect(
-      await screen.findByRole('button', { name: /activar acceso sin conexión/i }),
+      await screen.findByRole('button', { name: /^activar acceso sin conexión$/i }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /desactivar acceso sin conexión/i }),
@@ -115,7 +115,7 @@ describe('OfflineAccessPanel', () => {
   it('opens the activation dialog when activation is clicked', async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole('button', { name: /activar acceso sin conexión/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^activar acceso sin conexión$/i }));
 
     expect(await screen.findByLabelText(/contraseña de activación/i)).toBeInTheDocument();
   });
@@ -129,7 +129,7 @@ describe('OfflineAccessPanel', () => {
 
     await waitFor(() => expect(isRosterProvisioned()).toBe(false));
     expect(
-      await screen.findByRole('button', { name: /activar acceso sin conexión/i }),
+      await screen.findByRole('button', { name: /^activar acceso sin conexión$/i }),
     ).toBeInTheDocument();
     expect(showToastSuccessMock).toHaveBeenCalledWith('Acceso sin conexión desactivado.');
   });
