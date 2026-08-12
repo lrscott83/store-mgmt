@@ -104,6 +104,20 @@ export async function runGuardedAgainstMissingDek(
 }
 ```
 
+**Superseded by Task 4.** Once this design's eight call sites (three below, five in
+"The five sibling mutation handlers") were all written, every caller that needed to
+know whether it was safe to proceed had to hoist a mutable `let succeeded` flag and
+assign it from inside the guarded callback — the direct consequence of `fn` and the
+wrapper both returning `Promise<void>`. Task 4 changes the signature to
+`fn: () => Promise<boolean>` / returns `Promise<boolean>`: `fn` reports its own
+outcome by returning `true`/`false`, the wrapper passes that straight through, and
+only forces `false` itself when it catches a `MissingDataKeyError`. Every hoisted
+flag below except `handleBulkSave`'s `domainSucceeded` (which answers a genuinely
+different question — see that section) disappears, replaced by
+`const ok = await runGuardedAgainstMissingDek(...); if (!ok) return;`. The code
+blocks in this document were not rewritten to match; the plan's Task 4 has the
+exact, current code for the helper and all eight call sites.
+
 ## The three call sites
 
 Each gets its own message, matching how `handleClearData`'s three
