@@ -109,6 +109,14 @@ const messages: Record<string, string> = {
   'PROVISION.ERROR_UNKNOWN_FILE':
     'No pudimos reconocer el archivo. Usalo tal como te lo pasaron, sin cambiarle el nombre.',
 
+  'OFFLINE_ACCESS.MODAL_TITLE': 'Activar acceso sin conexión',
+  'OFFLINE_ACCESS.MODAL_INTRO':
+    'Con esto vas a poder entrar a este equipo aunque no haya internet. Necesitás el archivo de activación y su contraseña — pedíselos al administrador de tu tienda.',
+  'OFFLINE_ACCESS.FILE_LABEL': 'Archivo de activación',
+  'OFFLINE_ACCESS.PASSWORD_LABEL': 'Contraseña de activación',
+  'OFFLINE_ACCESS.SUBMIT': 'Activar',
+  'OFFLINE_ACCESS.ERROR_NO_FILE': 'Elegí el archivo de activación.',
+
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)
   'REGISTRATION.WELCOME': 'Creación de cuenta',
