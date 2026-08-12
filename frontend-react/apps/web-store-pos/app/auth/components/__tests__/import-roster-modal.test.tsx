@@ -96,10 +96,16 @@ describe('ImportRosterModal', () => {
     // Still open: the field the user typed into is still on screen.
     expect(screen.getByLabelText(/contraseña de activación/i)).toBeInTheDocument();
     expect(onImported).not.toHaveBeenCalled();
+    // Direct proof the password survives the failed attempt — asserted BEFORE
+    // the retry re-types the field, otherwise the retry's own change event
+    // would mask a catch that cleared it.
+    expect(
+      (screen.getByLabelText(/contraseña de activación/i) as HTMLInputElement).value,
+    ).toBe('incorrect');
 
     // Retry with only the password corrected — the file is NOT re-selected.
-    // This proves both the chosen file and the form survive a failed attempt:
-    // if either were dropped in the catch, this second submit would fail too.
+    // This proves the chosen file survives a failed attempt: if it were
+    // dropped in the catch, this second submit would fail too.
     typePasswordAndSubmit('master');
 
     await waitFor(() => expect(onImported).toHaveBeenCalledTimes(1));
