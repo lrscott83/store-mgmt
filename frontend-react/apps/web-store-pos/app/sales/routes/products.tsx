@@ -303,11 +303,15 @@ export function ProductsPage() {
   //
   // clearStoreData cannot throw (it swallows per key), so a try/catch around it would guard
   // nothing and would report a failure that never happens. It instead RETURNS the entity names
-  // it could not remove; that is the truth the wipe outranks. loadData()'s failure is a
-  // separate, genuinely-catchable concern (decryptEntity can throw when no DEK is in memory) —
-  // on an irreversible action, telling the user their data is gone when it might not be is the
-  // worst outcome this handler can produce, so the two failure modes get two distinct messages
-  // and neither is allowed to masquerade as the other.
+  // it could not remove; that is the truth the wipe outranks. clearCart() and loadData() are
+  // each a separate, genuinely-catchable concern — clearCart() is zustand's persist-middleware
+  // clear(), which calls localStorage.setItem synchronously with no guard of its own, and
+  // loadData() can throw via decryptEntity when no DEK is in memory. On an irreversible action,
+  // telling the user their data is gone when a step downstream of the wipe silently failed is
+  // the worst outcome this handler can produce, so each of the three concerns gets tracked
+  // independently and exactly ONE message fires, checked in order of what matters most: the
+  // wipe itself, then the cart (a stale cart can be sold from), then the repaint (cosmetic —
+  // a reload fixes it).
   async function handleClearData() {
     const confirmed = await confirmDialog({
       title: '¿Está seguro que desea eliminar todos los datos?',
@@ -318,7 +322,13 @@ export function ProductsPage() {
     if (!confirmed) return;
 
     const failedEntities = clearStoreData(storeId);
-    clearCart();
+
+    let cartCleared = true;
+    try {
+      clearCart();
+    } catch {
+      cartCleared = false;
+    }
 
     let repainted = true;
     try {
@@ -331,6 +341,14 @@ export function ProductsPage() {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
         `No se pudieron eliminar todos los datos. Quedaron sin borrar: ${failedEntities.join(', ')}.`,
+      );
+      return;
+    }
+
+    if (!cartCleared) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        'Los datos fueron eliminados, pero no se pudo vaciar el carrito. Revíselo antes de vender.',
       );
       return;
     }

@@ -234,7 +234,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     showToastSuccessMock.mockClear();
     showToastErrorMock.mockClear();
     mockUser.isOwnerAdmin = true;
-    clearCartMock.mockClear();
+    // mockReset (not mockClear) so a queued mockImplementationOnce throw from the cart-failure
+    // test below can never leak into an unrelated test.
+    clearCartMock.mockReset();
     // mockReset (not mockClear) so a queued mockReturnValueOnce from the wipe-failure test
     // below can never leak into an unrelated test; clearStoreData's real contract (Finding 1)
     // is "returns the entities it failed to remove", so the default here is the successful
@@ -1285,6 +1287,35 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       expect(showBlockingErrorMock).toHaveBeenCalledWith(
         'Error',
         'Los datos fueron eliminados, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    expect(showToastSuccessMock).not.toHaveBeenCalled();
+  });
+
+  // clearCart() is zustand's persist-middleware clear() action, which calls
+  // localStorage.setItem synchronously with no try/catch anywhere in that chain — if it
+  // throws, the wipe already completed, but a stale cart can still be sold from, which is
+  // exactly the hazard clearing the cart exists to prevent. This must surface as its own
+  // message, distinct from a wipe failure or a repaint failure.
+  it('surfaces a cart-clear failure separately when the wipe itself fully succeeded', async () => {
+    confirmDialogMock.mockResolvedValue(true);
+    clearStoreDataMock.mockReturnValueOnce([]);
+    clearCartMock.mockImplementationOnce(() => {
+      throw new Error('quota');
+    });
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('clear-data-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Los datos fueron eliminados, pero no se pudo vaciar el carrito. Revíselo antes de vender.',
       ),
     );
     expect(showToastSuccessMock).not.toHaveBeenCalled();
