@@ -23,26 +23,23 @@ const { bm } = vi.hoisted(() => ({
   bm: <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] }),
 }));
 
+const saleServiceSpies = vi.hoisted(() => ({
+  getProductsToSaleByCategoryId: vi.fn(),
+  getAvailableProductCategories: vi.fn(),
+}));
+
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     // Angular parity: getProductsToSaleByCategoryId -> categoryId + isActive + availableToSale,
-    // sorted by order.
-    getProductsToSaleByCategoryId: vi.fn(async (categoryId: string) =>
-      bm(
-        mockProducts
-          .filter((p) => p.categoryId === categoryId && p.isActive && p.availableToSale)
-          .sort((a, b) => a.order - b.order),
-      ),
-    ),
+    // sorted by order. Implementation is set in beforeEach so the spy stays inspectable.
+    getProductsToSaleByCategoryId: saleServiceSpies.getProductsToSaleByCategoryId,
   })),
 }));
 
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
     // Angular parity: getAvailableProductCategories -> active-only, sorted by order.
-    getAvailableProductCategories: vi.fn(async () =>
-      bm(mockCategories.filter((c) => c.isActive).sort((a, b) => a.order - b.order)),
-    ),
+    getAvailableProductCategories: saleServiceSpies.getAvailableProductCategories,
   })),
 }));
 
@@ -108,6 +105,19 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     addItemMock.mockClear();
     mockUser.storeModuleIds = [];
     localStorage.clear();
+
+    saleServiceSpies.getProductsToSaleByCategoryId.mockReset();
+    saleServiceSpies.getProductsToSaleByCategoryId.mockImplementation(async (categoryId: string) =>
+      bm(
+        mockProducts
+          .filter((p) => p.categoryId === categoryId && p.isActive && p.availableToSale)
+          .sort((a, b) => a.order - b.order),
+      ),
+    );
+    saleServiceSpies.getAvailableProductCategories.mockReset();
+    saleServiceSpies.getAvailableProductCategories.mockImplementation(async () =>
+      bm(mockCategories.filter((c) => c.isActive).sort((a, b) => a.order - b.order)),
+    );
   });
 
   it('renders the exact Angular header text SALES.HEADER', () => {
@@ -276,5 +286,25 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /adicionar/i }));
 
     expect(addItemMock).toHaveBeenCalled();
+  });
+
+  // CATALOG-SCOPE PIN (catalog-show-all-and-clear-data): the catalog's
+  // getProductCategoriesView / getAvailableProductsByCategoryId now return
+  // inactive rows too. This screen must keep reading through the
+  // active-and-sellable methods. Swapping it to a catalog method would leave
+  // PROD-17 and CAT-10 green while Ventas started listing inactive products.
+  it('reads its category and product lists through the active-and-sellable service methods', async () => {
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' })];
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
+    expect(saleServiceSpies.getAvailableProductCategories).toHaveBeenCalled();
+    expect(saleServiceSpies.getProductsToSaleByCategoryId).toHaveBeenCalledWith('c1');
   });
 });
