@@ -14,6 +14,7 @@ import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offl
 import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { clearStoreData } from '~/shared/lib/storage/store-data-reset';
+import { runGuardedAgainstMissingDek } from '~/shared/lib/storage/run-guarded-against-missing-dek';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { ProductRepository } from '../lib/repositories/product-repository';
@@ -75,7 +76,11 @@ export function ProductsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudieron cargar los datos. Recargue la página.',
+    );
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId
   }, [storeId]);
 
@@ -92,8 +97,14 @@ export function ProductsPage() {
   // Angular parity (edit-product-modal.component.ts:42-49): opening the modal for create awaits
   // the per-category max product order and prefills Orden with data+1.
   async function handleAddProduct(category: ProductCategory) {
-    const maxOrderResult = await productService.getMaxOrderByCategoryId(category.id);
-    setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const maxOrderResult = await productService.getMaxOrderByCategoryId(category.id);
+        setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo abrir el formulario. Recargue la página.',
+    );
   }
 
   // --- Add category (opens the create modal) ---
@@ -105,8 +116,14 @@ export function ProductsPage() {
   // no-op. Note the scope difference from handleAddProduct: this max is store-wide across all
   // categories, not per-category.
   async function handleAddCategory() {
-    const maxOrderResult = await categoryService.getMaxOrder();
-    setModal({ type: 'category', defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const maxOrderResult = await categoryService.getMaxOrder();
+        setModal({ type: 'category', defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo abrir el formulario. Recargue la página.',
+    );
   }
 
   // --- Create product ---

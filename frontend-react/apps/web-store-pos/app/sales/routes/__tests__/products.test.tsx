@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
+import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 import type { BaseResponseModel, CsvImportResult, Product, ProductCategory } from '@store-mgmt/domain';
 
 // --- Mutable in-memory fixtures, controlled per-test ---
@@ -669,6 +670,74 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'El nombre del producto ya existe.'));
     // Modal stays open on failure — not force-closed.
     expect(screen.getByTestId('create-product-submit')).toBeInTheDocument();
+  });
+
+  // products-missing-dek-guard: all three services here are typed "resolve, never reject"
+  // (ProductService/ProductCategoryService doc comments), but the underlying repository call
+  // can throw MissingDataKeyError when encryption is provisioned and no data key is in memory.
+  // Each of these three call sites must surface that specific failure as a blocking error
+  // instead of the silent no-op an unhandled promise rejection produces today.
+  describe('MissingDataKeyError guard — loadData/handleAddProduct/handleAddCategory', () => {
+    it('shows a blocking error instead of leaving the catalog silently empty when loadData throws on mount', async () => {
+      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'No se pudieron cargar los datos. Recargue la página.',
+        ),
+      );
+    });
+
+    it('shows a blocking error instead of a silent no-op when getMaxOrderByCategoryId throws', async () => {
+      mockCategories = [makeCategory()];
+      productServiceSpies.getMaxOrderByCategoryId.mockRejectedValueOnce(new MissingDataKeyError());
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+      fireEvent.click(screen.getByTestId('add-product-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'No se pudo abrir el formulario. Recargue la página.',
+        ),
+      );
+      // The guard caught the failure before setModal ran — the create-product modal must not open.
+      expect(screen.queryByTestId('product-name-input')).not.toBeInTheDocument();
+    });
+
+    it('shows a blocking error instead of a silent no-op when categoryService.getMaxOrder throws', async () => {
+      categoryServiceSpies.getMaxOrder.mockRejectedValueOnce(new MissingDataKeyError());
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'No se pudo abrir el formulario. Recargue la página.',
+        ),
+      );
+      // The guard caught the failure before setModal ran — the create-category modal must not open.
+      expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument();
+    });
   });
 
   // Angular parity (edit-product-category-modal.component.ts:50-63): creating a category
