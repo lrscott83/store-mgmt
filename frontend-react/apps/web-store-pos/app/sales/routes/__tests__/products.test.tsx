@@ -817,6 +817,47 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
   });
 
+  it('shows BOTH the domain-failure message and the repaint-guard message when a domain failure and a repaint DEK failure occur together', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.createProducts.mockResolvedValueOnce({
+      data: false,
+      succeeded: false,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    // The domain failure did not prevent the mutation guard from returning true (Angular
+    // parity: unconditional close+repaint), so the modal closes and the repaint fires — and
+    // the repaint's own DEK failure surfaces its own message, independent of the domain one.
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      'Error',
+      'Algunos productos no fueron adicionados porque ya existen.',
+    );
+    expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
+  });
+
   // Angular parity (edit-products-modal.component.ts:97-107): closeModal() + emit() run
   // unconditionally, THEN a Swal error is shown if !response.succeeded (some names already
   // existed) — mirrored via showBlockingError.
@@ -1446,6 +1487,62 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
         'Algunos productos no fueron importados porque ya existen: Pizzas - Pizza Vieja, Confituras - Chocolate.',
       );
       expect(showBlockingInfoMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows a blocking error and keeps the modal open when createCsvProducts throws MissingDataKeyError', async () => {
+      productServiceSpies.createCsvProducts.mockRejectedValueOnce(new MissingDataKeyError());
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'No se pudieron importar los productos. Recargue la página.',
+        ),
+      );
+      expect(screen.getByTestId('csv-import-button')).toBeInTheDocument();
+    });
+
+    it('shows a blocking error and closes the modal when the post-import repaint throws MissingDataKeyError', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
+      ]);
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+      // Let the initial mount's loadData() resolve normally before queuing the rejection —
+      // otherwise the Once rejection would be consumed by the mount call instead of the
+      // import-triggered repaint this test targets.
+      await waitFor(() => expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'Los productos fueron importados, pero no se pudo actualizar la vista. Recargue la página.',
+        ),
+      );
+      expect(screen.queryByTestId('csv-import-button')).not.toBeInTheDocument();
+      // The toast still fired — the mutation itself (including the toast/dialog reporting it)
+      // completed before the repaint guard ran and failed.
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.');
     });
   });
 

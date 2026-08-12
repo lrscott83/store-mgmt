@@ -84,7 +84,7 @@ export function ProductsPage() {
       intl.formatMessage({ id: 'GENERAL.ERROR' }),
       'No se pudieron cargar los datos. Recargue la página.',
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId; intl is stable
   }, [storeId]);
 
   function togglePanel(categoryId: string) {
@@ -272,6 +272,11 @@ export function ProductsPage() {
   // the modal and emits the update event UNCONDITIONALLY (before checking `response.succeeded`);
   // the Swal error is purely informational when some names already existed.
   async function handleBulkSave(categoryId: string, items: { name: string; price: number }[]) {
+    // Unlike every other handler's flag (removed in Task 4), this one survives: it answers a
+    // different question than the guard's own return value. The guard's `mutationSucceeded`
+    // means "no MissingDataKeyError happened"; `domainSucceeded` means "the mutation's own
+    // {succeeded} envelope was true" — Angular parity requires the modal to close and the
+    // repaint to fire even when the second is false, so the two must stay separate.
     let domainSucceeded = true;
     const mutationSucceeded = await runGuardedAgainstMissingDek(
       async () => {
@@ -357,54 +362,70 @@ export function ProductsPage() {
         quantity: row.quantity,
       }));
 
-    const result = await productService.createCsvProducts(csvProducts);
-    // createCsvProducts always resolves success(...) by design (ADR-1): failure() hardcodes
-    // data:null (envelope.ts:19-27), which would destroy the {created,failed} payload. This ??
-    // is TS narrowing on the BaseResponseModel union, NOT a runtime failure path.
-    const { created, failed } = result.data ?? { created: [], failed: [] };
+    const succeeded = await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createCsvProducts(csvProducts);
+        // createCsvProducts always resolves success(...) by design (ADR-1): failure() hardcodes
+        // data:null (envelope.ts:19-27), which would destroy the {created,failed} payload. This ??
+        // is TS narrowing on the BaseResponseModel union, NOT a runtime failure path.
+        const { created, failed } = result.data ?? { created: [], failed: [] };
 
-    const inventoryService = new InventoryOfflineService(
-      storeId,
-      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+        const inventoryService = new InventoryOfflineService(
+          storeId,
+          new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+        );
+
+        let entriesCreated = 0;
+        for (const product of created) {
+          // Absent, 0, or negative -> no entry (decision #8). The parser PRESERVES 0/negative
+          // quantities (REQ-1 sc.6/7) instead of collapsing them to undefined, so a bare
+          // `!product.quantity` check is insufficient here: `!(-3)` is `false` in JS and would let
+          // a negative-quantity row slip through to createInventoryEntry.
+          if (!product.quantity || product.quantity <= 0) continue;
+          const costPrice = product.cost ?? product.price; // decision #7/#16: 0 is a valid cost
+          const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice);
+          // R2: the primitive returns bare `null` (product not found) or a DataResult that may not
+          // have succeeded — the optional chain absorbs both, so neither inflates the count. Same
+          // idiom as today-entries.tsx:148.
+          if (entry?.succeeded) entriesCreated++;
+        }
+
+        setModal(null);
+
+        // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
+        // toast (no title), PLUS a conditional info dialog when there are duplicates. DIVERGES
+        // DELIBERATELY (decisions #6/#14/#17): the toast reports REAL successes (products created +
+        // entries created), unconditionally, with no branching — even a legacy 3-column CSV reads
+        // "... y 0 entradas correctamente." The info dialog enumerates each duplicate as
+        // "Categoría - Nombre" instead of the generic literal. Both strings stay hardcoded Spanish
+        // (no i18n key), matching Angular's own and the pre-existing React literal — introducing
+        // keys is out of scope (R6). Swal renders `text` as `textContent` with no
+        // `white-space: pre-line` (sweetalert2 11.26.25, css `.swal2-html-container`), so the list
+        // MUST be single-line comma-joined, never newline-separated.
+        showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
+        if (failed.length > 0) {
+          await showBlockingInfo(
+            intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+            `Algunos productos no fueron importados porque ya existen: ${failed
+              .map((p) => `${p.category} - ${p.name}`)
+              .join(', ')}.`,
+          );
+        }
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudieron importar los productos. Recargue la página.',
     );
+    if (!succeeded) return;
 
-    let entriesCreated = 0;
-    for (const product of created) {
-      // Absent, 0, or negative -> no entry (decision #8). The parser PRESERVES 0/negative
-      // quantities (REQ-1 sc.6/7) instead of collapsing them to undefined, so a bare
-      // `!product.quantity` check is insufficient here: `!(-3)` is `false` in JS and would let
-      // a negative-quantity row slip through to createInventoryEntry.
-      if (!product.quantity || product.quantity <= 0) continue;
-      const costPrice = product.cost ?? product.price; // decision #7/#16: 0 is a valid cost
-      const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice);
-      // R2: the primitive returns bare `null` (product not found) or a DataResult that may not
-      // have succeeded — the optional chain absorbs both, so neither inflates the count. Same
-      // idiom as today-entries.tsx:148.
-      if (entry?.succeeded) entriesCreated++;
-    }
-
-    loadData();
-    setModal(null);
-
-    // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
-    // toast (no title), PLUS a conditional info dialog when there are duplicates. DIVERGES
-    // DELIBERATELY (decisions #6/#14/#17): the toast reports REAL successes (products created +
-    // entries created), unconditionally, with no branching — even a legacy 3-column CSV reads
-    // "... y 0 entradas correctamente." The info dialog enumerates each duplicate as
-    // "Categoría - Nombre" instead of the generic literal. Both strings stay hardcoded Spanish
-    // (no i18n key), matching Angular's own and the pre-existing React literal — introducing
-    // keys is out of scope (R6). Swal renders `text` as `textContent` with no
-    // `white-space: pre-line` (sweetalert2 11.26.25, css `.swal2-html-container`), so the list
-    // MUST be single-line comma-joined, never newline-separated.
-    showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
-    if (failed.length > 0) {
-      await showBlockingInfo(
-        intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
-        `Algunos productos no fueron importados porque ya existen: ${failed
-          .map((p) => `${p.category} - ${p.name}`)
-          .join(', ')}.`,
-      );
-    }
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'Los productos fueron importados, pero no se pudo actualizar la vista. Recargue la página.',
+    );
   }
 
   // --- Clear all data ---
