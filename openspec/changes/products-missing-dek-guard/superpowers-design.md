@@ -205,3 +205,20 @@ unit-test coverage only, and no E2E test asserts on this failure mode.
 - `handleClearData`'s existing three-way error handling
   (`products.tsx:328-378`). Already correct for its own scenario, not
   touched.
+- `products.tsx`'s five other bare `loadData()` repaint calls, at the end of
+  `handleCreateProduct`, `handleEditProduct`, `handleDeactivateProduct`,
+  `handleBulkSave`, and `handleCategorySave`. Each of these already awaits
+  its mutating call (`createProduct`, `updateProduct`, `deleteProduct`,
+  `createProducts`, `createProductCategory`/`updateProductCategory`) and
+  handles that call's own `{succeeded: false}` failure through the existing
+  `showBlockingError` envelope path — so a `MissingDataKeyError` from the
+  mutation itself is already covered. What is not covered is the trailing,
+  unguarded `loadData()` repaint that runs after a successful mutation: if
+  the DEK goes missing between the mutation and that repaint, the rejection
+  is unhandled, the same failure shape this change just fixed for the mount
+  effect. These five are deferred rather than folded into this change
+  because they are post-mutation repaints, not pre-mutation reads — closer
+  in spirit to `handleClearData`'s already-separately-solved repaint problem
+  than to the three call sites this change addresses — and that distinction
+  deserves its own look rather than a mechanical copy-paste of this change's
+  pattern.
