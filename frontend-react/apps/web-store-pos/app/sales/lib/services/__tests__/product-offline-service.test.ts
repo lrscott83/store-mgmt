@@ -62,9 +62,9 @@ describe('ProductOfflineService', () => {
     });
   });
 
-  describe('PROD-10: getMaxOrder (async)', () => {
+  describe('PROD-10: getMaxOrderByCategoryId (async)', () => {
     it('resolves a success envelope with 0 when the category has no products', async () => {
-      const result = await service.getMaxOrder('empty-cat');
+      const result = await service.getMaxOrderByCategoryId('empty-cat');
       expect(result).toEqual({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
     });
 
@@ -76,7 +76,7 @@ describe('ProductOfflineService', () => {
       productRepository.addProduct(categoryId, 'Coca Cola', 1.5, '', 1, true, true, true);
       productRepository.addProduct(categoryId, 'Fanta', 1.5, '', 5, false, true, true);
 
-      const result = await service.getMaxOrder(categoryId);
+      const result = await service.getMaxOrderByCategoryId(categoryId);
       expect(result.data).toBe(5);
     });
   });

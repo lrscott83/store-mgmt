@@ -11,7 +11,7 @@ import type { BaseResponseModel } from '../models/base';
  * `hasAnyAvailableToSaleProduct`, `getProductById`, `getProductByBarcode`,
  * `getProductsToSelect`, `getAvailableProductsByCategoryId`, `deleteProduct`,
  * `createCsvProducts`, `getProductsToSaleByCategoryId`, `createProduct` (9
- * args), `updateProduct` (10 args), `getMaxOrder(categoryId)`,
+ * args), `updateProduct` (10 args), `getMaxOrderByCategoryId(categoryId)`,
  * `createProducts(categoryId, items)`. The React-only members
  * `getByName`/`activate`/`deactivate` have no Angular SERVICE correlate
  * (Angular exposes the equivalents on the REPOSITORY only) and are REMOVED,
@@ -22,6 +22,12 @@ import type { BaseResponseModel } from '../models/base';
  * 8's cross-cutting cleanup, design.md's Decision section, ratified precedent
  * from Slice 5's Flag #1) — the interface is now standalone, exactly these 12
  * async methods, no supertype.
+ *
+ * NOTE: Angular names this `getMaxOrder(categoryId)`. React DIVERGES ON PURPOSE
+ * (user-authorized 2026-08-12): the backend declares BOTH `GetMaxOrderAsync()`
+ * (global across all products) and `GetMaxOrderByCategoryIdAsync(categoryId)`
+ * on `IProductRepository`, and this method is the SECOND one — the bare name
+ * belonged to a different operation.
  */
 export interface ProductService {
   hasAnyAvailableToSaleProduct(): Promise<BaseResponseModel<boolean>>;
@@ -59,6 +65,6 @@ export interface ProductService {
     barcode?: string,
   ): Promise<BaseResponseModel<boolean>>;
 
-  getMaxOrder(categoryId: string): Promise<BaseResponseModel<number>>;
+  getMaxOrderByCategoryId(categoryId: string): Promise<BaseResponseModel<number>>;
   createProducts(categoryId: string, items: { name: string; price: number }[]): Promise<BaseResponseModel<boolean>>;
 }

@@ -135,7 +135,7 @@ class FakeProductService implements ProductService {
     return success(true);
   }
 
-  async getMaxOrder(categoryId: string): Promise<BaseResponseModel<number>> {
+  async getMaxOrderByCategoryId(categoryId: string): Promise<BaseResponseModel<number>> {
     const orders = this.items.filter((p) => p.categoryId === categoryId).map((p) => p.order);
     return success(orders.length > 0 ? Math.max(...orders) : 0);
   }
@@ -152,7 +152,7 @@ class FakeProductService implements ProductService {
 }
 
 describe('ProductService', () => {
-  it('is implementable with exactly the standalone async 12-method surface: hasAnyAvailableToSaleProduct/getProductById/getProductByBarcode/getProductsToSelect/getAvailableProductsByCategoryId/deleteProduct/createCsvProducts/getProductsToSaleByCategoryId/createProduct/updateProduct/getMaxOrder/createProducts', async () => {
+  it('is implementable with exactly the standalone async 12-method surface: hasAnyAvailableToSaleProduct/getProductById/getProductByBarcode/getProductsToSelect/getAvailableProductsByCategoryId/deleteProduct/createCsvProducts/getProductsToSaleByCategoryId/createProduct/updateProduct/getMaxOrderByCategoryId/createProducts', async () => {
     const svc: ProductService = new FakeProductService();
 
     const hasAny = await svc.hasAnyAvailableToSaleProduct();
@@ -174,7 +174,7 @@ describe('ProductService', () => {
     const created = await svc.createProduct('cat1', 'Fanta', 3, 'biz1', 2, true, true, true, '999');
     expect(created).toEqual({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] });
 
-    const maxOrder = await svc.getMaxOrder('cat1');
+    const maxOrder = await svc.getMaxOrderByCategoryId('cat1');
     expect(maxOrder.data).toBe(2);
 
     const toSale = await svc.getProductsToSaleByCategoryId('cat1');

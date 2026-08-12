@@ -90,9 +90,9 @@ export function ProductsPage() {
 
   // --- Add product (opens the create modal) ---
   // Angular parity (edit-product-modal.component.ts:42-49): opening the modal for create awaits
-  // productService.getMaxOrder(category.id) and prefills Orden with data+1.
+  // the per-category max product order and prefills Orden with data+1.
   async function handleAddProduct(category: ProductCategory) {
-    const maxOrderResult = await productService.getMaxOrder(category.id);
+    const maxOrderResult = await productService.getMaxOrderByCategoryId(category.id);
     setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
   }
 

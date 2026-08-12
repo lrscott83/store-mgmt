@@ -109,11 +109,11 @@ describe('ProductOnlineService (reference-only, apiClient-mocked)', () => {
     expect(api.post).toHaveBeenCalledWith('/v1/Products/import', { csvProducts });
   });
 
-  it('ONLINE-10: getMaxOrder → GET /v1/Products/maxOrderByCategoryId/:id', async () => {
+  it('ONLINE-10: getMaxOrderByCategoryId → GET /v1/Products/maxOrderByCategoryId/:id', async () => {
     const svc = await getService();
     const api = await mockedApiClient();
     api.get.mockResolvedValue(envelope(5));
-    const result = await svc.getMaxOrder('cat-1');
+    const result = await svc.getMaxOrderByCategoryId('cat-1');
     expect(api.get).toHaveBeenCalledWith('/v1/Products/maxOrderByCategoryId/cat-1');
     expect(result.data).toBe(5);
   });

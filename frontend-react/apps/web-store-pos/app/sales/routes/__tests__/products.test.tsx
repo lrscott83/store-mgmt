@@ -54,7 +54,7 @@ const productServiceSpies = vi.hoisted(() => ({
       Promise.resolve({ data: { created: [], failed: [] }, succeeded: true, message: '', actionCode: 200, errors: [] }),
   ),
   createProducts: vi.fn((..._args: unknown[]) => Promise.resolve({ data: true, succeeded: true, message: '', actionCode: 200, errors: [] })),
-  getMaxOrder: vi.fn((..._args: unknown[]) => Promise.resolve({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] })),
+  getMaxOrderByCategoryId: vi.fn((..._args: unknown[]) => Promise.resolve({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] })),
 }));
 
 const { bm } = vi.hoisted(() => ({
@@ -71,7 +71,7 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
     deleteProduct: productServiceSpies.deleteProduct,
     createCsvProducts: productServiceSpies.createCsvProducts,
     createProducts: productServiceSpies.createProducts,
-    getMaxOrder: productServiceSpies.getMaxOrder,
+    getMaxOrderByCategoryId: productServiceSpies.getMaxOrderByCategoryId,
   })),
 }));
 
@@ -201,8 +201,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     productServiceSpies.createProducts.mockResolvedValue(okEnvelope);
     confirmDialogMock.mockClear();
     confirmDialogMock.mockResolvedValue(true);
-    productServiceSpies.getMaxOrder.mockClear();
-    productServiceSpies.getMaxOrder.mockResolvedValue({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
+    productServiceSpies.getMaxOrderByCategoryId.mockClear();
+    productServiceSpies.getMaxOrderByCategoryId.mockResolvedValue({ data: 0, succeeded: true, message: '', actionCode: 200, errors: [] });
     categoryServiceSpies.createProductCategory.mockClear();
     categoryServiceSpies.createProductCategory.mockResolvedValue({
       data: true,
@@ -384,13 +384,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
   });
 
   // Angular parity (edit-product-modal.component.ts:42-49,88-100): opening the create modal
-  // awaits productService.getMaxOrder(category.id) and prefills Orden with data+1; submit routes
+  // awaits productService.getMaxOrderByCategoryId(category.id) and prefills Orden with data+1; submit routes
   // through the async createProduct(categoryId, name, price, businessId, order, isActive,
   // availableToSale, discountFromInvantory, barcode?) positional surface — no audit fields (the
   // service owns createdByName/createdDate stamping).
-  it('awaits getMaxOrder(category.id) and prefills Orden with max+1 before opening the create modal', async () => {
+  it('awaits getMaxOrderByCategoryId(category.id) and prefills Orden with max+1 before opening the create modal', async () => {
     mockCategories = [makeCategory()];
-    productServiceSpies.getMaxOrder.mockResolvedValueOnce({
+    productServiceSpies.getMaxOrderByCategoryId.mockResolvedValueOnce({
       data: 4,
       succeeded: true,
       message: '',
@@ -407,13 +407,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
     fireEvent.click(screen.getByTestId('add-product-button'));
 
-    await waitFor(() => expect(productServiceSpies.getMaxOrder).toHaveBeenCalledWith('cat-1'));
+    await waitFor(() => expect(productServiceSpies.getMaxOrderByCategoryId).toHaveBeenCalledWith('cat-1'));
     expect(await screen.findByTestId('product-order-input')).toHaveValue(5);
   });
 
   it('calls createProduct with positional args carrying the modal order/isActive (service owns audit stamping)', async () => {
     mockCategories = [makeCategory()];
-    productServiceSpies.getMaxOrder.mockResolvedValueOnce({
+    productServiceSpies.getMaxOrderByCategoryId.mockResolvedValueOnce({
       data: 0,
       succeeded: true,
       message: '',
@@ -440,7 +440,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[1]).toBe('Sprite'); // name
     expect(args[2]).toBe(2.5); // price
     expect(args[3]).toBe(''); // businessId
-    expect(args[4]).toBe(1); // order (getMaxOrder data=0 -> 0+1)
+    expect(args[4]).toBe(1); // order (getMaxOrderByCategoryId data=0 -> 0+1)
     expect(args[5]).toBe(true); // isActive
   });
 

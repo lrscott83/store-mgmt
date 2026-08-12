@@ -50,8 +50,11 @@ export class ProductOfflineService implements ProductService {
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
   }
 
-  /** 1:1 port of Angular `getMaxOrder` (product-offline.service.ts:159-162) — async, delegates repo. */
-  async getMaxOrder(categoryId: string): Promise<BaseResponseModel<number>> {
+  /**
+   * Angular calls this `getMaxOrder` (product-offline.service.ts:159-162). Renamed here to
+   * match the backend's `GetMaxOrderByCategoryIdAsync` — see `ProductService` for why.
+   */
+  async getMaxOrderByCategoryId(categoryId: string): Promise<BaseResponseModel<number>> {
     const products = this.productRepository.getProductsByCategoryId(categoryId);
     return success(Math.max(...products.map((p) => p.order), 0));
   }

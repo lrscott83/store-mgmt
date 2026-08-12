@@ -106,7 +106,7 @@ export class ProductCategoryOfflineService implements ProductCategoryService {
   /**
    * 1:1 port of Angular `getMaxOrder` (product-category-offline.service.ts:100-103) — GLOBAL
    * max across ALL categories (store-wide scope), never fails. Distinct from
-   * `ProductService.getMaxOrder(categoryId)`, which is per-category. Do not unify.
+   * `ProductService.getMaxOrderByCategoryId(categoryId)`, which is per-category.
    */
   getMaxOrder(): Promise<BaseResponseModel<number>> {
     const categories = this.categoryRepository.getProductCategories();

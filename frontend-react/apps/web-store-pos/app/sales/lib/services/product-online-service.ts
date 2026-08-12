@@ -21,7 +21,7 @@ import { apiClient } from '~/shared/lib/http/api-client';
  * double slashes (e.g. `/v1/Products//toEntry`). React NORMALIZES these 8 to a single slash
  * (`getProductById`, `hasAnyAvailableToSaleProduct`, `getProductsToSelect`,
  * `getAvailableProductsByCategoryId`, `getProductsToSaleByCategoryId`, `deleteProduct`,
- * `getMaxOrder`, `updateProduct`) for consistency with the sibling
+ * `getMaxOrderByCategoryId`, `updateProduct`) for consistency with the sibling
  * `ProductCategoryOnlineService` (already normalized, DG-1) — parity-audit-remediation Slice 1.
  * `getProductByBarcode`/`createCsvProducts`/`createProducts`/`createProduct` were already clean.
  *
@@ -91,7 +91,7 @@ export class ProductOnlineService implements ProductService {
     return response.data;
   }
 
-  async getMaxOrder(categoryId: string): Promise<BaseResponseModel<number>> {
+  async getMaxOrderByCategoryId(categoryId: string): Promise<BaseResponseModel<number>> {
     const url = this.API_URL + 'maxOrderByCategoryId/' + categoryId;
     const response = await apiClient.get<BaseResponseModel<number>>(url);
     return response.data;
