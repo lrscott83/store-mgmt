@@ -56,6 +56,8 @@ Never create new files under `docs/superpowers/`. If that directory still exists
 
 `subagent-driven-development` resolves a per-plan scratch workspace via `scripts/sdd-workspace` and writes the ledger, task briefs, implementer reports, and review packages into `.superpowers/sdd/<plan-slug>/`. That directory is short-lived state, self-ignored by a generated `.gitignore`, and **stays where it is**. Do not redirect it into `openspec/` — it would commit throwaway state. The ledger's first line names its plan file; that plan file path is now the `openspec/` one.
 
+**One catch, caused by the naming rule above.** `sdd-workspace` derives that directory from the plan file's **basename**, and under this convention every plan in the repo is named `superpowers-plan.md` — so every change would resolve to the same `.superpowers/sdd/superpowers-plan/`, defeating the per-plan scoping that exists to stop one change's stale ledger from being read as another's progress. Pass an explicit path instead: `.superpowers/sdd/<change-name>/`. Both `scripts/task-brief` and `scripts/review-package` accept an OUTFILE argument, so point them at that directory too.
+
 ### Archiving a finished change
 
 When the work is complete and merged, move the whole folder:
