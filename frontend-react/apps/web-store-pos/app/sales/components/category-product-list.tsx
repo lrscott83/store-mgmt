@@ -8,14 +8,14 @@ import { InactiveBadge } from './inactive-badge';
 interface CategoryProductListProps {
   products: Product[];
   onEditProduct: (product: Product) => void;
-  onDeleteProduct: (productId: string) => void;
+  onDeactivateProduct: (productId: string) => void;
 }
 
 /**
  * Per-category product panel — matches Angular's
  * `category-product-list.component.html`. Rendered inside one accordion panel per
  * category by `ProductsPage`. Shows the per-category empty state and the product list
- * (name + price) with a per-product edit/delete actions menu.
+ * (name + price) with a per-product edit/deactivate actions menu.
  *
  * The category-level actions (Editar Categoría / Nuevo Producto / Nuevo Productos)
  * now live in the header's CategoryActionsMenu (gear), not here.
@@ -23,7 +23,7 @@ interface CategoryProductListProps {
 export function CategoryProductList({
   products,
   onEditProduct,
-  onDeleteProduct,
+  onDeactivateProduct,
 }: CategoryProductListProps) {
   const intl = useIntl();
 
@@ -45,7 +45,7 @@ export function CategoryProductList({
               key={product.id}
               product={product}
               onEdit={() => onEditProduct(product)}
-              onDelete={() => onDeleteProduct(product.id)}
+              onDeactivate={() => onDeactivateProduct(product.id)}
             />
           ))}
         </ul>
@@ -57,10 +57,10 @@ export function CategoryProductList({
 interface ProductRowProps {
   product: Product;
   onEdit: () => void;
-  onDelete: () => void;
+  onDeactivate: () => void;
 }
 
-function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
+function ProductRow({ product, onEdit, onDeactivate }: ProductRowProps) {
   const intl = useIntl();
   const formattedPrice = formatCurrency(product.price);
 
@@ -80,9 +80,12 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
             {/* PRODUCT.EDIT_PRODUCT */}
             {intl.formatMessage({ id: 'PRODUCT.EDIT_PRODUCT' })}
           </ActionMenuItem>
-          <ActionMenuItem intent="delete" separatorBefore onClick={onDelete}>
-            {/* PRODUCT.DELETE_PRODUCT */}
-            {intl.formatMessage({ id: 'PRODUCT.DELETE_PRODUCT' })}
+          <ActionMenuItem intent="delete" separatorBefore onClick={onDeactivate}>
+            {/* PRODUCT.DEACTIVATE_PRODUCT — deleteProduct is a soft delete (isActive: false,
+                row stays in storage), so the row menu item is labelled for what it actually
+                does. Still intent="delete": deactivation is still the destructive action in
+                this menu, hence the red styling. */}
+            {intl.formatMessage({ id: 'PRODUCT.DEACTIVATE_PRODUCT' })}
           </ActionMenuItem>
         </ActionMenu>
       </div>

@@ -513,11 +513,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.queryByTestId('confirm-delete-button')).not.toBeInTheDocument();
   });
 
-  // Angular parity (category-product-list.component.ts:86-103, onDeleteProduct): a
-  // confirmDialog Swal (question icon, GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A with
-  // {name: PRODUCT.TEXT}, GENERAL.YES/NO) gates the delete — deleteProduct(id) only fires
-  // on isConfirmed.
-  it('T1: confirms via confirmDialog with the exact Angular keys, then calls deleteProduct(id) (WU4.3)', async () => {
+  // catalog-show-all-and-clear-data §Finding 2: deleteProduct is a soft delete (isActive:
+  // false, row stays in storage), so the row menu item and this confirmation are labelled
+  // "Desactivar", not "Eliminar" — the underlying service call is unchanged, only the label
+  // and the confirmation copy were aligned to the real behaviour. The confirmation no longer
+  // uses the SHARED GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A keys (four other screens depend on
+  // their "eliminar" wording); it uses hardcoded Spanish instead.
+  it('confirms via confirmDialog with the hardcoded "desactivar" copy, then calls deleteProduct(id)', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
 
@@ -529,12 +531,12 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(await screen.findByLabelText('Acciones'));
-    fireEvent.click(screen.getByText('Eliminar Producto'));
+    fireEvent.click(screen.getByText('Desactivar Producto'));
 
     await waitFor(() =>
       expect(confirmDialogMock).toHaveBeenCalledWith({
-        title: 'Confirmación para eliminar',
-        message: '¿Está seguro que desea eliminar esta Product?',
+        title: 'Confirmación para desactivar',
+        message: '¿Está seguro que desea desactivar este producto?',
         confirmButtonText: 'Si',
         cancelButtonText: 'No',
       }),
@@ -542,7 +544,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     await waitFor(() => expect(productServiceSpies.deleteProduct).toHaveBeenCalledWith('prod-1'));
   });
 
-  it('T1: does NOT call deleteProduct when the confirmDialog is cancelled', async () => {
+  it('does NOT call deleteProduct when the confirmDialog is cancelled', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
     confirmDialogMock.mockResolvedValueOnce(false);
@@ -555,7 +557,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(await screen.findByLabelText('Acciones'));
-    fireEvent.click(screen.getByText('Eliminar Producto'));
+    fireEvent.click(screen.getByText('Desactivar Producto'));
 
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
     expect(productServiceSpies.deleteProduct).not.toHaveBeenCalled();

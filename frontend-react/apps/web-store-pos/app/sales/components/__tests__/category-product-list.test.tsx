@@ -38,7 +38,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         <CategoryProductList
           products={[]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -52,7 +52,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         <CategoryProductList
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -65,7 +65,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         <CategoryProductList
           products={[makeProduct({ name: 'Sprite', price: 2 })]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -79,61 +79,61 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         <CategoryProductList
           products={[makeProduct({ name: 'Sprite', price: 2000 })]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
     expect(screen.getByText('$2,000.00')).toBeInTheDocument();
   });
 
-  it('opens a per-product actions menu with "Editar Producto" / "Eliminar Producto"', () => {
+  it('opens a per-product actions menu with "Editar Producto" / "Desactivar Producto"', () => {
     render(
       <Wrapper>
         <CategoryProductList
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
     fireEvent.click(screen.getByLabelText('Acciones'));
-    // PRODUCT.EDIT_PRODUCT = 'Editar Producto', PRODUCT.DELETE_PRODUCT = 'Eliminar Producto'
+    // PRODUCT.EDIT_PRODUCT = 'Editar Producto', PRODUCT.DEACTIVATE_PRODUCT = 'Desactivar Producto'
     expect(screen.getByText('Editar Producto')).toBeInTheDocument();
-    expect(screen.getByText('Eliminar Producto')).toBeInTheDocument();
+    expect(screen.getByText('Desactivar Producto')).toBeInTheDocument();
   });
 
-  it('renders "Editar Producto" with a primary-colored edit icon and "Eliminar Producto" with a danger-colored delete icon', () => {
+  it('renders "Editar Producto" with a primary-colored edit icon and "Desactivar Producto" with a danger-colored icon', () => {
     render(
       <Wrapper>
         <CategoryProductList
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
     fireEvent.click(screen.getByLabelText('Acciones'));
     const editButton = screen.getByText('Editar Producto').closest('button');
-    const deleteButton = screen.getByText('Eliminar Producto').closest('button');
+    const deactivateButton = screen.getByText('Desactivar Producto').closest('button');
     expect(editButton).toHaveClass('text-primary');
     expect(editButton?.querySelector('svg')).toBeTruthy();
-    expect(deleteButton).toHaveClass('text-danger');
-    expect(deleteButton?.querySelector('svg')).toBeTruthy();
+    expect(deactivateButton).toHaveClass('text-danger');
+    expect(deactivateButton?.querySelector('svg')).toBeTruthy();
   });
 
-  it('S-GM-PRODUCT-ROW-1: a separator precedes "Eliminar Producto"', () => {
+  it('S-GM-PRODUCT-ROW-1: a separator precedes "Desactivar Producto"', () => {
     render(
       <Wrapper>
         <CategoryProductList
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
     fireEvent.click(screen.getByLabelText('Acciones'));
-    const deleteButton = screen.getByText('Eliminar Producto').closest('button');
-    expect(deleteButton?.previousElementSibling).toHaveAttribute('role', 'separator');
+    const deactivateButton = screen.getByText('Desactivar Producto').closest('button');
+    expect(deactivateButton?.previousElementSibling).toHaveAttribute('role', 'separator');
   });
 
   it('calls onEditProduct with the product when "Editar Producto" is clicked', () => {
@@ -144,7 +144,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         <CategoryProductList
           products={[product]}
           onEditProduct={onEditProduct}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -153,21 +153,21 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
     expect(onEditProduct).toHaveBeenCalledWith(product);
   });
 
-  it('calls onDeleteProduct with the product id when "Eliminar Producto" is clicked', () => {
-    const onDeleteProduct = vi.fn();
+  it('calls onDeactivateProduct with the product id when "Desactivar Producto" is clicked', () => {
+    const onDeactivateProduct = vi.fn();
     const product = makeProduct();
     render(
       <Wrapper>
         <CategoryProductList
           products={[product]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={onDeleteProduct}
+          onDeactivateProduct={onDeactivateProduct}
         />
       </Wrapper>,
     );
     fireEvent.click(screen.getByLabelText('Acciones'));
-    fireEvent.click(screen.getByText('Eliminar Producto'));
-    expect(onDeleteProduct).toHaveBeenCalledWith(product.id);
+    fireEvent.click(screen.getByText('Desactivar Producto'));
+    expect(onDeactivateProduct).toHaveBeenCalledWith(product.id);
   });
 
   it('marks an inactive product with the Inactivo badge', () => {
@@ -176,7 +176,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         <CategoryProductList
           products={[makeProduct({ id: 'p1', name: 'Sprite', isActive: false })]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -190,7 +190,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         <CategoryProductList
           products={[makeProduct({ id: 'p1', name: 'Coca Cola', isActive: true })]}
           onEditProduct={vi.fn()}
-          onDeleteProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
         />
       </Wrapper>,
     );

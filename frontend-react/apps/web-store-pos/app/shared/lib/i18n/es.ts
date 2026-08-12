@@ -308,15 +308,16 @@ const messages: Record<string, string> = {
   // EDIT_PRODUCT_CATEGORY) for the per-category "edit" button, and EDIT_CATEGORY's Spanish
   // value in vocabs/es.ts is literally 'Categoría' — same text as NEW_PRODUCT_CATEGORY.
   'PRODUCT_CATEGORY.EDIT_CATEGORY': 'Categoría',
-  // PRODUCT.TEXT (Angular vocabs/es.ts:365) — used by Swal's DELETE_CONFIRM_MESSAGE_A
-  // interpolation in category-product-list.component.ts:88 (onDeleteProduct). Angular
-  // literally leaves this untranslated ('Product', not 'Producto') — preserved verbatim.
-  'PRODUCT.TEXT': 'Product',
   'PRODUCT.PRODUCTS': 'Productos',
   'PRODUCT.NEW_PRODUCT': 'Producto',
   'PRODUCT.NEW_PRODUCTS': 'Productos',
   'PRODUCT.EDIT_PRODUCT': 'Editar Producto',
-  'PRODUCT.DELETE_PRODUCT': 'Eliminar Producto',
+  // catalog-show-all-and-clear-data §Finding 2: ProductRepository.deleteProduct is a soft
+  // delete (isActive: false, row stays in storage), so the catalog row menu item is labelled
+  // for what it actually does — the label was aligned to the behaviour, not the other way
+  // around. Replaces the removed 'PRODUCT.DELETE_PRODUCT' key, whose only consumer was this
+  // same row menu item.
+  'PRODUCT.DEACTIVATE_PRODUCT': 'Desactivar Producto',
   'PRODUCT.AVAILABLE_TO_SALE': 'Disponible para Vender',
   // PRODUCT.ADD_PRODUCTS (Angular vocabs/es.ts:373) — edit-products-modal title
   // (edit-products-modal.component.html:4).

@@ -157,18 +157,22 @@ export function ProductsPage() {
     setModal(null);
   }
 
-  // --- Delete product ---
-  // Angular parity (category-product-list.component.ts:86-103, onDeleteProduct): a blocking
-  // confirmDialog Swal (question icon, GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A with
-  // {name: PRODUCT.TEXT}) gates the delete — only proceeds on isConfirmed. deleteProduct
-  // itself always resolves success (soft-delete, never fails) once confirmed.
-  async function handleDeleteProduct(id: string) {
+  // --- Deactivate product ---
+  // catalog-show-all-and-clear-data §Finding 2: `ProductService.deleteProduct` is, and stays,
+  // a SOFT delete — it sets isActive: false and the row stays in storage
+  // (`packages/domain`'s `ProductService` interface is untouchable, so the call itself is
+  // unchanged). Before the catalog started listing inactive rows, the isActive filter made the
+  // row vanish, so calling it "eliminar" read as true. Now the row stays listed, dimmed and
+  // badged "Inactivo", so it deactivates rather than removes — the label (and this handler's
+  // name) were aligned to that behaviour instead of the other way around. The confirmation
+  // copy is hardcoded Spanish rather than the SHARED GENERAL.DELETE_CONFIRM_TITLE/MESSAGE_A
+  // keys: those keys' "eliminar" wording is depended on by three other screens
+  // (today-entries.tsx, today-expenses.tsx, order-item-list.tsx) that genuinely delete/remove,
+  // so they stay untouched and this screen gets its own copy instead.
+  async function handleDeactivateProduct(id: string) {
     const confirmed = await confirmDialog({
-      title: intl.formatMessage({ id: 'GENERAL.DELETE_CONFIRM_TITLE' }),
-      message: intl.formatMessage(
-        { id: 'GENERAL.DELETE_CONFIRM_MESSAGE_A' },
-        { name: intl.formatMessage({ id: 'PRODUCT.TEXT' }) },
-      ),
+      title: 'Confirmación para desactivar',
+      message: '¿Está seguro que desea desactivar este producto?',
       confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
       cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
     });
@@ -434,7 +438,7 @@ export function ProductsPage() {
                     <CategoryProductList
                       products={categoryProducts}
                       onEditProduct={(product) => setModal({ type: 'edit', product })}
-                      onDeleteProduct={handleDeleteProduct}
+                      onDeactivateProduct={handleDeactivateProduct}
                     />
                   </div>
                 )}
