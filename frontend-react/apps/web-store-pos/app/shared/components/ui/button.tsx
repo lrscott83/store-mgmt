@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'outline' | 'fab';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'outline' | 'fab' | 'fab-danger';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary: 'rounded-md px-4 py-2 shadow-card bg-primary text-white hover:bg-primary-hover',
@@ -11,6 +11,10 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   // "+ Categoría" / "Importar Productos"): pill-shaped, filled purple, white text, elevated
   // shadow, comfortable padding.
   fab: 'rounded-full px-5 py-3 shadow-lg bg-primary text-white hover:bg-primary-hover',
+  // Same extended-FAB geometry as `fab`, in the danger colour — for prominent
+  // destructive actions that sit beside a `fab` button (the catalog's
+  // "Limpiar" next to "Importar Productos").
+  'fab-danger': 'rounded-full px-5 py-3 shadow-lg bg-danger text-white hover:opacity-90',
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

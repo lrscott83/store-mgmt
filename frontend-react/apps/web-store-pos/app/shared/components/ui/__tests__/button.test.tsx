@@ -32,6 +32,15 @@ describe('Button — variants and interaction', () => {
     expect(btn.className).toContain('border-primary');
   });
 
+  it('applies fab-danger variant classes when variant="fab-danger"', () => {
+    render(<Button variant="fab-danger">Limpiar</Button>);
+    const btn = screen.getByRole('button', { name: 'Limpiar' });
+    // Pill geometry from `fab`, colour from `danger` — the composition is the
+    // whole point of the variant existing.
+    expect(btn.className).toContain('rounded-full');
+    expect(btn.className).toContain('bg-danger');
+  });
+
   it('calls onClick when clicked', () => {
     const onClick = vi.fn();
     render(<Button onClick={onClick}>Guardar</Button>);
