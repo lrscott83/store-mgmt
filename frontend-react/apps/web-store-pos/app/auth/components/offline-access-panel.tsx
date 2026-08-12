@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
-import { showToastSuccess } from '~/shared/lib/toast';
+import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { ImportRosterModal } from './import-roster-modal';
 
 type RosterState = 'unknown' | 'provisioned' | 'absent';
@@ -25,9 +25,17 @@ export function OfflineAccessPanel() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { isRosterProvisioned } = await import('~/shared/lib/offline/roster-store');
-      if (!cancelled) {
-        setRosterState(isRosterProvisioned() ? 'provisioned' : 'absent');
+      try {
+        const { isRosterProvisioned } = await import('~/shared/lib/offline/roster-store');
+        if (!cancelled) {
+          setRosterState(isRosterProvisioned() ? 'provisioned' : 'absent');
+        }
+      } catch (err) {
+        // The panel cannot know whether this device is activated without
+        // this module, and guessing (rendering either button) would be
+        // worse than rendering none — so rosterState deliberately stays
+        // 'unknown' here instead of being "fixed" into a guess.
+        console.error('[offline-access-panel] failed to load roster-store module', err);
       }
     })();
     return () => {
@@ -36,10 +44,20 @@ export function OfflineAccessPanel() {
   }, []);
 
   async function handleDisable() {
-    const [{ isEncryptionProvisioned, clearRoster }, { hasDeviceDekWrap }] = await Promise.all([
-      import('~/shared/lib/offline/roster-store'),
-      import('~/shared/lib/storage/device-dek-table'),
-    ]);
+    let modules: [
+      typeof import('~/shared/lib/offline/roster-store'),
+      typeof import('~/shared/lib/storage/device-dek-table'),
+    ];
+    try {
+      modules = await Promise.all([
+        import('~/shared/lib/offline/roster-store'),
+        import('~/shared/lib/storage/device-dek-table'),
+      ]);
+    } catch {
+      showToastError(intl.formatMessage({ id: 'OFFLINE_ACCESS.ERROR_UNAVAILABLE' }));
+      return;
+    }
+    const [{ isEncryptionProvisioned, clearRoster }, { hasDeviceDekWrap }] = modules;
 
     // design D6: clearing the roster on a device that holds encrypted data
     // and NO device-level key copy makes that data permanently unreadable.

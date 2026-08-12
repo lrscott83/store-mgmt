@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
@@ -15,8 +15,10 @@ vi.mock('~/shared/lib/blocking-alert', () => ({
 }));
 
 const showToastSuccessMock = vi.hoisted(() => vi.fn());
+const showToastErrorMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/toast', () => ({
   showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+  showToastError: (...args: unknown[]) => showToastErrorMock(...args),
 }));
 
 function makeBundle(overrides: Partial<OfflineRosterBundle> = {}): OfflineRosterBundle {
@@ -78,6 +80,7 @@ describe('OfflineAccessPanel', () => {
     localStorage.clear();
     confirmDialogMock.mockReset();
     showToastSuccessMock.mockReset();
+    showToastErrorMock.mockReset();
   });
 
   it('renders nothing until the roster state is known', () => {
@@ -194,5 +197,75 @@ describe('OfflineAccessPanel', () => {
 
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
     expect(confirmDialogMock.mock.calls[0][0].message).not.toContain('ilegibles');
+  });
+});
+
+describe('OfflineAccessPanel — dynamic-import failures (Finding 3)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    confirmDialogMock.mockReset();
+    showToastSuccessMock.mockReset();
+    showToastErrorMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.doUnmock('~/shared/lib/offline/roster-store');
+    vi.doUnmock('~/shared/lib/storage/device-dek-table');
+    vi.resetModules();
+  });
+
+  it('logs a diagnosable error and stays in the unknown state when the mount-effect chunk fails to load', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.resetModules();
+    vi.doMock('~/shared/lib/offline/roster-store', () => {
+      throw new Error('chunk load failed');
+    });
+
+    const { OfflineAccessPanel: FreshPanel } = await import('../offline-access-panel');
+    const { container } = render(
+      <IntlProvider locale="es" messages={messages}>
+        <FreshPanel />
+      </IntlProvider>,
+    );
+
+    await waitFor(() => expect(consoleErrorSpy).toHaveBeenCalled());
+    expect(String(consoleErrorSpy.mock.calls[0]?.[0])).toContain('[offline-access-panel]');
+    // Neither button can be trusted without roster state, so the panel
+    // deliberately keeps rendering nothing rather than guessing.
+    expect(container).toBeEmptyDOMElement();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("surfaces the error through showToastError when handleDisable's dynamic import fails", async () => {
+    importRoster(makeBundle());
+
+    vi.resetModules();
+    vi.doMock('~/shared/lib/storage/device-dek-table', () => {
+      throw new Error('chunk load failed');
+    });
+
+    const { OfflineAccessPanel: FreshPanel } = await import('../offline-access-panel');
+    render(
+      <IntlProvider locale="es" messages={messages}>
+        <FreshPanel />
+      </IntlProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /desactivar acceso sin conexión/i }));
+
+    await waitFor(() =>
+      expect(showToastErrorMock).toHaveBeenCalledWith(
+        'No pudimos completar la acción. Recargá la página e intentá de nuevo.',
+      ),
+    );
+    // The confirmation dialog never opens: the failure happened before we
+    // even know whether data is at risk.
+    expect(confirmDialogMock).not.toHaveBeenCalled();
+    // Roster is untouched — the disable button is still offered.
+    expect(
+      screen.getByRole('button', { name: /desactivar acceso sin conexión/i }),
+    ).toBeInTheDocument();
   });
 });
