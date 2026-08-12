@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** When `loadData()`, `handleAddProduct`, or `handleAddCategory` in `products.tsx` hit a `MissingDataKeyError` (no encryption key in memory), the user sees an accurate blocking error message and stays on the page — instead of today's silent no-op with an unhandled promise rejection in the console.
+**Goal:** When any of `products.tsx`'s eight guardable call sites — `loadData()`'s mount effect, `handleAddProduct`, `handleAddCategory`, and the five mutation handlers (`handleCreateProduct`, `handleEditProduct`, `handleDeactivateProduct`, `handleBulkSave`, `handleCategorySave`) — hit a `MissingDataKeyError` (no encryption key in memory), the user sees an accurate blocking error message and stays on the page, instead of today's silent no-op with an unhandled promise rejection in the console.
 
-**Architecture:** A new, narrowly-scoped async helper (`runGuardedAgainstMissingDek`) catches specifically `MissingDataKeyError` and calls the app's existing `showBlockingError` primitive; any other error re-throws unchanged. The three call sites in `products.tsx` are wrapped with it. `loadData()`'s own body and `handleClearData`'s existing, unrelated `try/catch` around it are untouched.
+**Architecture:** A new, narrowly-scoped async helper (`runGuardedAgainstMissingDek`) catches specifically `MissingDataKeyError` and calls the app's existing `showBlockingError` primitive; any other error re-throws unchanged. Task 2 wires it onto the three read-only call sites. Task 3 wires it onto the five mutation handlers, each with TWO guards — one around the mutating service call (mirrors Task 2's shape: nothing persisted, modal stays open), one around the trailing `loadData()` repaint (mirrors `handleClearData`'s own established `succeeded`-flag idiom: the mutation already succeeded, only the repaint failed). `loadData()`'s own body and `handleClearData`'s existing, unrelated `try/catch` around it are untouched throughout.
 
 **Tech Stack:** React 19 + react-router, TypeScript, Vitest + @testing-library/react, pnpm workspaces + Turborepo.
 
@@ -28,8 +28,8 @@ Design: [`openspec/changes/products-missing-dek-guard/superpowers-design.md`](./
 |---|---|---|
 | `apps/web-store-pos/app/shared/lib/storage/run-guarded-against-missing-dek.ts` | The guard: catch `MissingDataKeyError`, show the blocking error; re-throw anything else | 1 |
 | `apps/web-store-pos/app/shared/lib/storage/__tests__/run-guarded-against-missing-dek.test.ts` | Unit tests for the guard in isolation | 1 |
-| `apps/web-store-pos/app/sales/routes/products.tsx` | Wires the guard onto the three call sites | 2 |
-| `apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx` | Route-level tests proving each call site is guarded | 2 |
+| `apps/web-store-pos/app/sales/routes/products.tsx` | Wires the guard onto the three read-only call sites (Task 2) and the five mutation handlers (Task 3) | 2, 3 |
+| `apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx` | Route-level tests proving each call site is guarded | 2, 3 |
 
 ---
 
@@ -349,6 +349,529 @@ git commit -m "fix(sales): guard products.tsx's three call sites against a swall
 
 ---
 
+### Task 3: Guard the five sibling mutation handlers
+
+`handleCreateProduct`, `handleEditProduct`, `handleDeactivateProduct`, `handleBulkSave`, and `handleCategorySave` each await a mutating service call and then fire a bare, unguarded `loadData()` repaint. Every mutating repository write calls `encryptEntity` synchronously before `localStorage.setItem`, so a missing DEK throws there exactly like the three already-fixed reads — nothing persists, no partial-mutation state exists (see the design's "The five sibling mutation handlers" section for the full trace). Each handler gets TWO guards: one around the mutating call (mirrors Task 2's shape), one around the trailing repaint (mirrors `handleClearData`'s own `succeeded`-flag idiom). `handleClearData` itself is not touched.
+
+**Files:**
+- Modify: `apps/web-store-pos/app/sales/routes/products.tsx:134-161` (`handleCreateProduct`), `:166-188` (`handleEditProduct`), `:202-214` (`handleDeactivateProduct`), `:221-231` (`handleBulkSave`), `:239-251` (`handleCategorySave`)
+- Test: `apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx`
+
+**Interfaces:**
+- Consumes: `runGuardedAgainstMissingDek(fn: () => Promise<void>, title: string, message: string): Promise<void>` (Task 1, `~/shared/lib/storage/run-guarded-against-missing-dek`, already imported by Task 2's edits to this same file).
+- Produces: final behavior. Nothing downstream.
+
+- [ ] **Step 1: Write the failing tests**
+
+Line numbers below describe content that exists NOW at those approximate positions after Task 2's edits — verify by reading the actual current file before editing, and locate by the code shown, not by blind line-number editing.
+
+Add the following ten tests to `apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx`. Each is placed inside the `describe` block whose existing tests exercise the same handler (do not create new top-level `describe` blocks — these are siblings of tests you have already read while working this plan).
+
+**Next to `'calls createProduct with positional args carrying the modal order/isActive (service owns audit stamping)'`** (currently ends around line 462), add:
+
+```tsx
+  it('shows a blocking error and keeps the modal open when createProduct throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    productServiceSpies.createProduct.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-product-button'));
+    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudo guardar el producto. Recargue la página.',
+      ),
+    );
+    // The mutation guard caught the failure — the modal must stay open, same as a domain failure.
+    expect(screen.getByTestId('product-name-input')).toBeInTheDocument();
+  });
+
+  it('shows a blocking error and closes the modal when the post-create repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    // Let the initial mount's loadData() resolve normally before queuing the rejection —
+    // otherwise the Once rejection would be consumed by the mount call instead of the
+    // create-triggered repaint this test targets.
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-product-button'));
+    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    // The mutation itself succeeded — the modal closes even though the repaint failed.
+    expect(screen.queryByTestId('product-name-input')).not.toBeInTheDocument();
+  });
+```
+
+**Next to `'calls updateProduct with the edited product positional args (WU4.2)'`** (currently ends around line 488), add:
+
+```tsx
+  it('shows a blocking error and keeps the modal open when updateProduct throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.updateProduct.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Editar Producto'));
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudo actualizar el producto. Recargue la página.',
+      ),
+    );
+    expect(screen.getByTestId('edit-product-name-input')).toBeInTheDocument();
+  });
+
+  it('shows a blocking error and closes the modal when the post-edit repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Editar Producto'));
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    expect(screen.queryByTestId('edit-product-name-input')).not.toBeInTheDocument();
+  });
+```
+
+**Next to `'confirms via confirmDialog with the hardcoded "desactivar" copy, then calls deleteProduct(id)'`** (currently ends around line 564), add:
+
+```tsx
+  it('shows a blocking error when deleteProduct throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.deleteProduct.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Desactivar Producto'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudo desactivar el producto. Recargue la página.',
+      ),
+    );
+  });
+
+  it('shows a blocking error when the post-deactivate repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByText('Desactivar Producto'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+  });
+```
+
+**Next to `'calls createProducts(categoryId, items) for the filled rows and reloads the list'`** (currently ends around line 609), add:
+
+```tsx
+  it('shows a blocking error and keeps the modal open when createProducts throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.createProducts.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudieron guardar los productos. Recargue la página.',
+      ),
+    );
+    expect(screen.getByTestId('bulk-save-button')).toBeInTheDocument();
+  });
+
+  it('shows a blocking error and closes the modal when the post-bulk-save repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
+  });
+```
+
+**Next to `'calls createProductCategory(name, order, isActive) and reloads on create'`** (inside `describe('handleCategorySave — Angular async category-C parity', ...)`, currently ends around line 764), add:
+
+```tsx
+    it('shows a blocking error and keeps the modal open when createProductCategory throws MissingDataKeyError', async () => {
+      categoryServiceSpies.createProductCategory.mockRejectedValueOnce(new MissingDataKeyError());
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'No se pudo guardar la categoría. Recargue la página.',
+        ),
+      );
+      expect(screen.getByTestId('category-name-input')).toBeInTheDocument();
+    });
+
+    it('shows a blocking error and closes the modal when the post-category-save repaint throws MissingDataKeyError', async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página.',
+        ),
+      );
+      expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument();
+    });
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/sales/routes/__tests__/products.test.tsx -t "MissingDataKeyError"
+```
+
+Expected: FAIL, all ten new tests — today's code has no guard on any of the five handlers, so `showBlockingErrorMock` is never called with any of these messages (the mutation-guard cases hang on an unhandled rejection instead; the repaint-guard cases succeed the mutation but the bare `loadData()` repaint's rejection is unhandled too).
+
+- [ ] **Step 3: Wire the five handlers**
+
+In `apps/web-store-pos/app/sales/routes/products.tsx`, replace `handleCreateProduct`:
+
+```tsx
+  async function handleCreateProduct(data: {
+    name: string;
+    price: number;
+    barcode?: string;
+    categoryId: string;
+    order: number;
+    isActive: boolean;
+    availableToSale: boolean;
+    discountFromInvantory: boolean;
+  }) {
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createProduct(
+          data.categoryId,
+          data.name,
+          data.price,
+          '',
+          data.order,
+          data.isActive,
+          data.availableToSale,
+          data.discountFromInvantory,
+          data.barcode,
+        );
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return;
+        }
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo guardar el producto. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleEditProduct`:
+
+```tsx
+  async function handleEditProduct(product: Product) {
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.updateProduct(
+          product.id,
+          product.categoryId,
+          product.name,
+          product.price,
+          product.businessId,
+          product.order,
+          product.isActive,
+          product.availableToSale,
+          product.discountFromInvantory,
+          // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
+          // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
+          // that already has a stored barcode.
+          undefined,
+        );
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return;
+        }
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo actualizar el producto. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleDeactivateProduct`:
+
+```tsx
+  async function handleDeactivateProduct(id: string) {
+    const confirmed = await confirmDialog({
+      title: 'Confirmación para desactivar',
+      message: '¿Está seguro que desea desactivar este producto?',
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        await productService.deleteProduct(id);
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo desactivar el producto. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleBulkSave`:
+
+```tsx
+  async function handleBulkSave(categoryId: string, items: { name: string; price: number }[]) {
+    let mutationSucceeded = false;
+    let domainSucceeded = true;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createProducts(categoryId, items);
+        mutationSucceeded = true;
+        domainSucceeded = result.succeeded;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudieron guardar los productos. Recargue la página.',
+    );
+    if (!mutationSucceeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+    if (!domainSucceeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        'Algunos productos no fueron adicionados porque ya existen.',
+      );
+    }
+  }
+```
+
+Replace `handleCategorySave`:
+
+```tsx
+  async function handleCategorySave(data: { name: string; order: number; isActive: boolean; id?: string }) {
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = data.id
+          ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
+          : await categoryService.createProductCategory(data.name, data.order, data.isActive);
+
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return;
+        }
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo guardar la categoría. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Do not touch `loadData()`'s own body, `handleClearData`, `handleAddProduct`, `handleAddCategory`, `handleCsvImport`, or the mount `useEffect` — none of them are in this task's scope.
+
+- [ ] **Step 4: Run the new tests to verify they pass**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/sales/routes/__tests__/products.test.tsx -t "MissingDataKeyError"
+```
+
+Expected: PASS, all ten new tests plus the three from Task 2 (thirteen total under this filter).
+
+- [ ] **Step 5: Run the full route suite to confirm no pre-existing test broke**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/sales/routes/__tests__/products.test.tsx
+```
+
+Expected: PASS, every block. Pay particular attention to `'shows a blocking error when createProducts reports some products already existed, but still closes the modal'` (the pre-existing test around line 614 before this task's edits) — it must still pass unmodified, proving the `MissingDataKeyError` guard and the pre-existing `{succeeded: false}` domain-failure path stayed independent for `handleBulkSave`.
+
+- [ ] **Step 6: Full gate**
+
+```bash
+cd frontend-react && npx turbo run typecheck --force
+```
+
+```bash
+cd frontend-react && npx turbo run test --force
+```
+
+Expected: PASS. Report the actual totals — do not claim green without the output.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add frontend-react/apps/web-store-pos/app/sales/routes
+git commit -m "fix(sales): guard products.tsx's five mutation handlers against a swallowed MissingDataKeyError"
+```
+
+---
+
 ## Verification checklist
 
 - [ ] `npx turbo run typecheck --force` passes.
@@ -356,8 +879,10 @@ git commit -m "fix(sales): guard products.tsx's three call sites against a swall
 - [ ] `run-guarded-against-missing-dek.test.ts`: 3/3 passing (success passthrough, MissingDataKeyError caught, other errors re-thrown).
 - [ ] `products.test.tsx`'s new `describe('MissingDataKeyError guard ...')`: 3/3 passing.
 - [ ] `products.test.tsx`'s two pre-existing `handleClearData` repaint-failure tests still pass unmodified.
-- [ ] `loadData()`'s function body (`products.tsx`) is byte-identical to before this change — only its mount-time call site changed.
+- [ ] `loadData()`'s function body (`products.tsx`) is byte-identical to before this change — only its call sites changed.
+- [ ] `handleClearData` (`products.tsx`) is byte-identical to before this change.
 - [ ] `rg "getMaxOrder" frontend-react/e2e` → no output (unchanged — no E2E file was touched by this plan).
+- [ ] All ten of Task 3's new tests pass, and the pre-existing `handleBulkSave` domain-failure test (`'shows a blocking error when createProducts reports some products already existed, but still closes the modal'`) still passes unmodified.
 
 ## Out of scope
 
@@ -366,5 +891,6 @@ Do not touch these, even if they look adjacent:
 - The other 17 authenticated routes with the same unguarded-`useEffect` shape (`available.tsx`, `sale.tsx`, `orders.tsx`, `credits.tsx`, five `today-*.tsx` files, `entries.tsx`, `egress.tsx`, `expenses-history.tsx`, `today-expenses.tsx`, `today-report.tsx`, `dashboard.tsx`, `landing-deep.tsx`). Each needs its own review of what its empty state means before adopting this guard.
 - `authLoader`, the idle-lock timer (`app-layout.tsx`), or `needsUnlock()`. Unrelated navigation-time gates, working as designed.
 - Redirecting to `/login?unlock=1` on this failure. Rejected in the design's brainstorm.
-- `handleClearData`'s existing three-way error handling (`products.tsx:328-378`). Already correct for its own scenario.
+- `handleClearData`'s existing three-way error handling (`products.tsx:328-378`). Already correct for its own scenario, not touched by Task 3 either.
+- The data-loss hazard in `product-category-repository.ts:237-247` (a `catch {}` that swallows a GCM tag failure with a *valid* DEK, then wipes the map). Different failure class from `MissingDataKeyError`, needs its own design decision, noted in the design doc.
 - Any Playwright spec or backend E2E test.
