@@ -291,6 +291,27 @@ still fires when the mutation itself resolves with a domain-level
 No existing test changes. `frontend-react/e2e/**` is not touched — this is
 unit-test coverage only, and no E2E test asserts on this failure mode.
 
+## `handleCsvImport` — the sixth mutation handler (Task 5)
+
+A round-2 whole-branch review found `handleCsvImport` (`products.tsx:349-408`)
+has the identical unguarded shape as the five siblings: it awaits
+`productService.createCsvProducts(...)` and then fires a bare `loadData()`.
+The reviewer's own reasoning for treating it as harder — per-row partial
+persistence, since `createCsvProducts` loops over rows — does not hold, and
+for the same reason the five siblings' original "partial-mutation" deferral
+did not hold: `ProductOfflineService.createCsvProducts`
+(`product-offline-service.ts:247`) iterates via a synchronous `forEach` with
+no `await` inside it, so the DEK cannot change state mid-loop. Either it is
+present for the whole loop (every row attempts its own domain-level
+create/skip, no throw), or it is absent from the start (the first row's
+write throws immediately and native `forEach` aborts before any later row is
+attempted, before any `localStorage.setItem` runs). The handler's second
+loop (`inventoryService.createInventoryEntry(...)` per created row) is the
+same shape, and only runs after the first loop already proved the DEK was
+present — nothing between the two loops can clear it, since no timer or DOM
+event fires inside a synchronous continuation. This handler is guarded with
+the same two-guard shape as the five siblings; see the plan's Task 5.
+
 ## Out of scope
 
 - The other 17 authenticated routes with the same unguarded pattern. Noted

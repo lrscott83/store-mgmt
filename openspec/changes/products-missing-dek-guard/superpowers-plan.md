@@ -28,8 +28,8 @@ Design: [`openspec/changes/products-missing-dek-guard/superpowers-design.md`](./
 |---|---|---|
 | `apps/web-store-pos/app/shared/lib/storage/run-guarded-against-missing-dek.ts` | The guard: catch `MissingDataKeyError`, show the blocking error; re-throw anything else | 1 |
 | `apps/web-store-pos/app/shared/lib/storage/__tests__/run-guarded-against-missing-dek.test.ts` | Unit tests for the guard in isolation | 1 |
-| `apps/web-store-pos/app/sales/routes/products.tsx` | Wires the guard onto the three read-only call sites (Task 2) and the five mutation handlers (Task 3) | 2, 3 |
-| `apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx` | Route-level tests proving each call site is guarded | 2, 3 |
+| `apps/web-store-pos/app/sales/routes/products.tsx` | Wires the guard onto the three read-only call sites (Task 2), the five mutation handlers (Task 3, simplified in Task 4), and `handleCsvImport` (Task 5) | 2, 3, 4, 5 |
+| `apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx` | Route-level tests proving each call site is guarded | 2, 3, 5 |
 
 ---
 
@@ -1279,6 +1279,281 @@ git commit -m "refactor(sales): return a boolean from runGuardedAgainstMissingDe
 
 ---
 
+### Task 5: Guard `handleCsvImport`, plus close out round-2 review cleanup
+
+The round-2 final whole-branch review found `handleCsvImport` (`products.tsx:349-408`) is a sixth mutation handler with the identical unguarded shape — it awaits `productService.createCsvProducts(...)` (resolve-never-reject by contract, but the underlying repository write can throw `MissingDataKeyError`) and then fires a bare `loadData()`. The reviewer's stated reason for treating it as harder than the five siblings ("per-row partial persistence") does not hold: `ProductOfflineService.createCsvProducts` (`product-offline-service.ts:247`) iterates rows via a synchronous `forEach` with no `await` inside it, so — exactly like `handleBulkSave`'s per-item loop — the DEK cannot change state mid-loop. If the DEK is present, every row attempts its own domain-level create/skip; if it is absent, the very first row's write throws immediately and native `Array.prototype.forEach` aborts on that throw before any later row is attempted, before any `localStorage.setItem` in `setProductsLocalStorage`/`setProductCategoriesLocalStorage` runs. The same is true of the second loop inside this handler (`inventoryService.createInventoryEntry(...)` per created row) — also synchronous, also no `await` inside it, and it only runs at all once `createCsvProducts` has already returned successfully (proving the DEK was present for the whole first loop, and nothing between the two loops can clear it — no timer or DOM event can run inside a synchronous continuation). This is confirmed correct by the same reasoning already established for the five siblings in the design's "The five sibling mutation handlers" section — user-confirmed to extend to this handler too.
+
+This task ALSO closes out three small round-2 findings that don't need their own task cycle:
+- **Important #2**: the design specified a test proving `handleBulkSave`'s domain-failure path and its `MissingDataKeyError` repaint-guard path stay independent when BOTH occur together in one import. The Task 3 test only covered the repaint-DEK-failure case with a successful domain result; the domain-failure-AND-repaint-DEK-failure combination was never pinned.
+- **Minor #3**: the mount effect's eslint-disable comment (`products.tsx:87`) says "loadData reads only storeId" but the effect body also closes over `intl` (added in Task 2) — the comment should say so.
+- **Minor #4**: `handleBulkSave`'s surviving `domainSucceeded` flag (`products.tsx:275`) has no comment explaining why it wasn't removed like every other flag in Task 4 — add one so a future duplication sweep doesn't "finish the job" incorrectly.
+
+**Files:**
+- Modify: `apps/web-store-pos/app/sales/routes/products.tsx:87` (eslint-disable comment), `:275` (add a comment, no code change), `:349-408` (`handleCsvImport`)
+- Test: `apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx`
+
+**Interfaces:**
+- Consumes: `runGuardedAgainstMissingDek(fn: () => Promise<boolean>, title: string, message: string): Promise<boolean>` (Task 4's final signature).
+- Produces: final behavior. Nothing downstream.
+
+- [ ] **Step 1: Write the failing tests**
+
+Line numbers below describe content that exists NOW at those approximate positions — verify by reading the actual current file before editing, and locate by the code shown, not by blind line-number editing.
+
+**The missing domain+DEK independence test.** Add this test to `products.test.tsx` immediately after the test `'shows a blocking error and closes the modal when the post-bulk-save repaint throws MissingDataKeyError'` (currently ends around line 818), before the comment introducing `'shows a blocking error when createProducts reports some products already existed, but still closes the modal'`:
+
+```tsx
+  it('shows BOTH the domain-failure message and the repaint-guard message when a domain failure and a repaint DEK failure occur together', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.createProducts.mockResolvedValueOnce({
+      data: false,
+      succeeded: false,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    // The domain failure did not prevent the mutation guard from returning true (Angular
+    // parity: unconditional close+repaint), so the modal closes and the repaint fires — and
+    // the repaint's own DEK failure surfaces its own message, independent of the domain one.
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      'Error',
+      'Algunos productos no fueron adicionados porque ya existen.',
+    );
+    expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
+  });
+```
+
+**The two new `handleCsvImport` guard tests.** Add these inside `describe('handleCsvImport — ProductService.createCsvProducts call site', ...)`, immediately after its last existing test (`'reports real non-zero counts AND shows the duplicate dialog together, from a single import (REQ-6 sc.1)'`, currently ends just before the `describe` block's own closing `});`, around line 1449):
+
+```tsx
+    it('shows a blocking error and keeps the modal open when createCsvProducts throws MissingDataKeyError', async () => {
+      productServiceSpies.createCsvProducts.mockRejectedValueOnce(new MissingDataKeyError());
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'No se pudieron importar los productos. Recargue la página.',
+        ),
+      );
+      expect(screen.getByTestId('csv-import-button')).toBeInTheDocument();
+    });
+
+    it('shows a blocking error and closes the modal when the post-import repaint throws MissingDataKeyError', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
+      ]);
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+      // Let the initial mount's loadData() resolve normally before queuing the rejection —
+      // otherwise the Once rejection would be consumed by the mount call instead of the
+      // import-triggered repaint this test targets.
+      await waitFor(() => expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByTestId('import-csv-button'));
+      fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeCsvFile()] } });
+      await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
+      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+      fireEvent.click(screen.getByTestId('csv-import-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'Los productos fueron importados, pero no se pudo actualizar la vista. Recargue la página.',
+        ),
+      );
+      expect(screen.queryByTestId('csv-import-button')).not.toBeInTheDocument();
+      // The toast still fired — the mutation itself (including the toast/dialog reporting it)
+      // completed before the repaint guard ran and failed.
+      expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.');
+    });
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/sales/routes/__tests__/products.test.tsx -t "MissingDataKeyError|domain-failure message and the repaint-guard message"
+```
+
+Expected: FAIL, all three new tests — `handleCsvImport` has no guard yet, and the bulk domain+DEK combination test fails because `showBlockingErrorMock` is never called with the repaint message (the unhandled rejection from the pre-Task-5 `loadData()` bare call is silent).
+
+- [ ] **Step 3: Apply the three small fixes**
+
+In `apps/web-store-pos/app/sales/routes/products.tsx`, update the mount effect's eslint-disable comment:
+
+```tsx
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId; intl is stable
+```
+
+Add a comment above `handleBulkSave`'s `domainSucceeded` declaration:
+
+```tsx
+    // Unlike every other handler's flag (removed in Task 4), this one survives: it answers a
+    // different question than the guard's own return value. The guard's `mutationSucceeded`
+    // means "no MissingDataKeyError happened"; `domainSucceeded` means "the mutation's own
+    // {succeeded} envelope was true" — Angular parity requires the modal to close and the
+    // repaint to fire even when the second is false, so the two must stay separate.
+    let domainSucceeded = true;
+```
+
+- [ ] **Step 4: Guard `handleCsvImport`**
+
+Replace the entire function (currently `products.tsx:349-408`):
+
+```tsx
+  async function handleCsvImport(rows: ParsedProductRow[]) {
+    const csvProducts: CsvProduct[] = rows
+      .filter((row) => row.category)
+      .map((row) => ({
+        category: row.category,
+        name: row.name,
+        price: row.price,
+        cost: row.cost,
+        quantity: row.quantity,
+      }));
+
+    const succeeded = await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createCsvProducts(csvProducts);
+        // createCsvProducts always resolves success(...) by design (ADR-1): failure() hardcodes
+        // data:null (envelope.ts:19-27), which would destroy the {created,failed} payload. This ??
+        // is TS narrowing on the BaseResponseModel union, NOT a runtime failure path.
+        const { created, failed } = result.data ?? { created: [], failed: [] };
+
+        const inventoryService = new InventoryOfflineService(
+          storeId,
+          new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+        );
+
+        let entriesCreated = 0;
+        for (const product of created) {
+          // Absent, 0, or negative -> no entry (decision #8). The parser PRESERVES 0/negative
+          // quantities (REQ-1 sc.6/7) instead of collapsing them to undefined, so a bare
+          // `!product.quantity` check is insufficient here: `!(-3)` is `false` in JS and would let
+          // a negative-quantity row slip through to createInventoryEntry.
+          if (!product.quantity || product.quantity <= 0) continue;
+          const costPrice = product.cost ?? product.price; // decision #7/#16: 0 is a valid cost
+          const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice);
+          // R2: the primitive returns bare `null` (product not found) or a DataResult that may not
+          // have succeeded — the optional chain absorbs both, so neither inflates the count. Same
+          // idiom as today-entries.tsx:148.
+          if (entry?.succeeded) entriesCreated++;
+        }
+
+        setModal(null);
+
+        // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
+        // toast (no title), PLUS a conditional info dialog when there are duplicates. DIVERGES
+        // DELIBERATELY (decisions #6/#14/#17): the toast reports REAL successes (products created +
+        // entries created), unconditionally, with no branching — even a legacy 3-column CSV reads
+        // "... y 0 entradas correctamente." The info dialog enumerates each duplicate as
+        // "Categoría - Nombre" instead of the generic literal. Both strings stay hardcoded Spanish
+        // (no i18n key), matching Angular's own and the pre-existing React literal — introducing
+        // keys is out of scope (R6). Swal renders `text` as `textContent` with no
+        // `white-space: pre-line` (sweetalert2 11.26.25, css `.swal2-html-container`), so the list
+        // MUST be single-line comma-joined, never newline-separated.
+        showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
+        if (failed.length > 0) {
+          await showBlockingInfo(
+            intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+            `Algunos productos no fueron importados porque ya existen: ${failed
+              .map((p) => `${p.category} - ${p.name}`)
+              .join(', ')}.`,
+          );
+        }
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudieron importar los productos. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'Los productos fueron importados, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+This moves `setModal(null)`, `showToastSuccess`, and the conditional `showBlockingInfo` inside the mutation guard (they only make sense once the import genuinely completed) and keeps `loadData()`'s repaint as the second, independent guard — the same two-guard shape as the five siblings. No existing test in `describe('handleCsvImport ...')` asserts an ordering between `loadData`/`setModal` and the toast/dialog (confirmed: they only assert with `waitFor` on the eventual call and its arguments), so none of the twelve pre-existing tests in that block should need to change.
+
+- [ ] **Step 5: Run the new tests to verify they pass**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/sales/routes/__tests__/products.test.tsx -t "MissingDataKeyError|domain-failure message and the repaint-guard message"
+```
+
+Expected: PASS, all three.
+
+- [ ] **Step 6: Run the full route suite to confirm no pre-existing test broke**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/sales/routes/__tests__/products.test.tsx
+```
+
+Expected: PASS, every block — including all twelve pre-existing `handleCsvImport` tests, unmodified.
+
+- [ ] **Step 7: Full gate**
+
+```bash
+cd frontend-react && npx turbo run typecheck --force
+```
+
+```bash
+cd frontend-react && npx turbo run test --force
+```
+
+Expected: PASS. Report the actual totals — do not claim green without the output.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add frontend-react/apps/web-store-pos/app/sales/routes/products.tsx frontend-react/apps/web-store-pos/app/sales/routes/__tests__/products.test.tsx
+git commit -m "fix(sales): guard handleCsvImport against a swallowed MissingDataKeyError"
+```
+
+---
+
 ## Verification checklist
 
 - [ ] `npx turbo run typecheck --force` passes.
@@ -1292,6 +1567,8 @@ git commit -m "refactor(sales): return a boolean from runGuardedAgainstMissingDe
 - [ ] All ten of Task 3's new tests pass, and the pre-existing `handleBulkSave` domain-failure test (`'shows a blocking error when createProducts reports some products already existed, but still closes the modal'`) still passes unmodified.
 - [ ] `runGuardedAgainstMissingDek` returns `Promise<boolean>`; no call site outside `handleBulkSave` hoists a mutable `let succeeded`/`mutationSucceeded` flag.
 - [ ] `products.test.tsx` has ZERO diff from Task 4 — the refactor changes no test file under `sales/`.
+- [ ] `handleCsvImport` is guarded with the same two-guard shape (mutation, then repaint) as the five siblings; all twelve pre-existing `describe('handleCsvImport ...')` tests still pass unmodified.
+- [ ] The bulk domain+DEK independence test (Task 5) passes, proving `showBlockingErrorMock` receives BOTH the domain-failure message and the repaint-guard message from one import.
 
 ## Out of scope
 
@@ -1300,6 +1577,6 @@ Do not touch these, even if they look adjacent:
 - The other 17 authenticated routes with the same unguarded-`useEffect` shape (`available.tsx`, `sale.tsx`, `orders.tsx`, `credits.tsx`, five `today-*.tsx` files, `entries.tsx`, `egress.tsx`, `expenses-history.tsx`, `today-expenses.tsx`, `today-report.tsx`, `dashboard.tsx`, `landing-deep.tsx`). Each needs its own review of what its empty state means before adopting this guard.
 - `authLoader`, the idle-lock timer (`app-layout.tsx`), or `needsUnlock()`. Unrelated navigation-time gates, working as designed.
 - Redirecting to `/login?unlock=1` on this failure. Rejected in the design's brainstorm.
-- `handleClearData`'s existing three-way error handling (`products.tsx:328-378`). Already correct for its own scenario, not touched by Task 3 either.
+- `handleClearData`'s existing three-way error handling (`products.tsx:328-378`). Already correct for its own scenario, not touched by any task.
 - The data-loss hazard in `product-category-repository.ts:237-247` (a `catch {}` that swallows a GCM tag failure with a *valid* DEK, then wipes the map). Different failure class from `MissingDataKeyError`, needs its own design decision, noted in the design doc.
 - Any Playwright spec or backend E2E test.
