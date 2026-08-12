@@ -387,4 +387,36 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
       expect(repo.getProductCategoryById('c2')).toBeUndefined();
     });
   });
+
+  describe('insertion order and the sibling shift', () => {
+    it('inserting at order 1 shifts EVERY existing category down by one', () => {
+      seedCategories([
+        makeCategory('c1', { name: 'Bebidas', order: 1 }),
+        makeCategory('c2', { name: 'Snacks', order: 2 }),
+      ]);
+      const repository = new ProductCategoryRepository(storeId);
+
+      repository.addProductCategory('Galletas', 1, true);
+
+      const stored = readStoredCategories();
+      expect(stored.find((c) => c.name === 'Bebidas')?.order).toBe(2);
+      expect(stored.find((c) => c.name === 'Snacks')?.order).toBe(3);
+      expect(stored.find((c) => c.name === 'Galletas')?.order).toBe(1);
+    });
+
+    it('inserting at max+1 leaves every existing category order untouched', () => {
+      seedCategories([
+        makeCategory('c1', { name: 'Bebidas', order: 1 }),
+        makeCategory('c2', { name: 'Snacks', order: 2 }),
+      ]);
+      const repository = new ProductCategoryRepository(storeId);
+
+      repository.addProductCategory('Galletas', 3, true);
+
+      const stored = readStoredCategories();
+      expect(stored.find((c) => c.name === 'Bebidas')?.order).toBe(1);
+      expect(stored.find((c) => c.name === 'Snacks')?.order).toBe(2);
+      expect(stored.find((c) => c.name === 'Galletas')?.order).toBe(3);
+    });
+  });
 });
