@@ -872,17 +872,426 @@ git commit -m "fix(sales): guard products.tsx's five mutation handlers against a
 
 ---
 
+### Task 4: Simplify the eight call sites — `runGuardedAgainstMissingDek` returns `Promise<boolean>`
+
+Task 3's review flagged real duplication (Important, plan-mandated): every one of the eight `runGuardedAgainstMissingDek` call sites that needs to know whether it's safe to proceed hoists a mutable `let succeeded = false` flag and assigns it from inside the guarded callback as an out-parameter. Root cause: the helper returns `Promise<void>`. The user chose the fix that addresses the cause — change the helper's contract so the callback reports its own outcome (`Promise<boolean>`) and the wrapper resolves that same boolean straight through, only forcing it to `false` when it catches a `MissingDataKeyError` itself. Every caller that needs the answer becomes `const ok = await runGuardedAgainstMissingDek(...); if (!ok) return;` — no more hoisted flag.
+
+`handleBulkSave` keeps ONE flag (`domainSucceeded`) — that one is not the artifact being removed. It exists because Angular parity requires the modal to close and the repaint to fire even when the mutation resolves with a domain-level `{succeeded: false}` (a different question from "did a `MissingDataKeyError` happen"), so the handler genuinely needs two independent answers out of one call. Every other handler needs only one.
+
+This task changes Task 1's already-merged helper and every call site Tasks 2 and 3 already wired. None of the 13 existing route tests assert on the internal flag — they only assert on `showBlockingErrorMock` calls and modal presence/absence via testid — so none of them should need to change; this task proves that by running them, not by assuming it.
+
+**Files:**
+- Modify: `apps/web-store-pos/app/shared/lib/storage/run-guarded-against-missing-dek.ts` (full rewrite)
+- Modify: `apps/web-store-pos/app/shared/lib/storage/__tests__/run-guarded-against-missing-dek.test.ts` (full rewrite)
+- Modify: `apps/web-store-pos/app/sales/routes/products.tsx` — all eight `runGuardedAgainstMissingDek` call sites (mount `useEffect`, `handleAddProduct`, `handleAddCategory`, `handleCreateProduct`, `handleEditProduct`, `handleDeactivateProduct`, `handleBulkSave`, `handleCategorySave`)
+
+**Interfaces:**
+- Produces: `runGuardedAgainstMissingDek(fn: () => Promise<boolean>, title: string, message: string): Promise<boolean>` — `fn` resolving `true`/`false` passes straight through; a caught `MissingDataKeyError` shows the message and forces `false`; any other thrown error re-throws unchanged (unchanged from before).
+- Consumes: nothing new.
+
+- [ ] **Step 1: Write the failing tests for the new helper contract**
+
+Replace the entire contents of `apps/web-store-pos/app/shared/lib/storage/__tests__/run-guarded-against-missing-dek.test.ts`:
+
+```ts
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { MissingDataKeyError } from '../entity-crypto';
+
+const showBlockingErrorMock = vi.fn();
+vi.mock('../../blocking-alert', () => ({
+  showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+}));
+
+import { runGuardedAgainstMissingDek } from '../run-guarded-against-missing-dek';
+
+describe('runGuardedAgainstMissingDek', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('resolves true and does not call showBlockingError when fn resolves true', async () => {
+    const fn = vi.fn().mockResolvedValue(true);
+
+    await expect(runGuardedAgainstMissingDek(fn, 'Error', 'message')).resolves.toBe(true);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('resolves false and does not call showBlockingError when fn itself resolves false', async () => {
+    const fn = vi.fn().mockResolvedValue(false);
+
+    await expect(runGuardedAgainstMissingDek(fn, 'Error', 'message')).resolves.toBe(false);
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('catches a MissingDataKeyError, calls showBlockingError with the given title/message, and resolves false', async () => {
+    const fn = vi.fn().mockRejectedValue(new MissingDataKeyError());
+
+    await expect(
+      runGuardedAgainstMissingDek(fn, 'Error', 'No se pudieron cargar los datos. Recargue la página.'),
+    ).resolves.toBe(false);
+
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      'Error',
+      'No se pudieron cargar los datos. Recargue la página.',
+    );
+  });
+
+  it('re-throws any other error and does not call showBlockingError', async () => {
+    const otherError = new Error('boom');
+    const fn = vi.fn().mockRejectedValue(otherError);
+
+    await expect(runGuardedAgainstMissingDek(fn, 'Error', 'message')).rejects.toBe(otherError);
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+});
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/shared/lib/storage/__tests__/run-guarded-against-missing-dek.test.ts
+```
+
+Expected: FAIL — the current implementation resolves `Promise<void>`, so `resolves.toBe(true)`/`resolves.toBe(false)` fail with the actual resolved value being `undefined`.
+
+- [ ] **Step 3: Rewrite the helper**
+
+Replace the entire contents of `apps/web-store-pos/app/shared/lib/storage/run-guarded-against-missing-dek.ts`:
+
+```ts
+import { MissingDataKeyError } from './entity-crypto';
+import { showBlockingError } from '../blocking-alert';
+
+/**
+ * Wraps an async call that is typed to never reject but can, in practice, throw
+ * `MissingDataKeyError` when encryption is provisioned and no data key is in memory
+ * (`entity-crypto.ts`'s `decryptEntity`/`encryptEntity`). Surfaces that one failure mode as a
+ * blocking error instead of an unhandled promise rejection; any other error re-throws
+ * unchanged, so an unrelated bug is never silently relabeled "reload the page".
+ *
+ * `fn` reports its own outcome by returning `true`/`false` (e.g. a domain-level failure it
+ * already surfaced itself) — the wrapper resolves that same boolean straight through. Only a
+ * caught `MissingDataKeyError` forces the result to `false`, after showing its own message.
+ * This lets a caller write `const ok = await runGuardedAgainstMissingDek(...); if (!ok) return;`
+ * instead of hoisting a mutable flag that `fn` assigns as an out-parameter.
+ */
+export async function runGuardedAgainstMissingDek(
+  fn: () => Promise<boolean>,
+  title: string,
+  message: string,
+): Promise<boolean> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!(err instanceof MissingDataKeyError)) throw err;
+    showBlockingError(title, message);
+    return false;
+  }
+}
+```
+
+- [ ] **Step 4: Run the helper tests to verify they pass**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/shared/lib/storage/__tests__/run-guarded-against-missing-dek.test.ts
+```
+
+Expected: PASS, 4/4.
+
+- [ ] **Step 5: Update all eight call sites in `products.tsx`**
+
+Every call site whose callback previously ended without a `return` statement now needs `return true;` at the end. Every call site that previously set an outer `let succeeded`/`mutationSucceeded` flag now returns that boolean directly from the callback and captures the helper's own return value with `const`.
+
+Replace the mount `useEffect`:
+
+```tsx
+  useEffect(() => {
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudieron cargar los datos. Recargue la página.',
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId
+  }, [storeId]);
+```
+
+Replace `handleAddProduct`:
+
+```tsx
+  async function handleAddProduct(category: ProductCategory) {
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const maxOrderResult = await productService.getMaxOrderByCategoryId(category.id);
+        setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo abrir el formulario. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleAddCategory`:
+
+```tsx
+  async function handleAddCategory() {
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const maxOrderResult = await categoryService.getMaxOrder();
+        setModal({ type: 'category', defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo abrir el formulario. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleCreateProduct`:
+
+```tsx
+  async function handleCreateProduct(data: {
+    name: string;
+    price: number;
+    barcode?: string;
+    categoryId: string;
+    order: number;
+    isActive: boolean;
+    availableToSale: boolean;
+    discountFromInvantory: boolean;
+  }) {
+    const succeeded = await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createProduct(
+          data.categoryId,
+          data.name,
+          data.price,
+          '',
+          data.order,
+          data.isActive,
+          data.availableToSale,
+          data.discountFromInvantory,
+          data.barcode,
+        );
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return false;
+        }
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo guardar el producto. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleEditProduct`:
+
+```tsx
+  async function handleEditProduct(product: Product) {
+    const succeeded = await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.updateProduct(
+          product.id,
+          product.categoryId,
+          product.name,
+          product.price,
+          product.businessId,
+          product.order,
+          product.isActive,
+          product.availableToSale,
+          product.discountFromInvantory,
+          // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
+          // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
+          // that already has a stored barcode.
+          undefined,
+        );
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return false;
+        }
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo actualizar el producto. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleDeactivateProduct`:
+
+```tsx
+  async function handleDeactivateProduct(id: string) {
+    const confirmed = await confirmDialog({
+      title: 'Confirmación para desactivar',
+      message: '¿Está seguro que desea desactivar este producto?',
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    const succeeded = await runGuardedAgainstMissingDek(
+      async () => {
+        await productService.deleteProduct(id);
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo desactivar el producto. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Replace `handleBulkSave` — note `domainSucceeded` is kept; only `mutationSucceeded`'s flag is replaced:
+
+```tsx
+  async function handleBulkSave(categoryId: string, items: { name: string; price: number }[]) {
+    let domainSucceeded = true;
+    const mutationSucceeded = await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createProducts(categoryId, items);
+        domainSucceeded = result.succeeded;
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudieron guardar los productos. Recargue la página.',
+    );
+    if (!mutationSucceeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+    if (!domainSucceeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        'Algunos productos no fueron adicionados porque ya existen.',
+      );
+    }
+  }
+```
+
+Replace `handleCategorySave`:
+
+```tsx
+  async function handleCategorySave(data: { name: string; order: number; isActive: boolean; id?: string }) {
+    const succeeded = await runGuardedAgainstMissingDek(
+      async () => {
+        const result = data.id
+          ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
+          : await categoryService.createProductCategory(data.name, data.order, data.isActive);
+
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return false;
+        }
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo guardar la categoría. Recargue la página.',
+    );
+    if (!succeeded) return;
+
+    setModal(null);
+    runGuardedAgainstMissingDek(
+      async () => {
+        await loadData();
+        return true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+  }
+```
+
+Do not touch `loadData()`'s own body or `handleClearData` — neither is in this task's scope, and neither calls `runGuardedAgainstMissingDek` directly.
+
+- [ ] **Step 6: Run the full route suite to confirm no pre-existing test broke**
+
+```bash
+cd frontend-react/apps/web-store-pos && npx vitest run app/sales/routes/__tests__/products.test.tsx
+```
+
+Expected: PASS, all 66 tests (56 pre-Task-3 + 10 from Task 3), byte-for-byte the same assertions as before this task — this task changes no test file under `sales/`.
+
+- [ ] **Step 7: Full gate**
+
+```bash
+cd frontend-react && npx turbo run typecheck --force
+```
+
+```bash
+cd frontend-react && npx turbo run test --force
+```
+
+Expected: PASS. Report the actual totals — do not claim green without the output.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add frontend-react/apps/web-store-pos/app/shared/lib/storage/run-guarded-against-missing-dek.ts frontend-react/apps/web-store-pos/app/shared/lib/storage/__tests__/run-guarded-against-missing-dek.test.ts frontend-react/apps/web-store-pos/app/sales/routes/products.tsx
+git commit -m "refactor(sales): return a boolean from runGuardedAgainstMissingDek to drop the hoisted succeeded flags"
+```
+
+---
+
 ## Verification checklist
 
 - [ ] `npx turbo run typecheck --force` passes.
 - [ ] `npx turbo run test --force` passes; totals reported in the completion message.
-- [ ] `run-guarded-against-missing-dek.test.ts`: 3/3 passing (success passthrough, MissingDataKeyError caught, other errors re-thrown).
+- [ ] `run-guarded-against-missing-dek.test.ts`: 4/4 passing (fn resolves true, fn resolves false, MissingDataKeyError caught, other errors re-thrown).
 - [ ] `products.test.tsx`'s new `describe('MissingDataKeyError guard ...')`: 3/3 passing.
 - [ ] `products.test.tsx`'s two pre-existing `handleClearData` repaint-failure tests still pass unmodified.
 - [ ] `loadData()`'s function body (`products.tsx`) is byte-identical to before this change — only its call sites changed.
 - [ ] `handleClearData` (`products.tsx`) is byte-identical to before this change.
 - [ ] `rg "getMaxOrder" frontend-react/e2e` → no output (unchanged — no E2E file was touched by this plan).
 - [ ] All ten of Task 3's new tests pass, and the pre-existing `handleBulkSave` domain-failure test (`'shows a blocking error when createProducts reports some products already existed, but still closes the modal'`) still passes unmodified.
+- [ ] `runGuardedAgainstMissingDek` returns `Promise<boolean>`; no call site outside `handleBulkSave` hoists a mutable `let succeeded`/`mutationSucceeded` flag.
+- [ ] `products.test.tsx` has ZERO diff from Task 4 — the refactor changes no test file under `sales/`.
 
 ## Out of scope
 
