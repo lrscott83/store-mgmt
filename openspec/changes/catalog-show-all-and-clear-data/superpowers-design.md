@@ -163,10 +163,12 @@ The cart persists to `localStorage` under `lizoft-cart` (`cart-store.ts:136`)
 and holds product snapshots. Left behind, it would point at products that no
 longer exist and could still be checked out into a new order.
 
-The button calls `useCartStore.getState().clear()` (`cart-store.ts:111`), not
+The button calls the cart store's own `clear()` action (`cart-store.ts:111`),
+read through the usual selector — `useCartStore((s) => s.clear)` — not
 `localStorage.removeItem('lizoft-cart')`. `removeItem` would leave the in-memory
 zustand state populated in the current tab, so the cart would look full until a
-reload and then re-persist itself. `clear()` resets both.
+reload and then re-persist itself. `clear()` resets the in-memory state and the
+persisted copy together.
 
 `clear()` is invoked from the catalog page, outside `clearStoreData`, which stays
 a pure `localStorage`-entity function.
@@ -257,24 +259,31 @@ Unit tests (vitest, `npx turbo run test --force`):
 
 - `product-category-offline-service.test.ts` — the view returns **inactive**
   categories too; `productsCount` equals the category's total product count,
-  including inactive and non-sellable ones. **Existing test CAT-12 at `:157`
-  asserts the old `isActive && availableToSale` count and must be updated** —
-  it is a unit test, not E2E.
+  including inactive and non-sellable ones. **Two existing CAT-12 tests must be
+  updated: `:157`** (asserts the old `isActive && availableToSale` count) **and
+  `:181`** (asserts inactive categories are excluded entirely). Both are unit
+  tests, not E2E.
 - `product-offline-service.test.ts` — `getAvailableProductsByCategoryId` returns
   inactive products. **Existing PROD-11 at `:84-103` asserts isActive-only
   filtering and must be updated** — unit test, not E2E.
 - `products.test.tsx` — inactive category and product render with the "Inactivo"
   label; the counter equals the number of rows listed; Clear is hidden for a
   non-owner; confirm-cancel wipes nothing; confirm-accept calls
-  `clearStoreData` and `cart.clear()` and repaints empty. **The badge assertion
-  at `:281` encodes the old count and must be updated** — unit test, not E2E.
+  `clearStoreData` and `cart.clear()` and repaints empty. **The service mocks at
+  `:45-46` and `:99-108` re-implement the old filters inside the test file and
+  must be updated**, along with the stale comment at `:281-282`; the `'1'`
+  assertion itself still holds. Unit test, not E2E.
 - `store-data-reset.test.ts` (new) — removes exactly the six keys for the given
   store; leaves `token` / `AUTH_MODEL` / `currentUser` / another store's keys
   untouched; one throwing key does not stop the rest.
-- **Regression pin for the sale screen** — a test asserting `sale.tsx` still
-  calls `getAvailableProductCategories` and `getProductsToSaleByCategoryId` and
-  never renders an inactive product. This is the guard that makes "catalog only"
-  enforceable rather than a promise.
+- **Regression pin for the sale screen.** The service-level filters are already
+  pinned — `product-offline-service.test.ts:192` (PROD-17) and
+  `product-category-offline-service.test.ts:121` (CAT-10) — and this change does
+  not touch either method. What is **not** pinned is that `sale.tsx` keeps
+  *calling* them: swapping it to the catalog's now-unfiltered method would leave
+  PROD-17 and CAT-10 green while Ventas started showing inactive products. So
+  `sale.test.tsx` gains an explicit assertion that both methods were called.
+  That is the guard that makes "catalog only" enforceable rather than a promise.
 
 **E2E: none written, none modified.** The existing Playwright suite
 (`frontend-react/e2e/`) and its support files are untouchable without explicit
