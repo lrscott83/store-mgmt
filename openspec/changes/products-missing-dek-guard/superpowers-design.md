@@ -282,11 +282,13 @@ deleteProduct,createProducts}` / `categoryServiceSpies.
 message and that the modal did not close; and the repaint guard, letting the
 mutation succeed and rejecting `categoryServiceSpies.getProductCategoriesView`
 (the first call inside `loadData()`) once, asserting the repaint-guard
-message and that the modal DID close. `handleBulkSave`'s repaint-guard test
-additionally asserts the pre-existing "some products already exist" message
-still fires when the mutation itself resolves with a domain-level
-`succeeded: false` — proving the `MissingDataKeyError` path and the
-`{succeeded: false}` path stayed independent.
+message and that the modal DID close. A third, dedicated test (added in
+Task 5, closing a gap the round-2 review found) asserts both the pre-existing
+"some products already exist" message and the repaint-guard message fire
+together from one import, when the mutation resolves with a domain-level
+`succeeded: false` **and** the repaint separately throws
+`MissingDataKeyError` — proving the two paths stay independent even when
+both occur in the same call.
 
 No existing test changes. `frontend-react/e2e/**` is not touched — this is
 unit-test coverage only, and no E2E test asserts on this failure mode.
@@ -305,12 +307,28 @@ no `await` inside it, so the DEK cannot change state mid-loop. Either it is
 present for the whole loop (every row attempts its own domain-level
 create/skip, no throw), or it is absent from the start (the first row's
 write throws immediately and native `forEach` aborts before any later row is
-attempted, before any `localStorage.setItem` runs). The handler's second
+attempted, before any `localStorage.setItem` runs).
+
+There IS an `await` between the two loops
+(`await productService.createCsvProducts(...)`) — an `await` alone does not
+rule out an interleaving timer, and the idle-lock timer
+(`app-layout.tsx:58`) really does call `logout()` → `clearDek()` across one.
+What rules it out here specifically is that `createCsvProducts` itself
+contains no `await` in its own body (confirmed above), so its returned
+promise settles in the same microtask checkpoint the caller's `await`
+resumes in — and a `setTimeout` callback cannot run inside a microtask
+checkpoint; it waits for the next macrotask. So control returns to
+`handleCsvImport`'s second loop before any timer gets a chance to run,
+carrying the same DEK state `createCsvProducts` itself observed. The second
 loop (`inventoryService.createInventoryEntry(...)` per created row) is the
-same shape, and only runs after the first loop already proved the DEK was
-present — nothing between the two loops can clear it, since no timer or DOM
-event fires inside a synchronous continuation. This handler is guarded with
-the same two-guard shape as the five siblings; see the plan's Task 5.
+same synchronous, no-`await` shape as the first, so once inside it the same
+guarantee applies again. This chain is specific to `handleCsvImport` — it is
+the only handler in this file where the guarded mutation spans an `await`
+before doing its own writes — and is worth re-checking if `createCsvProducts`
+or `createInventoryEntry` ever gain an internal `await` (e.g. under
+`GlobalConfig.USE_ONLINE_SERVICE`, where the HTTP path genuinely suspends).
+This handler is guarded with the same two-guard shape as the five siblings;
+see the plan's Task 5.
 
 ## Out of scope
 

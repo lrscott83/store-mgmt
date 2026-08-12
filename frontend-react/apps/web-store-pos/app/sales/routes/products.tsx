@@ -272,8 +272,9 @@ export function ProductsPage() {
   // the modal and emits the update event UNCONDITIONALLY (before checking `response.succeeded`);
   // the Swal error is purely informational when some names already existed.
   async function handleBulkSave(categoryId: string, items: { name: string; price: number }[]) {
-    // Unlike every other handler's flag (removed in Task 4), this one survives: it answers a
-    // different question than the guard's own return value. The guard's `mutationSucceeded`
+    // Unlike every other handler's flag (removed in the products-missing-dek-guard boolean
+    // refactor), this one survives: it answers a different question than the guard's own
+    // return value. The guard's `mutationSucceeded`
     // means "no MissingDataKeyError happened"; `domainSucceeded` means "the mutation's own
     // {succeeded} envelope was true" — Angular parity requires the modal to close and the
     // repaint to fire even when the second is false, so the two must stay separate.
