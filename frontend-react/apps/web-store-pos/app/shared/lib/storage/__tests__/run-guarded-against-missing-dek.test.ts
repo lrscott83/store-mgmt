@@ -13,21 +13,29 @@ describe('runGuardedAgainstMissingDek', () => {
     vi.clearAllMocks();
   });
 
-  it('runs fn and does not call showBlockingError when fn resolves', async () => {
-    const fn = vi.fn().mockResolvedValue(undefined);
+  it('resolves true and does not call showBlockingError when fn resolves true', async () => {
+    const fn = vi.fn().mockResolvedValue(true);
 
-    await runGuardedAgainstMissingDek(fn, 'Error', 'message');
+    await expect(runGuardedAgainstMissingDek(fn, 'Error', 'message')).resolves.toBe(true);
 
     expect(fn).toHaveBeenCalledTimes(1);
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
   });
 
-  it('catches a MissingDataKeyError and calls showBlockingError with the given title/message', async () => {
+  it('resolves false and does not call showBlockingError when fn itself resolves false', async () => {
+    const fn = vi.fn().mockResolvedValue(false);
+
+    await expect(runGuardedAgainstMissingDek(fn, 'Error', 'message')).resolves.toBe(false);
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('catches a MissingDataKeyError, calls showBlockingError with the given title/message, and resolves false', async () => {
     const fn = vi.fn().mockRejectedValue(new MissingDataKeyError());
 
     await expect(
       runGuardedAgainstMissingDek(fn, 'Error', 'No se pudieron cargar los datos. Recargue la página.'),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
 
     expect(showBlockingErrorMock).toHaveBeenCalledWith(
       'Error',
