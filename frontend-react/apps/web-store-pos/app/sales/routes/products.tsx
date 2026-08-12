@@ -305,9 +305,17 @@ export function ProductsPage() {
     });
     if (!confirmed) return;
 
-    clearStoreData(storeId);
-    clearCart();
-    await loadData();
+    try {
+      clearStoreData(storeId);
+      clearCart();
+      await loadData();
+    } catch {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        'No se pudieron eliminar todos los datos.',
+      );
+      return;
+    }
     showToastSuccess('Todos los datos fueron eliminados.');
   }
 

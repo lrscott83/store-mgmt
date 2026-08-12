@@ -231,7 +231,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     showToastErrorMock.mockClear();
     mockUser.isOwnerAdmin = true;
     clearCartMock.mockClear();
-    clearStoreDataMock.mockClear();
+    // mockReset (not mockClear) so a queued mockImplementationOnce throw from the
+    // error-handling test below can never leak into an unrelated test.
+    clearStoreDataMock.mockReset();
   });
 
   it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {
@@ -1196,6 +1198,32 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
   it('wipes nothing when the confirmation is cancelled', async () => {
     confirmDialogMock.mockResolvedValue(false);
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('clear-data-button'));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    expect(clearStoreDataMock).not.toHaveBeenCalled();
+    expect(clearCartMock).not.toHaveBeenCalled();
+    expect(showToastSuccessMock).not.toHaveBeenCalled();
+    // The screen itself is unaffected — not just the mocks.
+    expect(screen.getByText('Bebidas')).toBeInTheDocument();
+  });
+
+  it('surfaces a wipe failure via showBlockingError and does not show the success toast', async () => {
+    confirmDialogMock.mockResolvedValue(true);
+    clearStoreDataMock.mockImplementationOnce(() => {
+      throw new Error('quota');
+    });
+
     render(
       <Wrapper>
         <ProductsPage />
@@ -1204,9 +1232,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
     fireEvent.click(screen.getByTestId('clear-data-button'));
 
-    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
-    expect(clearStoreDataMock).not.toHaveBeenCalled();
-    expect(clearCartMock).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'No se pudieron eliminar todos los datos.'),
+    );
     expect(showToastSuccessMock).not.toHaveBeenCalled();
   });
 
