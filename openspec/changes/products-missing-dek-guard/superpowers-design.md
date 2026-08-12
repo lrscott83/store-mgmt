@@ -165,6 +165,76 @@ No new i18n message ids: the title reuses the existing `GENERAL.ERROR` key
 bodies are raw Spanish string literals, matching `handleClearData`'s own
 three messages — none of which are i18n keys either.
 
+## The five sibling mutation handlers
+
+**Correction to this design's own first draft.** The original "Out of scope"
+section deferred `handleCreateProduct`, `handleEditProduct`,
+`handleDeactivateProduct`, `handleBulkSave`, and `handleCategorySave` on the
+premise that guarding them required "deciding what a caller does when the
+mutation itself half-fails." On inspection that premise is false: every
+mutating repository write —
+`setProductsLocalStorage` (`product-repository.ts:402`) and
+`setProductCategoriesLocalStorage` (`product-category-repository.ts:229`) —
+mutates its in-memory `Map`, then calls `encryptEntity` synchronously
+*before* `localStorage.setItem` runs. If `encryptEntity` throws, the
+`setItem` call is never reached, so nothing persists. No `await` sits
+between the in-memory mutation and the persistence call in any of these
+paths, and JavaScript's single-threaded execution means the DEK cannot
+disappear mid-call. The failure is therefore all-or-nothing, exactly like
+the three already-fixed read sites — there is no partial-mutation state to
+reason about. `createProductService`/`createProductCategoryService` are also
+reconstructed on every `ProductsPage` render (`products.tsx:53-54`), so even
+the discarded in-memory `Map` from a failed write cannot leak into a later
+call.
+
+**Two guards per handler, not one — the mutation and the repaint are
+independent failures with independent messages**, matching
+`handleClearData`'s own established shape (`products.tsx:346-374`: a
+`repainted` flag, checked separately from the wipe's own success). The
+mutation guard wraps the service call and its existing `succeeded` check;
+on `MissingDataKeyError`, it shows a message and the modal stays open,
+unchanged from how a domain failure (e.g. `NameExists`) already behaves
+today. Only if the mutation genuinely succeeded does the handler close its
+modal and fire the **second**, separate guard around the trailing `loadData()`
+repaint — not awaited, matching every one of these handlers' existing
+fire-and-forget `loadData()` call today, but now guarded instead of an
+unhandled rejection.
+
+An outer `let succeeded = false` flag, set inside the mutation guard's
+callback, tells the handler whether to proceed to the repaint — the same
+idiom `handleClearData` already uses for `cartCleared`/`repainted`.
+
+**`handleBulkSave` keeps its documented Angular-parity divergence
+untouched**: today it calls `setModal(null)` and `loadData()`
+*unconditionally*, before checking `result.succeeded`, because Angular's own
+`onSubmit` closes the modal and emits its update event before checking the
+response (`edit-products-modal.component.ts:74-107` — "do not fix"). The
+mutation guard here only protects the `createProducts` call itself from a
+`MissingDataKeyError` throw; once that call returns (successfully, even if
+some individual items failed with a domain error), `setModal(null)` and the
+repaint proceed exactly as today, and the existing informational
+"some products already exist" message still fires off the domain-level
+`result.succeeded` check.
+
+**`handleDeactivateProduct` has no domain failure branch to preserve** —
+`ProductOfflineService.deleteProduct` is documented "never fails"
+(`product-offline-service.ts:101`) and its call site never checked
+`succeeded`. The mutation guard here is the *only* protection this call
+gains; there was no existing envelope check for a `MissingDataKeyError` to
+hide behind.
+
+Per-handler messages, following the file's own convention of a distinct
+message per failure (`handleClearData`'s three messages,
+`products.tsx:353-374`):
+
+| Handler | Mutation-guard message | Repaint-guard message |
+|---|---|---|
+| `handleCreateProduct` | No se pudo guardar el producto. Recargue la página. | El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página. |
+| `handleEditProduct` | No se pudo actualizar el producto. Recargue la página. | El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página. |
+| `handleDeactivateProduct` | No se pudo desactivar el producto. Recargue la página. | El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página. |
+| `handleBulkSave` | No se pudieron guardar los productos. Recargue la página. | Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página. |
+| `handleCategorySave` | No se pudo guardar la categoría. Recargue la página. | La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página. |
+
 ## Testing
 
 Three new tests in `products.test.tsx`, mocking
@@ -190,6 +260,20 @@ rejection through a full component render, which is what re-throwing from
 inside `products.tsx`'s fire-and-forget `useEffect` call would otherwise
 require.
 
+For each of the five sibling handlers, two new tests in `products.test.tsx`:
+the mutation guard, via `mockRejectedValueOnce(new MissingDataKeyError())` on
+its own service spy (`productServiceSpies.{createProduct,updateProduct,
+deleteProduct,createProducts}` / `categoryServiceSpies.
+{createProductCategory,updateProductCategory}`), asserting the mutation-guard
+message and that the modal did not close; and the repaint guard, letting the
+mutation succeed and rejecting `categoryServiceSpies.getProductCategoriesView`
+(the first call inside `loadData()`) once, asserting the repaint-guard
+message and that the modal DID close. `handleBulkSave`'s repaint-guard test
+additionally asserts the pre-existing "some products already exist" message
+still fires when the mutation itself resolves with a domain-level
+`succeeded: false` — proving the `MissingDataKeyError` path and the
+`{succeeded: false}` path stayed independent.
+
 No existing test changes. `frontend-react/e2e/**` is not touched — this is
 unit-test coverage only, and no E2E test asserts on this failure mode.
 
@@ -202,30 +286,16 @@ unit-test coverage only, and no E2E test asserts on this failure mode.
 - Changing `authLoader`, the idle-lock timer, or `needsUnlock()`. Those are
   the existing, working navigation-time gate; this change only covers the
   gap they cannot cover (an already-mounted page).
-- `handleClearData`'s existing three-way error handling
-  (`products.tsx:328-378`). Already correct for its own scenario, not
-  touched.
-- `products.tsx`'s five other unguarded call sites: `handleCreateProduct`,
-  `handleEditProduct`, `handleDeactivateProduct`, `handleBulkSave`, and
-  `handleCategorySave`. Each awaits a mutating call (`createProduct`,
-  `updateProduct`, `deleteProduct`, `createProducts`,
-  `createProductCategory`/`updateProductCategory`) and then a bare, unguarded
-  `loadData()` repaint. Unlike the three call sites this change fixes, the
-  risk here is not confined to the repaint: the mutating call itself can
-  throw `MissingDataKeyError`, because every repository write —
-  `setProductsLocalStorage` (`product-repository.ts:402`) and
-  `setProductCategoriesLocalStorage` (`product-category-repository.ts:229`) —
-  calls `encryptEntity` before persisting, the same throw site as the three
-  already-fixed reads. `deleteProduct` makes this worse, not equal:
-  `ProductOfflineService.deleteProduct` is documented "never fails"
-  (`product-offline-service.ts:101`) and its call site
-  (`handleDeactivateProduct`, `products.tsx:210-213`) does not check
-  `succeeded` at all — there is no existing envelope check for a
-  `MissingDataKeyError` to hide behind on that path. These five are deferred
-  rather than folded into this change because guarding them correctly means
-  deciding what a caller does when the MUTATION itself half-fails — e.g. a
-  wipe or an update that may or may not have persisted — which is a
-  different, harder design question than the three read-only sites this
-  change addresses (where failing before any state changed is unambiguous).
-  That question deserves its own look, not a mechanical copy-paste of this
-  change's pattern.
+- The data-loss hazard in `product-category-repository.ts:237-247`: its
+  `catch {}` swallows *every* decrypt failure, including a GCM tag failure
+  with a still-*valid* DEK (corrupt ciphertext), then writes an empty map
+  back over storage. That is a different failure class from a missing DEK —
+  it needs its own design decision (what should happen when decryption fails
+  with a valid key present?) — and is unrelated to `MissingDataKeyError`.
+  Noted here so it is not lost; not touched by this change.
+
+`handleClearData`'s existing three-way error handling
+(`products.tsx:328-378` before this change's edits) stays exactly as it was
+written — the two mutation/repaint guards added to the five sibling handlers
+follow its established `succeeded`-flag idiom, they do not replace it, and
+this change adds no new call inside `handleClearData` itself.
