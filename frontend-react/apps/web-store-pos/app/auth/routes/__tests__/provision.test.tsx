@@ -123,7 +123,7 @@ describe('Provision route (offline-device-provisioning spec)', () => {
     await fillAndSubmit('s1', 'incorrect-master');
 
     await waitFor(() => {
-      expect(screen.getByText('La contraseña maestra es incorrecta.')).toBeInTheDocument();
+      expect(screen.getByText('La contraseña de activación es incorrecta.')).toBeInTheDocument();
     });
     expect(getRoster()).toBeNull();
   });
@@ -152,7 +152,7 @@ describe('Provision route (offline-device-provisioning spec)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Este archivo de roster ya venció. Solicitá uno nuevo.'),
+        screen.getByText('Este archivo de activación ya venció. Pedile uno nuevo al administrador.'),
       ).toBeInTheDocument();
     });
     expect(getRoster()).toBeNull();
@@ -169,7 +169,7 @@ describe('Provision route (offline-device-provisioning spec)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Este archivo de roster ya fue importado en este dispositivo.'),
+        screen.getByText('Este archivo ya se usó en este equipo. Pedile uno nuevo al administrador.'),
       ).toBeInTheDocument();
     });
     expect(getRoster()?.bundleId).toBe(bundle.bundleId);

@@ -6,34 +6,12 @@ import { Button } from '~/shared/components/ui/button';
 import { FileInput } from '~/shared/components/ui/file-input';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { EyeIcon, EyeOffIcon } from '~/shared/components/ui/icons';
-import { deserializeRoster } from '~/shared/lib/offline/roster-serializer';
-import { importRoster } from '~/shared/lib/offline/roster-store';
+import { importRosterFile, rosterImportErrorMessageId } from '~/shared/lib/offline/roster-import';
 
 // NOTE: no `clientLoader` here (design D-note, verified against
 // `auth-layout.tsx`) — a `guestOnlyLoader` would redirect an already
 // authenticated admin away from this route, but provisioning a new device
 // must work regardless of the CURRENT device's auth state.
-
-/**
- * Design D4 — dispatches by `err.name`, mirroring `login.tsx`'s
- * `offlineErrorMessageId`. Each of the 4 import failure modes
- * (`offline-device-provisioning` spec) gets its own distinct message id.
- */
-function provisionErrorMessageId(err: unknown): string {
-  const name = (err as { name?: string } | null)?.name;
-  switch (name) {
-    case 'WrongPasswordError':
-      return 'PROVISION.ERROR_WRONG_PASSWORD';
-    case 'CorruptFileError':
-      return 'PROVISION.ERROR_CORRUPT_FILE';
-    case 'ExpiredBundleError':
-      return 'PROVISION.ERROR_EXPIRED';
-    case 'ReplayBundleError':
-      return 'PROVISION.ERROR_REPLAY';
-    default:
-      return 'PROVISION.ERROR_CORRUPT_FILE';
-  }
-}
 
 export function Provision() {
   const intl = useIntl();
@@ -61,16 +39,10 @@ export function Provision() {
 
     setBusy(true);
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const payload = new Uint8Array(arrayBuffer);
-      const bundle = await deserializeRoster(payload, master, storeId);
-      // Throws ExpiredBundleError/ReplayBundleError/InvalidBundleError; on
-      // success the roster is persisted and `isRosterProvisioned()` becomes
-      // true (offline-device-provisioning spec).
-      importRoster(bundle);
+      await importRosterFile({ file, master, storeId });
       setSuccess(true);
     } catch (err: unknown) {
-      setError(intl.formatMessage({ id: provisionErrorMessageId(err) }));
+      setError(intl.formatMessage({ id: rosterImportErrorMessageId(err) }));
     } finally {
       setBusy(false);
     }

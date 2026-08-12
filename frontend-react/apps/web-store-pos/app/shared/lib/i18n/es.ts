@@ -102,10 +102,12 @@ const messages: Record<string, string> = {
   'PROVISION.MASTER_PASSWORD_LABEL': 'Contraseña maestra',
   'PROVISION.FILE_LABEL': 'Archivo de roster (.smcabundle)',
   'PROVISION.SUBMIT': 'Activar',
-  'PROVISION.ERROR_WRONG_PASSWORD': 'La contraseña maestra es incorrecta.',
+  'PROVISION.ERROR_WRONG_PASSWORD': 'La contraseña de activación es incorrecta.',
   'PROVISION.ERROR_CORRUPT_FILE': 'El archivo está dañado o no tiene un formato válido.',
-  'PROVISION.ERROR_EXPIRED': 'Este archivo de roster ya venció. Solicitá uno nuevo.',
-  'PROVISION.ERROR_REPLAY': 'Este archivo de roster ya fue importado en este dispositivo.',
+  'PROVISION.ERROR_EXPIRED': 'Este archivo de activación ya venció. Pedile uno nuevo al administrador.',
+  'PROVISION.ERROR_REPLAY': 'Este archivo ya se usó en este equipo. Pedile uno nuevo al administrador.',
+  'PROVISION.ERROR_UNKNOWN_FILE':
+    'No pudimos reconocer el archivo. Usalo tal como te lo pasaron, sin cambiarle el nombre.',
 
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)
