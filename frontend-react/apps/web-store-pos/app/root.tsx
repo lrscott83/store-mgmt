@@ -109,6 +109,18 @@ export default function App() {
   );
 }
 
+// Without this export, React Router falls back to its own default
+// HydrateFallback, which renders an inline `console.log("💿 Hey developer...")`
+// tip via `dangerouslySetInnerHTML` — a `script-src` violation that ships in
+// the PRODUCTION build too (not gated on dev, contrary to what was assumed
+// when e2e/support/csp-violations.ts's KNOWN_DEV_ONLY_VIOLATIONS was written).
+// Rendering nothing here removes that script instead of allowlisting it: SPA
+// mode's initial paint is effectively instant, so no visible fallback UI is
+// needed.
+export function HydrateFallback() {
+  return null;
+}
+
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   // ErrorBoundary can render on paths that never reach I18nProvider (e.g. a
   // root-level render error), so it reads the Spanish catalog directly
