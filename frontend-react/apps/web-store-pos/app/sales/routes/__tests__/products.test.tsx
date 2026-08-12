@@ -104,6 +104,13 @@ const categoryServiceSpies = vi.hoisted(() => ({
       })),
     ),
   ),
+  getMaxOrder: vi.fn<() => Promise<BaseResponseModel<number>>>(async () => ({
+    data: 0,
+    succeeded: true,
+    message: '',
+    actionCode: 200,
+    errors: [],
+  })),
 }));
 
 // WU3 (csv-import-cost-quantity-entries): handleCsvImport constructs InventoryOfflineService
@@ -131,6 +138,7 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
     getProductCategoriesView: categoryServiceSpies.getProductCategoriesView,
     createProductCategory: categoryServiceSpies.createProductCategory,
     updateProductCategory: categoryServiceSpies.updateProductCategory,
+    getMaxOrder: categoryServiceSpies.getMaxOrder,
   })),
 }));
 
@@ -214,6 +222,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     categoryServiceSpies.updateProductCategory.mockClear();
     categoryServiceSpies.updateProductCategory.mockResolvedValue({
       data: true,
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+    categoryServiceSpies.getMaxOrder.mockClear();
+    categoryServiceSpies.getMaxOrder.mockResolvedValue({
+      data: 0,
       succeeded: true,
       message: '',
       actionCode: 200,
@@ -666,7 +682,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('add-category-button'));
-      fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await waitFor(() =>
@@ -712,7 +728,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
 
       fireEvent.click(screen.getByTestId('add-category-button'));
-      fireEvent.change(screen.getByTestId('category-name-input'), { target: { value: 'Bebidas' } });
+      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Bebidas' } });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await waitFor(() =>
@@ -720,6 +736,69 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
       // Modal stays open on failure — not force-closed.
       expect(screen.getByTestId('category-name-input')).toBeInTheDocument();
+    });
+
+    // Angular parity (edit-product-category-modal.component.ts:37-39): create-mode resolves the
+    // GLOBAL max category order and prefills Orden with data+1, so the new category lands last.
+    it('awaits categoryService.getMaxOrder() and prefills Orden with max+1', async () => {
+      categoryServiceSpies.getMaxOrder.mockResolvedValueOnce({
+        data: 4,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+
+      await waitFor(() => expect(categoryServiceSpies.getMaxOrder).toHaveBeenCalled());
+      expect(await screen.findByTestId('category-order-input')).toHaveValue(5);
+    });
+
+    // The one that matters: the value must reach the service, not just the screen.
+    it('calls createProductCategory with max+1 when the user never touches the order field', async () => {
+      categoryServiceSpies.getMaxOrder.mockResolvedValueOnce({
+        data: 6,
+        succeeded: true,
+        message: '',
+        actionCode: 200,
+        errors: [],
+      });
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Galletas' } });
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(categoryServiceSpies.createProductCategory).toHaveBeenCalledWith('Galletas', 7, true),
+      );
+    });
+
+    it('does NOT consult getMaxOrder when editing — the category keeps its own order', async () => {
+      mockCategories = [makeCategory({ order: 3 })];
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+      fireEvent.click(screen.getByTestId('edit-category-button'));
+
+      expect(await screen.findByTestId('category-order-input')).toHaveValue(3);
+      expect(categoryServiceSpies.getMaxOrder).not.toHaveBeenCalled();
     });
   });
 

@@ -34,7 +34,7 @@ type Modal =
   | { type: 'create'; category: ProductCategory; defaultOrder: number }
   | { type: 'edit'; product: Product }
   | { type: 'bulk'; category: ProductCategory }
-  | { type: 'category'; category?: ProductCategory }
+  | { type: 'category'; category?: ProductCategory; defaultOrder: number }
   | { type: 'csv' };
 
 export function ProductsPage() {
@@ -94,6 +94,19 @@ export function ProductsPage() {
   async function handleAddProduct(category: ProductCategory) {
     const maxOrderResult = await productService.getMaxOrderByCategoryId(category.id);
     setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
+  }
+
+  // --- Add category (opens the create modal) ---
+  // Angular parity (edit-product-category-modal.component.ts:37-39): create-mode prefills Orden
+  // with the GLOBAL max category order + 1. Resolved here rather than inside the modal, matching
+  // handleAddProduct above. This is not cosmetic: addProductCategoryData shifts every sibling
+  // with `order >= order` by +1 (product-category-repository.ts:133-137), so the old hardcoded
+  // `1` rewrote the order of EVERY existing category on each create. At max+1 that loop is a
+  // no-op. Note the scope difference from handleAddProduct: this max is store-wide across all
+  // categories, not per-category.
+  async function handleAddCategory() {
+    const maxOrderResult = await categoryService.getMaxOrder();
+    setModal({ type: 'category', defaultOrder: (maxOrderResult.data ?? 0) + 1 });
   }
 
   // --- Create product ---
@@ -374,7 +387,7 @@ export function ProductsPage() {
           <div className="flex items-center justify-between">
             {/* PRODUCT.PRODUCTS */}
             <span>{intl.formatMessage({ id: 'PRODUCT.PRODUCTS' })}</span>
-            <Button variant="fab" onClick={() => setModal({ type: 'category' })} data-testid="add-category-button">
+            <Button variant="fab" onClick={handleAddCategory} data-testid="add-category-button">
               {/* Angular: <mat-icon>add</mat-icon> */}
               <PlusIcon />
               {/* PRODUCT_CATEGORY.NEW_PRODUCT_CATEGORY */}
@@ -446,7 +459,7 @@ export function ProductsPage() {
                   </button>
                   <CategoryActionsMenu
                     category={category}
-                    onEditCategory={() => setModal({ type: 'category', category })}
+                    onEditCategory={() => setModal({ type: 'category', category, defaultOrder: category.order })}
                     onAddProduct={() => handleAddProduct(category)}
                     onAddProducts={() => setModal({ type: 'bulk', category })}
                   />
@@ -504,7 +517,7 @@ export function ProductsPage() {
       {modal?.type === 'category' && (
         <EditProductCategoryModal
           category={modal.category}
-          defaultOrder={1}
+          defaultOrder={modal.defaultOrder}
           onSave={handleCategorySave}
           onClose={() => setModal(null)}
         />
