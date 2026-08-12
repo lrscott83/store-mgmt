@@ -169,4 +169,31 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
     fireEvent.click(screen.getByText('Eliminar Producto'));
     expect(onDeleteProduct).toHaveBeenCalledWith(product.id);
   });
+
+  it('marks an inactive product with the Inactivo badge', () => {
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[makeProduct({ id: 'p1', name: 'Sprite', isActive: false })]}
+          onEditProduct={vi.fn()}
+          onDeleteProduct={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('Sprite')).toBeInTheDocument();
+    expect(screen.getByTestId('inactive-badge')).toHaveTextContent('Inactivo');
+  });
+
+  it('does not mark an active product', () => {
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[makeProduct({ id: 'p1', name: 'Coca Cola', isActive: true })]}
+          onEditProduct={vi.fn()}
+          onDeleteProduct={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('inactive-badge')).not.toBeInTheDocument();
+  });
 });

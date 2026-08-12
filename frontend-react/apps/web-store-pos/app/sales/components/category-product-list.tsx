@@ -3,6 +3,7 @@ import type { Product } from '@store-mgmt/domain';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { InactiveBadge } from './inactive-badge';
 
 interface CategoryProductListProps {
   products: Product[];
@@ -64,8 +65,11 @@ function ProductRow({ product, onEdit, onDelete }: ProductRowProps) {
   const formattedPrice = formatCurrency(product.price);
 
   return (
-    <li className="flex items-center justify-between py-3">
-      <span className="text-sm text-text">{product.name}</span>
+    <li className={`flex items-center justify-between py-3 ${product.isActive ? '' : 'opacity-60'}`.trim()}>
+      <span className="flex items-center gap-2">
+        <span className="text-sm text-text">{product.name}</span>
+        {!product.isActive && <InactiveBadge />}
+      </span>
       <div className="flex items-center gap-4">
         {/* Angular formats with `currency:'USD':'symbol':'1.2-2'` -> literal $X.XX,
             not locale-formatted (es locale would render "2,00 US$"). formatCurrency

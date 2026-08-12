@@ -43,7 +43,7 @@ const { bm } = vi.hoisted(() => ({
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
   ProductOfflineService: vi.fn().mockImplementation(() => ({
     getAvailableProductsByCategoryId: vi.fn(async (categoryId: string) =>
-      bm(mockProducts.filter((p) => p.categoryId === categoryId && p.isActive)),
+      bm(mockProducts.filter((p) => p.categoryId === categoryId)),
     ),
     createProduct: productServiceSpies.createProduct,
     updateProduct: productServiceSpies.updateProduct,
@@ -100,9 +100,7 @@ vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
       bm(
         mockCategories.map((c) => ({
           ...c,
-          productsCount: mockProducts.filter(
-            (p) => p.categoryId === c.id && p.isActive && p.availableToSale,
-          ).length,
+          productsCount: mockProducts.filter((p) => p.categoryId === c.id).length,
         })),
       ),
     ),
@@ -278,8 +276,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     );
 
     expect(await screen.findByText('Bebidas')).toBeInTheDocument();
-    // badge count comes from getProductCategoriesView's productsCount (isActive &&
-    // availableToSale), not a derived length.
+    // badge count comes from getProductCategoriesView's productsCount, which is
+    // now the category's TOTAL product count — the same set the panel lists.
     expect(screen.getByText('1')).toBeInTheDocument();
     // collapsed by default -> product name not visible yet
     expect(screen.queryByText('Coca Cola')).not.toBeInTheDocument();
@@ -1070,5 +1068,60 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       const rowButtons = row ? Array.from(row.querySelectorAll('button')) : [];
       expect(rowButtons).toHaveLength(3);
     });
+  });
+
+  it('lists inactive categories, marked', async () => {
+    mockCategories = [
+      makeCategory({ id: 'cat-1', name: 'Bebidas', isActive: true }),
+      makeCategory({ id: 'cat-2', name: 'Descontinuados', isActive: false }),
+    ];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText('Descontinuados')).toBeInTheDocument();
+    expect(screen.getAllByTestId('inactive-badge')).toHaveLength(1);
+  });
+
+  it('lists inactive products inside an expanded panel, marked', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', isActive: true }),
+      makeProduct({ id: 'p2', name: 'Sprite', isActive: false, order: 2 }),
+    ];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    expect(await screen.findByText('Sprite')).toBeInTheDocument();
+    expect(screen.getAllByTestId('inactive-badge')).toHaveLength(1);
+  });
+
+  it('shows a category count that matches the number of rows listed', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', isActive: true, availableToSale: true }),
+      makeProduct({ id: 'p2', name: 'Fanta', isActive: true, availableToSale: false, order: 2 }),
+      makeProduct({ id: 'p3', name: 'Sprite', isActive: false, availableToSale: true, order: 3 }),
+    ];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText('3')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
+    expect(screen.getByText('Fanta')).toBeInTheDocument();
+    expect(screen.getByText('Sprite')).toBeInTheDocument();
   });
 });

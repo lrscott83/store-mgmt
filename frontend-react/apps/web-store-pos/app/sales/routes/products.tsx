@@ -17,6 +17,7 @@ import { ProductRepository } from '../lib/repositories/product-repository';
 import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import type { ParsedProductRow } from '../lib/csv-product-parser';
 import { CategoryProductList } from '../components/category-product-list';
+import { InactiveBadge } from '../components/inactive-badge';
 import { CategoryActionsMenu } from '../components/category-actions-menu';
 import { CreateProductModal } from '../components/create-product-modal';
 import { EditProductModal } from '../components/edit-product-modal';
@@ -45,10 +46,12 @@ export function ProductsPage() {
   const productService = createProductService(storeId);
   const categoryService = createProductCategoryService(storeId);
 
-  // Angular parity (products.component.ts:30-40): categories via getProductCategoriesView
-  // (active-only, WITH productsCount); mirrors Angular's eager-mount-all
-  // CategoryProductListComponent behavior by fetching every category's product list up front
-  // via getAvailableProductsByCategoryId, cached per category id (Flag #1).
+  // Angular parity (products.component.ts:30-40): categories via getProductCategoriesView,
+  // which now returns EVERY category (active and inactive) with productsCount as the
+  // category's TOTAL product count; mirrors Angular's eager-mount-all CategoryProductListComponent
+  // behavior by fetching every category's full product list up front via
+  // getAvailableProductsByCategoryId (also unfiltered by isActive/availableToSale now), cached
+  // per category id (Flag #1). Inactive rows are marked, not hidden — see InactiveBadge.
   async function loadData() {
     const categoriesResult = await categoryService.getProductCategoriesView();
     const categoriesData = categoriesResult.data ?? [];
@@ -319,7 +322,10 @@ export function ProductsPage() {
             const categoryProducts = productsByCategory[category.id] ?? [];
             const isExpanded = expandedCategoryIds.has(category.id);
             return (
-              <div key={category.id} className="rounded-lg border border-border bg-surface">
+              <div
+                key={category.id}
+                className={`rounded-lg border border-border bg-surface ${category.isActive ? '' : 'opacity-60'}`.trim()}
+              >
                 {/* Header row: name+count toggle the panel; a gear menu sits to the LEFT of
                     the chevron and exposes the category actions WITHOUT expanding — clicking
                     the gear must not toggle. The chevron is its own toggle button so the gear
@@ -332,11 +338,11 @@ export function ProductsPage() {
                     data-testid={`category-panel-toggle-${category.id}`}
                     aria-expanded={isExpanded}
                   >
-                    <span className="flex-1 text-base font-medium text-text">{category.name}</span>
-                    {/* Angular parity (products.component.ts:30-40): badge uses
-                        getProductCategoriesView's productsCount (isActive && availableToSale) —
-                        a DIFFERENT filter than the panel's own product list below (isActive-only),
-                        a deliberate Angular quirk (spec.md "three separate filters"). */}
+                    <span className="flex-1 text-left text-base font-medium text-text">{category.name}</span>
+                    {!category.isActive && <InactiveBadge />}
+                    {/* productsCount is the category's TOTAL product count, resolved through the
+                        SAME repository method as the panel's product list below — the badge and
+                        the rows below can never disagree. */}
                     <span className="text-sm text-text-muted">{category.productsCount}</span>
                   </button>
                   <CategoryActionsMenu
