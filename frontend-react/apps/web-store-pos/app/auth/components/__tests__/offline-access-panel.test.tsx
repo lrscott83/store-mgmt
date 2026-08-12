@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
 import { OfflineAccessPanel } from '../offline-access-panel';
 import { importRoster, isRosterProvisioned } from '~/shared/lib/offline/roster-store';
+import { writeDeviceDekTable } from '~/shared/lib/storage/device-dek-table';
 import type { OfflineRosterBundle } from '~/shared/lib/offline/roster-types';
 
 const STORE_ID = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
@@ -162,6 +163,30 @@ describe('OfflineAccessPanel', () => {
 
   it('omits the data warning when the roster carries no encryption', async () => {
     importRoster(makeBundle());
+    confirmDialogMock.mockResolvedValue(false);
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole('button', { name: /desactivar acceso sin conexión/i }));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    expect(confirmDialogMock.mock.calls[0][0].message).not.toContain('ilegibles');
+  });
+
+  it('omits the data warning when the device holds its own key copy', async () => {
+    importRoster(makeEncryptedBundle());
+    // The other half of dataAtRisk: isEncryptionProvisioned() is true (same
+    // encrypted bundle as the warning test above), but this device DOES
+    // hold a key copy, so hasDeviceDekWrap() is true and the warning must
+    // not fire. Nothing above this line ever wrote this table, which is why
+    // both existing tests above cannot tell this branch apart from the
+    // "no encryption at all" one.
+    writeDeviceDekTable({
+      formatVersion: 1,
+      dekSource: 'local',
+      storeId: STORE_ID,
+      device: { wrappedDek: 'ct', wrapIv: 'iv' },
+      users: {},
+    });
     confirmDialogMock.mockResolvedValue(false);
     renderPanel();
 
