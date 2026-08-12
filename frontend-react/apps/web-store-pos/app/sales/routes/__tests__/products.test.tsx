@@ -461,6 +461,62 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[5]).toBe(true); // isActive
   });
 
+  it('shows a blocking error and keeps the modal open when createProduct throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    productServiceSpies.createProduct.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-product-button'));
+    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudo guardar el producto. Recargue la página.',
+      ),
+    );
+    // The mutation guard caught the failure — the modal must stay open, same as a domain failure.
+    expect(screen.getByTestId('product-name-input')).toBeInTheDocument();
+  });
+
+  it('shows a blocking error and closes the modal when the post-create repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    // Let the initial mount's loadData() resolve normally before queuing the rejection —
+    // otherwise the Once rejection would be consumed by the mount call instead of the
+    // create-triggered repaint this test targets.
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-product-button'));
+    fireEvent.change(await screen.findByTestId('product-name-input'), { target: { value: 'Sprite' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    // The mutation itself succeeded — the modal closes even though the repaint failed.
+    expect(screen.queryByTestId('product-name-input')).not.toBeInTheDocument();
+  });
+
   // Angular parity (edit-product-modal.component.ts:113-138): handleEditProduct routes through
   // the async updateProduct(id, categoryId, name, price, businessId, order, isActive,
   // availableToSale, discountFromInvantory, barcode?) positional surface.
@@ -485,6 +541,59 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[0]).toBe('prod-1'); // id
     expect(args[1]).toBe('cat-1'); // categoryId
     expect(args[2]).toBe('Coca Cola Zero'); // name
+  });
+
+  it('shows a blocking error and keeps the modal open when updateProduct throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.updateProduct.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Editar Producto'));
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudo actualizar el producto. Recargue la página.',
+      ),
+    );
+    expect(screen.getByTestId('edit-product-name-input')).toBeInTheDocument();
+  });
+
+  it('shows a blocking error and closes the modal when the post-edit repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Editar Producto'));
+    fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('edit-product-submit'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    expect(screen.queryByTestId('edit-product-name-input')).not.toBeInTheDocument();
   });
 
   // Angular parity (edit-product-modal.component.ts:86,125): the barcode FormControl is
@@ -563,6 +672,53 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     await waitFor(() => expect(productServiceSpies.deleteProduct).toHaveBeenCalledWith('prod-1'));
   });
 
+  it('shows a blocking error when deleteProduct throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.deleteProduct.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Desactivar Producto'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudo desactivar el producto. Recargue la página.',
+      ),
+    );
+  });
+
+  it('shows a blocking error when the post-deactivate repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByText('Desactivar Producto'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+  });
+
   it('does NOT call deleteProduct when the confirmDialog is cancelled', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
@@ -606,6 +762,59 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       { name: 'Fanta', price: 9.99 },
     ]);
     expect(productServiceSpies.updateProduct).not.toHaveBeenCalled();
+  });
+
+  it('shows a blocking error and keeps the modal open when createProducts throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+    productServiceSpies.createProducts.mockRejectedValueOnce(new MissingDataKeyError());
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudieron guardar los productos. Recargue la página.',
+      ),
+    );
+    expect(screen.getByTestId('bulk-save-button')).toBeInTheDocument();
+  });
+
+  it('shows a blocking error and closes the modal when the post-bulk-save repaint throws MissingDataKeyError', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    fireEvent.click(screen.getByTestId('add-products-button'));
+    fireEvent.change(await screen.findByTestId('product-name-0'), { target: { value: 'Fanta' } });
+    fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+    fireEvent.click(screen.getByTestId('bulk-save-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
+    );
+    expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
   });
 
   // Angular parity (edit-products-modal.component.ts:97-107): closeModal() + emit() run
@@ -760,6 +969,49 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       expect(categoryServiceSpies.updateProductCategory).not.toHaveBeenCalled();
       // Modal closes on success.
       await waitFor(() => expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument());
+    });
+
+    it('shows a blocking error and keeps the modal open when createProductCategory throws MissingDataKeyError', async () => {
+      categoryServiceSpies.createProductCategory.mockRejectedValueOnce(new MissingDataKeyError());
+
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'No se pudo guardar la categoría. Recargue la página.',
+        ),
+      );
+      expect(screen.getByTestId('category-name-input')).toBeInTheDocument();
+    });
+
+    it('shows a blocking error and closes the modal when the post-category-save repaint throws MissingDataKeyError', async () => {
+      render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+
+      fireEvent.click(screen.getByTestId('add-category-button'));
+      fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
+      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
+      fireEvent.click(screen.getByTestId('category-save-button'));
+
+      await waitFor(() =>
+        expect(showBlockingErrorMock).toHaveBeenCalledWith(
+          'Error',
+          'La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página.',
+        ),
+      );
+      expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument();
     });
 
     it('calls updateProductCategory(id, name, order, isActive) directly (no getById+save two-step) on edit', async () => {

@@ -141,50 +141,78 @@ export function ProductsPage() {
     availableToSale: boolean;
     discountFromInvantory: boolean;
   }) {
-    const result = await productService.createProduct(
-      data.categoryId,
-      data.name,
-      data.price,
-      '',
-      data.order,
-      data.isActive,
-      data.availableToSale,
-      data.discountFromInvantory,
-      data.barcode,
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createProduct(
+          data.categoryId,
+          data.name,
+          data.price,
+          '',
+          data.order,
+          data.isActive,
+          data.availableToSale,
+          data.discountFromInvantory,
+          data.barcode,
+        );
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return;
+        }
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo guardar el producto. Recargue la página.',
     );
-    if (!result.succeeded) {
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
-      return;
-    }
-    loadData();
+    if (!succeeded) return;
+
     setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
   }
 
   // --- Edit product ---
   // Angular parity (edit-product-modal.component.ts:113-138): updateProduct(...) positional
   // async surface; same failure surfacing.
   async function handleEditProduct(product: Product) {
-    const result = await productService.updateProduct(
-      product.id,
-      product.categoryId,
-      product.name,
-      product.price,
-      product.businessId,
-      product.order,
-      product.isActive,
-      product.availableToSale,
-      product.discountFromInvantory,
-      // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
-      // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
-      // that already has a stored barcode.
-      undefined,
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.updateProduct(
+          product.id,
+          product.categoryId,
+          product.name,
+          product.price,
+          product.businessId,
+          product.order,
+          product.isActive,
+          product.availableToSale,
+          product.discountFromInvantory,
+          // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
+          // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
+          // that already has a stored barcode.
+          undefined,
+        );
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return;
+        }
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo actualizar el producto. Recargue la página.',
     );
-    if (!result.succeeded) {
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
-      return;
-    }
-    loadData();
+    if (!succeeded) return;
+
     setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
   }
 
   // --- Deactivate product ---
@@ -208,9 +236,23 @@ export function ProductsPage() {
     });
     if (!confirmed) return;
 
-    await productService.deleteProduct(id);
-    loadData();
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        await productService.deleteProduct(id);
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo desactivar el producto. Recargue la página.',
+    );
+    if (!succeeded) return;
+
     setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página.',
+    );
   }
 
   // --- Bulk create (per-category "Nuevo Productos" -> bulk-CREATE, Angular parity) ---
@@ -219,10 +261,26 @@ export function ProductsPage() {
   // the modal and emits the update event UNCONDITIONALLY (before checking `response.succeeded`);
   // the Swal error is purely informational when some names already existed.
   async function handleBulkSave(categoryId: string, items: { name: string; price: number }[]) {
-    const result = await productService.createProducts(categoryId, items);
+    let mutationSucceeded = false;
+    let domainSucceeded = true;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = await productService.createProducts(categoryId, items);
+        mutationSucceeded = true;
+        domainSucceeded = result.succeeded;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudieron guardar los productos. Recargue la página.',
+    );
+    if (!mutationSucceeded) return;
+
     setModal(null);
-    loadData();
-    if (!result.succeeded) {
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
+    );
+    if (!domainSucceeded) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
         'Algunos productos no fueron adicionados porque ya existen.',
@@ -237,17 +295,30 @@ export function ProductsPage() {
   // Swal-error shape Angular uses (`icon: 'error', title: GENERAL.ERROR, text:
   // errors[0].description`) instead of silently swallowing it.
   async function handleCategorySave(data: { name: string; order: number; isActive: boolean; id?: string }) {
-    const result = data.id
-      ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
-      : await categoryService.createProductCategory(data.name, data.order, data.isActive);
+    let succeeded = false;
+    await runGuardedAgainstMissingDek(
+      async () => {
+        const result = data.id
+          ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
+          : await categoryService.createProductCategory(data.name, data.order, data.isActive);
 
-    if (!result.succeeded) {
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
-      return;
-    }
+        if (!result.succeeded) {
+          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+          return;
+        }
+        succeeded = true;
+      },
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'No se pudo guardar la categoría. Recargue la página.',
+    );
+    if (!succeeded) return;
 
-    loadData();
     setModal(null);
+    runGuardedAgainstMissingDek(
+      loadData,
+      intl.formatMessage({ id: 'GENERAL.ERROR' }),
+      'La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página.',
+    );
   }
 
   // --- CSV import ---
