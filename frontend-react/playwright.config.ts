@@ -65,6 +65,16 @@ export default defineConfig({
   // En CI falla si queda un `.only` olvidado; localmente no aplica.
   forbidOnly: !!process.env.CI,
 
+  // Falla la corrida entera, de entrada, si el dev server que se va a usar está
+  // configurado contra otro backend — el caso que `reuseExistingServer: true`
+  // hace posible (ver la trampa documentada en `webServer` más abajo). Sin este
+  // gate el síntoma llega tarde y disfrazado: solo `register.spec.ts` lo detecta
+  // (vía el observer de red), mientras que todo spec que mintea una identidad
+  // —`login.spec.ts`, y cualquiera que use `mintOwnerAdmin` de `support/session.ts`—
+  // se queda esperando una navegación que nunca ocurre y quema sus 120 s de
+  // timeout con un mensaje que no dice nada de la causa.
+  globalSetup: './e2e/support/global-setup.ts',
+
   // Borra las filas `e2e-*` que la suite deja en la BD, una sola vez, cuando
   // ya no queda ningún worker corriendo. Va acá y no por spec a propósito:
   // con `fullyParallel` un borrado per-spec eliminaría filas vivas de los
