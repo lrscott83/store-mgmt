@@ -288,14 +288,22 @@ export function ProductsPage() {
   }
 
   // --- Clear all data ---
-  // catalog-show-all-and-clear-data §D5/D6/D9. Wipes the six business entities of
-  // the ACTIVE store; never touches token/AUTH_MODEL/currentUser/roster/DEK, so the
-  // session survives and the device keeps offline access.
+  // catalog-show-all-and-clear-data §D5/D6/D9, revised by §Finding 1. Wipes the six business
+  // entities of the ACTIVE store; never touches token/AUTH_MODEL/currentUser/roster/DEK, so
+  // the session survives and the device keeps offline access.
   //
   // The cart goes through the store's own clear() action rather than its
   // localStorage key: the key alone would leave the in-memory zustand copy
   // populated in this tab, which would then re-persist itself. Left behind, that
   // cart points at products that no longer exist and can still be checked out.
+  //
+  // clearStoreData cannot throw (it swallows per key), so a try/catch around it would guard
+  // nothing and would report a failure that never happens. It instead RETURNS the entity names
+  // it could not remove; that is the truth the wipe outranks. loadData()'s failure is a
+  // separate, genuinely-catchable concern (decryptEntity can throw when no DEK is in memory) —
+  // on an irreversible action, telling the user their data is gone when it might not be is the
+  // worst outcome this handler can produce, so the two failure modes get two distinct messages
+  // and neither is allowed to masquerade as the other.
   async function handleClearData() {
     const confirmed = await confirmDialog({
       title: '¿Está seguro que desea eliminar todos los datos?',
@@ -305,17 +313,32 @@ export function ProductsPage() {
     });
     if (!confirmed) return;
 
+    const failedEntities = clearStoreData(storeId);
+    clearCart();
+
+    let repainted = true;
     try {
-      clearStoreData(storeId);
-      clearCart();
       await loadData();
     } catch {
+      repainted = false;
+    }
+
+    if (failedEntities.length > 0) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        'No se pudieron eliminar todos los datos.',
+        `No se pudieron eliminar todos los datos. Quedaron sin borrar: ${failedEntities.join(', ')}.`,
       );
       return;
     }
+
+    if (!repainted) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.ERROR' }),
+        'Los datos fueron eliminados, pero no se pudo actualizar la vista. Recargue la página.',
+      );
+      return;
+    }
+
     showToastSuccess('Todos los datos fueron eliminados.');
   }
 

@@ -93,6 +93,17 @@ const categoryServiceSpies = vi.hoisted(() => ({
     actionCode: 200,
     errors: [],
   })),
+  // Exposed as a spy (not inlined in the vi.mock factory below) so tests can queue a
+  // `.mockRejectedValueOnce(...)` to exercise loadData's genuinely-catchable failure path
+  // (Finding 1) — decryptEntity can throw MissingDataKeyError when no DEK is in memory.
+  getProductCategoriesView: vi.fn(async () =>
+    bm(
+      mockCategories.map((c) => ({
+        ...c,
+        productsCount: mockProducts.filter((p) => p.categoryId === c.id).length,
+      })),
+    ),
+  ),
 }));
 
 // WU3 (csv-import-cost-quantity-entries): handleCsvImport constructs InventoryOfflineService
@@ -117,14 +128,7 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
 
 vi.mock('~/sales/lib/services/product-category-offline-service', () => ({
   ProductCategoryOfflineService: vi.fn().mockImplementation(() => ({
-    getProductCategoriesView: vi.fn(async () =>
-      bm(
-        mockCategories.map((c) => ({
-          ...c,
-          productsCount: mockProducts.filter((p) => p.categoryId === c.id).length,
-        })),
-      ),
-    ),
+    getProductCategoriesView: categoryServiceSpies.getProductCategoriesView,
     createProductCategory: categoryServiceSpies.createProductCategory,
     updateProductCategory: categoryServiceSpies.updateProductCategory,
   })),
@@ -231,9 +235,17 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     showToastErrorMock.mockClear();
     mockUser.isOwnerAdmin = true;
     clearCartMock.mockClear();
-    // mockReset (not mockClear) so a queued mockImplementationOnce throw from the
-    // error-handling test below can never leak into an unrelated test.
+    // mockReset (not mockClear) so a queued mockReturnValueOnce from the wipe-failure test
+    // below can never leak into an unrelated test; clearStoreData's real contract (Finding 1)
+    // is "returns the entities it failed to remove", so the default here is the successful
+    // case, an empty array, not undefined.
     clearStoreDataMock.mockReset();
+    clearStoreDataMock.mockReturnValue([]);
+    // mockClear only (not mockReset): this spy's default implementation, set once at
+    // vi.fn(impl) creation, must survive across tests — only the per-test
+    // mockRejectedValueOnce queue (loadData-failure test below) needs to not leak, and Once
+    // entries self-consume.
+    categoryServiceSpies.getProductCategoriesView.mockClear();
   });
 
   it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {
@@ -1218,11 +1230,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.getByText('Bebidas')).toBeInTheDocument();
   });
 
-  it('surfaces a wipe failure via showBlockingError and does not show the success toast', async () => {
+  // Finding 1: clearStoreData cannot throw (it swallows per key) — it instead RETURNS the
+  // names of the entities it could not remove. A try/catch around a function built not to
+  // fail is dead code that reports a failure which never happens, so the caller now branches
+  // on the return value instead.
+  it('surfaces a partial wipe via showBlockingError naming the failed entities, and does not show the success toast', async () => {
     confirmDialogMock.mockResolvedValue(true);
-    clearStoreDataMock.mockImplementationOnce(() => {
-      throw new Error('quota');
-    });
+    clearStoreDataMock.mockReturnValueOnce(['orders']);
 
     render(
       <Wrapper>
@@ -1233,7 +1247,43 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('clear-data-button'));
 
     await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', 'No se pudieron eliminar todos los datos.'),
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'No se pudieron eliminar todos los datos. Quedaron sin borrar: orders.',
+      ),
+    );
+    expect(showToastSuccessMock).not.toHaveBeenCalled();
+  });
+
+  // The wipe itself and the repaint are two independent failure modes: loadData() can
+  // genuinely throw (decryptEntity raises MissingDataKeyError with no DEK in memory) AFTER
+  // the wipe already completed. Claiming "your data is gone" when it might not be is the
+  // worst outcome on an irreversible action, so this gets its own message, and the wipe is
+  // NOT reported as failed when only the repaint failed.
+  it('surfaces a repaint failure separately when the wipe itself fully succeeded', async () => {
+    confirmDialogMock.mockResolvedValue(true);
+    mockCategories = [makeCategory()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    // Let the initial mount's loadData() resolve normally BEFORE queuing the rejection —
+    // otherwise the Once rejection would be consumed by the mount call instead of the
+    // click-triggered reload this test targets.
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    clearStoreDataMock.mockReturnValueOnce([]);
+    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new Error('no DEK in memory'));
+
+    fireEvent.click(screen.getByTestId('clear-data-button'));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Los datos fueron eliminados, pero no se pudo actualizar la vista. Recargue la página.',
+      ),
     );
     expect(showToastSuccessMock).not.toHaveBeenCalled();
   });

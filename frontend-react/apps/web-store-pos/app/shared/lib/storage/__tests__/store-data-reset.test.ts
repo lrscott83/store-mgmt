@@ -73,7 +73,7 @@ describe('clearStoreData', () => {
     expect(localStorage.length).toBe(0);
   });
 
-  it('keeps removing the remaining keys when one removal throws', () => {
+  it('keeps removing the remaining keys when one removal throws, and reports it by name', () => {
     seedStore(STORE_A);
     const failingKey = StorageKeys.entityKey('inventory-entries', STORE_A);
     const realRemoveItem = Storage.prototype.removeItem;
@@ -85,11 +85,20 @@ describe('clearStoreData', () => {
       realRemoveItem.call(this, key);
     });
 
-    expect(() => clearStoreData(STORE_A)).not.toThrow();
+    const failedEntities = clearStoreData(STORE_A);
 
     vi.restoreAllMocks();
+    expect(failedEntities).toEqual(['inventory-entries']);
     expect(localStorage.getItem(failingKey)).not.toBeNull();
     expect(localStorage.getItem(StorageKeys.entityKey('orders', STORE_A))).toBeNull();
     expect(localStorage.getItem(StorageKeys.entityKey('saleCredits', STORE_A))).toBeNull();
+  });
+
+  it('returns an empty array when every key was removed successfully', () => {
+    seedStore(STORE_A);
+
+    const failedEntities = clearStoreData(STORE_A);
+
+    expect(failedEntities).toEqual([]);
   });
 });
