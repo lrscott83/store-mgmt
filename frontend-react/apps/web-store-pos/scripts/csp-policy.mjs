@@ -92,6 +92,18 @@ export function buildCspDirectives(env, options = {}) {
     directives.set('connect-src', connectSrc);
   }
 
+  // Build-time-computed hash sources for react-router's static hydration
+  // payload (scripts/csp-hydration-hashes.mjs) — allowlists the exact inline
+  // scripts the CURRENT build emits without relaxing script-src to
+  // 'unsafe-inline'. Omitted by default so every existing caller (the dev
+  // Vite plugin, the canonical-string tests) is unaffected; only
+  // scripts/verify-csp.mjs — the one caller with a fresh `build/client/`
+  // to hash — supplies this.
+  const { hydrationScriptHashes } = options;
+  if (hydrationScriptHashes?.length) {
+    directives.get('script-src').push(...hydrationScriptHashes);
+  }
+
   return directives;
 }
 

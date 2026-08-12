@@ -208,6 +208,34 @@ describe('csp-nginx', () => {
     });
   });
 
+  describe('checkNginxConf — hydrationScriptHashes (2026-08-12: react-router SPA hydration payload)', () => {
+    const HASHES = ["'sha256-AAAA'", "'sha256-BBBB'", "'sha256-CCCC'"];
+
+    it('passes when nginx.conf carries exactly the hashes a fresh build produced', () => {
+      const value = buildCspHeaderValue('prod', { hydrationScriptHashes: HASHES });
+      const conf = fixtureConf(`    add_header ${CSP_HEADER_NAME} "${value}" always;`);
+      expect(checkNginxConf(conf, { hydrationScriptHashes: HASHES })).toEqual([]);
+    });
+
+    it('fails when nginx.conf is missing a hash the fresh build produced (the enforcing-flip blocker this closes)', () => {
+      const conf = fixtureConf(`    add_header ${CSP_HEADER_NAME} "${CANONICAL_PROD_VALUE}" always;`);
+      const errors = checkNginxConf(conf, { hydrationScriptHashes: HASHES });
+      expect(errors.some((e) => /script-src/.test(e))).toBe(true);
+    });
+
+    it('fails when nginx.conf carries a stale hash a NEW build no longer produces (react-router upgrade drift)', () => {
+      const stale = buildCspHeaderValue('prod', { hydrationScriptHashes: ["'sha256-STALE'"] });
+      const conf = fixtureConf(`    add_header ${CSP_HEADER_NAME} "${stale}" always;`);
+      const errors = checkNginxConf(conf, { hydrationScriptHashes: HASHES });
+      expect(errors.some((e) => /script-src/.test(e))).toBe(true);
+    });
+
+    it('omitted entirely, behaves exactly like before (no hash expected, no hash tolerated)', () => {
+      const conf = fixtureConf(`    add_header ${CSP_HEADER_NAME} "${CANONICAL_PROD_VALUE}" always;`);
+      expect(checkNginxConf(conf)).toEqual([]);
+    });
+  });
+
   describe('EXPECTED_ADD_HEADERS', () => {
     it('declares exactly the CSP header today', () => {
       expect(EXPECTED_ADD_HEADERS).toEqual([CSP_HEADER_NAME]);
@@ -216,6 +244,14 @@ describe('csp-nginx', () => {
 
   it('deploy/nginx.conf carries the exact production policy', async () => {
     const conf = await readFile(NGINX_CONF_PATH, 'utf8');
-    expect(checkNginxConf(conf)).toEqual([]);
+    // Same reason `apiUrl` is never passed here either: this file has no
+    // fresh `build/client/` to hash (that's scripts/verify-csp.mjs's job,
+    // covered above with synthetic hashes). Reads the hash tokens nginx.conf
+    // ALREADY declares so this test still catches every OTHER kind of drift
+    // (a missing directive, a weakened token, a dropped 'always') without
+    // requiring a build to run first.
+    const declaredHashes = (parseCspHeaderValue(extractAddHeaders(conf)[0]?.value ?? '').get('script-src') ?? [])
+      .filter((token) => token.startsWith("'sha256-"));
+    expect(checkNginxConf(conf, { hydrationScriptHashes: declaredHashes })).toEqual([]);
   });
 });

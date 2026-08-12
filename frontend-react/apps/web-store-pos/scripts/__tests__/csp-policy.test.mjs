@@ -115,4 +115,27 @@ describe('csp-policy', () => {
   it('exports the report-only header name', () => {
     expect(CSP_HEADER_NAME).toBe('Content-Security-Policy-Report-Only');
   });
+
+  describe('hydrationScriptHashes option — 2026-08-12 hash-allowlist for react-router\'s SPA hydration payload', () => {
+    it('is a no-op when omitted — every existing caller stays byte-for-byte unaffected', () => {
+      expect(buildCspHeaderValue('prod')).toContain("script-src 'self' 'report-sample';");
+    });
+
+    it('is a no-op for an empty array', () => {
+      expect(buildCspHeaderValue('prod', { hydrationScriptHashes: [] })).toBe(buildCspHeaderValue('prod'));
+    });
+
+    it('appends the given hash sources to script-src, after the existing tokens', () => {
+      const value = buildCspHeaderValue('prod', {
+        hydrationScriptHashes: ["'sha256-AAAA'", "'sha256-BBBB'"],
+      });
+      expect(value).toContain("script-src 'self' 'report-sample' 'sha256-AAAA' 'sha256-BBBB';");
+    });
+
+    it('never relaxes script-src to unsafe-inline or unsafe-eval', () => {
+      const value = buildCspHeaderValue('prod', { hydrationScriptHashes: ["'sha256-AAAA'"] });
+      expect(value).not.toMatch(/script-src[^;]*unsafe-inline/);
+      expect(value).not.toMatch(/unsafe-eval/);
+    });
+  });
 });

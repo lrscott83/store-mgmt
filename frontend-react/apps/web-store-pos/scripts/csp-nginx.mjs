@@ -91,6 +91,14 @@ export function diffPolicies(a, b) {
  * `options.apiUrl` is optional: callers with no build-time API_URL in hand
  * (the fixture tests, the `deploy/nginx.conf` drift test) get checks 1-5
  * exactly as before.
+ *
+ * `options.hydrationScriptHashes` is optional too: an array of
+ * `'sha256-<base64>'` source strings computed by
+ * scripts/csp-hydration-hashes.mjs from a fresh `build/client/index.html`
+ * (scripts/verify-csp.mjs is the only caller with that file in hand). Omitted
+ * by every fixture test, so check 3's `script-src` comparison stays exactly
+ * `'self' 'report-sample'` for them — only the real build-gate run compares
+ * against the hash-augmented value.
  */
 export function checkNginxConf(conf, options = {}) {
   const errors = [];
@@ -119,9 +127,12 @@ export function checkNginxConf(conf, options = {}) {
       );
     }
 
-    // 3. Text equality with the generator.
+    // 3. Text equality with the generator. `hydrationScriptHashes` (check 6.1
+    // below) is threaded in here so a fresh build's hydration-script hashes
+    // are compared against nginx.conf exactly like every other token —
+    // missing/stale hashes surface as an ordinary script-src drift error.
     const nginxDirectives = parseCspHeaderValue(cspHeader.value);
-    const prodDirectives = buildCspDirectives('prod');
+    const prodDirectives = buildCspDirectives('prod', { hydrationScriptHashes: options.hydrationScriptHashes });
     const { onlyInA: onlyInNginx, onlyInB: missingFromNginx, differingTokens } = diffPolicies(
       nginxDirectives,
       prodDirectives
