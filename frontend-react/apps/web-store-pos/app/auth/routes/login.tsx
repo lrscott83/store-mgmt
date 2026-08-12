@@ -5,6 +5,7 @@ import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { Button } from '~/shared/components/ui/button';
 import { EyeIcon, EyeOffIcon, LoginIcon } from '~/shared/components/ui/icons';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { OfflineAccessPanel } from '~/auth/components/offline-access-panel';
 import { ConnectivityService } from '~/shared/lib/auth/connectivity-service';
 import { resolveUserHomePath } from '~/shared/lib/auth/user-home';
 import { preloadHeavyChunks } from '~/shared/lib/pwa/preload-heavy-chunks';
@@ -281,6 +282,8 @@ export default function LoginPage() {
           {intl.formatMessage({ id: 'AUTH.REGISTER' })}
         </Link>
       </div>
+
+      <OfflineAccessPanel />
     </div>
   );
 }

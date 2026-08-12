@@ -116,6 +116,16 @@ const messages: Record<string, string> = {
   'OFFLINE_ACCESS.PASSWORD_LABEL': 'Contraseña de activación',
   'OFFLINE_ACCESS.SUBMIT': 'Activar',
   'OFFLINE_ACCESS.ERROR_NO_FILE': 'Elegí el archivo de activación.',
+  'OFFLINE_ACCESS.ENABLE_BUTTON': 'Activar acceso sin conexión',
+  'OFFLINE_ACCESS.DISABLE_BUTTON': 'Desactivar acceso sin conexión',
+  'OFFLINE_ACCESS.ENABLED': 'Listo. Este equipo ya puede entrar sin internet.',
+  'OFFLINE_ACCESS.DISABLED': 'Acceso sin conexión desactivado.',
+  'OFFLINE_ACCESS.DISABLE_TITLE': '¿Desactivar el acceso sin conexión?',
+  'OFFLINE_ACCESS.DISABLE_MESSAGE':
+    'Este equipo va a necesitar internet para entrar. Para volver a activarlo vas a tener que pedir un archivo nuevo: el que usaste ya no sirve.',
+  'OFFLINE_ACCESS.DISABLE_MESSAGE_DATA_LOSS':
+    'Este equipo va a necesitar internet para entrar. Para volver a activarlo vas a tener que pedir un archivo nuevo: el que usaste ya no sirve. Además, los datos guardados en este equipo van a quedar ilegibles.',
+  'OFFLINE_ACCESS.DISABLE_CONFIRM': 'Sí, desactivar',
 
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)
