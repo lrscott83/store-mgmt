@@ -24,7 +24,7 @@ Every task's requirements implicitly include this section.
 - **`roster-store.ts` gains no runtime import and no top-level side effect** — `app/shared/lib/offline/__tests__/roster-store.purity.test.ts` must stay green.
 - **Copy is exact.** Spanish strings are copied verbatim from this plan, including accents and the em dash in `OFFLINE_ACCESS.MODAL_INTRO`. Never invent or paraphrase user-facing text.
 - **Conventional commits, no AI attribution.** No `Co-Authored-By` trailer.
-- Test gate for every task: `npx turbo run test --force --filter=web-store-pos`. The `--force` flag is mandatory — turbo replays cached runs otherwise, and a replayed pass is not evidence.
+- Test gate for every task: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`. The `--force` flag is mandatory — turbo replays cached runs otherwise, and a replayed pass is not evidence.
 
 ## File Structure
 
@@ -404,7 +404,7 @@ Expected: PASS, unchanged count. This is the regression gate: the same tests, th
 
 - [ ] **Step 6: Run the full unit gate**
 
-Run: `npx turbo run test --force --filter=web-store-pos`
+Run: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Expected: PASS. Watch specifically that `roster-store.purity.test.ts` is still green.
 
 - [ ] **Step 7: Commit**
@@ -1090,12 +1090,12 @@ Change nothing else in this file. In particular, do not convert the dynamic `imp
 
 - [ ] **Step 7: Run the full unit gate**
 
-Run: `npx turbo run test --force --filter=web-store-pos`
+Run: `npx turbo run test --force --filter=@store-mgmt/web-store-pos`
 Expected: PASS. `login.offline.test.tsx`, `login.offline.e2e.test.tsx` and `roster-store.purity.test.ts` must all stay green — if any of them breaks, the panel is doing something at module load that it should be doing behind the dynamic import.
 
 - [ ] **Step 8: Run typecheck and lint**
 
-Run: `npx turbo run typecheck lint --force --filter=web-store-pos`
+Run: `npx turbo run typecheck lint --force --filter=@store-mgmt/web-store-pos`
 Expected: PASS.
 
 - [ ] **Step 9: Commit**
@@ -1167,8 +1167,8 @@ git commit -m "test(e2e): cover offline access activation and removal from the l
 
 ## Definition of done
 
-- [ ] `npx turbo run test --force --filter=web-store-pos` passes, including `roster-store.purity.test.ts`, `login.offline.test.tsx` and `provision.test.tsx`.
-- [ ] `npx turbo run typecheck lint --force --filter=web-store-pos` passes.
+- [ ] `npx turbo run test --force --filter=@store-mgmt/web-store-pos` passes, including `roster-store.purity.test.ts`, `login.offline.test.tsx` and `provision.test.tsx`.
+- [ ] `npx turbo run typecheck lint --force --filter=@store-mgmt/web-store-pos` passes.
 - [ ] `git status` shows no modification to any file under `frontend-react/e2e/` other than the newly added spec.
 - [ ] `grep -n "shared/lib/offline" app/auth/routes/login.tsx` returns only the dynamic `import()` on line 109.
 - [ ] The user has run the new Playwright spec and reported the result. Until then, the end-to-end behaviour is **unverified** and must be described that way.
