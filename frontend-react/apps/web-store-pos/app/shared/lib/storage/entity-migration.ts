@@ -23,23 +23,9 @@
 // roster at all) also migrates its own pre-existing plaintext, which the
 // old roster-only guard could never do. This module drops its `roster-store`
 // import entirely.
-import { StorageKeys } from './storage-keys';
+import { StorageKeys, BUSINESS_ENTITY_NAMES } from './storage-keys';
 import { isEncrypted, encryptEntity } from './entity-crypto';
 import { getDekStoreId } from './data-key-store';
-
-/**
- * The six business-entity names migrated, in the same order the seams
- * landed (WU5-10): products -> product-categories -> inventory-entries ->
- * orders -> expenses -> saleCredits.
- */
-const MIGRATED_ENTITY_NAMES = [
-  'products',
-  'product-categories',
-  'inventory-entries',
-  'orders',
-  'expenses',
-  'saleCredits',
-] as const;
 
 /**
  * Runs the eager migration pass for the CURRENT device's DEK store.
@@ -72,7 +58,7 @@ export function runEntityMigration(): void {
   const storeId = getDekStoreId();
   if (!storeId) return;
 
-  for (const entity of MIGRATED_ENTITY_NAMES) {
+  for (const entity of BUSINESS_ENTITY_NAMES) {
     const key = StorageKeys.entityKey(entity, storeId);
     try {
       const raw = localStorage.getItem(key);
