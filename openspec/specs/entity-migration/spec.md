@@ -9,16 +9,16 @@ indefinitely under the illusion of protection.
 
 ## Requirements
 
-### Requirement: Migration runs only when provisioned and never blocks login
-`runEntityMigration()` MUST return immediately, touching none of the six entity keys, when `isEncryptionProvisioned()` is false. (Evaluating that guard necessarily reads the roster key — `isEncryptionProvisioned()` sits on `getRawRoster()`, which reads it. The guarantee is about entity data, not about performing zero storage access.) It MUST be invoked after a successful DEK unwrap on both login paths, wrapped so that any failure inside it is swallowed and never propagates to the caller — the worst outcome is "still plaintext," never "cannot log in."
+### Requirement: Migration runs only when a DEK is present in memory and never blocks login
+`runEntityMigration()` MUST derive its guard from the SAME source as its store scope (below): the in-memory DEK's own store id. It MUST return immediately, touching none of the six entity keys, when that store id is absent (no DEK set this session). It MUST be invoked after a successful DEK acquisition on any of the three points defined in `dek-lifecycle-and-unlock-gate` (both login paths and the startup device-key recovery), wrapped so any failure inside it is swallowed and never propagates to the caller — the worst outcome is "still plaintext," never "cannot log in."
 
-#### Scenario: Unprovisioned device — no-op
-- GIVEN `isEncryptionProvisioned()` is false
+#### Scenario: No DEK in memory — no-op
+- GIVEN no DEK is set in memory, regardless of roster state
 - WHEN `runEntityMigration()` is called
-- THEN none of the six entity keys is read or written (the roster key is read by the guard itself)
+- THEN none of the six entity keys is read or written
 
 #### Scenario: A failure inside migration does not fail login
-- GIVEN a provisioned device where migration will throw partway through
+- GIVEN a device where migration will throw partway through
 - WHEN login completes and triggers migration
 - THEN the login call still resolves successfully
 
@@ -30,15 +30,14 @@ The pass MUST read each of the six entity keys with a raw `getItem`, and if the 
 - WHEN migration converts it
 - THEN decrypting the new stored value with the DEK returns the exact original string, byte-for-byte
 
-### Requirement: Migration is scoped to the roster's store, not the active store
-The pass MUST use `getRawRoster().storeId` to scope which entity keys it touches, NOT the current user's `selectedStoreId`. This prevents a super-admin whose active store differs from the roster's store from having a foreign store's data encrypted under a DEK that does not belong to it.
+### Requirement: Migration is scoped to the in-memory DEK's own store, not the active store
+The pass MUST use the in-memory DEK's own store id (`getDekStoreId()`, set whenever the DEK was acquired, whichever of the three sources produced it — this is the SAME value the guard above tests for absence) to scope which entity keys it touches — NOT the current user's `selectedStoreId`, and NOT a roster-only lookup (`getRawRoster().storeId`) that would be absent on a locally-minted-DEK device.
 
-#### Scenario: Active store differs from roster store — foreign store untouched
-- GIVEN a v2 roster scoped to store A
+#### Scenario: Active store differs from the DEK's store — foreign store untouched
+- GIVEN the in-memory DEK belongs to store A
 - AND the current user's `selectedStoreId` is store B
 - WHEN migration runs
-- THEN only store A's entity keys are read or written
-- AND store B's entity keys are untouched
+- THEN only store A's entity keys are read or written; store B's are untouched
 
 ### Requirement: Migration is idempotent and skips absent keys
 Running migration any number of times MUST produce the same end state as running it once. A key already carrying the `enc:v1:` marker MUST be left untouched. A key with no stored value MUST be skipped — migration MUST NOT create a key the user never wrote to.

@@ -6,23 +6,30 @@ The `enc:v1:` ciphertext envelope for the six business entities (products,
 product-categories, inventory-entries, orders, expenses, saleCredits) and
 the uniform seam contract that applies it at every `localStorage` read/write
 boundary. Owns the permanent plaintext-passthrough guarantee that keeps
-optional encryption free on devices that never import a roster.
+optional encryption free on devices that never import a roster and never
+complete a login.
 
 ## Requirements
 
-### Requirement: Encryption absence is a permanent, first-class mode — never an error
-On a device that is not encryption-provisioned (no roster, or `formatVersion < 2`), `encryptEntity` MUST return its input unchanged and MUST NOT throw. Login, reads, and writes on such a device MUST behave exactly as before this change. This is a standing hard constraint (offline-auth and at-rest encryption are strictly optional); no requirement in this capability may be satisfied at the cost of it.
+### Requirement: Encryption absence is a permanent mode only while this device has never completed a login
+On a device that has never completed a login AND has no roster provisioned, `encryptEntity` MUST return its input unchanged and MUST NOT throw. Once a device completes its first login (roster-based or locally-minted DEK), the permanent plaintext-passthrough applies ONLY when no DEK is available: with a DEK in memory it encrypts, without one it throws. This preserves the standing hard constraint (offline-auth and at-rest encryption are strictly optional) on devices that never authenticate at all.
 
-#### Scenario: Unprovisioned device writes plaintext, never throws
-- GIVEN no roster has ever been imported on this device
+#### Scenario: Pre-first-login device still returns plaintext, never throws
+- GIVEN no roster has ever been imported and no login has ever completed on this device
 - WHEN `encryptEntity(json)` is called
-- THEN it returns `json` unchanged
-- AND no error is raised
+- THEN it returns `json` unchanged and does not throw
 
-#### Scenario: v1-roster device writes plaintext, never throws
-- GIVEN a stored roster with `formatVersion: 1`
+#### Scenario: Any device, after its first completed login, no longer passes through for lack of a roster
+- GIVEN a login has completed at least once on this device (roster-based or locally minted DEK), with no roster ever imported
+- AND no DEK is set in memory this session
 - WHEN `encryptEntity(json)` is called
-- THEN it returns `json` unchanged
+- THEN it throws `MissingDataKeyError` — it does NOT return plaintext
+
+#### Scenario: Bootstrapped device with no roster encrypts when the DEK is in memory
+- GIVEN this device has completed a login and a DEK is set in memory (device wrap or freshly minted)
+- AND no roster has ever been imported
+- WHEN `encryptEntity(json)` is called
+- THEN the result starts with `enc:v1:`
 
 ### Requirement: encryptEntity — DEK checked before roster state
 `encryptEntity(plaintext)` MUST, in order: (1) if a DEK is present in memory, return `ENTITY_ENVELOPE_PREFIX + base64(iv‖ciphertext‖tag)` with a fresh random 12-byte iv; (2) else if `isEncryptionProvisioned()` is false, return the plaintext unchanged; (3) else throw `MissingDataKeyError`. Step 1 MUST be evaluated first so provisioning state is read from storage only on the locked path.
