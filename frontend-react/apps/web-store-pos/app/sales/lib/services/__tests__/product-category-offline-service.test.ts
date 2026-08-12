@@ -116,6 +116,29 @@ describe('ProductCategoryOfflineService — async category-C surface (Angular pa
       const result = await service.getMaxOrder();
       expect(result.data).toBe(3);
     });
+
+    // The catalog sorts by category.order (products.tsx), and an inactive category still
+    // occupies its slot. If the max ignored inactive rows, a new category could be created
+    // with an order that collides with a deactivated one.
+    it('includes INACTIVE categories in the max', async () => {
+      await service.createProductCategory('Bebidas', 1, true);
+      await service.createProductCategory('Snacks', 7, false);
+      const result = await service.getMaxOrder();
+      expect(result.data).toBe(7);
+    });
+
+    // Guards the rename in ProductService: this method reads ProductCategory.order, NOT the
+    // order of any product inside a category. A product at order 99 must not raise it.
+    it('reads category.order, never a contained product order', async () => {
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      service = new ProductCategoryOfflineService(storeId, categoryRepository, productRepository);
+      await service.createProductCategory('Bebidas', 2, true);
+      const [bebidas] = categoryRepository.getProductCategories();
+      productRepository.addProduct(bebidas.id, 'Coca Cola', 1.5, '', 99, true, true, true);
+
+      const result = await service.getMaxOrder();
+      expect(result.data).toBe(2);
+    });
   });
 
   describe('CAT-10: getAvailableProductCategories', () => {
