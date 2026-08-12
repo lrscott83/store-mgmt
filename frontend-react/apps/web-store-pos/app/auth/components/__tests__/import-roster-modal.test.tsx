@@ -83,7 +83,7 @@ describe('ImportRosterModal', () => {
     expect(onImported).not.toHaveBeenCalled();
   });
 
-  it('keeps the dialog open with the message inline when the password is wrong', async () => {
+  it('keeps the file and lets the user retry with the correct password after a wrong one', async () => {
     const payload = await serializeRoster(makeBundle(), 'master', STORE_ID);
     const { onImported } = renderModal();
 
@@ -96,6 +96,14 @@ describe('ImportRosterModal', () => {
     // Still open: the field the user typed into is still on screen.
     expect(screen.getByLabelText(/contraseña de activación/i)).toBeInTheDocument();
     expect(onImported).not.toHaveBeenCalled();
+
+    // Retry with only the password corrected — the file is NOT re-selected.
+    // This proves both the chosen file and the form survive a failed attempt:
+    // if either were dropped in the catch, this second submit would fail too.
+    typePasswordAndSubmit('master');
+
+    await waitFor(() => expect(onImported).toHaveBeenCalledTimes(1));
+    expect(getRoster()?.bundleId).toBe('b1');
   });
 
   it('blames the filename, not the password, when the file was renamed', async () => {
