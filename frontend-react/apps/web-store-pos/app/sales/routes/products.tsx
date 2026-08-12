@@ -7,10 +7,13 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { PlusIcon, PaperclipIcon, ChevronDownIcon } from '~/shared/components/ui/icons';
+import { PlusIcon, PaperclipIcon, ChevronDownIcon, TrashIcon } from '~/shared/components/ui/icons';
 import { showBlockingError, showBlockingInfo, confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
+import { useCartStore } from '~/shared/lib/stores/cart-store';
+import { clearStoreData } from '~/shared/lib/storage/store-data-reset';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { ProductRepository } from '../lib/repositories/product-repository';
@@ -37,6 +40,10 @@ type Modal =
 export function ProductsPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
+  // The wipe is irreversible and local-only, so this is a render guard, not an
+  // authorization boundary — there is no server call to protect.
+  const isOwner = useAuthStore((s) => (s.user ? isOwnerAdmin(s.user) : false));
+  const clearCart = useCartStore((s) => s.clear);
 
   const [categories, setCategories] = useState<ProductCategoryView[]>([]);
   const [productsByCategory, setProductsByCategory] = useState<Record<string, Product[]>>({});
@@ -280,6 +287,30 @@ export function ProductsPage() {
     }
   }
 
+  // --- Clear all data ---
+  // catalog-show-all-and-clear-data §D5/D6/D9. Wipes the six business entities of
+  // the ACTIVE store; never touches token/AUTH_MODEL/currentUser/roster/DEK, so the
+  // session survives and the device keeps offline access.
+  //
+  // The cart goes through the store's own clear() action rather than its
+  // localStorage key: the key alone would leave the in-memory zustand copy
+  // populated in this tab, which would then re-persist itself. Left behind, that
+  // cart points at products that no longer exist and can still be checked out.
+  async function handleClearData() {
+    const confirmed = await confirmDialog({
+      title: '¿Está seguro que desea eliminar todos los datos?',
+      message: 'Este proceso no se podrá revertir.',
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    clearStoreData(storeId);
+    clearCart();
+    await loadData();
+    showToastSuccess('Todos los datos fueron eliminados.');
+  }
+
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order);
 
   return (
@@ -307,7 +338,13 @@ export function ProductsPage() {
           </InfoBox>
         )}
 
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end gap-3 mb-4">
+          {isOwner && (
+            <Button variant="fab-danger" onClick={handleClearData} data-testid="clear-data-button">
+              <TrashIcon />
+              Limpiar
+            </Button>
+          )}
           <Button variant="fab" onClick={() => setModal({ type: 'csv' })} data-testid="import-csv-button">
             {/* Angular: <mat-icon>attach_file</mat-icon> */}
             <PaperclipIcon />

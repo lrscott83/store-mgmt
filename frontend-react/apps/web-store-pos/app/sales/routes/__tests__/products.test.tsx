@@ -8,14 +8,35 @@ import type { BaseResponseModel, CsvImportResult, Product, ProductCategory } fro
 let mockCategories: ProductCategory[] = [];
 let mockProducts: Product[] = [];
 
+const mockUser = vi.hoisted(() => ({
+  selectedStoreId: 's1',
+  login: 'jdoe',
+  isOwnerAdmin: true,
+}));
+
 vi.mock('~/shared/lib/stores/auth-store', () => {
-  const state = { user: { selectedStoreId: 's1', login: 'jdoe' }, isAuthenticated: true };
+  const state = { user: mockUser, isAuthenticated: true };
   const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
   });
   return { useAuthStore };
 });
+
+const clearCartMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/stores/cart-store', () => {
+  const state = { clear: clearCartMock };
+  const useCartStore = vi.fn((selector?: (s: typeof state) => unknown) => {
+    if (typeof selector === 'function') return selector(state);
+    return state;
+  });
+  return { useCartStore };
+});
+
+const clearStoreDataMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/storage/store-data-reset', () => ({
+  clearStoreData: (...args: unknown[]) => clearStoreDataMock(...args),
+}));
 
 // Hoisted so the mock factory below (which runs before module-scope const
 // declarations) and the tests can both reference the same spy instances —
@@ -208,6 +229,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     showBlockingErrorMock.mockClear();
     showToastSuccessMock.mockClear();
     showToastErrorMock.mockClear();
+    mockUser.isOwnerAdmin = true;
+    clearCartMock.mockClear();
+    clearStoreDataMock.mockClear();
   });
 
   it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {
@@ -1123,5 +1147,89 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
     expect(screen.getByText('Fanta')).toBeInTheDocument();
     expect(screen.getByText('Sprite')).toBeInTheDocument();
+  });
+
+  it('renders the "Limpiar" button to the LEFT of "Importar Productos" for an OwnerAdmin', () => {
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    const clearButton = screen.getByTestId('clear-data-button');
+    const importButton = screen.getByTestId('import-csv-button');
+    expect(clearButton).toHaveTextContent('Limpiar');
+    // DOCUMENT_POSITION_FOLLOWING === 4: import comes after clear in the DOM,
+    // which in this left-to-right flex row means clear sits to its left.
+    expect(clearButton.compareDocumentPosition(importButton)).toBe(4);
+  });
+
+  it('hides the "Limpiar" button from a non-owner', () => {
+    mockUser.isOwnerAdmin = false;
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('clear-data-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('import-csv-button')).toBeInTheDocument();
+  });
+
+  it('asks for confirmation with the irreversible-action copy before wiping anything', async () => {
+    confirmDialogMock.mockResolvedValue(false);
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('clear-data-button'));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    expect(confirmDialogMock).toHaveBeenCalledWith({
+      title: '¿Está seguro que desea eliminar todos los datos?',
+      message: 'Este proceso no se podrá revertir.',
+      confirmButtonText: 'Si',
+      cancelButtonText: 'No',
+    });
+  });
+
+  it('wipes nothing when the confirmation is cancelled', async () => {
+    confirmDialogMock.mockResolvedValue(false);
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('clear-data-button'));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    expect(clearStoreDataMock).not.toHaveBeenCalled();
+    expect(clearCartMock).not.toHaveBeenCalled();
+    expect(showToastSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it('wipes the store data AND the cart on confirm, then repaints empty with a toast', async () => {
+    confirmDialogMock.mockResolvedValue(true);
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct()];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
+
+    // The wipe is mocked, so empty the fixtures the reload will read back.
+    mockCategories = [];
+    mockProducts = [];
+    fireEvent.click(screen.getByTestId('clear-data-button'));
+
+    await waitFor(() => expect(clearStoreDataMock).toHaveBeenCalledWith('s1'));
+    expect(clearCartMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByText('Bebidas')).not.toBeInTheDocument());
+    expect(showToastSuccessMock).toHaveBeenCalledWith('Todos los datos fueron eliminados.');
   });
 });
