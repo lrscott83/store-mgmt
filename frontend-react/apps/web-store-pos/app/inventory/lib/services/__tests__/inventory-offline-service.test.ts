@@ -1473,13 +1473,13 @@ describe('InventoryOfflineService', () => {
       expect(raw).toBe('[]');
     });
 
-    it('auto-writes an empty Map-entries array when the stored value is corrupt/unparsable JSON', () => {
-      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, '{not valid json');
-      expect(() => service.getStorageInventoriesMap()).not.toThrow();
-      const map = service.getStorageInventoriesMap();
-      expect(map.size).toBe(0);
-      const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`);
-      expect(raw).toBe('[]');
+    it('throws instead of overwriting when the stored value is corrupt/unparsable JSON', () => {
+      const bytes = '{not valid json';
+      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, bytes);
+
+      expect(() => service.getStorageInventoriesMap()).toThrow(EntityUnreadableError);
+      // The whole point: unreadable is not the same as empty, so the bytes stay.
+      expect(localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`)).toBe(bytes);
     });
 
     it('throws instead of returning an empty map when the stored inventory entries cannot be read', () => {
