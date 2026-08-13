@@ -5,17 +5,24 @@ import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
 import { DekUnwrapError } from '~/shared/lib/offline/dek-unwrap';
 
-// device-wrapped-dek design (Task 5, corrected by the controller's ruling
+// device-wrapped-dek design (Task 5, corrected TWICE by controller rulings
 // after the first version of this file): a device holding encrypted data it
 // cannot open must not be allowed to authenticate — but on the login SCREEN
-// itself, the recovery is an INLINE banner naming both routes (sign in
-// online, import a roster), not the app-wide blocking-dialog + sign-out
-// policy (`handleDecryptionFailure`, storage/decryption-failure-policy.ts).
-// That policy exists to carry a user OFF an authenticated screen and ONTO
-// /login, where the recovery routes live; here the user is already there, so
-// a modal + logout would be pure friction on a form they can act on
-// directly. Only the copy changed from the old AUTH.UNLOCK_FAILED (named one
-// route, obliquely) to ENCRYPTION.KEY_UNAVAILABLE (names both explicitly).
+// itself, the recovery is an INLINE banner, not the app-wide blocking-dialog
+// + sign-out policy (`handleDecryptionFailure`,
+// storage/decryption-failure-policy.ts). That policy exists to carry a user
+// OFF an authenticated screen and ONTO /login, where the recovery routes
+// live; here the user is already there, so a modal + logout would be pure
+// friction on a form they can act on directly.
+//
+// The SECOND ruling split the copy by branch, because
+// `e2e/login-offline.spec.ts` T7 pins the OFFLINE branch's exact text and
+// that file is untouchable without authorization:
+//   - offline (`loginOffline` rejects): AUTH.UNLOCK_FAILED — T7's scenario,
+//     a wrap that no longer opens (e.g. after a password change).
+//   - online (`login` rejects): ENCRYPTION.KEY_UNAVAILABLE — the refusal
+//     when no server key can be obtained at all (design D2), which is what
+//     the first ruling was actually about. No E2E test pins this branch.
 
 const showBlockingErrorMock = vi.fn();
 vi.mock('~/shared/lib/blocking-alert', () => ({
@@ -64,6 +71,10 @@ import LoginPage from '../login';
 
 const KEY_UNAVAILABLE =
   'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.';
+// Byte-for-byte the string e2e/login-offline.spec.ts T7 asserts
+// (UNLOCK_FAILED_TEXT, :40-41) — pinned there, restored here.
+const UNLOCK_FAILED =
+  'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.';
 const CATEGORIES_KEY = 'lizoft.store-product-categories-s1';
 const SEEDED_BYTES = 'enc:v1:AAAA';
 
@@ -147,7 +158,11 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     expect(logoutMock).not.toHaveBeenCalled();
   });
 
-  it('refuses an offline login the same way (inline banner, no dialog, no sign-out) when loginOffline cannot unwrap the device DEK', async () => {
+  // Mirrors e2e/login-offline.spec.ts T7 at the unit level: same cause
+  // (a roster wrap that no longer unwraps), same expected copy
+  // (AUTH.UNLOCK_FAILED, NOT ENCRYPTION.KEY_UNAVAILABLE — those diverged by
+  // the second controller ruling), same "never invalid-credentials" guard.
+  it('refuses an offline login with AUTH.UNLOCK_FAILED (inline banner, no dialog, no sign-out) when loginOffline cannot unwrap the device DEK', async () => {
     isRosterProvisionedMock.mockReturnValue(true);
     loginOfflineFn = vi.fn().mockRejectedValue(new DekUnwrapError());
 
@@ -155,8 +170,10 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     await submit();
 
     await waitFor(() => {
-      expect(screen.getByText(KEY_UNAVAILABLE)).toBeInTheDocument();
+      expect(screen.getByText(UNLOCK_FAILED)).toBeInTheDocument();
     });
+    expect(screen.queryByText('Usuario o contraseña inválidos')).not.toBeInTheDocument();
+    expect(screen.queryByText(KEY_UNAVAILABLE)).not.toBeInTheDocument();
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
     expect(logoutMock).not.toHaveBeenCalled();
   });

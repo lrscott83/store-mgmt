@@ -86,13 +86,13 @@ const messages: Record<string, string> = {
   'AUTH.INVALID_ERROR': 'La autenticación no es válida por el siguiente error: {error}',
   'AUTH.OFFLINE_LOGIN': 'Estás offline. Se requiere conexión para iniciar sesión.',
   // at-rest-encryption-errors spec §"unlock banner and failure copy exact
-  // strings" — ratified verbatim, do not reword.
+  // strings" — ratified verbatim, do not reword. AUTH.UNLOCK_FAILED is
+  // asserted byte-for-byte by e2e/login-offline.spec.ts T7 (:359,
+  // UNLOCK_FAILED_TEXT) — that file is untouchable without authorization, so
+  // this string may never be reworded or removed without it.
   'AUTH.UNLOCK_REQUIRED': 'Ingresá tu contraseña para desbloquear los datos de este dispositivo.',
-  // AUTH.UNLOCK_FAILED removed by Task 5's controller ruling: a DekUnwrapError
-  // at login now renders ENCRYPTION.KEY_UNAVAILABLE below instead, which
-  // names both recovery routes explicitly (this one named only one,
-  // obliquely). Verified unreferenced by any production code or test before
-  // removal.
+  'AUTH.UNLOCK_FAILED':
+    'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.',
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
   'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',
 

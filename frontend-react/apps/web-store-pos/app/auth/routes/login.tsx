@@ -43,17 +43,20 @@ function offlineErrorMessageId(err: unknown): string {
   if (name === 'OfflineUserInactiveError') {
     return 'AUTH.ACCOUNT_INACTIVE';
   }
-  // design §10 / at-rest-encryption-errors, corrected by Task 5's controller
-  // ruling: the offline verifier has already passed by the time unwrap runs,
-  // so a DekUnwrapError here means this device cannot open its own data, not
-  // a wrong password. Stays an INLINE banner at this seam (not the app-wide
-  // blocking-dialog + sign-out policy) — the user is already ON the login
-  // screen, where both recovery routes live, so a modal + logout is pure
-  // friction. Only the copy changed from AUTH.UNLOCK_FAILED (names one route,
-  // obliquely) to ENCRYPTION.KEY_UNAVAILABLE (names both explicitly), to keep
-  // this seam and the app-wide policy agreeing on what a missing key deserves.
+  // design §10 / at-rest-encryption-errors: the offline verifier has already
+  // passed by the time unwrap runs, so a DekUnwrapError here means parameter
+  // drift or a corrupt bundle — not a wrong password.
+  //
+  // PINNED, do not change without authorization: `AUTH.UNLOCK_FAILED` is
+  // asserted byte-for-byte by e2e/login-offline.spec.ts T7 ("DEK corrupta con
+  // contraseña correcta"), which plants a tampered roster wrap, submits the
+  // CORRECT password, and asserts this exact text (a stale/corrupted wrap
+  // asks for a new activation, which is precise for that scenario). This
+  // seam stays an INLINE banner either way — not the app-wide
+  // blocking-dialog + sign-out policy, since the user is already ON the
+  // login screen, where the recovery routes live.
   if (name === 'DekUnwrapError') {
-    return 'ENCRYPTION.KEY_UNAVAILABLE';
+    return 'AUTH.UNLOCK_FAILED';
   }
   // Includes NoRosterError, OfflineVerifierError, and anything unexpected.
   return 'AUTH.SERVER_ERROR';
@@ -164,10 +167,15 @@ export default function LoginPage() {
       // policy exists to carry a user OFF an authenticated screen and ONTO
       // /login, where the recovery routes live — here the user is already on
       // /login, so a modal + logout would be pure friction on a form they can
-      // act on directly. Only the copy changed, to
-      // ENCRYPTION.KEY_UNAVAILABLE, which (unlike the old AUTH.UNLOCK_FAILED)
-      // names both recovery routes explicitly, matching what the policy says
-      // elsewhere for the same `classifyDecryptionFailure` 'missing-key' case.
+      // act on directly.
+      //
+      // Copy is ENCRYPTION.KEY_UNAVAILABLE, not AUTH.UNLOCK_FAILED (the
+      // offline branch's copy above): this is the refusal when no server key
+      // can be obtained at all (design D2 — no device wrap, no roster wrap),
+      // where naming BOTH recovery routes is the accurate statement. No E2E
+      // test pins this branch's copy today (only the offline one, T7) — if
+      // one is added later asserting AUTH.UNLOCK_FAILED here, that is a
+      // scope disagreement to raise, not silently follow.
       if ((err as { name?: string } | null)?.name === 'DekUnwrapError') {
         setErrors({ form: intl.formatMessage({ id: 'ENCRYPTION.KEY_UNAVAILABLE' }) });
         return;
