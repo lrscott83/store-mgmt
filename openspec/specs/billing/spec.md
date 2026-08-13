@@ -14,10 +14,10 @@ Per-store paid-plan lifecycle: plan activation (owner, once), manual payment rec
 | Activation (creation) | Set unconditionally to `DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime)` at store creation (`CreateStoreService.CreateStoreAsync`), for BOTH admin `POST /v1/stores` and self-registration, regardless of paid/free-only modules |
 | Activation (legacy update path) | For rows where `PaymentStartDate is null` at update time, `UpdateStoreCommandHandler` SHALL still set it to today on first paid-module add (unchanged conditional, `UpdateStoreCommand.cs:96-97`) — the only remaining activation path for pre-existing rows |
 | Client input | The client cannot seed `PaymentStartDate` on creation (no such field on `CreateStoreCommand`). On update, a value supplied by a non-SuperAdmin caller MUST be ignored; only SuperAdmin MAY set it explicitly (`UpdateStoreCommand.cs:100-101`) |
-| Lock | Once non-null, OwnerAdmin cannot change modules (plan is locked). SuperAdmin retains full edit |
+| Lock | While the store has ANY active paid module (`ModulePriceIncluded == false`), OwnerAdmin MUST NOT change modules: requests whose `ModuleIds` differ from the current active set (distinct-sorted; duplicates/order never reject) SHALL be rejected (`ValidationException`, 400, code `PlanLocked`). Same-set updates SHALL stay allowed; stores with no active paid module SHALL activate; trigger is modules, not `PaymentStartDate`. SuperAdmin SHALL retain full edit |
 | Migration | Existing rows keep their current value. NO migration, NO backfill — legacy `null` rows are never retro-activated |
 
-(Previously: only the update-path conditional set `PaymentStartDate`; creation always passed `null`.)
+(Previously: the Lock row read "Once non-null..." — the `PaymentStartDate` proxy.)
 
 #### Scenario: Admin creates store with paid module
 - GIVEN admin calls `POST /v1/stores` assigning a paid module
@@ -48,6 +48,31 @@ Per-store paid-plan lifecycle: plan activation (owner, once), manual payment rec
 - GIVEN a store row created before this change with `PaymentStartDate = null`
 - WHEN the system is upgraded (no migration runs)
 - THEN `PaymentStartDate` SHALL remain `null` until the existing `UpdateStore` first-paid-module conditional fires
+
+#### Scenario: OwnerAdmin module change on paid store rejected
+- GIVEN OwnerAdmin PUTs different `moduleIds` on a paid store
+- WHEN update processed
+- THEN 400 + `PlanLocked`
+
+#### Scenario: OwnerAdmin same-set update on paid store allowed
+- GIVEN OwnerAdmin PUTs the same active module set on a paid store (any order, duplicates)
+- WHEN update processed
+- THEN 200 (distinct-sorted equality)
+
+#### Scenario: OwnerAdmin activates a free store
+- GIVEN OwnerAdmin PUTs paid modules on a free store
+- WHEN update processed
+- THEN 200 (activation allowed)
+
+#### Scenario: SuperAdmin module change on paid store
+- GIVEN SuperAdmin PUTs different `moduleIds` on paid store
+- WHEN update processed
+- THEN 200 (carve-out)
+
+#### Scenario: Legacy paid store, null clock, stays locked
+- GIVEN legacy store, paid modules, `PaymentStartDate = null`
+- WHEN OwnerAdmin changes modules
+- THEN 400 (modules, not clock)
 
 ### `StorePayment` (extended)
 
@@ -522,3 +547,12 @@ Once `PaymentStartDate` is never `null` for new stores, `NoAplica` no longer occ
 - GIVEN a free-only store created today, clock advanced to `due + graceDays + 1`
 - WHEN billing status is computed
 - THEN `PaymentStatus` SHALL be `"Vencido"` AND all of its modules (all `PriceIncluded`) SHALL remain accessible
+
+### Requirement: Angular legacy plan edits 4xx on paid stores (accepted consequence)
+
+Legacy Angular edit form (`edit-store.component.html:99-100`) has no DG-7 guard; its plan edits on paid stores now receive 400 + `PlanLocked`. Accepted; companion guard deferred; no Angular code change.
+
+#### Scenario: Legacy-app plan edit on paid store rejected
+- GIVEN legacy Angular app PUTs module change on paid store
+- WHEN update processed
+- THEN 400 + `PlanLocked`
