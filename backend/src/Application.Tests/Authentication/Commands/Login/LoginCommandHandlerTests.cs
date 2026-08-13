@@ -5,6 +5,7 @@ using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Common.Results;
 using Domain.Entities.Authentication;
+using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,10 @@ public class LoginCommandHandlerTests
     private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepo;
     private readonly Mock<IApplicationUnitOfWork> _mockUnitOfWork;
     private readonly Mock<ILogger<LoginCommandHandler>> _mockLogger;
+    private readonly Mock<IUserRepository> _mockUserRepository;
+    private readonly Mock<IOfflinePreHashProtector> _mockPreHashProtector;
+    private readonly Mock<IStoreDataKeyProvider> _mockDataKeyProvider;
+    private readonly Mock<IStoreKeyWrapService> _mockKeyWrapService;
     private readonly LoginCommandHandler _handler;
 
     public LoginCommandHandlerTests()
@@ -36,6 +41,10 @@ public class LoginCommandHandlerTests
         _mockRefreshTokenRepo = new Mock<IRefreshTokenRepository>();
         _mockUnitOfWork = new Mock<IApplicationUnitOfWork>();
         _mockLogger = new Mock<ILogger<LoginCommandHandler>>();
+        _mockUserRepository = new Mock<IUserRepository>();
+        _mockPreHashProtector = new Mock<IOfflinePreHashProtector>();
+        _mockDataKeyProvider = new Mock<IStoreDataKeyProvider>();
+        _mockKeyWrapService = new Mock<IStoreKeyWrapService>();
 
         _mockAuthTokenConfig.Setup(x => x.TokenLifetimeDays).Returns(35);
 
@@ -56,7 +65,11 @@ public class LoginCommandHandlerTests
             _mockRefreshTokenRepo.Object,
             Options.Create(authSettings),
             _mockLogger.Object,
-            _mockUnitOfWork.Object);
+            _mockUnitOfWork.Object,
+            _mockUserRepository.Object,
+            _mockPreHashProtector.Object,
+            _mockDataKeyProvider.Object,
+            _mockKeyWrapService.Object);
     }
 
     #region Invalid Credentials Tests
@@ -543,6 +556,191 @@ public class LoginCommandHandlerTests
         result.Data.Should().NotBeNull();
         result.Data!.RefreshToken.Should().NotBeNull();
         result.Data!.RefreshToken.Should().Be("test-refresh-token");
+    }
+
+    #endregion
+
+    #region Wrapped DEK Tests
+
+    [Fact]
+    public async Task Handle_WithValidCredentials_ShouldReturnWrappedDekFields()
+    {
+        // Arrange
+        var command = new LoginCommand("testuser", "CorrectPassword123!");
+        var userId = Guid.NewGuid();
+        var storeId = Guid.NewGuid();
+        var authResult = Result.Success<Guid>(userId);
+
+        _mockAuthService
+            .Setup(x => x.IsValidUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.FromResult(authResult));
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateToken(userId, command.Login))
+            .Returns("token");
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateRefreshToken())
+            .Returns("test-refresh-token");
+
+        var user = CreateUserWithId(userId);
+        user.SelectedStoreId = storeId;
+        user.OfflinePasswordPreHash = "encrypted-envelope";
+        _mockUserRepository
+            .Setup(x => x.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString()))
+            .ReturnsAsync(user);
+        _mockPreHashProtector
+            .Setup(x => x.Unprotect("encrypted-envelope", userId))
+            .Returns("decrypted-pre-hash");
+        _mockDataKeyProvider
+            .Setup(x => x.GetDek(storeId))
+            .Returns(new byte[32]);
+        _mockKeyWrapService
+            .Setup(x => x.WrapDek("decrypted-pre-hash", It.IsAny<byte[]>()))
+            .Returns(new WrappedDekResult("wrapped-dek", "wrap-salt", "wrap-iv", 210_000));
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        result.Data.Should().NotBeNull();
+        result.Data!.WrappedDek.Should().Be("wrapped-dek");
+        result.Data.WrapSalt.Should().Be("wrap-salt");
+        result.Data.WrapIv.Should().Be("wrap-iv");
+    }
+
+    [Fact]
+    public async Task Handle_WhenDekWrapThrows_ShouldStillSucceedWithEmptyFields()
+    {
+        // Arrange
+        var command = new LoginCommand("testuser", "CorrectPassword123!");
+        var userId = Guid.NewGuid();
+        var storeId = Guid.NewGuid();
+        var authResult = Result.Success<Guid>(userId);
+
+        _mockAuthService
+            .Setup(x => x.IsValidUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.FromResult(authResult));
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateToken(userId, command.Login))
+            .Returns("token");
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateRefreshToken())
+            .Returns("test-refresh-token");
+
+        var user = CreateUserWithId(userId);
+        user.SelectedStoreId = storeId;
+        user.OfflinePasswordPreHash = "encrypted-envelope";
+        _mockUserRepository
+            .Setup(x => x.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString()))
+            .ReturnsAsync(user);
+        _mockPreHashProtector
+            .Setup(x => x.Unprotect("encrypted-envelope", userId))
+            .Throws(new InvalidOperationException("corrupt envelope"));
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert — login must still succeed; the wrap degrades to empty fields
+        result.Succeeded.Should().BeTrue();
+        result.Data!.WrappedDek.Should().BeEmpty();
+        result.Data.WrapSalt.Should().BeEmpty();
+        result.Data.WrapIv.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_WhenRequeriedUserHasNullPreHash_ShouldReturnEmptyFields()
+    {
+        // Arrange
+        var command = new LoginCommand("testuser", "CorrectPassword123!");
+        var userId = Guid.NewGuid();
+        var authResult = Result.Success<Guid>(userId);
+
+        _mockAuthService
+            .Setup(x => x.IsValidUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.FromResult(authResult));
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateToken(userId, command.Login))
+            .Returns("token");
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateRefreshToken())
+            .Returns("test-refresh-token");
+
+        var user = CreateUserWithId(userId);
+        user.SelectedStoreId = Guid.NewGuid();
+        user.OfflinePasswordPreHash = "encrypted-envelope";
+        _mockUserRepository
+            .Setup(x => x.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString()))
+            .ReturnsAsync(user);
+        _mockPreHashProtector
+            .Setup(x => x.Unprotect(It.IsAny<string?>(), userId))
+            .Returns((string?)null);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        result.Data!.WrappedDek.Should().BeEmpty();
+        result.Data.WrapSalt.Should().BeEmpty();
+        result.Data.WrapIv.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_WhenSelectedStoreIdIsEmpty_ShouldReturnEmptyFields_AndNotDeriveKey()
+    {
+        // Arrange
+        var command = new LoginCommand("testuser", "CorrectPassword123!");
+        var userId = Guid.NewGuid();
+        var authResult = Result.Success<Guid>(userId);
+
+        _mockAuthService
+            .Setup(x => x.IsValidUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.FromResult(authResult));
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateToken(userId, command.Login))
+            .Returns("token");
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateRefreshToken())
+            .Returns("test-refresh-token");
+
+        var user = CreateUserWithId(userId);
+        user.SelectedStoreId = Guid.Empty;
+        user.OfflinePasswordPreHash = "encrypted-envelope";
+        _mockUserRepository
+            .Setup(x => x.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString()))
+            .ReturnsAsync(user);
+        _mockPreHashProtector
+            .Setup(x => x.Unprotect("encrypted-envelope", userId))
+            .Returns("decrypted-pre-hash");
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        result.Data!.WrappedDek.Should().BeEmpty();
+        result.Data.WrapSalt.Should().BeEmpty();
+        result.Data.WrapIv.Should().BeEmpty();
+        _mockDataKeyProvider.Verify(x => x.GetDek(It.IsAny<Guid>()), Times.Never);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static User CreateUserWithId(Guid userId)
+    {
+        var user = User.Create("testuser", "hashed_password", "Test User", "+1234567890", "test@example.com", Guid.NewGuid());
+        typeof(User).GetProperty("Id")!.SetValue(user, userId);
+        return user;
     }
 
     #endregion
