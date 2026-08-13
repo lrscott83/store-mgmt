@@ -16,12 +16,21 @@ vi.mock('../../storage/device-key-store', () => ({
 
 import { resolveDekForLogin, rewrapDeviceDekForPassword } from '../dek-provisioning';
 import { getDek, clearDek } from '../../storage/data-key-store';
-import { readDeviceDekTable, clearDeviceDekTable } from '../../storage/device-dek-table';
+import {
+  readDeviceDekTable,
+  writeDeviceDekTable,
+  clearDeviceDekTable,
+} from '../../storage/device-dek-table';
 import { importRoster, clearRoster } from '../roster-store';
-import { unwrapDek, wrapDekWithPassword } from '../dek-unwrap';
+import { unwrapDek, wrapDekWithPassword, DekUnwrapError } from '../dek-unwrap';
 import type { OfflineRosterBundle } from '../roster-types';
 
 const STORE_ID = 's1';
+
+// Two deliberately different 32-byte keys, so "which key won?" is decidable
+// by bytes alone in the D3 reconciliation test below.
+const KEY_A = new Uint8Array(32).fill(0xaa);
+const KEY_B = new Uint8Array(32).fill(0xbb);
 
 function v2Bundle(
   login: string,
@@ -51,6 +60,34 @@ function v2Bundle(
       },
     ],
   };
+}
+
+/**
+ * A device table that already holds `dek` as THIS login's own password wrap
+ * and no device wrap — the shape a device carries after it minted locally
+ * under the pre-D2 behaviour (hence `dekSource: 'local'`, the union member
+ * this change stops WRITING but must keep READING). With this file's
+ * `getDeviceKey -> null` mock, step 1's bootstrap recovers nothing, so
+ * step 3a's `own` branch is the one that supplies `dek`.
+ */
+async function seedDeviceTableWithDek(
+  dek: Uint8Array,
+  login: string,
+  password: string,
+  storeId: string,
+): Promise<void> {
+  writeDeviceDekTable({
+    formatVersion: 1,
+    dekSource: 'local',
+    storeId,
+    device: null,
+    users: { [login]: await wrapDekWithPassword(password, dek) },
+  });
+}
+
+/** A roster bundle whose wrap for `login` opens, under `password`, to `dek`. */
+async function seedRosterWithDek(dek: Uint8Array, login: string, password: string): Promise<void> {
+  importRoster(v2Bundle(login, await wrapDekWithPassword(password, dek)));
 }
 
 describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
@@ -254,5 +291,69 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(healedOwn.wrapSalt).not.toBe(staleOwn.wrapSalt);
     const recovered = await unwrapDek('new-secret', healedOwn);
     expect(Array.from(recovered)).toEqual(Array.from(x));
+  });
+
+  // D2 — the app never invents a key. The key the SERVER derives (HKDF over a
+  // master secret plus the store id) is the only key anything can ever
+  // re-derive; a locally minted one is recoverable by nobody, forever. A
+  // device with no table, no roster wrap and no login-response wrap has no
+  // route to those bytes, so it refuses instead of writing data under a key
+  // that cannot be read back.
+  it('D2: refuses to mint a key when nothing can supply the server key', async () => {
+    localStorage.clear();
+
+    await expect(
+      resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 's1' }),
+    ).rejects.toThrow(DekUnwrapError);
+  });
+
+  // The refusal must also leave no trace: a persisted half-provisioned table
+  // would make the NEXT login take a different (table-bearing) branch.
+  it('D2: writes nothing to storage when it refuses', async () => {
+    localStorage.clear();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+
+    try {
+      await expect(
+        resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 's1' }),
+      ).rejects.toThrow();
+
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  // D3 — the server's key wins. Before this change, step 4 detected the
+  // disagreement and only wrote a `console.error`, which made "import a fresh
+  // roster" a no-op on any device that had drifted: the recovery route the
+  // business rules depend on did nothing at all.
+  it('D3: adopts the roster key over a disagreeing local key, instead of only logging', async () => {
+    // Arrange: a device table holding key A, and a roster wrap holding key B.
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', 's1');
+    await seedRosterWithDek(KEY_B, 'jdoe', 'pw');
+
+    await resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 's1' });
+
+    // The server's key is the authority — the roster carries it, the local
+    // table does not.
+    expect(getDek()).toEqual(KEY_B);
+    expect(readDeviceDekTable()?.conflictDetectedAt).toBeDefined();
+  });
+
+  // The adoption is not just in-memory: the device wrap and this login's own
+  // password wrap must both be re-written under the ADOPTED key, or the next
+  // login (or the next page load's device-key bootstrap) would silently
+  // resurrect the abandoned local key.
+  it('D3: re-wraps the device copy and this login\'s password wrap under the adopted key', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', 's1');
+    await seedRosterWithDek(KEY_B, 'jdoe', 'pw');
+
+    await resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 's1' });
+
+    const table = readDeviceDekTable()!;
+    expect(table.device).not.toBeNull();
+    const recovered = await unwrapDek('pw', table.users['jdoe']);
+    expect(Array.from(recovered)).toEqual(Array.from(KEY_B));
   });
 });

@@ -59,10 +59,14 @@ const ENTITY_MIGRATION_SWALLOW_LOG_MARKER =
 /**
  * Resolves and sets THIS DEVICE's DEK for `args.login`, in order:
  * an already-recovered device DEK > this login's own table wrap >
- * the roster's wrap for this login > a freshly minted local DEK (Q2).
- * Never throws EXCEPT the one genuine dead end (design §6 F5): a table
- * exists, holds no recoverable wrap for this login, and the roster has none
- * either.
+ * the roster's wrap for this login. There is no fourth source: the Q2
+ * local mint that used to sit at the end of this list was removed (design
+ * D2), because only the SERVER can re-derive a store's key and anything
+ * written under a minted one is recoverable by nobody, forever.
+ * Rejects with `DekUnwrapError` whenever none of those three sources
+ * yields the key — the original F5 dead end (design §6: a table exists and
+ * holds no recoverable wrap for this login, and the roster has none
+ * either), and now also the bare-device case that used to mint.
  */
 export async function resolveDekForLogin(args: {
   login: string;
@@ -99,9 +103,9 @@ export async function resolveDekForLogin(args: {
   // successful `unwrapDek` call IS free proof the entry is still valid for
   // this password and this DEK — step 5 uses this flag to skip a
   // provably-redundant rewrite. See step 5's own comment for why every
-  // other branch (roster-derivation, local-mint, the common steady-state
-  // case where step 1's device-key bootstrap alone recovers `dek`, and
-  // structural note 1's offline roster-sourced case) is NOT touched: none
+  // other branch (roster-derivation, the common steady-state case where
+  // step 1's device-key bootstrap alone recovers `dek`, and structural
+  // note 1's offline roster-sourced case) is NOT touched: none
   // of them ever validates `table.users[login]` against the current
   // password, so the only sound check there costs exactly one PBKDF2 —
   // the same as just rewriting.
@@ -159,11 +163,12 @@ export async function resolveDekForLogin(args: {
       tableStoreId = bundle.storeId;
       dekSourcedFromRosterThisCall = true;
     } else {
-      // Step 3c — Q2 mint: first-ever DEK for this device, nothing to adopt.
-      dek = crypto.getRandomValues(new Uint8Array(32));
-      setDek(dek, sessionStoreId);
-      source = 'local';
-      tableStoreId = sessionStoreId;
+      // design D2: no device table, no roster wrap, and nothing on the login
+      // response — there is no way to obtain the key the SERVER derives for this
+      // store. Minting a random local key here (the old behaviour) produced data
+      // no roster and no online login could ever recover. Refusing destroys
+      // nothing; minting destroyed silently.
+      throw new DekUnwrapError();
     }
   } else if (!table) {
     // Structural note 1: the DEK was already non-null on entry (step 1's
@@ -195,7 +200,7 @@ export async function resolveDekForLogin(args: {
         const bundle = getRawRoster();
         workingTable = workingTable ?? {
           formatVersion: 1,
-          dekSource: source ?? 'local',
+          dekSource: source ?? 'roster',
           storeId: tableStoreId ?? getDekStoreId() ?? sessionStoreId,
           device: null,
           users: {},
@@ -203,6 +208,14 @@ export async function resolveDekForLogin(args: {
         workingTable.conflictDetectedAt = Date.now();
         workingTable.conflictStoreId = bundle?.storeId;
         console.error(CONFLICT_LOG_MARKER, { conflictStoreId: workingTable.conflictStoreId });
+
+        // design D3: the server's key is the authority. Detecting the
+        // disagreement and keeping the local key (the old behaviour) made
+        // "import a fresh roster" a no-op on any device that had drifted — the
+        // recovery route the business rules depend on did nothing at all.
+        dek = fromRoster;
+        setDek(dek, bundle?.storeId ?? sessionStoreId);
+        workingTable.device = null; // re-wrapped for the adopted key at step 5
       }
     } catch {
       // F9 — stale roster wrap; we already hold the device DEK. Step 5
@@ -212,6 +225,13 @@ export async function resolveDekForLogin(args: {
   }
 
   // Step 5 — persist, best-effort, never fatal.
+  //
+  // The `?? 'local'` fallback below is now unreachable, and deliberately left
+  // as the neutral default rather than promoted to a claim: `workingTable` is
+  // null here only when `table` was, and with the mint gone every branch that
+  // survives a null `table` (3b and structural note 1) sets `source =
+  // 'roster'` itself. `'local'` also stays a legal `DeviceDekTable` value
+  // because tables WRITTEN before design D2 carry it and must still READ.
   workingTable = workingTable ?? {
     formatVersion: 1,
     dekSource: source ?? 'local',
@@ -242,8 +262,9 @@ export async function resolveDekForLogin(args: {
   // REGENERATED — so any call where a roster entry is in play keeps
   // rewriting unconditionally, same as before this batch.
   //
-  // Every other branch — roster-derivation (3b), local-mint (3c),
-  // structural note 1's offline roster-sourced case, and the common
+  // Every other branch — roster-derivation (3b), step 4's D3 adoption of a
+  // disagreeing roster key, structural note 1's offline
+  // roster-sourced case, and the common
   // steady-state case where step 1's device-key bootstrap alone already
   // recovered `dek` (this device is provisioned, the device key still
   // works) — also keeps rewriting unconditionally. That last case is the
