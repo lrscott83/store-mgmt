@@ -873,12 +873,35 @@ test.describe('el cifrado no depende del modo de autenticación (backend real)',
     await seedProductInOnlyCategory(page, offlineName);
     await expectProductVisibleInCategory(page, offlineName);
 
-    // La escritura offline ocurrió de verdad Y salió cifrada: los bytes
-    // cambiaron y siguen llevando el sobre. Sin la comparación, "el producto
-    // se ve" podría ser solo estado de React que nunca aterrizó en disco.
-    await expectEntityEncrypted(page, 'products', storeId);
-    const productsAfterOfflineWrite = await readEntityBytes(page, 'products', storeId);
-    expect(productsAfterOfflineWrite).not.toBe(productsAfterOnlineWrite);
+    // La escritura offline ocurrió de verdad Y salió cifrada, afirmado sobre
+    // UNA MISMA lectura de los bytes. Que sea una sola lectura es el punto
+    // entero de esta forma, no un detalle de estilo:
+    //
+    //   - `expectEntityEncrypted` acá sería un no-op. La entidad `products`
+    //     lleva el prefijo `enc:v1:` desde la escritura ONLINE de más arriba,
+    //     así que su predicado ya es verdadero antes de que la escritura
+    //     offline aterrice: el poll puede volver en su primera lectura sin
+    //     haber esperado nada.
+    //   - Y un `not.toBe` posterior contra el snapshot online solo prueba que
+    //     los bytes cambiaron, nunca que los bytes NUEVOS siguen cifrados.
+    //
+    // Encadenadas, dejaban abierto un falso positivo: si una regresión hiciera
+    // que la escritura offline emitiera texto plano, y ese texto plano cayera
+    // entre la primera lectura del poll y la comparación, el test pasaba en
+    // verde sobre ciphertext viejo. Pidiendo las dos condiciones a la vez, la
+    // única forma de satisfacerlas es que el valor almacenado EN ESE INSTANTE
+    // sea distinto del de la escritura online Y empiece por el sobre — que es
+    // exactamente la afirmación. De paso desaparece la carrera entre la
+    // escritura a disco y el repintado del DOM que se esperó unas líneas antes.
+    await expect
+      .poll(async () => {
+        const raw = await readEntityBytes(page, 'products', storeId);
+        return {
+          changed: raw !== productsAfterOnlineWrite,
+          encrypted: raw?.startsWith(ENTITY_ENVELOPE_PREFIX) ?? false,
+        };
+      })
+      .toEqual({ changed: true, encrypted: true });
     expect(loginPosts(), 'crear datos sin conexión tampoco habla con el backend').toBe(1);
 
     await signOut(page);
