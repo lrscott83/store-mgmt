@@ -381,6 +381,23 @@ export async function resolveDekForLogin(args: {
   // `dekSourcedFromLoginResponseThisCall`'s comment for why a disagreement
   // between two server-derived wraps can only be a store-scoping mismatch,
   // never a stale copy of the same key.
+  //
+  // KNOWN GAP (accepted, tracked as a follow-up, not fixed here): this block
+  // only ever fires against `rosterEntry`. An ALREADY-established `dek` —
+  // recovered above via step 1's device-wrap bootstrap or step 3a's own
+  // table entry — is never reconciled against the login response, because
+  // dek !== null skips this whole function's `if (dek === null)` branch
+  // where source 3 lives. Two devices this can bite: (a) a pre-this-branch
+  // device whose table still carries a minted `dekSource: 'local'` key never
+  // migrates off it, online included; (b) a device shared across stores can
+  // bind a second user's login to the FIRST user's store's key. Deliberately
+  // shipped open: this app has no production deployment yet, so case (a)'s
+  // population is currently empty, and case (b) shares its root cause with
+  // the parked per-user-wrap finding this branch's own history already
+  // accepted (same "an established key is trusted without comparing it to
+  // the session's authority" gap). Closing both is one fix: extend this
+  // gate's skip condition to also compare `dek` against a login-response
+  // wrap when one is present, mirroring the roster comparison below.
   if (!dekSourcedFromRosterThisCall && !dekSourcedFromLoginResponseThisCall && rosterEntry) {
     try {
       const fromRoster = await unwrapDek(password, rosterEntry);
