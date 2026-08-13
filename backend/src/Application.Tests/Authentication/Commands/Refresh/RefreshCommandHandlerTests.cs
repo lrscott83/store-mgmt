@@ -81,6 +81,28 @@ public class RefreshCommandHandlerTests
     }
 
     [Fact]
+    public async Task Refresh_withValidToken_returnsEmptyWrapFields()
+    {
+        // Arrange — auth-login-wrapped-dek R4: Refresh never delivers a wrapped DEK
+        var userId = Guid.NewGuid();
+        var rawToken = "valid-raw-refresh-token";
+        var refreshToken = new RefreshToken(userId, rawToken, DateTimeOffset.UtcNow.AddDays(7));
+        var user = CreateTestUser(userId, "testuser@test.com");
+
+        SetupMocksForValidToken(refreshToken, user, "new-access-token", "new-raw-refresh-token");
+
+        // Act
+        var result = await _handler.Handle(new RefreshCommand(rawToken), CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        result.Data.Should().NotBeNull();
+        result.Data!.WrappedDek.Should().BeEmpty();
+        result.Data.WrapSalt.Should().BeEmpty();
+        result.Data.WrapIv.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Refresh_withRevokedToken_returnsFailure()
     {
         // Arrange

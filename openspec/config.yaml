@@ -6,18 +6,24 @@ strict_tdd: true
 context: |
   SMCA Store Management monorepo: .NET 8 backend (backend/), Angular 21 legacy frontend (frontend/, parity source of truth),
   React 19 migration target (frontend-react/). Backend is Clean Architecture + CQRS: Domain, Application, Infrastructure,
-  SMCA.Presentation, SMCA.WebApi, Resources. Stack: EF Core 8 + Npgsql PostgreSQL, MediatR 12, FluentValidation 11,
-  AutoMapper 13, Identity + JWT, Hangfire, Serilog. Solution: backend/src/SMCA.sln. Tests: Domain.UnitTests,
-  Application.Tests, SMCA.WebApi.E2ETests (xUnit + FluentAssertions + Moq + WebApplicationFactory). Frontend: pnpm +
-  Turborepo, React 19 / RRv7 SSR, Vitest + Testing Library, strict TDD pattern.
+  SMCA.Presentation, SMCA.WebApi, SMCA.PasswordHasher, Resources. Stack: EF Core 8 + Npgsql PostgreSQL, MediatR 12,
+  FluentValidation 11, AutoMapper 13, Identity + JWT, Hangfire, Serilog. Solution: backend/src/SMCA.sln. Tests:
+  Domain.UnitTests, Application.Tests, SMCA.WebApi.E2ETests (xUnit + FluentAssertions + Moq + WebApplicationFactory,
+  real PostgreSQL). Frontend: pnpm + Turborepo, React 19 / RRv7 SSR, Vitest + Testing Library, Playwright E2E
+  (frontend-react/e2e/), strict TDD pattern.
   Conventions: ResponseResult<T> envelope + i18n error keys, conventional commits, docs/plans per change,
   gentle-ai.verify-result/v1 verify reports.
+  Project-mandated rules: E2E tests (backend + frontend) are UNTOUCHABLE without explicit user authorization;
+  backend test work may only ADD new E2E tests (no production code or existing test edits without approval).
 
 testing:
   backend_test: dotnet test backend/src/SMCA.sln
   backend_e2e_filtered: dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj --filter "FullyQualifiedName~<Feature>" --no-build
   backend_build: dotnet build backend/src/SMCA.sln
   frontend_test: pnpm test
+  frontend_test_e2e: pnpm test:e2e
+  frontend_test_e2e_api: pnpm test:e2e:api
+  frontend_test_e2e_rate_limit: pnpm test:e2e:rate-limit
   frontend_typecheck: pnpm typecheck
   frontend_lint: pnpm lint
   coverage_command: dotnet test --collect:"XPlat Code Coverage"
