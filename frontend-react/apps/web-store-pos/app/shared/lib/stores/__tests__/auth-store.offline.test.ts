@@ -265,8 +265,10 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
 
   // The same v1 roster on a device that IS provisioned still signs in — the
   // pairing that shows the refusal above is about the missing key material,
-  // not about v1 rosters being rejected wholesale.
-  it('loginOffline() on a v1 roster, provisioned device -> recovers the device key and signs in', async () => {
+  // not about v1 rosters being rejected wholesale. `seedProvisionedDevice`
+  // writes `device: null`, so recovery here is step 3a's PASSWORD wrap, not
+  // the device-key wrap.
+  it('loginOffline() on a v1 roster, provisioned device -> recovers the key from this login\'s password wrap and signs in', async () => {
     await seedRoster();
     await seedProvisionedDevice('ana', 'secret', 's1');
 

@@ -15,7 +15,7 @@ vi.mock('../../storage/device-key-store', () => ({
 }));
 
 import { resolveDekForLogin, rewrapDeviceDekForPassword } from '../dek-provisioning';
-import { getDek, clearDek } from '../../storage/data-key-store';
+import { getDek, getDekStoreId, clearDek } from '../../storage/data-key-store';
 import {
   readDeviceDekTable,
   writeDeviceDekTable,
@@ -37,13 +37,14 @@ const KEY_B = new Uint8Array(32).fill(0xbb);
 function v2Bundle(
   login: string,
   wrap: { wrappedDek: string; wrapSalt: string; wrapIv: string },
+  storeId: string = STORE_ID,
 ): OfflineRosterBundle {
   return {
     bundleId: 'b1',
     issuedAt: 1000,
     expiresAt: Date.now() + 1_000_000,
     formatVersion: 2,
-    storeId: STORE_ID,
+    storeId,
     users: [
       {
         id: 'u1',
@@ -56,7 +57,7 @@ function v2Bundle(
         isSuperAdmin: false,
         isOwnerAdmin: false,
         isReSeller: false,
-        selectedStoreId: STORE_ID,
+        selectedStoreId: storeId,
         verifier: { hash: 'h', salt: 's', iterations: 210_000 },
         ...wrap,
       },
@@ -65,12 +66,13 @@ function v2Bundle(
 }
 
 /**
- * A device table that already holds `dek` as THIS login's own password wrap
- * and no device wrap — the shape a device carries after it minted locally
- * under the pre-D2 behaviour (hence `dekSource: 'local'`, the union member
- * this change stops WRITING but must keep READING). With this file's
- * `getDeviceKey -> null` mock, step 1's bootstrap recovers nothing, so
- * step 3a's `own` branch is the one that supplies `dek`.
+ * A device table that already holds `dek` as THIS login's own password wrap —
+ * the shape a device carries after it minted locally under the pre-D2
+ * behaviour (hence `dekSource: 'local'`, the union member this change stops
+ * WRITING but must keep READING). A device wrap is added only when
+ * `withDeviceWrap` is passed; see that option's own note below. With this
+ * file's `getDeviceKey -> null` mock, step 1's bootstrap recovers nothing
+ * either way, so step 3a's `own` branch is always the one that supplies `dek`.
  */
 async function seedDeviceTableWithDek(
   dek: Uint8Array,
@@ -99,8 +101,13 @@ async function seedDeviceTableWithDek(
 }
 
 /** A roster bundle whose wrap for `login` opens, under `password`, to `dek`. */
-async function seedRosterWithDek(dek: Uint8Array, login: string, password: string): Promise<void> {
-  importRoster(v2Bundle(login, await wrapDekWithPassword(password, dek)));
+async function seedRosterWithDek(
+  dek: Uint8Array,
+  login: string,
+  password: string,
+  storeId: string = STORE_ID,
+): Promise<void> {
+  importRoster(v2Bundle(login, await wrapDekWithPassword(password, dek), storeId));
 }
 
 describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
@@ -415,5 +422,43 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
 
     const recovered = await unwrapDek('pw', table.users['jdoe']);
     expect(Array.from(recovered)).toEqual(Array.from(KEY_B));
+  });
+
+  // D3, CROSS-STORE. Every other D3 test above puts the device table and the
+  // roster bundle on the SAME store id, which is why none of them could catch
+  // this: design D3 says the server's key is adopted "and the device table is
+  // rewritten", and rewriting the table means more than replacing the wraps —
+  // the table's own `storeId` and `dekSource` describe WHICH key it holds.
+  //
+  // Leaving them describing the abandoned key splits the data in two. Within
+  // the adopting session, step 6's `runEntityMigration()` scopes by
+  // `getDekStoreId()`, so writes land under the NEW store's keys. On the next
+  // page load `bootstrapDeviceDek()` does `setDek(dek, table.storeId)` — the
+  // same adopted key, re-scoped to the OLD store id — so every store-scoped
+  // read and write then addresses a different key space than before the
+  // reload. Nothing is destroyed; it is split, in exactly the cross-store
+  // conflict case `conflictStoreId` exists to record.
+  it('D3: adopting a key from a DIFFERENT store rewrites the table to describe the adopted key', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'jdoe', 'pw', 'STORE-OLD');
+    await seedRosterWithDek(KEY_B, 'jdoe', 'pw', 'STORE-NEW');
+
+    await resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 'STORE-OLD' });
+
+    expect(getDek()).toEqual(KEY_B);
+    expect(getDekStoreId()).toBe('STORE-NEW');
+
+    const table = readDeviceDekTable()!;
+    expect(table.storeId).toBe('STORE-NEW');
+    expect(table.dekSource).toBe('roster');
+
+    // The invariant the split violates, stated directly: the scope the table
+    // will restore the key under on the next page load must be the scope this
+    // session is already using it under.
+    expect(table.storeId).toBe(getDekStoreId());
+
+    // Forensics survive the rewrite — D3 adopts, it does not erase the record
+    // that the two disagreed.
+    expect(table.conflictDetectedAt).toBeTypeOf('number');
+    expect(table.conflictStoreId).toBe('STORE-NEW');
   });
 });

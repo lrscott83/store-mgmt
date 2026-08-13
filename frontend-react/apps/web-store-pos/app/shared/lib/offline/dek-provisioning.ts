@@ -213,8 +213,23 @@ export async function resolveDekForLogin(args: {
         // disagreement and keeping the local key (the old behaviour) made
         // "import a fresh roster" a no-op on any device that had drifted — the
         // recovery route the business rules depend on did nothing at all.
+        const adoptedStoreId = bundle?.storeId ?? sessionStoreId;
         dek = fromRoster;
-        setDek(dek, bundle?.storeId ?? sessionStoreId);
+        setDek(dek, adoptedStoreId);
+
+        // D3's "and the device table is rewritten" is not only about the
+        // wraps: the table's own `storeId`/`dekSource` say WHICH key it
+        // holds, and after an adoption they described the ABANDONED one.
+        // That splits the data whenever the two disagree across stores. This
+        // session scopes its writes by `getDekStoreId()` (step 6's
+        // `runEntityMigration`, and every store-scoped read after it), but
+        // the next page load re-scopes the very same key by `table.storeId`
+        // (`dek-bootstrap.ts`'s `setDek(dek, table.storeId)`) — so data
+        // written before and after a reload would land in two different key
+        // spaces. Nothing is destroyed, but it is split, in exactly the
+        // cross-store case `conflictStoreId` exists to record.
+        workingTable.storeId = adoptedStoreId;
+        workingTable.dekSource = 'roster';
         workingTable.device = null; // re-wrapped for the adopted key at step 5
       }
     } catch {
