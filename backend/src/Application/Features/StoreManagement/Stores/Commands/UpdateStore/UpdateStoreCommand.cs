@@ -75,6 +75,22 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             if (store is null)
                 throw new ValidationException { Errors = new List<Error> { new Error("Id", _localizer["StoreNotFound"]) } };
 
+            // DG-7 one-way plan lock: a non-SuperAdmin caller must not change the module set of a
+            // store that has any active paid module. The store is loaded with its active StoreModules
+            // already carrying ModulePriceIncluded, so this guard needs no extra queries. Same-set
+            // updates (e.g. renaming) stay allowed; duplicates/order never reject (distinct-sorted).
+            if (!_httpContextService.IsSuperAdmin
+                && store.StoreModules.Any(sm => !sm.ModulePriceIncluded))
+            {
+                var requested = request.ModuleIds.Distinct().OrderBy(id => id);
+                var current = store.StoreModules.Select(sm => sm.ModuleId).Distinct().OrderBy(id => id);
+                if (!requested.SequenceEqual(current))
+                    throw new ValidationException
+                    {
+                        Errors = new List<Error> { new Error("PlanLocked", _localizer["PlanLocked"]) }
+                    };
+            }
+
             if (_storeRepository.Where(s => s.Id != request.Id).Any(s => s.Name == request.Name))
                 throw new ValidationException(_localizer["StoreAlreadyExists"]);
 

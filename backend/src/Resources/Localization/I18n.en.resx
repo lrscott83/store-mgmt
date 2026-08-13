@@ -450,6 +450,9 @@
   <data name="PerMilesRateTrailerTypeNotFound" xml:space="preserve">
     <value>Rate per miles trailer type not found</value>
   </data>
+  <data name="PlanLocked" xml:space="preserve">
+    <value>The store plan is locked. Only a SuperAdmin can change the store's modules.</value>
+  </data>
   <data name="PspNotFound" xml:space="preserve">
     <value>PSP not found</value>
   </data>

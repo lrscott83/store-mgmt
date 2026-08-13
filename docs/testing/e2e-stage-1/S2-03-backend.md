@@ -26,7 +26,11 @@
 |---|---|
 | Tras el flujo **por UI**, la cantidad de filas `Store` del tenant es la misma | Necesita manejar el navegador. Es una aserción de dato **dependiente de Playwright**, y la capa frontend de esta US está en PENDIENTE |
 
-## Qué hacer
+## Estado actual — **RESUELTO** (2026-08-12, rama `fix/s2-03-backend-h10`)
+
+El defecto quedó arreglado y probado en la rama: `96fa69d3` restringe `POST /v1/stores` a SuperAdmin, `115515ab` endurece el guard del handler y quita el re-point de `SelectedStoreId`, `93c829c2` agrega el test 403, `04e6868f` archiva el cambio SDD. El merge a `main` no es un problema a resolver (decisión del usuario, 2026-08-13).
+
+## Qué hacer (histórico)
 
 1. **Documentación**: pasar los 3 checkboxes a `[x]` con sus citas, y reescribir el párrafo que dice *"NUEVO — no existe ningún test"*.
 2. **Decisión de producto, que no es de testing**: el endpoint permite que un OwnerAdmin cree tiendas. Los tests hoy **fijan ese comportamiento como correcto**. Si la regla de la US es la que vale, entonces esos tests están pineando un bug — y arreglarlo significa cambiar producción **y** los tests. Eso requiere autorización explícita y no se decide acá.

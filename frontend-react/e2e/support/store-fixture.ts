@@ -1,20 +1,25 @@
 import type { Page } from '@playwright/test';
+import { Client } from 'pg';
 import { E2E_API_URL } from './backend-url';
 import { readBearerToken } from './auth-storage';
 
 /**
  * S2-01 (design.md D1). Server-side SEEDING, not a user flow: this file
- * degrades an already-existing store to the free plan by issuing real
- * `GET`/`PUT` requests against `E2E_API_URL` with `page.request`, using the
- * Bearer token of the already-authenticated `owner-admin` session
- * (`readBearerToken`, `auth-storage.ts`). It never drives the browser UI.
+ * degrades an already-existing store to the free plan by writing the
+ * `StoreModule` rows directly in the test database (`pg` Client, same
+ * connection strategy as `global-teardown.ts`). The module catalog and the
+ * post-condition verification still go through the real API
+ * (`GET /v1/modules/ToStore`, `GET /v1/stores/{id}`) with `page.request`.
+ * It never drives the browser UI.
  *
- * This precondition is reachable ONLY because of **H-15**
- * (`docs/testing/e2e-stage-1/README.md`): the backend has no server-side
- * lock on a store's module set — `UpdateStoreCommand.cs`'s only guard is
- * `IsSuperAdminOrOwnerAdmin` (`:71-72`). DG-7's lock is a UI-only guarantee
- * (`plan-picker.tsx:9-15`). If H-15 were ever fixed, this fixture — and the
- * spec it seeds — would lose its precondition.
+ * WHY DIRECT-DB AND NOT `PUT /v1/stores/{id}`: **H-15**
+ * (`docs/testing/e2e-stage-1/README.md`) added a server-side one-way lock to
+ * `UpdateStoreCommand.cs` — a non-SuperAdmin caller may no longer change the
+ * module set of a store that has any active paid module (HTTP 400
+ * `PlanLocked`). The owner-admin session this suite uses therefore cannot
+ * degrade a paid store through the API anymore; the fixture seeds the
+ * precondition at the persistence layer instead, exactly like the backend
+ * E2E suite seeds its own fixtures. The `Store` row itself is untouched.
  */
 
 export interface ModuleCatalog {
@@ -105,16 +110,20 @@ export async function readModuleCatalog(page: Page): Promise<ModuleCatalog> {
 }
 
 /**
- * Degrades `storeId` to the free plan via a real `PUT /v1/stores/{id}`
- * (design.md D1, 4 steps — step 4 is mandatory, not optional):
+ * Degrades `storeId` to the free plan via direct-DB seeding (design.md D1,
+ * H-15: the API now rejects non-SuperAdmin module-set changes on paid
+ * stores, so PUT seeding is no longer available to this suite):
  *
  * 1. Read the real module catalog, split into free/paid/all ids.
- * 2. Read the store's current `name`/`address` — `UpdateStoreCommand.cs:81-82`
- *    overwrites both unconditionally, so they have to be carried forward.
- * 3. `PUT` with `moduleIds: freeIds`.
- * 4. Re-`GET` and throw a loud, diagnosable error if the store did not end
- *    up exactly where step 3 asked it to — same precondition-pinning
- *    pattern as `plantRoster()` (`roster-fixture.ts:298-326`).
+ * 2. In one transaction: delete the store's `StoreRoleFeature` +
+ *    `StoreModule` rows, then re-insert `StoreModule` rows for the free
+ *    modules only — copied from the `Module` catalog (`PriceIncluded`,
+ *    `Price`, etc.), carrying the store's `TenantId`. The `Store` row is
+ *    untouched (`name`/`address`/`paymentStartDate` survive).
+ * 3. Re-`GET` through the API and throw a loud, diagnosable error if the
+ *    store did not end up exactly where step 2 asked it to — same
+ *    precondition-pinning pattern as `plantRoster()`
+ *    (`roster-fixture.ts:298-326`).
  */
 export async function degradeStoreToFreePlan(
   page: Page,
@@ -122,33 +131,8 @@ export async function degradeStoreToFreePlan(
 ): Promise<FreePlanPrecondition> {
   const token = await requireBearerToken(page);
   const catalog = await readModuleCatalog(page);
-  const { name, address } = await fetchStore(page, storeId, token);
 
-  const putResponse = await page.request.put(`${E2E_API_URL}/v1/stores/${storeId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: {
-      id: storeId,
-      name,
-      address,
-      description: null,
-      approved: false,
-      paymentStartDate: null,
-      isActive: true,
-      moduleIds: catalog.freeIds,
-    },
-  });
-  let putBody: ApiEnvelope<boolean> | null = null;
-  try {
-    putBody = (await putResponse.json()) as ApiEnvelope<boolean>;
-  } catch {
-    putBody = null;
-  }
-  if (!putResponse.ok() || !putBody?.succeeded) {
-    throw new Error(
-      `store-fixture: PUT /v1/stores/${storeId} failed (status ${putResponse.status()}) while ` +
-        `degrading the store to the free plan (moduleIds=[${catalog.freeIds.join(',')}]).`
-    );
-  }
+  await seedStoreModulesDirect(storeId, catalog.freeIds);
 
   const reread = await fetchStore(page, storeId, token);
   const observedIds = [...reread.modules.map((m) => m.id)].sort((a, b) => a - b);
@@ -160,16 +144,15 @@ export async function degradeStoreToFreePlan(
   if (!idsMatch) {
     throw new Error(
       `store-fixture: degradeStoreToFreePlan(${storeId}) precondition mismatch — expected module ` +
-        `ids [${expectedIds.join(',')}] after the PUT, observed [${observedIds.join(',')}]. The ` +
-        'free-plan precondition this spec relies on was not actually written.'
+        `ids [${expectedIds.join(',')}] after the direct-DB seed, observed [${observedIds.join(',')}]. ` +
+        'The free-plan precondition this spec relies on was not actually written.'
     );
   }
   if (!reread.paymentStartDate) {
     throw new Error(
       `store-fixture: degradeStoreToFreePlan(${storeId}) precondition mismatch — expected ` +
-        'paymentStartDate to remain non-null after degrading to the free plan ' +
-        '(UpdateStoreCommand.cs:96 only clears it when the store had none to begin with), observed ' +
-        'null. S2-02 depends on this staying non-null.'
+        'paymentStartDate to remain non-null after degrading to the free plan (the Store row is ' +
+        'untouched by the direct-DB seed), observed null. S2-02 depends on this staying non-null.'
     );
   }
 
@@ -180,6 +163,53 @@ export async function degradeStoreToFreePlan(
     allIds: catalog.allIds,
     paymentStartDate: reread.paymentStartDate,
   };
+}
+
+// Same default the README's documented backend mode uses; override with
+// E2E_DB_URL when the backend was pointed somewhere else (global-teardown.ts:27).
+const DEFAULT_DB_URL = 'postgresql://postgres:postgres@localhost:5432/smca_test';
+
+/**
+ * Rewrites `storeId`'s `StoreModule` rows to exactly the given `moduleIds`
+ * in one transaction: `StoreRoleFeature` and `StoreModule` rows are deleted
+ * first (both FK to the store; children-first order as in
+ * `global-teardown.ts:30-78`), then the `StoreModule` rows are re-inserted
+ * from the `Module` catalog (`ModulePriceIncluded`, `Price`,
+ * `ModuleDiscountPrice`, `ModulePercentDiscountPrice` copied from `Module`;
+ * `TenantId` from the `Store` row). Column list follows
+ * `20240910194934_Create-Store-Module-Price.cs:82-99`.
+ */
+async function seedStoreModulesDirect(storeId: string, moduleIds: number[]): Promise<void> {
+  const connectionString = process.env['E2E_DB_URL'] ?? DEFAULT_DB_URL;
+  const client = new Client({ connectionString });
+
+  try {
+    await client.connect();
+    await client.query('BEGIN');
+    await client.query('DELETE FROM "StoreRoleFeature" WHERE "StoreId" = $1', [storeId]);
+    await client.query('DELETE FROM "StoreModule" WHERE "StoreId" = $1', [storeId]);
+    await client.query(
+      `INSERT INTO "StoreModule"
+         ("StoreId", "ModuleId", "ModulePriceIncluded", "Price", "ModulePrice",
+          "ModuleDiscountPrice", "ModulePercentDiscountPrice", "TenantId", "IsActive",
+          "CreatedDate", "CreatedBy", "UpdatedDate", "UpdatedBy")
+       SELECT s."Id", m."Id", m."PriceIncluded", m."Price", m."Price",
+              m."DiscountPrice", m."PercentDiscountPrice", s."TenantId", true,
+              now(), '00000000-0000-0000-0000-000000000000', NULL, NULL
+         FROM "Module" m, "Store" s
+        WHERE m."Id" = ANY($2::int[]) AND s."Id" = $1`,
+      [storeId, moduleIds]
+    );
+    await client.query('COMMIT');
+  } catch (cause) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw new Error(
+      `store-fixture: seedStoreModulesDirect(${storeId}, [${moduleIds.join(',')}]) failed — ` +
+        `free-plan seeding did not happen: ${cause instanceof Error ? cause.message : String(cause)}`
+    );
+  } finally {
+    await client.end();
+  }
 }
 
 /**

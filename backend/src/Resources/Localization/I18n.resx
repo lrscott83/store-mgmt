@@ -198,6 +198,9 @@
   <data name="PaymentMethodNotUpdated" xml:space="preserve">
     <value>No se pudo actualizar el método de pago</value>
   </data>
+  <data name="PlanLocked" xml:space="preserve">
+    <value>El plan de la tienda está bloqueado. Solo un SuperAdmin puede modificar los módulos del plan.</value>
+  </data>
   <data name="ProductAlreadyExists" xml:space="preserve">
     <value>El nombre '{0}' del producto ya existe.</value>
   </data>

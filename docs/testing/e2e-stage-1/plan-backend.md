@@ -21,7 +21,7 @@ Varios ítems de acá **tocan tests E2E existentes**. Cada uno declara si necesi
 | [B-3](#b-3) | `MintToken` saltea el endpoint de login | Alta | No | No — solo agrega tests nuevos |
 | [B-4](#b-4) | `GetPagedReponseAsync`: `Skip`/`Take` sin `OrderBy` | Media | No — código muerto | No |
 | [B-5](#b-5) | Rechazos esperados logueados como `Unhandled exception` | Baja | No | No |
-| [B-6](#b-6) | No hay forma de desactivar una cuenta, así que el 404 de `/me` no se ejerce | Media | No — brecha declarada | No — solo agrega tests nuevos |
+| [B-6](#b-6) | No hay forma de desactivar una cuenta, así que el 404 de `/me` no se ejerce | Media | **RESUELTO** — `Auth/AuthMeDeactivationTests.cs` | No — tests nuevos |
 
 Lo ya cerrado en la rama `feat/e2e-playwright-login-s1-02` está en [Antecedentes](#antecedentes) — leerlo primero, porque explica por qué esta lista existe.
 
@@ -158,7 +158,11 @@ Ambos son comportamiento **correcto y esperado**:
 
 ## B-6
 
-### No hay forma de desactivar una cuenta, así que el 404 de `/me` nunca se ejerce
+### No hay forma de desactivar una cuenta, así que el 404 de `/me` nunca se ejerce — **RESUELTO**
+
+**Verificado el 2026-08-13**: `Auth/AuthMeDeactivationTests.cs` ejercita exactamente la cadena que este ítem pedía — desactivar por API (`POST /api/v1/users/activate` con `IsActive=false`, `:65` / `:105`) y luego pedir `/me` con el token de esa cuenta → **404** (`Deactivated_same_tenant_store_user_me_returns_404_account_inactive`, `:44`). El camino `activate(false)` existe en el servidor (`Users/UsersActivateTests.cs:20-29`) aunque ninguna pantalla lo invoque (H-6); la brecha era de cobertura y quedó cerrada con tests nuevos, sin tocar ninguno existente.
+
+**Diagnóstico original (histórico).**
 
 **Qué pasa.** `GetMeQuery` usa 404 para dos casos distintos: *NotFound* y *AccountInactive*.
 El frontend los trata igual — `isSessionRejection` (`auth-store.ts:39-45`) evalúa
