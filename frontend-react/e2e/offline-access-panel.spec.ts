@@ -101,7 +101,7 @@ interface ActivationFile {
  * indescifrable.
  */
 async function buildActivationFile(login: string): Promise<ActivationFile> {
-  const bundle = await buildRosterBundle({ users: [{ login }] });
+  const bundle = await buildRosterBundle({ users: [{ login, wrap: 'kat' }] });
 
   if (!GUID_PATTERN.test(bundle.storeId)) {
     throw new Error(

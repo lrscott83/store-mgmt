@@ -215,7 +215,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     // D4: goto (online) -> plant -> fill -> submit, no network cut at all —
     // the navigator stays online the whole test (REQ-2).
     await loginPage.goto();
-    await plantRoster(page, { users: [{ login }] });
+    await plantRoster(page, { users: [{ login, wrap: 'kat' }] });
     await loginPage.fill({ login, password: KAT_PASSWORD });
     await loginPage.submit();
 
@@ -237,7 +237,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     const login = uniqueLogin('t2');
 
     await loginPage.goto();
-    await plantRoster(page, { users: [{ login }] });
+    await plantRoster(page, { users: [{ login, wrap: 'kat' }] });
     await loginPage.fill({ login, password: KAT_PASSWORD });
     await loginPage.submit();
     await page.waitForURL(/\/sales\/products$/);
@@ -506,7 +506,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     const login = uniqueLogin('f4');
 
     await loginPage.goto();
-    const bundle = await plantRoster(page, { users: [{ login }] });
+    const bundle = await plantRoster(page, { users: [{ login, wrap: 'kat' }] });
     await loginPage.fill({ login, password: KAT_PASSWORD });
     await loginPage.submit();
     await page.waitForURL(/\/sales\/products$/);
@@ -570,7 +570,7 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
     const login = uniqueLogin('t11');
 
     await loginPage.goto();
-    await plantRoster(page, { users: [{ login }] });
+    await plantRoster(page, { users: [{ login, wrap: 'kat' }] });
 
     // Verified gotcha (not in design.md): the Vite dev server serves route
     // chunks as on-demand ES module HTTP fetches (playwright.config.ts's own
