@@ -732,6 +732,41 @@ public class LoginCommandHandlerTests
         _mockDataKeyProvider.Verify(x => x.GetDek(It.IsAny<Guid>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_WhenRequeriedUserIsNull_ShouldReturnEmptyFields()
+    {
+        // Arrange — the user vanished between validation and wrap (deleted/hidden): login must
+        // still succeed, the wrap degrades to empty fields (guard in TryBuildLoginDekWrapAsync)
+        var command = new LoginCommand("testuser", "CorrectPassword123!");
+        var userId = Guid.NewGuid();
+        var authResult = Result.Success<Guid>(userId);
+
+        _mockAuthService
+            .Setup(x => x.IsValidUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.FromResult(authResult));
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateToken(userId, command.Login))
+            .Returns("token");
+
+        _mockJwtProvider
+            .Setup(x => x.GenerateRefreshToken())
+            .Returns("test-refresh-token");
+
+        _mockUserRepository
+            .Setup(x => x.GetUserByIdIgnoreQueryFiltersAsync(userId.ToString()))
+            .ReturnsAsync((User)null!);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        result.Data!.WrappedDek.Should().BeEmpty();
+        result.Data.WrapSalt.Should().BeEmpty();
+        result.Data.WrapIv.Should().BeEmpty();
+    }
+
     #endregion
 
     #region Helper Methods
