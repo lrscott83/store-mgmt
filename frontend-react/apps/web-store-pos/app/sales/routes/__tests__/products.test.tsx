@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
+import {
+  registerDecryptionFailurePolicy,
+  resetDecryptionFailureLatch,
+} from '~/shared/lib/storage/decryption-failure-policy';
 import type { BaseResponseModel, CsvImportResult, Product, ProductCategory } from '@store-mgmt/domain';
 
 // --- Mutable in-memory fixtures, controlled per-test ---
@@ -15,12 +19,18 @@ const mockUser = vi.hoisted(() => ({
   isOwnerAdmin: true,
 }));
 
+const logoutMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const state = { user: mockUser, isAuthenticated: true };
-  const useAuthStore = vi.fn((selector?: (s: typeof state) => unknown) => {
-    if (typeof selector === 'function') return selector(state);
-    return state;
-  });
+  const useAuthStore = Object.assign(
+    vi.fn((selector?: (s: typeof state) => unknown) => {
+      if (typeof selector === 'function') return selector(state);
+      return state;
+    }),
+    // The real module exposes this, and the app-wide decryption-failure policy
+    // (registered below, exactly as root.tsx does in the real app) calls it.
+    { getState: () => ({ logout: logoutMock }) },
+  );
   return { useAuthStore };
 });
 
@@ -198,7 +208,18 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
 import { ProductsPage } from '../products';
 
 describe('ProductsPage — strict Angular parity (products.component.html)', () => {
+  // In the real app root.tsx installs the app-wide decryption-failure policy, so
+  // a rejection escaping one of this route's handlers is always claimed. This
+  // suite renders the route with no root above it, so it installs the same real
+  // policy rather than a stand-in: the tests below that provoke a decryption
+  // failure then travel the actual production route (rejection -> vitest.setup's
+  // jsdom bridge -> window event -> policy). Nothing about the policy is
+  // asserted here; it owns its own suite.
+  let unregisterPolicy: () => void;
+
   beforeEach(() => {
+    resetDecryptionFailureLatch();
+    unregisterPolicy = registerDecryptionFailurePolicy();
     mockCategories = [];
     mockProducts = [];
     productServiceSpies.createProduct.mockClear();
@@ -267,6 +288,10 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     // mockRejectedValueOnce queue (loadData-failure test below) needs to not leak, and Once
     // entries self-consume.
     categoryServiceSpies.getProductCategoriesView.mockClear();
+  });
+
+  afterEach(() => {
+    unregisterPolicy();
   });
 
   it('renders the card title "Productos" (PRODUCT.PRODUCTS)', () => {

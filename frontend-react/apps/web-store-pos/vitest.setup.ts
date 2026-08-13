@@ -51,3 +51,26 @@ if (typeof Blob !== 'undefined' && typeof Blob.prototype.text !== 'function') {
     });
   };
 }
+
+// jsdom does not implement `unhandledrejection` (jsdom#2893): a promise that
+// rejects with nobody listening reaches Node's `process.on('unhandledRejection')`
+// and never becomes a DOM event. Real browsers DO fire it on `window`, and the
+// app depends on that: root.tsx installs the app-wide decryption-failure policy
+// as an `unhandledrejection` listener, which is how a failed fire-and-forget
+// entity read reaches the user (see storage/decryption-failure-policy.ts).
+//
+// Without this bridge, any suite that provokes such a rejection fails the run
+// with an unhandled error, and the only alternatives are reshaping production
+// code around a jsdom gap or setting `dangerouslyIgnoreUnhandledErrors`, which
+// would blind all 197 files to real unhandled rejections.
+//
+// This is NOT a blanket suppressor, and the distinction is the whole point:
+// the synthetic event is `cancelable`, so it is swallowed ONLY if a listener
+// claims it with `preventDefault()`. `dispatchEvent` returns false in exactly
+// that case. Anything nobody claims is re-thrown and still fails its test.
+process.on('unhandledRejection', (reason: unknown) => {
+  const event = new Event('unhandledrejection', { cancelable: true });
+  (event as Event & { reason: unknown }).reason = reason;
+  const claimed = !window.dispatchEvent(event);
+  if (!claimed) throw reason;
+});
