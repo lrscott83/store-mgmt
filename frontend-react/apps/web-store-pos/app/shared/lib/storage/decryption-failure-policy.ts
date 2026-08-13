@@ -34,6 +34,11 @@ export type DecryptionFailureKind = 'missing-key' | 'damaged';
 export function classifyDecryptionFailure(error: unknown): DecryptionFailureKind | null {
   const name = (error as { name?: unknown } | null | undefined)?.name;
   if (name === 'MissingDataKeyError') return 'missing-key';
+  // Task 5: a login that cannot unwrap this device's DEK (no device-key wrap,
+  // or a roster wrap that does not open with the password just used) is the
+  // same recoverable story as a missing key — an online login or a roster
+  // import brings it back.
+  if (name === 'DekUnwrapError') return 'missing-key';
   if (name === 'EntityUnreadableError') return 'damaged';
   return null;
 }

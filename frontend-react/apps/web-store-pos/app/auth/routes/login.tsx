@@ -43,12 +43,11 @@ function offlineErrorMessageId(err: unknown): string {
   if (name === 'OfflineUserInactiveError') {
     return 'AUTH.ACCOUNT_INACTIVE';
   }
-  // design §10 / at-rest-encryption-errors: the offline verifier has already
-  // passed by the time unwrap runs, so a DekUnwrapError here means parameter
-  // drift or a corrupt bundle — not a wrong password.
-  if (name === 'DekUnwrapError') {
-    return 'AUTH.UNLOCK_FAILED';
-  }
+  // Task 5: DekUnwrapError is intercepted earlier in handleSubmit (routed
+  // through handleDecryptionFailure, before this function ever runs) — the
+  // offline verifier has already passed by the time unwrap runs, so it means
+  // this device cannot open its own data, not a wrong password. Never
+  // reaches here; see the catch block below.
   // Includes NoRosterError, OfflineVerifierError, and anything unexpected.
   return 'AUTH.SERVER_ERROR';
 }
@@ -117,6 +116,21 @@ export default function LoginPage() {
         navigate(await resolveUserHomePath(user));
       } catch (err: unknown) {
         setIsSubmitting(false);
+        // Task 5: a device that cannot open its own data must not be allowed
+        // to authenticate, offline included — same policy as the online
+        // branch below. Checked BEFORE offlineErrorMessageId's generic
+        // fallback, which would otherwise mislabel this as AUTH.SERVER_ERROR.
+        const { handleDecryptionFailure, resetDecryptionFailureLatch } = await import(
+          '~/shared/lib/storage/decryption-failure-policy'
+        );
+        if (handleDecryptionFailure(err)) {
+          // A fresh login attempt is a NEW failure event, not a second
+          // rejection from one already-reported cause (the latch's actual
+          // target — several entity reads failing from a single load) — so
+          // it must not be silently swallowed on a retry.
+          resetDecryptionFailureLatch();
+          return;
+        }
         setErrors({
           form: intl.formatMessage({ id: offlineErrorMessageId(err) }),
         });
@@ -152,8 +166,22 @@ export default function LoginPage() {
       // that must fail loudly (a swallowed failure would authenticate the
       // user with `needsUnlock` permanently true, looping authLoader ->
       // /login -> "successful" login -> authLoader forever).
-      if ((err as { name?: string } | null)?.name === 'DekUnwrapError') {
-        setErrors({ form: intl.formatMessage({ id: 'AUTH.UNLOCK_FAILED' }) });
+      //
+      // Task 5: a device that cannot open its own data must not be allowed
+      // to authenticate. `handleDecryptionFailure` classifies DekUnwrapError
+      // as the recoverable 'missing-key' case, shows the blocking dialog
+      // naming both recovery routes (online login, roster import), and signs
+      // out — replacing the old inline AUTH.UNLOCK_FAILED message, which left
+      // a `needsUnlock`-permanently-true session standing.
+      const { handleDecryptionFailure, resetDecryptionFailureLatch } = await import(
+        '~/shared/lib/storage/decryption-failure-policy'
+      );
+      if (handleDecryptionFailure(err)) {
+        // A fresh login attempt is a NEW failure event, not a second
+        // rejection from one already-reported cause (the latch's actual
+        // target — several entity reads failing from a single load) — so
+        // it must not be silently swallowed on a retry.
+        resetDecryptionFailureLatch();
         return;
       }
       // Angular login.component.ts:162-167 INVALID_ERROR path: a body-level

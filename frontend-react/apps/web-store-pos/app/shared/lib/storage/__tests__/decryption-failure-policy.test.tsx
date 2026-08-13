@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MissingDataKeyError } from '../entity-crypto';
 import { EntityUnreadableError } from '../read-entity-or-throw';
+import { DekUnwrapError } from '../../offline/dek-unwrap';
 
 const showBlockingErrorMock = vi.fn();
 vi.mock('../../blocking-alert', () => ({
@@ -56,6 +57,14 @@ describe('classifyDecryptionFailure', () => {
     expect(classifyDecryptionFailure(new EntityUnreadableError('k', new Error('tag')))).toBe(
       'damaged',
     );
+  });
+
+  // Task 5: a device that cannot unwrap its DEK at login time (no device-key
+  // wrap, no roster wrap that opens with the password just used) is the same
+  // recoverable story as a missing key elsewhere — signing in online or
+  // importing a roster brings it back.
+  it('classifies a DEK unwrap failure as recoverable, same as a missing key', () => {
+    expect(classifyDecryptionFailure(new DekUnwrapError())).toBe('missing-key');
   });
 
   it('classifies anything else as not ours — the policy must never become a catch-all', () => {
