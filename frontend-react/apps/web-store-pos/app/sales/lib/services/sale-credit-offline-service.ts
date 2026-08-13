@@ -386,13 +386,18 @@ export class SaleCreditOfflineService {
 
   /**
    * Private port of Angular `getSaleCreditsFromLocalStorage` (sale-credit-offline.service.ts:285-302) —
-   * on empty/missing/unparsable storage, auto-initializes by writing an empty array before
-   * returning it. Revives `date`/`paidDate`/`createdDate`/`updatedDate` to `Date` instances —
-   * SAME fields the pre-existing `BaseRepository<SaleCredit>` revived (Decision Gate:
-   * unchanged; Angular's own revival of `paidDate`/nonexistent `paymentDate` has known bugs
-   * that are a separate, out-of-scope fix-vs-replicate call).
+   * on a genuinely empty store (absent key, or an empty-string value), auto-initializes by
+   * writing an empty array before returning it — this half is real Angular parity. An
+   * unreadable store (corrupt/unparsable JSON, or ciphertext with no data key in memory)
+   * throws instead and never writes (design D4). Revives `date`/`paidDate`/`createdDate`/
+   * `updatedDate` to `Date` instances — SAME fields the pre-existing `BaseRepository<SaleCredit>`
+   * revived (Decision Gate: unchanged; Angular's own revival of `paidDate`/nonexistent
+   * `paymentDate` has known bugs that are a separate, out-of-scope fix-vs-replicate call).
    */
   private getSaleCreditsFromLocalStorage(): SaleCredit[] {
+    // design D4: an unreadable store propagates and is never written over. The
+    // auto-init below survives only for its honest case — no stored value at
+    // all, i.e. a genuinely new store.
     const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
       json ? (JSON.parse(json) as SaleCredit[]).map((c) => this.reviveSaleCreditDates(c)) : null,
     );

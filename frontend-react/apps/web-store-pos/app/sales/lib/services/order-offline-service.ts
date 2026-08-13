@@ -592,13 +592,19 @@ export class OrderOfflineService {
 
   /**
    * Private port of Angular `getOrdersFromLocalStorage` (order-offline.service.ts:451-470) —
-   * on empty/missing/unparsable storage, auto-initializes by writing an empty array before
-   * returning it. In the same per-order mapping pass: revives ONLY `date` to a `Date`
-   * instance (Angular revives no other field here) AND backfills `isCredit=false`/
-   * `paymentType=Efectivo` for legacy orders missing those fields (falsy-check semantics,
-   * mirroring Angular's `!order.isCredit`/`!order.paymentType`, not an is-undefined check).
+   * on a genuinely empty store (absent key, or an empty-string value), auto-initializes by
+   * writing an empty array before returning it — this half is real Angular parity. An
+   * unreadable store (corrupt/unparsable JSON, or ciphertext with no data key in memory)
+   * throws instead and never writes (design D4). In the same per-order mapping pass: revives
+   * ONLY `date` to a `Date` instance (Angular revives no other field here) AND backfills
+   * `isCredit=false`/`paymentType=Efectivo` for legacy orders missing those fields
+   * (falsy-check semantics, mirroring Angular's `!order.isCredit`/`!order.paymentType`, not
+   * an is-undefined check).
    */
   private getOrdersFromLocalStorage(): Order[] {
+    // design D4: an unreadable store propagates and is never written over. The
+    // auto-init below survives only for its honest case — no stored value at
+    // all, i.e. a genuinely new store.
     const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
       json ? (JSON.parse(json) as Order[]).map((order) => this.reviveAndBackfillOrder(order)) : null,
     );

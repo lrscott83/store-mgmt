@@ -936,13 +936,18 @@ export class InventoryOfflineService {
 
   /**
    * Private port of Angular `getInventoriesFromLocalStorage`
-   * (inventory-offline.service.ts:535-554) — on empty/missing/`'{}'`/unparsable storage,
-   * auto-initializes by writing an empty Map before returning it. Revives ONLY `date` to a
-   * `Date` instance (Angular parity, lines 540-544) — `createdDate`/`updatedDate` are left as
-   * the raw stored (string) values, unlike the deleted `InventoryRepository`, which revived
-   * all three.
+   * (inventory-offline.service.ts:535-554) — on a genuinely empty store (absent key, or the
+   * `'{}'` sentinel), auto-initializes by writing an empty Map before returning it — this
+   * half is real Angular parity. An unreadable store (corrupt/unparsable JSON, or ciphertext
+   * with no data key in memory) throws instead and never writes (design D4). Revives ONLY
+   * `date` to a `Date` instance (Angular parity, lines 540-544) — `createdDate`/`updatedDate`
+   * are left as the raw stored (string) values, unlike the deleted `InventoryRepository`,
+   * which revived all three.
    */
   private getInventoriesFromLocalStorage(): Map<string, InventoryEntry[]> {
+    // design D4: an unreadable store propagates and is never written over. The
+    // auto-init below survives only for its honest case — no stored value at
+    // all, i.e. a genuinely new store.
     const stored = readEntityOrThrow(this.getStorageKey(), (json) => {
       if (!json || json === '{}') return null;
       const inventoryMap = new Map<string, InventoryEntry[]>(JSON.parse(json));

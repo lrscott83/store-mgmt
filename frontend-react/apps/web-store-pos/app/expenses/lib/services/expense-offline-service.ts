@@ -272,12 +272,18 @@ export class ExpenseOfflineService {
 
   /**
    * Private port of Angular `getExpensesFromLocalStorage` (expense-offline.service.ts:209-226) —
-   * on empty/missing/unparsable storage, auto-initializes by writing an empty array before
-   * returning it. Revives `date`/`createdDate`/`updatedDate` to `Date` instances — SAME fields
-   * the pre-existing `BaseRepository<Expense>` revived (Decision Gate: unchanged; Angular
-   * itself only revives `date` + normalizes `paymentType`, a separate out-of-scope call).
+   * on a genuinely empty store (absent key, or an empty-string value), auto-initializes by
+   * writing an empty array before returning it — this half is real Angular parity. An
+   * unreadable store (corrupt/unparsable JSON, or ciphertext with no data key in memory)
+   * throws instead and never writes (design D4). Revives `date`/`createdDate`/`updatedDate`
+   * to `Date` instances — SAME fields the pre-existing `BaseRepository<Expense>` revived
+   * (Decision Gate: unchanged; Angular itself only revives `date` + normalizes `paymentType`,
+   * a separate out-of-scope call).
    */
   private getExpensesFromLocalStorage(): Expense[] {
+    // design D4: an unreadable store propagates and is never written over. The
+    // auto-init below survives only for its honest case — no stored value at
+    // all, i.e. a genuinely new store.
     const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
       json ? (JSON.parse(json) as Expense[]).map((e) => this.reviveExpenseDates(e)) : null,
     );

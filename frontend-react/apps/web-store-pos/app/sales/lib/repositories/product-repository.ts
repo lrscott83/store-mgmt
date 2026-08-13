@@ -416,10 +416,16 @@ export class ProductRepository {
 
   /**
    * Private port of Angular `getProductsFromLocalStorage` (product.repository.ts:305-320) —
-   * on empty/missing/unparsable storage, auto-initializes by writing an empty Map before
-   * returning it. NO date revival (Angular revives no dates here).
+   * on a genuinely empty store (absent key, or the `'{}'` sentinel), auto-initializes by
+   * writing an empty Map before returning it — this half is real Angular parity. An
+   * unreadable store (corrupt/unparsable JSON, or ciphertext with no data key in memory)
+   * throws instead and never writes (design D4). NO date revival (Angular revives no dates
+   * here).
    */
   private getProductsFromLocalStorage(): Map<string, Product> {
+    // design D4: an unreadable store propagates and is never written over. The
+    // auto-init below survives only for its honest case — no stored value at
+    // all, i.e. a genuinely new store.
     const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
       json && json !== '{}' ? new Map<string, Product>(JSON.parse(json)) : null,
     );
