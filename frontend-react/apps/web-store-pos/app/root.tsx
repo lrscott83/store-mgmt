@@ -15,6 +15,10 @@ import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registrat
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
 import { registerAuthRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
+import {
+  handleDecryptionFailure,
+  registerDecryptionFailurePolicy,
+} from '~/shared/lib/storage/decryption-failure-policy';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { InstallAppButton } from '~/shared/components/install-app-button';
 import { ToastContainer } from 'react-toastify';
@@ -88,6 +92,12 @@ export default function App() {
     registerAuthRedirect(navigate);
   }, [navigate]);
 
+  // design D5: one app-wide response to a decryption failure, rather than a
+  // guard at each of the ~20 authenticated routes that read entity storage.
+  // Rejected promises arrive here; a throw during render or in a loader is
+  // caught by the ErrorBoundary below, which calls the same handler.
+  useEffect(() => registerDecryptionFailurePolicy(), []);
+
   // Stage 6 Slice C: client-side daily store-usage tracker, mirroring
   // Angular's `StoreUsageTrackerService` nav hook (see
   // `~/shared/lib/usage/store-usage-tracker.ts`).
@@ -122,6 +132,13 @@ export function HydrateFallback() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  // design D5, seam 2: a decryption failure THROWN during render or in a
+  // loader never becomes an unhandled rejection, so the listener above cannot
+  // see it — react-router routes it here instead. The policy shows its own
+  // message and ends the session; rendering the generic error page underneath
+  // would tell the user two different things about one failure.
+  if (handleDecryptionFailure(error)) return null;
+
   // ErrorBoundary can render on paths that never reach I18nProvider (e.g. a
   // root-level render error), so it reads the Spanish catalog directly
   // instead of useIntl (view-text-parity).

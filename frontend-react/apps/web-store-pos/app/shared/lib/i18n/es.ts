@@ -830,6 +830,17 @@ const messages: Record<string, string> = {
   'SYNC.ERROR_NO_FILE': 'Seleccioná un archivo de respaldo.',
   'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
   'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
+
+  // At-rest encryption — the two decryption failures the app-wide policy
+  // announces (decryption-failure-policy.ts). They are worded differently on
+  // purpose: the first is recoverable and names both recovery routes, the
+  // second is not, and says so rather than sending the user chasing a fix that
+  // does not exist. Both end the session, so both must also reassure that the
+  // data was left untouched.
+  'ENCRYPTION.KEY_UNAVAILABLE':
+    'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.',
+  'ENCRYPTION.DATA_DAMAGED':
+    'La información guardada en este dispositivo está dañada y no se pudo leer. No se borró nada.',
 };
 
 export default messages;

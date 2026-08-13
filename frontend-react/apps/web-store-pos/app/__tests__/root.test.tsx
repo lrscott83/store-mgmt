@@ -38,6 +38,22 @@ vi.mock('~/shared/lib/i18n/i18n-provider', () => ({
   I18nProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// design D5: root.tsx owns the two seams through which a decryption failure
+// reaches the app-wide policy. The policy itself is unit-tested in
+// storage/__tests__/decryption-failure-policy.test.ts; these tests assert only
+// the WIRING, so the module is stubbed rather than exercised (which also keeps
+// the real one's auth-store import out of this file's mock graph).
+const mockRegisterDecryptionFailurePolicy = vi.fn();
+const mockUnregisterDecryptionFailurePolicy = vi.fn();
+const mockHandleDecryptionFailure = vi.fn().mockReturnValue(false);
+vi.mock('~/shared/lib/storage/decryption-failure-policy', () => ({
+  registerDecryptionFailurePolicy: () => {
+    mockRegisterDecryptionFailurePolicy();
+    return mockUnregisterDecryptionFailurePolicy;
+  },
+  handleDecryptionFailure: (error: unknown) => mockHandleDecryptionFailure(error),
+}));
+
 // TOAST-CONTAINER (toast-notifications-parity): recording stub so the test can assert
 // root.tsx mounts exactly one <ToastContainer> with the Angular-equivalent config, without
 // pulling in the real react-toastify runtime.
@@ -170,6 +186,70 @@ describe('Layout — mounts a single global <ToastContainer> (Angular ToastrModu
     expect(containerProps).toHaveBeenCalledWith(
       expect.objectContaining({ position: 'top-right', autoClose: 1000, closeButton: true }),
     );
+  });
+});
+
+// design D5: one app-wide response to a decryption failure, installed once at
+// the root, instead of a guard at each of the ~20 authenticated routes that
+// read entity storage.
+describe('App (root) — installs the app-wide decryption-failure policy (design D5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHandleDecryptionFailure.mockReturnValue(false);
+    useLoadingStore.setState({ count: 0, isLoading: false });
+  });
+
+  it('registers the policy once on mount', () => {
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(mockRegisterDecryptionFailurePolicy).toHaveBeenCalledTimes(1);
+    expect(mockUnregisterDecryptionFailurePolicy).not.toHaveBeenCalled();
+  });
+
+  it('tears the listener down on unmount, so a remount does not stack two of them', () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
+
+    unmount();
+
+    expect(mockUnregisterDecryptionFailurePolicy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The second seam: a decryption failure that THROWS during render or in a
+// loader never becomes an unhandled rejection — react-router routes it here.
+describe('ErrorBoundary — routes a decryption failure to the same policy (design D5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHandleDecryptionFailure.mockReturnValue(false);
+  });
+
+  it('hands the error to the policy and renders nothing once the policy owns it', () => {
+    mockHandleDecryptionFailure.mockReturnValue(true);
+    const error = new Error('no data key');
+
+    const { container } = render(<ErrorBoundary error={error} params={{}} />);
+
+    expect(mockHandleDecryptionFailure).toHaveBeenCalledWith(error);
+    // The policy already showed its own blocking message and signed the user
+    // out; rendering the generic error page under it would say two different
+    // things about one failure.
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders the generic error page unchanged when the policy declines the error', () => {
+    mockHandleDecryptionFailure.mockReturnValue(false);
+
+    render(<ErrorBoundary error={mockRouteError(404)} params={{}} />);
+
+    expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
   });
 });
 

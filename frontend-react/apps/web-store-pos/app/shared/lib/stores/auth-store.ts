@@ -301,6 +301,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { resolveDekForLogin } = await import('../offline/dek-provisioning');
       await resolveDekForLogin({ login: user.login, password, sessionStoreId: user.selectedStoreId });
 
+      // Task 4: a login that RESOLVED a key is the one event meaning "this
+      // device can read again", so it re-arms the decryption-failure policy's
+      // latch. Placed after `resolveDekForLogin` on purpose — a login that
+      // rejects proves nothing and must leave the latch alone, or one
+      // unreadable store produces a dialog per retry.
+      //
+      // Dynamic import for the same reason as the line above (D6) plus one
+      // more: `decryption-failure-policy` imports THIS module, so a static
+      // import here would close a cycle at module-evaluation time, and it
+      // would drag sweetalert2 into every cold boot.
+      const { resetDecryptionFailureLatch } = await import(
+        '../storage/decryption-failure-policy'
+      );
+      resetDecryptionFailureLatch();
+
       set({ isLoading: false });
       return user;
     } catch (err) {
@@ -332,6 +347,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // online path above.
       const { resolveDekForLogin } = await import('../offline/dek-provisioning');
       await resolveDekForLogin({ login: user.login, password, sessionStoreId: user.selectedStoreId });
+      // Task 4: re-arm the decryption-failure latch, same rationale (and same
+      // dynamic-import rationale) as the online path above.
+      const { resetDecryptionFailureLatch } = await import(
+        '../storage/decryption-failure-policy'
+      );
+      resetDecryptionFailureLatch();
       // The ONE hydration seam (auth-session spec: "loginOffline hydrates
       // through the existing setUser seam") — writes TOKEN/CURRENT_USER/
       // AUTH_MODEL exactly like online login().
