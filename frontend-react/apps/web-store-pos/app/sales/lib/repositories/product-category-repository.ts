@@ -2,6 +2,7 @@ import type { ProductCategory } from '@store-mgmt/domain';
 import { ProductCategoryErrors, Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -235,14 +236,14 @@ export class ProductCategoryRepository {
    * returning it.
    */
   private getProductCategoriesFromLocalStorage(): Map<string, ProductCategory> {
-    try {
-      const categoryMapJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
-      if (categoryMapJson && categoryMapJson !== '{}') {
-        return new Map(JSON.parse(categoryMapJson));
-      }
-    } catch {
-      // ignore — fall through to auto-init
-    }
+    // design D4: an unreadable store propagates and is never written over. The
+    // auto-init below survives only for its honest case — no stored value at
+    // all, i.e. a genuinely new store.
+    const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
+      json && json !== '{}' ? new Map<string, ProductCategory>(JSON.parse(json)) : null,
+    );
+    if (stored) return stored;
+
     const categories = new Map<string, ProductCategory>();
     this.setProductCategoriesLocalStorage(categories);
     return categories;

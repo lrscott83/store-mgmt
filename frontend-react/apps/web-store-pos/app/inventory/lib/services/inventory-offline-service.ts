@@ -9,6 +9,7 @@ import { DataResult, InventoryErrors, ProductErrors, Result, success } from '@st
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import {
   hasAvailableProductToSale,
@@ -942,20 +943,18 @@ export class InventoryOfflineService {
    * all three.
    */
   private getInventoriesFromLocalStorage(): Map<string, InventoryEntry[]> {
-    try {
-      const inventoriesJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
-      if (inventoriesJson && inventoriesJson !== '{}') {
-        const inventoryMap: Map<string, InventoryEntry[]> = new Map(JSON.parse(inventoriesJson));
-        inventoryMap.forEach((entries) => {
-          entries.forEach((entry) => {
-            (entry as unknown as { date: Date }).date = new Date(entry.date);
-          });
+    const stored = readEntityOrThrow(this.getStorageKey(), (json) => {
+      if (!json || json === '{}') return null;
+      const inventoryMap = new Map<string, InventoryEntry[]>(JSON.parse(json));
+      inventoryMap.forEach((entries) => {
+        entries.forEach((entry) => {
+          (entry as unknown as { date: Date }).date = new Date(entry.date);
         });
-        return inventoryMap;
-      }
-    } catch {
-      // ignore — fall through to auto-init
-    }
+      });
+      return inventoryMap;
+    });
+    if (stored) return stored;
+
     const inventories = new Map<string, InventoryEntry[]>();
     this.setInventoriesLocalStorage(inventories);
     return inventories;

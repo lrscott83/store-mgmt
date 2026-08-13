@@ -1,7 +1,8 @@
 import type { BaseResponseModel, SaleCredit } from '@store-mgmt/domain';
 import { DataResult, PaymentType, Result, SaleCreditErrors, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
-import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 
@@ -392,15 +393,11 @@ export class SaleCreditOfflineService {
    * that are a separate, out-of-scope fix-vs-replicate call).
    */
   private getSaleCreditsFromLocalStorage(): SaleCredit[] {
-    try {
-      const saleCreditsJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
-      if (saleCreditsJson) {
-        const saleCredits = JSON.parse(saleCreditsJson) as SaleCredit[];
-        return saleCredits.map((c) => this.reviveSaleCreditDates(c));
-      }
-    } catch {
-      // ignore — fall through to auto-init
-    }
+    const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
+      json ? (JSON.parse(json) as SaleCredit[]).map((c) => this.reviveSaleCreditDates(c)) : null,
+    );
+    if (stored) return stored;
+
     this.setSaleCreditsLocalStorage([]);
     return [];
   }

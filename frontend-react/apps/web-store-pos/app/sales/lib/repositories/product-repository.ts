@@ -3,6 +3,7 @@ import { ProductCategoryErrors, ProductErrors, Result } from '@store-mgmt/domain
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { ProductCategoryRepository } from './product-category-repository';
 
 function generateId(): string {
@@ -419,14 +420,11 @@ export class ProductRepository {
    * returning it. NO date revival (Angular revives no dates here).
    */
   private getProductsFromLocalStorage(): Map<string, Product> {
-    try {
-      const productMapJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
-      if (productMapJson && productMapJson !== '{}') {
-        return new Map(JSON.parse(productMapJson));
-      }
-    } catch {
-      // ignore — fall through to auto-init
-    }
+    const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
+      json && json !== '{}' ? new Map<string, Product>(JSON.parse(json)) : null,
+    );
+    if (stored) return stored;
+
     const products = new Map<string, Product>();
     this.setProductsLocalStorage(products);
     return products;

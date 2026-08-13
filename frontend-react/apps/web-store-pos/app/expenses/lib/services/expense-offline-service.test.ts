@@ -3,6 +3,8 @@ import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
 import type { BaseResponseModel, Expense, UserModel } from '@store-mgmt/domain';
 import { ExpenseOfflineService } from './expense-offline-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
+import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 const storeId = 'store-test';
 
@@ -107,6 +109,20 @@ describe('ExpenseOfflineService', () => {
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === `lizoft.store-expenses-${storeId}`);
       expect(callsForKey).toHaveLength(1);
+    });
+
+    it('throws instead of returning an empty array when the stored expenses cannot be read', () => {
+      localStorage.setItem(`lizoft.store-expenses-${storeId}`, 'enc:v1:AAAA');
+      const freshSvc = new ExpenseOfflineService(storeId);
+      expect(() => freshSvc.getStorageExpenses()).toThrow(MissingDataKeyError);
+    });
+
+    it('leaves the unreadable bytes byte-for-byte intact', () => {
+      const bytes = 'enc:v1:AAAA';
+      localStorage.setItem(`lizoft.store-expenses-${storeId}`, bytes);
+      const freshSvc = new ExpenseOfflineService(storeId);
+      expect(() => freshSvc.getStorageExpenses()).toThrow();
+      expect(localStorage.getItem(`lizoft.store-expenses-${storeId}`)).toBe(bytes);
     });
 
     it('STILL revives date/createdDate/updatedDate to Date instances on a fresh instance re-read (unchanged React behavior — Decision Gate)', () => {

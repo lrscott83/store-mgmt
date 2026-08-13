@@ -12,6 +12,8 @@ function unwrap<T>(response: BaseResponseModel<T>): T {
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
+import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
+import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 // Mock InventoryOfflineService BEFORE importing OrderOfflineService
 vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
@@ -650,6 +652,20 @@ describe('OrderOfflineService', () => {
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === 'lizoft.store-orders-s1');
       expect(callsForKey).toHaveLength(1);
+    });
+
+    it('throws instead of returning an empty array when the stored orders cannot be read', () => {
+      localStorage.setItem('lizoft.store-orders-s1', 'enc:v1:AAAA');
+      const freshService = new OrderOfflineService('s1');
+      expect(() => freshService.getStorageOrders()).toThrow(MissingDataKeyError);
+    });
+
+    it('leaves the unreadable bytes byte-for-byte intact', () => {
+      const bytes = 'enc:v1:AAAA';
+      localStorage.setItem('lizoft.store-orders-s1', bytes);
+      const freshService = new OrderOfflineService('s1');
+      expect(() => freshService.getStorageOrders()).toThrow();
+      expect(localStorage.getItem('lizoft.store-orders-s1')).toBe(bytes);
     });
 
     // Angular parity (order-offline.service.ts:456-463): revives ONLY `date` on read;

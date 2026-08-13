@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProductCategory } from '@store-mgmt/domain';
 import { ProductCategoryRepository } from '../product-category-repository';
+import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
+import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 const storeId = 's1';
 const STORAGE_KEY = `lizoft.store-product-categories-${storeId}`;
@@ -72,6 +74,20 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === STORAGE_KEY);
       expect(callsForKey).toHaveLength(1);
+    });
+
+    it('throws instead of returning an empty map when the stored categories cannot be read', () => {
+      localStorage.setItem('lizoft.store-product-categories-s1', 'enc:v1:AAAA');
+      const freshRepo = new ProductCategoryRepository('s1');
+      expect(() => freshRepo.getProductCategories()).toThrow(MissingDataKeyError);
+    });
+
+    it('leaves the unreadable bytes byte-for-byte intact', () => {
+      const bytes = 'enc:v1:AAAA';
+      localStorage.setItem('lizoft.store-product-categories-s1', bytes);
+      const freshRepo = new ProductCategoryRepository('s1');
+      expect(() => freshRepo.getProductCategories()).toThrow();
+      expect(localStorage.getItem('lizoft.store-product-categories-s1')).toBe(bytes);
     });
   });
 

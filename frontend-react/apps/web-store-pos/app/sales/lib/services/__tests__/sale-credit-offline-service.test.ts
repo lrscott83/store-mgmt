@@ -3,6 +3,8 @@ import { SaleCreditOfflineService } from '../sale-credit-offline-service';
 import { PaymentType } from '@store-mgmt/domain';
 import type { BaseResponseModel, SaleCredit, UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
+import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 // response-envelope-nullability: `data` only narrows to non-null on the succeeded
 // branch. These tests only ever exercise the success path, so unwrap once instead of
@@ -579,6 +581,20 @@ describe('SaleCreditOfflineService', () => {
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === 'lizoft.store-saleCredits-s1');
       expect(callsForKey).toHaveLength(1);
+    });
+
+    it('throws instead of returning an empty array when the stored sale credits cannot be read', () => {
+      localStorage.setItem('lizoft.store-saleCredits-s1', 'enc:v1:AAAA');
+      const freshService = new SaleCreditOfflineService('s1');
+      expect(() => freshService.getStorageSaleCredits()).toThrow(MissingDataKeyError);
+    });
+
+    it('leaves the unreadable bytes byte-for-byte intact', () => {
+      const bytes = 'enc:v1:AAAA';
+      localStorage.setItem('lizoft.store-saleCredits-s1', bytes);
+      const freshService = new SaleCreditOfflineService('s1');
+      expect(() => freshService.getStorageSaleCredits()).toThrow();
+      expect(localStorage.getItem('lizoft.store-saleCredits-s1')).toBe(bytes);
     });
 
     it('STILL revives date/paidDate/createdDate/updatedDate to Date instances on a fresh instance re-read (unchanged React behavior — Decision Gate)', () => {

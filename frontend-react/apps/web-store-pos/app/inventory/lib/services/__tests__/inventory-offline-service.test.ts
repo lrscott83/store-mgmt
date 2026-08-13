@@ -5,6 +5,8 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { InventoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
 import type { BaseResponseModel, InventoryEntry, OrderItem, Product, ProductCategory, UserModel } from '@store-mgmt/domain';
+import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
+import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 const storeId = 's1';
 
@@ -1478,6 +1480,26 @@ describe('InventoryOfflineService', () => {
       expect(map.size).toBe(0);
       const raw = localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`);
       expect(raw).toBe('[]');
+    });
+
+    it('throws instead of returning an empty map when the stored inventory entries cannot be read', () => {
+      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, 'enc:v1:AAAA');
+      const freshService = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
+      expect(() => freshService.getStorageInventoriesMap()).toThrow(MissingDataKeyError);
+    });
+
+    it('leaves the unreadable bytes byte-for-byte intact', () => {
+      const bytes = 'enc:v1:AAAA';
+      localStorage.setItem(`lizoft.store-inventory-entries-${storeId}`, bytes);
+      const freshService = new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      );
+      expect(() => freshService.getStorageInventoriesMap()).toThrow();
+      expect(localStorage.getItem(`lizoft.store-inventory-entries-${storeId}`)).toBe(bytes);
     });
 
     it('reuses the in-memory cache across two reads without an intervening write (localStorage.getItem hit once)', () => {

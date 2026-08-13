@@ -2,7 +2,8 @@ import type { BaseResponseModel, Expense } from '@store-mgmt/domain';
 import type { ExpenseType, PaymentType } from '@store-mgmt/domain';
 import { DataResult, ExpenseErrors, Result, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
-import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
@@ -277,15 +278,11 @@ export class ExpenseOfflineService {
    * itself only revives `date` + normalizes `paymentType`, a separate out-of-scope call).
    */
   private getExpensesFromLocalStorage(): Expense[] {
-    try {
-      const expensesJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
-      if (expensesJson) {
-        const expenses = JSON.parse(expensesJson) as Expense[];
-        return expenses.map((e) => this.reviveExpenseDates(e));
-      }
-    } catch {
-      // ignore — fall through to auto-init
-    }
+    const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
+      json ? (JSON.parse(json) as Expense[]).map((e) => this.reviveExpenseDates(e)) : null,
+    );
+    if (stored) return stored;
+
     this.setExpensesLocalStorage([]);
     return [];
   }

@@ -3,6 +3,8 @@ import type { Product, ProductCategory, UserModel } from '@store-mgmt/domain';
 import { ProductRepository } from '../product-repository';
 import { ProductCategoryRepository } from '../product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
+import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
+import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 const storeId = 's1';
 
@@ -122,6 +124,20 @@ describe('ProductRepository (React mirror of Angular product.repository.ts looku
 
       const callsForKey = getItemSpy.mock.calls.filter(([key]) => key === `lizoft.store-products-${storeId}`);
       expect(callsForKey).toHaveLength(1);
+    });
+
+    it('throws instead of returning an empty map when the stored products cannot be read', () => {
+      localStorage.setItem('lizoft.store-products-s1', 'enc:v1:AAAA');
+      const freshRepo = new ProductRepository('s1', new ProductCategoryRepository('s1'));
+      expect(() => freshRepo.getStorageProductsMap()).toThrow(MissingDataKeyError);
+    });
+
+    it('leaves the unreadable bytes byte-for-byte intact', () => {
+      const bytes = 'enc:v1:AAAA';
+      localStorage.setItem('lizoft.store-products-s1', bytes);
+      const freshRepo = new ProductRepository('s1', new ProductCategoryRepository('s1'));
+      expect(() => freshRepo.getStorageProductsMap()).toThrow();
+      expect(localStorage.getItem('lizoft.store-products-s1')).toBe(bytes);
     });
 
     it('does NOT revive createdDate/updatedDate to Date instances on a fresh instance re-read (Angular repo revives no dates)', () => {

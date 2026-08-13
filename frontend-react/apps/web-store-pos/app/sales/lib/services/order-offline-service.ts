@@ -3,6 +3,7 @@ import { DataResult, OrderErrors, OrderType, PaymentType, Result, success } from
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
@@ -598,15 +599,11 @@ export class OrderOfflineService {
    * mirroring Angular's `!order.isCredit`/`!order.paymentType`, not an is-undefined check).
    */
   private getOrdersFromLocalStorage(): Order[] {
-    try {
-      const ordersJson = decryptEntity(localStorage.getItem(this.getStorageKey()));
-      if (ordersJson) {
-        const orders = JSON.parse(ordersJson) as Order[];
-        return orders.map((order) => this.reviveAndBackfillOrder(order));
-      }
-    } catch {
-      // ignore — fall through to auto-init
-    }
+    const stored = readEntityOrThrow(this.getStorageKey(), (json) =>
+      json ? (JSON.parse(json) as Order[]).map((order) => this.reviveAndBackfillOrder(order)) : null,
+    );
+    if (stored) return stored;
+
     this.setOrdersLocalStorage([]);
     return [];
   }
