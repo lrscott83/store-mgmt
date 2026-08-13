@@ -17,7 +17,14 @@ export const DEVICE_DEK_KEY = 'lizoft.device-dek';
 
 export interface DeviceDekTable {
   formatVersion: 1;
-  dekSource: 'roster' | 'local';
+  // Provenance of the key this table holds, for forensics only — nothing
+  // branches on it. `'login-response'` is the D1 source-3 addition (the wrap
+  // the login response carries); it is server-derived exactly like
+  // `'roster'`, but recording it as `'roster'` would claim a bundle that may
+  // never have existed on this device, and recording it as `'local'` would
+  // claim the opposite of the truth — `'local'` means "minted here, nobody can
+  // ever re-derive it", the pre-D2 behaviour this change removed.
+  dekSource: 'roster' | 'local' | 'login-response';
   storeId: string;
   device: { wrappedDek: string; wrapIv: string } | null;
   users: Record<string, WrappedDekEntry>;
@@ -33,7 +40,13 @@ function hasValidShape(candidate: unknown): candidate is DeviceDekTable {
   if (!candidate || typeof candidate !== 'object') return false;
   const t = candidate as Record<string, unknown>;
   if (t['formatVersion'] !== 1) return false;
-  if (t['dekSource'] !== 'roster' && t['dekSource'] !== 'local') return false;
+  if (
+    t['dekSource'] !== 'roster' &&
+    t['dekSource'] !== 'local' &&
+    t['dekSource'] !== 'login-response'
+  ) {
+    return false;
+  }
   if (typeof t['storeId'] !== 'string') return false;
   if (t['device'] !== null && typeof t['device'] !== 'object') return false;
   if (!t['users'] || typeof t['users'] !== 'object' || Array.isArray(t['users'])) return false;

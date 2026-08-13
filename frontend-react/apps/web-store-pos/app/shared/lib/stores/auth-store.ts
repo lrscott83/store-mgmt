@@ -303,10 +303,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // device-wrapped-dek design §5 (dek-provisioning, D4/D6): resolve
       // THIS DEVICE's DEK for this login — an existing device DEK, else
-      // this login's own roster wrap. There is no third fallback: design D2
-      // removed the Q2 local mint, because only the SERVER can re-derive a
-      // store's key and data written under an invented one is recoverable by
-      // nobody. Dynamic import (D6): `dek-provisioning` is an `offline/`
+      // this login's own roster wrap, else the wrap THIS response carried
+      // (design D1 source 3: `AuthDto` ships the store's key wrapped under the
+      // user's password, byte-compatible with the roster's, which is what lets
+      // a brand-new device with no roster sign in at all). There is no further
+      // fallback: design D2 removed the Q2 local mint, because only the SERVER
+      // can re-derive a store's key and data written under an invented one is
+      // recoverable by nobody. The three fields are forwarded exactly as
+      // received — empty strings are the contract's "no wrap available" signal
+      // and the resolver reads them as absent.
+      // Dynamic import (D6): `dek-provisioning` is an `offline/`
       // module and this file is evaluated on every page load.
       // NOT wrapped in a swallowing try/catch — a DekUnwrapError here (the
       // step 3b hard-fail, where this login's roster wrap does not open with
@@ -319,7 +325,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // also runs the eager entity migration pass itself (design §5 step
       // 6), so the old direct call here is gone.
       const { resolveDekForLogin } = await import('../offline/dek-provisioning');
-      await resolveDekForLogin({ login: user.login, password, sessionStoreId: user.selectedStoreId });
+      await resolveDekForLogin({
+        login: user.login,
+        password,
+        sessionStoreId: user.selectedStoreId,
+        wrappedDek: authData.wrappedDek,
+        wrapSalt: authData.wrapSalt,
+        wrapIv: authData.wrapIv,
+      });
 
       // Task 4: a login that RESOLVED a key is the one event meaning "this
       // device can read again", so it re-arms the decryption-failure policy's
@@ -356,8 +369,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = await authenticateOffline(login, password);
       // device-wrapped-dek design §5 (D4): resolve THIS DEVICE's DEK for
       // this login, same as the online path — an existing device DEK,
-      // else this login's own roster wrap, and no third fallback since
-      // design D2 removed the Q2 local mint. Consequence worth knowing: a
+      // else this login's own roster wrap, and no further fallback since
+      // design D2 removed the Q2 local mint. The online path's third source
+      // (design D1: the login response's wrap) is deliberately NOT passed
+      // here and must not be: this path never contacts the server, it
+      // authenticates from the roster file alone, so there is no response to
+      // take a wrap from. Consequence worth knowing: a
       // v1 roster carries no wrap, so an offline login against one now
       // requires a device this login has already provisioned.
       // `authenticateOffline` itself is UNTOUCHED (D4) and may

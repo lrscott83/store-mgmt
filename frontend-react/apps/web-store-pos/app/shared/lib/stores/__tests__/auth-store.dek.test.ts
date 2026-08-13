@@ -99,12 +99,19 @@ function mockAuthHttp(loginResponse: BaseResponseModel<AuthModel>, meUser: UserM
   }));
 }
 
-function successEnvelope(): BaseResponseModel<AuthModel> {
+// `dekWrap` (Task 7 / design D1 source 3) defaults to EMPTY, so every existing
+// caller keeps describing exactly what it described before: a login response
+// with no wrap — which is also the shape the backend returns when it cannot
+// produce one (`AuthDto`'s three fields default to `""`).
+function successEnvelope(
+  dekWrap: Partial<Pick<AuthModel, 'wrappedDek' | 'wrapSalt' | 'wrapIv'>> = {},
+): BaseResponseModel<AuthModel> {
   return {
     data: {
       authToken: 'tok123',
       refreshToken: 'ref123',
       expiresIn: Date.now() + 1_000_000,
+      ...dekWrap,
     } as AuthModel,
     succeeded: true,
     message: '',
@@ -241,6 +248,40 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
       vi.doUnmock('../../offline/dek-provisioning');
       vi.doUnmock('~/shared/lib/http/auth-http-service');
     }
+  });
+
+  // Task 7 / design D1 source 3 — the plan's required test, end to end through
+  // the real online `login()`. This is the exact device 11.3 above refuses:
+  // no device table, no roster, nothing. What changed is not the resolver's
+  // appetite for inventing keys (it still invents nothing) but the arrival of
+  // a THIRD server-derived source: `AuthDto` now carries the store's key
+  // wrapped under this user's password, byte-compatible with the roster's own
+  // wrap, so `unwrapDek` opens it with no translation.
+  it('11.6: login response carrying a wrap provisions a bare device (no table, no roster)', async () => {
+    const loginWrap = await wrapDek('secret', FIXED_DEK);
+    mockAuthHttp(
+      successEnvelope(loginWrap),
+      makeAuthUser({ selectedStoreId: 'online-session-id' }),
+    );
+
+    // PRECONDITION — the two sources that could otherwise supply the key are
+    // genuinely absent, so a pass below is the login response's doing. (The
+    // `beforeEach` clears localStorage; asserted rather than assumed, since
+    // 11.3 proves this same state rejects without the wrap.)
+    expect(readDeviceDekTable()).toBeNull();
+
+    await useAuthStore.getState().login('ana@example.com', 'secret');
+
+    expect(Array.from(getDek()!)).toEqual(Array.from(FIXED_DEK));
+    // No roster bundle to read a store id from, so it is the session's own —
+    // the binding 11.5 pins, now load-bearing for an observable outcome.
+    expect(getDekStoreId()).toBe('online-session-id');
+    const table = readDeviceDekTable()!;
+    expect(table.dekSource).toBe('login-response');
+    expect(table.storeId).toBe('online-session-id');
+    expect(table.users['ana@example.com']).toBeDefined();
+
+    vi.doUnmock('~/shared/lib/http/auth-http-service');
   });
 });
 

@@ -378,6 +378,101 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     }
   });
 
+  // D1 source 3 — the login response's wrap. The design's ordered resolution
+  // is: device wrap > this login's own table entry > THE LOGIN RESPONSE'S WRAP
+  // > the roster's wrap. Sources 3 and 4 both carry the key the SERVER
+  // derived, so they agree by construction; what source 3 adds is the case no
+  // other source can cover — a brand-new device that never imported a roster.
+  // Before this, D2's refusal (5.1 above) locked that device out of the app
+  // entirely, online or not.
+  it('D1: no table, no roster, but the login response carries a wrap -> adopts exactly that key and creates the table', async () => {
+    const serverDek = KEY_B;
+    const loginWrap = await wrapDekWithPassword('secret', serverDek);
+
+    // PRECONDITION — the device really has nothing else to fall back on, so a
+    // pass below cannot be some other source quietly supplying the key.
+    expect(readDeviceDekTable()).toBeNull();
+
+    await resolveDekForLogin({
+      login: 'ana',
+      password: 'secret',
+      sessionStoreId: STORE_ID,
+      ...loginWrap,
+    });
+
+    // Exactly the bytes the login response carried — not a re-mint, not a
+    // different key that merely happens to be 32 bytes long.
+    expect(Array.from(getDek()!)).toEqual(Array.from(serverDek));
+    // A login response carries no bundle to read a store id from, so the
+    // session's own store id is the only source for it.
+    expect(getDekStoreId()).toBe(STORE_ID);
+
+    const table = readDeviceDekTable()!;
+    expect(table.dekSource).toBe('login-response');
+    expect(table.storeId).toBe(STORE_ID);
+    // The invariant D3's cross-store test states: the scope the table restores
+    // the key under on the next page load is the scope this session uses.
+    expect(table.storeId).toBe(getDekStoreId());
+    // Provisioned for next time: the device wrap makes the next page load
+    // recover without a password, and this login's own wrap makes the next
+    // login recover without a login response.
+    expect(table.device).not.toBeNull();
+    const recovered = await unwrapDek('secret', table.users['ana']);
+    expect(Array.from(recovered)).toEqual(Array.from(serverDek));
+  });
+
+  // The SAME source, at the OTHER dead end (F5, pinned by 5.9 above): a table
+  // exists but holds nothing this login can open, and there is no roster
+  // entry either. Without this, a device carrying an unrelated user's wrap is
+  // still refused even though the login response just handed over a valid
+  // key — the same lockout D1 exists to close, one branch over.
+  it('D1 (F5): table with wraps for another user only, no roster, login-response wrap -> adopts it and adds this login\'s entry', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'other-user', 'secret2', STORE_ID);
+    const serverDek = KEY_B;
+    const loginWrap = await wrapDekWithPassword('secret', serverDek);
+
+    // PRECONDITION — this is genuinely the F5 shape 5.9 pins: a table with no
+    // entry for 'ana', and no roster at all.
+    expect(readDeviceDekTable()!.users['ana']).toBeUndefined();
+
+    await resolveDekForLogin({
+      login: 'ana',
+      password: 'secret',
+      sessionStoreId: STORE_ID,
+      ...loginWrap,
+    });
+
+    expect(Array.from(getDek()!)).toEqual(Array.from(serverDek));
+
+    const table = readDeviceDekTable()!;
+    // The existing table is extended, not replaced: the other user's wrap
+    // survives, and the table keeps describing its own store.
+    expect(Object.keys(table.users).sort()).toEqual(['ana', 'other-user']);
+    expect(table.storeId).toBe(STORE_ID);
+    const recovered = await unwrapDek('secret', table.users['ana']);
+    expect(Array.from(recovered)).toEqual(Array.from(serverDek));
+  });
+
+  // Backend contract rule 4: when the wrap cannot be produced, the login
+  // succeeds with the three fields EMPTY rather than failing. Empty means
+  // "absent" — never a malformed wrap to feed to `unwrapDek` and fail on, and
+  // never a reason to stop refusing.
+  it('D1: empty login-response wrap fields mean "absent" -> still refuses, exactly as with no fields at all', async () => {
+    await expect(
+      resolveDekForLogin({
+        login: 'ana',
+        password: 'secret',
+        sessionStoreId: STORE_ID,
+        wrappedDek: '',
+        wrapSalt: '',
+        wrapIv: '',
+      }),
+    ).rejects.toMatchObject({ name: 'DekUnwrapError' });
+
+    expect(getDek()).toBeNull();
+    expect(readDeviceDekTable()).toBeNull();
+  });
+
   // D3 — the server's key wins. Before this change, step 4 detected the
   // disagreement and only wrote a `console.error`, which made "import a fresh
   // roster" a no-op on any device that had drifted: the recovery route the

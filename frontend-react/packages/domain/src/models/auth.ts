@@ -9,6 +9,19 @@ export interface AuthModel {
   authToken: string;
   refreshToken: string;
   expiresIn: number;
+  /**
+   * The store's data key, wrapped under this user's password
+   * (`Dtos/Authentication/AuthDto.cs`, populated by
+   * `LoginCommandHandler.TryBuildLoginDekWrapAsync`). Byte-compatible with the
+   * roster's per-user wrap, so these three go straight into `unwrapDek`'s
+   * `WrappedDekEntry` with no translation. Optional here because the DTO
+   * defaults them to `""` — the contract's own "the wrap could not be
+   * produced" signal, which degrades the login instead of failing it — and
+   * because Register/Refresh responses carry them empty too.
+   */
+  wrappedDek?: string;
+  wrapSalt?: string;
+  wrapIv?: string;
 }
 
 /**
