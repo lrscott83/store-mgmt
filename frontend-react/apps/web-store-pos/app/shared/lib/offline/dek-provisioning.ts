@@ -209,14 +209,33 @@ export async function resolveDekForLogin(args: {
         if (loginResponseEntry) {
           // Step 3c at the F5 site (design D1 source 3), ahead of the roster
           // because D1's ordered list puts it there: this wrap came from the
-          // live server on THIS login, the roster's came from an export of
-          // unknown age. `setDek` scopes it by `table.storeId`, exactly as the
-          // roster branch below does at this same site, which keeps the
-          // table's own `storeId` describing the scope the key is in use under
-          // (the invariant D3's cross-store case exists to protect).
+          // live server on THIS login, for the store this session is for.
+          //
+          // This is D3's ADOPTION, applied to a source D3 predates — and it
+          // has to rewrite the table, not just call `setDek`. The key is a
+          // pure function of the store id (`GetDek` is `HKDF(masterSecret,
+          // storeId)`), so this key belongs to `sessionStoreId`, full stop.
+          // Scoping it by `table.storeId` (what this branch did before) left
+          // the persisted table describing the store it held BEFORE this
+          // login: step 4 is skipped for a login-response-sourced key, and
+          // `workingTable` below IS this same object, so nothing else would
+          // ever correct the label — and the next page load's
+          // `bootstrapDeviceDek` re-scopes the recovered key by that stale
+          // `table.storeId`. That is Task 3's cross-store split, reached
+          // through this task's own new path.
           try {
             dek = await unwrapDek(password, loginResponseEntry);
-            setDek(dek, table.storeId);
+            setDek(dek, sessionStoreId);
+            table.storeId = sessionStoreId;
+            table.dekSource = 'login-response';
+            // D3's fourth line, and it is NOT optional here for the same
+            // reason it is not optional there: a device wrap of the ABANDONED
+            // store's key must not survive, or the next page load recovers
+            // those bytes and `setDek`s them under the store id just written
+            // above — the wrong key under the right label, which is worse
+            // than the wrong label this branch is fixing. Step 5 re-wraps it
+            // for the adopted key.
+            table.device = null;
             dekSourcedFromLoginResponseThisCall = true;
           } catch {
             // Same shape, and the same reason, as step 3a's `own` catch above:

@@ -544,6 +544,65 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(Array.from(recovered)).toEqual(Array.from(KEY_B));
   });
 
+  // D1 + D3, CROSS-STORE at the F5 site — the same shape as the D3 cross-store
+  // test at the bottom of this file, for the same bug reached through this
+  // task's new path. A device holding a table for STORE-OLD (nothing this
+  // login can open, no roster) signs in against STORE-NEW, and the login
+  // response supplies STORE-NEW's key.
+  //
+  // Scoping that key by `table.storeId` — what this branch did first — splits
+  // the data exactly as D3 describes: step 4 is SKIPPED for a
+  // login-response-sourced key, and `workingTable` is this same table object,
+  // so nothing would ever correct the label; the next page load then re-scopes
+  // the correctly recovered key by the stale `STORE-OLD`. Assertion 4 is the
+  // one that proves the fix rather than describing it: it re-runs the resolver
+  // on a cleared in-memory key, which is what the next page load does.
+  it('D1 (F5) cross-store: adopting the login response\'s key rewrites the table to describe it, and the next load agrees', async () => {
+    // `withDeviceWrap` matters: a device wrap of the ABANDONED store's key
+    // must not survive the adoption. Seeded `device: null` instead, step 5
+    // would write one unconditionally and this test would pass even if the
+    // adoption forgot to invalidate the stale one — the same mutation check
+    // the D3 test below documents.
+    await seedDeviceTableWithDek(KEY_A, 'other-user', 'secret2', 'STORE-OLD', {
+      withDeviceWrap: true,
+    });
+    const staleDeviceWrap = readDeviceDekTable()!.device;
+    expect(staleDeviceWrap).not.toBeNull(); // precondition, not an outcome
+
+    const loginWrap = await wrapDekWithPassword('pw', KEY_B);
+    await resolveDekForLogin({
+      login: 'jdoe',
+      password: 'pw',
+      sessionStoreId: 'STORE-NEW',
+      ...loginWrap,
+    });
+
+    // 1-2: the key, and the scope this session will address it under.
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_B));
+    expect(getDekStoreId()).toBe('STORE-NEW');
+
+    // 3: read back from STORAGE, not from an in-memory object, so this cannot
+    // pass because of something that was never persisted.
+    const persisted = readDeviceDekTable()!;
+    expect(persisted.storeId).toBe('STORE-NEW');
+    expect(persisted.dekSource).toBe('login-response');
+    expect(persisted.storeId).toBe(getDekStoreId());
+    // The abandoned store's device wrap did not survive.
+    expect(persisted.device).not.toBeNull();
+    expect(persisted.device!.wrappedDek).not.toBe(staleDeviceWrap!.wrappedDek);
+
+    // 4: the actual proof. Clearing the in-memory key is what a page reload
+    // does; the resolver then re-recovers from the table alone (no login
+    // response, no roster). If the label were still STORE-OLD, the key would
+    // come back scoped to a store this session never used, and every
+    // store-scoped read after the reload would address a different key space.
+    clearDek();
+    await resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 'STORE-NEW' });
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_B));
+    expect(getDekStoreId()).toBe('STORE-NEW');
+    expect(readDeviceDekTable()!.storeId).toBe('STORE-NEW');
+  });
+
   // A login-response wrap that EXISTS but does not open must not hard-fail a
   // login while a valid roster entry is sitting right there — the same rule,
   // and the same `try`/`catch` shape, that step 3a's `own` branch already
