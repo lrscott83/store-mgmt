@@ -14,7 +14,6 @@ import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offl
 import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { clearStoreData } from '~/shared/lib/storage/store-data-reset';
-import { runGuardedAgainstMissingDek } from '~/shared/lib/storage/run-guarded-against-missing-dek';
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { ProductRepository } from '../lib/repositories/product-repository';
@@ -80,18 +79,16 @@ export function ProductsPage() {
     // and only then redirects — through /login's async guestOnlyLoader, so this page is
     // still mounted when storeId (above) falls back to ''. Reloading from that state reaches
     // the category repository's auto-init write (product-category-repository.ts:246-247) with
-    // no DEK in memory: it throws MissingDataKeyError, and the guard's blocking alert outlives
-    // the navigation to sit on top of the login screen. An unselected store has nothing to load.
+    // no DEK in memory: it throws MissingDataKeyError, and the resulting blocking alert
+    // outlives the navigation to sit on top of the login screen. An unselected store has
+    // nothing to load.
     if (!storeId) return;
 
-    runGuardedAgainstMissingDek(
-      async () => {
-        await loadData();
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudieron cargar los datos. Recargue la página.',
-    );
+    // Deliberately unawaited, and deliberately unguarded: a decryption failure
+    // here rejects, and root.tsx's app-wide policy answers it once for the
+    // whole app (design D5). The per-call-site guard this replaced would show
+    // a second dialog for the same failure.
+    void loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData reads only storeId; intl is stable
   }, [storeId]);
 
@@ -108,15 +105,8 @@ export function ProductsPage() {
   // Angular parity (edit-product-modal.component.ts:42-49): opening the modal for create awaits
   // the per-category max product order and prefills Orden with data+1.
   async function handleAddProduct(category: ProductCategory) {
-    await runGuardedAgainstMissingDek(
-      async () => {
-        const maxOrderResult = await productService.getMaxOrderByCategoryId(category.id);
-        setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudo abrir el formulario. Recargue la página.',
-    );
+    const maxOrderResult = await productService.getMaxOrderByCategoryId(category.id);
+    setModal({ type: 'create', category, defaultOrder: (maxOrderResult.data ?? 0) + 1 });
   }
 
   // --- Add category (opens the create modal) ---
@@ -128,15 +118,8 @@ export function ProductsPage() {
   // no-op. Note the scope difference from handleAddProduct: this max is store-wide across all
   // categories, not per-category.
   async function handleAddCategory() {
-    await runGuardedAgainstMissingDek(
-      async () => {
-        const maxOrderResult = await categoryService.getMaxOrder();
-        setModal({ type: 'category', defaultOrder: (maxOrderResult.data ?? 0) + 1 });
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudo abrir el formulario. Recargue la página.',
-    );
+    const maxOrderResult = await categoryService.getMaxOrder();
+    setModal({ type: 'category', defaultOrder: (maxOrderResult.data ?? 0) + 1 });
   }
 
   // --- Create product ---
@@ -154,82 +137,52 @@ export function ProductsPage() {
     availableToSale: boolean;
     discountFromInvantory: boolean;
   }) {
-    const succeeded = await runGuardedAgainstMissingDek(
-      async () => {
-        const result = await productService.createProduct(
-          data.categoryId,
-          data.name,
-          data.price,
-          '',
-          data.order,
-          data.isActive,
-          data.availableToSale,
-          data.discountFromInvantory,
-          data.barcode,
-        );
-        if (!result.succeeded) {
-          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
-          return false;
-        }
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudo guardar el producto. Recargue la página.',
+    const result = await productService.createProduct(
+      data.categoryId,
+      data.name,
+      data.price,
+      '',
+      data.order,
+      data.isActive,
+      data.availableToSale,
+      data.discountFromInvantory,
+      data.barcode,
     );
-    if (!succeeded) return;
+    if (!result.succeeded) {
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      return;
+    }
 
     setModal(null);
-    runGuardedAgainstMissingDek(
-      async () => {
-        await loadData();
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página.',
-    );
+    void loadData();
   }
 
   // --- Edit product ---
   // Angular parity (edit-product-modal.component.ts:113-138): updateProduct(...) positional
   // async surface; same failure surfacing.
   async function handleEditProduct(product: Product) {
-    const succeeded = await runGuardedAgainstMissingDek(
-      async () => {
-        const result = await productService.updateProduct(
-          product.id,
-          product.categoryId,
-          product.name,
-          product.price,
-          product.businessId,
-          product.order,
-          product.isActive,
-          product.availableToSale,
-          product.discountFromInvantory,
-          // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
-          // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
-          // that already has a stored barcode.
-          undefined,
-        );
-        if (!result.succeeded) {
-          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
-          return false;
-        }
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudo actualizar el producto. Recargue la página.',
+    const result = await productService.updateProduct(
+      product.id,
+      product.categoryId,
+      product.name,
+      product.price,
+      product.businessId,
+      product.order,
+      product.isActive,
+      product.availableToSale,
+      product.discountFromInvantory,
+      // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
+      // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
+      // that already has a stored barcode.
+      undefined,
     );
-    if (!succeeded) return;
+    if (!result.succeeded) {
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      return;
+    }
 
     setModal(null);
-    runGuardedAgainstMissingDek(
-      async () => {
-        await loadData();
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página.',
-    );
+    void loadData();
   }
 
   // --- Deactivate product ---
@@ -253,25 +206,10 @@ export function ProductsPage() {
     });
     if (!confirmed) return;
 
-    const succeeded = await runGuardedAgainstMissingDek(
-      async () => {
-        await productService.deleteProduct(id);
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudo desactivar el producto. Recargue la página.',
-    );
-    if (!succeeded) return;
+    await productService.deleteProduct(id);
 
     setModal(null);
-    runGuardedAgainstMissingDek(
-      async () => {
-        await loadData();
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página.',
-    );
+    void loadData();
   }
 
   // --- Bulk create (per-category "Nuevo Productos" -> bulk-CREATE, Angular parity) ---
@@ -280,34 +218,15 @@ export function ProductsPage() {
   // the modal and emits the update event UNCONDITIONALLY (before checking `response.succeeded`);
   // the Swal error is purely informational when some names already existed.
   async function handleBulkSave(categoryId: string, items: { name: string; price: number }[]) {
-    // Unlike every other handler's flag (removed in the products-missing-dek-guard boolean
-    // refactor), this one survives: it answers a different question than the guard's own
-    // return value. The guard's `mutationSucceeded`
-    // means "no MissingDataKeyError happened"; `domainSucceeded` means "the mutation's own
-    // {succeeded} envelope was true" — Angular parity requires the modal to close and the
-    // repaint to fire even when the second is false, so the two must stay separate.
-    let domainSucceeded = true;
-    const mutationSucceeded = await runGuardedAgainstMissingDek(
-      async () => {
-        const result = await productService.createProducts(categoryId, items);
-        domainSucceeded = result.succeeded;
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudieron guardar los productos. Recargue la página.',
-    );
-    if (!mutationSucceeded) return;
+    // `result.succeeded` is NOT a reason to stop here: Angular parity requires the modal to
+    // close and the repaint to fire even when the bulk create partially failed, with the
+    // error shown afterwards as information — see the Angular note above. The check stays
+    // last for that reason, not by accident.
+    const result = await productService.createProducts(categoryId, items);
 
     setModal(null);
-    runGuardedAgainstMissingDek(
-      async () => {
-        await loadData();
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
-    );
-    if (!domainSucceeded) {
+    void loadData();
+    if (!result.succeeded) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
         'Algunos productos no fueron adicionados porque ya existen.',
@@ -322,32 +241,17 @@ export function ProductsPage() {
   // Swal-error shape Angular uses (`icon: 'error', title: GENERAL.ERROR, text:
   // errors[0].description`) instead of silently swallowing it.
   async function handleCategorySave(data: { name: string; order: number; isActive: boolean; id?: string }) {
-    const succeeded = await runGuardedAgainstMissingDek(
-      async () => {
-        const result = data.id
-          ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
-          : await categoryService.createProductCategory(data.name, data.order, data.isActive);
+    const result = data.id
+      ? await categoryService.updateProductCategory(data.id, data.name, data.order, data.isActive)
+      : await categoryService.createProductCategory(data.name, data.order, data.isActive);
 
-        if (!result.succeeded) {
-          showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
-          return false;
-        }
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudo guardar la categoría. Recargue la página.',
-    );
-    if (!succeeded) return;
+    if (!result.succeeded) {
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      return;
+    }
 
     setModal(null);
-    runGuardedAgainstMissingDek(
-      async () => {
-        await loadData();
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página.',
-    );
+    void loadData();
   }
 
   // --- CSV import ---
@@ -371,70 +275,55 @@ export function ProductsPage() {
         quantity: row.quantity,
       }));
 
-    const succeeded = await runGuardedAgainstMissingDek(
-      async () => {
-        const result = await productService.createCsvProducts(csvProducts);
-        // createCsvProducts always resolves success(...) by design (ADR-1): failure() hardcodes
-        // data:null (envelope.ts:19-27), which would destroy the {created,failed} payload. This ??
-        // is TS narrowing on the BaseResponseModel union, NOT a runtime failure path.
-        const { created, failed } = result.data ?? { created: [], failed: [] };
+    const result = await productService.createCsvProducts(csvProducts);
+    // createCsvProducts always resolves success(...) by design (ADR-1): failure() hardcodes
+    // data:null (envelope.ts:19-27), which would destroy the {created,failed} payload. This ??
+    // is TS narrowing on the BaseResponseModel union, NOT a runtime failure path.
+    const { created, failed } = result.data ?? { created: [], failed: [] };
 
-        const inventoryService = new InventoryOfflineService(
-          storeId,
-          new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
-        );
-
-        let entriesCreated = 0;
-        for (const product of created) {
-          // Absent, 0, or negative -> no entry (decision #8). The parser PRESERVES 0/negative
-          // quantities (REQ-1 sc.6/7) instead of collapsing them to undefined, so a bare
-          // `!product.quantity` check is insufficient here: `!(-3)` is `false` in JS and would let
-          // a negative-quantity row slip through to createInventoryEntry.
-          if (!product.quantity || product.quantity <= 0) continue;
-          const costPrice = product.cost ?? product.price; // decision #7/#16: 0 is a valid cost
-          const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice);
-          // R2: the primitive returns bare `null` (product not found) or a DataResult that may not
-          // have succeeded — the optional chain absorbs both, so neither inflates the count. Same
-          // idiom as today-entries.tsx:148.
-          if (entry?.succeeded) entriesCreated++;
-        }
-
-        setModal(null);
-
-        // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
-        // toast (no title), PLUS a conditional info dialog when there are duplicates. DIVERGES
-        // DELIBERATELY (decisions #6/#14/#17): the toast reports REAL successes (products created +
-        // entries created), unconditionally, with no branching — even a legacy 3-column CSV reads
-        // "... y 0 entradas correctamente." The info dialog enumerates each duplicate as
-        // "Categoría - Nombre" instead of the generic literal. Both strings stay hardcoded Spanish
-        // (no i18n key), matching Angular's own and the pre-existing React literal — introducing
-        // keys is out of scope (R6). Swal renders `text` as `textContent` with no
-        // `white-space: pre-line` (sweetalert2 11.26.25, css `.swal2-html-container`), so the list
-        // MUST be single-line comma-joined, never newline-separated.
-        showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
-        if (failed.length > 0) {
-          await showBlockingInfo(
-            intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
-            `Algunos productos no fueron importados porque ya existen: ${failed
-              .map((p) => `${p.category} - ${p.name}`)
-              .join(', ')}.`,
-          );
-        }
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'No se pudieron importar los productos. Recargue la página.',
+    const inventoryService = new InventoryOfflineService(
+      storeId,
+      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
-    if (!succeeded) return;
 
-    runGuardedAgainstMissingDek(
-      async () => {
-        await loadData();
-        return true;
-      },
-      intl.formatMessage({ id: 'GENERAL.ERROR' }),
-      'Los productos fueron importados, pero no se pudo actualizar la vista. Recargue la página.',
-    );
+    let entriesCreated = 0;
+    for (const product of created) {
+      // Absent, 0, or negative -> no entry (decision #8). The parser PRESERVES 0/negative
+      // quantities (REQ-1 sc.6/7) instead of collapsing them to undefined, so a bare
+      // `!product.quantity` check is insufficient here: `!(-3)` is `false` in JS and would let
+      // a negative-quantity row slip through to createInventoryEntry.
+      if (!product.quantity || product.quantity <= 0) continue;
+      const costPrice = product.cost ?? product.price; // decision #7/#16: 0 is a valid cost
+      const entry = inventoryService.createInventoryEntry(product.id, product.quantity, costPrice);
+      // R2: the primitive returns bare `null` (product not found) or a DataResult that may not
+      // have succeeded — the optional chain absorbs both, so neither inflates the count. Same
+      // idiom as today-entries.tsx:148.
+      if (entry?.succeeded) entriesCreated++;
+    }
+
+    setModal(null);
+
+    // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
+    // toast (no title), PLUS a conditional info dialog when there are duplicates. DIVERGES
+    // DELIBERATELY (decisions #6/#14/#17): the toast reports REAL successes (products created +
+    // entries created), unconditionally, with no branching — even a legacy 3-column CSV reads
+    // "... y 0 entradas correctamente." The info dialog enumerates each duplicate as
+    // "Categoría - Nombre" instead of the generic literal. Both strings stay hardcoded Spanish
+    // (no i18n key), matching Angular's own and the pre-existing React literal — introducing
+    // keys is out of scope (R6). Swal renders `text` as `textContent` with no
+    // `white-space: pre-line` (sweetalert2 11.26.25, css `.swal2-html-container`), so the list
+    // MUST be single-line comma-joined, never newline-separated.
+    showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
+    if (failed.length > 0) {
+      await showBlockingInfo(
+        intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+        `Algunos productos no fueron importados porque ya existen: ${failed
+          .map((p) => `${p.category} - ${p.name}`)
+          .join(', ')}.`,
+      );
+    }
+
+    void loadData();
   }
 
   // --- Clear all data ---
