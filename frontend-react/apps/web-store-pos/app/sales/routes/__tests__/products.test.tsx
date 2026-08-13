@@ -656,53 +656,6 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     await waitFor(() => expect(productServiceSpies.deleteProduct).toHaveBeenCalledWith('prod-1'));
   });
 
-  it('shows a blocking error when deleteProduct throws MissingDataKeyError', async () => {
-    mockCategories = [makeCategory()];
-    mockProducts = [makeProduct()];
-    productServiceSpies.deleteProduct.mockRejectedValueOnce(new MissingDataKeyError());
-
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
-
-    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
-    fireEvent.click(await screen.findByLabelText('Acciones'));
-    fireEvent.click(screen.getByText('Desactivar Producto'));
-
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'No se pudo desactivar el producto. Recargue la página.',
-      ),
-    );
-  });
-
-  it('shows a blocking error when the post-deactivate repaint throws MissingDataKeyError', async () => {
-    mockCategories = [makeCategory()];
-    mockProducts = [makeProduct()];
-
-    render(
-      <Wrapper>
-        <ProductsPage />
-      </Wrapper>,
-    );
-    expect(await screen.findByText('Bebidas')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('category-panel-toggle-cat-1'));
-    fireEvent.click(await screen.findByLabelText('Acciones'));
-    categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
-    fireEvent.click(screen.getByText('Desactivar Producto'));
-
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'El producto fue desactivado, pero no se pudo actualizar la vista. Recargue la página.',
-      ),
-    );
-  });
-
   it('does NOT call deleteProduct when the confirmDialog is cancelled', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
@@ -791,7 +744,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
   });
 
-  it('shows BOTH the domain-failure message and the repaint-guard message when a domain failure and a repaint DEK failure occur together', async () => {
+  it('still closes the modal and reports the domain failure when the repaint ALSO fails with a DEK error', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
     productServiceSpies.createProducts.mockResolvedValueOnce({
@@ -893,29 +846,12 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.getByTestId('create-product-submit')).toBeInTheDocument();
   });
 
-  // products-missing-dek-guard: all three services here are typed "resolve, never reject"
-  // (ProductService/ProductCategoryService doc comments), but the underlying repository call
-  // can throw MissingDataKeyError when encryption is provisioned and no data key is in memory.
-  // Each of these three call sites must surface that specific failure as a blocking error
-  // instead of the silent no-op an unhandled promise rejection produces today.
-  describe('MissingDataKeyError guard — loadData/handleAddProduct/handleAddCategory', () => {
-    it('shows a blocking error instead of leaving the catalog silently empty when loadData throws on mount', async () => {
-      categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
-
-      render(
-        <Wrapper>
-          <ProductsPage />
-        </Wrapper>,
-      );
-
-      await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith(
-          'Error',
-          'No se pudieron cargar los datos. Recargue la página.',
-        ),
-      );
-    });
-
+  // These services are typed "resolve, never reject" (ProductService/ProductCategoryService doc
+  // comments), but the underlying repository call can throw MissingDataKeyError when encryption
+  // is provisioned and no data key is in memory. What the USER is shown when that happens is no
+  // longer decided here: the app-wide policy owns it (decryption-failure-policy.test.tsx covers
+  // both delivery routes). What remains below is this route's own behaviour around those calls.
+  describe('MissingDataKeyError at the handleAddProduct/handleAddCategory call sites', () => {
     it('does not reload, and raises no blocking error, when logout empties the store id while the page is still mounted', async () => {
       mockCategories = [makeCategory()];
 
@@ -930,7 +866,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       // and only then redirects — through /login's async guestOnlyLoader, so this page is
       // still mounted when selectedStoreId becomes ''. Reloading from that state reaches the
       // repository's auto-init write (product-category-repository.ts:246-247) with no DEK in
-      // memory, which throws MissingDataKeyError and leaves the guard's blocking alert sitting
+      // memory, which throws MissingDataKeyError and leaves the resulting blocking alert sitting
       // on top of the login screen. An unselected store has nothing to load.
       //
       // No mockRejectedValueOnce is queued here on purpose: a fix means the reload never

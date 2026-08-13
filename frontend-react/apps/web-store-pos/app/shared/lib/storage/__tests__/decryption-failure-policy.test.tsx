@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { MissingDataKeyError } from '../entity-crypto';
 import { EntityUnreadableError } from '../read-entity-or-throw';
 
@@ -10,6 +11,18 @@ vi.mock('../../blocking-alert', () => ({
 const logoutMock = vi.fn();
 vi.mock('../../stores/auth-store', () => ({
   useAuthStore: { getState: () => ({ logout: logoutMock }) },
+  // root.tsx (imported by the ErrorBoundary-route suite at the bottom of this
+  // file) pulls this from the same module.
+  registerAuthRedirect: vi.fn(),
+}));
+
+// root.tsx's module graph, stubbed only far enough to import it. None of these
+// participate in what is asserted below.
+vi.mock('../../pwa/service-worker-registration', () => ({ registerServiceWorker: vi.fn() }));
+vi.mock('../../usage/use-store-usage-tracker', () => ({ useStoreUsageTracker: vi.fn() }));
+vi.mock('react-toastify', () => ({
+  ToastContainer: () => null,
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 import {
@@ -160,5 +173,79 @@ describe('registerDecryptionFailurePolicy', () => {
 
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
     expect(logoutMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The SECOND delivery route.
+//
+// A decryption failure reaches this policy by two structurally different paths,
+// and the suites above only exercise one of them. A rejected promise arrives at
+// the `unhandledrejection` listener (covered above, end to end: real listener,
+// real event, real error). But a failure THROWN during render or in a loader
+// never becomes a rejection — react-router catches it and renders the route's
+// ErrorBoundary instead, which calls `handleDecryptionFailure` directly.
+//
+// root.test.tsx pins that ErrorBoundary calls the handler, but it does so with
+// this module MOCKED, so it proves the wiring and not the outcome. Nothing else
+// proved that a REAL decryption error entering by this route produces the
+// message and the sign-out. These tests close that gap with the real policy.
+// ---------------------------------------------------------------------------
+describe('ErrorBoundary delivery route (design D5, seam 2)', () => {
+  // Imported lazily so the mocks above are installed before root.tsx's module
+  // graph is evaluated.
+  async function renderBoundary(error: unknown) {
+    const { ErrorBoundary } = await import('../../../../root');
+    // `params`/`loaderData` are part of react-router's ErrorBoundary props but
+    // are unread on this path.
+    const props = { error, params: {} } as unknown as Parameters<typeof ErrorBoundary>[0];
+    return render(<ErrorBoundary {...props} />);
+  }
+
+  it('announces a missing key that arrived as a THROW, and signs the user out', async () => {
+    const { container } = await renderBoundary(new MissingDataKeyError());
+
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', KEY_UNAVAILABLE);
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+    // Nothing is rendered: the policy already owns this failure, and the generic
+    // error page underneath would say a second, different thing about it.
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('announces damaged data that arrived as a THROW, and signs the user out', async () => {
+    const { container } = await renderBoundary(new EntityUnreadableError('k', new Error('tag')));
+
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', DATA_DAMAGED);
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('leaves an unrelated route error to the generic error page, untouched', async () => {
+    await renderBoundary({ status: 404, statusText: '', internal: false, data: null });
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(logoutMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
+  });
+
+  it('shares the latch with the rejection route — one cause cannot produce two dialogs', async () => {
+    // The two routes are separate seams but ONE policy: a page whose loader
+    // throws while a parallel read rejects must still speak once.
+    const unregister = registerDecryptionFailurePolicy();
+    const event = new Event('unhandledrejection') as Event & { reason: unknown };
+    event.reason = new MissingDataKeyError();
+    window.dispatchEvent(event);
+
+    const { container } = await renderBoundary(new MissingDataKeyError());
+
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+    // Load-bearing, and the reason this test can fail: the two assertions above
+    // would BOTH still hold if the ErrorBoundary were not wired to the policy at
+    // all, since the rejection route already produced their one call. Rendering
+    // nothing is the part that can only happen if the boundary asked the policy
+    // and was told the failure was already owned.
+    expect(container).toBeEmptyDOMElement();
+    unregister();
   });
 });
