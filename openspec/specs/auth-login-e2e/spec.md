@@ -1,7 +1,7 @@
 # auth-login-e2e Capability Specification
 
 **Capability**: auth-login-e2e — E2E coverage for login rejection (403 `Store.Inactive`) and login-delivered wrapped DEK
-**Origin**: SDD changes `e2e-stage-1-s1-02`, `e2e-b3-auth-login-roundtrip`, `login-wrapped-dek`
+**Origin**: SDD changes `e2e-stage-1-s1-02`, `e2e-b3-auth-login-roundtrip`, `login-wrapped-dek`, `b3-login-roundtrip`
 **Source**: `docs/testing/e2e-stage-1/S1-02.md:72` (declared E2E coverage gap); `login-wrapped-dek` (wrapped DEK delivery coverage)
 **Status**: Active
 
@@ -21,7 +21,7 @@ coverage, not new product capabilities.
 ### In Scope
 
 - One new `[Fact]` in `backend/src/SMCA.WebApi.E2ETests/Auth/AuthLoginFailureTests.cs` covering the inactive-store login rejection — Requirement 1, the baseline deliverable.
-- StoreUser persona roundtrip (`AuthenticationService.cs:125-144`) — Requirement 2, DELIVERED by change `e2e-b3-auth-login-roundtrip` (previously archived 2026-08-06 as OPTIONAL / NOT delivered in the baseline). Now covered by new `AuthLoginStoreUserTests.cs`: 1 positive + 2 negative `[Fact]`s.
+- StoreUser persona roundtrip (`AuthenticationService.cs:125-144`) — Requirement 2, DELIVERED by change `e2e-b3-auth-login-roundtrip` (previously archived 2026-08-06 as OPTIONAL / NOT delivered in the baseline). Now covered by new `AuthLoginStoreUserTests.cs`: 1 positive + 2 negative `[Fact]`s; EXTENDED by change `b3-login-roundtrip` with 2 additive `[Fact]`s pinning `HasActiveStore` branches 1 (role-only, no `StoreUser` row) and 2 (`StoreUser.IsActive == false`) — total 5.
 
 ### Out of Scope
 
@@ -68,13 +68,16 @@ the file MUST NOT be modified, and no production code MUST be changed.
 
 ### Requirement: E2E coverage — StoreUser login roundtrip
 
-The E2E suite MUST include a new `AuthLoginStoreUserTests` class covering the
+The E2E suite MUST include an `AuthLoginStoreUserTests` class covering the
 StoreUser persona branch (`AuthenticationService.cs:125-144`) over HTTP: a
 StoreUser with an active store MUST receive HTTP 200 with `Succeeded == true`
 and a non-empty `Data.AuthToken`; a StoreUser whose store — or whose store's
 owner — is deactivated MUST receive HTTP 403, `Succeeded == false`, and exactly
-one error whose `Code == "Store.Inactive"`. The tests MUST be purely additive:
-existing tests MUST NOT be modified, and no production code MUST be changed.
+one error whose `Code == "Store.Inactive"`; a user with the StoreUser role but
+NO `StoreUser` row (branch 1) and a StoreUser whose row has `IsActive == false`
+(branch 2) MUST likewise receive HTTP 403 with exactly one error whose
+`Code == "Store.Inactive"`. The tests MUST be purely additive: existing tests
+MUST NOT be modified, and no production code MUST be changed.
 
 #### Scenario: StoreUser logs in to an active store
 
@@ -97,11 +100,32 @@ existing tests MUST NOT be modified, and no production code MUST be changed.
 - THEN the response status is HTTP 403 with `Succeeded == false`
 - AND `Errors` contains exactly one entry with `Code == "Store.Inactive"` (the `!owner.IsActive` branch of the six-condition chain)
 
+#### Scenario: Role-only StoreUser is rejected with 403 `Store.Inactive` (branch 1)
+
+- GIVEN a user with the StoreUser role (3) seeded via `DbTestHelpers.SeedUserWithRoleAsync((int)RoleType.StoreUser)` and NO `StoreUser` row (no store graph)
+- WHEN `POST /api/v1/auth/login` is called with the user's credentials
+- THEN the response is HTTP 403 with `Succeeded == false`
+- AND `Errors` contains exactly one entry with `Code == "Store.Inactive"` — NOT `Auth.AccountInactive` (the user row is active), pinning `storeUser is null` (`AuthenticationService.cs:126-127`)
+- AND the test documents this as the intentional blind-zone contract (mirroring the ReSeller role-only pin D6) and cleans up the seeded user only
+
+#### Scenario: StoreUser with inactive row is rejected with 403 `Store.Inactive` (branch 2)
+
+- GIVEN a StoreUser seeded via `AuthzSeed.SeedStoreUserAsync` whose `StoreUser.IsActive` is set to `false` via a NoTracking-safe tracked update / `ExecuteUpdateAsync` (mirroring `DbTestHelpers.DeactivateOwnerByUserIdAsync`)
+- WHEN `POST /api/v1/auth/login` is called with the StoreUser's credentials
+- THEN the response is HTTP 403 with `Succeeded == false`
+- AND `Errors` contains exactly one entry with `Code == "Store.Inactive"` — NOT `Auth.AccountInactive` (the user row stays active), pinning `!storeUser.IsActive` (`AuthenticationService.cs:129-130`)
+- AND cleanup removes the full store graph via `AuthzSeed.CleanupStoreGraphAsync` with both user ids
+
 #### Scenario: Cleanup removes the full store graph
 
 - GIVEN any StoreUser test completes
 - WHEN cleanup runs `AuthzSeed.CleanupStoreGraphAsync(fixture.StoreId, fixture.UserId)`
 - THEN Store, StoreUser, Owner, and User rows are removed in FK-safe order
+
+> **Delivery note (2026-08-13)**: EXTENDED by change `b3-login-roundtrip` — added
+> branch 1 (role-only StoreUser, no `StoreUser` row) and branch 2
+> (`StoreUser.IsActive == false`) scenarios pinning the residual `HasActiveStore`
+> branches over HTTP; purely additive (+2 `[Fact]`s in `AuthLoginStoreUserTests.cs`).
 
 > **Delivery note (2026-08-09)**: DELIVERED by change `e2e-b3-auth-login-roundtrip`.
 > Previously archived 2026-08-06 as OPTIONAL / NOT delivered in `e2e-stage-1-s1-02`.
@@ -174,6 +198,23 @@ Each new `[Fact]` MUST clean up via `AuthzSeed.CleanupStoreGraphAsync` /
 > `AuthLoginDekWrapTests.cs` (6 facts) covering wrapped-DEK delivery on login,
 > byte-compatible with the roster wrap; purely additive (new file only, no
 > existing E2E test or support file modified).
+
+### Requirement: E2E plan doc — B-3 states DELIVERED
+
+`docs/testing/e2e-stage-1/plan-backend.md` B-3 MUST be corrected (doc-only) so its
+coverage table states StoreUser and ReSeller real-login roundtrips as DELIVERED
+(change `e2e-b3-auth-login-roundtrip`, 2026-08-09) and notes the StoreUser branch
+1/2 residuals now pinned by this change. No production code and no existing E2E
+test MUST be touched.
+
+#### Scenario: B-3 table is truthful about delivered personas
+
+- GIVEN `plan-backend.md` B-3 lines 106-111 currently list StoreUser and ReSeller as "falta"
+- WHEN the doc is updated per this change
+- THEN the table states StoreUser and ReSeller DELIVERED and notes the StoreUser branch 1/2 residual pins
+
+> **Delivery note (2026-08-13)**: ADDED by change `b3-login-roundtrip` — doc-only
+> deliverable correcting the stale B-3 plan table; no code or test changes.
 
 ## Verification Criteria
 

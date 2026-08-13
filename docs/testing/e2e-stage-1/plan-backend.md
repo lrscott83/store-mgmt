@@ -99,18 +99,16 @@ Y los tests que **sí** pegan a `/auth/login` siembran:
 
 **Regla que conviene dejar escrita**: *un helper que acuña tokens salteando el endpoint de login deja una zona ciega del tamaño del handler entero.* El atajo es legítimo —autenticar por HTTP en cada test sería lento y frágil— pero exige que **cada persona** tenga al menos un test que sí atraviese el login real.
 
-**Estado actual**: cubierto para OwnerAdmin en `AuthLoginOwnerAdminTests.cs` (nuevo, agregado en esta rama).
-
-**Arreglo propuesto**: agregar el round-trip que falta para las personas restantes.
+**Estado actual**: cubierto para las tres personas — OwnerAdmin en `AuthLoginOwnerAdminTests.cs`, StoreUser en `AuthLoginStoreUserTests.cs` y ReSeller en `AuthLoginReSellerTests.cs` (cambio `e2e-b3-auth-login-roundtrip`, 2026-08-09).
 
 | Persona | ¿Tiene login real? |
 |---|---|
 | SuperAdmin | Sí |
-| OwnerAdmin | Sí (nuevo) |
-| **StoreUser** | **No** — falta |
-| **ReSeller** | **No** — falta |
+| OwnerAdmin | Sí |
+| **StoreUser** | **Sí** — DELIVERED, cambio `e2e-b3-auth-login-roundtrip` (2026-08-09), `AuthLoginStoreUserTests.cs` |
+| **ReSeller** | **Sí** — DELIVERED, cambio `e2e-b3-auth-login-roundtrip` (2026-08-09), `AuthLoginReSellerTests.cs` |
 
-El de StoreUser es el más valioso: es la otra rama de `HasActiveStore` (`AuthenticationService.cs:117-131`), con cinco condiciones encadenadas y ninguna probada por HTTP.
+StoreUser es la otra rama de `HasActiveStore` (`AuthenticationService.cs:117-131`), con cinco condiciones encadenadas. Las ramas 1 (rol StoreUser sin fila `StoreUser`) y 2 (`StoreUser.IsActive == false`) quedaron pineadas por `b3-login-roundtrip` (`AuthLoginStoreUserTests.cs`).
 
 **Autorización**: **no requerida** — son tests **nuevos**, lo cual está expresamente permitido. Sí conviene avisar antes por el costo de corrida.
 

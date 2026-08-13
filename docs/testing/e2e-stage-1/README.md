@@ -46,7 +46,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 |---|---|---|---|---|
 | [S3-01](S3-01.md) | Exportar el roster de aprovisionamiento | ALTA | **PENDIENTE** | **CUBIERTO** |
 | [S3-02](S3-02.md) | Crear cuenta StoreUser | ALTA | **PENDIENTE** | **CUBIERTO** |
-| [S3-03](S3-03.md) | Listar, editar, activar y dar de baja usuarios | ALTA | **PENDIENTE** | **PARCIAL** — aislamiento ya medido (`Users/UsersIsolationTests.cs`): **cross-tenant SÍ aísla** (envelope 404, el usuario ajeno no se modifica) pero **cross-store NO** (200, la edición se aplica). H-11 queda partida: la mitad de tenant está cerrada, la de tienda es un defecto abierto |
+| [S3-03](S3-03.md) | Listar, editar, activar y dar de baja usuarios | ALTA | **PENDIENTE** | **CUBIERTO** — CRUD + ciclo de vida + aislamiento medido (`Users/UsersIsolationTests.cs`): **cross-tenant SÍ aísla** (envelope 404, sin escritura). **Cross-store 200 es REGLA DE NEGOCIO**: el OwnerAdmin es dueño del tenant y de todas sus tiendas; la frontera de seguridad es el tenant, no la tienda (ver H-11) |
 
 ### Bloque D — Perfil propio
 
@@ -251,7 +251,7 @@ Conclusión: la creación de tiendas por un OwnerAdmin está **habilitada en el 
 
 Nota adicional: el rechazo del handler devuelve **400 BadRequest**, no 403 (`CreateStoreCommand.cs:51`), divergiendo de los demás guards de este controlador.
 
-### H-11 — `PUT /v1/users/{id}` no tiene scoping por tienda, ni en el cliente ni en el handler
+### H-11 — La frontera de seguridad de `PUT /v1/users/{id}` es el **tenant**, no la tienda (regla de negocio)
 
 **Cliente**: `/management/users/edit/:id` toma el id de la URL y llama `getUserById` sin comprobar pertenencia alguna (`user-edit.tsx:21,32-47`). No hay filtro por tienda.
 
@@ -262,9 +262,11 @@ if (request.Id != _httpContextService.UserExternalId.ToGuid() && !_httpContextSe
     return ResponseResult.Failure<bool>(UserErrors.NotFound, 404);   // UpdateUserCommand.cs:49-50
 ```
 
-Traducido: *"o sos vos mismo, o sos admin"*. Ningún OwnerAdmin es rechazado por editar a un usuario de otra tienda. Lo único que podría frenarlo es el filtro global de tenant sobre `User` (`UserEntityTypeConfiguration.cs:22-24`), pero la búsqueda entra por `FindAsync` (`GenericRepository.cs:82-85`) — **no se determinó por lectura si ese camino aplica el filtro**, y por eso [S3-03](S3-03.md) lo plantea como aserción a resolver empíricamente, no como afirmación.
+Traducido: *"o sos vos mismo, o sos admin"*. **Y es correcto**: el OwnerAdmin es dueño del tenant —y de todas sus tiendas—, y su scope de gestión de usuarios es el tenant entero (`HttpContextService.cs:45-50`, con el `TenantId` viniendo del claim del JWT). No existe ni debe existir un límite por tienda para el OwnerAdmin.
 
-Lo que sí queda establecido por lectura: **el aislamiento por tienda no existe como regla explícita en ninguna capa**. Si funciona, funciona por efecto colateral del tenant, no por diseño.
+**La frontera real se cumple en el ORM**: el filtro global sobre `User` (`UserEntityTypeConfiguration.cs:22-24`) aplica al camino `FindAsync` — un usuario de **otro tenant** es invisible → `user is null` → envelope 404, sin escritura. Verificado empíricamente por `Users/UsersIsolationTests.cs:22`. La incógnita que la primera versión de este hallazgo dejó abierta (¿el filtro aplica al camino `FindAsync` de `GenericRepository.cs:82-85`?) quedó respondida por corrida real: **sí aplica**.
+
+**Consecuencia sobre la cobertura**: la mitad "cross-store" de la aserción de S3-03 era una expectativa equivocada (aislamiento por tienda), no un defecto. El comportamiento medido —un OwnerAdmin edita a un usuario de otra tienda del mismo tenant y el cambio se aplica (`UsersIsolationTests.cs:48`)— es la regla de negocio. La única consideración que queda es de UI (qué lista ve el OwnerAdmin según `SelectedStoreId`), que es producto, no seguridad.
 
 ### H-12 — El rate limiting está **apagado** en el entorno de pruebas
 
@@ -365,9 +367,9 @@ Bitácora de cierre, para que el próximo lector sepa qué se resolvió y dónde
 | 7 | Umbrales de rate limiting | **Resuelto**: login 5/1min, register 10/10min, por IP, hardcodeados | [S1-01](S1-01.md), [S1-02](S1-02.md) + **H-12**, **H-13** |
 | 8 | ¿`GET /v1/stores/{id}` devuelve solo módulos activos? | **Resuelto y la suposición del frontend SE SOSTIENE** | [S2-01](S2-01.md) (bloque "De dónde sale cada mitad") |
 
-### Una sola incógnita deliberada, planteada como test y no como afirmación
+### La incógnita deliberada quedó respondida por corrida real
 
-En [S3-03](S3-03.md), la aserción sobre **aislamiento cross-tenant de `PUT /v1/users/{id}`** queda escrita como pregunta a responder ejecutando el test, no como afirmación. Lo que **sí** está verificado por lectura es lo estructural: el handler no tiene guard de tienda ni de tenant (`UpdateUserCommand.cs:49-50`) y la búsqueda entra por `FindAsync` (`GenericRepository.cs:82-85`). Lo que **no** se determinó leyendo es si ese camino de acceso aplica el filtro global de tenant de `User` (`UserEntityTypeConfiguration.cs:22-24`). Es una semántica del ORM, no del código de este repo, y se prefiere que la conteste una corrida real contra base antes que afirmarla.
+La pregunta que la primera versión de la etapa dejó escrita como test y no como afirmación —si el filtro global de tenant de `User` aplica al camino `FindAsync` de `PUT /v1/users/{id}` (`UserEntityTypeConfiguration.cs:22-24`, `GenericRepository.cs:82-85`)— fue contestada por `Users/UsersIsolationTests.cs:22` contra base real: **sí aplica** (cross-tenant → envelope 404, sin escritura). El caso "cross-store" resultó ser la regla de negocio del OwnerAdmin (ver **H-11**). Cero incógnitas abiertas.
 
 ---
 
