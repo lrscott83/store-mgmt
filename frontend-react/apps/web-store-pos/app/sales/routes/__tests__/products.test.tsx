@@ -488,7 +488,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[5]).toBe(true); // isActive
   });
 
-  it('shows a blocking error and keeps the modal open when createProduct throws MissingDataKeyError', async () => {
+  it('keeps the modal open when createProduct rejects with MissingDataKeyError', async () => {
     mockCategories = [makeCategory()];
     productServiceSpies.createProduct.mockRejectedValueOnce(new MissingDataKeyError());
 
@@ -505,13 +505,16 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // Liveness: without this the assertion below also passes if the control did
+    // nothing at all, which is indistinguishable from the behaviour under test.
+    expect(productServiceSpies.createProduct).toHaveBeenCalled();
     // The mutation rejected before setModal(null) ran, so the modal is still mounted. What the
     // USER sees now (one message, then a sign-out) is the app-wide policy's business and is
     // asserted in decryption-failure-policy.test.ts, not here.
     expect(screen.getByTestId('product-name-input')).toBeInTheDocument();
   });
 
-  it('shows a blocking error and closes the modal when the post-create repaint throws MissingDataKeyError', async () => {
+  it('closes the modal when the post-create repaint rejects with MissingDataKeyError', async () => {
     mockCategories = [makeCategory()];
 
     render(
@@ -532,6 +535,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // Liveness: without this the assertion below also passes if the control did
+    // nothing at all, which is indistinguishable from the behaviour under test.
+    expect(productServiceSpies.createProduct).toHaveBeenCalled();
     // The mutation itself succeeded — the modal closes even though the repaint failed.
     expect(screen.queryByTestId('product-name-input')).not.toBeInTheDocument();
   });
@@ -562,7 +568,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(args[2]).toBe('Coca Cola Zero'); // name
   });
 
-  it('shows a blocking error and keeps the modal open when updateProduct throws MissingDataKeyError', async () => {
+  it('keeps the modal open when updateProduct rejects with MissingDataKeyError', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
     productServiceSpies.updateProduct.mockRejectedValueOnce(new MissingDataKeyError());
@@ -580,10 +586,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // Liveness: without this the assertion below also passes if the control did
+    // nothing at all, which is indistinguishable from the behaviour under test.
+    expect(productServiceSpies.updateProduct).toHaveBeenCalled();
     expect(screen.getByTestId('edit-product-name-input')).toBeInTheDocument();
   });
 
-  it('shows a blocking error and closes the modal when the post-edit repaint throws MissingDataKeyError', async () => {
+  it('closes the modal when the post-edit repaint rejects with MissingDataKeyError', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
 
@@ -602,6 +611,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // Liveness: without this the assertion below also passes if the control did
+    // nothing at all, which is indistinguishable from the behaviour under test.
+    expect(productServiceSpies.updateProduct).toHaveBeenCalled();
     expect(screen.queryByTestId('edit-product-name-input')).not.toBeInTheDocument();
   });
 
@@ -726,7 +738,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(productServiceSpies.updateProduct).not.toHaveBeenCalled();
   });
 
-  it('shows a blocking error and keeps the modal open when createProducts throws MissingDataKeyError', async () => {
+  it('keeps the modal open when createProducts rejects with MissingDataKeyError', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
     productServiceSpies.createProducts.mockRejectedValueOnce(new MissingDataKeyError());
@@ -744,10 +756,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // Liveness: without this the assertion below also passes if the control did
+    // nothing at all, which is indistinguishable from the behaviour under test.
+    expect(productServiceSpies.createProducts).toHaveBeenCalled();
     expect(screen.getByTestId('bulk-save-button')).toBeInTheDocument();
   });
 
-  it('shows a blocking error and closes the modal when the post-bulk-save repaint throws MissingDataKeyError', async () => {
+  it('closes the modal when the post-bulk-save repaint rejects with MissingDataKeyError', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct()];
 
@@ -766,6 +781,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // Liveness: without this the assertion below also passes if the control did
+    // nothing at all, which is indistinguishable from the behaviour under test.
+    expect(productServiceSpies.createProducts).toHaveBeenCalled();
     expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
   });
 
@@ -911,7 +929,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       expect(showBlockingErrorMock).not.toHaveBeenCalled();
     });
 
-    it('shows a blocking error instead of a silent no-op when getMaxOrderByCategoryId throws', async () => {
+    it('does not open the create-product modal when getMaxOrderByCategoryId rejects', async () => {
       mockCategories = [makeCategory()];
       productServiceSpies.getMaxOrderByCategoryId.mockRejectedValueOnce(new MissingDataKeyError());
 
@@ -925,11 +943,14 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('add-product-button'));
 
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // Liveness: without this the assertion below also passes if the control did
+      // nothing at all, which is indistinguishable from the behaviour under test.
+      expect(productServiceSpies.getMaxOrderByCategoryId).toHaveBeenCalled();
       // The rejection propagated before setModal ran — the create-product modal must not open.
       expect(screen.queryByTestId('product-name-input')).not.toBeInTheDocument();
     });
 
-    it('shows a blocking error instead of a silent no-op when categoryService.getMaxOrder throws', async () => {
+    it('does not open the create-category modal when categoryService.getMaxOrder rejects', async () => {
       categoryServiceSpies.getMaxOrder.mockRejectedValueOnce(new MissingDataKeyError());
 
       render(
@@ -941,6 +962,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('add-category-button'));
 
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // Liveness: without this the assertion below also passes if the control did
+      // nothing at all, which is indistinguishable from the behaviour under test.
+      expect(categoryServiceSpies.getMaxOrder).toHaveBeenCalled();
       // The rejection propagated before setModal ran — the create-category modal must not open.
       expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument();
     });
@@ -968,7 +992,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() => expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument());
     });
 
-    it('shows a blocking error and keeps the modal open when createProductCategory throws MissingDataKeyError', async () => {
+    it('keeps the modal open when createProductCategory rejects with MissingDataKeyError', async () => {
       categoryServiceSpies.createProductCategory.mockRejectedValueOnce(new MissingDataKeyError());
 
       render(
@@ -982,10 +1006,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // Liveness: without this the assertion below also passes if the control did
+      // nothing at all, which is indistinguishable from the behaviour under test.
+      expect(categoryServiceSpies.createProductCategory).toHaveBeenCalled();
       expect(screen.getByTestId('category-name-input')).toBeInTheDocument();
     });
 
-    it('shows a blocking error and closes the modal when the post-category-save repaint throws MissingDataKeyError', async () => {
+    it('closes the modal when the post-category-save repaint rejects with MissingDataKeyError', async () => {
       render(
         <Wrapper>
           <ProductsPage />
@@ -998,6 +1025,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('category-save-button'));
 
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // Liveness: without this the assertion below also passes if the control did
+      // nothing at all, which is indistinguishable from the behaviour under test.
+      expect(categoryServiceSpies.createProductCategory).toHaveBeenCalled();
       expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument();
     });
 
@@ -1435,7 +1465,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       expect(showBlockingInfoMock).toHaveBeenCalledTimes(1);
     });
 
-    it('shows a blocking error and keeps the modal open when createCsvProducts throws MissingDataKeyError', async () => {
+    it('keeps the modal open when createCsvProducts rejects with MissingDataKeyError', async () => {
       productServiceSpies.createCsvProducts.mockRejectedValueOnce(new MissingDataKeyError());
 
       render(
@@ -1450,10 +1480,13 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // Liveness: without this the assertion below also passes if the control did
+      // nothing at all, which is indistinguishable from the behaviour under test.
+      expect(productServiceSpies.createCsvProducts).toHaveBeenCalled();
       expect(screen.getByTestId('csv-import-button')).toBeInTheDocument();
     });
 
-    it('shows a blocking error and closes the modal when the post-import repaint throws MissingDataKeyError', async () => {
+    it('closes the modal when the post-import repaint rejects with MissingDataKeyError', async () => {
       mockCreateCsvProductsOnce([
         { id: 'p1', category: 'Snacks', name: 'Chips', price: 10, cost: undefined, quantity: undefined },
       ]);
@@ -1475,6 +1508,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // Liveness: without this the assertion below also passes if the control did
+      // nothing at all, which is indistinguishable from the behaviour under test.
+      expect(productServiceSpies.createCsvProducts).toHaveBeenCalled();
       expect(screen.queryByTestId('csv-import-button')).not.toBeInTheDocument();
       // The toast still fired — the mutation itself (including the toast/dialog reporting it)
       // completed before the repaint ran and failed.

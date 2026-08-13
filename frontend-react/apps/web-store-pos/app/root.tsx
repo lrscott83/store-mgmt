@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   isRouteErrorResponse,
   Links,
@@ -13,9 +13,10 @@ import { I18nProvider } from '~/shared/lib/i18n/i18n-provider';
 import messages from '~/shared/lib/i18n/es';
 import { registerServiceWorker } from '~/shared/lib/pwa/service-worker-registration';
 import { useStoreUsageTracker } from '~/shared/lib/usage/use-store-usage-tracker';
-import { registerAuthRedirect } from '~/shared/lib/stores/auth-store';
+import { registerAuthRedirect, willLogoutRedirect } from '~/shared/lib/stores/auth-store';
 import { useLoadingStore } from '~/shared/lib/stores/loading-store';
 import {
+  classifyDecryptionFailure,
   handleDecryptionFailure,
   registerDecryptionFailurePolicy,
 } from '~/shared/lib/storage/decryption-failure-policy';
@@ -134,10 +135,32 @@ export function HydrateFallback() {
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   // design D5, seam 2: a decryption failure THROWN during render or in a
   // loader never becomes an unhandled rejection, so the listener above cannot
-  // see it — react-router routes it here instead. The policy shows its own
-  // message and ends the session; rendering the generic error page underneath
-  // would tell the user two different things about one failure.
-  if (handleDecryptionFailure(error)) return null;
+  // see it — react-router routes it here instead.
+  const isDecryptionFailure = classifyDecryptionFailure(error) !== null;
+
+  // Whether hiding this page is safe is decided ONCE, on the render that first
+  // showed the boundary, and before the effect below navigates: afterwards the
+  // pathname is `/login` and the same question would answer differently.
+  const [redirectIsComing] = useState(
+    () => isDecryptionFailure && willLogoutRedirect(),
+  );
+
+  // The announcement and the sign-out are side effects — a SweetAlert, a
+  // zustand `set()` and a `navigate()`. Running them in the render body made
+  // React warn about updating a component while rendering another, so they run
+  // here instead.
+  useEffect(() => {
+    if (isDecryptionFailure) handleDecryptionFailure(error);
+  }, [isDecryptionFailure, error]);
+
+  // Render nothing ONLY when a redirect is actually coming to replace it.
+  // Otherwise fall through to the generic page below. On cold boot, a
+  // root-level throw reaches this boundary before `App()`'s effect has
+  // registered the router's navigate, so `logout()` moves the user nowhere;
+  // returning `null` there would leave a permanently blank page with no route
+  // to the recovery screens. Better a generic error page over the dialog than
+  // nothing at all.
+  if (redirectIsComing) return null;
 
   // ErrorBoundary can render on paths that never reach I18nProvider (e.g. a
   // root-level render error), so it reads the Spanish catalog directly

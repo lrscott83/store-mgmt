@@ -9,11 +9,15 @@ vi.mock('../../blocking-alert', () => ({
 }));
 
 const logoutMock = vi.fn();
+// Defaults to true: the ordinary case, where App() mounted first and registered
+// the router's navigate. The cold-boot tests below flip it to false.
+const willLogoutRedirectMock = vi.fn(() => true);
 vi.mock('../../stores/auth-store', () => ({
   useAuthStore: { getState: () => ({ logout: logoutMock }) },
   // root.tsx (imported by the ErrorBoundary-route suite at the bottom of this
-  // file) pulls this from the same module.
+  // file) pulls these from the same module.
   registerAuthRedirect: vi.fn(),
+  willLogoutRedirect: () => willLogoutRedirectMock(),
 }));
 
 // root.tsx's module graph, stubbed only far enough to import it. None of these
@@ -39,6 +43,7 @@ const DATA_DAMAGED =
 
 beforeEach(() => {
   vi.clearAllMocks();
+  willLogoutRedirectMock.mockReturnValue(true);
   resetDecryptionFailureLatch();
 });
 
@@ -247,5 +252,52 @@ describe('ErrorBoundary delivery route (design D5, seam 2)', () => {
     // and was told the failure was already owned.
     expect(container).toBeEmptyDOMElement();
     unregister();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// COLD BOOT: the shape nobody writes a test for, and the one that strands a
+// real user.
+//
+// `authRedirect` is module-level in auth-store and stays undefined until
+// `App()`'s effect registers it. A root-level render or loader throw on the
+// FIRST paint therefore happens before that effect has ever run, so `logout()`
+// signs the user out and navigates nowhere. If the boundary still hid its UI on
+// the assumption that a redirect was coming, the result is a permanently blank
+// page — with no route to the recovery screens this whole design exists to
+// reach.
+// ---------------------------------------------------------------------------
+describe('ErrorBoundary on cold boot, before any redirect is registered', () => {
+  async function renderBoundary(error: unknown) {
+    const { ErrorBoundary } = await import('../../../../root');
+    const props = { error, params: {} } as unknown as Parameters<typeof ErrorBoundary>[0];
+    return render(<ErrorBoundary {...props} />);
+  }
+
+  it('never leaves a blank page when the redirect cannot fire', async () => {
+    willLogoutRedirectMock.mockReturnValue(false);
+
+    const { container } = await renderBoundary(new MissingDataKeyError());
+
+    // The whole point: something is on screen.
+    expect(container).not.toBeEmptyDOMElement();
+    expect(screen.getByRole('heading', { name: 'Error' })).toBeInTheDocument();
+  });
+
+  it('still announces the failure and still ends the session', async () => {
+    willLogoutRedirectMock.mockReturnValue(false);
+
+    await renderBoundary(new MissingDataKeyError());
+
+    expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', KEY_UNAVAILABLE);
+    expect(logoutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the generic page only when a redirect really is coming', async () => {
+    willLogoutRedirectMock.mockReturnValue(true);
+
+    const { container } = await renderBoundary(new MissingDataKeyError());
+
+    expect(container).toBeEmptyDOMElement();
   });
 });

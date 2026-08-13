@@ -68,6 +68,15 @@ if (typeof Blob !== 'undefined' && typeof Blob.prototype.text !== 'function') {
 // the synthetic event is `cancelable`, so it is swallowed ONLY if a listener
 // claims it with `preventDefault()`. `dispatchEvent` returns false in exactly
 // that case. Anything nobody claims is re-thrown and still fails its test.
+// Pinned by app/shared/lib/testing/__tests__/unhandled-rejection-bridge.test.ts,
+// which fails if either the re-throw or `cancelable` is dropped.
+//
+// One cosmetic consequence, so a confusing label does not send anyone hunting:
+// re-throwing from inside this handler means vitest reports an unclaimed
+// rejection under a different heading than it used to. `Unhandled Rejection`
+// now prints as `Uncaught Exception`, and a reason that is not an `Error`
+// prints as `Unknown Error: <value>`. Nothing is hidden or downgraded — the
+// run still fails and the stack still points at the original rejection site.
 process.on('unhandledRejection', (reason: unknown) => {
   const event = new Event('unhandledrejection', { cancelable: true });
   (event as Event & { reason: unknown }).reason = reason;

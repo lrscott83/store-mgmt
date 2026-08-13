@@ -25,6 +25,26 @@ export function registerAuthRedirect(fn: (path: string) => void): void {
 }
 
 /**
+ * Will a `logout()` right now actually navigate the user somewhere?
+ *
+ * Two ways it will not. The redirect is skipped when we are already on `/login`
+ * or `/` (Decision 2, below), and `authRedirect` is undefined until `App()`'s
+ * effect registers it — which has NOT happened yet during the first render, so
+ * a root-level throw on cold boot logs the user out and moves them nowhere.
+ *
+ * Exported because a caller that hides the UI on the assumption that a redirect
+ * follows (root.tsx's ErrorBoundary) would otherwise leave a blank page with no
+ * route to the recovery screens. This is the single source of truth for that
+ * question: `logout()` below branches on the same function, so the two can
+ * never disagree.
+ */
+export function willLogoutRedirect(): boolean {
+  if (authRedirect === undefined) return false;
+  const pathname = window.location.pathname;
+  return pathname !== '/login' && pathname !== '/';
+}
+
+/**
  * Did the server pass judgement on this session, or did it just fail to answer?
  *
  * Only the first ends the session. 401 and 404 are verdicts — 404 is the code
@@ -384,9 +404,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: null, isAuthenticated: false, error: null });
 
     // Decision 2: conditional redirect (Angular auth.service.ts:83-98) — skip
-    // when already on /login or / to avoid a redundant navigation loop.
-    const pathname = window.location.pathname;
-    if (pathname !== '/login' && pathname !== '/') {
+    // when already on /login or / to avoid a redundant navigation loop. The
+    // condition lives in `willLogoutRedirect()` so callers can ask the same
+    // question BEFORE calling this.
+    if (willLogoutRedirect()) {
       authRedirect?.('/login');
     }
   },

@@ -22,8 +22,10 @@ vi.mock('react-router', async (importOriginal) => {
   };
 });
 
+const mockWillLogoutRedirect = vi.fn(() => true);
 vi.mock('~/shared/lib/stores/auth-store', () => ({
   registerAuthRedirect: (fn: (path: string) => void) => mockRegisterAuthRedirect(fn),
+  willLogoutRedirect: () => mockWillLogoutRedirect(),
 }));
 
 vi.mock('~/shared/lib/pwa/service-worker-registration', () => ({
@@ -46,12 +48,14 @@ vi.mock('~/shared/lib/i18n/i18n-provider', () => ({
 const mockRegisterDecryptionFailurePolicy = vi.fn();
 const mockUnregisterDecryptionFailurePolicy = vi.fn();
 const mockHandleDecryptionFailure = vi.fn().mockReturnValue(false);
+const mockClassifyDecryptionFailure = vi.fn<(error: unknown) => string | null>(() => null);
 vi.mock('~/shared/lib/storage/decryption-failure-policy', () => ({
   registerDecryptionFailurePolicy: () => {
     mockRegisterDecryptionFailurePolicy();
     return mockUnregisterDecryptionFailurePolicy;
   },
   handleDecryptionFailure: (error: unknown) => mockHandleDecryptionFailure(error),
+  classifyDecryptionFailure: (error: unknown) => mockClassifyDecryptionFailure(error),
 }));
 
 // TOAST-CONTAINER (toast-notifications-parity): recording stub so the test can assert
@@ -229,9 +233,12 @@ describe('ErrorBoundary — routes a decryption failure to the same policy (desi
   beforeEach(() => {
     vi.clearAllMocks();
     mockHandleDecryptionFailure.mockReturnValue(false);
+    mockClassifyDecryptionFailure.mockReturnValue(null);
+    mockWillLogoutRedirect.mockReturnValue(true);
   });
 
   it('hands the error to the policy and renders nothing once the policy owns it', () => {
+    mockClassifyDecryptionFailure.mockReturnValue('missing-key');
     mockHandleDecryptionFailure.mockReturnValue(true);
     const error = new Error('no data key');
 
@@ -244,12 +251,42 @@ describe('ErrorBoundary — routes a decryption failure to the same policy (desi
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('does not touch the policy during render — the side effects run in an effect', () => {
+    mockClassifyDecryptionFailure.mockReturnValue('missing-key');
+    mockHandleDecryptionFailure.mockReturnValue(true);
+
+    // `renderHook`-free way to observe render vs effect ordering: React runs
+    // effects only on commit, so a render that never commits calls nothing.
+    // `handleDecryptionFailure` fires a SweetAlert, a zustand set() and a
+    // navigate(); doing that mid-render made React warn about updating one
+    // component while rendering another.
+    expect(mockHandleDecryptionFailure).not.toHaveBeenCalled();
+
+    render(<ErrorBoundary error={new Error('no data key')} params={{}} />);
+
+    expect(mockHandleDecryptionFailure).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the generic error page unchanged when the policy declines the error', () => {
-    mockHandleDecryptionFailure.mockReturnValue(false);
+    mockClassifyDecryptionFailure.mockReturnValue(null);
 
     render(<ErrorBoundary error={mockRouteError(404)} params={{}} />);
 
     expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
+    expect(mockHandleDecryptionFailure).not.toHaveBeenCalled();
+  });
+
+  it('shows the generic page instead of a blank one when no redirect will follow', () => {
+    // Cold boot: App()'s effect has not registered the router navigate yet, so
+    // logout() moves the user nowhere. Hiding the UI here would strand them.
+    mockClassifyDecryptionFailure.mockReturnValue('missing-key');
+    mockHandleDecryptionFailure.mockReturnValue(true);
+    mockWillLogoutRedirect.mockReturnValue(false);
+
+    const { container } = render(<ErrorBoundary error={new Error('no key')} params={{}} />);
+
+    expect(container).not.toBeEmptyDOMElement();
+    expect(screen.getByRole('heading', { name: 'Error' })).toBeInTheDocument();
   });
 });
 
