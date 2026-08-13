@@ -5,13 +5,17 @@ import { IntlProvider } from 'react-intl';
 import messages from '~/shared/lib/i18n/es';
 import { DekUnwrapError } from '~/shared/lib/offline/dek-unwrap';
 
-// device-wrapped-dek design (Task 5): a device holding encrypted data it
-// cannot open must not be allowed to authenticate. This suite pins the
-// login-screen consequence of `resolveDekForLogin` rejecting with
-// `DekUnwrapError` (Task 3): the app-wide decryption-failure policy (Task 4)
-// takes over — one blocking dialog naming the recovery routes, then sign-out
-// — instead of the old inline `AUTH.UNLOCK_FAILED` message that left the
-// (unrecoverable, `needsUnlock`-true) session standing.
+// device-wrapped-dek design (Task 5, corrected by the controller's ruling
+// after the first version of this file): a device holding encrypted data it
+// cannot open must not be allowed to authenticate — but on the login SCREEN
+// itself, the recovery is an INLINE banner naming both routes (sign in
+// online, import a roster), not the app-wide blocking-dialog + sign-out
+// policy (`handleDecryptionFailure`, storage/decryption-failure-policy.ts).
+// That policy exists to carry a user OFF an authenticated screen and ONTO
+// /login, where the recovery routes live; here the user is already there, so
+// a modal + logout would be pure friction on a form they can act on
+// directly. Only the copy changed from the old AUTH.UNLOCK_FAILED (named one
+// route, obliquely) to ENCRYPTION.KEY_UNAVAILABLE (names both explicitly).
 
 const showBlockingErrorMock = vi.fn();
 vi.mock('~/shared/lib/blocking-alert', () => ({
@@ -19,19 +23,17 @@ vi.mock('~/shared/lib/blocking-alert', () => ({
 }));
 
 const logoutMock = vi.fn();
-// Idiom from app-layout.test.tsx: `useAuthStore` must work BOTH as the
-// selector-less hook call login.tsx makes (`useAuthStore()`) AND as the
-// static `useAuthStore.getState()` the (real, unmocked)
-// decryption-failure-policy module calls internally. A bare `vi.fn()` with
-// no `.getState` — the shape login.test.tsx's neighbouring suite uses —
-// would make `handleDecryptionFailure` throw `TypeError: ...getState is not
-// a function`, so this suite cannot reuse that bare shape.
 vi.mock('~/shared/lib/stores/auth-store', () => {
   const useAuthStore = vi.fn(() => ({
     login: loginFn,
     loginOffline: loginOfflineFn,
     isLoading: false,
   }));
+  // Not strictly required by login.tsx itself (this seam never reaches
+  // handleDecryptionFailure's `useAuthStore.getState().logout()`), but kept
+  // so `logoutMock`/`showBlockingErrorMock` can assert the NEGATIVE — that
+  // this seam never touches the app-wide policy at all — which is the whole
+  // point this suite now pins.
   (useAuthStore as unknown as { getState: () => unknown }).getState = () => ({
     logout: logoutMock,
   });
@@ -92,7 +94,7 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     localStorage.clear();
   });
 
-  it('refuses the login and reports the reason when the online login cannot unwrap the device DEK', async () => {
+  it('renders the recovery banner inline and does NOT sign out when the online login cannot unwrap the device DEK', async () => {
     localStorage.setItem(CATEGORIES_KEY, SEEDED_BYTES);
     loginFn = vi.fn().mockRejectedValue(new DekUnwrapError());
 
@@ -106,15 +108,19 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     await submit();
 
     await waitFor(() => {
-      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', KEY_UNAVAILABLE);
+      expect(screen.getByText(KEY_UNAVAILABLE)).toBeInTheDocument();
     });
-    expect(logoutMock).toHaveBeenCalledTimes(1);
+    // The mechanism is the inline banner, NOT the app-wide policy: no dialog,
+    // no sign-out. The user is already on /login, where both recovery routes
+    // (named in the banner text above) live.
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(logoutMock).not.toHaveBeenCalled();
     // The failure is about this device's key, not the stored ciphertext —
     // nothing is touched, let alone wiped, on a refused login.
     expect(localStorage.getItem(CATEGORIES_KEY)).toBe(SEEDED_BYTES);
   });
 
-  it('still shows the ordinary invalid-credentials message on a wrong password — no dialog, no sign-out', async () => {
+  it('still shows the ordinary invalid-credentials message on a wrong password, never the data-recovery copy', async () => {
     loginFn = vi.fn().mockRejectedValue({ status: 401 });
 
     renderLogin();
@@ -123,22 +129,25 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     await waitFor(() => {
       expect(screen.getByText('Usuario o contraseña inválidos')).toBeInTheDocument();
     });
+    expect(screen.queryByText(KEY_UNAVAILABLE)).not.toBeInTheDocument();
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
     expect(logoutMock).not.toHaveBeenCalled();
   });
 
-  it('reports a second refused attempt too — a fresh login attempt is not the latched parallel-read case', async () => {
+  it('reports a second refused attempt too — the banner is not a one-shot latch', async () => {
     loginFn = vi.fn().mockRejectedValue(new DekUnwrapError());
 
     renderLogin();
     await submit();
-    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText(KEY_UNAVAILABLE)).toBeInTheDocument());
 
     await submit();
-    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByText(KEY_UNAVAILABLE)).toBeInTheDocument());
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(logoutMock).not.toHaveBeenCalled();
   });
 
-  it('refuses an offline login the same way when loginOffline cannot unwrap the device DEK', async () => {
+  it('refuses an offline login the same way (inline banner, no dialog, no sign-out) when loginOffline cannot unwrap the device DEK', async () => {
     isRosterProvisionedMock.mockReturnValue(true);
     loginOfflineFn = vi.fn().mockRejectedValue(new DekUnwrapError());
 
@@ -146,8 +155,9 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     await submit();
 
     await waitFor(() => {
-      expect(showBlockingErrorMock).toHaveBeenCalledWith('Error', KEY_UNAVAILABLE);
+      expect(screen.getByText(KEY_UNAVAILABLE)).toBeInTheDocument();
     });
-    expect(logoutMock).toHaveBeenCalledTimes(1);
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(logoutMock).not.toHaveBeenCalled();
   });
 });

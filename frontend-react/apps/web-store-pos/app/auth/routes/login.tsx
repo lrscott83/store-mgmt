@@ -43,11 +43,18 @@ function offlineErrorMessageId(err: unknown): string {
   if (name === 'OfflineUserInactiveError') {
     return 'AUTH.ACCOUNT_INACTIVE';
   }
-  // Task 5: DekUnwrapError is intercepted earlier in handleSubmit (routed
-  // through handleDecryptionFailure, before this function ever runs) — the
-  // offline verifier has already passed by the time unwrap runs, so it means
-  // this device cannot open its own data, not a wrong password. Never
-  // reaches here; see the catch block below.
+  // design §10 / at-rest-encryption-errors, corrected by Task 5's controller
+  // ruling: the offline verifier has already passed by the time unwrap runs,
+  // so a DekUnwrapError here means this device cannot open its own data, not
+  // a wrong password. Stays an INLINE banner at this seam (not the app-wide
+  // blocking-dialog + sign-out policy) — the user is already ON the login
+  // screen, where both recovery routes live, so a modal + logout is pure
+  // friction. Only the copy changed from AUTH.UNLOCK_FAILED (names one route,
+  // obliquely) to ENCRYPTION.KEY_UNAVAILABLE (names both explicitly), to keep
+  // this seam and the app-wide policy agreeing on what a missing key deserves.
+  if (name === 'DekUnwrapError') {
+    return 'ENCRYPTION.KEY_UNAVAILABLE';
+  }
   // Includes NoRosterError, OfflineVerifierError, and anything unexpected.
   return 'AUTH.SERVER_ERROR';
 }
@@ -116,21 +123,6 @@ export default function LoginPage() {
         navigate(await resolveUserHomePath(user));
       } catch (err: unknown) {
         setIsSubmitting(false);
-        // Task 5: a device that cannot open its own data must not be allowed
-        // to authenticate, offline included — same policy as the online
-        // branch below. Checked BEFORE offlineErrorMessageId's generic
-        // fallback, which would otherwise mislabel this as AUTH.SERVER_ERROR.
-        const { handleDecryptionFailure, resetDecryptionFailureLatch } = await import(
-          '~/shared/lib/storage/decryption-failure-policy'
-        );
-        if (handleDecryptionFailure(err)) {
-          // A fresh login attempt is a NEW failure event, not a second
-          // rejection from one already-reported cause (the latch's actual
-          // target — several entity reads failing from a single load) — so
-          // it must not be silently swallowed on a retry.
-          resetDecryptionFailureLatch();
-          return;
-        }
         setErrors({
           form: intl.formatMessage({ id: offlineErrorMessageId(err) }),
         });
@@ -167,21 +159,17 @@ export default function LoginPage() {
       // user with `needsUnlock` permanently true, looping authLoader ->
       // /login -> "successful" login -> authLoader forever).
       //
-      // Task 5: a device that cannot open its own data must not be allowed
-      // to authenticate. `handleDecryptionFailure` classifies DekUnwrapError
-      // as the recoverable 'missing-key' case, shows the blocking dialog
-      // naming both recovery routes (online login, roster import), and signs
-      // out — replacing the old inline AUTH.UNLOCK_FAILED message, which left
-      // a `needsUnlock`-permanently-true session standing.
-      const { handleDecryptionFailure, resetDecryptionFailureLatch } = await import(
-        '~/shared/lib/storage/decryption-failure-policy'
-      );
-      if (handleDecryptionFailure(err)) {
-        // A fresh login attempt is a NEW failure event, not a second
-        // rejection from one already-reported cause (the latch's actual
-        // target — several entity reads failing from a single load) — so
-        // it must not be silently swallowed on a retry.
-        resetDecryptionFailureLatch();
+      // Task 5 controller ruling: stays an INLINE banner, NOT the app-wide
+      // handleDecryptionFailure blocking-dialog + sign-out policy. That
+      // policy exists to carry a user OFF an authenticated screen and ONTO
+      // /login, where the recovery routes live — here the user is already on
+      // /login, so a modal + logout would be pure friction on a form they can
+      // act on directly. Only the copy changed, to
+      // ENCRYPTION.KEY_UNAVAILABLE, which (unlike the old AUTH.UNLOCK_FAILED)
+      // names both recovery routes explicitly, matching what the policy says
+      // elsewhere for the same `classifyDecryptionFailure` 'missing-key' case.
+      if ((err as { name?: string } | null)?.name === 'DekUnwrapError') {
+        setErrors({ form: intl.formatMessage({ id: 'ENCRYPTION.KEY_UNAVAILABLE' }) });
         return;
       }
       // Angular login.component.ts:162-167 INVALID_ERROR path: a body-level

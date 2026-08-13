@@ -88,8 +88,11 @@ const messages: Record<string, string> = {
   // at-rest-encryption-errors spec §"unlock banner and failure copy exact
   // strings" — ratified verbatim, do not reword.
   'AUTH.UNLOCK_REQUIRED': 'Ingresá tu contraseña para desbloquear los datos de este dispositivo.',
-  'AUTH.UNLOCK_FAILED':
-    'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.',
+  // AUTH.UNLOCK_FAILED removed by Task 5's controller ruling: a DekUnwrapError
+  // at login now renders ENCRYPTION.KEY_UNAVAILABLE below instead, which
+  // names both recovery routes explicitly (this one named only one,
+  // obliquely). Verified unreferenced by any production code or test before
+  // removal.
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
   'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',
 

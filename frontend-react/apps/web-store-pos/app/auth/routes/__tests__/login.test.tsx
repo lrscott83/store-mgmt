@@ -352,7 +352,13 @@ describe('LoginPage — unlock gate banner + DekUnwrapError copy (design §10)',
     ).not.toBeInTheDocument();
   });
 
-  it('renders AUTH.UNLOCK_FAILED when the online login call rejects with a DekUnwrapError-named error', async () => {
+  // Task 5 controller ruling: the message changed from AUTH.UNLOCK_FAILED
+  // (names one recovery route, obliquely) to ENCRYPTION.KEY_UNAVAILABLE
+  // (names both — online login and roster import — explicitly). The
+  // mechanism did NOT change: still the inline banner on this same screen,
+  // not the app-wide blocking-dialog + sign-out policy, since the user is
+  // already on /login, where both recovery routes live.
+  it('renders the recovery copy (ENCRYPTION.KEY_UNAVAILABLE) when the online login call rejects with a DekUnwrapError-named error', async () => {
     const rejection = Object.assign(new Error('unwrap failed'), { name: 'DekUnwrapError' });
     const loginFn = vi.fn().mockRejectedValue(rejection);
     renderLoginAt('/login', loginFn);
@@ -368,7 +374,7 @@ describe('LoginPage — unlock gate banner + DekUnwrapError copy (design §10)',
     await waitFor(() => {
       expect(
         screen.getByText(
-          'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.'
+          'No se pudo abrir la información de esta tienda. Inicie sesión con conexión o importe un roster para recuperarla.'
         )
       ).toBeInTheDocument();
     });
