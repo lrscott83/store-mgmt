@@ -76,6 +76,14 @@ export function ProductsPage() {
   }
 
   useEffect(() => {
+    // logout() (auth-store.ts:352-353) releases the DEK and nulls the user synchronously,
+    // and only then redirects — through /login's async guestOnlyLoader, so this page is
+    // still mounted when storeId (above) falls back to ''. Reloading from that state reaches
+    // the category repository's auto-init write (product-category-repository.ts:246-247) with
+    // no DEK in memory: it throws MissingDataKeyError, and the guard's blocking alert outlives
+    // the navigation to sit on top of the login screen. An unselected store has nothing to load.
+    if (!storeId) return;
+
     runGuardedAgainstMissingDek(
       async () => {
         await loadData();

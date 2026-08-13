@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
@@ -251,6 +251,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     showToastSuccessMock.mockClear();
     showToastErrorMock.mockClear();
     mockUser.isOwnerAdmin = true;
+    // Restored per-test: the logout test below empties it to reproduce the post-logout render.
+    mockUser.selectedStoreId = 's1';
     // mockReset (not mockClear) so a queued mockImplementationOnce throw from the cart-failure
     // test below can never leak into an unrelated test.
     clearCartMock.mockReset();
@@ -943,6 +945,40 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
           'No se pudieron cargar los datos. Recargue la página.',
         ),
       );
+    });
+
+    it('does not reload, and raises no blocking error, when logout empties the store id while the page is still mounted', async () => {
+      mockCategories = [makeCategory()];
+
+      const { rerender } = render(
+        <Wrapper>
+          <ProductsPage />
+        </Wrapper>,
+      );
+      await waitFor(() => expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1));
+
+      // logout() (auth-store.ts:352-353) releases the DEK and nulls the user synchronously,
+      // and only then redirects — through /login's async guestOnlyLoader, so this page is
+      // still mounted when selectedStoreId becomes ''. Reloading from that state reaches the
+      // repository's auto-init write (product-category-repository.ts:246-247) with no DEK in
+      // memory, which throws MissingDataKeyError and leaves the guard's blocking alert sitting
+      // on top of the login screen. An unselected store has nothing to load.
+      //
+      // No mockRejectedValueOnce is queued here on purpose: a fix means the reload never
+      // happens, so a queued Once would survive this test and leak into the next one (the
+      // beforeEach above clears these spies without resetting them). The call count below is
+      // the falsifier — it read 2 before the fix.
+      mockUser.selectedStoreId = '';
+      await act(async () => {
+        rerender(
+          <Wrapper>
+            <ProductsPage />
+          </Wrapper>,
+        );
+      });
+
+      expect(categoryServiceSpies.getProductCategoriesView).toHaveBeenCalledTimes(1);
+      expect(showBlockingErrorMock).not.toHaveBeenCalled();
     });
 
     it('shows a blocking error instead of a silent no-op when getMaxOrderByCategoryId throws', async () => {
