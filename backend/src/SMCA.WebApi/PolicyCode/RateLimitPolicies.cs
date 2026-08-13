@@ -17,7 +17,7 @@ public static class RateLimitPolicies
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new SlidingWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
                 SegmentsPerWindow = 3,
                 QueueLimit = 0

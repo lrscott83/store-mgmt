@@ -144,8 +144,23 @@ async function captureSnapshot(
   // restored session honest about that, and costs no coverage: the
   // device-wrap paths are covered end to end by T10/F4 in
   // login-offline.spec.ts, which run in their own real context.
+  //
+  // The SAME honesty rule applies to the six encrypted business entities
+  // (`lizoft.store-*` with an `enc:v1:` value, entity-crypto.ts). The mint
+  // writes them ciphertext because the DEK is in memory during the real
+  // login; a snapshot-restored context has no DEK (module-level `let`,
+  // data-key-store.ts), so the first page that reads the entity
+  // (`/sales/products`, the owner-admin homePath) throws
+  // `MissingDataKeyError`, the app-wide decryption-failure policy logs the
+  // user out with the `ENCRYPTION.KEY_UNAVAILABLE` dialog, and every
+  // downstream assertion dies waiting on the login page. Plaintext entity
+  // values (the `*-with-products` personas seed AFTER restore, when no DEK
+  // is present, so their bytes are honest plaintext) stay captured — the
+  // filter is by ciphertext marker, not by key prefix.
   const localStorage = originState.localStorage.filter(
-    (entry) => entry.name !== 'lizoft.device-dek'
+    (entry) =>
+      entry.name !== 'lizoft.device-dek' &&
+      !(entry.name.startsWith('lizoft.store-') && entry.value.startsWith('enc:v1:'))
   );
   return { localStorage, identity, selectedStoreId, homePath };
 }
