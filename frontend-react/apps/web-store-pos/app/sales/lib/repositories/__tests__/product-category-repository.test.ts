@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProductCategory } from '@store-mgmt/domain';
 import { ProductCategoryRepository } from '../product-category-repository';
-import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 const storeId = 's1';

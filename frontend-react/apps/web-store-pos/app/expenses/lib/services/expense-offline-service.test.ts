@@ -3,7 +3,6 @@ import { ExpenseType, PaymentType, ExpenseErrors } from '@store-mgmt/domain';
 import type { BaseResponseModel, Expense, UserModel } from '@store-mgmt/domain';
 import { ExpenseOfflineService } from './expense-offline-service';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 const storeId = 'store-test';

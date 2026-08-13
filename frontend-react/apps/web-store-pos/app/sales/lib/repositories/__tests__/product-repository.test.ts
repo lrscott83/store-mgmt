@@ -3,7 +3,6 @@ import type { Product, ProductCategory, UserModel } from '@store-mgmt/domain';
 import { ProductRepository } from '../product-repository';
 import { ProductCategoryRepository } from '../product-category-repository';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 const storeId = 's1';

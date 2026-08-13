@@ -347,8 +347,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // online path above.
       const { resolveDekForLogin } = await import('../offline/dek-provisioning');
       await resolveDekForLogin({ login: user.login, password, sessionStoreId: user.selectedStoreId });
-      // Task 4: re-arm the decryption-failure latch, same rationale (and same
-      // dynamic-import rationale) as the online path above.
+      // Task 4: re-arm the decryption-failure latch, same rationale as the
+      // online path above — and dynamic for the same two reasons, restated
+      // here because this call site is edited on its own: a static import
+      // would close a cycle (`decryption-failure-policy` imports THIS module)
+      // and would pull sweetalert2 into every cold boot.
       const { resetDecryptionFailureLatch } = await import(
         '../storage/decryption-failure-policy'
       );

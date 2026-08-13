@@ -12,7 +12,6 @@ function unwrap<T>(response: BaseResponseModel<T>): T {
 import type { CartItem } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { startOfDay, addDays } from '~/shared/lib/date-utils';
-import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 // Mock InventoryOfflineService BEFORE importing OrderOfflineService

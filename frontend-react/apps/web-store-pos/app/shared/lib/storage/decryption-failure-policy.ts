@@ -2,6 +2,13 @@ import { showBlockingError } from '../blocking-alert';
 import messages from '../i18n/es';
 import { useAuthStore } from '../stores/auth-store';
 
+// Note for anyone tidying imports: these three are static here, but
+// `auth-store.ts` reaches BACK for `resetDecryptionFailureLatch` through a
+// DYNAMIC import, and must keep doing so. This module importing `auth-store`
+// is what makes the reverse edge a cycle, and `auth-store` is evaluated on
+// every page load, so a static edge there would also drag sweetalert2 (via
+// `blocking-alert` above) into every cold boot.
+
 /**
  * Which of the two decryption failures happened, and therefore which truth the
  * user is owed:

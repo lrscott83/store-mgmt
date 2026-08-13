@@ -3,7 +3,6 @@ import { SaleCreditOfflineService } from '../sale-credit-offline-service';
 import { PaymentType } from '@store-mgmt/domain';
 import type { BaseResponseModel, SaleCredit, UserModel } from '@store-mgmt/domain';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
-import { EntityUnreadableError } from '~/shared/lib/storage/read-entity-or-throw';
 import { MissingDataKeyError } from '~/shared/lib/storage/entity-crypto';
 
 // response-envelope-nullability: `data` only narrows to non-null on the succeeded

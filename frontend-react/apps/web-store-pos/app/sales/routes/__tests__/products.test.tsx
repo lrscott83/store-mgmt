@@ -479,13 +479,10 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'No se pudo guardar el producto. Recargue la página.',
-      ),
-    );
-    // The mutation guard caught the failure — the modal must stay open, same as a domain failure.
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    // The mutation rejected before setModal(null) ran, so the modal is still mounted. What the
+    // USER sees now (one message, then a sign-out) is the app-wide policy's business and is
+    // asserted in decryption-failure-policy.test.ts, not here.
     expect(screen.getByTestId('product-name-input')).toBeInTheDocument();
   });
 
@@ -509,12 +506,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
     fireEvent.click(screen.getByTestId('create-product-submit'));
 
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'El producto fue guardado, pero no se pudo actualizar la vista. Recargue la página.',
-      ),
-    );
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     // The mutation itself succeeded — the modal closes even though the repaint failed.
     expect(screen.queryByTestId('product-name-input')).not.toBeInTheDocument();
   });
@@ -562,12 +554,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'No se pudo actualizar el producto. Recargue la página.',
-      ),
-    );
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(screen.getByTestId('edit-product-name-input')).toBeInTheDocument();
   });
 
@@ -589,12 +576,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'El producto fue actualizado, pero no se pudo actualizar la vista. Recargue la página.',
-      ),
-    );
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(screen.queryByTestId('edit-product-name-input')).not.toBeInTheDocument();
   });
 
@@ -783,12 +765,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.change(await screen.findByTestId('product-price-0'), { target: { value: '9.99' } });
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'No se pudieron guardar los productos. Recargue la página.',
-      ),
-    );
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(screen.getByTestId('bulk-save-button')).toBeInTheDocument();
   });
 
@@ -810,12 +787,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
-      ),
-    );
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(screen.queryByTestId('bulk-save-button')).not.toBeInTheDocument();
   });
 
@@ -844,15 +816,12 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
     fireEvent.click(screen.getByTestId('bulk-save-button'));
 
-    // The domain failure did not prevent the mutation guard from returning true (Angular
-    // parity: unconditional close+repaint), so the modal closes and the repaint fires — and
-    // the repaint's own DEK failure surfaces its own message, independent of the domain one.
-    await waitFor(() =>
-      expect(showBlockingErrorMock).toHaveBeenCalledWith(
-        'Error',
-        'Los productos fueron guardados, pero no se pudo actualizar la vista. Recargue la página.',
-      ),
-    );
+    // Angular parity: close+repaint are unconditional, so a domain failure does not stop them —
+    // the modal closes and the repaint fires, and the domain failure is reported afterwards.
+    // The repaint's own DEK failure no longer surfaces a message of its own here; it reaches
+    // the app-wide policy, which has its own suite. Both assertions below survived that change
+    // and are the reason this test was kept rather than dropped with the guard.
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(showBlockingErrorMock).toHaveBeenCalledWith(
       'Error',
       'Algunos productos no fueron adicionados porque ya existen.',
@@ -994,13 +963,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(await screen.findByTestId('category-actions-toggle-cat-1'));
       fireEvent.click(screen.getByTestId('add-product-button'));
 
-      await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith(
-          'Error',
-          'No se pudo abrir el formulario. Recargue la página.',
-        ),
-      );
-      // The guard caught the failure before setModal ran — the create-product modal must not open.
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // The rejection propagated before setModal ran — the create-product modal must not open.
       expect(screen.queryByTestId('product-name-input')).not.toBeInTheDocument();
     });
 
@@ -1015,13 +979,8 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
 
       fireEvent.click(screen.getByTestId('add-category-button'));
 
-      await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith(
-          'Error',
-          'No se pudo abrir el formulario. Recargue la página.',
-        ),
-      );
-      // The guard caught the failure before setModal ran — the create-category modal must not open.
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      // The rejection propagated before setModal ran — the create-category modal must not open.
       expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument();
     });
   });
@@ -1061,12 +1020,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.change(await screen.findByTestId('category-name-input'), { target: { value: 'Snacks' } });
       fireEvent.click(screen.getByTestId('category-save-button'));
 
-      await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith(
-          'Error',
-          'No se pudo guardar la categoría. Recargue la página.',
-        ),
-      );
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
       expect(screen.getByTestId('category-name-input')).toBeInTheDocument();
     });
 
@@ -1082,12 +1036,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
       fireEvent.click(screen.getByTestId('category-save-button'));
 
-      await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith(
-          'Error',
-          'La categoría fue guardada, pero no se pudo actualizar la vista. Recargue la página.',
-        ),
-      );
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
       expect(screen.queryByTestId('category-name-input')).not.toBeInTheDocument();
     });
 
@@ -1539,12 +1488,7 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith(
-          'Error',
-          'No se pudieron importar los productos. Recargue la página.',
-        ),
-      );
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
       expect(screen.getByTestId('csv-import-button')).toBeInTheDocument();
     });
 
@@ -1569,15 +1513,10 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       categoryServiceSpies.getProductCategoriesView.mockRejectedValueOnce(new MissingDataKeyError());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      await waitFor(() =>
-        expect(showBlockingErrorMock).toHaveBeenCalledWith(
-          'Error',
-          'Los productos fueron importados, pero no se pudo actualizar la vista. Recargue la página.',
-        ),
-      );
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
       expect(screen.queryByTestId('csv-import-button')).not.toBeInTheDocument();
       // The toast still fired — the mutation itself (including the toast/dialog reporting it)
-      // completed before the repaint guard ran and failed.
+      // completed before the repaint ran and failed.
       expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 1 productos y 0 entradas correctamente.');
     });
   });
