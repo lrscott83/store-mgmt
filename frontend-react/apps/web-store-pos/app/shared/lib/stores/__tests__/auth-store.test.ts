@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore, registerAuthRedirect } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
 import { getDek, setDek, clearDek } from '../../storage/data-key-store';
+import { writeDeviceDekTable } from '../../storage/device-dek-table';
+import { wrapDekWithPassword } from '../../offline/dek-unwrap';
 import { authHttpService } from '../../http/auth-http-service';
 import { allowUnmockedHttpReporting } from '../../testing/block-real-http';
 import type { UserModel } from '@store-mgmt/domain';
@@ -30,6 +32,21 @@ import type { UserModel } from '@store-mgmt/domain';
 // per-test report it cannot attribute. Every other file keeps the report.
 
 const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
+
+/**
+ * The minimum key material a device needs for `login()` to get past
+ * `resolveDekForLogin` now that design D2 has removed the Q2 mint: this
+ * login's own password wrap in the device table, which step 3a recovers.
+ */
+async function seedDeviceDekTableFor(login: string, password: string): Promise<void> {
+  writeDeviceDekTable({
+    formatVersion: 1,
+    dekSource: 'local',
+    storeId: 's1',
+    device: null,
+    users: { [login]: await wrapDekWithPassword(password, new Uint8Array(32).fill(0x66)) },
+  });
+}
 
 function makeUser(overrides: Partial<UserModel> = {}): UserModel {
   return {
@@ -592,6 +609,22 @@ describe('useAuthStore', () => {
       const fakeUser = makeUser();
       const spy = vi.fn().mockResolvedValue(fakeUser);
       useAuthStore.setState({ getUserByToken: spy });
+
+      // SETUP RESEEDED (design D2 removed the Q2 mint). This test is about
+      // action wiring and mentions no key at all, but `login()` now runs
+      // `resolveDekForLogin`, which refuses on a device holding no key
+      // material. This is the smallest seed that gets past it.
+      //
+      // It is a device table and NOT a one-line `setDek(...)`, which would be
+      // smaller but racy: the in-memory DEK is cleared by `logout()`
+      // (`auth-store.ts:352`), and per this file's own header comment one
+      // `initialize()`/`getUserByToken()` tail escapes and "lands in whichever
+      // test runs when it resolves". A seed living in localStorage is immune
+      // to that — `logout()` never touches the device table, so step 3a
+      // re-derives the key no matter when the stray tail fires. Measured, not
+      // assumed: with `setDek` this test failed, and passed only when extra
+      // awaits happened to reorder the tail.
+      await seedDeviceDekTableFor(fakeUser.login, 'pw');
 
       useAuthStore.getState().initialize();
       expect(spy).toHaveBeenCalledTimes(1);

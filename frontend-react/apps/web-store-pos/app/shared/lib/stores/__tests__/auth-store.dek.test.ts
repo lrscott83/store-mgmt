@@ -139,19 +139,25 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
     vi.doUnmock('~/shared/lib/http/auth-http-service');
   });
 
-  // AUTHORIZED rewrite (device-wrapped-dek design §5/§7): "no roster entry"
-  // no longer leaves the DEK null — `resolveDekForLogin`'s Q2 mint branch
-  // (step 3c) gives every device a DEK after its first login. IndexedDB is
-  // absent under plain jsdom (no `fake-indexeddb` import in this file),
-  // which correctly exercises the F1 local-mint path (no device-key wrap,
-  // password wrap only) — no crypto mocking needed.
-  it('11.3: no roster entry for this login -> login still resolves and getDek() is non-null (device-wrapped-dek Q2 mint)', async () => {
+  // REWRITTEN (design D2), same input, opposite expectation. This test was
+  // itself an AUTHORIZED rewrite once, when the Q2 mint branch (step 3c) was
+  // introduced: it then read "no roster entry for this login -> login still
+  // resolves and getDek() is non-null" and asserted exactly that. The mint is
+  // now gone — only the SERVER can re-derive a store's key, so a device with
+  // no roster wrap, no device wrap and (until Task 7) no login-response wrap
+  // has no route to it, and entering would mean writing data nobody can ever
+  // read back. The login refuses instead.
+  //
+  // The rejection propagating out of `login()` un-swallowed is the contract
+  // Task 5 builds on to show the user a message; see `auth-store.ts:297-298`.
+  it('11.3: no roster entry for this login -> login rejects DekUnwrapError and no key is invented (design D2, was the Q2 mint)', async () => {
     mockAuthHttp(successEnvelope(), makeAuthUser());
 
-    const user = await useAuthStore.getState().login('ana@example.com', 'secret');
-
-    expect(user).toBeDefined();
-    expect(getDek()).not.toBeNull();
+    await expect(
+      useAuthStore.getState().login('ana@example.com', 'secret'),
+    ).rejects.toMatchObject({ name: 'DekUnwrapError' });
+    expect(getDek()).toBeNull();
+    expect(readDeviceDekTable()).toBeNull();
 
     vi.doUnmock('~/shared/lib/http/auth-http-service');
   });
@@ -174,23 +180,67 @@ describe('useAuthStore.login — DEK unwrap wiring (design §11, WU11, first beh
   // GAP 2 (batch-2 apply-progress, obs #2123): `sessionStoreId` was inferred
   // as `user.selectedStoreId` (repo convention: `user-home.ts:24`,
   // `authorization-service.ts:35`), never specified explicitly by
-  // design/tasks. This pins the ONLINE call site's Q2 mint branch (11.3's
-  // scenario — no roster entry for this login), where `sessionStoreId` is
-  // the ONLY store id design §5 step 3c has to work with. A distinctive,
-  // non-default id catches a wrong binding (e.g. a hardcoded fallback or a
-  // dropped argument) that a coincidentally-matching 's1' fixture would not.
-  it('11.5: login() Q2 mint branch (no roster) -> the table storeId is user.selectedStoreId', async () => {
+  // design/tasks. That binding is still a live contract and still needs
+  // pinning.
+  //
+  // HOW IT IS PINNED CHANGED, and the reason matters. This test used to infer
+  // the binding from an OUTCOME — `getDekStoreId()` and `table.storeId` both
+  // came out as `user.selectedStoreId` because the Q2 mint branch called
+  // `setDek(dek, sessionStoreId)`. With the mint gone, `sessionStoreId` no
+  // longer reaches any observable outcome: every surviving use of it in
+  // `dek-provisioning.ts` sits behind a `??` whose left side is always
+  // defined (`getDekStoreId()` is non-null whenever `getDek()` is, since only
+  // `setDek` sets either; and `bundle?.storeId` is defined whenever a roster
+  // entry was found). Verified by mutation — replacing the parameter with a
+  // sentinel value fails no test in the suite.
+  //
+  // So the argument is asserted directly, at the call site, which is where
+  // the contract actually lives (`auth-store.ts:298`). This is strictly more
+  // direct than the old inference, and it keeps working when Task 7's
+  // login-response source makes the parameter load-bearing again. The real
+  // resolver still runs underneath — the mock delegates to it — so this is
+  // not a stub standing in for the behaviour.
+  it('11.5: login() passes sessionStoreId = user.selectedStoreId to resolveDekForLogin (GAP 2 binding)', async () => {
+    await seedV2Roster(await wrapDek('secret', FIXED_DEK));
     mockAuthHttp(successEnvelope(), makeAuthUser({ selectedStoreId: 'online-session-id' }));
 
-    await useAuthStore.getState().login('ana@example.com', 'secret');
+    const seen: Array<{ login: string; password: string; sessionStoreId: string }> = [];
+    vi.doMock('../../offline/dek-provisioning', async () => {
+      const actual =
+        await vi.importActual<typeof import('../../offline/dek-provisioning')>(
+          '../../offline/dek-provisioning',
+        );
+      return {
+        ...actual,
+        resolveDekForLogin: (args: { login: string; password: string; sessionStoreId: string }) => {
+          seen.push(args);
+          return actual.resolveDekForLogin(args);
+        },
+      };
+    });
 
-    expect(getDek()).not.toBeNull();
-    expect(getDekStoreId()).toBe('online-session-id');
-    const table = readDeviceDekTable();
-    expect(table?.dekSource).toBe('local');
-    expect(table?.storeId).toBe('online-session-id');
+    try {
+      await useAuthStore.getState().login('ana@example.com', 'secret');
 
-    vi.doUnmock('~/shared/lib/http/auth-http-service');
+      // The binding under test. A distinctive, non-default id catches a
+      // hardcoded fallback or a dropped argument that a coincidentally
+      // matching 's1' fixture would not.
+      expect(seen).toHaveLength(1);
+      expect(seen[0].sessionStoreId).toBe('online-session-id');
+      expect(seen[0].login).toBe('ana@example.com');
+
+      // The delegated real resolver did its job, so the binding above was
+      // observed on a live call and not on a stub that replaced it.
+      expect(getDek()).not.toBeNull();
+      // Where the store id actually comes from now: the roster bundle that
+      // supplied the key, NOT the session. Recorded so the divergence from
+      // this test's own history is explicit rather than surprising.
+      expect(getDekStoreId()).toBe('s1');
+      expect(readDeviceDekTable()?.storeId).toBe('s1');
+    } finally {
+      vi.doUnmock('../../offline/dek-provisioning');
+      vi.doUnmock('~/shared/lib/http/auth-http-service');
+    }
   });
 });
 

@@ -283,13 +283,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // device-wrapped-dek design §5 (dek-provisioning, D4/D6): resolve
       // THIS DEVICE's DEK for this login — an existing device DEK, else
-      // this login's own roster wrap, else a freshly minted local DEK
-      // (Q2). Dynamic import (D6): `dek-provisioning` is an `offline/`
+      // this login's own roster wrap. There is no third fallback: design D2
+      // removed the Q2 local mint, because only the SERVER can re-derive a
+      // store's key and data written under an invented one is recoverable by
+      // nobody. Dynamic import (D6): `dek-provisioning` is an `offline/`
       // module and this file is evaluated on every page load.
       // NOT wrapped in a swallowing try/catch — a DekUnwrapError here (the
-      // step 3b hard-fail: no device table yet, and this login's roster
-      // wrap fails to unwrap with the password just used) MUST fail this
-      // login call, never be swallowed. Swallowing it would authenticate
+      // step 3b hard-fail, where this login's roster wrap does not open with
+      // the password just used, or D2's refusal, where the device has no key
+      // material at all) MUST fail this login call, never be swallowed.
+      // Task 5 turns that rejection into a message the user can act on.
+      // Swallowing it would authenticate
       // the user with `needsUnlock` permanently true, looping authLoader
       // -> /login -> "successful" login -> authLoader. `resolveDekForLogin`
       // also runs the eager entity migration pass itself (design §5 step
@@ -317,8 +321,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = await authenticateOffline(login, password);
       // device-wrapped-dek design §5 (D4): resolve THIS DEVICE's DEK for
       // this login, same as the online path — an existing device DEK,
-      // else this login's own roster wrap, else a freshly minted local
-      // DEK (Q2). `authenticateOffline` itself is UNTOUCHED (D4) and may
+      // else this login's own roster wrap, and no third fallback since
+      // design D2 removed the Q2 local mint. Consequence worth knowing: a
+      // v1 roster carries no wrap, so an offline login against one now
+      // requires a device this login has already provisioned.
+      // `authenticateOffline` itself is UNTOUCHED (D4) and may
       // already have set a DEK for a v2-roster login with wrap fields;
       // `resolveDekForLogin` accounts for that (structural note 1) and is
       // idempotent either way. Not swallowed, same rationale as the

@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../auth-store';
 import { StorageKeys } from '../../storage/storage-keys';
 import { importRoster, isRosterProvisioned } from '../../offline/roster-store';
 import { sha256Base64, pbkdf2Base64 } from '../../offline/offline-crypto';
 import { getDek, getDekStoreId, clearDek } from '../../storage/data-key-store';
-import { readDeviceDekTable } from '../../storage/device-dek-table';
+import { readDeviceDekTable, writeDeviceDekTable } from '../../storage/device-dek-table';
 import { unwrapDek, wrapDekWithPassword } from '../../offline/dek-unwrap';
 import type { OfflineRosterBundle } from '../../offline/roster-types';
 
@@ -76,6 +76,30 @@ async function seedV2Roster(): Promise<void> {
   importRoster(bundle);
 }
 
+// design D2 removed the Q2 mint, so a device with no wrap material for this
+// login can no longer sign in at all — including offline, against a v1
+// roster. Several tests below are about the hydration seam or about logout,
+// not about keys, and they used to get a key for free from the mint. This
+// gives them the provisioned device they now need: a device table holding
+// THIS login's password wrap, which is exactly the state a real device is
+// left in by any earlier successful login. It is a faithful precondition,
+// not a bypass — step 3a's own branch recovers the key from it.
+const PROVISIONED_DEK = new Uint8Array(32).fill(0x55);
+
+async function seedProvisionedDevice(
+  login: string,
+  password: string,
+  storeId: string,
+): Promise<void> {
+  writeDeviceDekTable({
+    formatVersion: 1,
+    dekSource: 'local',
+    storeId,
+    device: null,
+    users: { [login]: await wrapDekWithPassword(password, PROVISIONED_DEK) },
+  });
+}
+
 // device-wrapped-dek batch-2 gap closure (GAP 1 + GAP 2): a v2 roster twin
 // carrying an actual DEK wrap for 'ana', with the bundle's OWN storeId
 // deliberately DIFFERENT from the user's `selectedStoreId` — this is what
@@ -130,6 +154,9 @@ describe('useAuthStore.loginOffline (D6)', () => {
 
   it('hydrates through setUser exactly like an online login', async () => {
     await seedRoster();
+    // SETUP RESEEDED (D2 removed the mint this used to borrow). Assertions
+    // below untouched — this test is about the hydration seam, not the key.
+    await seedProvisionedDevice('ana', 'secret', 's1');
 
     const user = await useAuthStore.getState().loginOffline('ana', 'secret');
 
@@ -156,6 +183,10 @@ describe('useAuthStore.loginOffline (D6)', () => {
 
   it('hydrates through setUser exactly like a v1 login (WU14 regression coverage: v2 roster, no wrap fields present)', async () => {
     await seedV2Roster();
+    // SETUP RESEEDED (D2 removed the mint this used to borrow). Assertions
+    // below untouched — this still pins that the hydration seam does not care
+    // about the roster's formatVersion.
+    await seedProvisionedDevice('ana', 'secret', 's1');
 
     const user = await useAuthStore.getState().loginOffline('ana', 'secret');
 
@@ -180,6 +211,10 @@ describe('useAuthStore.logout() — preserves the offline roster (auth-session M
 
   it('keeps isRosterProvisioned() true after a real logout() call following a real offline login', async () => {
     await seedRoster();
+    // SETUP RESEEDED (D2 removed the mint this used to borrow). Assertions
+    // below untouched — this test is about what logout() does and does not
+    // erase, and it still drives a REAL offline login to get there.
+    await seedProvisionedDevice('ana', 'secret', 's1');
     await useAuthStore.getState().loginOffline('ana', 'secret');
     expect(isRosterProvisioned()).toBe(true);
 
@@ -204,12 +239,41 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
     useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
   });
 
-  it('loginOffline() on a v1 roster (no wrap fields) -> getDek() is non-null (offline twin of 11.3, Q2 mint)', async () => {
+  // REWRITTEN (design D2), same input, opposite expectation. This test used
+  // to read "-> getDek() is non-null (offline twin of 11.3, Q2 mint)" and
+  // asserted exactly that. A v1 roster carries no wrap fields, so it cannot
+  // supply the key the SERVER derived; on a device with nothing else, the
+  // mint was the only thing that made this login succeed, and everything
+  // written afterwards was unreadable by anyone forever. The offline twin of
+  // 11.3 now refuses, same as the online path.
+  //
+  // This is the sharpest edge of design D2's accepted trade-off: a v1 roster
+  // alone is no longer enough to sign in offline on an unprovisioned device.
+  it('loginOffline() on a v1 roster (no wrap fields), unprovisioned device -> rejects DekUnwrapError (design D2, was the Q2 mint)', async () => {
     await seedRoster();
+
+    await expect(
+      useAuthStore.getState().loginOffline('ana', 'secret'),
+    ).rejects.toMatchObject({ name: 'DekUnwrapError' });
+
+    expect(getDek()).toBeNull();
+    expect(readDeviceDekTable()).toBeNull();
+    // The refusal is not a half-login: nothing hydrated.
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  });
+
+  // The same v1 roster on a device that IS provisioned still signs in — the
+  // pairing that shows the refusal above is about the missing key material,
+  // not about v1 rosters being rejected wholesale.
+  it('loginOffline() on a v1 roster, provisioned device -> recovers the device key and signs in', async () => {
+    await seedRoster();
+    await seedProvisionedDevice('ana', 'secret', 's1');
 
     await useAuthStore.getState().loginOffline('ana', 'secret');
 
     expect(getDek()).not.toBeNull();
+    expect(Array.from(getDek()!)).toEqual(Array.from(PROVISIONED_DEK));
   });
 
   // GAP 1 (batch-2 apply-progress, obs #2123): the ONE branch WU7's own
@@ -256,16 +320,27 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
     expect(Array.from(recovered)).toEqual(Array.from(rosterDek));
   });
 
-  // GAP 2 (batch-2 apply-progress, obs #2123): `sessionStoreId` was
-  // inferred as `user.selectedStoreId` (the repo's existing "current
-  // store" convention — `user-home.ts:24`, `authorization-service.ts:35`),
-  // never specified explicitly by design/tasks. This pins the offline
-  // call site's Q2 mint branch (step 3c — no roster wrap for this login,
-  // no local table), where `sessionStoreId` is the ONLY store id
-  // available. Bundle-level `storeId` and the user's `selectedStoreId` are
-  // deliberately different so a wrong binding (e.g. reading the roster
-  // bundle's storeId instead) would fail this assertion.
-  it('loginOffline() Q2 mint branch (no wrap for this login) -> the table storeId is user.selectedStoreId, not the roster bundle storeId', async () => {
+  // GAP 2 (batch-2 apply-progress, obs #2123), OFFLINE call site
+  // (`auth-store.ts:327`, the twin of `auth-store.dek.test.ts`'s 11.5).
+  // `sessionStoreId` is bound to `user.selectedStoreId` (the repo's existing
+  // "current store" convention — `user-home.ts:24`,
+  // `authorization-service.ts:35`), never specified explicitly by
+  // design/tasks. Still a live contract, still pinned.
+  //
+  // SPLIT from the old test, which asserted three things at once:
+  //   - `table?.dekSource === 'local'` — DROPPED. It pinned the removed Q2
+  //     mint branch and nothing writes `'local'` any more.
+  //   - `getDekStoreId()` / `table?.storeId` === `user.selectedStoreId` —
+  //     these were how the binding was INFERRED, via the mint's
+  //     `setDek(dek, sessionStoreId)`. With the mint gone, `sessionStoreId`
+  //     reaches no observable outcome at all (every surviving use sits behind
+  //     a `??` whose left side is always defined). Verified by mutation:
+  //     replacing the parameter with a sentinel fails no test in the suite.
+  //   - the binding itself — KEPT, and now asserted directly on the argument,
+  //     which is where the contract lives and where it stays observable when
+  //     Task 7's login-response source makes the parameter load-bearing
+  //     again. The real resolver still runs underneath (the mock delegates).
+  it('loginOffline() passes sessionStoreId = user.selectedStoreId to resolveDekForLogin (GAP 2 binding)', async () => {
     const preHash = await sha256Base64('secret');
     const hash = await pbkdf2Base64(preHash, FIXED_SALT, ITERATIONS);
     const bundle: OfflineRosterBundle = {
@@ -292,13 +367,47 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
       ],
     };
     importRoster(bundle);
+    // 'beto' has no roster wrap (v1 bundle), so D2 refuses unless the device
+    // is provisioned for him. The seed's storeId is deliberately a THIRD
+    // value, distinct from both the bundle's and the session's, so nothing
+    // below can agree by coincidence.
+    await seedProvisionedDevice('beto', 'secret', 'device-table-id');
 
-    await useAuthStore.getState().loginOffline('beto', 'secret');
+    const seen: Array<{ login: string; password: string; sessionStoreId: string }> = [];
+    vi.doMock('../../offline/dek-provisioning', async () => {
+      const actual =
+        await vi.importActual<typeof import('../../offline/dek-provisioning')>(
+          '../../offline/dek-provisioning',
+        );
+      return {
+        ...actual,
+        resolveDekForLogin: (args: { login: string; password: string; sessionStoreId: string }) => {
+          seen.push(args);
+          return actual.resolveDekForLogin(args);
+        },
+      };
+    });
 
-    expect(getDek()).not.toBeNull();
-    expect(getDekStoreId()).toBe('beto-session-id');
-    const table = readDeviceDekTable();
-    expect(table?.dekSource).toBe('local');
-    expect(table?.storeId).toBe('beto-session-id');
+    try {
+      await useAuthStore.getState().loginOffline('beto', 'secret');
+
+      // The binding under test: the argument is the user's selectedStoreId,
+      // not the roster bundle's storeId and not the device table's.
+      expect(seen).toHaveLength(1);
+      expect(seen[0].sessionStoreId).toBe('beto-session-id');
+      expect(seen[0].sessionStoreId).not.toBe('roster-bundle-id');
+      expect(seen[0].login).toBe('beto');
+
+      // The delegated real resolver ran, so the binding was observed on a
+      // live call rather than on a stub that replaced it.
+      expect(getDek()).not.toBeNull();
+      // Where the store id actually comes from now: the device table that
+      // supplied the key. Recorded so the divergence from this test's own
+      // history is explicit rather than surprising.
+      expect(getDekStoreId()).toBe('device-table-id');
+      expect(readDeviceDekTable()?.storeId).toBe('device-table-id');
+    } finally {
+      vi.doUnmock('../../offline/dek-provisioning');
+    }
   });
 });
