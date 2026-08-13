@@ -249,8 +249,41 @@ export async function resolveDekForLogin(args: {
         }
         if (dek === null) {
           if (rosterEntry) {
+            // Step 3b at the F5 site — the LAST of this function's seven
+            // adoption sites, and the last one to get D3's adoption discipline.
+            // It is unchanged pre-existing code, but this change routes a NEW
+            // way into it: the login-response `catch` just above now falls
+            // through here, so a corrupt server wrap on a device provisioned
+            // for another store lands in exactly this branch.
+            //
+            // `bundle` is NOT already in scope here, unlike at the two sites
+            // this mirrors: `rosterEntry` came from `findRosterWrapEntry`,
+            // which reads the bundle internally and returns only the three
+            // wrap fields. So the bundle is re-read the same way the no-table
+            // roster branch below does it — non-null by construction, since
+            // `rosterEntry` is only defined when `getRawRoster()` returned a
+            // bundle carrying this login.
+            const bundle = getRawRoster()!;
             dek = await unwrapDek(password, rosterEntry);
-            setDek(dek, table.storeId);
+            // The roster's key is `HKDF(masterSecret, bundle.storeId)`, so it
+            // belongs to the ROSTER's store — never to whatever store this
+            // table described before this login, and never to `sessionStoreId`
+            // (step 3b below ignores that too, pinned by test 5.3). Labelling
+            // it `table.storeId` was Task 3's cross-store split, at this site:
+            // step 4 is skipped whole for a roster-sourced key and
+            // `workingTable` below IS this same object, so nothing downstream
+            // would ever correct it — and step 6's `runEntityMigration` then
+            // encrypts this store's legacy plaintext under another store's key.
+            setDek(dek, bundle.storeId);
+            table.storeId = bundle.storeId;
+            table.dekSource = 'roster';
+            // D3's fourth line, mandatory for the same reason as at the
+            // login-response site above: a device wrap of the ABANDONED key
+            // must not survive, or the next page load's `bootstrapDeviceDek`
+            // recovers those bytes and scopes them under the store id just
+            // written here — the wrong key under the right label. Step 5's
+            // `if (!workingTable.device)` re-wraps it for the adopted key.
+            table.device = null;
             dekSourcedFromRosterThisCall = true;
           } else {
             // F5 — the genuine dead end: nothing in the table for this login

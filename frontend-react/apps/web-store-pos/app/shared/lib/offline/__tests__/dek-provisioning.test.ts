@@ -780,6 +780,87 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     }
   });
 
+  // THE SAME CROSS-STORE ADOPTION, at the F5 site's ROSTER branch — the one
+  // adoption site of the seven in `resolveDekForLogin` that was still labelling
+  // an adopted key with the table's PRE-EXISTING store id. It is pre-existing
+  // code, but this change routes into it for the first time: a CORRUPT
+  // login-response wrap now falls through into exactly this branch (see the two
+  // `CORRUPT_LOGIN_WRAP` tests below), so the gap is live, not theoretical.
+  //
+  // Three DISTINCT store ids, so the assertions decide rather than coincide:
+  // the table describes STORE-OLD, the roster bundle describes STORE-ROSTER,
+  // and the session claims STORE-SESSION. The roster's key is a pure function
+  // of the roster's own store (`GetDek` is `HKDF(masterSecret, storeId)`), so
+  // STORE-ROSTER is the only correct label — the same rule 5.3 already pins for
+  // the no-table roster branch, where `sessionStoreId` is explicitly ignored.
+  //
+  // Both halves of the D3 discipline are exercised: the LABEL half (the
+  // persisted `storeId`/`dekSource`, read back from storage, plus the second
+  // call standing in for the next page load) and the DEVICE-WRAP half (by the
+  // same byte-comparison proxy the login-response cross-store test above uses —
+  // `withDeviceWrap: true` is what makes that assertion able to fail, since a
+  // seeded `device: null` would be re-wrapped by step 5 regardless).
+  it('F5 roster cross-store: adopting the roster\'s key rewrites the table to describe the ROSTER\'s store, and the next load agrees', async () => {
+    await seedDeviceTableWithDek(KEY_A, 'other-user', 'secret2', 'STORE-OLD', {
+      withDeviceWrap: true,
+    });
+    const staleDeviceWrap = readDeviceDekTable()!.device;
+    expect(staleDeviceWrap).not.toBeNull(); // precondition, not an outcome
+
+    await seedRosterWithDek(KEY_B, 'jdoe', 'pw', 'STORE-ROSTER');
+
+    // PRECONDITIONS, read from STORAGE — this must genuinely be the F5 roster
+    // branch. No own entry for this login (else step 3a wins and the adoption
+    // never runs), and a roster entry that really opens under this password
+    // (else the dead end throws and nothing is adopted at all).
+    expect(readDeviceDekTable()!.users['jdoe']).toBeUndefined();
+    const seededRosterEntry = getRawRoster()!.users.find((u) => u.login === 'jdoe')!;
+    const rosterOpens = await unwrapDek('pw', {
+      wrappedDek: seededRosterEntry.wrappedDek!,
+      wrapSalt: seededRosterEntry.wrapSalt!,
+      wrapIv: seededRosterEntry.wrapIv!,
+    });
+    expect(Array.from(rosterOpens)).toEqual(Array.from(KEY_B));
+
+    // No login-response wrap at all, so the roster is the only source left.
+    await resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 'STORE-SESSION' });
+
+    // 1-2: the key, and the scope this session addresses it under. Under the
+    // unfixed code the scope was `table.storeId` — STORE-OLD.
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_B));
+    expect(getDekStoreId()).toBe('STORE-ROSTER');
+
+    // 3: read back from STORAGE, not from the in-memory object, so this cannot
+    // pass on something that was never persisted.
+    const persisted = readDeviceDekTable()!;
+    expect(persisted.storeId).toBe('STORE-ROSTER');
+    expect(persisted.dekSource).toBe('roster');
+    expect(persisted.storeId).toBe(getDekStoreId());
+    // Step 4 is skipped whole for a roster-sourced key, so this is an adoption
+    // and not a reconciliation — no conflict marker is written.
+    expect(persisted.conflictDetectedAt).toBeUndefined();
+
+    // 4: the abandoned store's device wrap did not survive. PROXY assertion
+    // (bytes compared, not opened), exactly as in the login-response
+    // cross-store test above; it is what kills the mutant if `table.device =
+    // null` is dropped from the adoption.
+    expect(persisted.device).not.toBeNull();
+    expect(persisted.device!.wrappedDek).not.toBe(staleDeviceWrap!.wrappedDek);
+
+    // 5: THE NEXT PAGE LOAD. `getDeviceKey` is mocked to `null` in this file,
+    // so step 1's bootstrap recovers nothing and this second call re-derives
+    // from `table.users['jdoe']` — step 3a's own branch, which does
+    // `setDek(dek, table.storeId)`. That is precisely the LABEL half: had the
+    // adoption left `storeId` at STORE-OLD, the correct key would come back
+    // scoped to a store this session never used, and every store-scoped read
+    // after the reload would address a different key space.
+    clearDek();
+    await resolveDekForLogin({ login: 'jdoe', password: 'pw', sessionStoreId: 'STORE-SESSION' });
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_B));
+    expect(getDekStoreId()).toBe('STORE-ROSTER');
+    expect(readDeviceDekTable()!.storeId).toBe('STORE-ROSTER');
+  });
+
   // A login-response wrap that EXISTS but does not open must not hard-fail a
   // login while a valid roster entry is sitting right there — the same rule,
   // and the same `try`/`catch` shape, that step 3a's `own` branch already
