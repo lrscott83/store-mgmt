@@ -83,12 +83,13 @@ const ENTITY_MIGRATION_SWALLOW_LOG_MARKER =
  * further source: the Q2 local mint that used to sit at the end of this list
  * was removed (design D2), because only the SERVER can re-derive a store's
  * key and anything written under a minted one is recoverable by nobody,
- * forever. Sources 3 and 4 agree by construction — both carry the key the
- * server derived, wrapped by the same `StoreKeyWrapService` — so on a healthy
- * pair the order decides nothing; it decides only when they disagree, and
- * then the live response beats an export of unknown age (with step 4 still
- * reconciling the two, since a login-response-sourced key leaves
- * `dekSourcedFromRosterThisCall` false).
+ * forever. Sources 3 and 4 agree by construction whenever they describe the
+ * same store — `GetDek` is `HKDF(masterSecret, storeId)`, deterministic — so
+ * the order decides nothing on a healthy pair. It decides only when they
+ * disagree, which can ONLY mean they are scoped to different stores, and then
+ * source 3 wins outright: it was derived for the store this session is for.
+ * Step 4 does not reconcile that pair (see
+ * `dekSourcedFromLoginResponseThisCall`).
  * Rejects with `DekUnwrapError` whenever none of those four sources
  * yields the key — the original F5 dead end (design §6: a table exists and
  * holds no recoverable wrap for this login, and neither the login response
@@ -132,6 +133,35 @@ export async function resolveDekForLogin(args: {
   // case below where the DEK was already non-null on entry (structural
   // note 1).
   let dekSourcedFromRosterThisCall = false;
+
+  // The SAME gate, for the source added by this change: true only when THIS
+  // call derived the DEK from the login response's wrap (step 3c, at either
+  // dead end). Skipping reconciliation here rests on a property of the key
+  // itself, not on a preference between sources:
+  // `StoreDataKeyProvider.GetDek(storeId)` is `HKDF(masterSecret, storeId)` —
+  // DETERMINISTIC. Two server-derived wraps of the same store can therefore
+  // never disagree in bytes; if they disagree, they are scoped to DIFFERENT
+  // stores. So a login-response-vs-roster disagreement is not a content
+  // dispute at all — it means the roster was exported for a store this user no
+  // longer has selected, and the login response, derived server-side for the
+  // CURRENT `selectedStoreId` at THIS login, is definitionally the right key
+  // for this session.
+  //
+  // That is why D3's "the roster wins" does NOT generalize to this pair. D3
+  // compares a DEVICE-LOCAL key against the roster, where both claim the same
+  // store, so a disagreement there is a genuine correctness bug (a drifted or
+  // pre-D2 minted local key) and the roster is the authority. Here there is no
+  // bug to correct, and adopting the roster's key would swap in the key of a
+  // store the session is not for.
+  //
+  // No conflict marker either, deliberately — the whole step-4 block is
+  // skipped, exactly as it already is for a roster-sourced key. A user who has
+  // ever switched selected store would otherwise trip `conflictDetectedAt` on
+  // every single login for as long as an old roster sits in storage. That is
+  // expected and harmless, and logging it as a conflict trains everyone to
+  // ignore the one log line that means something.
+  let dekSourcedFromLoginResponseThisCall = false;
+
   let source: DeviceDekTable['dekSource'] | undefined;
   let tableStoreId: string | undefined;
 
@@ -184,77 +214,90 @@ export async function resolveDekForLogin(args: {
           // roster branch below does at this same site, which keeps the
           // table's own `storeId` describing the scope the key is in use under
           // (the invariant D3's cross-store case exists to protect).
-          //
-          // `dekSourcedFromRosterThisCall` stays false — this did NOT come
-          // from the roster — which is what lets step 4 reconcile this key
-          // against a roster entry that still exists. No new reconciliation
-          // logic is needed for that: step 4 already fires on
-          // `!dekSourcedFromRosterThisCall && rosterEntry`, and it now simply
-          // sees a case it could never reach while the roster won here.
+          try {
+            dek = await unwrapDek(password, loginResponseEntry);
+            setDek(dek, table.storeId);
+            dekSourcedFromLoginResponseThisCall = true;
+          } catch {
+            // Same shape, and the same reason, as step 3a's `own` catch above:
+            // a wrap that EXISTS but fails to open must not hard-fail a login
+            // while another valid source is sitting right there. A malformed
+            // login-response wrap is a server-side hiccup (or a timing edge
+            // before the `OfflinePasswordPreHash` backfill lands), not a
+            // verdict on the roster. `dek` stays null and the roster attempt
+            // below runs; if that has nothing either, the dead end throws.
+          }
+        }
+        if (dek === null) {
+          if (rosterEntry) {
+            dek = await unwrapDek(password, rosterEntry);
+            setDek(dek, table.storeId);
+            dekSourcedFromRosterThisCall = true;
+          } else {
+            // F5 — the genuine dead end: nothing in the table for this login
+            // (absent, or present but no longer opens with this password),
+            // nothing on the login response that opens, and nothing in the
+            // roster either. Narrower than, and strictly better than, the
+            // uncaught MissingDataKeyError this replaces.
+            throw new DekUnwrapError();
+          }
+        }
+      }
+    } else {
+      // No table on this device at all. Sources 3 then 4, in D1's order, with
+      // the same fall-through discipline as the F5 site above.
+      if (loginResponseEntry) {
+        // Step 3c (design D1 source 3) — the branch this whole task exists
+        // for: a brand-new device, no roster ever imported, no device wrap,
+        // and an ONLINE login whose response carried the store's key wrapped
+        // under this user's password. Before it, D2's refusal below locked
+        // such a device out of the app entirely — correctly refusing to invent
+        // a key, but with no route to the real one.
+        //
+        // AHEAD of step 3b's roster branch, per D1's ordered list, and it
+        // KEEPS its key when the two disagree (see
+        // `dekSourcedFromLoginResponseThisCall`'s comment: a disagreement
+        // between two server-derived wraps can only mean different stores, and
+        // this one is scoped to the store the session is actually for).
+        //
+        // A login response carries no bundle, so `sessionStoreId` is the only
+        // source for the store id — this is where the GAP 2 binding
+        // (`user.selectedStoreId`, pinned by `auth-store.dek.test.ts` 11.5)
+        // becomes load-bearing for an observable outcome again.
+        try {
           dek = await unwrapDek(password, loginResponseEntry);
-          setDek(dek, table.storeId);
-        } else if (rosterEntry) {
+          setDek(dek, sessionStoreId);
+          source = 'login-response';
+          tableStoreId = sessionStoreId;
+          dekSourcedFromLoginResponseThisCall = true;
+        } catch {
+          // Falls through to the roster, same reason as the F5 site's catch.
+        }
+      }
+      if (dek === null) {
+        if (rosterEntry) {
+          // Step 3b — no table yet, and no login-response wrap that opened,
+          // but this login has a roster wrap: adopt those bytes as the device
+          // DEK. `auth-store.dek.test.ts:151-161` (11.4, NOT authorized) lives
+          // exactly here — its `beforeEach` clears localStorage, so no table
+          // exists, its login response carries no wrap, and a stale roster
+          // wrap's `unwrapDek` rejection propagates unhandled, hard-failing
+          // the login (unchanged from today).
+          const bundle = getRawRoster()!;
           dek = await unwrapDek(password, rosterEntry);
-          setDek(dek, table.storeId);
+          setDek(dek, bundle.storeId);
+          source = 'roster';
+          tableStoreId = bundle.storeId;
           dekSourcedFromRosterThisCall = true;
         } else {
-          // F5 — the genuine dead end: nothing in the table for this login
-          // (absent, or present but no longer opens with this password),
-          // nothing on the login response and nothing in the roster either.
-          // Narrower than, and strictly better than, the uncaught
-          // MissingDataKeyError this replaces.
+          // design D2: no device table, no roster wrap, and nothing usable on
+          // the login response — there is no way to obtain the key the SERVER
+          // derives for this store. Minting a random local key here (the old
+          // behaviour) produced data no roster and no online login could ever
+          // recover. Refusing destroys nothing; minting destroyed silently.
           throw new DekUnwrapError();
         }
       }
-    } else if (loginResponseEntry) {
-      // Step 3c (design D1 source 3) — the branch this whole task exists for:
-      // a brand-new device, no roster ever imported, no device wrap, and an
-      // ONLINE login whose response carried the store's key wrapped under this
-      // user's password. Before it, D2's refusal below locked such a device out
-      // of the app entirely — correctly refusing to invent a key, but with no
-      // route to the real one.
-      //
-      // AHEAD of step 3b's roster branch, per D1's ordered list. Both wraps
-      // carry the key the server derived, so when they agree the order decides
-      // nothing; when they DISAGREE, this one is the live answer from the
-      // server on this very login and the roster's is an export of unknown
-      // age. `dekSourcedFromRosterThisCall` stays false, so step 4 still
-      // reconciles this key against a roster entry if one exists — the
-      // existing D3 machinery, reached in a case it could not previously see.
-      //
-      // A login response carries no bundle, so `sessionStoreId` is the only
-      // source for the store id — this is where the GAP 2 binding
-      // (`user.selectedStoreId`, pinned by `auth-store.dek.test.ts` 11.5)
-      // becomes load-bearing for an observable outcome again.
-      //
-      // A rejection here propagates, deliberately: the server wrapped this key
-      // under the very password the login just succeeded with, so a wrap that
-      // does not open is a real fault (parameter drift, a tampered response).
-      dek = await unwrapDek(password, loginResponseEntry);
-      setDek(dek, sessionStoreId);
-      source = 'login-response';
-      tableStoreId = sessionStoreId;
-    } else if (rosterEntry) {
-      // Step 3b — no table yet, no login-response wrap, but this login has a
-      // roster wrap: adopt those bytes as the device DEK.
-      // `auth-store.dek.test.ts:151-161` (11.4, NOT authorized) lives exactly
-      // here — its `beforeEach` clears localStorage, so no table exists, its
-      // login response carries no wrap, and a stale roster wrap's `unwrapDek`
-      // rejection propagates unhandled, hard-failing the login (unchanged from
-      // today).
-      const bundle = getRawRoster()!;
-      dek = await unwrapDek(password, rosterEntry);
-      setDek(dek, bundle.storeId);
-      source = 'roster';
-      tableStoreId = bundle.storeId;
-      dekSourcedFromRosterThisCall = true;
-    } else {
-      // design D2: no device table, no roster wrap, and nothing on the login
-      // response — there is no way to obtain the key the SERVER derives for this
-      // store. Minting a random local key here (the old behaviour) produced data
-      // no roster and no online login could ever recover. Refusing destroys
-      // nothing; minting destroyed silently.
-      throw new DekUnwrapError();
     }
   } else if (!table) {
     // Structural note 1: the DEK was already non-null on entry (step 1's
@@ -278,8 +321,15 @@ export async function resolveDekForLogin(args: {
   let workingTable = table;
 
   // Step 4 — reconcile (D6): only when this call did NOT just derive the
-  // DEK from the roster, and a roster entry exists to compare against.
-  if (!dekSourcedFromRosterThisCall && rosterEntry) {
+  // DEK from a live, authoritative source — the roster, or (added with D1's
+  // source 3) the login response — and a roster entry exists to compare
+  // against. Both skips are the same rule: there is nothing to reconcile a
+  // key against when it was just handed over by the authority this very call.
+  // The login-response half is NOT a preference between sources; see
+  // `dekSourcedFromLoginResponseThisCall`'s comment for why a disagreement
+  // between two server-derived wraps can only be a store-scoping mismatch,
+  // never a stale copy of the same key.
+  if (!dekSourcedFromRosterThisCall && !dekSourcedFromLoginResponseThisCall && rosterEntry) {
     try {
       const fromRoster = await unwrapDek(password, rosterEntry);
       if (!bytesEqual(fromRoster, dek)) {

@@ -453,31 +453,31 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(Array.from(recovered)).toEqual(Array.from(serverDek));
   });
 
-  // D1 PRIORITY — source 3 is consulted BEFORE source 4. Both wraps carry a
-  // server-derived key, so on a healthy pair the order decides nothing; this
-  // test builds the pair that DISAGREES, with the roster on a different store
-  // than the session, so the order is observable.
+  // D1 PRIORITY — source 3 is consulted BEFORE source 4, and KEEPS its key
+  // when the two disagree. Both wraps carry a server-derived key, so on a
+  // healthy pair the order decides nothing; this test builds the only pair
+  // that CAN disagree.
   //
-  // What this pins is the ordering itself, and the assertion that discriminates
-  // is the conflict record, not the final key: with the roster consulted first
-  // (the pre-fix order) it wins at step 3b, sets
-  // `dekSourcedFromRosterThisCall`, and step 4's reconciliation is SKIPPED
-  // entirely — the disagreement is never even looked at. With the login
-  // response first, step 4 fires and the existing D3 machinery sees a case it
-  // could not previously reach.
+  // Why that is the only one: `StoreDataKeyProvider.GetDek(storeId)` is
+  // `HKDF(masterSecret, storeId)` — deterministic. Two server-derived wraps of
+  // the SAME store are byte-identical, always. So a disagreement means the two
+  // are scoped to DIFFERENT stores: the roster was exported for a store the
+  // user no longer has selected. Not a stale copy of this key — there is no
+  // such thing — but a different store's key entirely.
   //
-  // Read the last two assertions carefully: D3's precedence (Task 3) then
-  // ADOPTS the roster's key over the login response's. That is the existing,
-  // deliberate rule — "the server's key is the authority, and a device's
-  // local key is not" — applied to a source that did not exist when it was
-  // written. So the final key here is the roster's; what changed is that the
-  // conflict is now detected and recorded instead of silently invisible.
-  it('D1 priority: a login-response wrap is consulted before a valid roster entry, so their disagreement reaches step 4', async () => {
+  // Hence no reconciliation and no conflict marker. D3's "the roster is the
+  // authority" was written for a DEVICE-LOCAL key vs the roster, where both
+  // claim the same store and a disagreement is a genuine correctness bug. It
+  // does not generalize here: adopting the roster's key would swap in the key
+  // of a store this session is not for, and recording a "conflict" would fire
+  // on every login of any user who has ever switched selected store and still
+  // has the old roster lying around.
+  it('D1 priority: a login-response wrap outranks a roster entry scoped to a DIFFERENT store, with no conflict recorded', async () => {
     const loginWrap = await wrapDekWithPassword('pw', KEY_B);
     await seedRosterWithDek(KEY_A, 'jdoe', 'pw', 'STORE-ROSTER');
 
     // PRECONDITION — the roster entry is genuinely VALID under this password,
-    // so the ordering is what decides, not a failure to unwrap.
+    // so what decides here is the priority rule, not a failure to unwrap.
     const rosterCheck = await unwrapDek('pw', (await wrapDekWithPassword('pw', KEY_A)));
     expect(Array.from(rosterCheck)).toEqual(Array.from(KEY_A));
 
@@ -488,19 +488,26 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
       ...loginWrap,
     });
 
-    const table = readDeviceDekTable()!;
-    // THE ASSERTION THAT FAILS UNDER THE PRE-FIX ORDER: reaching step 4 at all
-    // is only possible when the key did NOT come from the roster this call.
-    expect(table.conflictDetectedAt).toBeTypeOf('number');
-    expect(table.conflictStoreId).toBe('STORE-ROSTER');
+    // The login response's key wins outright — it is the one derived for the
+    // store this session is actually for.
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_B));
+    expect(Array.from(getDek()!)).not.toEqual(Array.from(KEY_A));
+    expect(getDekStoreId()).toBe('STORE-SESSION');
 
-    // D3's precedence, unchanged by this task: having seen the disagreement,
-    // the roster's key is adopted over the login response's, and the table is
-    // rewritten to describe the adopted key (the cross-store invariant).
-    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_A));
-    expect(getDekStoreId()).toBe('STORE-ROSTER');
+    const table = readDeviceDekTable()!;
+    // The table describes the key it actually holds, so the next page load's
+    // `bootstrapDeviceDek` re-scopes it to the same place this session used it.
+    expect(table.storeId).toBe('STORE-SESSION');
     expect(table.storeId).toBe(getDekStoreId());
-    expect(table.dekSource).toBe('roster');
+    expect(table.dekSource).toBe('login-response');
+    // NOT a conflict: an old roster for another store is an ordinary state,
+    // and marking it would make the marker meaningless.
+    expect(table.conflictDetectedAt).toBeUndefined();
+    expect(table.conflictStoreId).toBeUndefined();
+    // The wrap written for next time opens to the key that won, not the one
+    // that lost.
+    const recovered = await unwrapDek('pw', table.users['jdoe']);
+    expect(Array.from(recovered)).toEqual(Array.from(KEY_B));
   });
 
   // The same ordering, in the case where it changes what the USER sees. This
@@ -535,6 +542,65 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(table.dekSource).toBe('login-response');
     const recovered = await unwrapDek('new-secret', table.users['jdoe']);
     expect(Array.from(recovered)).toEqual(Array.from(KEY_B));
+  });
+
+  // A login-response wrap that EXISTS but does not open must not hard-fail a
+  // login while a valid roster entry is sitting right there — the same rule,
+  // and the same `try`/`catch` shape, that step 3a's `own` branch already
+  // applies to a stale table entry. A malformed wrap is a server-side hiccup
+  // (or a timing edge before the `OfflinePasswordPreHash` backfill lands), not
+  // a verdict on the roster. Non-empty, so it is "present" per rule 4 and
+  // genuinely reaches `unwrapDek`, unlike the empty-string case above.
+  const CORRUPT_LOGIN_WRAP = {
+    wrappedDek: 'not-valid-base64!!!',
+    wrapSalt: 'also-not-valid!!!',
+    wrapIv: 'nor-this!!!',
+  };
+
+  it('D1: a CORRUPT login-response wrap falls through to a valid roster entry (no table)', async () => {
+    await seedRosterWithDek(KEY_A, 'jdoe', 'pw', STORE_ID);
+
+    // PRECONDITION — the wrap really is unusable, so the fall-through is what
+    // is being exercised and not a wrap that quietly worked.
+    await expect(unwrapDek('pw', CORRUPT_LOGIN_WRAP)).rejects.toMatchObject({
+      name: 'DekUnwrapError',
+    });
+
+    await expect(
+      resolveDekForLogin({
+        login: 'jdoe',
+        password: 'pw',
+        sessionStoreId: STORE_ID,
+        ...CORRUPT_LOGIN_WRAP,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_A));
+    const table = readDeviceDekTable()!;
+    expect(table.dekSource).toBe('roster');
+    expect(table.storeId).toBe(STORE_ID);
+  });
+
+  it('D1 (F5): a CORRUPT login-response wrap falls through to a valid roster entry (table exists)', async () => {
+    // The F5 shape: a table with no entry this login can open...
+    await seedDeviceTableWithDek(KEY_B, 'other-user', 'secret2', STORE_ID);
+    // ...and a roster that can serve it.
+    await seedRosterWithDek(KEY_A, 'jdoe', 'pw', STORE_ID);
+
+    await expect(
+      resolveDekForLogin({
+        login: 'jdoe',
+        password: 'pw',
+        sessionStoreId: STORE_ID,
+        ...CORRUPT_LOGIN_WRAP,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_A));
+    const table = readDeviceDekTable()!;
+    expect(Object.keys(table.users).sort()).toEqual(['jdoe', 'other-user']);
+    const recovered = await unwrapDek('pw', table.users['jdoe']);
+    expect(Array.from(recovered)).toEqual(Array.from(KEY_A));
   });
 
   // Backend contract rule 4: when the wrap cannot be produced, the login
