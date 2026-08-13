@@ -303,10 +303,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // device-wrapped-dek design §5 (dek-provisioning, D4/D6): resolve
       // THIS DEVICE's DEK for this login — an existing device DEK, else
-      // this login's own roster wrap, else the wrap THIS response carried
-      // (design D1 source 3: `AuthDto` ships the store's key wrapped under the
-      // user's password, byte-compatible with the roster's, which is what lets
-      // a brand-new device with no roster sign in at all). There is no further
+      // the wrap THIS response carried (design D1 source 3: `AuthDto` ships
+      // the store's key wrapped under the user's password, byte-compatible
+      // with the roster's, which is what lets a brand-new device with no
+      // roster sign in at all), else this login's roster wrap. There is no further
       // fallback: design D2 removed the Q2 local mint, because only the SERVER
       // can re-derive a store's key and data written under an invented one is
       // recoverable by nobody. The three fields are forwarded exactly as

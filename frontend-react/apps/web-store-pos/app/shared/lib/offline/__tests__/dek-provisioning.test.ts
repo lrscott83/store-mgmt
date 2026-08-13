@@ -453,6 +453,90 @@ describe('resolveDekForLogin (design §5, the login-path algorithm)', () => {
     expect(Array.from(recovered)).toEqual(Array.from(serverDek));
   });
 
+  // D1 PRIORITY — source 3 is consulted BEFORE source 4. Both wraps carry a
+  // server-derived key, so on a healthy pair the order decides nothing; this
+  // test builds the pair that DISAGREES, with the roster on a different store
+  // than the session, so the order is observable.
+  //
+  // What this pins is the ordering itself, and the assertion that discriminates
+  // is the conflict record, not the final key: with the roster consulted first
+  // (the pre-fix order) it wins at step 3b, sets
+  // `dekSourcedFromRosterThisCall`, and step 4's reconciliation is SKIPPED
+  // entirely — the disagreement is never even looked at. With the login
+  // response first, step 4 fires and the existing D3 machinery sees a case it
+  // could not previously reach.
+  //
+  // Read the last two assertions carefully: D3's precedence (Task 3) then
+  // ADOPTS the roster's key over the login response's. That is the existing,
+  // deliberate rule — "the server's key is the authority, and a device's
+  // local key is not" — applied to a source that did not exist when it was
+  // written. So the final key here is the roster's; what changed is that the
+  // conflict is now detected and recorded instead of silently invisible.
+  it('D1 priority: a login-response wrap is consulted before a valid roster entry, so their disagreement reaches step 4', async () => {
+    const loginWrap = await wrapDekWithPassword('pw', KEY_B);
+    await seedRosterWithDek(KEY_A, 'jdoe', 'pw', 'STORE-ROSTER');
+
+    // PRECONDITION — the roster entry is genuinely VALID under this password,
+    // so the ordering is what decides, not a failure to unwrap.
+    const rosterCheck = await unwrapDek('pw', (await wrapDekWithPassword('pw', KEY_A)));
+    expect(Array.from(rosterCheck)).toEqual(Array.from(KEY_A));
+
+    await resolveDekForLogin({
+      login: 'jdoe',
+      password: 'pw',
+      sessionStoreId: 'STORE-SESSION',
+      ...loginWrap,
+    });
+
+    const table = readDeviceDekTable()!;
+    // THE ASSERTION THAT FAILS UNDER THE PRE-FIX ORDER: reaching step 4 at all
+    // is only possible when the key did NOT come from the roster this call.
+    expect(table.conflictDetectedAt).toBeTypeOf('number');
+    expect(table.conflictStoreId).toBe('STORE-ROSTER');
+
+    // D3's precedence, unchanged by this task: having seen the disagreement,
+    // the roster's key is adopted over the login response's, and the table is
+    // rewritten to describe the adopted key (the cross-store invariant).
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_A));
+    expect(getDekStoreId()).toBe('STORE-ROSTER');
+    expect(table.storeId).toBe(getDekStoreId());
+    expect(table.dekSource).toBe('roster');
+  });
+
+  // The same ordering, in the case where it changes what the USER sees. This
+  // is concern 1's real-world shape: the roster export is stale (wrapped under
+  // a password since changed), the login response is live and correct.
+  //
+  // Under the pre-fix order this login FAILED — step 3b's `unwrapDek` on the
+  // stale roster wrap propagates unhandled (the behaviour `auth-store.dek.test.ts`
+  // 11.4 pins for a device with no login-response wrap, which stays true).
+  // Under D1's order the live wrap supplies the key, and step 4's attempt on
+  // the stale roster entry lands in the existing F9 `catch`, so the login
+  // proceeds. This is the one place where the login response's key is also the
+  // FINAL key — the roster has none to adopt.
+  it('D1 priority: a STALE roster entry no longer refuses a login the response can serve', async () => {
+    const loginWrap = await wrapDekWithPassword('new-secret', KEY_B);
+    await seedRosterWithDek(KEY_A, 'jdoe', 'old-secret', STORE_ID);
+
+    await expect(
+      resolveDekForLogin({
+        login: 'jdoe',
+        password: 'new-secret',
+        sessionStoreId: STORE_ID,
+        ...loginWrap,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(Array.from(getDek()!)).toEqual(Array.from(KEY_B));
+    const table = readDeviceDekTable()!;
+    // F9, not a conflict: the roster wrap failed to open, so there was never a
+    // key to compare against.
+    expect(table.conflictDetectedAt).toBeUndefined();
+    expect(table.dekSource).toBe('login-response');
+    const recovered = await unwrapDek('new-secret', table.users['jdoe']);
+    expect(Array.from(recovered)).toEqual(Array.from(KEY_B));
+  });
+
   // Backend contract rule 4: when the wrap cannot be produced, the login
   // succeeds with the three fields EMPTY rather than failing. Empty means
   // "absent" — never a malformed wrap to feed to `unwrapDek` and fail on, and
