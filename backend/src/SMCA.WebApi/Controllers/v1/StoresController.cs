@@ -81,7 +81,11 @@ namespace SMCA.WebApi.Controllers.v1
         }
 
         [HttpPost()]
+        [HasPermission(StoreRoleFeatures.SuperAdmin)]
         [ProducesResponseType(typeof(ResponseResult<StoreDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<IActionResult> CreateStoreAsync([FromBody] CreateStoreCommand command)
         {
             var result = await Sender.Send(command);

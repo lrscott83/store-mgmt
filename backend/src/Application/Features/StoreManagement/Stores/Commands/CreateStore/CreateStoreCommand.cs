@@ -21,7 +21,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
     {
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IOwnerRepository _ownerRepository;
-        private readonly IUserRepository _userRepository;
         private readonly IHttpContextService _httpContextService;
         private readonly IMapper _mapper;
         private readonly IStringLocalizer<I18n> _localizer;
@@ -30,7 +29,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
         public CreateStoreCommandHandler(
             IApplicationUnitOfWork applicationUnitOfWork,
             IOwnerRepository ownerRepository,
-            IUserRepository userRepository,
             IHttpContextService httpContextService,
             IMapper mapper,
             IStringLocalizer<I18n> localizer,
@@ -39,7 +37,6 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
             _ownerRepository = ownerRepository;
-            _userRepository = userRepository;
             _mapper = mapper;
             _localizer = localizer;
             _createStoreService = createStoreService;
@@ -47,18 +44,12 @@ namespace Application.Features.StoreManagement.Stores.Commands.CreateStore
 
         public async Task<ResponseResult<StoreDto>> Handle(CreateStoreCommand request, CancellationToken cancellationToken)
         {
-            if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
-                throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.BadRequest);
+            if (!_httpContextService.IsSuperAdmin)
+                throw new ApiException(_localizer["NotAuthorized"], HttpStatusCode.Forbidden);
 
             var owner = await _ownerRepository.GetOwnerIncludingUserByIdAsync(request.OwnerId);
             var store = await _createStoreService.CreateStoreAsync(request.OwnerId, owner.TenantId, request.Name, request.Address, 
                 request.Description, request.Approved, request.ModuleIds);
-
-            if (_httpContextService.IsOwnerAdmin)
-            {
-                owner.User.SelectedStoreId = store.Id;
-                await _userRepository.UpdateAsync(owner.User);
-            }
 
             return await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0
                 ? ResponseResult.Success(_mapper.Map<StoreDto>(store)) 

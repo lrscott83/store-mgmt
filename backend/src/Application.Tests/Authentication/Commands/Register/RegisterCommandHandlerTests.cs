@@ -54,6 +54,23 @@ public class RegisterCommandHandlerTests : RegisterCommandHandlerTestFixture
     }
 
     [Fact]
+    public async Task Handle_ShouldReturnSuccess_WithEmptyWrapFields()
+    {
+        // Arrange — auth-login-wrapped-dek R4: Register never delivers a wrapped DEK
+        var handler = CreateHandler();
+        var command = CreateValidCommand();
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        result.Data.WrappedDek.Should().BeEmpty();
+        result.Data.WrapSalt.Should().BeEmpty();
+        result.Data.WrapIv.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Handle_ShouldReturnSuccess_WhenRegistrationWithValidReSellerCode()
     {
         // Arrange
