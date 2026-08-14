@@ -37,7 +37,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('getDiasSemana — Sunday edge (2026-06-07)', () => {
   it('returns Mon-first rolling window ending on Dom for a Sunday', async () => {
     const { getDiasSemana } = await import('../dashboard');
-    const result = getDiasSemana(new Date('2026-06-07'));
+    // Local-time constructor (not 'YYYY-MM-DD', which is parsed as UTC midnight): getDiasSemana
+    // reads getDay() in LOCAL time, so an ISO-date fixture would shift a day on UTC- zones.
+    const result = getDiasSemana(new Date(2026, 5, 7));
     expect(result).toEqual(['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']);
   });
 });
@@ -45,7 +47,8 @@ describe('getDiasSemana — Sunday edge (2026-06-07)', () => {
 describe('getDiasSemana — Monday (2026-06-01)', () => {
   it('returns Mon-first rolling window starting from Tue for a Monday', async () => {
     const { getDiasSemana } = await import('../dashboard');
-    const result = getDiasSemana(new Date('2026-06-01'));
+    // Local-time constructor (see Sunday edge above).
+    const result = getDiasSemana(new Date(2026, 5, 1));
     expect(result).toEqual(['Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom', 'Lun']);
   });
 });

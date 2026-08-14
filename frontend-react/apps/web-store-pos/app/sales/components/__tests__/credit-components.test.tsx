@@ -59,7 +59,7 @@ describe('SaleCreditList', () => {
 
   it('shows paid date label only when the credit is paid', () => {
     const credits = [
-      makeCredit({ id: 'c1', isPaid: true, paidDate: new Date('2025-03-05T00:00:00Z') }),
+      makeCredit({ id: 'c1', isPaid: true, paidDate: new Date(2025, 2, 5) }),
     ];
     render(
       <Wrapper>

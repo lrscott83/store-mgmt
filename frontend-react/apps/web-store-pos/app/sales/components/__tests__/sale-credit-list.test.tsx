@@ -23,7 +23,7 @@ function makeSaleCredit(overrides: Partial<SaleCredit> = {}): SaleCredit {
     date: new Date('2025-01-01'),
     paid: 0,
     isPaid: true,
-    paidDate: new Date('2025-01-02'),
+    paidDate: new Date(2025, 0, 2),
     paidType: PaymentType.Efectivo,
     note: '',
     isActive: true,
