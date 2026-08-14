@@ -307,4 +307,77 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(saleServiceSpies.getAvailableProductCategories).toHaveBeenCalled();
     expect(saleServiceSpies.getProductsToSaleByCategoryId).toHaveBeenCalledWith('c1');
   });
+
+  it('renders a search box and a Todos switch (ON by default) above the categories', async () => {
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    expect(await screen.findByRole('searchbox')).toBeInTheDocument();
+    const toggle = screen.getByRole('switch', { name: 'Todos' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('shows a Todos category button first and, when selected, lists all products ordered by category order then product order', async () => {
+    mockCategories = [
+      makeCategory({ id: 'c1', name: 'Bebidas', order: 1 }),
+      makeCategory({ id: 'c2', name: 'Snacks', order: 2 }),
+    ];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', order: 1 }),
+      makeProduct({ id: 'p2', name: 'Papas', categoryId: 'c2', order: 1 }),
+      makeProduct({ id: 'p3', name: 'Sprite', categoryId: 'c1', order: 2 }),
+    ];
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Todos' }));
+    const names = screen.getAllByText(/^(Coca Cola|Sprite|Papas)$/);
+    expect(names.map((node) => node.textContent)).toEqual(['Coca Cola', 'Sprite', 'Papas']);
+  });
+
+  it('searches across all categories while the Todos switch is ON (default)', async () => {
+    mockCategories = [
+      makeCategory({ id: 'c1', name: 'Bebidas', order: 1 }),
+      makeCategory({ id: 'c2', name: 'Snacks', order: 2 }),
+    ];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' }),
+      makeProduct({ id: 'p2', name: 'Papas', categoryId: 'c2' }),
+    ];
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    await screen.findByText('Coca Cola');
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'papas' } });
+    expect(await screen.findByText('Papas')).toBeInTheDocument();
+  });
+
+  it('restricts the search to the selected category when the Todos switch is OFF', async () => {
+    mockCategories = [
+      makeCategory({ id: 'c1', name: 'Bebidas', order: 1 }),
+      makeCategory({ id: 'c2', name: 'Snacks', order: 2 }),
+    ];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' }),
+      makeProduct({ id: 'p2', name: 'Papas', categoryId: 'c2' }),
+    ];
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    await screen.findByText('Coca Cola');
+    fireEvent.click(screen.getByRole('switch', { name: 'Todos' }));
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'papas' } });
+    await waitFor(() => expect(screen.queryByText('Papas')).not.toBeInTheDocument());
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'coca' } });
+    expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+  });
 });

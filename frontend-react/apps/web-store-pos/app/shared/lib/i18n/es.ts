@@ -340,6 +340,8 @@ const messages: Record<string, string> = {
   'SALES.PRODUCT_NOT_ADDED_TO_CART':
     'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
   'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE': 'El producto no está disponible en el inventario.',
+  'SALES.ALL_CATEGORIES': 'Todos',
+  'SALES.SEARCH_PLACEHOLDER': 'Buscar producto por nombre...',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
   // hardcoded Spanish literals there, not i18n keys; added here as i18n keys for React's
