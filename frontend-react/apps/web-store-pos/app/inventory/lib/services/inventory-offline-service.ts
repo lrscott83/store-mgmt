@@ -177,7 +177,7 @@ export class InventoryOfflineService {
    */
   getInventoryEntriesInDay(_date: Date): BaseResponseModel<InventoryEntryView[]> {
     const dayStart = startOfDay(new Date());
-    const dayEnd = addDays(dayStart, 1);
+    const dayEnd = startOfDay(addDays(new Date(), 1));
     const entries = this.getActiveInventoryEntriesStorage()
       .filter((v) => v.date >= dayStart && v.date < dayEnd)
       .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -281,7 +281,7 @@ export class InventoryOfflineService {
 
   getInventoryCostTotal(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.getInventoryCostTotalBefore(end);
   }
 

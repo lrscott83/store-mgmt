@@ -60,7 +60,7 @@ export class ExpenseOfflineService {
    */
   getExpensesInDay(date: Date): BaseResponseModel<Expense[]> {
     const startDate = startOfDay(date);
-    const endDate = addDays(startDate, 1);
+    const endDate = startOfDay(addDays(date, 1));
     const filtered = this.getStorageExpenses()
       .filter((e) => e.isActive && e.date >= startDate && e.date < endDate)
       .sort((e1, e2) => e2.date.getTime() - e1.date.getTime());
@@ -82,7 +82,7 @@ export class ExpenseOfflineService {
 
   getActiveExpensesPriceToday(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.getActiveExpensesPriceBetweenDates(start, end);
   }
 
@@ -104,7 +104,7 @@ export class ExpenseOfflineService {
 
   getExpensesTotal(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.getExpensesTotalBefore(end);
   }
 

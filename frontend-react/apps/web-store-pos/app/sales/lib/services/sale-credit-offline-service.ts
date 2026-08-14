@@ -47,7 +47,7 @@ export class SaleCreditOfflineService {
    */
   getSaleCreditsInDay(date: Date): BaseResponseModel<SaleCredit[]> {
     const startDate = startOfDay(date);
-    const endDate = addDays(startDate, 1);
+    const endDate = startOfDay(addDays(date, 1));
     const filtered = this.getStorageSaleCredits()
       .filter((c) => c.isActive && c.date >= startDate && c.date < endDate)
       .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
@@ -91,7 +91,7 @@ export class SaleCreditOfflineService {
    */
   getPaidSaleCreditsInDayObservable(date: Date): Promise<BaseResponseModel<SaleCredit[]>> {
     const startDate = startOfDay(date);
-    const endDate = addDays(startDate, 1);
+    const endDate = startOfDay(addDays(date, 1));
     const filtered = this.getStorageSaleCredits()
       .filter(
         (c) =>
@@ -127,7 +127,7 @@ export class SaleCreditOfflineService {
 
   getSaleCreditsTotal(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.getSaleCreditsTotalBefore(end);
   }
 
@@ -160,7 +160,7 @@ export class SaleCreditOfflineService {
 
   getActiveSaleCreditsPriceToday(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.getActiveSaleCreditsPriceBetweenDates(start, end);
   }
 
@@ -172,7 +172,7 @@ export class SaleCreditOfflineService {
 
   getActiveUnpaidSaleCreditsPriceToday(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.activeUnpaidSaleCreditsBetween(start, end).reduce((sum, c) => sum + c.total, 0);
   }
 

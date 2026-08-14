@@ -107,7 +107,7 @@ export class OrderOfflineService {
    */
   getActiveOrdersInDay(_date: Date): Order[] {
     const dayStart = startOfDay(new Date());
-    const dayEnd = addDays(dayStart, 1);
+    const dayEnd = startOfDay(addDays(new Date(), 1));
     return this.getStorageOrders().filter(
       (o) => o.isActive && o.date >= dayStart && o.date < dayEnd,
     );
@@ -153,7 +153,7 @@ export class OrderOfflineService {
 
   getActiveOrdersPriceToday(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.getActiveOrdersPriceBetweenDates(start, end);
   }
 
@@ -175,7 +175,7 @@ export class OrderOfflineService {
 
   getActiveOrdersProfitToday(): number {
     const start = startOfDay(new Date());
-    const end = addDays(start, 1);
+    const end = startOfDay(addDays(new Date(), 1));
     return this.getActiveOrdersProfitBetweenDates(start, end);
   }
 
@@ -206,7 +206,7 @@ export class OrderOfflineService {
     for (let i = 29; i >= 0; i--) {
       const label = addDays(today, -i);
       const dayStart = startOfDay(label);
-      const dayEnd = addDays(dayStart, 1);
+      const dayEnd = startOfDay(addDays(label, 1));
       data.push({
         label,
         value: this.getActiveOrdersPriceBetweenDates(dayStart, dayEnd),
@@ -233,7 +233,7 @@ export class OrderOfflineService {
     for (let i = 29; i >= 0; i--) {
       const label = addDays(today, -i);
       const dayStart = startOfDay(label);
-      const dayEnd = addDays(dayStart, 1);
+      const dayEnd = startOfDay(addDays(label, 1));
       const orderProfit = this.getActiveOrdersProfitBetweenDates(dayStart, dayEnd);
       const dayExpenses = this.expenseService.getActiveExpensesPriceBetweenDates(dayStart, dayEnd);
       data.push({
