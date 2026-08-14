@@ -93,10 +93,18 @@ export function fromLocalDayKey(dayKey: string): Date {
   return new Date(year, month - 1, day);
 }
 
-/** The half-open local-day window `[midnight, next midnight)` used by every day filter. */
+/**
+ * The half-open local-day window `[midnight, next midnight)` used by every day filter.
+ *
+ * The end re-snaps with `startOfDay(addDays(date, 1))` instead of `addDays(start, 1)`:
+ * on a day whose local midnight does not exist (DST spring-forward at midnight, e.g.
+ * historic Brazil/Cuba), `startOfDay` snaps the start to 01:00, and adding a day to
+ * that snapped instant would carry the 01:00 into the next day — stretching the window
+ * one real hour into the next day and double-counting its first hour of sales. Re-snapping
+ * from the original instant anchors the end to the next day's true local midnight.
+ */
 export function localDayRange(date: Date): { start: Date; end: Date } {
-  const start = startOfDay(date);
-  return { start, end: addDays(start, 1) };
+  return { start: startOfDay(date), end: startOfDay(addDays(date, 1)) };
 }
 
 /** True when `instant` falls on the same LOCAL calendar day as `day`. */
