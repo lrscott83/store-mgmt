@@ -115,9 +115,10 @@ describe('ChangePasswordForm — PWD-5: offline disables submit', () => {
   });
 });
 
-describe('ChangePasswordForm — password visibility toggle (edit-user-credentials.component.html:22-27,42-47 parity)', () => {
-  // Angular binds a SINGLE showPassword boolean to newPassword + confirmPassword
-  // (oldPassword has no toggle/type binding at all — out of scope here).
+describe('ChangePasswordForm — password visibility toggle (edit-user-credentials.component.html:22-27,42-47 parity + user request 2026-08-14)', () => {
+  // Angular binds a SINGLE showPassword boolean to newPassword + confirmPassword.
+  // User request 2026-08-14 added an INDEPENDENT toggle to oldPassword too, so
+  // "Contraseña actual" can be revealed without exposing the new password.
   it('newPassword and confirmPassword share one toggle state (both flip together)', () => {
     render(
       <Wrapper>
@@ -129,22 +130,46 @@ describe('ChangePasswordForm — password visibility toggle (edit-user-credentia
     expect(newPassword).toHaveAttribute('type', 'password');
     expect(confirm).toHaveAttribute('type', 'password');
 
+    // Old toggle (index 0) flips ONLY oldPassword; new+confirm toggles are 1 and 2.
     const toggles = screen.getAllByRole('button', { name: 'Mostrar contraseña' });
-    expect(toggles).toHaveLength(2);
+    expect(toggles).toHaveLength(3);
     // EyeOffIcon (hidden) renders 1 <path>; EyeIcon (revealed) renders 2 — catches
     // an inverted icon even when the aria-label direction is still correct.
-    expect(toggles[0].querySelectorAll('svg path')).toHaveLength(1);
     expect(toggles[1].querySelectorAll('svg path')).toHaveLength(1);
+    expect(toggles[2].querySelectorAll('svg path')).toHaveLength(1);
 
-    fireEvent.click(toggles[0]);
+    fireEvent.click(toggles[1]);
     expect(newPassword).toHaveAttribute('type', 'text');
     expect(confirm).toHaveAttribute('type', 'text');
+    // Only new+confirm flip together; the old-password toggle stays in "Mostrar"
+    // (hidden) state, so exactly 2 buttons are now labeled "Ocultar contraseña".
     const revealedToggles = screen.getAllByRole('button', { name: 'Ocultar contraseña' });
     expect(revealedToggles).toHaveLength(2);
     expect(revealedToggles[0].querySelectorAll('svg path')).toHaveLength(2);
     expect(revealedToggles[1].querySelectorAll('svg path')).toHaveLength(2);
 
     fireEvent.click(revealedToggles[1]);
+    expect(newPassword).toHaveAttribute('type', 'password');
+    expect(confirm).toHaveAttribute('type', 'password');
+  });
+
+  it('oldPassword has an INDEPENDENT toggle that does not flip the other fields', () => {
+    render(
+      <Wrapper>
+        <ChangePasswordForm isOnline isLoading={false} onSubmit={vi.fn()} />
+      </Wrapper>,
+    );
+    const oldPassword = screen.getByLabelText(/contraseña actual/i);
+    const newPassword = screen.getByLabelText(/^nueva contraseña$/i);
+    const confirm = screen.getByLabelText(/confirmar nueva contraseña/i);
+    expect(oldPassword).toHaveAttribute('type', 'password');
+
+    const toggles = screen.getAllByRole('button', { name: 'Mostrar contraseña' });
+    expect(toggles).toHaveLength(3);
+
+    // Toggle #0 is oldPassword's own eye button: flipping it reveals ONLY that field.
+    fireEvent.click(toggles[0]);
+    expect(oldPassword).toHaveAttribute('type', 'text');
     expect(newPassword).toHaveAttribute('type', 'password');
     expect(confirm).toHaveAttribute('type', 'password');
   });

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { Button } from '~/shared/components/ui/button';
+import { EditIcon } from '~/shared/components/ui/icons';
 
 interface EditProfileFormValues {
   fullName: string;
@@ -123,15 +125,15 @@ export function EditProfileForm({
         />
       </div>
 
-      <button
-        type="submit"
-        disabled={submitDisabled}
-        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-      >
+      {/* EditUserDetailsComponent.html:54 — Angular's submit is `mat-fab extended` with
+          a leading edit icon; keep the exact fab geometry React uses for the same
+          component (change-password-form) so both profile submits look identical. */}
+      <Button type="submit" variant="fab" disabled={submitDisabled}>
+        <EditIcon />
         {isLoading
           ? intl.formatMessage({ id: 'PROFILE.SAVING' })
           : intl.formatMessage({ id: 'PROFILE.SAVE' })}
-      </button>
+      </Button>
     </form>
   );
 }

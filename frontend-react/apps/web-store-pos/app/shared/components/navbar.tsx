@@ -97,41 +97,71 @@ export function Navbar({ isSidebarOpen, onSidebarToggle }: NavbarProps) {
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-gray-200 bg-white shadow-lg z-50 py-1">
-              <div className="border-b border-gray-100 px-4 py-2">
-                <p className="text-xs font-semibold text-gray-800 truncate">{user?.login}</p>
-                <p className="text-xs text-gray-500 truncate">{user?.fullName}</p>
+            <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+              {/* Header: login + fullName + logout icon on the right — mirrors Angular's
+                  header-user-profile dropdown-header (nav-right.component.html:255-267). */}
+              <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-gray-800">{user?.login}</p>
+                  <p className="truncate text-xs text-gray-500">{user?.fullName}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                  aria-label={intl.formatMessage({ id: 'GENERAL.LOGOUT' })}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
               </div>
-              <Link
-                to="/profile/edit"
-                onClick={() => setIsUserMenuOpen(false)}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+              {/* Tab bar: single "Perfil" tab with a user icon — mirrors Angular's
+                  drp-tabs nav (nav-right.component.html:269-271). */}
+              <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2">
+                <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                {intl.formatMessage({ id: 'MENU.EDIT_PROFILE' })}
-              </Link>
-              <Link
-                to="/profile/change-password"
-                onClick={() => setIsUserMenuOpen(false)}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                {intl.formatMessage({ id: 'MENU.CHANGE_PASSWORD' })}
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                {intl.formatMessage({ id: 'GENERAL.LOGOUT' })}
-              </button>
+                <span className="text-xs font-medium text-gray-600">
+                  {intl.formatMessage({ id: 'GENERAL.PROFILE' })}
+                </span>
+              </div>
+
+              {/* Tab content: profile items + logout — mirrors Angular's profile array
+                  (nav-right.component.html:272-287). */}
+              <div className="py-1">
+                <Link
+                  to="/profile/edit"
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                  </svg>
+                  {intl.formatMessage({ id: 'MENU.EDIT_PROFILE' })}
+                </Link>
+                <Link
+                  to="/profile/change-password"
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  {intl.formatMessage({ id: 'MENU.CHANGE_PASSWORD' })}
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  {intl.formatMessage({ id: 'GENERAL.LOGOUT' })}
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -33,6 +33,8 @@ const messages: Record<string, string> = {
   'GENERAL.SUCCESS': 'Éxito',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
   'GENERAL.LOGOUT': 'Salir',
+  // GENERAL.PROFILE — Angular nav-right user popup tab label (vocabs/es.ts PROFILE: 'Perfil')
+  'GENERAL.PROFILE': 'Perfil',
   'GENERAL.EDIT': 'Editar',
   'GENERAL.DELETE': 'Eliminar',
   'GENERAL.UPDATE': 'Actualizar',

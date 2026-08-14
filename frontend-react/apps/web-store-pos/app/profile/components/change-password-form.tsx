@@ -30,8 +30,10 @@ export function ChangePasswordForm({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [validationError, setValidationError] = useState('');
   // edit-user-credentials.component.html:22-27,42-47: a SINGLE showPassword
-  // boolean drives newPassword + confirmPassword (oldPassword has no toggle).
+  // boolean drives newPassword + confirmPassword. "Contraseña actual" carries its
+  // OWN independent toggle (user request 2026-08-14: show icon like the fields below).
   const [showPassword, setShowPassword] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,14 +81,26 @@ export function ChangePasswordForm({
         <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700">
           {intl.formatMessage({ id: 'PROFILE.OLD_PASSWORD' })}
         </label>
-        <input
-          id="oldPassword"
-          type="password"
-          value={oldPassword}
-          onChange={(e) => setOldPassword(e.target.value)}
-          disabled={isLoading}
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
-        />
+        <div className="relative mt-1">
+          <input
+            id="oldPassword"
+            type={showOldPassword ? 'text' : 'password'}
+            value={oldPassword}
+            onChange={(e) => setOldPassword(e.target.value)}
+            disabled={isLoading}
+            className="block w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={() => setShowOldPassword((visible) => !visible)}
+            aria-label={intl.formatMessage({
+              id: showOldPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+            })}
+            className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-500 hover:text-gray-700"
+          >
+            {showOldPassword ? <EyeIcon className="h-5 w-5" /> : <EyeOffIcon className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       <div>
