@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
+import { WrongStoreError } from '~/sync/lib/services/data-serializer-service';
 import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { FileInput } from '~/shared/components/ui/file-input';
@@ -13,11 +14,12 @@ export interface ImportFormProps {
   /**
    * Called with the selected file and typed password.
    * Should decrypt, parse, and run the synchronizer.
-   * Should throw WrongPasswordError or CorruptFileError on failure.
-   * Resolves with a SyncResult even when the domain-validated merge itself
-   * fails (`succeeded: false` + typed `errors`) — the synchronizer never
-   * throws for merge-validation failures, only the serializer's decrypt
-   * step throws (WrongPasswordError/CorruptFileError, before any write).
+   * Should throw WrongPasswordError, WrongStoreError, or CorruptFileError on
+   * failure. Resolves with a SyncResult even when the domain-validated merge
+   * itself fails (`succeeded: false` + typed `errors`) — the synchronizer
+   * never throws for merge-validation failures, only the serializer's decrypt
+   * step throws (WrongPasswordError/WrongStoreError/CorruptFileError, before
+   * any write).
    */
   onImport: (file: File, password: string) => Promise<SyncResult>;
 }
@@ -65,13 +67,19 @@ export function ImportForm({ onImport }: ImportFormProps) {
             intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }),
         );
       }
-    } catch {
+    } catch (err) {
       // Angular parity (receive-data.component.ts:55-59): same blocking error Swal shape.
       // Angular collapses every failure (wrong password, corrupt file, unexpected) into one
-      // generic message; never leak a raw err.message.
+      // generic message; never leak a raw err.message. sync-export-import-v2 (V2-10): a
+      // store mismatch is the ONE case with a dedicated message — the file is fine, the
+      // store isn't, so "wrong password" would send the user down the wrong path.
+      const message =
+        err instanceof WrongStoreError
+          ? intl.formatMessage({ id: 'SYNC.ERROR_WRONG_STORE' })
+          : intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' });
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-        intl.formatMessage({ id: 'SYNC.IMPORT_ERROR' }),
+        message,
       );
     } finally {
       setBusy(false);

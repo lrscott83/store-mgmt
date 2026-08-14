@@ -2,13 +2,18 @@
  * S-IMPORT-4 / S-IMPORT-5 — container-level "no writes on wrong password"
  *
  * Verifies the import flow contract: DataSynchronizerService.sync() must NOT
- * be called when DataSerializerService.import() throws WrongPasswordError or
- * CorruptFileError. This is the critical "no writes before failure" assertion
- * that belongs at the service boundary, not just the UI level.
+ * be called when DataSerializerService.import() throws WrongPasswordError,
+ * CorruptFileError, or WrongStoreError. This is the critical "no writes
+ * before failure" assertion that belongs at the service boundary, not just
+ * the UI level.
  */
 
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
+import {
+  WrongPasswordError,
+  CorruptFileError,
+  WrongStoreError,
+} from '~/sync/lib/services/data-serializer-service';
 import type { ParsedData } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -72,6 +77,22 @@ describe('Import flow — no writes on CorruptFileError', () => {
     await expect(
       runImportFlow(serializer, synchronizer, new Uint8Array([1, 2, 3]), 'any'),
     ).rejects.toBeInstanceOf(CorruptFileError);
+
+    expect(synchronizer.sync).not.toHaveBeenCalled();
+  });
+});
+
+// sync-export-import-v2 (V2-09): a store mismatch is a "no writes" failure too
+// — the WrongStoreError surfaces from the serializer BEFORE any decryption or
+// merge, so the container must not call synchronizer.sync for it either.
+describe('Import flow — no writes on WrongStoreError', () => {
+  it('synchronizer.sync is NOT called when serializer.import throws WrongStoreError', async () => {
+    const serializer = makeSerializerThatThrows(WrongStoreError);
+    const synchronizer = makeSynchronizer();
+
+    await expect(
+      runImportFlow(serializer, synchronizer, new Uint8Array([1, 2, 3]), 'correct'),
+    ).rejects.toBeInstanceOf(WrongStoreError);
 
     expect(synchronizer.sync).not.toHaveBeenCalled();
   });

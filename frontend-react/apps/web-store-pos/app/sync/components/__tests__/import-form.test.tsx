@@ -4,7 +4,11 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { ImportForm } from '../import-form';
 import type { SyncResult } from '~/sync/lib/services/data-synchronizer-service';
-import { WrongPasswordError, CorruptFileError } from '~/sync/lib/services/data-serializer-service';
+import {
+  WrongPasswordError,
+  CorruptFileError,
+  WrongStoreError,
+} from '~/sync/lib/services/data-serializer-service';
 
 // T6 (Angular parity, receive-data.component.ts:48/55): the two import-failure paths are
 // blocking error Swals, mocked via the shared wrapper rather than asserting inline DOM text.
@@ -180,6 +184,48 @@ describe('ImportForm — S-IMPORT-5: corrupt-file collapses into Angular generic
         'Error',
         'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
       ),
+    );
+    expect(
+      screen.queryByText(/Los datos se importaron correctamente/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('ImportForm — V2-10: wrong-store shows the dedicated message (not the generic one)', () => {
+  // sync-export-import-v2 (V2-10): WrongStoreError is the ONE import failure
+  // with its own message — the archive is valid, the store isn't, so the
+  // generic "error importing" text would mislead the user.
+  it('shows SYNC.ERROR_WRONG_STORE via showBlockingError when serializer throws WrongStoreError', async () => {
+    const onImport = vi.fn().mockRejectedValue(new WrongStoreError());
+    // Isolate call history from earlier describe blocks (mock is file-scoped).
+    showBlockingErrorMock.mockClear();
+    render(
+      <Wrapper>
+        <ImportForm onImport={onImport} />
+      </Wrapper>,
+    );
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(fileInput, 'files', {
+      value: [makeZipFile()],
+      configurable: true,
+    });
+    fireEvent.change(fileInput);
+    fireEvent.change(screen.getByLabelText(/contraseña de cifrado/i), {
+      target: { value: 'correct-for-another-store' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /importar/i }));
+
+    await waitFor(() =>
+      expect(showBlockingErrorMock).toHaveBeenCalledWith(
+        'Error',
+        'Este respaldo pertenece a otra tienda. Usá la contraseña y el archivo de exportación de la tienda actual.',
+      ),
+    );
+    // The generic message must NOT be shown for a store mismatch
+    expect(showBlockingErrorMock).not.toHaveBeenCalledWith(
+      'Error',
+      'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
     );
     expect(
       screen.queryByText(/Los datos se importaron correctamente/i),

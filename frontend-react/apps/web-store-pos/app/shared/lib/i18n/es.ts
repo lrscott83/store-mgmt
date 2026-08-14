@@ -845,6 +845,10 @@ const messages: Record<string, string> = {
   'SYNC.IMPORT_ERROR': 'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
   'SYNC.ERROR_EMPTY_PASSWORD': 'La contraseña no puede estar vacía.',
   'SYNC.ERROR_NO_FILE': 'Seleccioná un archivo de respaldo.',
+  // sync-export-import-v2 (V2-10): shown when the backup was exported from a
+  // DIFFERENT store — a store mismatch is not a password problem, so the user
+  // must retry with the right file/password, not just retype theirs.
+  'SYNC.ERROR_WRONG_STORE': 'Este respaldo pertenece a otra tienda. Usá la contraseña y el archivo de exportación de la tienda actual.',
   'SYNC.SHOW_PASSWORD': 'Mostrar contraseña',
   'SYNC.HIDE_PASSWORD': 'Ocultar contraseña',
 

@@ -1,12 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
-import type { Entry } from '@zip.js/zip.js';
+import { BlobReader, BlobWriter, TextReader, TextWriter, ZipReader, ZipWriter } from '@zip.js/zip.js';
+import type { Entry, EntryGetDataOptions } from '@zip.js/zip.js';
 import {
   DataSerializerService,
   WrongPasswordError,
+  WrongStoreError,
   CorruptFileError,
   EDataFileName,
+  deriveV2Key,
+  V2_META_FILENAME,
+  V2_FORMAT_VERSION,
+  V2_ITERATIONS,
+  V2_SALT_BYTES,
 } from '../data-serializer-service';
+import type { V2Meta } from '../data-serializer-service';
 import type {
   InventoryReader,
   OrderReader,
@@ -250,9 +257,8 @@ function makeServiceWithUnseededCategoriesAndProducts(
 }
 
 /**
- * Reads the raw zip entries with zip.js directly, given an already-derived
- * password (e.g. `PASSWORD + STORE_ID`). Used to assert the Angular-compatible
- * entry names/shapes independently of DataSerializerService.import().
+ * Reads the raw zip entries of a LEGACY v1 archive with zip.js directly,
+ * given an already-derived password (e.g. `PASSWORD + STORE_ID`).
  */
 async function readRawEntries(payload: Uint8Array, derivedPassword: string) {
   const blob = new Blob([payload]);
@@ -262,10 +268,115 @@ async function readRawEntries(payload: Uint8Array, derivedPassword: string) {
   return entries;
 }
 
+/**
+ * Reads a v2 archive with a password-free reader (mixed ZIP: plaintext
+ * meta.json + encrypted data entries), returning the parsed envelope AND the
+ * password-only derived key so tests can assert on the data entries without
+ * going through `DataSerializerService.import()`.
+ */
+async function readRawEntriesV2(payload: Uint8Array, password: string) {
+  const blob = new Blob([payload]);
+  const zipReader = new ZipReader(new BlobReader(blob));
+  const entries = await zipReader.getEntries();
+  const metaEntry = entries.find(
+    (e) => !e.directory && e.filename === V2_META_FILENAME,
+  );
+  if (!metaEntry || metaEntry.directory) {
+    throw new Error('v2 archive is missing meta.json');
+  }
+  const meta = JSON.parse(await metaEntry.getData(new TextWriter())) as V2Meta;
+  const key = await deriveV2Key(password, toBase64Bytes(meta.salt), meta.iterations);
+  await zipReader.close();
+  return { entries, meta, key };
+}
+
 /** Narrows an `Entry` (DirectoryEntry | FileEntry) and reads its text content. */
-async function getEntryText(entry: Entry): Promise<string> {
+async function getEntryText(entry: Entry, options?: EntryGetDataOptions): Promise<string> {
   if (entry.directory) throw new Error(`unexpected directory entry: ${entry.filename}`);
-  return entry.getData(new TextWriter());
+  return entry.getData(new TextWriter(), options);
+}
+
+/** Base64-decodes a byte array (test-side mirror of the service's private helper). */
+function toBase64Bytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/** Base64-encodes a byte array (test-side mirror of the service's private helper). */
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Builds a LEGACY v1 archive: the 6 Angular-named entries encrypted with the
+ * derived string password (`password + storeId`, writer-level), NO meta.json.
+ * Used to pin the v1 fallback path (V2-07, SYNC-01/02).
+ */
+async function buildLegacyV1Zip(
+  payloads: Record<string, string>,
+  derivedPassword: string,
+): Promise<Uint8Array> {
+  const zipWriter = new ZipWriter(new BlobWriter('application/zip'), {
+    password: derivedPassword,
+  });
+  for (const [name, text] of Object.entries(payloads)) {
+    await zipWriter.add(name, new TextReader(text));
+  }
+  const blob = await zipWriter.close();
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/**
+ * Builds a v2 archive with a custom iteration count (V2-03 fixture): the
+ * import path must honor `meta.iterations` rather than assume the constant.
+ */
+async function buildV2ZipWithIterations(
+  payloads: Record<string, string>,
+  password: string,
+  iterations: number,
+): Promise<Uint8Array> {
+  const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
+  const key = await deriveV2Key(password, salt, iterations);
+  const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+  await zipWriter.add(
+    V2_META_FILENAME,
+    new TextReader(
+      JSON.stringify({
+        formatVersion: V2_FORMAT_VERSION,
+        salt: toBase64(salt),
+        iterations,
+        storeId: STORE_ID,
+        exportedAt: new Date().toISOString(),
+      } satisfies V2Meta),
+    ),
+  );
+  for (const [name, text] of Object.entries(payloads)) {
+    await zipWriter.add(name, new TextReader(text), { rawPassword: key });
+  }
+  const blob = await zipWriter.close();
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/** The 6 Angular-named payloads for a legacy v1 archive (matches makeService defaults). */
+function makeV1Payloads(): Record<string, string> {
+  return {
+    [EDataFileName.Categories]: JSON.stringify([['cat-1', mockCategory]] as [string, ProductCategory][]),
+    [EDataFileName.Products]: JSON.stringify([['prod-1', mockProduct]] as [string, Product][]),
+    [EDataFileName.InventoryEntries]: JSON.stringify([
+      ['prod-1', [mockInventoryEntry]],
+    ] as [string, InventoryEntry[]][]),
+    [EDataFileName.Orders]: JSON.stringify([mockOrder]),
+    [EDataFileName.Expenses]: JSON.stringify([mockExpense]),
+    [EDataFileName.SaleCredits]: JSON.stringify([mockSaleCredit]),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -326,16 +437,16 @@ describe('DataSerializerService', () => {
   });
 
   // -------------------------------------------------------------------------
-  // T2: Angular-compatible ZIP shape — 6 named entries, Map-entry vs array
+  // T2: v2 ZIP shape — meta.json envelope + 6 Angular-named encrypted entries
   // -------------------------------------------------------------------------
 
-  describe('T2 — Angular-compatible 6-entry ZIP format', () => {
-    it('produces exactly the 6 Angular-named entries', async () => {
+  describe('T2 — v2 envelope: meta.json + 6 Angular-named entries', () => {
+    it('produces meta.json plus exactly the 6 Angular-named entries', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
       const names = entries.map((e) => e.filename).sort();
-      expect(names).toEqual([...ANGULAR_ENTRY_NAMES].sort());
+      expect(names).toEqual(['meta.json', ...ANGULAR_ENTRY_NAMES].sort());
     });
 
     // parity-audit-remediation Slice 2: naming-only alignment with Angular's
@@ -351,22 +462,46 @@ describe('DataSerializerService', () => {
       });
     });
 
-    it('each entry is reported as encrypted (password-AES)', async () => {
+    it('meta.json is NOT encrypted while all 6 data entries are (V2-01)', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
+      const metaEntry = entries.find((e) => e.filename === 'meta.json')!;
+      expect(metaEntry.encrypted).toBe(false);
       for (const entry of entries) {
+        if (entry.filename === 'meta.json') continue;
         expect(entry.encrypted).toBe(true);
       }
+    });
+
+    it('meta.json carries the v2 envelope fields (formatVersion 2, salt 16B, iterations 100000, storeId, exportedAt ISO) (V2-01)', async () => {
+      const svc = makeService();
+      const payload = await svc.export(PASSWORD);
+      const { meta } = await readRawEntriesV2(payload, PASSWORD);
+      expect(meta.formatVersion).toBe(2);
+      expect(toBase64Bytes(meta.salt)).toHaveLength(16);
+      expect(meta.iterations).toBe(100_000);
+      expect(meta.storeId).toBe(STORE_ID);
+      expect(new Date(meta.exportedAt).toISOString()).toBe(meta.exportedAt);
+    });
+
+    it('each export gets a FRESH salt (V2-02)', async () => {
+      const svc = makeService();
+      const payloadA = await svc.export(PASSWORD);
+      const payloadB = await svc.export(PASSWORD);
+      const { meta: metaA } = await readRawEntriesV2(payloadA, PASSWORD);
+      const { meta: metaB } = await readRawEntriesV2(payloadB, PASSWORD);
+      expect(metaA.salt).not.toBe(metaB.salt);
+      expect(toBase64Bytes(metaA.salt)).not.toEqual(toBase64Bytes(metaB.salt));
     });
 
     it('categories.json is a Map-entry tuple array ([id, ProductCategory])', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
       const catEntry = entries.find((e) => e.filename === 'categories.json');
       expect(catEntry).toBeDefined();
-      const text = await getEntryText(catEntry!);
+      const text = await getEntryText(catEntry!, { rawPassword: key });
       const parsed = JSON.parse(text) as [string, ProductCategory][];
       expect(Array.isArray(parsed)).toBe(true);
       expect(parsed[0][0]).toBe('cat-1');
@@ -376,9 +511,9 @@ describe('DataSerializerService', () => {
     it('products.json is a Map-entry tuple array ([id, Product])', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
       const prodEntry = entries.find((e) => e.filename === 'products.json');
-      const text = await getEntryText(prodEntry!);
+      const text = await getEntryText(prodEntry!, { rawPassword: key });
       const parsed = JSON.parse(text) as [string, Product][];
       expect(parsed[0][0]).toBe('prod-1');
       expect(parsed[0][1].price).toBe(1500);
@@ -387,9 +522,9 @@ describe('DataSerializerService', () => {
     it('inventory-entries.json is a Map-entry tuple array keyed by productId ([productId, InventoryEntry[]])', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
       const invEntry = entries.find((e) => e.filename === 'inventory-entries.json');
-      const text = await getEntryText(invEntry!);
+      const text = await getEntryText(invEntry!, { rawPassword: key });
       const parsed = JSON.parse(text) as [string, InventoryEntry[]][];
       expect(parsed[0][0]).toBe('prod-1');
       expect(Array.isArray(parsed[0][1])).toBe(true);
@@ -399,19 +534,19 @@ describe('DataSerializerService', () => {
     it('orders.json / expenses.json / sale-credits.json are plain arrays (not Map entries)', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
 
       const ordersEntry = entries.find((e) => e.filename === 'orders.json');
-      const ordersParsed = JSON.parse(await getEntryText(ordersEntry!)) as Order[];
+      const ordersParsed = JSON.parse(await getEntryText(ordersEntry!, { rawPassword: key })) as Order[];
       expect(ordersParsed[0]).not.toBeInstanceOf(Array);
       expect(ordersParsed[0].id).toBe('order-1');
 
       const expensesEntry = entries.find((e) => e.filename === 'expenses.json');
-      const expensesParsed = JSON.parse(await getEntryText(expensesEntry!)) as Expense[];
+      const expensesParsed = JSON.parse(await getEntryText(expensesEntry!, { rawPassword: key })) as Expense[];
       expect(expensesParsed[0].id).toBe('exp-1');
 
       const creditsEntry = entries.find((e) => e.filename === 'sale-credits.json');
-      const creditsParsed = JSON.parse(await getEntryText(creditsEntry!)) as SaleCredit[];
+      const creditsParsed = JSON.parse(await getEntryText(creditsEntry!, { rawPassword: key })) as SaleCredit[];
       expect(creditsParsed[0].id).toBe('credit-1');
     });
 
@@ -433,9 +568,9 @@ describe('DataSerializerService', () => {
       );
 
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
       const invEntry = entries.find((e) => e.filename === 'inventory-entries.json')!;
-      expect(await getEntryText(invEntry)).toBe(rawInventoryJson);
+      expect(await getEntryText(invEntry, { rawPassword: key })).toBe(rawInventoryJson);
     });
 
     it('exports corrupt/malformed inventory JSON AS-IS, NOT silently emptied (parity fix vs the deleted InventoryRepository.getAll, which swallowed parse errors to an empty Map)', async () => {
@@ -456,41 +591,70 @@ describe('DataSerializerService', () => {
       );
 
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
       const invEntry = entries.find((e) => e.filename === 'inventory-entries.json')!;
-      expect(await getEntryText(invEntry)).toBe(corrupt);
+      expect(await getEntryText(invEntry, { rawPassword: key })).toBe(corrupt);
     });
   });
 
   // -------------------------------------------------------------------------
-  // T3: Password derivation — userPassword + selectedStoreId, NO separator
+  // T3: v2 password-only KDF — PBKDF2-HMAC-SHA-256, 32 bytes, no storeId
   // -------------------------------------------------------------------------
 
-  describe('T3 — store-scoped password derivation (no separator)', () => {
-    it('decrypts with plain concatenation password+storeId (no separator)', async () => {
-      const svc = makeService();
-      const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
-      expect(entries).toHaveLength(6);
+  describe('T3 — v2 password-only key derivation (V2-03/V2-04)', () => {
+    it('deriveV2Key produces a 32-byte key', async () => {
+      const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
+      const key = await deriveV2Key(PASSWORD, salt, V2_ITERATIONS);
+      expect(key).toHaveLength(32);
     });
 
-    it('fails to decrypt when a separator is inserted between password and storeId', async () => {
+    it('is deterministic for the same password + salt (no storeId/time in the KDF)', async () => {
+      const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
+      const a = await deriveV2Key(PASSWORD, salt, V2_ITERATIONS);
+      const b = await deriveV2Key(PASSWORD, salt, V2_ITERATIONS);
+      expect(a).toEqual(b);
+    });
+
+    it('a different password produces a different key', async () => {
+      const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
+      const a = await deriveV2Key(PASSWORD, salt, V2_ITERATIONS);
+      const b = await deriveV2Key(WRONG_PASSWORD, salt, V2_ITERATIONS);
+      expect(a).not.toEqual(b);
+    });
+
+    it('the iteration count feeds the KDF — a different count yields a different key', async () => {
+      const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
+      const a = await deriveV2Key(PASSWORD, salt, V2_ITERATIONS);
+      const b = await deriveV2Key(PASSWORD, salt, 50_000);
+      expect(a).not.toEqual(b);
+    });
+
+    it('import honors meta.iterations rather than assuming the export constant (V2-03)', async () => {
+      const svc = makeService();
+      const payload = await buildV2ZipWithIterations(makeV1Payloads(), PASSWORD, 50_000);
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.categories[0].id).toBe('cat-1');
+      expect(parsed.products[0].id).toBe('prod-1');
+    });
+
+    it('v2 data entries are NOT decryptable with password+storeId (the password-only key replaces the v1 string derivation) (V2-04)', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, `${PASSWORD}:${STORE_ID}`);
+      const { entries } = await readRawEntriesV2(payload, PASSWORD);
       const catEntry = entries.find((e) => e.filename === 'categories.json')!;
-      await expect(getEntryText(catEntry)).rejects.toThrow();
+      await expect(getEntryText(catEntry, { password: PASSWORD + STORE_ID })).rejects.toThrow();
     });
 
     it('does not set an explicit encryptionStrength override (default AE-2/AES-256)', async () => {
       // No behavioral assertion beyond successful decrypt with the derived
-      // password — the absence of an explicit encryptionStrength option in
+      // key — the absence of an explicit encryptionStrength option in
       // the implementation is enforced by code review, matching Angular's
       // `serializeEncryptedZip` which also omits it (default = 3 = AES-256).
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
-      expect(entries.length).toBeGreaterThan(0);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
+      const catEntry = entries.find((e) => e.filename === 'categories.json')!;
+      expect(JSON.parse(await getEntryText(catEntry, { rawPassword: key }))).toBeDefined();
     });
   });
 
@@ -499,17 +663,23 @@ describe('DataSerializerService', () => {
   // -------------------------------------------------------------------------
 
   describe('T4 — wrong-password / wrong-store rejection', () => {
-    it('throws WrongPasswordError when decrypting with wrong password', async () => {
+    it('throws WrongPasswordError when decrypting with wrong password (V2-06)', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
       await expect(svc.import(payload, WRONG_PASSWORD)).rejects.toThrow(WrongPasswordError);
     });
 
-    it('throws WrongPasswordError when importing with the correct password but a different selectedStoreId', async () => {
+    it('throws WrongStoreError — not WrongPasswordError — with the correct password but a different store (V2-05)', async () => {
       const svc = makeService(undefined, STORE_ID);
       const payload = await svc.export(PASSWORD);
       const otherStoreSvc = makeService(undefined, OTHER_STORE_ID);
-      await expect(otherStoreSvc.import(payload, PASSWORD)).rejects.toThrow(WrongPasswordError);
+      await expect(otherStoreSvc.import(payload, PASSWORD)).rejects.toThrow(WrongStoreError);
+      try {
+        await otherStoreSvc.import(payload, PASSWORD);
+        throw new Error('Should have thrown');
+      } catch (err) {
+        expect((err as Error).name).toBe('WrongStoreError');
+      }
     });
 
     it('WrongPasswordError is distinguishable by name', async () => {
@@ -523,7 +693,12 @@ describe('DataSerializerService', () => {
       }
     });
 
-    it('throws CorruptFileError for a non-zip payload', async () => {
+    it('WrongStoreError is distinguishable by name and defaults to an informative message', () => {
+      expect(new WrongStoreError().name).toBe('WrongStoreError');
+      expect(new WrongStoreError().message).toBe('Backup belongs to another store');
+    });
+
+    it('throws CorruptFileError for a non-zip payload (V2-12)', async () => {
       const svc = makeService();
       const garbage = new Uint8Array([1, 2, 3, 4, 5]);
       await expect(svc.import(garbage, PASSWORD)).rejects.toThrow(CorruptFileError);
@@ -531,10 +706,53 @@ describe('DataSerializerService', () => {
   });
 
   // -------------------------------------------------------------------------
-  // T5: Full export→import round-trip (all 6 entities)
+  // T5: Legacy v1 fallback — archives without meta.json (V2-07, SYNC-01/02)
   // -------------------------------------------------------------------------
 
-  describe('T5 — full export→import round-trip', () => {
+  describe('T5 — legacy v1 fallback (no meta.json)', () => {
+    it('imports a v1 archive with the correct password via password+storeId (V2-07)', async () => {
+      const payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
+      const svc = makeService();
+      const parsed = await svc.import(payload, PASSWORD);
+      expect(parsed.categories[0].id).toBe('cat-1');
+      expect(parsed.products[0].id).toBe('prod-1');
+      expect(parsed.inventoryEntries[0].id).toBe('inv-1');
+      expect(parsed.orders[0].id).toBe('order-1');
+      expect(parsed.expenses[0].id).toBe('exp-1');
+      expect(parsed.saleCredits[0].id).toBe('credit-1');
+    });
+
+    it('v1 remains store-scoped: an archive derived for another storeId fails (SYNC-02)', async () => {
+      const payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + OTHER_STORE_ID);
+      const svc = makeService(undefined, STORE_ID);
+      await expect(svc.import(payload, PASSWORD)).rejects.toThrow(WrongPasswordError);
+    });
+
+    it('throws WrongPasswordError for a v1 archive with the wrong password', async () => {
+      const payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
+      const svc = makeService();
+      await expect(svc.import(payload, WRONG_PASSWORD)).rejects.toThrow(WrongPasswordError);
+    });
+
+    it('decrypts with plain concatenation password+storeId, no separator (v1 parity)', async () => {
+      const payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
+      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      expect(entries).toHaveLength(6);
+    });
+
+    it('fails to decrypt a v1 archive when a separator is inserted between password and storeId', async () => {
+      const payload = await buildLegacyV1Zip(makeV1Payloads(), PASSWORD + STORE_ID);
+      const entries = await readRawEntries(payload, `${PASSWORD}:${STORE_ID}`);
+      const catEntry = entries.find((e) => e.filename === 'categories.json')!;
+      await expect(getEntryText(catEntry)).rejects.toThrow();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // T6: Full export→import round-trip (all 6 entities)
+  // -------------------------------------------------------------------------
+
+  describe('T6 — full export→import round-trip', () => {
     it('all entity counts match after round-trip', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
@@ -547,7 +765,7 @@ describe('DataSerializerService', () => {
       expect(parsed.saleCredits).toHaveLength(1);
     });
 
-    it('empty store produces valid empty arrays on import', async () => {
+    it('empty store produces valid empty arrays on import (V2-11)', async () => {
       const svc = makeService({
         categories: [],
         products: [],
@@ -576,19 +794,19 @@ describe('DataSerializerService', () => {
       expect(parsed.categories).toEqual([]);
       expect(parsed.products).toEqual([]);
 
-      const entries = await readRawEntries(payload, PASSWORD + STORE_ID);
+      const { entries, key } = await readRawEntriesV2(payload, PASSWORD);
       const catEntry = entries.find((e) => e.filename === 'categories.json')!;
       const prodEntry = entries.find((e) => e.filename === 'products.json')!;
-      expect(await getEntryText(catEntry)).toBe('[]');
-      expect(await getEntryText(prodEntry)).toBe('[]');
+      expect(await getEntryText(catEntry, { rawPassword: key })).toBe('[]');
+      expect(await getEntryText(prodEntry, { rawPassword: key })).toBe('[]');
     });
   });
 
   // -------------------------------------------------------------------------
-  // T6: Inventory no-loss round-trip — all InventoryEntry fields survive
+  // T7: Inventory no-loss round-trip — all InventoryEntry fields survive
   // -------------------------------------------------------------------------
 
-  describe('T6 — inventory field no-loss round-trip', () => {
+  describe('T7 — inventory field no-loss round-trip', () => {
     it('all InventoryEntry fields survive export→import', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
@@ -621,6 +839,27 @@ describe('DataSerializerService', () => {
       const ids = parsed.inventoryEntries.map((e) => e.id);
       expect(ids).toContain('inv-1');
       expect(ids).toContain('inv-2');
+    });
+
+    it("Angular's `'{}'` empty-inventory sentinel imports as EMPTY inventory, not a crash — getInventoryEntriesJson() falls back to the literal '{}' when a store has no inventory (a valid OBJECT, so parseJson's error fallback never fires and a bare .flatMap would throw). The guard must hold for BOTH the v2 path and the legacy v1 fallback", async () => {
+      // This is exactly what a real export of an inventory-less store contains:
+      // the Angular raw-string reader Blob-coerces its `'{}'` fallback into the
+      // zip entry, and the old v1 import path had the same `.flatMap` crash.
+      const emptyInventoryPayloads = {
+        ...makeV1Payloads(),
+        [EDataFileName.InventoryEntries]: '{}',
+      };
+
+      const v2Payload = await buildV2ZipWithIterations(emptyInventoryPayloads, PASSWORD, V2_ITERATIONS);
+      const v2Parsed = await makeService().import(v2Payload, PASSWORD);
+      expect(v2Parsed.inventoryEntries).toEqual([]);
+      expect(v2Parsed.categories).toHaveLength(1);
+      expect(v2Parsed.products).toHaveLength(1);
+
+      const v1Payload = await buildLegacyV1Zip(emptyInventoryPayloads, PASSWORD + STORE_ID);
+      const v1Parsed = await makeService().import(v1Payload, PASSWORD);
+      expect(v1Parsed.inventoryEntries).toEqual([]);
+      expect(v1Parsed.categories).toHaveLength(1);
     });
   });
 });
