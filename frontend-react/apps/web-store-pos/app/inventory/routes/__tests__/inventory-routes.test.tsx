@@ -734,8 +734,8 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
       </Wrapper>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
-    await screen.findByRole('option', { name: 'Ron' });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Ron' }));
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });
     fireEvent.click(screen.getByText('Adicionar'));
@@ -771,8 +771,8 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     );
     const callsBeforeClick = getByDateMock.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
-    await screen.findByRole('option', { name: 'Ron' });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Ron' }));
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });
     fireEvent.click(screen.getByText('Adicionar'));
@@ -809,8 +809,8 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
 
     // First open: fill the form with a product, quantity, and cost.
     fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
-    await screen.findByRole('option', { name: 'Ron' });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Ron' }));
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });
 
@@ -820,7 +820,6 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
 
     // Reopen: the form must be clean (no product, no quantity, no cost).
     fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
-    await screen.findByRole('option', { name: 'Ron' });
     expect(screen.getByRole('combobox')).toHaveValue('');
     expect(screen.getByLabelText('Cantidad')).toHaveValue(null);
     expect(screen.getByLabelText('Precio de costo')).toHaveValue(null);

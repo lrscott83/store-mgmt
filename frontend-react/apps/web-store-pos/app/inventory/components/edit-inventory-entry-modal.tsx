@@ -41,17 +41,37 @@ export function EditInventoryEntryModal({
   const [quantity, setQuantity] = useState(entry?.quantity.toString() ?? '');
   const [costPrice, setCostPrice] = useState(entry?.costPrice.toString() ?? '');
   const [validationError, setValidationError] = useState('');
+  // Searchable combobox (UX improvement over Angular's plain mat-select): the input holds the
+  // typed query, the list filters products while the user types, and selection keeps the id.
+  const [query, setQuery] = useState('');
+  const [isListOpen, setIsListOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
     createProductService(storeId).getProductsToSelect().then((result) => {
-      if (!cancelled && result.succeeded) setProducts(result.data);
+      if (!cancelled && result.succeeded) {
+        setProducts(result.data);
+        // Edit mode: prefill the query with the current entry's product name once loaded.
+        if (entry) {
+          const match = result.data.find((p) => p.id === entry.productId);
+          if (match) setQuery(match.fullName);
+        }
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [isOpen, storeId]);
+  }, [isOpen, storeId, entry]);
+
+  // Accent- and case-insensitive filter: "cafe" matches "Café", "RON" matches "Ron".
+  const normalized = (value: string) =>
+    value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const filteredProducts =
+    query.trim() === ''
+      ? products
+      : products.filter((p) => normalized(p.fullName).includes(normalized(query)));
 
   if (!isOpen) return null;
 
@@ -100,6 +120,29 @@ export function EditInventoryEntryModal({
     );
   }
 
+  function selectProduct(product: ProductSelectView) {
+    setProductId(product.id);
+    setQuery(product.fullName);
+    setIsListOpen(false);
+  }
+
+  // ArrowDown/ArrowUp move the active option; Enter selects it; Escape closes the list.
+  function handleProductKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setIsListOpen(true);
+      setActiveIndex((prev) => (filteredProducts.length === 0 ? 0 : Math.min(prev + 1, filteredProducts.length - 1)));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((prev) => (filteredProducts.length === 0 ? 0 : Math.max(prev - 1, 0)));
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (isListOpen && filteredProducts[activeIndex]) selectProduct(filteredProducts[activeIndex]);
+    } else if (event.key === 'Escape') {
+      setIsListOpen(false);
+    }
+  }
+
   const inputClass =
     'w-full rounded border border-border px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary';
   const labelClass = 'mb-1 block text-sm font-medium text-text';
@@ -136,30 +179,69 @@ export function EditInventoryEntryModal({
           }
         >
           <div className="space-y-3">
-            {/* Product (searchable select) */}
-            <div>
-              <label className={labelClass}>
+            {/* Product (searchable combobox — filters while the user types) */}
+            <div className="relative">
+              <label htmlFor="entry-product" className={labelClass}>
                 {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}
               </label>
-              <select
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
+              <input
+                id="entry-product"
+                type="text"
+                role="combobox"
+                autoComplete="off"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setProductId('');
+                  setIsListOpen(true);
+                  setActiveIndex(0);
+                }}
+                onFocus={() => setIsListOpen(true)}
+                onBlur={() => setIsListOpen(false)}
+                onKeyDown={handleProductKeyDown}
+                aria-expanded={isListOpen}
+                aria-controls="entry-product-listbox"
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  isListOpen && filteredProducts[activeIndex]
+                    ? `entry-product-option-${activeIndex}`
+                    : undefined
+                }
                 className={inputClass}
-                // Angular parity: edit-inventory-entry-modal.component.html:17 has
-                // [disabled]="true" on the mat-select, but that is a no-op in reactive forms
-                // (template [disabled] on a formControlName control is ignored). The disabled
-                // state comes from the FormControl model, created with disabled:false
-                // (component.ts:105), so the Angular dropdown is enabled/selectable in both modes.
-              >
-                <option value="">
-                  {intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}...
-                </option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.fullName}
-                  </option>
-                ))}
-              </select>
+                placeholder={intl.formatMessage({ id: 'INVENTORY.ENTRY.PRODUCT' })}
+              />
+              {isListOpen && (
+                <ul
+                  id="entry-product-listbox"
+                  role="listbox"
+                  className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-border bg-surface py-1 shadow-md"
+                >
+                  {filteredProducts.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-text-muted">
+                      {intl.formatMessage({ id: 'GENERAL.NO_RESULTS' })}
+                    </li>
+                  ) : (
+                    filteredProducts.map((p, index) => (
+                      <li
+                        key={p.id}
+                        id={`entry-product-option-${index}`}
+                        role="option"
+                        aria-selected={index === activeIndex}
+                        onMouseDown={(e) => {
+                          // Prevent the input blur before the click lands on the option.
+                          e.preventDefault();
+                        }}
+                        onClick={() => selectProduct(p)}
+                        className={`cursor-pointer px-3 py-2 text-sm ${
+                          index === activeIndex ? 'bg-primary/10 text-primary' : 'text-text hover:bg-surface-hover'
+                        }`}
+                      >
+                        {p.fullName}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </div>
 
             {/* Quantity */}

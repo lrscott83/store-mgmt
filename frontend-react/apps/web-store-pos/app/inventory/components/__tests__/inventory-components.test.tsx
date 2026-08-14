@@ -668,8 +668,9 @@ describe('EditInventoryEntryModal — validation messages (Angular parity)', () 
         <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
       </Wrapper>,
     );
-    await screen.findByRole('option', { name: 'Bebidas - Ron' });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    await screen.findByRole('combobox');
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Bebidas - Ron' }));
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
     expect(screen.getByText('Cantidad mínimo valor es 1')).toBeInTheDocument();
   });
@@ -692,8 +693,9 @@ describe('EditInventoryEntryModal — validation messages (Angular parity)', () 
         <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
       </Wrapper>,
     );
-    await screen.findByRole('option', { name: 'Bebidas - Ron' });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    await screen.findByRole('combobox');
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Bebidas - Ron' }));
     fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
@@ -757,5 +759,125 @@ describe('EditInventoryEntryModal — CloseIcon/SaveIcon parity (edit-inventory-
       </Wrapper>,
     );
     expect(screen.getByRole('button', { name: 'Adicionar' }).querySelector('svg')).not.toBeNull();
+  });
+});
+
+// ─── EditInventoryEntryModal — searchable product combobox ──────────────────
+//
+// UX improvement over Angular's plain mat-select (Angular has no client-side filter here):
+// the product field is a combobox whose list filters as the user types, with keyboard
+// navigation (ArrowDown/ArrowUp/Enter/Escape) and a no-results state.
+
+const THREE_PRODUCTS = {
+  getProductsToSelect: vi.fn(async () => ({
+    data: [
+      { id: 'p1', fullName: 'Bebidas - Ron' },
+      { id: 'p2', fullName: 'Bebidas - Agua' },
+      { id: 'p3', fullName: 'Snacks - Papas' },
+    ],
+    succeeded: true,
+    message: '',
+    actionCode: 200,
+    errors: [],
+  })),
+};
+
+describe('EditInventoryEntryModal — searchable product combobox filters while typing', () => {
+  it('shows all options when opened with an empty query', async () => {
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () => THREE_PRODUCTS as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    fireEvent.focus(screen.getByRole('combobox'));
+    expect(await screen.findByRole('option', { name: 'Bebidas - Ron' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Bebidas - Agua' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Snacks - Papas' })).toBeInTheDocument();
+  });
+
+  it('filters options while the user types (case- and accent-insensitive)', async () => {
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () => THREE_PRODUCTS as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    const input = screen.getByRole('combobox');
+    // "bebi" matches only the two "Bebidas -" products, not "Snacks - Papas".
+    fireEvent.change(input, { target: { value: 'bebi' } });
+    expect(await screen.findByRole('option', { name: 'Bebidas - Ron' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Bebidas - Agua' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Snacks - Papas' })).not.toBeInTheDocument();
+    // Narrow further: "agua" leaves exactly one.
+    fireEvent.change(input, { target: { value: 'agua' } });
+    expect(await screen.findByRole('option', { name: 'Bebidas - Agua' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Bebidas - Ron' })).not.toBeInTheDocument();
+  });
+
+  it('shows the no-results message when nothing matches', async () => {
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () => THREE_PRODUCTS as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'zzz' } });
+    expect(await screen.findByText('No hay resultados')).toBeInTheDocument();
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+  });
+
+  it('selects a product by clicking the option: sets the id and fills the query', async () => {
+    const onSave = vi.fn();
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () => THREE_PRODUCTS as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={onSave} storeId="s1" />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Ron' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Bebidas - Ron' }));
+    expect(screen.getByRole('combobox')).toHaveValue('Bebidas - Ron');
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p1', quantity: 2, costPrice: 4 },
+      undefined,
+    );
+  });
+
+  it('selects the highlighted option with Enter and navigates with ArrowDown', async () => {
+    const onSave = vi.fn();
+    vi.mocked(ProductOfflineService).mockImplementationOnce(
+      () => THREE_PRODUCTS as unknown as InstanceType<typeof ProductOfflineService>,
+    );
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={onSave} storeId="s1" />
+      </Wrapper>,
+    );
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+    await screen.findByRole('option', { name: 'Bebidas - Ron' });
+    // ArrowDown moves the active option to index 1 (Bebidas - Agua), Enter selects it.
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(input).toHaveValue('Bebidas - Agua');
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(onSave).toHaveBeenCalledWith(
+      { productId: 'p2', quantity: 5, costPrice: 1 },
+      undefined,
+    );
   });
 });

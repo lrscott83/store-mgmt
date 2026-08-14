@@ -15,6 +15,7 @@ const messages: Record<string, string> = {
   'GENERAL.NO_FILE_SELECTED': 'Ningún archivo seleccionado',
   'GENERAL.CREDIT': 'Crédito',
   'GENERAL.SEARCH': 'Buscar',
+  'GENERAL.NO_RESULTS': 'No hay resultados',
   'GENERAL.TOTAL': 'Total',
   'GENERAL.CHANGE': 'Cambio',
   'GENERAL.QUANTITY': 'Cantidad',
