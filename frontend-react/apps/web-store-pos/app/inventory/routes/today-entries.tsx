@@ -198,17 +198,23 @@ export function TodayEntriesPage() {
         />
       )}
 
-      <EditInventoryEntryModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingEntry(undefined);
-        }}
-        onSave={handleSave}
-        storeId={storeId}
-        entry={editingEntry}
-        error={modalError}
-      />
+      {/* The modal is conditionally MOUNTED (not just toggled): an always-mounted modal whose
+          useState initializers only run once would keep the previous session's productId/
+          quantity/costPrice when reopened in create mode (entry=undefined). Unmounting on close
+          gives every create-open a fresh empty form and every edit-open a fresh prefill. */}
+      {isModalOpen && (
+        <EditInventoryEntryModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingEntry(undefined);
+          }}
+          onSave={handleSave}
+          storeId={storeId}
+          entry={editingEntry}
+          error={modalError}
+        />
+      )}
     </Card>
   );
 }

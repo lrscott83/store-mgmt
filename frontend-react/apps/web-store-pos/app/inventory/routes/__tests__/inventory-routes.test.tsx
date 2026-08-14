@@ -782,6 +782,49 @@ describe('TodayEntriesPage — handleSave/handleDeactivate check .succeeded (WU2
     // Modal closed — its Insertar/Actualizar action button no longer present.
     expect(screen.queryByText('Adicionar')).not.toBeInTheDocument();
   });
+
+  // REGRESSION GUARD: the create modal must not keep the previous session's values.
+  // The modal used to stay mounted (it only returned null when closed), so the useState
+  // initializers ran once and a reopened create-form showed the previous product/quantity/
+  // cost. It is now conditionally mounted, so every create-open is a fresh empty form.
+  it('opens the create modal clean, without the previous entry session values', async () => {
+    vi.mocked(InventoryOfflineService).mockImplementation(
+      () =>
+        ({
+          getActiveInventoryEntriesStorage: vi.fn().mockReturnValue([]),
+          getInventoryEntriesInDay: vi.fn().mockReturnValue(bm([])),
+          getInventoryCategoriesView: vi.fn().mockReturnValue(bm([])),
+          getAvailableQuantity: vi.fn().mockReturnValue({ hasEntries: false, available: 0 }),
+          createInventoryEntry: vi.fn(),
+          update: vi.fn(),
+          deleteInventoryEntry: vi.fn(),
+        }) as unknown as InstanceType<typeof InventoryOfflineService>,
+    );
+
+    render(
+      <Wrapper>
+        <TodayEntriesPage />
+      </Wrapper>,
+    );
+
+    // First open: fill the form with a product, quantity, and cost.
+    fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    await screen.findByRole('option', { name: 'Ron' });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p1' } });
+    fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Precio de costo'), { target: { value: '1.5' } });
+
+    // Close without saving.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cerrar' })[0]);
+    expect(screen.queryByText('Adicionar')).not.toBeInTheDocument();
+
+    // Reopen: the form must be clean (no product, no quantity, no cost).
+    fireEvent.click(screen.getByRole('button', { name: 'Entrada' }));
+    await screen.findByRole('option', { name: 'Ron' });
+    expect(screen.getByRole('combobox')).toHaveValue('');
+    expect(screen.getByLabelText('Cantidad')).toHaveValue(null);
+    expect(screen.getByLabelText('Precio de costo')).toHaveValue(null);
+  });
 });
 
 // ─── EntriesPage ─────────────────────────────────────────────────────────────
