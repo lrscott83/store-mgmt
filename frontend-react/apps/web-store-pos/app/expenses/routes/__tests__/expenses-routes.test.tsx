@@ -480,6 +480,31 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     expect(svgClass()).toContain('rotate-180');
   });
 
+  // Local-day grouping parity (orders.tsx local-grouping pattern): a late-evening expense must
+  // group under ITS OWN local day — at a negative UTC offset the UTC key would have grouped it
+  // under the NEXT day while it renders as the current one.
+  it('groups expenses by LOCAL calendar day — a late-evening expense stays on its own local day', async () => {
+    const late = makeExpense({ id: 'a', date: new Date(2024, 2, 15, 23, 30, 0), total: 10 });
+    vi.mocked(ExpenseOfflineService).mockImplementation(
+      () =>
+        ({
+          filterExpensesObservable: vi.fn().mockReturnValue(expensesResponse([late])),
+          create: vi.fn(),
+          update: vi.fn(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <ExpensesHistoryPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByTestId('expense-day-panel-toggle-2024-03-15')).toBeInTheDocument();
+    expect(screen.queryAllByTestId(/^expense-day-panel-toggle-/)).toHaveLength(1);
+  });
+
   it('filters by payment type', async () => {
     const cash = makeExpense({ id: 'a', paymentType: PaymentType.Efectivo, total: 10 });
     const card = makeExpense({ id: 'b', paymentType: PaymentType.Tarjeta, total: 25 });

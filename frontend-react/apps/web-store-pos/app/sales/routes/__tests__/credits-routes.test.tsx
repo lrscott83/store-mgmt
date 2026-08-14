@@ -280,6 +280,38 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
     expect(svgClass()).toContain('rotate-180');
   });
 
+  // Local-day grouping parity (orders.tsx local-grouping pattern): two late-evening credits on
+  // the same LOCAL day must fall in ONE group under ITS local day key — at a negative UTC offset
+  // the UTC key would have split them across two days.
+  it('groups credits by LOCAL calendar day — two evening credits on the same local day fall in ONE group', async () => {
+    const filter = vi.fn().mockResolvedValue({
+      data: [
+        makeCredit({ id: 'c1', total: 20, date: new Date(2024, 2, 15, 22, 0, 0) }),
+        makeCredit({ id: 'c2', total: 30, date: new Date(2024, 2, 15, 23, 30, 0) }),
+      ],
+      succeeded: true,
+      message: '',
+      actionCode: 200,
+      errors: [],
+    });
+    vi.mocked(SaleCreditOfflineService).mockImplementation(
+      () =>
+        ({
+          filterSaleCredits: filter,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+    );
+
+    render(
+      <Wrapper>
+        <SaleCreditsPage />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByTestId('credit-date-panel-toggle-2024-03-15')).toBeInTheDocument();
+    expect(screen.queryAllByTestId(/^credit-date-panel-toggle-/)).toHaveLength(1);
+  });
+
   // response-envelope-nullability WU-D — BEHAVIORAL GAP, pinned not fixed.
   // filterSaleCredits succeeded:false silently swallows (no error state, no
   // error UI) — same idiom as the sibling silent guards on this branch. This

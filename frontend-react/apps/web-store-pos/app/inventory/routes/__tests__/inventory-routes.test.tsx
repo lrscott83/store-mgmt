@@ -991,6 +991,31 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(svgClass()).toContain('rotate-180');
   });
+
+  // Local-day grouping parity (orders.tsx local-grouping pattern): a 23:00-local entry must
+  // group under ITS OWN local day — at a negative UTC offset the UTC key would have keyed it to
+  // the NEXT day while it renders as the current one.
+  it('groups entries by LOCAL calendar day — a late-evening entry stays on its own local day', () => {
+    const late: InventoryEntryView = {
+      id: 'e-late',
+      productId: 'p-late',
+      productName: 'Product Late',
+      quantity: 1,
+      costPrice: 7,
+      date: new Date(2026, 5, 30, 23, 0, 0),
+      isActive: true,
+    };
+    mockEntries([late]);
+    render(
+      <Wrapper>
+        <EntriesPage />
+      </Wrapper>,
+    );
+
+    const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0].getAttribute('data-testid')).toBe('entry-day-panel-toggle-2026-06-30');
+  });
 });
 
 // ─── EntriesPage — read-only history (Angular parity, diff-matrix #19) ──────

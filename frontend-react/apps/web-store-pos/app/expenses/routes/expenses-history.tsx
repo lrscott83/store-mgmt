@@ -8,47 +8,12 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
 import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
-import { formatLocalDate } from '~/shared/lib/date-utils';
+import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
+import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
 
 export const clientLoader = featureLoader([EFeatures.ExpensesHistory]);
-
-interface DayExpenseGroup {
-  date: Date;
-  expenses: Expense[];
-  count: number;
-  total: number;
-}
-
-/**
- * Groups ACTIVE expenses by calendar day, matching Angular's `ExpensesComponent.groupExpenses`
- * (expenses.component.ts:77-99) exactly: same grouping key (ISO date), same per-day count/total
- * reducers, DESCENDING sort both across days (:98, most recent day first) AND within a day
- * (:92, most recent expense first) — the mirror image of Inventory's `groupEntriesByDay`
- * (entries.tsx), which sorts ascending; each module replicates its own Angular component's
- * actual sort direction rather than reusing a shared assumption.
- */
-function groupExpensesByDay(expenses: Expense[]): DayExpenseGroup[] {
-  const groups = new Map<string, Expense[]>();
-  expenses.forEach((expense) => {
-    const groupId = new Date(expense.date).toISOString().split('T')[0];
-    const collection = groups.get(groupId);
-    if (collection) collection.push(expense);
-    else groups.set(groupId, [expense]);
-  });
-
-  const dayGroups: DayExpenseGroup[] = Array.from(groups.values()).map((groupExpenses) => ({
-    date: groupExpenses[0].date,
-    expenses: [...groupExpenses].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-    ),
-    count: groupExpenses.length,
-    total: groupExpenses.reduce((total, e) => total + e.total, 0),
-  }));
-
-  return dayGroups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
 
 const PAYMENT_TYPE_OPTIONS: { value: PaymentType | null; labelKey: string }[] = [
   { value: null, labelKey: 'GENERAL.ALL' },
@@ -81,7 +46,7 @@ export function ExpensesHistoryPage() {
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
-  const [dayGroups, setDayGroups] = useState<DayExpenseGroup[]>([]);
+  const [dayGroups, setDayGroups] = useState<LocalDayGroup<Expense>[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
   // Angular parity (expenses.component.ts `loadExpenses` → `loadExpensesFiltered`): always calls
@@ -99,7 +64,17 @@ export function ExpensesHistoryPage() {
     // ExpenseOfflineService.filterExpensesObservable is a same-tick `Promise.resolve(success(...))`
     // over local storage — it never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
-    setDayGroups(groupExpensesByDay(response.data));
+    // Angular parity (expenses.component.ts groupExpenses): DESCENDING sort both across days
+    // (:98, most recent day first) AND within a day (:92, most recent expense first) — the
+    // mirror image of Inventory's groupEntriesByDay (entries.tsx), which sorts ascending.
+    // groupByLocalDay defaults to newest-first, matching this route's sort direction.
+    setDayGroups(
+      groupByLocalDay(
+        response.data,
+        (e) => new Date(e.date),
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      ),
+    );
   }
 
   useEffect(() => {
@@ -116,8 +91,11 @@ export function ExpensesHistoryPage() {
     });
   }
 
-  const expensesCount = dayGroups.reduce((count, d) => count + d.count, 0);
-  const expensesTotal = dayGroups.reduce((total, d) => total + d.total, 0);
+  const expensesCount = dayGroups.reduce((count, d) => count + d.items.length, 0);
+  const expensesTotal = dayGroups.reduce(
+    (total, d) => total + d.items.reduce((t, e) => t + e.total, 0),
+    0,
+  );
 
   return (
     <Card
@@ -166,7 +144,7 @@ export function ExpensesHistoryPage() {
 
         <div className="space-y-2">
           {dayGroups.map((dayGroup) => {
-            const dayId = new Date(dayGroup.date).toISOString().split('T')[0];
+            const dayId = dayGroup.dayKey;
             const isExpanded = expandedDayIds.has(dayId);
             return (
               <div key={dayId} className="rounded-lg border border-border bg-background">
@@ -178,18 +156,18 @@ export function ExpensesHistoryPage() {
                   aria-expanded={isExpanded}
                 >
                   <span className="text-sm font-medium text-text">
-                    {formatLocalDate(dayGroup.date)} ({dayGroup.count})
+                    {formatLocalDate(dayGroup.date)} ({dayGroup.items.length})
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-danger">
-                      ${dayGroup.total.toFixed(2)}
+                      ${dayGroup.items.reduce((total, e) => total + e.total, 0).toFixed(2)}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>
                 </button>
                 {isExpanded && (
                   <div className="border-t border-border px-4 py-3">
-                    <ExpenseList expenses={dayGroup.expenses} readOnly />
+                    <ExpenseList expenses={dayGroup.items} readOnly />
                   </div>
                 )}
               </div>

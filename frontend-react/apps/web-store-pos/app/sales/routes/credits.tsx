@@ -7,39 +7,12 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
-import { formatLocalDate } from '~/shared/lib/date-utils';
+import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
+import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
 
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
-
-interface DateSaleCredit {
-  date: Date;
-  saleCredits: SaleCredit[];
-  creditsCount: number;
-  creditsTotal: number;
-}
-
-function groupSaleCredits(saleCredits: SaleCredit[]): DateSaleCredit[] {
-  const groups = new Map<string, SaleCredit[]>();
-  saleCredits.forEach((credit) => {
-    const groupId = new Date(credit.date).toISOString().split('T')[0];
-    const collection = groups.get(groupId);
-    if (collection) collection.push(credit);
-    else groups.set(groupId, [credit]);
-  });
-
-  const dateSaleCredits: DateSaleCredit[] = Array.from(groups.values()).map((credits) => ({
-    date: credits[0].date,
-    saleCredits: [...credits].sort((c1, c2) => new Date(c1.date).getTime() - new Date(c2.date).getTime()),
-    // creditsCount/creditsTotal only count UNPAID credits — matches Angular's
-    // SaleCreditsComponent.groupSaleCredits exactly (count += !isPaid ? 1 : 0).
-    creditsCount: credits.reduce((count, c) => count + (!c.isPaid ? 1 : 0), 0),
-    creditsTotal: credits.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0),
-  }));
-
-  return dateSaleCredits.sort((c1, c2) => new Date(c1.date).getTime() - new Date(c2.date).getTime());
-}
 
 /**
  * Matches Angular's `sale-credits.component.html` (Créditos): NO filters at
@@ -53,7 +26,7 @@ function groupSaleCredits(saleCredits: SaleCredit[]): DateSaleCredit[] {
 export function SaleCreditsPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const [dateSaleCredits, setDateSaleCredits] = useState<DateSaleCredit[]>([]);
+  const [dateSaleCredits, setDateSaleCredits] = useState<LocalDayGroup<SaleCredit>[]>([]);
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
 
   // WU4 (flagged mismatch #4): Angular's SaleCreditsComponent.loadSaleCredits() always
@@ -65,7 +38,16 @@ export function SaleCreditsPage() {
     // SaleCreditOfflineService.filterSaleCredits is a same-tick `Promise.resolve(...)` over
     // local storage — it never actually fails; this guard exists for the type only.
     if (!response.succeeded) return;
-    setDateSaleCredits(groupSaleCredits(response.data));
+    // creditsCount/creditsTotal count UNPAID credits only (!isPaid) — matches Angular's
+    // SaleCreditsComponent.groupSaleCredits exactly. groupByLocalDay returns newest-first;
+    // reverse to preserve Angular's ASCENDING day order (SaleCreditsComponent), oldest first.
+    setDateSaleCredits(
+      groupByLocalDay(
+        response.data,
+        (c) => new Date(c.date),
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      ).reverse(),
+    );
   }
 
   useEffect(() => {
@@ -82,8 +64,14 @@ export function SaleCreditsPage() {
     });
   }
 
-  const creditsCount = dateSaleCredits.reduce((count, d) => count + d.creditsCount, 0);
-  const creditsTotal = dateSaleCredits.reduce((total, d) => total + d.creditsTotal, 0);
+  const creditsCount = dateSaleCredits.reduce(
+    (count, d) => count + d.items.reduce((c, credit) => c + (!credit.isPaid ? 1 : 0), 0),
+    0,
+  );
+  const creditsTotal = dateSaleCredits.reduce(
+    (total, d) => total + d.items.reduce((t, credit) => t + (!credit.isPaid ? credit.total : 0), 0),
+    0,
+  );
 
   return (
     <Card
@@ -110,7 +98,7 @@ export function SaleCreditsPage() {
 
       <div className="space-y-2">
         {dateSaleCredits.map((dateSaleCredit) => {
-          const dateId = new Date(dateSaleCredit.date).toISOString().split('T')[0];
+          const dateId = dateSaleCredit.dayKey;
           const isExpanded = expandedDateIds.has(dateId);
           return (
             <div key={dateId} className="rounded-lg border border-border bg-surface">
@@ -122,18 +110,19 @@ export function SaleCreditsPage() {
                 aria-expanded={isExpanded}
               >
                 <span className="text-sm font-medium text-text">
-                  {formatLocalDate(dateSaleCredit.date)} ({dateSaleCredit.creditsCount})
+                  {formatLocalDate(dateSaleCredit.date)} (
+                  {dateSaleCredit.items.reduce((count, c) => count + (!c.isPaid ? 1 : 0), 0)})
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-danger">
-                    ${dateSaleCredit.creditsTotal.toFixed(2)}
+                    ${dateSaleCredit.items.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0).toFixed(2)}
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
               </button>
               {isExpanded && (
                 <div className="border-t border-border px-4 py-3">
-                  <SaleCreditList saleCredits={dateSaleCredit.saleCredits} />
+                  <SaleCreditList saleCredits={dateSaleCredit.items} />
                 </div>
               )}
             </div>

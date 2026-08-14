@@ -11,44 +11,11 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
-import { formatLocalDate } from '~/shared/lib/date-utils';
+import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
+import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { EntryList } from '../components/entry-list';
 
 export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
-
-interface DayEntryGroup {
-  date: Date;
-  entries: InventoryEntryView[];
-  count: number;
-  total: number;
-}
-
-/**
- * Groups active inventory entries by calendar day (`YYYY-MM-DD` via ISO date), computing a
- * per-day count (Σ quantity) and total (Σ costPrice·quantity). Mirrors Angular's
- * `EntriesComponent.groupEntries` exactly (entries.component.ts:82-104): same grouping key,
- * same per-day reducers, ascending sort both across days (:103) and within a day (:97).
- */
-function groupEntriesByDay(entries: InventoryEntryView[]): DayEntryGroup[] {
-  const groups = new Map<string, InventoryEntryView[]>();
-  entries.forEach((entry) => {
-    const groupId = new Date(entry.date).toISOString().split('T')[0];
-    const collection = groups.get(groupId);
-    if (collection) collection.push(entry);
-    else groups.set(groupId, [entry]);
-  });
-
-  const dayGroups: DayEntryGroup[] = Array.from(groups.values()).map((groupEntries) => ({
-    date: groupEntries[0].date,
-    entries: [...groupEntries].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    ),
-    count: groupEntries.reduce((count, e) => count + e.quantity, 0),
-    total: groupEntries.reduce((total, e) => total + e.costPrice * e.quantity, 0),
-  }));
-
-  return dayGroups.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-}
 
 /**
  * Matches Angular's `entries.component.html`/`.ts` (Historial de Entradas).
@@ -80,7 +47,7 @@ export function EntriesPage() {
   // Angular parity: entry-list.component.ts:32 isOwnerAdmin() (currentUser.isOwnerAdmin) —
   // gates the cost-price column inside EntryList (diff-matrix #6, L5 map).
   const isOwnerAdmin = user ? checkIsOwnerAdmin(user) : false;
-  const [dayGroups, setDayGroups] = useState<DayEntryGroup[]>([]);
+  const [dayGroups, setDayGroups] = useState<LocalDayGroup<InventoryEntryView>[]>([]);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<string>>(new Set());
 
   function loadEntries() {
@@ -93,7 +60,15 @@ export function EntriesPage() {
       ...e,
       productName: productMap.get(e.productId) ?? e.productName,
     }));
-    setDayGroups(groupEntriesByDay(enriched));
+    setDayGroups(
+      // groupByLocalDay returns newest-first; reverse to preserve Angular's ASCENDING day
+      // order (EntriesComponent.groupEntries, entries.component.ts:103), oldest day first.
+      groupByLocalDay(
+        enriched,
+        (e) => new Date(e.date),
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      ).reverse(),
+    );
   }
 
   useEffect(() => {
@@ -110,8 +85,14 @@ export function EntriesPage() {
     });
   }
 
-  const entriesCount = dayGroups.reduce((count, d) => count + d.count, 0);
-  const entriesTotal = dayGroups.reduce((total, d) => total + d.total, 0);
+  const entriesCount = dayGroups.reduce(
+    (count, d) => count + d.items.reduce((c, e) => c + e.quantity, 0),
+    0,
+  );
+  const entriesTotal = dayGroups.reduce(
+    (total, d) => total + d.items.reduce((t, e) => t + e.costPrice * e.quantity, 0),
+    0,
+  );
 
   return (
     <Card
@@ -137,7 +118,7 @@ export function EntriesPage() {
 
         <div className="space-y-2">
           {dayGroups.map((dayGroup) => {
-            const dayId = new Date(dayGroup.date).toISOString().split('T')[0];
+            const dayId = dayGroup.dayKey;
             const isExpanded = expandedDayIds.has(dayId);
             return (
               <div key={dayId} className="rounded-lg border border-border bg-background">
@@ -153,14 +134,14 @@ export function EntriesPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary">
-                      ${dayGroup.total.toFixed(2)}
+                      ${dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0).toFixed(2)}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>
                 </button>
                 {isExpanded && (
                   <div className="border-t border-border px-4 py-3">
-                    <EntryList entries={dayGroup.entries} readOnly isOwnerAdmin={isOwnerAdmin} />
+                    <EntryList entries={dayGroup.items} readOnly isOwnerAdmin={isOwnerAdmin} />
                   </div>
                 )}
               </div>
