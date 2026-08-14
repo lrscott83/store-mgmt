@@ -59,6 +59,10 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
   })),
 }));
 
+vi.mock('~/shared/lib/blocking-alert', () => ({
+  showBlockingInfo: vi.fn(),
+}));
+
 vi.mock('~/sales/lib/services/sale-credit-offline-service', () => ({
   SaleCreditOfflineService: vi.fn().mockImplementation(() => ({
     getStorageSaleCredits: vi.fn().mockReturnValue([]),
@@ -191,7 +195,8 @@ describe('OrdersPage — smoke render', () => {
   // Parity fix (collapsible-panel-chevron-parity): the date-group panel header must render
   // the shared ChevronDownIcon and rotate it (rotate-180) iff the panel is expanded.
   it('renders a chevron on the date-panel header that rotates iff the panel is expanded', () => {
-    const order = makeOrder({ id: 'o1', date: new Date('2025-01-01T10:00:00Z') });
+    // Local noon — the LOCAL calendar-day grouping key is unambiguous in any timezone.
+    const order = makeOrder({ id: 'o1', date: new Date(2025, 0, 1, 12, 0, 0) });
     vi.mocked(OrderOfflineService).mockImplementationOnce(
       () =>
         ({

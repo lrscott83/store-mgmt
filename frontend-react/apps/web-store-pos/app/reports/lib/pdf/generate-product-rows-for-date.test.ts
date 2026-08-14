@@ -5,10 +5,12 @@ import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-o
 import { generateProductRowsForDate } from './generate-product-rows-for-date';
 import { generateProductRows } from './generate-product-rows';
 
-const DAY_KEY = '2026-07-22';
-const BEFORE_DATE = new Date('2026-07-20T09:00:00.000Z');
-const DURING_DATE = new Date('2026-07-22T12:00:00.000Z');
-const AFTER_DATE = new Date('2026-07-23T15:00:00.000Z');
+// Local-noon fixtures — `new Date(2026, 6, 22, 12)` is the SAME calendar day in every
+// timezone, so the local-day windows (startOfDay/addDays) make these tests timezone-independent.
+const DAY = new Date(2026, 6, 22, 12, 0, 0);
+const BEFORE_DATE = new Date(2026, 6, 20, 9, 0, 0);
+const DURING_DATE = new Date(2026, 6, 22, 12, 0, 0);
+const AFTER_DATE = new Date(2026, 6, 23, 15, 0, 0);
 
 interface OrderItemOverrides {
   productId: string;
@@ -119,7 +121,7 @@ function makeInventoryCategoryView(overrides: Partial<InventoryCategoryView> = {
 }
 
 describe('generateProductRowsForDate', () => {
-  it('FOR-DATE-01: entries before/during/after the day + orders during/after → hand-derived 13-col row', () => {
+  it('FOR-DATE-01: entries before/during/after the day + orders during/after → hand-derived 13-col row, no suspects', () => {
     const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 6, costPrice: 2 });
     const e2 = makeInventoryEntry({ id: 'e2', date: DURING_DATE, quantity: 5, available: 5, costPrice: 5 });
     const e3 = makeInventoryEntry({ id: 'e3', date: AFTER_DATE, quantity: 3, available: 3, costPrice: 6 });
@@ -141,16 +143,17 @@ describe('generateProductRowsForDate', () => {
       'o2',
     );
 
-    const rows = generateProductRowsForDate({
+    const result = generateProductRowsForDate({
       products: [makeProduct()],
       orders: [dayOrder, afterOrder],
-      entriesByProduct: new Map([['p1', [e1, e2, e3]]]),
-      dayKey: DAY_KEY,
+      inventories: new Map([['p1', [e1, e2, e3]]]),
+      day: DAY,
     });
 
-    expect(rows).toHaveLength(1);
-    const row = rows[0];
-    // e1 asOfEndOfDay = available(6) + consumedAfter(4) = 10; e2 = 5; e3 excluded (after day).
+    expect(result.suspectProductNames).toEqual([]);
+    expect(result.rows).toHaveLength(1);
+    const row = result.rows[0];
+    // e1 availableAtEndOfDay = available(6) + consumedAfter(4) = 10; e2 = 5; e3 excluded (after day).
     expect(row.final).toBe(15);
     // Only the entry dated ON the day counts as entrada.
     expect(row.entrada).toBe(5);
@@ -160,7 +163,7 @@ describe('generateProductRowsForDate', () => {
     expect(row.importeVenta).toBe(20);
     expect(row.disponible).toBe(17); // final(15) + vendido(2)
     expect(row.inicio).toBe(12); // disponible(17) - entrada(5)
-    // costEntries: e1 (asOf 10 > 0) + e2 (asOf 5 > 0); weighted by RECEIVED quantity.
+    // costEntries: e1 (10 > 0) + e2 (5 > 0); weighted by RECEIVED quantity.
     expect(row.costoUnitario).toBe(3); // (2*10 + 5*5) / (10 + 5)
     expect(row.costoTotal).toBe(6); // vendido(2) * 3
     expect(row.cpVenta).toBeCloseTo(6 / 20);
@@ -182,16 +185,16 @@ describe('generateProductRowsForDate', () => {
       'o2',
     );
 
-    const rows = generateProductRowsForDate({
+    const result = generateProductRowsForDate({
       products: [makeProduct()],
       orders: [afterOrder],
-      entriesByProduct: new Map([['p1', [e1]]]),
-      dayKey: DAY_KEY,
+      inventories: new Map([['p1', [e1]]]),
+      day: DAY,
     });
 
-    expect(rows).toHaveLength(1);
-    const row = rows[0];
-    // asOfEndOfDay = available(3) + consumedAfter(7) = 10 — the stock at end of the day,
+    expect(result.rows).toHaveLength(1);
+    const row = result.rows[0];
+    // availableAtEndOfDay = available(3) + consumedAfter(7) = 10 — the stock at end of the day,
     // NOT the current available (3).
     expect(row.final).toBe(10);
     expect(row.vendido).toBe(0);
@@ -200,27 +203,30 @@ describe('generateProductRowsForDate', () => {
     expect(row.inicio).toBe(10);
     expect(row.costoUnitario).toBe(5);
     expect(row.importeFinal).toBe(50);
+    expect(result.suspectProductNames).toEqual([]);
   });
 
-  it('FOR-DATE-03: deactivated entry (available forced 0, no productCosts) contributes 0 — never negative', () => {
+  it('FOR-DATE-03: deactivated entries (available forced 0 / negative, no productCosts) contribute 0 to available', () => {
     const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 5, available: 0, costPrice: 4, isActive: false });
-    // A never-restored entry holding a negative available must clamp to 0 too.
+    // A never-restored entry holding a negative available is excluded from the available sum
+    // (inactive), so it must not pull the row negative either.
     const e2 = makeInventoryEntry({ id: 'e2', date: BEFORE_DATE, quantity: 3, available: -3, costPrice: 4, isActive: false });
 
-    const rows = generateProductRowsForDate({
+    const result = generateProductRowsForDate({
       products: [makeProduct()],
       orders: [],
-      entriesByProduct: new Map([['p1', [e1, e2]]]),
-      dayKey: DAY_KEY,
+      inventories: new Map([['p1', [e1, e2]]]),
+      day: DAY,
     });
 
-    expect(rows).toHaveLength(1);
-    const row = rows[0];
+    expect(result.rows).toHaveLength(1);
+    const row = result.rows[0];
     expect(row.final).toBe(0);
     expect(row.disponible).toBe(0);
     expect(row.inicio).toBe(0);
     expect(row.costoUnitario).toBe(0);
     expect(row.importeFinal).toBe(0);
+    expect(result.suspectProductNames).toEqual([]);
   });
 
   it('FOR-DATE-04: product with no entries sold without inventory (empty productCosts) → zeros + vendido only', () => {
@@ -228,15 +234,15 @@ describe('generateProductRowsForDate', () => {
       makeOrderItem({ productId: 'p1', quantity: 2, price: 10, productCosts: [] }),
     ]);
 
-    const rows = generateProductRowsForDate({
+    const result = generateProductRowsForDate({
       products: [makeProduct()],
       orders: [dayOrder],
-      entriesByProduct: new Map([['p1', []]]),
-      dayKey: DAY_KEY,
+      inventories: new Map([['p1', []]]),
+      day: DAY,
     });
 
-    expect(rows).toHaveLength(1);
-    const row = rows[0];
+    expect(result.rows).toHaveLength(1);
+    const row = result.rows[0];
     expect(row.final).toBe(0);
     expect(row.entrada).toBe(0);
     expect(row.disponible).toBe(2); // final(0) + vendido(2)
@@ -248,9 +254,10 @@ describe('generateProductRowsForDate', () => {
     expect(row.costoTotal).toBe(0);
     expect(row.cpVenta).toBe(0);
     expect(row.importeFinal).toBe(0);
+    expect(result.suspectProductNames).toEqual([]);
   });
 
-  it('FOR-DATE-05: orders and entries on other UTC days are excluded (before AND after)', () => {
+  it('FOR-DATE-05: orders and entries on other LOCAL days are excluded (before AND after)', () => {
     const entries = [
       makeInventoryEntry({ id: 'e1', date: DURING_DATE, quantity: 5, available: 5, costPrice: 4 }),
       makeInventoryEntry({ id: 'eBefore', date: BEFORE_DATE, quantity: 5, available: 5, costPrice: 2 }),
@@ -262,15 +269,15 @@ describe('generateProductRowsForDate', () => {
       makeOrder(AFTER_DATE, [makeOrderItem({ productId: 'p1', quantity: 1, price: 5, productCosts: [] })], 'oA'),
     ];
 
-    const rows = generateProductRowsForDate({
+    const result = generateProductRowsForDate({
       products: [makeProduct()],
       orders,
-      entriesByProduct: new Map([['p1', entries]]),
-      dayKey: DAY_KEY,
+      inventories: new Map([['p1', entries]]),
+      day: DAY,
     });
 
-    expect(rows).toHaveLength(1);
-    const row = rows[0];
+    expect(result.rows).toHaveLength(1);
+    const row = result.rows[0];
     expect(row.vendido).toBe(2); // before/after orders excluded
     expect(row.entrada).toBe(5); // eBefore/eAfter excluded
     expect(row.final).toBe(10); // e1(5) + eBefore(5); eAfter excluded
@@ -278,11 +285,129 @@ describe('generateProductRowsForDate', () => {
     expect(row.inicio).toBe(7);
     expect(row.costoUnitario).toBe(3); // (5*4 + 5*2) / (5 + 5); eAfter excluded
     expect(row.importeFinal).toBe(30);
+    expect(result.suspectProductNames).toEqual([]);
   });
 
-  it('FOR-DATE-06: reduce-to-today invariant — dayKey = today reproduces generateProductRows exactly', () => {
-    const today = DURING_DATE;
-    const todayKey = today.toISOString().split('T')[0];
+  it('FOR-DATE-06: suspect — entry updatedDate AFTER the day flags the product, name surfaced', () => {
+    const e1 = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 5,
+      available: 5,
+      costPrice: 4,
+      updatedDate: new Date(2026, 6, 23, 10, 0, 0),
+    });
+
+    const result = generateProductRowsForDate({
+      products: [makeProduct()],
+      orders: [],
+      inventories: new Map([['p1', [e1]]]),
+      day: DAY,
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.suspectProductNames).toEqual(['Ron']);
+  });
+
+  it('FOR-DATE-07: suspect — reconstructed stock exceeding received quantity flags the product', () => {
+    // available(10) already exceeds the received quantity(5) — a signal the entry was
+    // edited after the day even without an updatedDate stamp.
+    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 5, available: 10, costPrice: 4 });
+
+    const result = generateProductRowsForDate({
+      products: [makeProduct()],
+      orders: [],
+      inventories: new Map([['p1', [e1]]]),
+      day: DAY,
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.suspectProductNames).toEqual(['Ron']);
+  });
+
+  it('FOR-DATE-08: suspect — raw-string updatedDate after the day is parsed defensively and flags', () => {
+    // Inventory revival hydrates only `date`; a touched entry's updatedDate may be a raw
+    // string. Must be treated as evidence, not ignored (and must not throw).
+    const e1 = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 5,
+      available: 5,
+      costPrice: 4,
+      // Inventory revival hydrates only `date`; the fixture simulates a raw stored string.
+      updatedDate: '2026-07-23T10:00:00.000Z' as unknown as Date,
+    });
+
+    const result = generateProductRowsForDate({
+      products: [makeProduct()],
+      orders: [],
+      inventories: new Map([['p1', [e1]]]),
+      day: DAY,
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.suspectProductNames).toEqual(['Ron']);
+  });
+
+  it('FOR-DATE-09: suspect — unparseable/absent updatedDate is NOT evidence (no false positive)', () => {
+    const eNormal = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      quantity: 5,
+      available: 5,
+      costPrice: 4,
+      updatedDate: 'not-a-date' as unknown as Date,
+    });
+
+    const result = generateProductRowsForDate({
+      products: [makeProduct()],
+      orders: [],
+      inventories: new Map([['p1', [eNormal]]]),
+      day: DAY,
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.suspectProductNames).toEqual([]);
+  });
+
+  it('FOR-DATE-10: isActive — inactive entries never contribute to available or entrada', () => {
+    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 5, available: 5, costPrice: 4 });
+    // Inactive but positive — must NOT feed the available (Final) basis.
+    const eInactiveBefore = makeInventoryEntry({
+      id: 'eInactiveBefore',
+      date: BEFORE_DATE,
+      quantity: 3,
+      available: 3,
+      costPrice: 4,
+      isActive: false,
+    });
+    // Inactive and created DURING the day — must NOT count toward entrada either.
+    const eInactiveDuring = makeInventoryEntry({
+      id: 'eInactiveDuring',
+      date: DURING_DATE,
+      quantity: 4,
+      available: 4,
+      costPrice: 4,
+      isActive: false,
+    });
+
+    const result = generateProductRowsForDate({
+      products: [makeProduct()],
+      orders: [],
+      inventories: new Map([['p1', [e1, eInactiveBefore, eInactiveDuring]]]),
+      day: DAY,
+    });
+
+    expect(result.rows).toHaveLength(1);
+    const row = result.rows[0];
+    expect(row.final).toBe(5); // only e1's stock
+    expect(row.entrada).toBe(0); // the inactive during-day entry does not count
+    expect(row.disponible).toBe(5);
+    expect(result.suspectProductNames).toEqual([]);
+  });
+
+  it('FOR-DATE-11: reduce-to-today invariant — local day = today reproduces generateProductRows exactly', () => {
+    const today = DAY;
     const products = [makeProduct()];
     const entries = [
       makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 8, costPrice: 2 }),
@@ -290,11 +415,11 @@ describe('generateProductRowsForDate', () => {
     ];
     const orders = [makeOrder(today, [makeOrderItem({ productId: 'p1', quantity: 3, price: 10, productCosts: [] })])];
 
-    const rowsForDate = generateProductRowsForDate({
+    const result = generateProductRowsForDate({
       products,
       orders,
-      entriesByProduct: new Map([['p1', entries]]),
-      dayKey: todayKey,
+      inventories: new Map([['p1', entries]]),
+      day: today,
     });
 
     const rowsToday = generateProductRows(
@@ -309,6 +434,7 @@ describe('generateProductRowsForDate', () => {
       today,
     );
 
-    expect(rowsForDate).toEqual(rowsToday);
+    expect(result.rows).toEqual(rowsToday);
+    expect(result.suspectProductNames).toEqual([]);
   });
 });

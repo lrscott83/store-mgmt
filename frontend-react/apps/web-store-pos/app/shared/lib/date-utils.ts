@@ -72,3 +72,18 @@ export function formatLocalDate(date: Date): string {
   const year = d.getFullYear();
   return `${day}/${month}/${year}`;
 }
+
+/**
+ * Returns the LOCAL calendar date as `yyyy-mm-dd` (zero-padded) — local
+ * `getFullYear`/`getMonth`/`getDate`, NOT `toISOString` (which is UTC).
+ * The canonical grouping key for the sales-history day panels: grouping must
+ * agree with the local day windows (`startOfDay`/`addDays`) the offline
+ * services use, so an evening transaction (e.g. 22:00 local at a negative UTC
+ * offset) lands under ITS calendar day, not tomorrow's UTC key.
+ */
+export function formatLocalDateKey(date: Date): string {
+  const d = new Date(date);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}

@@ -408,6 +408,11 @@ const messages: Record<string, string> = {
   // established no-instruction-to-prune-orphans precedent).
   'ORDERS.TITLE': 'Historial de Ventas',
   'ORDERS.NO_ORDERS_FOUND': 'No se encontró ninguna venta',
+  // SALES.ORDERS.REPORT_SUSPECT_WARNING — shown when the per-day inventory-at-sale-price
+  // export flags suspect products (entries touched on/after the day, or reconstructed
+  // stock exceeding the received quantity). Interpolates the comma-joined product names.
+  'SALES.ORDERS.REPORT_SUSPECT_WARNING':
+    'El stock de estos productos pudo ser editado después de ese día: {names}',
   'ORDERS.TODAY_TITLE': 'Pedidos de hoy',
   'ORDERS.STATS_TITLE': 'Estadísticas de hoy',
   'ORDERS.DATE': 'Fecha',

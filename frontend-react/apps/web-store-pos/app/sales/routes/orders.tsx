@@ -8,7 +8,8 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { formatLocalDate } from '~/shared/lib/date-utils';
+import { formatLocalDate, formatLocalDateKey } from '~/shared/lib/date-utils';
+import { showBlockingInfo } from '~/shared/lib/blocking-alert';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-rows-for-date';
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
@@ -35,7 +36,7 @@ const PAYMENT_TYPE_OPTIONS = [
 function groupOrders(orders: Order[]): DateOrder[] {
   const groups = new Map<string, Order[]>();
   orders.forEach((order) => {
-    const groupId = new Date(order.date).toISOString().split('T')[0];
+    const groupId = formatLocalDateKey(new Date(order.date));
     const collection = groups.get(groupId);
     if (collection) collection.push(order);
     else groups.set(groupId, [order]);
@@ -91,12 +92,14 @@ export function OrdersPage() {
   }
 
   // Per-day "Inventario a precio de venta" export: rebuilds the 13-column
-  // inventory-at-sale-price ledger faithfully reconstructed for the day group
-  // (same aggregation as generateProductRows, but scoped to `dayKey` — entries
-  // restored to their end-of-day stock via the FIFO productCosts ledger). The
-  // report counts ALL active orders, matching the today report (isActive only).
+  // inventory-at-sale-price ledger faithfully reconstructed for the LOCAL day group
+  // (same aggregation as generateProductRows, but scoped to `day` — entries restored
+  // to their end-of-day stock via the FIFO productCosts ledger). `dateId` is the
+  // LOCAL `yyyy-mm-dd` grouping key; it is parsed into a local-noon Date (noon avoids
+  // DST boundary edges) and reused verbatim for the filename. The report counts ALL
+  // active orders, matching the today report (isActive only).
   const handleGenerateDayReport = useCallback(
-    async (dayKey: string) => {
+    async (dateId: string) => {
       const categoryRepository = new ProductCategoryRepository(storeId);
       const productRepository = new ProductRepository(storeId, categoryRepository);
       const orderService = new OrderOfflineService(storeId);
@@ -104,15 +107,32 @@ export function OrdersPage() {
 
       const products = productRepository.getAvailableProducts();
       const orders = orderService.getStorageOrders().filter((o) => o.isActive);
-      const entriesByProduct = new Map<string, InventoryEntry[]>();
+      const inventories = new Map<string, InventoryEntry[]>();
       for (const product of products) {
-        entriesByProduct.set(product.id, inventoryService.getProductInventoriesByProductId(product.id));
+        inventories.set(product.id, inventoryService.getProductInventoriesByProductId(product.id));
       }
 
-      const rows = generateProductRowsForDate({ products, orders, entriesByProduct, dayKey });
-      await exportInventoryTodaySalePdf(rows, `${dayKey}_ipv.pdf`);
+      const [year, month, day] = dateId.split('-');
+      const dayDate = new Date(Number(year), Number(month) - 1, Number(day), 12);
+
+      const { rows, suspectProductNames } = generateProductRowsForDate({
+        products,
+        orders,
+        inventories,
+        day: dayDate,
+      });
+      if (suspectProductNames.length > 0) {
+        showBlockingInfo(
+          intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
+          intl.formatMessage(
+            { id: 'SALES.ORDERS.REPORT_SUSPECT_WARNING' },
+            { names: suspectProductNames.join(', ') },
+          ),
+        );
+      }
+      await exportInventoryTodaySalePdf(rows, `${dateId}_ipv.pdf`);
     },
-    [storeId],
+    [storeId, intl],
   );
 
   const ordersCount = dateOrders.reduce((count, d) => count + d.count, 0);
@@ -201,7 +221,7 @@ export function OrdersPage() {
 
       <div className="space-y-2">
         {dateOrders.map((dateOrder) => {
-          const dateId = new Date(dateOrder.date).toISOString().split('T')[0];
+          const dateId = formatLocalDateKey(new Date(dateOrder.date));
           const isExpanded = expandedDateIds.has(dateId);
           return (
             <div key={dateId} className="rounded-lg border border-border bg-surface">
