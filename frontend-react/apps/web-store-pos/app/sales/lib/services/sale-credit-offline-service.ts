@@ -4,7 +4,7 @@ import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
-import { startOfDay, addDays } from '~/shared/lib/date-utils';
+import { startOfDay, addDays, localDayRange } from '~/shared/lib/date-utils';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -46,8 +46,7 @@ export class SaleCreditOfflineService {
    * `getByDateRange`/`getActiveToday` (no Angular correlate, flagged mismatch #2).
    */
   getSaleCreditsInDay(date: Date): BaseResponseModel<SaleCredit[]> {
-    const startDate = startOfDay(date);
-    const endDate = startOfDay(addDays(date, 1));
+    const { start: startDate, end: endDate } = localDayRange(date);
     const filtered = this.getStorageSaleCredits()
       .filter((c) => c.isActive && c.date >= startDate && c.date < endDate)
       .sort((c1, c2) => c1.date.getTime() - c2.date.getTime());
@@ -90,8 +89,7 @@ export class SaleCreditOfflineService {
    * Pagados" panel on the Today Stats view.
    */
   getPaidSaleCreditsInDayObservable(date: Date): Promise<BaseResponseModel<SaleCredit[]>> {
-    const startDate = startOfDay(date);
-    const endDate = startOfDay(addDays(date, 1));
+    const { start: startDate, end: endDate } = localDayRange(date);
     const filtered = this.getStorageSaleCredits()
       .filter(
         (c) =>
@@ -126,8 +124,7 @@ export class SaleCreditOfflineService {
   }
 
   getSaleCreditsTotal(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.getSaleCreditsTotalBefore(end);
   }
 
@@ -159,26 +156,22 @@ export class SaleCreditOfflineService {
   }
 
   getActiveSaleCreditsPriceToday(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.getActiveSaleCreditsPriceBetweenDates(start, end);
   }
 
   getActiveSaleCreditsPriceYesterday(): number {
-    const start = startOfDay(addDays(new Date(), -1));
-    const end = startOfDay(new Date());
+    const { start, end } = localDayRange(addDays(new Date(), -1));
     return this.getActiveSaleCreditsPriceBetweenDates(start, end);
   }
 
   getActiveUnpaidSaleCreditsPriceToday(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.activeUnpaidSaleCreditsBetween(start, end).reduce((sum, c) => sum + c.total, 0);
   }
 
   getActiveUnpaidSaleCreditsPriceYesterday(): number {
-    const start = startOfDay(addDays(new Date(), -1));
-    const end = startOfDay(new Date());
+    const { start, end } = localDayRange(addDays(new Date(), -1));
     return this.activeUnpaidSaleCreditsBetween(start, end).reduce((sum, c) => sum + c.total, 0);
   }
 

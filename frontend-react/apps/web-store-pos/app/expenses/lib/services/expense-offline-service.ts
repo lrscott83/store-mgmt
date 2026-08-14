@@ -4,7 +4,7 @@ import { DataResult, ExpenseErrors, Result, success } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
-import { startOfDay, addDays } from '~/shared/lib/date-utils';
+import { startOfDay, addDays, localDayRange } from '~/shared/lib/date-utils';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 
 function generateId(): string {
@@ -59,8 +59,7 @@ export class ExpenseOfflineService {
    * it only removes the latent defect for any future non-today caller.
    */
   getExpensesInDay(date: Date): BaseResponseModel<Expense[]> {
-    const startDate = startOfDay(date);
-    const endDate = startOfDay(addDays(date, 1));
+    const { start: startDate, end: endDate } = localDayRange(date);
     const filtered = this.getStorageExpenses()
       .filter((e) => e.isActive && e.date >= startDate && e.date < endDate)
       .sort((e1, e2) => e2.date.getTime() - e1.date.getTime());
@@ -81,14 +80,12 @@ export class ExpenseOfflineService {
   }
 
   getActiveExpensesPriceToday(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.getActiveExpensesPriceBetweenDates(start, end);
   }
 
   getActiveExpensesPriceYesterday(): number {
-    const start = startOfDay(addDays(new Date(), -1));
-    const end = startOfDay(new Date());
+    const { start, end } = localDayRange(addDays(new Date(), -1));
     return this.getActiveExpensesPriceBetweenDates(start, end);
   }
 
@@ -103,8 +100,7 @@ export class ExpenseOfflineService {
   }
 
   getExpensesTotal(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.getExpensesTotalBefore(end);
   }
 

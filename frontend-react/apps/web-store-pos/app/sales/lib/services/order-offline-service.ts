@@ -9,7 +9,7 @@ import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offl
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
-import { startOfDay, addDays } from '~/shared/lib/date-utils';
+import { addDays, localDayRange } from '~/shared/lib/date-utils';
 import type { CategoryCartItemsView, ProductCartItemsView } from '../category-cart-items-view';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -106,8 +106,7 @@ export class OrderOfflineService {
    * the signature for call-site compatibility, mirroring Angular's own unused param.
    */
   getActiveOrdersInDay(_date: Date): Order[] {
-    const dayStart = startOfDay(new Date());
-    const dayEnd = startOfDay(addDays(new Date(), 1));
+    const { start: dayStart, end: dayEnd } = localDayRange(new Date());
     return this.getStorageOrders().filter(
       (o) => o.isActive && o.date >= dayStart && o.date < dayEnd,
     );
@@ -129,8 +128,7 @@ export class OrderOfflineService {
    * isActive check).
    */
   getOrdersInDay(date: Date): Order[] {
-    const dayStart = startOfDay(date);
-    const dayEnd = startOfDay(addDays(date, 1));
+    const { start: dayStart, end: dayEnd } = localDayRange(date);
     return this.getStorageOrders()
       .filter((o) => o.date >= dayStart && o.date < dayEnd)
       .sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -152,14 +150,12 @@ export class OrderOfflineService {
   }
 
   getActiveOrdersPriceToday(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.getActiveOrdersPriceBetweenDates(start, end);
   }
 
   getActiveOrdersPriceYesterday(): number {
-    const start = startOfDay(addDays(new Date(), -1));
-    const end = startOfDay(new Date());
+    const { start, end } = localDayRange(addDays(new Date(), -1));
     return this.getActiveOrdersPriceBetweenDates(start, end);
   }
 
@@ -174,14 +170,12 @@ export class OrderOfflineService {
   }
 
   getActiveOrdersProfitToday(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.getActiveOrdersProfitBetweenDates(start, end);
   }
 
   getActiveOrdersProfitYesterday(): number {
-    const start = startOfDay(addDays(new Date(), -1));
-    const end = startOfDay(new Date());
+    const { start, end } = localDayRange(addDays(new Date(), -1));
     return this.getActiveOrdersProfitBetweenDates(start, end);
   }
 
@@ -205,8 +199,7 @@ export class OrderOfflineService {
     const data: ChartData[] = [];
     for (let i = 29; i >= 0; i--) {
       const label = addDays(today, -i);
-      const dayStart = startOfDay(label);
-      const dayEnd = startOfDay(addDays(label, 1));
+      const { start: dayStart, end: dayEnd } = localDayRange(label);
       data.push({
         label,
         value: this.getActiveOrdersPriceBetweenDates(dayStart, dayEnd),
@@ -232,8 +225,7 @@ export class OrderOfflineService {
     const data: ChartData[] = [];
     for (let i = 29; i >= 0; i--) {
       const label = addDays(today, -i);
-      const dayStart = startOfDay(label);
-      const dayEnd = startOfDay(addDays(label, 1));
+      const { start: dayStart, end: dayEnd } = localDayRange(label);
       const orderProfit = this.getActiveOrdersProfitBetweenDates(dayStart, dayEnd);
       const dayExpenses = this.expenseService.getActiveExpensesPriceBetweenDates(dayStart, dayEnd);
       data.push({

@@ -10,7 +10,7 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
-import { startOfDay, addDays } from '~/shared/lib/date-utils';
+import { startOfDay, localDayRange } from '~/shared/lib/date-utils';
 import {
   hasAvailableProductToSale,
   type ProductAvailabilityFields,
@@ -176,8 +176,7 @@ export class InventoryOfflineService {
    * never async).
    */
   getInventoryEntriesInDay(_date: Date): BaseResponseModel<InventoryEntryView[]> {
-    const dayStart = startOfDay(new Date());
-    const dayEnd = startOfDay(addDays(new Date(), 1));
+    const { start: dayStart, end: dayEnd } = localDayRange(new Date());
     const entries = this.getActiveInventoryEntriesStorage()
       .filter((v) => v.date >= dayStart && v.date < dayEnd)
       .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -280,8 +279,7 @@ export class InventoryOfflineService {
   }
 
   getInventoryCostTotal(): number {
-    const start = startOfDay(new Date());
-    const end = startOfDay(addDays(new Date(), 1));
+    const { start, end } = localDayRange(new Date());
     return this.getInventoryCostTotalBefore(end);
   }
 
