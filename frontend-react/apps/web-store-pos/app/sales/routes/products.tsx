@@ -212,6 +212,42 @@ export function ProductsPage() {
     void loadData();
   }
 
+  // --- Activate product ---
+  // Mirror of handleDeactivateProduct for an inactive catalog row. ProductService has NO
+  // activateProduct (exact Angular parity surface, untouchable — see packages/domain
+  // src/services/product-service.ts), so activation reuses updateProduct with isActive: true
+  // and the product's own unchanged fields, including its stored barcode (unlike the edit
+  // modal, which deliberately always sends undefined per Angular parity).
+  async function handleActivateProduct(product: Product) {
+    const confirmed = await confirmDialog({
+      title: 'Confirmación para activar',
+      message: '¿Está seguro que desea activar este producto?',
+      confirmButtonText: intl.formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: intl.formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+
+    const result = await productService.updateProduct(
+      product.id,
+      product.categoryId,
+      product.name,
+      product.price,
+      product.businessId,
+      product.order,
+      true,
+      product.availableToSale,
+      product.discountFromInvantory,
+      product.barcode,
+    );
+    if (!result.succeeded) {
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
+      return;
+    }
+
+    setModal(null);
+    void loadData();
+  }
+
   // --- Bulk create (per-category "Nuevo Productos" -> bulk-CREATE, Angular parity) ---
   // Angular parity (edit-products-modal.component.ts:74-107): "Nuevo Productos" bulk-CREATES
   // new products (createProducts) — it never edits existing ones. Angular's onSubmit closes
@@ -501,6 +537,7 @@ export function ProductsPage() {
                       products={categoryProducts}
                       onEditProduct={(product) => setModal({ type: 'edit', product })}
                       onDeactivateProduct={handleDeactivateProduct}
+                      onActivateProduct={handleActivateProduct}
                     />
                   </div>
                 )}

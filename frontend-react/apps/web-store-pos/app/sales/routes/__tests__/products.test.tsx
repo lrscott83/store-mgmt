@@ -712,6 +712,68 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(productServiceSpies.deleteProduct).not.toHaveBeenCalled();
   });
 
+  // An INACTIVE catalog row's menu offers "Activar Producto" (PRODUCT.ACTIVATE_PRODUCT), the
+  // mirror of the deactivate item. ProductService has no activateProduct (exact Angular parity
+  // surface), so activation reuses updateProduct with isActive: true and the product's own
+  // unchanged fields — including its stored barcode (the edit modal's always-undefined barcode
+  // parity does NOT apply here: activation must not wipe an existing barcode).
+  it('confirms via confirmDialog with the hardcoded "activar" copy, then calls updateProduct with isActive: true', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct({ id: 'prod-1', name: 'Sprite', isActive: false, barcode: '7790001' })];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Activar Producto'));
+
+    await waitFor(() =>
+      expect(confirmDialogMock).toHaveBeenCalledWith({
+        title: 'Confirmación para activar',
+        message: '¿Está seguro que desea activar este producto?',
+        confirmButtonText: 'Si',
+        cancelButtonText: 'No',
+      }),
+    );
+    await waitFor(() =>
+      expect(productServiceSpies.updateProduct).toHaveBeenCalledWith(
+        'prod-1',
+        'cat-1',
+        'Sprite',
+        1.5,
+        'biz-1',
+        1,
+        true,
+        true,
+        false,
+        '7790001',
+      ),
+    );
+  });
+
+  it('does NOT call updateProduct when the activation confirmDialog is cancelled', async () => {
+    mockCategories = [makeCategory()];
+    mockProducts = [makeProduct({ id: 'prod-1', isActive: false })];
+    confirmDialogMock.mockResolvedValueOnce(false);
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
+    fireEvent.click(await screen.findByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Activar Producto'));
+
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalled());
+    expect(productServiceSpies.updateProduct).not.toHaveBeenCalled();
+  });
+
   // Angular parity (edit-products-modal.component.ts:74-107): "Nuevo Productos" bulk-CREATES
   // new products via createProducts(categoryId, items), it does NOT edit existing ones (WU3
   // rework — supersedes the former per-item updateProduct-loop test, WU4.4).

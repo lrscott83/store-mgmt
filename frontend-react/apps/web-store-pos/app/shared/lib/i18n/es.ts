@@ -321,6 +321,10 @@ const messages: Record<string, string> = {
   // around. Replaces the removed 'PRODUCT.DELETE_PRODUCT' key, whose only consumer was this
   // same row menu item.
   'PRODUCT.DEACTIVATE_PRODUCT': 'Desactivar Producto',
+  // Mirrors DEACTIVATE_PRODUCT: an inactive catalog row's menu offers the reverse action,
+  // implemented through updateProduct(isActive: true) — no dedicated activateProduct exists
+  // on ProductService (exact Angular parity surface, untouchable).
+  'PRODUCT.ACTIVATE_PRODUCT': 'Activar Producto',
   'PRODUCT.AVAILABLE_TO_SALE': 'Disponible para Vender',
   // PRODUCT.ADD_PRODUCTS (Angular vocabs/es.ts:373) — edit-products-modal title
   // (edit-products-modal.component.html:4).

@@ -39,6 +39,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -53,6 +54,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -66,6 +68,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct({ name: 'Sprite', price: 2 })]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -80,6 +83,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct({ name: 'Sprite', price: 2000 })]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -93,6 +97,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -109,6 +114,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -128,6 +134,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct()]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -145,6 +152,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[product]}
           onEditProduct={onEditProduct}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -162,6 +170,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[product]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={onDeactivateProduct}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -177,6 +186,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct({ id: 'p1', name: 'Sprite', isActive: false })]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
@@ -191,9 +201,61 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
           products={[makeProduct({ id: 'p1', name: 'Coca Cola', isActive: true })]}
           onEditProduct={vi.fn()}
           onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
         />
       </Wrapper>,
     );
     expect(screen.queryByTestId('inactive-badge')).not.toBeInTheDocument();
+  });
+
+  it('offers "Activar Producto" (not "Desactivar Producto") in the menu for an inactive product', () => {
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[makeProduct({ id: 'p1', name: 'Sprite', isActive: false })]}
+          onEditProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByLabelText('Acciones'));
+    expect(screen.getByText('Activar Producto')).toBeInTheDocument();
+    expect(screen.queryByText('Desactivar Producto')).not.toBeInTheDocument();
+  });
+
+  it('renders "Activar Producto" with a success-colored check icon for an inactive product', () => {
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[makeProduct({ id: 'p1', name: 'Sprite', isActive: false })]}
+          onEditProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
+          onActivateProduct={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByLabelText('Acciones'));
+    const activateButton = screen.getByText('Activar Producto').closest('button');
+    expect(activateButton).toHaveClass('text-success');
+    expect(activateButton?.querySelector('svg')).toBeTruthy();
+  });
+
+  it('calls onActivateProduct with the product when "Activar Producto" is clicked', () => {
+    const onActivateProduct = vi.fn();
+    const product = makeProduct({ id: 'p1', name: 'Sprite', isActive: false });
+    render(
+      <Wrapper>
+        <CategoryProductList
+          products={[product]}
+          onEditProduct={vi.fn()}
+          onDeactivateProduct={vi.fn()}
+          onActivateProduct={onActivateProduct}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByLabelText('Acciones'));
+    fireEvent.click(screen.getByText('Activar Producto'));
+    expect(onActivateProduct).toHaveBeenCalledWith(product);
   });
 });
