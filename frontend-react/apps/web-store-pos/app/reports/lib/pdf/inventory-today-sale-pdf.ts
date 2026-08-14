@@ -52,6 +52,9 @@ export interface InventoryTodaySaleRow {
  * Angular's export button is disabled — a bug, not a feature (angular-bugs-policy #511):
  * this port makes the export ACTUALLY WORK, producing and opening a real PDF.
  *
+ * When `filename` is given, the generated blob is downloaded as `<filename>` instead of
+ * being opened — used by the per-day sales-history export (`<dayKey>_ipv.pdf`).
+ *
  * `jspdf`/`jspdf-autotable` are loaded via dynamic `import()` INSIDE this function body
  * (never at module top-level) so they stay out of the main bundle — same code-splitting
  * strategy as `statistics/components/chart-core.tsx` (recharts).
@@ -113,7 +116,10 @@ function drawHeader(doc: jsPDF): void {
   doc.text(TITLE, 300, 100);
 }
 
-export async function exportInventoryTodaySalePdf(rows: InventoryTodaySaleRow[]): Promise<void> {
+export async function exportInventoryTodaySalePdf(
+  rows: InventoryTodaySaleRow[],
+  filename?: string,
+): Promise<void> {
   const { jsPDF: JsPDF } = await import('jspdf');
   const { default: autoTable } = await import('jspdf-autotable');
 
@@ -138,5 +144,15 @@ export async function exportInventoryTodaySalePdf(rows: InventoryTodaySaleRow[])
 
   const pdfBlob = doc.output('blob');
   const pdfUrl = URL.createObjectURL(pdfBlob);
-  window.open(pdfUrl);
+
+  if (filename) {
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } else {
+    window.open(pdfUrl);
+  }
 }

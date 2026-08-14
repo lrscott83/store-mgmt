@@ -47,6 +47,10 @@ describe('exportInventoryTodaySalePdf', () => {
   const windowOpenMock = vi.fn().mockReturnValue(null);
   const originalCreateObjectURL = URL.createObjectURL;
   const originalWindowOpen = window.open;
+  // `vi.spyOn`-created spies to restore in afterEach. NOT restored via
+  // `vi.restoreAllMocks()` — that would also wipe the `vi.fn()` implementations
+  // of jsPDFCtor/mockAutoTable/mockDoc between tests.
+  let documentSpies: Array<{ mockRestore: () => void }> = [];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,11 +60,14 @@ describe('exportInventoryTodaySalePdf', () => {
     windowOpenMock.mockReturnValue(null);
     URL.createObjectURL = createObjectURLMock;
     window.open = windowOpenMock;
+    documentSpies = [];
   });
 
   afterEach(() => {
     URL.createObjectURL = originalCreateObjectURL;
     window.open = originalWindowOpen;
+    for (const spy of documentSpies) spy.mockRestore();
+    documentSpies = [];
   });
 
   it('PDF-01: does not import jspdf/jspdf-autotable modules until the export function is actually invoked', async () => {
@@ -151,6 +158,37 @@ describe('exportInventoryTodaySalePdf', () => {
 
     expect(mockDoc.output).toHaveBeenCalledWith('blob');
     expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(windowOpenMock).toHaveBeenCalledWith('blob:mock-url');
+  });
+
+  it('PDF-08: filename given → downloads via a temporary <a download="...">, never window.open', async () => {
+    const { exportInventoryTodaySalePdf } = await import('./inventory-today-sale-pdf');
+
+    const clickMock = vi.fn();
+    const removeMock = vi.fn();
+    const link = { href: '', download: '', click: clickMock, remove: removeMock } as unknown as HTMLAnchorElement;
+    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(link as unknown as HTMLElement);
+    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => link as unknown as Node);
+    documentSpies.push(createElementSpy, appendSpy);
+
+    await exportInventoryTodaySalePdf([makeRow()], '2026-07-22_ipv.pdf');
+
+    expect(createElementSpy).toHaveBeenCalledWith('a');
+    expect(link.href).toBe('blob:mock-url');
+    expect(link.download).toBe('2026-07-22_ipv.pdf');
+    expect(appendSpy).toHaveBeenCalledWith(link);
+    expect(clickMock).toHaveBeenCalledTimes(1);
+    expect(removeMock).toHaveBeenCalledTimes(1);
+    expect(windowOpenMock).not.toHaveBeenCalled();
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('PDF-09: no filename → legacy window.open download path is preserved', async () => {
+    const { exportInventoryTodaySalePdf } = await import('./inventory-today-sale-pdf');
+
+    await exportInventoryTodaySalePdf([makeRow()]);
+
+    expect(mockDoc.output).toHaveBeenCalledWith('blob');
     expect(windowOpenMock).toHaveBeenCalledWith('blob:mock-url');
   });
 });

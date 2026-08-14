@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Order } from '@store-mgmt/domain';
+import type { InventoryEntry, Order } from '@store-mgmt/domain';
 import { EFeatures, PaymentType } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatLocalDate } from '~/shared/lib/date-utils';
+import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
+import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-rows-for-date';
+import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
+import { ProductRepository } from '../lib/repositories/product-repository';
+import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import { OrderList } from '../components/order-list';
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
@@ -83,6 +89,31 @@ export function OrdersPage() {
       return next;
     });
   }
+
+  // Per-day "Inventario a precio de venta" export: rebuilds the 13-column
+  // inventory-at-sale-price ledger faithfully reconstructed for the day group
+  // (same aggregation as generateProductRows, but scoped to `dayKey` — entries
+  // restored to their end-of-day stock via the FIFO productCosts ledger). The
+  // report counts ALL active orders, matching the today report (isActive only).
+  const handleGenerateDayReport = useCallback(
+    async (dayKey: string) => {
+      const categoryRepository = new ProductCategoryRepository(storeId);
+      const productRepository = new ProductRepository(storeId, categoryRepository);
+      const orderService = new OrderOfflineService(storeId);
+      const inventoryService = new InventoryOfflineService(storeId, productRepository);
+
+      const products = productRepository.getAvailableProducts();
+      const orders = orderService.getStorageOrders().filter((o) => o.isActive);
+      const entriesByProduct = new Map<string, InventoryEntry[]>();
+      for (const product of products) {
+        entriesByProduct.set(product.id, inventoryService.getProductInventoriesByProductId(product.id));
+      }
+
+      const rows = generateProductRowsForDate({ products, orders, entriesByProduct, dayKey });
+      await exportInventoryTodaySalePdf(rows, `${dayKey}_ipv.pdf`);
+    },
+    [storeId],
+  );
 
   const ordersCount = dateOrders.reduce((count, d) => count + d.count, 0);
   const ordersTotal = dateOrders.reduce((total, d) => total + d.total, 0);
@@ -174,21 +205,36 @@ export function OrdersPage() {
           const isExpanded = expandedDateIds.has(dateId);
           return (
             <div key={dateId} className="rounded-lg border border-border bg-surface">
-              <button
-                type="button"
-                onClick={() => toggleDatePanel(dateId)}
-                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-                data-testid={`date-panel-toggle-${dateId}`}
-                aria-expanded={isExpanded}
-              >
-                <span className="text-sm font-medium text-text">
-                  {formatLocalDate(dateOrder.date)} ({dateOrder.count})
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
-                  <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
-                </span>
-              </button>
+              <div className="flex items-center gap-2 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => toggleDatePanel(dateId)}
+                  className="flex w-full items-center justify-between gap-4 text-left"
+                  data-testid={`date-panel-toggle-${dateId}`}
+                  aria-expanded={isExpanded}
+                >
+                  <span className="text-sm font-medium text-text">
+                    {formatLocalDate(dateOrder.date)} ({dateOrder.count})
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
+                    <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
+                  </span>
+                </button>
+                <ActionMenu
+                  testId={`day-actions-toggle-${dateId}`}
+                  label="Opciones del día"
+                  widthClass="min-w-52"
+                >
+                  <ActionMenuItem
+                    intent="edit"
+                    onClick={() => handleGenerateDayReport(dateId)}
+                    data-testid={`day-report-button-${dateId}`}
+                  >
+                    {intl.formatMessage({ id: 'REPORT.INVENTORY_TODAY_SALE' })}
+                  </ActionMenuItem>
+                </ActionMenu>
+              </div>
               {isExpanded && (
                 <div className="border-t border-border px-4 py-3">
                   <OrderList orders={dateOrder.orders} />
