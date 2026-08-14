@@ -178,7 +178,7 @@ export function DashboardPage() {
 
       {/* KPI cards — Angular dashboard.component.html:24-84 (literal, untranslated titles).
           Angular lays them out as two `.row`s of two `.col`s each → two cards per row. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4">
         <KpiCard
           title="Ventas Hoy"
           value={(salePriceToday / divisor).toFixed(2)}
