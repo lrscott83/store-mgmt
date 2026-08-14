@@ -8,7 +8,8 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
-import { formatLocalDate, formatLocalDateKey } from '~/shared/lib/date-utils';
+import { formatLocalDate, fromLocalDayKey, groupByLocalDay } from '~/shared/lib/date-utils';
+import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { showBlockingInfo } from '~/shared/lib/blocking-alert';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-rows-for-date';
@@ -20,37 +21,11 @@ import { OrderList } from '../components/order-list';
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
-interface DateOrder {
-  date: Date;
-  orders: Order[];
-  count: number;
-  total: number;
-}
-
 const PAYMENT_TYPE_OPTIONS = [
   { value: PaymentType.Efectivo, label: 'Efectivo' },
   { value: PaymentType.Tarjeta, label: 'Tarjeta' },
   { value: PaymentType.Zelle, label: 'Zelle' },
 ];
-
-function groupOrders(orders: Order[]): DateOrder[] {
-  const groups = new Map<string, Order[]>();
-  orders.forEach((order) => {
-    const groupId = formatLocalDateKey(new Date(order.date));
-    const collection = groups.get(groupId);
-    if (collection) collection.push(order);
-    else groups.set(groupId, [order]);
-  });
-
-  const dateOrders: DateOrder[] = Array.from(groups.values()).map((groupOrders) => ({
-    date: groupOrders[0].date,
-    orders: [...groupOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-    count: groupOrders.length,
-    total: groupOrders.reduce((total, o) => total + o.total, 0),
-  }));
-
-  return dateOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-}
 
 /**
  * Matches Angular's `orders.component.html` (Historial de Ventas): payment-type
@@ -62,7 +37,7 @@ function groupOrders(orders: Order[]): DateOrder[] {
 export function OrdersPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
-  const [dateOrders, setDateOrders] = useState<DateOrder[]>([]);
+  const [groups, setGroups] = useState<LocalDayGroup<Order>[]>([]);
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
   const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
   const [isCredit, setIsCredit] = useState<number>(-1);
@@ -74,7 +49,9 @@ export function OrdersPage() {
       .filter((o) => o.isActive)
       .filter((o) => !paymentType || paymentType === o.paymentType)
       .filter((o) => isCredit === -1 || (isCredit === 1 && o.isCredit) || (isCredit === 0 && !o.isCredit));
-    setDateOrders(groupOrders(filtered));
+    setGroups(
+      groupByLocalDay(filtered, (o) => new Date(o.date), (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    );
   }
 
   useEffect(() => {
@@ -95,9 +72,10 @@ export function OrdersPage() {
   // inventory-at-sale-price ledger faithfully reconstructed for the LOCAL day group
   // (same aggregation as generateProductRows, but scoped to `day` — entries restored
   // to their end-of-day stock via the FIFO productCosts ledger). `dateId` is the
-  // LOCAL `yyyy-mm-dd` grouping key; it is parsed into a local-noon Date (noon avoids
-  // DST boundary edges) and reused verbatim for the filename. The report counts ALL
-  // active orders, matching the today report (isActive only).
+  // LOCAL `yyyy-mm-dd` grouping key; it is parsed back into the local midnight via
+  // `fromLocalDayKey` (the generator snaps with `startOfDay` anyway) and reused
+  // verbatim for the filename. The report counts ALL active orders, matching the
+  // today report (isActive only).
   const handleGenerateDayReport = useCallback(
     async (dateId: string) => {
       const categoryRepository = new ProductCategoryRepository(storeId);
@@ -112,14 +90,11 @@ export function OrdersPage() {
         inventories.set(product.id, inventoryService.getProductInventoriesByProductId(product.id));
       }
 
-      const [year, month, day] = dateId.split('-');
-      const dayDate = new Date(Number(year), Number(month) - 1, Number(day), 12);
-
       const { rows, suspectProductNames } = generateProductRowsForDate({
         products,
         orders,
         inventories,
-        day: dayDate,
+        day: fromLocalDayKey(dateId),
       });
       if (suspectProductNames.length > 0) {
         showBlockingInfo(
@@ -135,8 +110,8 @@ export function OrdersPage() {
     [storeId, intl],
   );
 
-  const ordersCount = dateOrders.reduce((count, d) => count + d.count, 0);
-  const ordersTotal = dateOrders.reduce((total, d) => total + d.total, 0);
+  const ordersCount = groups.reduce((count, g) => count + g.items.length, 0);
+  const ordersTotal = groups.reduce((total, g) => total + g.items.reduce((t, o) => t + o.total, 0), 0);
 
   return (
     <Card
@@ -212,7 +187,7 @@ export function OrdersPage() {
         </label>
       </fieldset>
 
-      {dateOrders.length === 0 && (
+      {groups.length === 0 && (
         <InfoBox variant="primary" className="mb-6 text-center">
           {/* ORDERS.NO_ORDERS_FOUND */}
           {intl.formatMessage({ id: 'ORDERS.NO_ORDERS_FOUND' })}
@@ -220,8 +195,8 @@ export function OrdersPage() {
       )}
 
       <div className="space-y-2">
-        {dateOrders.map((dateOrder) => {
-          const dateId = formatLocalDateKey(new Date(dateOrder.date));
+        {groups.map((g) => {
+          const dateId = g.dayKey;
           const isExpanded = expandedDateIds.has(dateId);
           return (
             <div key={dateId} className="rounded-lg border border-border bg-surface">
@@ -234,10 +209,12 @@ export function OrdersPage() {
                   aria-expanded={isExpanded}
                 >
                   <span className="text-sm font-medium text-text">
-                    {formatLocalDate(dateOrder.date)} ({dateOrder.count})
+                    {formatLocalDate(g.date)} ({g.items.length})
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-text">${dateOrder.total.toFixed(2)}</span>
+                    <span className="text-sm font-semibold text-text">
+                      ${g.items.reduce((t, o) => t + o.total, 0).toFixed(2)}
+                    </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>
                 </button>
@@ -257,7 +234,7 @@ export function OrdersPage() {
               </div>
               {isExpanded && (
                 <div className="border-t border-border px-4 py-3">
-                  <OrderList orders={dateOrder.orders} />
+                  <OrderList orders={g.items} />
                 </div>
               )}
             </div>

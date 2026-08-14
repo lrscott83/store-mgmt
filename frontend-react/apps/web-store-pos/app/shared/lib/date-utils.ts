@@ -74,16 +74,67 @@ export function formatLocalDate(date: Date): string {
 }
 
 /**
- * Returns the LOCAL calendar date as `yyyy-mm-dd` (zero-padded) — local
- * `getFullYear`/`getMonth`/`getDate`, NOT `toISOString` (which is UTC).
- * The canonical grouping key for the sales-history day panels: grouping must
- * agree with the local day windows (`startOfDay`/`addDays`) the offline
- * services use, so an evening transaction (e.g. 22:00 local at a negative UTC
- * offset) lands under ITS calendar day, not tomorrow's UTC key.
+ * Calendar-day key of an instant in the VIEWER's LOCAL timezone; agrees by
+ * construction with startOfDay and formatLocalDate. Do NOT use
+ * toISOString().split('T')[0] — it projects onto the UTC calendar day, so a
+ * 23:00 transaction under a negative offset keys to the NEXT day while being
+ * filtered and displayed as the current one.
  */
-export function formatLocalDateKey(date: Date): string {
+export function toLocalDayKey(date: Date): string {
   const d = new Date(date);
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/** Inverse of `toLocalDayKey`: the LOCAL midnight that opens the given day key. */
+export function fromLocalDayKey(dayKey: string): Date {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/** The half-open local-day window `[midnight, next midnight)` used by every day filter. */
+export function localDayRange(date: Date): { start: Date; end: Date } {
+  const start = startOfDay(date);
+  return { start, end: addDays(start, 1) };
+}
+
+/** True when `instant` falls on the same LOCAL calendar day as `day`. */
+export function isInLocalDay(instant: Date, day: Date): boolean {
+  const { start, end } = localDayRange(day);
+  return instant >= start && instant < end;
+}
+
+export interface LocalDayGroup<T> {
+  /** `YYYY-MM-DD` in local time — stable, sortable, and safe as a DOM id. */
+  dayKey: string;
+  /** Local midnight of the group's day. NOT the first item's instant: the day itself. */
+  date: Date;
+  items: T[];
+}
+
+/**
+ * Groups items by their LOCAL calendar day, newest day first.
+ * `dayKey` sorts lexicographically in chronological order (that is the point of
+ * `YYYY-MM-DD`), so no date arithmetic is needed to order the groups.
+ */
+export function groupByLocalDay<T>(
+  items: T[],
+  getDate: (item: T) => Date,
+  compareItems?: (a: T, b: T) => number,
+): LocalDayGroup<T>[] {
+  const buckets = new Map<string, T[]>();
+  for (const item of items) {
+    const key = toLocalDayKey(new Date(getDate(item)));
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(item);
+    else buckets.set(key, [item]);
+  }
+  return [...buckets.entries()]
+    .map(([dayKey, groupItems]) => ({
+      dayKey,
+      date: fromLocalDayKey(dayKey),
+      items: compareItems ? [...groupItems].sort(compareItems) : groupItems,
+    }))
+    .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
 }

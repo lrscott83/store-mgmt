@@ -1,5 +1,5 @@
 import type { InventoryEntry, Order, Product } from '@store-mgmt/domain';
-import { addDays, startOfDay } from '~/shared/lib/date-utils';
+import { isInLocalDay, localDayRange } from '~/shared/lib/date-utils';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
 
 /**
@@ -33,8 +33,8 @@ export interface DayReportResult {
  * `generateProductRowsForDate` — per-day sibling of `generateProductRows`
  * (generate-product-rows.ts): rebuilds the same 13-column inventory-at-sale-price
  * ledger for ONE past LOCAL day instead of today. Every column reflects THAT day's
- * data, never current stock. The day window is `[startOfDay(day), addDays(startOfDay(day), 1))`
- * — the same LOCAL boundaries the offline day services (`getActiveOrdersInDay`,
+ * data, never current stock. The day window is `localDayRange(day)` — the same
+ * LOCAL boundaries the offline day services (`getActiveOrdersInDay`,
  * `getInventoryEntriesInDay`, ...) use, so the view's grouping and the report agree.
  *
  * The day's own columns (entrada, vendido, precioVenta, ...) come only from
@@ -57,9 +57,8 @@ export interface DayReportResult {
 export function generateProductRowsForDate(input: GenerateProductRowsForDateInput): DayReportResult {
   const { products, orders, inventories, day } = input;
 
-  const dayStart = startOfDay(day);
-  const dayEnd = addDays(dayStart, 1);
-  const isInDay = (d: Date): boolean => d >= dayStart && d < dayEnd;
+  const { start: dayStart, end: dayEnd } = localDayRange(day);
+  const isInDay = (d: Date): boolean => isInLocalDay(d, day);
 
   const dayOrders = orders.filter((o) => o.isActive && isInDay(o.date));
   const afterDayOrders = orders.filter((o) => o.isActive && o.date >= dayEnd);

@@ -4,7 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { OrderType, PaymentType } from '@store-mgmt/domain';
 import type { InventoryEntry, Order, Product } from '@store-mgmt/domain';
-import { formatLocalDateKey } from '~/shared/lib/date-utils';
+import { toLocalDayKey } from '~/shared/lib/date-utils';
 import { OrdersPage } from '../orders';
 
 // --- Mutable in-memory fixtures, controlled per-test ---
@@ -182,7 +182,7 @@ describe('OrdersPage — per-day inventory-at-sale-price export', () => {
       day: Date;
     };
     // The generator receives the LOCAL noon Date whose local key matches the group.
-    expect(formatLocalDateKey(generateInput.day)).toBe('2026-01-01');
+    expect(toLocalDayKey(generateInput.day)).toBe('2026-01-01');
     expect(generateInput.inventories).toBeInstanceOf(Map);
     expect(generateInput.inventories.get('p1')).toEqual(fixtures.entries['p1'] ?? []);
     // The report counts ALL active orders (isActive only), matching the today report —
@@ -211,7 +211,7 @@ describe('OrdersPage — per-day inventory-at-sale-price export', () => {
     await waitFor(() => expect(fixtures.exportPdf).toHaveBeenCalledTimes(1));
 
     const generateInput = fixtures.generateRows.mock.calls[0][0] as { day: Date };
-    expect(formatLocalDateKey(generateInput.day)).toBe('2026-01-02');
+    expect(toLocalDayKey(generateInput.day)).toBe('2026-01-02');
     expect(fixtures.exportPdf).toHaveBeenCalledWith(expect.anything(), '2026-01-02_ipv.pdf');
   });
 
