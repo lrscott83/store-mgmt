@@ -90,7 +90,7 @@ describe('PaymentBanner — trial notice (PorVencer/EnGracia + isInTrial=true)',
     mockUser = makeUser({ paymentStatus: 'PorVencer', isInTrial: true, paymentDueDate: '2026-08-15' });
     await renderBanner();
     expect(
-      screen.getByText('Se encuentra en el período de prueba gratuita. El primer cobro del plan pago será el 15/08/2026.'),
+      screen.getByText('Probando el plan de pago. El primer cobro del plan pago será el 15/08/2026.'),
     ).toBeInTheDocument();
   });
 
@@ -98,7 +98,7 @@ describe('PaymentBanner — trial notice (PorVencer/EnGracia + isInTrial=true)',
     mockUser = makeUser({ paymentStatus: 'EnGracia', isInTrial: true, paymentDueDate: '2026-09-01' });
     await renderBanner();
     expect(
-      screen.getByText('Se encuentra en el período de prueba gratuita. El primer cobro del plan pago será el 01/09/2026.'),
+      screen.getByText('Probando el plan de pago. El primer cobro del plan pago será el 01/09/2026.'),
     ).toBeInTheDocument();
   });
 });

@@ -688,7 +688,7 @@ const messages: Record<string, string> = {
   'STORES.DISAPPROVE_CONFIRM_MESSAGE': '¿Está seguro que desea desaprobar esta tienda?',
 
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)
-  'BILLING.TRIAL_NOTICE': 'Se encuentra en el período de prueba gratuita. El primer cobro del plan pago será el {date}.',
+  'BILLING.TRIAL_NOTICE': 'Probando el plan de pago. El primer cobro del plan pago será el {date}.',
   'BILLING.DUE_NOTICE': 'El pago del plan vence el {date}. Realice el pago para evitar interrupciones en el servicio.',
   'BILLING.OVERDUE_NOTICE': 'El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.',
 

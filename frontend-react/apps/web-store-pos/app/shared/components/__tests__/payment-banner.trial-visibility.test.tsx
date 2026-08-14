@@ -85,7 +85,7 @@ describe('PaymentBanner — trial is visible while the plan is AlDia (the real t
     await renderBanner();
     expect(
       screen.getByText(
-        'Se encuentra en el período de prueba gratuita. El primer cobro del plan pago será el 04/10/2026.',
+        'Probando el plan de pago. El primer cobro del plan pago será el 04/10/2026.',
       ),
     ).toBeInTheDocument();
   });
