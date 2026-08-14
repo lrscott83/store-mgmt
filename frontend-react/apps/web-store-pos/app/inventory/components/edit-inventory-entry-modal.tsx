@@ -189,6 +189,7 @@ export function EditInventoryEntryModal({
                 type="text"
                 role="combobox"
                 autoComplete="off"
+                autoFocus
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);

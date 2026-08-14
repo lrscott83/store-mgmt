@@ -783,6 +783,17 @@ const THREE_PRODUCTS = {
 };
 
 describe('EditInventoryEntryModal — searchable product combobox filters while typing', () => {
+  // The add-entry popup puts initial focus on the product field so the user can
+  // start typing immediately (autoFocus on the combobox input).
+  it('focuses the product combobox when the modal opens', () => {
+    render(
+      <Wrapper>
+        <EditInventoryEntryModal isOpen onClose={vi.fn()} onSave={vi.fn()} storeId="s1" />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('combobox')).toHaveFocus();
+  });
+
   it('shows all options when opened with an empty query', async () => {
     vi.mocked(ProductOfflineService).mockImplementationOnce(
       () => THREE_PRODUCTS as unknown as InstanceType<typeof ProductOfflineService>,
