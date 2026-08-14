@@ -1659,6 +1659,33 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.getAllByTestId('inactive-badge')).toHaveLength(1);
   });
 
+  // REGRESSION GUARD: an inactive category's actions menu must stay fully legible. The
+  // opacity-60 used to sit on the header-row WRAPPER, which also dims the CategoryActionsMenu
+  // gear AND its dropdown (both render inside the header) — making the menu look disabled.
+  // The dim now lives on the toggle button (content) only, mirroring the product-row fix.
+  it('dims an inactive category header content, not its actions menu wrapper', async () => {
+    mockCategories = [makeCategory({ id: 'cat-1', name: 'Descontinuados', isActive: false })];
+
+    render(
+      <Wrapper>
+        <ProductsPage />
+      </Wrapper>,
+    );
+
+    const toggle = await screen.findByTestId('category-panel-toggle-cat-1');
+    // Content (toggle button) carries the inactive dim.
+    expect(toggle.className).toContain('opacity-60');
+    // The header-row wrapper (parent of toggle, gear, chevron) must NOT carry it — if it did,
+    // the gear dropdown would inherit the opacity and be unreadable.
+    const headerRow = toggle.parentElement;
+    expect(headerRow?.className ?? '').not.toContain('opacity-60');
+    // The gear and its dropdown stay reachable and undimmed.
+    fireEvent.click(screen.getByTestId('category-actions-toggle-cat-1'));
+    expect(screen.getByTestId('edit-category-button')).toBeInTheDocument();
+    expect(screen.getByTestId('add-product-button')).toBeInTheDocument();
+    expect(screen.getByTestId('add-products-button')).toBeInTheDocument();
+  });
+
   it('lists inactive products inside an expanded panel, marked', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [
