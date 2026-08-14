@@ -92,4 +92,49 @@ describe('RosterExportPanel — offline-device-provisioning "Admin export action
     });
     expect(serializeRosterMock).toHaveBeenCalledWith(bundle, 'master', 's1');
   });
+
+  // The export action opens a POPUP (password + Confirm/Close) instead of an
+  // inline form — mirroring the import-roster flow's password entry.
+  it('opens a popup dialog with the master-password field and Confirm/Close buttons', () => {
+    renderPanel();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /exportar roster sin conexión/i }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText(/contraseña maestra/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^confirmar$/i })).toBeInTheDocument();
+    // Two close controls: the header ✕ (aria-label "Cerrar") and the footer button
+    // whose visible text is "Cerrar".
+    expect(screen.getAllByRole('button', { name: /^cerrar$/i })).toHaveLength(2);
+    expect(screen.getByText('Cerrar')).toBeInTheDocument();
+  });
+
+  it('closes the popup without exporting when Cerrar is clicked', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: /exportar roster sin conexión/i }));
+    fireEvent.change(screen.getByLabelText(/contraseña maestra/i), { target: { value: 'master' } });
+    // Footer close button: the one whose VISIBLE text is "Cerrar" (the header ✕
+    // only carries it as aria-label).
+    fireEvent.click(screen.getByText('Cerrar'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(getOfflineRosterMock).not.toHaveBeenCalled();
+    expect(serializeRosterMock).not.toHaveBeenCalled();
+  });
+
+  it('closes the popup when clicking the overlay backdrop', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: /exportar roster sin conexión/i }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(dialog);
+    // Clicking the overlay itself (not a child) closes the popup.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows the empty-password error inside the popup and does not export', async () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: /exportar roster sin conexión/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^confirmar$/i }));
+    expect(screen.getByText('La contraseña no puede estar vacía.')).toBeInTheDocument();
+    expect(getOfflineRosterMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
 });

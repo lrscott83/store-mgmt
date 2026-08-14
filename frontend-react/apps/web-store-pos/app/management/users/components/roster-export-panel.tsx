@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
+import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { EyeIcon, EyeOffIcon, DownloadIcon } from '~/shared/components/ui/icons';
+import { CloseIcon, EyeIcon, EyeOffIcon, DownloadIcon } from '~/shared/components/ui/icons';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { rosterHttpService } from '~/shared/lib/http/roster-http-service';
@@ -13,6 +14,9 @@ import { serializeRoster } from '~/shared/lib/offline/roster-serializer';
  * A DEDICATED component (design's File Changes table + orchestrator
  * resolution) rather than inline in `user-list.tsx`, keeping the list page
  * thin.
+ *
+ * UX: the export action opens a POPUP (password + Confirm/Close), mirroring
+ * the import-roster flow's password entry instead of an inline form.
  *
  * WU14 correction: `GET /v1/storeusers/{storeId}/offline-roster` DOES exist
  * server-side — `StoreUsersController.cs` implements exactly this route.
@@ -66,8 +70,14 @@ export function RosterExportPanel() {
     }
   }
 
-  if (!open) {
-    return (
+  function handleClose() {
+    setOpen(false);
+    setMaster('');
+    setError('');
+  }
+
+  return (
+    <>
       <Button
         type="button"
         variant="outline"
@@ -77,37 +87,77 @@ export function RosterExportPanel() {
         <DownloadIcon className="h-4 w-4" />
         {intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}
       </Button>
-    );
-  }
 
-  return (
-    <form onSubmit={handleConfirm} className="flex items-center gap-2">
-      <div className="relative">
-        <input
-          id="roster-export-master"
-          type={showPassword ? 'text' : 'password'}
-          value={master}
-          onChange={(e) => setMaster(e.target.value)}
-          disabled={busy}
-          aria-label={intl.formatMessage({ id: 'PROVISION.MASTER_PASSWORD_LABEL' })}
-          className="rounded border border-border px-3 py-1.5 pr-9 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
-        />
-        <button
-          type="button"
-          onClick={() => setShowPassword((visible) => !visible)}
-          aria-label={intl.formatMessage({
-            id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
-          })}
-          className="absolute inset-y-0 right-0 flex items-center px-2 text-text-muted hover:text-text"
+      {open && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClose();
+          }}
         >
-          {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-        </button>
-      </div>
-      <Button type="submit" variant="primary" disabled={busy}>
-        {intl.formatMessage({ id: 'GENERAL.CONFIRM' })}
-      </Button>
-      {error && <InfoBox variant="danger">{error}</InfoBox>}
-    </form>
+          <div className="w-full max-w-md">
+            <Card
+              title={
+                <div className="flex items-center justify-between">
+                  <span>{intl.formatMessage({ id: 'USERS.EXPORT_ROSTER' })}</span>
+                  <button
+                    onClick={handleClose}
+                    className="text-text-muted hover:text-text"
+                    aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              }
+            >
+              <form onSubmit={handleConfirm} className="space-y-3">
+                <div>
+                  <label htmlFor="roster-export-master" className="mb-1 block text-sm font-medium text-text">
+                    {intl.formatMessage({ id: 'PROVISION.MASTER_PASSWORD_LABEL' })}
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="roster-export-master"
+                      type={showPassword ? 'text' : 'password'}
+                      value={master}
+                      onChange={(e) => setMaster(e.target.value)}
+                      disabled={busy}
+                      aria-label={intl.formatMessage({ id: 'PROVISION.MASTER_PASSWORD_LABEL' })}
+                      className="w-full rounded border border-border px-3 py-2 pr-10 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      aria-label={intl.formatMessage({
+                        id: showPassword ? 'SYNC.HIDE_PASSWORD' : 'SYNC.SHOW_PASSWORD',
+                      })}
+                      className="absolute inset-y-0 right-0 flex items-center px-2 text-text-muted hover:text-text"
+                    >
+                      {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && <InfoBox variant="danger">{error}</InfoBox>}
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="fab" onClick={handleClose}>
+                    <CloseIcon />
+                    {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+                  </Button>
+                  <Button type="submit" variant="primary" disabled={busy}>
+                    {intl.formatMessage({ id: 'GENERAL.CONFIRM' })}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
