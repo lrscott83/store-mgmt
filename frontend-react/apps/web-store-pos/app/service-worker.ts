@@ -103,8 +103,18 @@ self.addEventListener('fetch', (event) => {
   // cache-first: a miss falls through to a network fetch attempt (which
   // fails offline) rather than crashing — pwa-offline-shell spec, "Cache
   // miss on a static asset does not crash the worker".
+  //
+  // `ignoreVary: true` is required for precached assets: the server's `Vary`
+  // header (nginx: `Accept-Encoding`; vite preview: `Origin`) makes
+  // `caches.match(request)` reject entries whose request differs from the
+  // one that stored them — modulepreload requests arrive with `mode: cors`
+  // plus an `Origin` header, so a `Vary: Origin` response stored without an
+  // Origin request MISSes and falls through to `fetch()` (offline →
+  // ERR_FAILED). Precache entries are exactly the bytes this manifest
+  // describes; `Vary` negotiation must not invalidate them (workbox's
+  // precache strategies use ignoreVary for the same reason).
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(request, { ignoreVary: true }).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
         if (response.ok) {
