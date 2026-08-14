@@ -30,43 +30,28 @@ export interface DayReportResult {
 }
 
 /**
- * `generateProductRowsForDate` — per-day sibling of `generateProductRows`
- * (generate-product-rows.ts): rebuilds the same 13-column inventory-at-sale-price
- * ledger for ONE past LOCAL day instead of today. Every column reflects THAT day's
- * data, never current stock. The day window is `localDayRange(day)` — the same
- * LOCAL boundaries the offline day services (`getActiveOrdersInDay`,
- * `getInventoryEntriesInDay`, ...) use, so the view's grouping and the report agree.
- *
- * The day's own columns (entrada, vendido, precioVenta, ...) come only from
- * orders and entries inside that local window. Stock reconstruction is the mirror
- * image of the FIFO ledger: for an entry `e` created on or before the day,
- * `availableAtEndOfDay(e) = e.available + consumedAfter(e)`, where `consumedAfter(e)`
- * is the sum of `productCosts.quantity` for `e.id` across active orders dated strictly
- * AFTER the day — the consumption recorded at sale time that the FIFO decrements have
- * since subtracted from `e.available`. Adding it back restores the entry to what it
- * held at the end of the day.
- *
- * Suspect detection: an entry is suspect when it was touched (`updatedDate`) on/after
- * the day, or its reconstructed stock exceeds its received `quantity`. Suspect products
- * are surfaced (not clamped away) so the user can judge the reconstruction themselves.
- *
- * Reduce-to-today invariant: with `day` equal to today (local), the rows are identical
- * to `generateProductRows` called with equivalent service fakes built from the same data
- * (pinned by generate-product-rows-for-date.test.ts).
+ * The day's own orders — active orders whose `date` falls inside the LOCAL
+ * calendar window of `day` (via `isInLocalDay`). They drive the day's sold
+ * (`vendido`) and sale-price (`precioVenta`/`importeVenta`) columns.
  */
-export function generateProductRowsForDate(input: GenerateProductRowsForDateInput): DayReportResult {
-  const { products, orders, inventories, day } = input;
+export function getActiveOrdersOfDay(orders: Order[], day: Date): Order[] {
+  return orders.filter((o) => o.isActive && isInLocalDay(o.date, day));
+}
 
-  const { start: dayStart, end: dayEnd } = localDayRange(day);
-  const isInDay = (d: Date): boolean => isInLocalDay(d, day);
-
-  const dayOrders = orders.filter((o) => o.isActive && isInDay(o.date));
-  const afterDayOrders = orders.filter((o) => o.isActive && o.date >= dayEnd);
-
-  // Per-entry quantity consumed by active orders dated strictly AFTER the day — keyed by
-  // entry id so the FIFO consumption ledger can be reversed for any entry.
+/**
+ * FIFO consumption ledger reversal — the quantity of each inventory entry sold
+ * by ACTIVE orders dated strictly AFTER the day (`date >= dayEnd`, the day's
+ * closing local midnight), summed per `cost.inventoryId` across every
+ * `orderItems[].productCosts`. The consumption recorded at sale time is exactly
+ * what the FIFO decrements have since subtracted from the entry's live
+ * `available`; adding it back restores the entry to what it held at the end of
+ * the day.
+ */
+export function getConsumedAfterDayByEntry(orders: Order[], day: Date): ReadonlyMap<string, number> {
+  const { end: dayEnd } = localDayRange(day);
   const consumedAfterByEntry = new Map<string, number>();
-  for (const order of afterDayOrders) {
+  for (const order of orders) {
+    if (!order.isActive || order.date < dayEnd) continue;
     for (const item of order.orderItems) {
       for (const cost of item.productCosts) {
         consumedAfterByEntry.set(
@@ -76,19 +61,97 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
       }
     }
   }
+  return consumedAfterByEntry;
+}
 
-  // `updatedDate` is typed `Date | undefined` on the domain model, but inventory revival
-  // hydrates only `date` — an edited/deactivated entry's `updatedDate` may still be the
-  // RAW stored string. `new Date` accepts both, so parse defensively and bail on anything
-  // absent or unparseable (a "touched after" signal we cannot read is not evidence).
-  const wasTouchedAfter = (entry: InventoryEntry, threshold: Date): boolean => {
-    if (entry.updatedDate === undefined) return false;
-    const parsed = new Date(entry.updatedDate);
-    return !Number.isNaN(parsed.getTime()) && parsed >= threshold;
-  };
+/**
+ * True when an entry was "touched" on or after `threshold`.
+ *
+ * `updatedDate` is typed `Date | undefined` on the domain model, but inventory revival
+ * hydrates only `date` — an edited/deactivated entry's `updatedDate` may still be the
+ * RAW stored string. `new Date` accepts both, so parse defensively and bail on anything
+ * absent or unparseable (a "touched after" signal we cannot read is not evidence).
+ */
+export function wasTouchedAfter(entry: InventoryEntry, threshold: Date): boolean {
+  if (entry.updatedDate === undefined) return false;
+  const parsed = new Date(entry.updatedDate);
+  return !Number.isNaN(parsed.getTime()) && parsed >= threshold;
+}
 
-  const availableAtEndOfDay = (entry: InventoryEntry): number =>
-    entry.available + (consumedAfterByEntry.get(entry.id) ?? 0);
+/**
+ * Reconstructed end-of-day stock of an entry: its live `available` plus whatever
+ * {@link getConsumedAfterDayByEntry} recorded for its id (a missing key leaves the
+ * available untouched — `?? 0`).
+ */
+export function availableAtEndOfDay(
+  entry: InventoryEntry,
+  consumedAfterByEntry: ReadonlyMap<string, number>,
+): number {
+  return entry.available + (consumedAfterByEntry.get(entry.id) ?? 0);
+}
+
+/**
+ * An inventory entry as it stood at the close of a LOCAL day: the raw entry plus
+ * its reconstructed end-of-day stock (see {@link availableAtEndOfDay}).
+ */
+export interface EntryAtDay {
+  entry: InventoryEntry;
+  availableAtEndOfDay: number;
+}
+
+/**
+ * The stock snapshot for a day: every entry that EXISTED by the day
+ * (`date < dayEnd`, the day's closing local midnight — entries dated on the day
+ * itself are included), each carrying its reconstructed end-of-day stock.
+ */
+export function reconstructEntriesAtDay(
+  entries: InventoryEntry[],
+  day: Date,
+  consumedAfterByEntry: ReadonlyMap<string, number>,
+): EntryAtDay[] {
+  const { end: dayEnd } = localDayRange(day);
+  return entries
+    .filter((e) => e.date < dayEnd)
+    .map((entry) => ({ entry, availableAtEndOfDay: availableAtEndOfDay(entry, consumedAfterByEntry) }));
+}
+
+/**
+ * `generateProductRowsForDate` — per-day sibling of `generateProductRows`
+ * (generate-product-rows.ts): rebuilds the same 13-column inventory-at-sale-price
+ * ledger for ONE past LOCAL day instead of today. Every column reflects THAT day's
+ * data, never current stock. The day window is `localDayRange(day)` — the same
+ * LOCAL boundaries the offline day services (`getActiveOrdersInDay`,
+ * `getInventoryEntriesInDay`, ...) use, so the view's grouping and the report agree.
+ * It is composed from the exported helpers above (`getActiveOrdersOfDay`,
+ * `getConsumedAfterDayByEntry`, `wasTouchedAfter`, `availableAtEndOfDay`,
+ * `reconstructEntriesAtDay`), so the reconstruction math is unit-testable on its own.
+ *
+ * The day's own columns (entrada, vendido, precioVenta, ...) come only from
+ * orders and entries inside that local window. Stock reconstruction is the mirror
+ * image of the FIFO ledger: for an entry `e` created on or before the day,
+ * `availableAtEndOfDay(e) = e.available + consumedAfter(e)`, where `consumedAfter(e)`
+ * (from `getConsumedAfterDayByEntry`) is the sum of `productCosts.quantity` for `e.id`
+ * across active orders dated strictly AFTER the day — the consumption recorded at sale
+ * time that the FIFO decrements have since subtracted from `e.available`. Adding it back
+ * restores the entry to what it held at the end of the day (`reconstructEntriesAtDay`).
+ *
+ * Suspect detection: an entry is suspect when it was touched (`updatedDate`, see
+ * `wasTouchedAfter`) on/after the day, or its reconstructed stock exceeds its received
+ * `quantity`. Suspect products are surfaced (not clamped away) so the user can judge the
+ * reconstruction themselves.
+ *
+ * Reduce-to-today invariant: with `day` equal to today (local), the rows are identical
+ * to `generateProductRows` called with equivalent service fakes built from the same data
+ * (pinned by generate-product-rows-for-date.test.ts).
+ */
+export function generateProductRowsForDate(input: GenerateProductRowsForDateInput): DayReportResult {
+  const { products, orders, inventories, day } = input;
+
+  const { end: dayEnd } = localDayRange(day);
+  const isInDay = (d: Date): boolean => isInLocalDay(d, day);
+
+  const dayOrders = getActiveOrdersOfDay(orders, day);
+  const consumedAfterByEntry = getConsumedAfterDayByEntry(orders, day);
 
   const suspectProductNames: string[] = [];
 
@@ -100,17 +163,17 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
     const importeVenta = vendido * precioVenta;
 
     const entries = inventories.get(prod.id) ?? [];
-    const existedByDay = entries.filter((e) => e.date < dayEnd);
+    const entriesAtDay = reconstructEntriesAtDay(entries, day, consumedAfterByEntry);
 
     // `available` (the "Final" basis) sums reconstructed end-of-day stock ONLY over
     // active entries — inactive rows never contribute. Suspects are flagged, not clamped.
     let available = 0;
     let isSuspect = false;
-    for (const entry of existedByDay) {
-      if (wasTouchedAfter(entry, dayEnd) || availableAtEndOfDay(entry) > entry.quantity) {
+    for (const atDay of entriesAtDay) {
+      if (wasTouchedAfter(atDay.entry, dayEnd) || atDay.availableAtEndOfDay > atDay.entry.quantity) {
         isSuspect = true;
       }
-      if (entry.isActive) available += availableAtEndOfDay(entry);
+      if (atDay.entry.isActive) available += atDay.availableAtEndOfDay;
     }
     if (isSuspect) suspectProductNames.push(prod.name);
 
@@ -121,11 +184,11 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
 
     // Cost entries mirror the today report: any entry existing by the day with positive
     // end-of-day stock (no isActive filter), weighted by RECEIVED quantity.
-    const costEntries = existedByDay.filter((e) => availableAtEndOfDay(e) > 0);
+    const costEntries = entriesAtDay.filter((x) => x.availableAtEndOfDay > 0);
     const costoUnitario =
       costEntries.length > 0
-        ? costEntries.reduce((total, e) => total + e.costPrice * e.quantity, 0) /
-          costEntries.reduce((total, e) => total + e.quantity, 0)
+        ? costEntries.reduce((total, x) => total + x.entry.costPrice * x.entry.quantity, 0) /
+          costEntries.reduce((total, x) => total + x.entry.quantity, 0)
         : 0;
     const costoTotal = vendido * costoUnitario;
     const cpVenta = importeVenta > 0 ? costoTotal / importeVenta : 0;

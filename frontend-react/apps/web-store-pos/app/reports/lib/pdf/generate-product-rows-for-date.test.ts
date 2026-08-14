@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest';
 import type { InventoryEntry, InventoryEntryView, Order, Product } from '@store-mgmt/domain';
 import { OrderType, PaymentType, success } from '@store-mgmt/domain';
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
-import { generateProductRowsForDate } from './generate-product-rows-for-date';
+import { localDayRange } from '~/shared/lib/date-utils';
+import {
+  availableAtEndOfDay,
+  generateProductRowsForDate,
+  getActiveOrdersOfDay,
+  getConsumedAfterDayByEntry,
+  reconstructEntriesAtDay,
+  wasTouchedAfter,
+} from './generate-product-rows-for-date';
 import { generateProductRows } from './generate-product-rows';
 
 // Local-noon fixtures — `new Date(2026, 6, 22, 12)` is the SAME calendar day in every
@@ -436,5 +444,109 @@ describe('generateProductRowsForDate', () => {
 
     expect(result.rows).toEqual(rowsToday);
     expect(result.suspectProductNames).toEqual([]);
+  });
+});
+
+describe('day-report reconstruction helpers', () => {
+  it('HELPER-01: getActiveOrdersOfDay — includes active orders at 23:00 local of the day, excludes next-day 00:30 and inactive', () => {
+    const lateDayOrder = makeOrder(new Date(2026, 6, 22, 23, 0, 0), [makeOrderItem()], 'o-late');
+    const nextDayOrder = makeOrder(new Date(2026, 6, 23, 0, 30, 0), [makeOrderItem()], 'o-next');
+    const inactiveOrder = { ...makeOrder(DURING_DATE, [makeOrderItem()], 'o-inactive'), isActive: false };
+
+    const result = getActiveOrdersOfDay([lateDayOrder, nextDayOrder, inactiveOrder], DAY);
+
+    expect(result).toEqual([lateDayOrder]);
+  });
+
+  it('HELPER-02: getConsumedAfterDayByEntry — sums productCosts.quantity per inventoryId across active after-day orders only', () => {
+    const afterOrder = makeOrder(
+      new Date(2026, 6, 23, 10, 0, 0),
+      [
+        makeOrderItem({
+          productId: 'p1',
+          quantity: 1,
+          price: 10,
+          productCosts: [
+            { inventoryId: 'e1', costPrice: 2, quantity: 3 },
+            { inventoryId: 'e2', costPrice: 3, quantity: 4 },
+          ],
+        }),
+      ],
+      'o-after',
+    );
+    const dayOrder = makeOrder(
+      DURING_DATE,
+      [
+        makeOrderItem({
+          productId: 'p1',
+          quantity: 1,
+          price: 10,
+          productCosts: [{ inventoryId: 'e1', costPrice: 2, quantity: 99 }],
+        }),
+      ],
+      'o-day',
+    );
+    const inactiveAfterOrder = {
+      ...makeOrder(
+        new Date(2026, 6, 23, 11, 0, 0),
+        [
+          makeOrderItem({
+            productId: 'p1',
+            quantity: 1,
+            price: 10,
+            productCosts: [{ inventoryId: 'e3', costPrice: 1, quantity: 7 }],
+          }),
+        ],
+        'o-inactive',
+      ),
+      isActive: false,
+    };
+
+    const consumed = getConsumedAfterDayByEntry([afterOrder, dayOrder, inactiveAfterOrder], DAY);
+
+    expect(consumed).toBeInstanceOf(Map);
+    expect(consumed.get('e1')).toBe(3);
+    expect(consumed.get('e2')).toBe(4);
+    expect(consumed.get('e3')).toBeUndefined();
+    expect(consumed.get('e-missing')).toBeUndefined();
+  });
+
+  it('HELPER-03: wasTouchedAfter — parses updatedDate defensively against the threshold', () => {
+    const threshold = localDayRange(DAY).end;
+    const touchedOn = makeInventoryEntry({ updatedDate: new Date(2026, 6, 23, 10, 0, 0) });
+    // Raw-string `updatedDate` (inventory revival hydrates only `date`) round-trips
+    // through `toISOString()` to the same instant, timezone-independently.
+    const rawString = makeInventoryEntry({ updatedDate: new Date(2026, 6, 23, 10, 0, 0).toISOString() as unknown as Date });
+    const touchedBefore = makeInventoryEntry({ updatedDate: new Date(2026, 6, 22, 10, 0, 0) });
+    const unparseable = makeInventoryEntry({ updatedDate: 'not-a-date' as unknown as Date });
+    const absent = makeInventoryEntry();
+
+    expect(wasTouchedAfter(touchedOn, threshold)).toBe(true);
+    expect(wasTouchedAfter(rawString, threshold)).toBe(true);
+    expect(wasTouchedAfter(touchedBefore, threshold)).toBe(false);
+    expect(wasTouchedAfter(unparseable, threshold)).toBe(false);
+    expect(wasTouchedAfter(absent, threshold)).toBe(false);
+  });
+
+  it('HELPER-04: availableAtEndOfDay — adds the mapped consumption; missing key keeps entry.available', () => {
+    const entry = makeInventoryEntry({ id: 'e1', available: 5 });
+
+    expect(availableAtEndOfDay(entry, new Map<string, number>([['e1', 7]]))).toBe(12);
+    expect(availableAtEndOfDay(entry, new Map<string, number>())).toBe(5);
+  });
+
+  it('HELPER-05: reconstructEntriesAtDay — only entries dated before dayEnd, each with reconstructed stock', () => {
+    const eBefore = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 4 });
+    const eDuring = makeInventoryEntry({ id: 'e2', date: DURING_DATE, quantity: 5, available: 5 });
+    const eAtDayEnd = makeInventoryEntry({ id: 'e4', date: localDayRange(DAY).end, quantity: 2, available: 2 });
+    const eAfter = makeInventoryEntry({ id: 'e3', date: AFTER_DATE, quantity: 3, available: 3 });
+    const consumed = new Map<string, number>([['e1', 6]]);
+
+    const atDay = reconstructEntriesAtDay([eBefore, eDuring, eAtDayEnd, eAfter], DAY, consumed);
+
+    expect(atDay).toHaveLength(2);
+    expect(atDay.map((x) => x.entry.id)).toEqual(['e1', 'e2']);
+    expect(atDay[0]).toEqual({ entry: eBefore, availableAtEndOfDay: 10 });
+    expect(atDay[1]).toEqual({ entry: eDuring, availableAtEndOfDay: 5 });
   });
 });
