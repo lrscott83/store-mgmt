@@ -39,6 +39,24 @@ export function getActiveOrdersOfDay(orders: Order[], day: Date): Order[] {
 }
 
 /**
+ * The day's own inventory entries: every ACTIVE entry dated inside the LOCAL day,
+ * collected across every product bucket. Mirrors `getActiveOrdersOfDay` for the
+ * "entrada" column source.
+ */
+export function getEntriesOfDay(
+  inventories: ReadonlyMap<string, InventoryEntry[]>,
+  day: Date,
+): InventoryEntry[] {
+  const result: InventoryEntry[] = [];
+  for (const entries of inventories.values()) {
+    for (const entry of entries) {
+      if (entry.isActive && isInLocalDay(entry.date, day)) result.push(entry);
+    }
+  }
+  return result;
+}
+
+/**
  * FIFO consumption ledger reversal — the quantity of each inventory entry sold
  * by ACTIVE orders dated strictly AFTER the day (`date >= dayEnd`, the day's
  * closing local midnight), summed per `cost.inventoryId` across every
@@ -93,16 +111,22 @@ export function availableAtEndOfDay(
 /**
  * An inventory entry as it stood at the close of a LOCAL day: the raw entry plus
  * its reconstructed end-of-day stock (see {@link availableAtEndOfDay}).
+ *
+ * `isSuspect` flags an entry that was touched on/after the day's closing midnight
+ * (`wasTouchedAfter`) or whose reconstructed stock exceeds its received `quantity` —
+ * flagged, never clamped.
  */
 export interface EntryAtDay {
   entry: InventoryEntry;
   availableAtEndOfDay: number;
+  isSuspect: boolean;
 }
 
 /**
  * The stock snapshot for a day: every entry that EXISTED by the day
  * (`date < dayEnd`, the day's closing local midnight — entries dated on the day
- * itself are included), each carrying its reconstructed end-of-day stock.
+ * itself are included), each carrying its reconstructed end-of-day stock and the
+ * `isSuspect` flag (see {@link EntryAtDay}).
  */
 export function reconstructEntriesAtDay(
   entries: InventoryEntry[],
@@ -112,7 +136,12 @@ export function reconstructEntriesAtDay(
   const { end: dayEnd } = localDayRange(day);
   return entries
     .filter((e) => e.date < dayEnd)
-    .map((entry) => ({ entry, availableAtEndOfDay: availableAtEndOfDay(entry, consumedAfterByEntry) }));
+    .map((entry) => ({
+      entry,
+      availableAtEndOfDay: availableAtEndOfDay(entry, consumedAfterByEntry),
+      isSuspect:
+        wasTouchedAfter(entry, dayEnd) || availableAtEndOfDay(entry, consumedAfterByEntry) > entry.quantity,
+    }));
 }
 
 /**
@@ -135,10 +164,10 @@ export function reconstructEntriesAtDay(
  * time that the FIFO decrements have since subtracted from `e.available`. Adding it back
  * restores the entry to what it held at the end of the day (`reconstructEntriesAtDay`).
  *
- * Suspect detection: an entry is suspect when it was touched (`updatedDate`, see
- * `wasTouchedAfter`) on/after the day, or its reconstructed stock exceeds its received
- * `quantity`. Suspect products are surfaced (not clamped away) so the user can judge the
- * reconstruction themselves.
+ * Suspect detection: `reconstructEntriesAtDay` flags an entry (its `isSuspect`) when it was
+ * touched (`updatedDate`, see `wasTouchedAfter`) on/after the day, or its reconstructed stock
+ * exceeds its received `quantity`. Suspect products are surfaced (not clamped away) so the
+ * user can judge the reconstruction themselves.
  *
  * Reduce-to-today invariant: with `day` equal to today (local), the rows are identical
  * to `generateProductRows` called with equivalent service fakes built from the same data
@@ -147,7 +176,6 @@ export function reconstructEntriesAtDay(
 export function generateProductRowsForDate(input: GenerateProductRowsForDateInput): DayReportResult {
   const { products, orders, inventories, day } = input;
 
-  const { end: dayEnd } = localDayRange(day);
   const isInDay = (d: Date): boolean => isInLocalDay(d, day);
 
   const dayOrders = getActiveOrdersOfDay(orders, day);
@@ -170,9 +198,7 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
     let available = 0;
     let isSuspect = false;
     for (const atDay of entriesAtDay) {
-      if (wasTouchedAfter(atDay.entry, dayEnd) || atDay.availableAtEndOfDay > atDay.entry.quantity) {
-        isSuspect = true;
-      }
+      if (atDay.isSuspect) isSuspect = true;
       if (atDay.entry.isActive) available += atDay.availableAtEndOfDay;
     }
     if (isSuspect) suspectProductNames.push(prod.name);

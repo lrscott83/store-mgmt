@@ -8,6 +8,7 @@ import {
   generateProductRowsForDate,
   getActiveOrdersOfDay,
   getConsumedAfterDayByEntry,
+  getEntriesOfDay,
   reconstructEntriesAtDay,
   wasTouchedAfter,
 } from './generate-product-rows-for-date';
@@ -546,7 +547,214 @@ describe('day-report reconstruction helpers', () => {
 
     expect(atDay).toHaveLength(2);
     expect(atDay.map((x) => x.entry.id)).toEqual(['e1', 'e2']);
-    expect(atDay[0]).toEqual({ entry: eBefore, availableAtEndOfDay: 10 });
-    expect(atDay[1]).toEqual({ entry: eDuring, availableAtEndOfDay: 5 });
+    expect(atDay[0]).toEqual({ entry: eBefore, availableAtEndOfDay: 10, isSuspect: false });
+    expect(atDay[1]).toEqual({ entry: eDuring, availableAtEndOfDay: 5, isSuspect: false });
+  });
+});
+
+describe('ported reference suite (reconstructEntriesAtDay + getActiveOrdersOfDay + getEntriesOfDay)', () => {
+  it('REC-01: adds back the units consumed by ACTIVE orders placed after the target day', () => {
+    const entry = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 2 });
+    const laterOrder = makeOrder(
+      AFTER_DATE,
+      [
+        makeOrderItem({
+          productId: 'p1',
+          quantity: 5,
+          price: 10,
+          productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 5 }],
+        }),
+      ],
+      'o-later',
+    );
+    const consumed = getConsumedAfterDayByEntry([laterOrder], DAY);
+    const [atDay] = reconstructEntriesAtDay([entry], DAY, consumed);
+    expect(atDay.availableAtEndOfDay).toBe(7);
+    // Falsification: without the replay this would be today's leftover.
+    expect(atDay.availableAtEndOfDay).not.toBe(2);
+  });
+
+  it('REC-02: orders placed WITHIN the target day are NOT replayed — the report shows stock at close of day', () => {
+    const entry = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 2 });
+    const sameDayOrder = makeOrder(
+      DURING_DATE,
+      [
+        makeOrderItem({
+          productId: 'p1',
+          quantity: 5,
+          price: 10,
+          productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 5 }],
+        }),
+      ],
+      'o-day',
+    );
+    const consumed = getConsumedAfterDayByEntry([sameDayOrder], DAY);
+    const [atDay] = reconstructEntriesAtDay([entry], DAY, consumed);
+    expect(atDay.availableAtEndOfDay).toBe(2);
+  });
+
+  it('REC-03: deactivated orders are NOT replayed — their stock was already returned by increaseQuantitiesByOrderItems', () => {
+    const entry = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 10, available: 2 });
+    const cancelled = makeOrder(
+      AFTER_DATE,
+      [
+        makeOrderItem({
+          productId: 'p1',
+          quantity: 5,
+          price: 10,
+          productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 5 }],
+        }),
+      ],
+      'o-cancelled',
+    );
+    const consumed = getConsumedAfterDayByEntry([{ ...cancelled, isActive: false }], DAY);
+    const [atDay] = reconstructEntriesAtDay([entry], DAY, consumed);
+    // Counting it would double-refund and report 7 units that never existed.
+    expect(atDay.availableAtEndOfDay).toBe(2);
+  });
+
+  it('REC-04: entries created AFTER the target day are excluded — they did not exist yet', () => {
+    const old = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE });
+    const future = makeInventoryEntry({ id: 'e2', date: AFTER_DATE });
+    const atDay = reconstructEntriesAtDay([old, future], DAY, new Map());
+    expect(atDay.map((x) => x.entry.id)).toEqual(['e1']);
+  });
+
+  it('REC-05: consumption is attributed per inventoryId — another entry\'s sales do not leak in', () => {
+    const e1 = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, available: 2 });
+    const e2 = makeInventoryEntry({ id: 'e2', date: BEFORE_DATE, available: 3 });
+    const order = makeOrder(
+      AFTER_DATE,
+      [
+        makeOrderItem({
+          productId: 'p1',
+          quantity: 5,
+          price: 10,
+          productCosts: [{ inventoryId: 'e2', costPrice: 4, quantity: 5 }],
+        }),
+      ],
+      'o-after',
+    );
+    const consumed = getConsumedAfterDayByEntry([order], DAY);
+    const byId = new Map(
+      reconstructEntriesAtDay([e1, e2], DAY, consumed).map((x) => [x.entry.id, x.availableAtEndOfDay]),
+    );
+    expect(byId.get('e1')).toBe(2);
+    expect(byId.get('e2')).toBe(8);
+  });
+
+  it('REC-06: consumption accumulates across several orders and several items hitting the same entry', () => {
+    const entry = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 20, available: 1 });
+    const orders = [
+      makeOrder(
+        AFTER_DATE,
+        [
+          makeOrderItem({ productId: 'p1', productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 3 }] }),
+          makeOrderItem({ productId: 'p1', productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 2 }] }),
+        ],
+        'o-1',
+      ),
+      makeOrder(
+        AFTER_DATE,
+        [makeOrderItem({ productId: 'p1', productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 4 }] })],
+        'o-2',
+      ),
+    ];
+    const consumed = getConsumedAfterDayByEntry(orders, DAY);
+    const [atDay] = reconstructEntriesAtDay([entry], DAY, consumed);
+    expect(atDay.availableAtEndOfDay).toBe(10);
+  });
+
+  it('REC-07: flags as suspect an entry whose updatedDate — a RAW STRING in storage — is after the target day', () => {
+    const entry = makeInventoryEntry({
+      id: 'e1',
+      date: BEFORE_DATE,
+      // The inventory revival hydrates only `date`; updatedDate stays a string.
+      updatedDate: new Date(2026, 6, 23, 10, 0, 0).toISOString() as unknown as Date,
+    });
+    const [atDay] = reconstructEntriesAtDay([entry], DAY, new Map());
+    expect(atDay.isSuspect).toBe(true);
+  });
+
+  it('REC-08: an entry edited BEFORE the target day, or never edited, is not suspect', () => {
+    const edited = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, updatedDate: new Date(2026, 6, 20, 10, 0, 0) });
+    const untouched = makeInventoryEntry({ id: 'e2', date: BEFORE_DATE, updatedDate: undefined });
+    const atDay = reconstructEntriesAtDay([edited, untouched], DAY, new Map());
+    expect(atDay.every((x) => !x.isSuspect)).toBe(true);
+  });
+
+  it('REC-09: a replay exceeding the entry quantity is flagged, NOT clamped — the signature of a later amortizeSoldEntry', () => {
+    // amortizeSoldEntry zeroed `available` and dropped `quantity` from 10 to 4.
+    const amortized = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, quantity: 4, available: 0 });
+    const order = makeOrder(
+      AFTER_DATE,
+      [
+        makeOrderItem({
+          productId: 'p1',
+          quantity: 6,
+          price: 10,
+          productCosts: [{ inventoryId: 'e1', costPrice: 4, quantity: 6 }],
+        }),
+      ],
+      'o-after',
+    );
+    const consumed = getConsumedAfterDayByEntry([order], DAY);
+    const [atDay] = reconstructEntriesAtDay([amortized], DAY, consumed);
+    expect(atDay.availableAtEndOfDay).toBe(6);
+    expect(atDay.isSuspect).toBe(true);
+  });
+
+  it('REC-10: does not mutate the entries or the map it receives', () => {
+    const entry = makeInventoryEntry({ id: 'e1', date: BEFORE_DATE, available: 2 });
+    const entries = [entry];
+    const consumed = new Map<string, number>([['e1', 5]]);
+    reconstructEntriesAtDay(entries, DAY, consumed);
+    expect(entry.available).toBe(2);
+    expect(entries).toHaveLength(1);
+    expect(consumed.get('e1')).toBe(5);
+  });
+
+  it('DAY-01: returns only the orders of the requested day — NOT today', () => {
+    const orders = [makeOrder(BEFORE_DATE, [makeOrderItem()], 'o-before'), makeOrder(DURING_DATE, [makeOrderItem()], 'o-day')];
+    const result = getActiveOrdersOfDay(orders, DAY);
+    expect(result).toHaveLength(1);
+    expect(result[0].date).toBe(DURING_DATE);
+  });
+
+  it('DAY-02: excludes inactive orders', () => {
+    const orders = [{ ...makeOrder(DURING_DATE, [makeOrderItem()], 'o-inactive'), isActive: false }];
+    expect(getActiveOrdersOfDay(orders, DAY)).toHaveLength(0);
+  });
+
+  it('DAY-03: the window is [local midnight, next local midnight) — inclusive start, exclusive end', () => {
+    const atMidnight = new Date(2026, 6, 22, 0, 0, 0, 0);
+    const lastMillisecond = new Date(2026, 6, 22, 23, 59, 59, 999);
+    const nextMidnight = new Date(2026, 6, 23, 0, 0, 0, 0);
+    const orders = [atMidnight, lastMillisecond, nextMidnight].map((d) => makeOrder(d, [makeOrderItem()]));
+    const result = getActiveOrdersOfDay(orders, DAY);
+    expect(result.map((o) => o.date)).toEqual([atMidnight, lastMillisecond]);
+  });
+
+  it('DAY-04: returns only the active entries created on the requested day', () => {
+    const map = new Map<string, InventoryEntry[]>([
+      [
+        'p1',
+        [
+          makeInventoryEntry({ id: 'e1', productId: 'p1', date: DURING_DATE }),
+          makeInventoryEntry({ id: 'e2', productId: 'p1', date: new Date(2026, 6, 23, 10, 0, 0) }),
+          makeInventoryEntry({ id: 'e3', productId: 'p1', date: new Date(2026, 6, 20, 10, 0, 0) }),
+          makeInventoryEntry({ id: 'e4', productId: 'p1', date: DURING_DATE, isActive: false }),
+        ],
+      ],
+    ]);
+    expect(getEntriesOfDay(map, DAY).map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('DAY-05: collects entries across every product bucket', () => {
+    const map = new Map<string, InventoryEntry[]>([
+      ['p1', [makeInventoryEntry({ id: 'e1', productId: 'p1', date: DURING_DATE })]],
+      ['p2', [makeInventoryEntry({ id: 'e2', productId: 'p2', date: DURING_DATE })]],
+    ]);
+    expect(getEntriesOfDay(map, DAY)).toHaveLength(2);
   });
 });
