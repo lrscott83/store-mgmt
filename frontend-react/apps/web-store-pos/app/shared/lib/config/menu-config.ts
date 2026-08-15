@@ -85,7 +85,9 @@ export const MENU_GROUPS: MenuGroup[] = [
     groupLabel: 'MENU.MANAGEMENT',
     moduleId: EModules.Management,
     items: [
-      { label: 'MENU.STORES', path: '/management/stores', featureIds: [EFeatures.Stores], moduleId: EModules.Management },
+      // Plan/update split: two entries, same authorization (EFeatures.Stores).
+      { label: 'MENU.STORES_PLAN', path: '/management/stores', featureIds: [EFeatures.Stores], moduleId: EModules.Management },
+      { label: 'MENU.STORES_UPDATE', path: '/management/stores/update', featureIds: [EFeatures.Stores], moduleId: EModules.Management },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management },
       { label: 'MENU.CONFIGURATIONS', path: '/management/configurations', featureIds: [EFeatures.Configurations], moduleId: EModules.Management },
     ],

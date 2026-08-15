@@ -7,6 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserCreateForm } from '~/management/users/components/UserCreateForm';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Users]);
 
@@ -24,7 +25,10 @@ export function UserCreatePage() {
 
   useEffect(() => {
     if (!resolvedStoreId) {
-      navigate('/management/stores');
+      // Plan/update split: the index URL is now the PLAN view. A user without
+      // a selected store is sent to the CREATE form (same destination the
+      // index URL used to render for them).
+      navigate('/management/stores/create');
     }
   }, [resolvedStoreId, navigate]);
 
@@ -49,8 +53,8 @@ export function UserCreatePage() {
         roleIds: [ERoles.StoreUser],
       });
       navigate('/management/users');
-    } catch {
-      setError(intl.formatMessage({ id: 'USERS.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'USERS.ERROR') }));
     } finally {
       setIsLoading(false);
     }

@@ -273,4 +273,26 @@ public class UpdateStoreCommandHandlerLockTests
         // Assert
         result.Succeeded.Should().BeTrue();
     }
+
+    // ── Task: data-only update (ModuleIds null) ──────────────────────────────
+
+    [Fact]
+    public async Task Handle_OwnerAdminDataOnlyUpdateOnPaidStore_DoesNotFireLockOrTouchModules()
+    {
+        // The update view saves store data WITHOUT ModuleIds: the DG-7 lock must
+        // not fire (no module change is requested) and the module sync must be
+        // skipped entirely — the plan is untouched.
+        var command = new UpdateStoreCommand(
+            _storeId, "Renamed", null, null, Approved: false,
+            ModuleIds: null, IsActive: true);
+        ArrangePaidStoreOwnerAdmin(new List<int>());
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        _mockStoreModuleRepository.Verify(
+            x => x.GetStoreModulesByIdAsync(_storeId), Times.Never);
+    }
 }

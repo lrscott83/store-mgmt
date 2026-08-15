@@ -27,7 +27,11 @@ const PAID_ACTIVATE_TEXT = 'Activar este plan'; // es.ts:643
 const WILL_ACTIVATE_TEXT = 'Se activará al guardar'; // es.ts:644
 const ACTIVE_BADGE_TEXT = 'Activo'; // es.ts:639
 const SELECTED_TEXT = 'Plan seleccionado'; // es.ts:642
-const STORES_ERROR_TEXT = 'Ocurrió un error. Intente de nuevo.'; // es.ts:632
+// GENERAL.OFFLINE (es.ts:34) — the plan view classifies a network cut as an
+// OFFLINE failure via httpErrorKey (api-client tags requests with no server
+// response), so the load-failure alert carries the connection message, not
+// the generic STORES.ERROR.
+const STORES_OFFLINE_TEXT = 'Sin conexión. Se requiere conexión a internet.'; // es.ts:34
 
 test.use({ persona: 'owner-admin' });
 
@@ -219,27 +223,32 @@ test('OwnerAdmin activa el plan pago una sola vez', async ({ signedInPage, login
  * not touch the store's data (D5), so no shared state, no ordering
  * dependency between the two tests.
  *
- * Intercepts `GET /v1/modules/ToStore` — the narrowest of the three
- * `Promise.all` requests (`edit-store.tsx:49-53`) — and aborts it at the
- * origin. This is NOT a mock: `abort()` fabricates no response body; it
- * reproduces a network condition a real environment produces every day
- * (design.md D5, precedent `login.spec.ts:351`: "the honest simulation of
- * 'the server is not there' is cutting the request at the origin").
+ * Intercepts `GET /v1/modules/ToStore` — one of the two plan-view requests
+ * (`store-plan.tsx`) — and aborts it at the origin. This is NOT a mock:
+ * `abort()` fabricates no response body; it reproduces a network condition
+ * a real environment produces every day (design.md D5, precedent
+ * `login.spec.ts:351`: "the honest simulation of 'the server is not there'
+ * is cutting the request at the origin").
  *
- * Covers the `.catch()` branch at `edit-store.tsx:80-82`.
+ * The network cut is classified by `httpErrorKey` as an OFFLINE failure
+ * (api-client tags requests with no server response), so the plan page
+ * shows the connection message (GENERAL.OFFLINE) — NOT the generic
+ * STORES.ERROR. Either way the form never mounts.
+ *
+ * Covers the `.catch()` branch at `store-plan.tsx`.
  *
  * G1 — DECLARED GAP, not disguised: this does NOT cover the
- * `succeeded === false` branch (`edit-store.tsx:55-58`) that S2-01.md's
- * assertion 11 literally cites. Reaching that branch needs a fabricated
- * 200 response body — a real mock — which design.md D5 rejects. See
+ * `succeeded === false` branch that S2-01.md's assertion 11 literally
+ * cites. Reaching that branch needs a fabricated 200 response body — a
+ * real mock — which design.md D5 rejects. See
  * docs/testing/e2e-stage-1/S2-01.md and README.md.
  */
-test('fallo de carga muestra STORES.ERROR y no monta el formulario', async ({ signedInPage }) => {
+test('fallo de carga por red muestra el mensaje de conexión y no monta el formulario', async ({ signedInPage }) => {
   const { page } = signedInPage;
 
   await page.route('**/v1/modules/ToStore', (route) => route.abort());
   await page.goto('/management/stores');
 
-  await expect(page.getByRole('alert')).toHaveText(STORES_ERROR_TEXT);
+  await expect(page.getByRole('alert')).toHaveText(STORES_OFFLINE_TEXT);
   await expect(page.locator('#store-name')).toHaveCount(0);
 });

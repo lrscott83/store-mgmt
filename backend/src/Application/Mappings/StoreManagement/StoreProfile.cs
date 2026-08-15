@@ -20,6 +20,12 @@ namespace Application.Mappings.StoreManagement
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.Owner.User.FullName))
                 .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
 
+            CreateMap<Store, StorePlanDto>()
+                .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
+                .ForMember(dest => dest.StoreId, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Name))
+                .ForMember(dest => dest.Modules, opt => opt.MapFrom(src => src.StoreModules));
+
             CreateMap<Store, OwnerStoreModuleDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
                 .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Name))

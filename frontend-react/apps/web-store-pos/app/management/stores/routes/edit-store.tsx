@@ -1,30 +1,49 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useIntl } from 'react-intl';
-import { EFeatures } from '@store-mgmt/domain';
+import { EFeatures, success } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasOwnersAvailableFeature } from '~/shared/lib/auth/authorization-service';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreForm } from '~/management/stores/components/store-form';
-import { success } from '@store-mgmt/domain';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
+import { mergeStoreModules } from '~/management/stores/lib/store-modules';
 import type { Store, Module, Owner } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
 
+interface EditStorePageProps {
+  /**
+   * Plan split (management stores): the store-DATA update view passes false —
+   * the PlanPicker is not rendered, the module catalog is not fetched, and the
+   * save omits `moduleIds` (backend leaves the plan untouched). Create mode
+   * always includes the plan (module selection happens at birth). Defaults to
+   * true.
+   */
+  includePlan?: boolean;
+}
+
 /**
- * Unified edit-store route — Angular parity (edit-store.component.ts:53, getHeader():62-63).
- * All three `/management/stores*` URLs render THIS component: `storeId` resolves from the
- * route param first, falling back to `user.selectedStoreId`. Truthiness of `storeId` alone
- * decides create vs. edit — NOT the URL. This intentionally means a store-admin with a
- * `selectedStoreId` hitting `/management/stores/create` lands in EDIT mode of their own
- * store, matching Angular byte-for-byte (`params.id || currentUser.selectedStoreId`).
+ * Unified create/update-store page — Angular parity (edit-store.component.ts:53,
+ * getHeader():62-63). `storeId` resolves from the route param first, falling
+ * back to `user.selectedStoreId`. Truthiness of `storeId` alone decides create
+ * vs. edit — NOT the URL. This intentionally means a store-admin with a
+ * `selectedStoreId` hitting `/management/stores/create` lands in EDIT mode of
+ * their own store, matching Angular byte-for-byte (`params.id ||
+ * currentUser.selectedStoreId`).
  *
- * HTTP-only data access (Req: HTTP-Only Data Access): Angular's `store.service.ts` is pure
- * HTTP with no local cache — no `BaseRepository`/offline-cache layer here either, and no
- * offline/degraded notice at any connectivity state.
+ * Route split: `management/stores/create` renders this page with the plan
+ * (creation needs module selection); `management/stores/update` and
+ * `management/stores/edit/:id` render it with `includePlan={false}` via the
+ * thin UpdateStorePage wrapper. The PLAN view itself lives on its own page
+ * (`store-plan.tsx`) at `management/stores`.
+ *
+ * HTTP-only data access (Req: HTTP-Only Data Access): Angular's `store.service.ts`
+ * is pure HTTP with no local cache — no `BaseRepository`/offline-cache layer
+ * here either, and no offline/degraded notice at any connectivity state.
  */
-export function EditStorePage() {
+export function EditStorePage({ includePlan = true }: EditStorePageProps) {
   const intl = useIntl();
   const navigate = useNavigate();
   const { id: paramId } = useParams<{ id: string }>();
@@ -48,7 +67,9 @@ export function EditStorePage() {
     if (isEditMode) {
       Promise.all([
         storeHttpService.getStore(storeId),
-        storeHttpService.getModulesToStore(),
+        includePlan
+          ? storeHttpService.getModulesToStore()
+          : Promise.resolve(success([] as Module[])),
         (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve(success([] as Owner[])),
       ])
         .then(([storeRes, modulesRes, ownersRes]) => {
@@ -57,30 +78,18 @@ export function EditStorePage() {
             return;
           }
           const fetchedStore = storeRes.data;
-          // Merge store.modules into catalog: selected=true, override price overrides
-          const storeModuleIds = new Set(fetchedStore.modules.map((m) => m.id));
-          const mergedModules = modulesRes.data.map((m) => {
-            const storeModule = fetchedStore.modules.find((sm) => sm.id === m.id);
-            if (storeModule) {
-              return {
-                ...m,
-                selected: true,
-                currentPrice: storeModule.currentPrice,
-                price: storeModule.price,
-                discountText: storeModule.discountText,
-              };
-            }
-            return { ...m, selected: storeModuleIds.has(m.id) };
-          });
+          // Merge store.modules into catalog: selected=true, price overrides
           setStore(fetchedStore);
-          setModules(mergedModules);
+          setModules(
+            includePlan ? mergeStoreModules(modulesRes.data, fetchedStore.modules) : []
+          );
           setOwners(ownersRes.data);
           setLoadError('');
         })
-        .catch(() => {
-          setLoadError(intl.formatMessage({ id: 'STORES.ERROR' }));
+        .catch((error) => {
+          setLoadError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
         });
-    } else {
+    } else if (includePlan) {
       Promise.all([
         storeHttpService.getModulesToStore(),
         (isSuperAdmin || isOwnerAdmin) ? storeHttpService.listOwners() : Promise.resolve(success([] as Owner[])),
@@ -94,11 +103,13 @@ export function EditStorePage() {
           setOwners(ownersRes.data);
           setCatalogError('');
         })
-        .catch(() => {
-          setCatalogError(intl.formatMessage({ id: 'STORES.ERROR' }));
+        .catch((error) => {
+          setCatalogError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
         });
     }
-  }, [isEditMode, storeId, isSuperAdmin, isOwnerAdmin, intl]);
+    // includePlan=false with no storeId is the update view without a selected
+    // store — the render branch below shows STORES.NO_STORE_SELECTED.
+  }, [isEditMode, storeId, isSuperAdmin, isOwnerAdmin, includePlan, intl]);
 
   // In create mode, a catalog-load failure blocks submit (Finding: S-CREATE-5).
   const submitDisabled = isEditMode ? false : !!catalogError;
@@ -125,8 +136,12 @@ export function EditStorePage() {
           address: values.address,
           description: values.description,
           approved: values.approved,
-          paymentStartDate: values.paymentStartDate,
-          moduleIds: values.moduleIds,
+          // Data-only update (includePlan=false): omit moduleIds (plan is
+          // untouched) and omit an empty paymentStartDate — an empty string
+          // would fail DateOnly binding; the backend only applies non-null.
+          ...(includePlan
+            ? { paymentStartDate: values.paymentStartDate, moduleIds: values.moduleIds }
+            : { paymentStartDate: values.paymentStartDate || undefined }),
           isActive: values.isActive,
         });
         // Angular parity: after edit, refresh user session via the consolidated
@@ -136,7 +151,9 @@ export function EditStorePage() {
         } catch {
           // Non-critical: session refresh failure should not block navigation
         }
-        navigate('/management/stores');
+        if (includePlan) {
+          navigate('/management/stores');
+        }
       } else {
         await storeHttpService.createStore({
           ownerId: values.ownerId,
@@ -148,11 +165,21 @@ export function EditStorePage() {
         });
         navigate('/management/users/create/');
       }
-    } catch {
-      setError(intl.formatMessage({ id: 'STORES.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (!isEditMode && !includePlan) {
+    return (
+      <div className="space-y-4 p-4">
+        <p className="text-sm text-gray-500">
+          {intl.formatMessage({ id: 'STORES.NO_STORE_SELECTED' })}
+        </p>
+      </div>
+    );
   }
 
   if (loadError) {
@@ -189,6 +216,7 @@ export function EditStorePage() {
         isSuperAdmin={isSuperAdmin}
         isOwnerAdmin={isOwnerAdmin}
         isEditMode={isEditMode}
+        includePlan={includePlan}
         onSubmit={handleSubmit}
         error={error}
       />

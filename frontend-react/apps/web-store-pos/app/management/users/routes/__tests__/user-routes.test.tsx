@@ -292,7 +292,7 @@ describe('UserListPage — succeeded:true still populates users (regression)', (
 // UserCreatePage — spec TEST-3 (5 cases)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('UserCreatePage — S-CREATE-1: missing selectedStoreId → redirect /management/stores', () => {
+describe('UserCreatePage — S-CREATE-1: missing selectedStoreId → redirect to the store CREATE form', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUser = makeUser({ selectedStoreId: '' });
@@ -300,11 +300,11 @@ describe('UserCreatePage — S-CREATE-1: missing selectedStoreId → redirect /m
     mockParams = {};
   });
 
-  it('navigates to /management/stores when no storeId available', async () => {
+  it('navigates to /management/stores/create when no storeId available', async () => {
     const { UserCreatePage } = await import('../user-create');
     render(<Wrapper><UserCreatePage /></Wrapper>);
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/management/stores');
+      expect(mockNavigate).toHaveBeenCalledWith('/management/stores/create');
     });
   });
 });

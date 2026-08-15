@@ -39,6 +39,17 @@ export interface Store {
   isActive: boolean;
 }
 
+export interface StorePlan {
+  storeId: string;
+  storeName: string;
+  address: string;
+  description: string;
+  approved: boolean;
+  isActive: boolean;
+  paymentStartDate: string | null;
+  modules: Module[];
+}
+
 export interface StoreToCollect {
   storeId: string;
   storeName: string;

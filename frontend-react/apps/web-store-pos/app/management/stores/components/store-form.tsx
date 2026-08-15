@@ -29,6 +29,12 @@ interface StoreFormProps {
   error?: string;
   /** External submit gate unrelated to connectivity — e.g. create-mode module catalog load failure. */
   submitDisabled?: boolean;
+  /**
+   * Plan split (management stores): the store-data view renders WITHOUT the
+   * PlanPicker — the plan lives on its own page. Create mode keeps it (module
+   * selection happens at birth). Defaults to true.
+   */
+  includePlan?: boolean;
 }
 
 /**
@@ -47,6 +53,7 @@ export function StoreForm({
   onSubmit,
   error,
   submitDisabled: externalSubmitDisabled = false,
+  includePlan = true,
 }: StoreFormProps) {
   const intl = useIntl();
 
@@ -246,11 +253,13 @@ export function StoreForm({
             </div>
           )}
 
-          <PlanPicker
-            modules={modules}
-            onChange={setModuleIds}
-            readOnly={!isSuperAdmin && isOnPaidPlan}
-          />
+          {includePlan && (
+            <PlanPicker
+              modules={modules}
+              onChange={setModuleIds}
+              readOnly={!isSuperAdmin && isOnPaidPlan}
+            />
+          )}
         </div>
       </Card>
     </form>

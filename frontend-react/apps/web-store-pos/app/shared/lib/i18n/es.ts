@@ -213,7 +213,11 @@ const messages: Record<string, string> = {
   // Menu items — Reports / Stats / Management (Angular MENU.REPORTS.*, MENU.STATISTICS.*, MENU.STORE_MGMT.*)
   'MENU.TODAY_REPORTS': 'Reportes del día',
   'MENU.DASHBOARD': 'Panel de Control',
-  'MENU.STORES': 'Tiendas',
+  // Plan/update split: the single 'Tiendas' entry became two links — the plan
+  // view (/management/stores) and the store-data update view
+  // (/management/stores/update), same authorization (EFeatures.Stores).
+  'MENU.STORES_PLAN': 'Plan de la tienda',
+  'MENU.STORES_UPDATE': 'Editar la tienda',
   'MENU.USERS': 'Empleados',
   'MENU.CONFIGURATIONS': 'Configuraciones',
   'MENU.TUTORIAL': 'Tutorial',
@@ -336,6 +340,13 @@ const messages: Record<string, string> = {
   // Sale / POS screen (Angular SALES.* — frontend/src/app/_modules/i18n/vocabs/es.ts)
   'SALES.HEADER': 'Productos para vender',
   'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE': 'Seleccione primero una categoría para adicionar productos a la venta.',
+  // SALES.SHOW_LIMIT_* / SALES.SHOWING_COUNT — React-only product-list limiter on the
+  // Sale/POS screen (no Angular correlate). A compact "Mostrar N" selector caps how many
+  // product rows render at once (20/50/100/Todos) so a long list stays short; the
+  // shown/total count appears only while the list is truncated.
+  'SALES.SHOW_LIMIT_LABEL': 'Mostrar',
+  'SALES.SHOW_LIMIT_ALL': 'Todos',
+  'SALES.SHOWING_COUNT': 'Mostrando {shown} de {total}',
   'SALES.PRODUCT_ADDED_TO_CART': 'El producto fue adicionado a la venta',
   'SALES.PRODUCT_NOT_ADDED_TO_CART':
     'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
@@ -682,6 +693,7 @@ const messages: Record<string, string> = {
   'STORES.EMPTY_STATE': 'No hay tiendas registradas.',
   'STORES.NAME_REQUIRED': 'El nombre es obligatorio.',
   'STORES.PLAN.SECTION_TITLE': 'Plan de la tienda',
+  'STORES.NO_STORE_SELECTED': 'No hay una tienda seleccionada.',
   'STORES.PLAN.BILLING_NOTICE': 'Plan Pago: 1 mes GRATIS. Luego se cobra por mes vencido → el primer pago después del segundo mes.',
   'STORES.PLAN.FREE_TAB': 'Gratis',
   'STORES.PLAN.PAID_TAB': 'Pago',

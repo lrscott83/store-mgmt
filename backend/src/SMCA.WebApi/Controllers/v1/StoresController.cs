@@ -12,6 +12,7 @@ using Application.Features.StoreManagement.Stores.Commands.DisapproveStore;
 using Application.Features.StoreManagement.Stores.Commands.SetMyStore;
 using Application.Features.StoreManagement.Stores.Commands.UpdateStore;
 using Application.Features.StoreManagement.Stores.Queries.GetStoreById;
+using Application.Features.StoreManagement.Stores.Queries.GetStorePlan;
 using Application.Features.StoreManagement.Stores.Queries.GetStores;
 using Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrentUser;
 using Application.ResponseModels;
@@ -78,6 +79,22 @@ namespace SMCA.WebApi.Controllers.v1
         public async Task<IActionResult> GetStoreByIdAsync(Guid id)
         {
             return Ok(await Sender.Send(new GetStoreByIdQuery(id)));
+        }
+
+        /// <summary>
+        /// Get the store's plan (active modules + the store fields the plan save
+        /// round-trips). Dedicated backing for the plan view.
+        /// Only available for SuperAdmin and StoresAdmin roles (same gate as
+        /// <see cref="GetStoreByIdAsync"/>).
+        /// </summary>
+        [HttpGet("{id}/plan")]
+        [ProducesResponseType(typeof(ResponseResult<StorePlanDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetStorePlanAsync(Guid id)
+        {
+            return Ok(await Sender.Send(new GetStorePlanQuery(id)));
         }
 
         [HttpPost()]

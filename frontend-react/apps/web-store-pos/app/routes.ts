@@ -66,12 +66,16 @@ export default [
     route('sync/import', 'sync/routes/import.tsx'),
 
     // Management — Stores
-    // Angular parity (edit-store.component.ts:53, getHeader():62-63): all three URLs render
-    // the SAME unified edit-form component. Distinct route `id`s are required because RR7
-    // rejects reusing one file across multiple route() entries without one (see design.md).
-    route('management/stores', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-index' }),
+    // Plan/update split: the PLAN view lives at `management/stores` (PlanPicker +
+    // plan save) and the store-DATA update view at `management/stores/update` and
+    // `management/stores/edit/:id` (no plan section — moduleIds omitted on save).
+    // Creation stays on `management/stores/create` (it needs the plan picker).
+    // Distinct route `id`s are required because RR7 rejects reusing one file across
+    // multiple route() entries without one (see design.md).
+    route('management/stores', 'management/stores/routes/store-plan.tsx', { id: 'management-stores-index' }),
+    route('management/stores/update', 'management/stores/routes/update-store.tsx', { id: 'management-stores-update' }),
     route('management/stores/create', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-create' }),
-    route('management/stores/edit/:id', 'management/stores/routes/edit-store.tsx', { id: 'management-stores-edit' }),
+    route('management/stores/edit/:id', 'management/stores/routes/update-store.tsx', { id: 'management-stores-edit' }),
 
     // Management — Stores — Billing (Req: billing-collections; DG-4 resellerFeatureLoader)
     route('management/stores/collections', 'management/stores/routes/collections.tsx'),

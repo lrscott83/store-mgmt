@@ -22,8 +22,13 @@ using System.Net;
 
 namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
 {
+    /// <summary>
+    /// Store data update. <c>ModuleIds</c> is optional: when null the store's
+    /// modules/plan are left untouched (the plan has its own dedicated update
+    /// path through this same command with <c>ModuleIds</c> populated).
+    /// </summary>
     public sealed record UpdateStoreCommand(Guid Id, string Name, string? Address, string? Description, 
-        bool Approved, List<int> ModuleIds, bool IsActive, DateOnly? PaymentStartDate = null)
+        bool Approved, List<int>? ModuleIds, bool IsActive, DateOnly? PaymentStartDate = null)
         : ICommand<bool> { }
 
     public class UpdateStoreCommandHandler : ICommandHandler<UpdateStoreCommand, bool>
@@ -79,7 +84,9 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             // store that has any active paid module. The store is loaded with its active StoreModules
             // already carrying ModulePriceIncluded, so this guard needs no extra queries. Same-set
             // updates (e.g. renaming) stay allowed; duplicates/order never reject (distinct-sorted).
-            if (!_httpContextService.IsSuperAdmin
+            // A null ModuleIds (data-only update) requests no module change, so the lock never fires.
+            if (request.ModuleIds is not null
+                && !_httpContextService.IsSuperAdmin
                 && store.StoreModules.Any(sm => !sm.ModulePriceIncluded))
             {
                 var requested = request.ModuleIds.Distinct().OrderBy(id => id);
@@ -105,19 +112,24 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
             }
 
             // Activation-on-first-paid: if a paid module is requested on a store
-            // without PaymentStartDate, auto-set to now.
-            bool hasPaidModuleRequested = (await _moduleRepository.GetModulesByIdsAsync(request.ModuleIds))
-                .Any(m => !m.PriceIncluded);
+            // without PaymentStartDate, auto-set to now. Skipped for data-only
+            // updates (ModuleIds is null).
+            if (request.ModuleIds is not null)
+            {
+                bool hasPaidModuleRequested = (await _moduleRepository.GetModulesByIdsAsync(request.ModuleIds))
+                    .Any(m => !m.PriceIncluded);
 
-            if (store.PaymentStartDate is null && hasPaidModuleRequested)
-                store.PaymentStartDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
+                if (store.PaymentStartDate is null && hasPaidModuleRequested)
+                    store.PaymentStartDate = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
+            }
 
             // Explicit PaymentStartDate (SuperAdmin only) wins over auto-activation.
             if (request.PaymentStartDate is not null && _httpContextService.IsSuperAdmin)
                 store.PaymentStartDate = request.PaymentStartDate;
 
             await _storeRepository.UpdateAsync(store);
-            await UpdateStoreModules(store.Id, store.TenantId, request.ModuleIds);
+            if (request.ModuleIds is not null)
+                await UpdateStoreModules(store.Id, store.TenantId, request.ModuleIds);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
 

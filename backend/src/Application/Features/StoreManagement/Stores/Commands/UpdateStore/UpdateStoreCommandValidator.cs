@@ -27,10 +27,15 @@ namespace Application.Features.StoreManagement.Stores.Commands.UpdateStore
               .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
               .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"]);
 
+            // ModuleIds is optional: a data-only update omits it (null) and the
+            // plan is left untouched. When present it must be non-empty and
+            // reference only modules available to store.
             RuleFor(x => x.ModuleIds)
                 .NotNull().WithMessage(_localizer["IsRequired", "{PropertyName}"])
                 .NotEmpty().WithMessage(_localizer["IsRequired", "{PropertyName}"])
-                .MustAsync(AvailableModuleIdsToStore).WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"]);
+                .MustAsync((moduleIds, ct) => AvailableModuleIdsToStore(moduleIds!, ct))
+                    .WithMessage(_localizer["ModuleNotAvailableToStore", "{PropertyName}"])
+                .When(x => x.ModuleIds is not null);
         }
 
         private async Task<bool> AvailableModuleIdsToStore(List<int> moduleIds, CancellationToken cancellationToken)

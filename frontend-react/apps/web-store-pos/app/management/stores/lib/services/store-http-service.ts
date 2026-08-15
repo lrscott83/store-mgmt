@@ -1,6 +1,7 @@
 import type {
   BaseResponseModel,
   Store,
+  StorePlan,
   Module,
   Owner,
   StoreToCollect,
@@ -23,8 +24,17 @@ interface UpdateStorePayload {
   address: string;
   description: string;
   approved: boolean;
-  paymentStartDate: string;
-  moduleIds: number[];
+  /**
+   * Undefined when there is no date to send (backend only applies a non-null
+   * value; an empty string would fail DateOnly binding).
+   */
+  paymentStartDate?: string;
+  /**
+   * Optional since the store-data view and the plan view were split: the
+   * data-only update omits it (backend leaves the plan untouched), while the
+   * plan view sends the full set.
+   */
+  moduleIds?: number[];
   isActive: boolean;
 }
 
@@ -39,6 +49,13 @@ export const storeHttpService = {
   async getStore(id: string): Promise<BaseResponseModel<Store>> {
     const response = await apiClient.get<BaseResponseModel<Store>>(
       `/v1/stores/${id}`
+    );
+    return response.data;
+  },
+
+  async getStorePlan(id: string): Promise<BaseResponseModel<StorePlan>> {
+    const response = await apiClient.get<BaseResponseModel<StorePlan>>(
+      `/v1/stores/${id}/plan`
     );
     return response.data;
   },
