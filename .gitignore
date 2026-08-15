@@ -155,5 +155,9 @@ lizo-models/
 # gentle-ai skill registry cache
 .atl/
 
+# local agent tooling state (Freebuff desktop DB, Playwright MCP logs)
+.freebuff/
+.playwright-mcp/
+
 # production-only backend config (VPS-managed, never committed)
 appsettings.Production.json
