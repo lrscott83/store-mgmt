@@ -1,5 +1,8 @@
 import type { jsPDF } from 'jspdf';
 import type { HookData, UserOptions } from 'jspdf-autotable';
+import messages from '~/shared/lib/i18n/es';
+import { showToastSuccess } from '~/shared/lib/toast';
+import { toLocalDayKey } from '~/shared/lib/date-utils';
 
 /**
  * One row of the 13-column per-product inventory-at-sale-price ledger.
@@ -50,10 +53,13 @@ export interface InventoryTodaySaleRow {
  * (Stage 7, spec Slice B).
  *
  * Angular's export button is disabled — a bug, not a feature (angular-bugs-policy #511):
- * this port makes the export ACTUALLY WORK, producing and opening a real PDF.
+ * this port makes the export ACTUALLY WORK, producing a real PDF.
  *
- * When `filename` is given, the generated blob is downloaded as `<filename>` instead of
- * being opened — used by the per-day sales-history export (`<dayKey>_ipv.pdf`).
+ * The PDF is ALWAYS downloaded directly via a temporary `<a download>` element — never
+ * opened in a new tab. When `filename` is given it is used verbatim (the per-day
+ * sales-history export passes `<dayKey>_ipv.pdf`); otherwise the default name is today's
+ * LOCAL date `yyyy-mm-dd_ipv.pdf`. Once the download is triggered, a success toast
+ * (REPORTS.PDF_DOWNLOAD_SUCCESS) confirms completion.
  *
  * `jspdf`/`jspdf-autotable` are loaded via dynamic `import()` INSIDE this function body
  * (never at module top-level) so they stay out of the main bundle — same code-splitting
@@ -145,14 +151,16 @@ export async function exportInventoryTodaySalePdf(
   const pdfBlob = doc.output('blob');
   const pdfUrl = URL.createObjectURL(pdfBlob);
 
-  if (filename) {
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  } else {
-    window.open(pdfUrl);
-  }
+  // Always download via a temporary <a download> — the legacy window.open new-tab path
+  // is removed. Default name is today's LOCAL `yyyy-mm-dd_ipv.pdf`.
+  const downloadName = filename ?? `${toLocalDayKey(new Date())}_ipv.pdf`;
+  const link = document.createElement('a');
+  link.href = pdfUrl;
+  link.download = downloadName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  // Download triggered — confirm completion to the user.
+  showToastSuccess(messages['REPORTS.PDF_DOWNLOAD_SUCCESS']);
 }

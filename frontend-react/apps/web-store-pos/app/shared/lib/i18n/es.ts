@@ -608,6 +608,10 @@ const messages: Record<string, string> = {
   // "Generar Reporte" PDF export button label. Kept under the singular `REPORT.*`
   // namespace (not `REPORTS.*`) to match Angular's key 1:1.
   'REPORT.INVENTORY_TODAY_SALE': 'Inventario a precio de venta',
+  // REPORTS.PDF_DOWNLOAD_SUCCESS — success toast fired by inventory-today-sale-pdf.ts
+  // once the inventory-at-sale-price PDF download has been triggered. Applies to both
+  // reports/today's "Generar Reporte" and the per-day sales-history gear export.
+  'REPORTS.PDF_DOWNLOAD_SUCCESS': 'El reporte se descargó correctamente.',
 
   // Statistics — Dashboard
   // Angular parity: DASHBOARD.HEADER (vocabs/es.ts:501-503) is the card-header title.

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import messages from '~/shared/lib/i18n/es';
+import { toLocalDayKey } from '~/shared/lib/date-utils';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
 
 // ─── Mock jspdf + jspdf-autotable (Lazy Code-Split Export — Requirement) ─────
@@ -21,6 +23,12 @@ vi.mock('jspdf', () => ({ jsPDF: jsPDFCtor }));
 const mockAutoTable = vi.fn();
 
 vi.mock('jspdf-autotable', () => ({ default: mockAutoTable }));
+
+// Success toast fired by the export once the download is triggered (shared/lib/toast).
+const showToastSuccessMock = vi.fn();
+vi.mock('~/shared/lib/toast', () => ({
+  showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+}));
 
 function makeRow(overrides: Partial<InventoryTodaySaleRow> = {}): InventoryTodaySaleRow {
   return {
@@ -51,6 +59,11 @@ describe('exportInventoryTodaySalePdf', () => {
   // `vi.restoreAllMocks()` — that would also wipe the `vi.fn()` implementations
   // of jsPDFCtor/mockAutoTable/mockDoc between tests.
   let documentSpies: Array<{ mockRestore: () => void }> = [];
+  // Every export invocation now downloads via a temporary <a download>, so ALL
+  // tests spy on the anchor: jsdom does not implement blob: navigation and would
+  // otherwise print "Not implemented: navigation" per real click.
+  type MockAnchor = { href: string; download: string; click: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+  let link: MockAnchor;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,9 +71,20 @@ describe('exportInventoryTodaySalePdf', () => {
 
     createObjectURLMock.mockReturnValue('blob:mock-url');
     windowOpenMock.mockReturnValue(null);
+    showToastSuccessMock.mockClear();
     URL.createObjectURL = createObjectURLMock;
     window.open = windowOpenMock;
     documentSpies = [];
+
+    link = {
+      href: '',
+      download: '',
+      click: vi.fn(),
+      remove: vi.fn(),
+    } as MockAnchor;
+    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(link as unknown as HTMLElement);
+    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => link as unknown as Node);
+    documentSpies.push(createElementSpy, appendSpy);
   });
 
   afterEach(() => {
@@ -151,44 +175,40 @@ describe('exportInventoryTodaySalePdf', () => {
     expect(mockDoc.text).not.toHaveBeenCalled();
   });
 
-  it('PDF-07: produces a real PDF blob and opens it — Angular\'s disabled export is fixed, not replicated', async () => {
+  it('PDF-07: produces a real PDF blob and downloads it directly — never window.open', async () => {
     const { exportInventoryTodaySalePdf } = await import('./inventory-today-sale-pdf');
 
     await exportInventoryTodaySalePdf([makeRow()]);
 
     expect(mockDoc.output).toHaveBeenCalledWith('blob');
     expect(createObjectURLMock).toHaveBeenCalledTimes(1);
-    expect(windowOpenMock).toHaveBeenCalledWith('blob:mock-url');
+    expect(link.href).toBe('blob:mock-url');
+    // No filename → the DEFAULT name is today's local yyyy-mm-dd_ipv.pdf.
+    expect(link.download).toBe(`${toLocalDayKey(new Date())}_ipv.pdf`);
+    expect(link.click).toHaveBeenCalledTimes(1);
+    expect(link.remove).toHaveBeenCalledTimes(1);
+    expect(windowOpenMock).not.toHaveBeenCalled();
   });
 
-  it('PDF-08: filename given → downloads via a temporary <a download="...">, never window.open', async () => {
+  it('PDF-08: filename given → downloads via a temporary <a download="..."> with that exact name, never window.open', async () => {
     const { exportInventoryTodaySalePdf } = await import('./inventory-today-sale-pdf');
-
-    const clickMock = vi.fn();
-    const removeMock = vi.fn();
-    const link = { href: '', download: '', click: clickMock, remove: removeMock } as unknown as HTMLAnchorElement;
-    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(link as unknown as HTMLElement);
-    const appendSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => link as unknown as Node);
-    documentSpies.push(createElementSpy, appendSpy);
 
     await exportInventoryTodaySalePdf([makeRow()], '2026-07-22_ipv.pdf');
 
-    expect(createElementSpy).toHaveBeenCalledWith('a');
     expect(link.href).toBe('blob:mock-url');
     expect(link.download).toBe('2026-07-22_ipv.pdf');
-    expect(appendSpy).toHaveBeenCalledWith(link);
-    expect(clickMock).toHaveBeenCalledTimes(1);
-    expect(removeMock).toHaveBeenCalledTimes(1);
+    expect(link.click).toHaveBeenCalledTimes(1);
+    expect(link.remove).toHaveBeenCalledTimes(1);
     expect(windowOpenMock).not.toHaveBeenCalled();
     expect(createObjectURLMock).toHaveBeenCalledTimes(1);
   });
 
-  it('PDF-09: no filename → legacy window.open download path is preserved', async () => {
+  it('PDF-09: fires the success toast once the download is triggered', async () => {
     const { exportInventoryTodaySalePdf } = await import('./inventory-today-sale-pdf');
 
     await exportInventoryTodaySalePdf([makeRow()]);
 
-    expect(mockDoc.output).toHaveBeenCalledWith('blob');
-    expect(windowOpenMock).toHaveBeenCalledWith('blob:mock-url');
+    expect(showToastSuccessMock).toHaveBeenCalledTimes(1);
+    expect(showToastSuccessMock).toHaveBeenCalledWith(messages['REPORTS.PDF_DOWNLOAD_SUCCESS']);
   });
 });
