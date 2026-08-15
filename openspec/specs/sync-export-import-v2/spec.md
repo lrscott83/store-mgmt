@@ -168,11 +168,12 @@ A non-ZIP file or a corrupt ZIP MUST throw the existing `CorruptFileError` on im
 - WHEN import runs
 - THEN `CorruptFileError` is thrown
 
-#### Scenario: Corrupt ZIP rejected
+#### Scenario: Corrupt ZIP behaves with v1 parity
 
-- GIVEN a ZIP whose data entries are corrupt
+- GIVEN a ZIP whose central directory is intact but whose data entries are corrupt
 - WHEN import runs
-- THEN `CorruptFileError` is thrown
+- THEN `WrongPasswordError` is thrown — byte-identical to the v1 fallback mapping (zip.js conflates wrong-password and corrupt-stream at `getData`), unchanged from v1
+- AND a structurally corrupt ZIP (corrupt central directory or local headers) throws `CorruptFileError`, unchanged from v1
 
 ## Non-Goals
 
