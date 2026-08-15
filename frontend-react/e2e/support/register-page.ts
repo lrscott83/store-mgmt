@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import type { TestIdentity } from './identity';
 
@@ -89,13 +90,44 @@ export class RegisterPage {
       ...overrides,
     };
 
-    await this.fullName.fill(values.fullName);
-    await this.login.fill(values.login);
-    await this.email.fill(values.email);
-    await this.cellPhone.fill(values.cellPhone);
-    await this.storeName.fill(values.storeName);
-    await this.password.fill(values.password);
-    await this.passwordConfirmation.fill(values.passwordConfirmation);
+    // Same defensive pattern as LoginPage.fill (login-page.ts): the register
+    // form shares the #login/#password ids with the login page
+    // (login.tsx:248,269), so a fill that races a CLIENT-side navigation
+    // (login -> /register via the "Registrarse" link, login.tsx:239-240)
+    // could type into the still-mounted login form and lose the values when
+    // it unmounts. Every current call site navigates with a full goto
+    // (load event -> old form gone), so this is a hardening against the
+    // future, not a fix for a live flake — the poll passes on its first
+    // iteration on the happy path.
+    await expect(this.submitButton).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          await this.fullName.fill(values.fullName);
+          await this.login.fill(values.login);
+          await this.email.fill(values.email);
+          await this.cellPhone.fill(values.cellPhone);
+          await this.storeName.fill(values.storeName);
+          await this.password.fill(values.password);
+          await this.passwordConfirmation.fill(values.passwordConfirmation);
+          return (
+            (await this.fullName.inputValue()) === values.fullName &&
+            (await this.login.inputValue()) === values.login &&
+            (await this.email.inputValue()) === values.email &&
+            (await this.cellPhone.inputValue()) === values.cellPhone &&
+            (await this.storeName.inputValue()) === values.storeName &&
+            (await this.password.inputValue()) === values.password &&
+            (await this.passwordConfirmation.inputValue()) === values.passwordConfirmation
+          );
+        },
+        {
+          timeout: 10_000,
+          message:
+            'no pudo escribir los campos en el formulario de /register (una navegación ' +
+            'client-side desde /login pudo haber desmontado el formulario con los valores)',
+        }
+      )
+      .toBe(true);
   }
 
   async submit(): Promise<void> {
