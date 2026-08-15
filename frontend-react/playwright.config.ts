@@ -59,6 +59,13 @@ export default defineConfig({
   // Los tests viven en e2e/ en la raíz del workspace, junto a esta config.
   testDir: './e2e',
 
+  // `offline-shell.spec.ts` corre SOLO con su config dedicada
+  // (`playwright.pwa.config.ts`, `vite preview` + el service worker REAL del
+  // build). Contra este dev server el SW se registra con `globPatterns: []`
+  // (vite.config.ts, design D10) y no precachea nada — el test fallaría por un
+  // motivo que no existe en producción (ver el encabezado del spec).
+  testIgnore: '**/offline-shell.spec.ts',
+
   // Corre cada test en un worker propio para aprovechar el paralelismo local.
   fullyParallel: true,
 

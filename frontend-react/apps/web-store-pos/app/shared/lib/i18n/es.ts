@@ -33,6 +33,9 @@ const messages: Record<string, string> = {
   'GENERAL.SUCCESS': 'Éxito',
   'GENERAL.OFFLINE': 'Sin conexión. Se requiere conexión a internet.',
   'GENERAL.LOGOUT': 'Salir',
+  // The user-popup's icon-only logout button (dropdown header) — distinct from the
+  // text "Salir" item so the two controls have unique accessible names.
+  'GENERAL.LOGOUT_ICON': 'Cerrar sesión',
   // GENERAL.PROFILE — Angular nav-right user popup tab label (vocabs/es.ts PROFILE: 'Perfil')
   'GENERAL.PROFILE': 'Perfil',
   'GENERAL.EDIT': 'Editar',
