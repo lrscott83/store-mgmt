@@ -39,6 +39,10 @@ export function SalePage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchAllCategories, setSearchAllCategories] = useState(true);
+  // React-only product-list limiter (no Angular correlate): caps how many product rows
+  // render at once. 0 = no limit ("Todos"). Default 50 keeps a long list short without
+  // hiding anything permanently.
+  const [visibleLimit, setVisibleLimit] = useState(50);
 
   // Angular parity (sale.component.ts:39-40): getAvailableProductCategories() already
   // returns active-only categories sorted by order (ProductCategoryRepository.
@@ -96,6 +100,13 @@ export function SalePage() {
     const source = searchAllCategories ? allProducts : baseProducts;
     return source.filter((product) => product.name.toLowerCase().includes(query));
   }, [allProducts, products, selectedCategoryId, searchQuery, searchAllCategories]);
+
+  // Apply the visible limit AFTER category + search filtering: the limiter caps what is
+  // currently displayed, and never hides anything from a filter (only the tail of it).
+  const visibleProducts = useMemo(() => {
+    if (visibleLimit === 0 || displayedProducts.length <= visibleLimit) return displayedProducts;
+    return displayedProducts.slice(0, visibleLimit);
+  }, [displayedProducts, visibleLimit]);
 
   function handleAdded(productId: string, quantity: number, price: number) {
     const product = displayedProducts.find((p) => p.id === productId);
@@ -171,8 +182,34 @@ export function SalePage() {
         ))}
       </div>
 
+      {/* Compact product-list limiter — one row between the category bar and the products.
+          The shown/total count appears only while the list is truncated. */}
+      <div className="mb-2 flex items-center justify-end gap-2">
+        {visibleLimit !== 0 && displayedProducts.length > visibleLimit && (
+          <span className="mr-auto text-xs text-text-muted">
+            {intl.formatMessage(
+              { id: 'SALES.SHOWING_COUNT' },
+              { shown: visibleLimit, total: displayedProducts.length },
+            )}
+          </span>
+        )}
+        <label className="flex items-center gap-1 text-xs text-text">
+          {intl.formatMessage({ id: 'SALES.SHOW_LIMIT_LABEL' })}
+          <select
+            value={visibleLimit}
+            onChange={(e) => setVisibleLimit(Number(e.target.value))}
+            className="rounded border border-border px-1 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={0}>{intl.formatMessage({ id: 'SALES.SHOW_LIMIT_ALL' })}</option>
+          </select>
+        </label>
+      </div>
+
       <SaleCategoryProducts
-        products={displayedProducts}
+        products={visibleProducts}
         orderType={ORDER_TYPE}
         onAdded={handleAdded}
         checkAvailability={checkAvailability}

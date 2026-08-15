@@ -381,3 +381,107 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(screen.getByText('Coca Cola')).toBeInTheDocument();
   });
 });
+
+describe('SalePage — product list limiter', () => {
+  beforeEach(() => {
+    mockCategories = [];
+    mockProducts = [];
+    addItemMock.mockClear();
+    mockUser.storeModuleIds = [];
+    localStorage.clear();
+
+    saleServiceSpies.getProductsToSaleByCategoryId.mockReset();
+    saleServiceSpies.getProductsToSaleByCategoryId.mockImplementation(async (categoryId: string) =>
+      bm(
+        mockProducts
+          .filter((p) => p.categoryId === categoryId && p.isActive && p.availableToSale)
+          .sort((a, b) => a.order - b.order),
+      ),
+    );
+    saleServiceSpies.getAvailableProductCategories.mockReset();
+    saleServiceSpies.getAvailableProductCategories.mockImplementation(async () =>
+      bm(mockCategories.filter((c) => c.isActive).sort((a, b) => a.order - b.order)),
+    );
+  });
+
+  // Each rendered product row exposes exactly one "Adicionar" button — a reliable count
+  // of how many rows are on screen.
+  function productRowCount(): number {
+    return screen.getAllByRole('button', { name: 'Adicionar' }).length;
+  }
+
+  it('renders a compact "Mostrar" select above the products, defaulting to 50', async () => {
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' })];
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+
+    const select = await screen.findByRole('combobox', { name: 'Mostrar' });
+    expect(select).toHaveValue('50');
+    // The row renders above the product list and stays compact (no big filter bar).
+    expect(screen.getByText('Mostrar')).toBeInTheDocument();
+    expect(await screen.findByText('Coca Cola')).toBeInTheDocument();
+  });
+
+  it('caps the rendered product rows at the default limit of 50', async () => {
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = Array.from({ length: 60 }, (_, i) =>
+      makeProduct({ id: `p${i}`, name: `Producto ${i}`, categoryId: 'c1', order: i + 1 }),
+    );
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(productRowCount()).toBe(50));
+    expect(screen.getByText('Producto 0')).toBeInTheDocument();
+    expect(screen.queryByText('Producto 55')).not.toBeInTheDocument();
+  });
+
+  it('changing the limit updates the rendered rows; Todos shows the full list', async () => {
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = Array.from({ length: 60 }, (_, i) =>
+      makeProduct({ id: `p${i}`, name: `Producto ${i}`, categoryId: 'c1', order: i + 1 }),
+    );
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(productRowCount()).toBe(50));
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mostrar' }), { target: { value: '20' } });
+    expect(productRowCount()).toBe(20);
+    expect(screen.queryByText('Producto 25')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mostrar' }), { target: { value: '0' } });
+    expect(productRowCount()).toBe(60);
+    expect(screen.getByText('Producto 59')).toBeInTheDocument();
+  });
+
+  it('shows "Mostrando X de Y" only while the list is truncated', async () => {
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = Array.from({ length: 60 }, (_, i) =>
+      makeProduct({ id: `p${i}`, name: `Producto ${i}`, categoryId: 'c1', order: i + 1 }),
+    );
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Mostrando 50 de 60')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mostrar' }), { target: { value: '0' } });
+    expect(screen.queryByText(/Mostrando/)).not.toBeInTheDocument();
+  });
+});
