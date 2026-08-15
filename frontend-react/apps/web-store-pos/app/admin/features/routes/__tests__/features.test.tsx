@@ -327,4 +327,35 @@ describe('FeaturesPage — error state (HTTP error)', () => {
       );
     });
   });
+
+  it('shows the connectivity message (GENERAL.OFFLINE) when activateFeatures rejects with a tagged network error', async () => {
+    const { featureHttpService } = await import(
+      '~/admin/features/lib/services/feature-http-service'
+    );
+    const { showToastError } = await import('~/shared/lib/toast');
+    // api-client.ts's response interceptor tags `isNetworkError` when the call never
+    // reached a server (offline / 30s timeout).
+    vi.mocked(featureHttpService.activateFeatures).mockRejectedValue({
+      isNetworkError: true,
+      message: 'Network Error',
+    } as unknown as Error);
+
+    const { FeaturesPage } = await import('../features');
+    render(
+      <Wrapper>
+        <FeaturesPage />
+      </Wrapper>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: esMessages['FEATURES.ACTIVATE_FEATURES'] })
+    );
+
+    await waitFor(() => {
+      expect(showToastError).toHaveBeenCalledWith(
+        esMessages['GENERAL.OFFLINE'],
+        esMessages['GENERAL.RESPONSE.ERROR_TITLE'],
+      );
+    });
+  });
 });

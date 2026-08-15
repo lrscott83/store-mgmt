@@ -1,3 +1,5 @@
+import { isNetworkError } from './http-error';
+
 /** The `code` of a backend validation error is the raw FluentValidation
  *  `PropertyName` (`ValidationException.cs:20`), and its casing varies by command:
  *  `"Cellphone"` on create, `"CellPhone"` on update. Normalized to lowercase before
@@ -47,6 +49,11 @@ function findByCodeMatch(errors: unknown, byCode: Record<string, string> | undef
 
 export function apiErrorMessageId(error: unknown, options: ApiErrorMessageOptions): string {
   const { byCode, byStatus, fallback } = options;
+
+  // A network-layer failure (offline / timeout, tagged by api-client.ts's response
+  // interceptor with `isNetworkError`) has no response/status/errors to map — show the
+  // connectivity message instead of the generic fallback.
+  if (isNetworkError(error)) return 'GENERAL.OFFLINE';
 
   const rejection = error as RejectionShape | null | undefined;
   const envelope = error as EnvelopeShape | null | undefined;

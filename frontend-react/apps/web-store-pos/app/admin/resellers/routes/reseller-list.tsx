@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { ResellerCardList } from '~/admin/resellers/components/reseller-card-list';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import type { ReSeller } from '@store-mgmt/domain';
 
 export const clientLoader = superAdminLoader;
@@ -23,8 +24,8 @@ export function ResellerListPage() {
       }
       setResellers(res.data);
       setError(undefined);
-    } catch {
-      setError(formatMessage({ id: 'RESELLERS.ERROR' }));
+    } catch (error) {
+      setError(formatMessage({ id: httpErrorKey(error, 'RESELLERS.ERROR') }));
     }
   }, [formatMessage]);
 

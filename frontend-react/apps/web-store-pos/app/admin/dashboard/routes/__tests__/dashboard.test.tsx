@@ -239,6 +239,30 @@ describe('AdminDashboardPage — error state', () => {
       expect(screen.getByText(esMessages['ADMIN_DASHBOARD.ERROR'])).toBeInTheDocument();
     });
   });
+
+  it('shows the connectivity message (GENERAL.OFFLINE) when getStoresLastWeek rejects with a tagged network error', async () => {
+    const { usageHttpService } = await import(
+      '~/admin/dashboard/lib/services/usage-http-service'
+    );
+    // api-client.ts's response interceptor tags `isNetworkError` when the call never
+    // reached a server (offline / 30s timeout).
+    vi.mocked(usageHttpService.getStoresLastWeek).mockRejectedValue({
+      isNetworkError: true,
+      message: 'Network Error',
+    } as unknown as Error);
+
+    const { AdminDashboardPage } = await import('../dashboard');
+    render(
+      <Wrapper>
+        <AdminDashboardPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['GENERAL.OFFLINE'])).toBeInTheDocument();
+    });
+    expect(screen.queryByText(esMessages['ADMIN_DASHBOARD.ERROR'])).not.toBeInTheDocument();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

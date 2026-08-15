@@ -486,10 +486,12 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
     });
   });
 
-  it('shows OWNER.ERROR when createOwner rejects with no response (network failure)', async () => {
+  it('shows the connectivity message (GENERAL.OFFLINE) when createOwner rejects with a tagged network error (no response)', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
+    // api-client.ts's response interceptor tags `isNetworkError` when the call never
+    // reached a server (offline / 30s timeout).
     vi.mocked(ownerHttpService.createOwner).mockRejectedValue({
       isNetworkError: true,
     });
@@ -500,7 +502,7 @@ describe('OwnerCreatePage — FE-OC2: classified rejections', () => {
     fireEvent.submit(screen.getByRole('button', { name: esMessages['GENERAL.ADD'] }).closest('form')!);
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['GENERAL.OFFLINE']);
     });
   });
 });

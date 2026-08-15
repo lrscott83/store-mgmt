@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { usageHttpService } from '~/admin/dashboard/lib/services/usage-http-service';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 
 export const clientLoader = superAdminLoader;
 
@@ -41,8 +42,8 @@ export function AdminDashboardPage() {
         if (res.succeeded && res.data) {
           setData(res.data.storeUsagesCountDays);
         }
-      } catch {
-        setError(formatMessage({ id: 'ADMIN_DASHBOARD.ERROR' }));
+      } catch (error) {
+        setError(formatMessage({ id: httpErrorKey(error, 'ADMIN_DASHBOARD.ERROR') }));
       }
     },
     [formatMessage],

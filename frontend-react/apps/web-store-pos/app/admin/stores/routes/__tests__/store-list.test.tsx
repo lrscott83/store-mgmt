@@ -351,6 +351,30 @@ describe('AdminStoreListPage — error state', () => {
       expect(screen.getByText(esMessages['STORES.ERROR'])).toBeInTheDocument();
     });
   });
+
+  it('shows the connectivity message (GENERAL.OFFLINE) when listStores rejects with a tagged network error', async () => {
+    // api-client.ts's response interceptor tags `isNetworkError` when the call never
+    // reached a server (offline / 30s timeout).
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.listStores).mockRejectedValue({
+      isNetworkError: true,
+      message: 'Network Error',
+    } as unknown as Error);
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(esMessages['GENERAL.OFFLINE'])).toBeInTheDocument();
+    });
+    expect(screen.queryByText(esMessages['STORES.ERROR'])).not.toBeInTheDocument();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

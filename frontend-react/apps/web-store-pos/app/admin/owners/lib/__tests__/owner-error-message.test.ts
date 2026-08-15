@@ -16,10 +16,16 @@ describe('ownerErrorMessageId', () => {
     expect(id).toBe('OWNER.ERROR');
   });
 
-  it('returns OWNER.ERROR when the error has no response (network failure)', () => {
+  it('returns OWNER.ERROR when the error has no response (untagged network failure)', () => {
     const error = { message: 'Network Error' };
     const id = ownerErrorMessageId(error, { 409: 'OWNER.DUPLICATE_LOGIN' });
     expect(id).toBe('OWNER.ERROR');
+  });
+
+  it('returns GENERAL.OFFLINE when the error is tagged isNetworkError (offline/timeout)', () => {
+    const error = { isNetworkError: true, message: 'Network Error' };
+    const id = ownerErrorMessageId(error, { 409: 'OWNER.DUPLICATE_LOGIN' });
+    expect(id).toBe('GENERAL.OFFLINE');
   });
 
   it('returns OWNER.ERROR when error is undefined', () => {

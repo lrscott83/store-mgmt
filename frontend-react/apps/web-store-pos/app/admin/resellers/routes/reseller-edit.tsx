@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { resellerHttpService } from '~/admin/resellers/lib/services/reseller-http-service';
 import { apiErrorMessageId, API_ERROR_CODE_CELL_PHONE } from '~/shared/lib/http/api-error-message';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { useUnsavedChangesPrompt } from '~/shared/lib/hooks/use-unsaved-changes-prompt';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
@@ -91,8 +92,8 @@ export function ResellerEditPage() {
         setSnapshot(makeSnapshot(r));
         setLoadError('');
       })
-      .catch(() => {
-        setLoadError(formatMessage({ id: 'RESELLERS.ERROR' }));
+      .catch((error) => {
+        setLoadError(formatMessage({ id: httpErrorKey(error, 'RESELLERS.ERROR') }));
       });
   }, [id, formatMessage]);
 

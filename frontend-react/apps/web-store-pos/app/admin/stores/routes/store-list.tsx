@@ -4,6 +4,7 @@ import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreCardList } from '~/admin/stores/components/store-card-list';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
@@ -32,8 +33,8 @@ export function AdminStoreListPage() {
       }
       setStores(res.data);
       setError(undefined);
-    } catch {
-      setError(formatMessage({ id: 'STORES.ERROR' }));
+    } catch (error) {
+      setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
   }, [formatMessage]);
 
@@ -52,8 +53,8 @@ export function AdminStoreListPage() {
     try {
       await storeHttpService.approveStore(id);
       await loadStores();
-    } catch {
-      setError(formatMessage({ id: 'STORES.ERROR' }));
+    } catch (error) {
+      setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
   }
 
@@ -68,8 +69,8 @@ export function AdminStoreListPage() {
     try {
       await storeHttpService.disapproveStore(id);
       await loadStores();
-    } catch {
-      setError(formatMessage({ id: 'STORES.ERROR' }));
+    } catch (error) {
+      setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
   }
 

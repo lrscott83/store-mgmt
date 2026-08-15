@@ -19,6 +19,7 @@ import { PlusIcon, EditIcon } from '~/shared/components/ui/icons';
 // itself stays untouched — still the sole list mounted at /admin/stores.
 import { StoreCardList } from '~/admin/stores/components/store-card-list';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import type { Owner, ReSeller, Store } from '@store-mgmt/domain';
 
@@ -95,8 +96,8 @@ export function OwnerEditPage() {
       }
       setStores(res.data);
       setStoresError(undefined);
-    } catch {
-      setStoresError(intl.formatMessage({ id: 'STORES.ERROR' }));
+    } catch (error) {
+      setStoresError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
   }
 
@@ -111,8 +112,8 @@ export function OwnerEditPage() {
     try {
       await storeHttpService.approveStore(storeId);
       await loadStores();
-    } catch {
-      setStoresError(intl.formatMessage({ id: 'STORES.ERROR' }));
+    } catch (error) {
+      setStoresError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
   }
 
@@ -127,8 +128,8 @@ export function OwnerEditPage() {
     try {
       await storeHttpService.disapproveStore(storeId);
       await loadStores();
-    } catch {
-      setStoresError(intl.formatMessage({ id: 'STORES.ERROR' }));
+    } catch (error) {
+      setStoresError(intl.formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
     }
   }
 

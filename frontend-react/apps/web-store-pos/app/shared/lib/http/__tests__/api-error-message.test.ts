@@ -61,8 +61,11 @@ describe('apiErrorMessageId', () => {
     expect(id).toBe('OWNER.PHONE_REQUIRED');
   });
 
-  it('9. network failures / undefined / null all fall to fallback', () => {
-    expect(apiErrorMessageId({ isNetworkError: true }, { fallback: 'OWNER.ERROR' })).toBe('OWNER.ERROR');
+  it('9. a tagged network failure shows the connectivity key (GENERAL.OFFLINE); untagged / undefined / null still fall to fallback', () => {
+    // isNetworkError is set by api-client.ts's response interceptor when the call never
+    // reached a server (offline / 30s timeout) — those get the connectivity message.
+    expect(apiErrorMessageId({ isNetworkError: true }, { fallback: 'OWNER.ERROR' })).toBe('GENERAL.OFFLINE');
+    expect(apiErrorMessageId({ message: 'Network Error' }, { fallback: 'OWNER.ERROR' })).toBe('OWNER.ERROR');
     expect(apiErrorMessageId(undefined, { fallback: 'OWNER.ERROR' })).toBe('OWNER.ERROR');
     expect(apiErrorMessageId(null, { fallback: 'OWNER.ERROR' })).toBe('OWNER.ERROR');
   });

@@ -5,6 +5,7 @@ import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
 import { OwnerCardList } from '~/admin/owners/components/owner-card-list';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import type { Owner } from '@store-mgmt/domain';
 
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
@@ -24,8 +25,8 @@ export function OwnerListPage() {
       }
       setOwners(res.data);
       setError(undefined);
-    } catch {
-      setError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'OWNER.ERROR') }));
     }
   }, [intl]);
 
@@ -37,8 +38,8 @@ export function OwnerListPage() {
     try {
       await ownerHttpService.deleteOwner(id);
       await loadOwners();
-    } catch {
-      setError(intl.formatMessage({ id: 'OWNER.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'OWNER.ERROR') }));
     }
   }
 

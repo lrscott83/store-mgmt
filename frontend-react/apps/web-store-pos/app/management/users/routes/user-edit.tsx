@@ -7,6 +7,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserDetailsForm } from '~/management/users/components/UserDetailsForm';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import type { User } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Users]);
@@ -41,8 +42,8 @@ export function UserEditPage() {
         setStoreUser(res.data);
         setLoadError('');
       })
-      .catch(() => {
-        setLoadError(intl.formatMessage({ id: 'USERS.ERROR' }));
+      .catch((error) => {
+        setLoadError(intl.formatMessage({ id: httpErrorKey(error, 'USERS.ERROR') }));
       });
   }, [userId, intl]);
 
@@ -58,8 +59,8 @@ export function UserEditPage() {
     try {
       await userHttpService.editUser(userId, values);
       navigate('/management/users');
-    } catch {
-      setDetailsError(intl.formatMessage({ id: 'USERS.ERROR' }));
+    } catch (error) {
+      setDetailsError(intl.formatMessage({ id: httpErrorKey(error, 'USERS.ERROR') }));
     } finally {
       setDetailsLoading(false);
     }

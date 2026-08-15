@@ -623,11 +623,13 @@ describe('OwnerEditPage — FE-OC3: classified rejections', () => {
     });
   });
 
-  it('shows OWNER.ERROR when updateOwner rejects with no response (network failure)', async () => {
+  it('shows the connectivity message (GENERAL.OFFLINE) when updateOwner rejects with a tagged network error (no response)', async () => {
+    // api-client.ts's response interceptor tags `isNetworkError` when the call never
+    // reached a server (offline / 30s timeout).
     await submitWithRejection({ isNetworkError: true });
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['OWNER.ERROR']);
+      expect(screen.getByRole('alert')).toHaveTextContent(esMessages['GENERAL.OFFLINE']);
     });
   });
 

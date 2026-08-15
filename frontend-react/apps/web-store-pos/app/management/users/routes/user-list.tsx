@@ -6,6 +6,7 @@ import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { userHttpService } from '~/management/users/lib/services/user-http-service';
 import { UserCardList } from '~/management/users/components/user-card-list';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { RosterExportPanel } from '~/management/users/components/roster-export-panel';
 import type { User } from '@store-mgmt/domain';
 
@@ -30,8 +31,8 @@ export function UserListPage() {
         setUsers(res.data);
         setError('');
       })
-      .catch(() => {
-        setError(intl.formatMessage({ id: 'USERS.ERROR' }));
+      .catch((error) => {
+        setError(intl.formatMessage({ id: httpErrorKey(error, 'USERS.ERROR') }));
       });
   }
 
@@ -49,8 +50,8 @@ export function UserListPage() {
       await action(id);
       loadUsers();
       setError('');
-    } catch {
-      setError(intl.formatMessage({ id: 'USERS.LIFECYCLE_ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'USERS.LIFECYCLE_ERROR') }));
     }
   }
 

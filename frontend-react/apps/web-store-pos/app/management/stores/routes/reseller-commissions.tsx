@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import type { ReSellerCommission } from '@store-mgmt/domain';
 
@@ -34,8 +35,8 @@ export function ReSellerCommissionsPage() {
       }
       setRows(res.data);
       setError(undefined);
-    } catch {
-      setError(intl.formatMessage({ id: 'BILLING.COMMISSIONS.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'BILLING.COMMISSIONS.ERROR') }));
     }
   }, [intl]);
 

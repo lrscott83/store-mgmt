@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import { EFeatures } from '@store-mgmt/domain';
 import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { formatDateOnly } from '~/shared/lib/date-utils';
 import { Button } from '~/shared/components/ui/button';
@@ -33,8 +34,8 @@ export function CollectionsPage() {
       }
       setRows(res.data);
       setError(undefined);
-    } catch {
-      setError(intl.formatMessage({ id: 'BILLING.COLLECTIONS.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'BILLING.COLLECTIONS.ERROR') }));
     }
   }, [intl]);
 
@@ -46,8 +47,8 @@ export function CollectionsPage() {
     try {
       await storeHttpService.registerStorePayment(storeId);
       await loadRows();
-    } catch {
-      setError(intl.formatMessage({ id: 'BILLING.COLLECTIONS.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'BILLING.COLLECTIONS.ERROR') }));
     }
   }
 

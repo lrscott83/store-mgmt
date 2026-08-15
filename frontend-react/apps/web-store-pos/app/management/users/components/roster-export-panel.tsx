@@ -7,6 +7,7 @@ import { CloseIcon, EyeIcon, EyeOffIcon, DownloadIcon } from '~/shared/component
 import { useOnlineStatus } from '~/shared/lib/hooks/use-online-status';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { rosterHttpService } from '~/shared/lib/http/roster-http-service';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { serializeRoster } from '~/shared/lib/offline/roster-serializer';
 
 /**
@@ -63,8 +64,8 @@ export function RosterExportPanel() {
 
       setOpen(false);
       setMaster('');
-    } catch {
-      setError(intl.formatMessage({ id: 'USERS.ERROR' }));
+    } catch (error) {
+      setError(intl.formatMessage({ id: httpErrorKey(error, 'USERS.ERROR') }));
     } finally {
       setBusy(false);
     }

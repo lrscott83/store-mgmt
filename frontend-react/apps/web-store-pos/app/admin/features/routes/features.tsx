@@ -6,6 +6,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { EditIcon } from '~/shared/components/ui/icons';
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
+import { httpErrorKey } from '~/shared/lib/http/http-error';
 
 export const clientLoader = superAdminLoader;
 
@@ -29,9 +30,9 @@ export function FeaturesPage() {
           formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
         );
       }
-    } catch {
+    } catch (error) {
       showToastError(
-        formatMessage({ id: 'FEATURES.UNEXPECTED_ERROR' }),
+        formatMessage({ id: httpErrorKey(error, 'FEATURES.UNEXPECTED_ERROR') }),
         formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
       );
     } finally {
