@@ -14,10 +14,13 @@ import { showBlockingInfo } from '~/shared/lib/blocking-alert';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-rows-for-date';
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
+import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { ProductRepository } from '../lib/repositories/product-repository';
 import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import { OrderList } from '../components/order-list';
+import { DaySalesSummaryModal } from '../components/day-sales-summary-modal';
+import type { DaySalesSummary } from '../components/day-sales-summary-modal';
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
@@ -26,6 +29,40 @@ const PAYMENT_TYPE_OPTIONS = [
   { value: PaymentType.Tarjeta, label: 'Tarjeta' },
   { value: PaymentType.Zelle, label: 'Zelle' },
 ];
+
+/**
+ * Per-day sales summary for the gear-menu popup — same metrics and aggregation as
+ * reports/today's `computeTodayReport` (today-report.tsx), scoped to ONE local day.
+ * Uses `getOrdersInDay` (which honors its date param, unlike `getActiveOrdersInDay`
+ * with Angular's always-today quirk), then keeps only active orders to match the
+ * today report's isActive filter. Rule 12: no shared aggregation service is invented
+ * on the React side — the today report keeps its computation inline in the route file,
+ * so this day-scoped variant lives here too.
+ */
+function computeDaySalesSummary(storeId: string, dateId: string): DaySalesSummary {
+  const orderService = new OrderOfflineService(storeId);
+  const day = fromLocalDayKey(dateId);
+  const orders = orderService.getOrdersInDay(day).filter((o) => o.isActive);
+
+  let totalRevenue = 0;
+  let totalCost = 0;
+
+  for (const order of orders) {
+    for (const item of order.orderItems) {
+      const result = calculateOrderProfit(item);
+      totalRevenue += result.revenue;
+      totalCost += result.cost;
+    }
+  }
+
+  return {
+    date: day,
+    orderCount: orders.length,
+    totalRevenue,
+    totalCost,
+    totalProfit: totalRevenue - totalCost,
+  };
+}
 
 /**
  * Matches Angular's `orders.component.html` (Historial de Ventas): payment-type
@@ -41,6 +78,7 @@ export function OrdersPage() {
   const [expandedDateIds, setExpandedDateIds] = useState<Set<string>>(new Set());
   const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
   const [isCredit, setIsCredit] = useState<number>(-1);
+  const [daySummary, setDaySummary] = useState<DaySalesSummary | null>(null);
 
   function loadOrders() {
     const service = new OrderOfflineService(storeId);
@@ -230,6 +268,12 @@ export function OrdersPage() {
                   >
                     {intl.formatMessage({ id: 'REPORT.INVENTORY_TODAY_SALE' })}
                   </ActionMenuItem>
+                  <ActionMenuItem
+                    onClick={() => setDaySummary(computeDaySalesSummary(storeId, dateId))}
+                    data-testid={`day-summary-button-${dateId}`}
+                  >
+                    {intl.formatMessage({ id: 'SALES.ORDERS.DAY_SALES_SUMMARY' })}
+                  </ActionMenuItem>
                 </ActionMenu>
               </div>
               {isExpanded && (
@@ -241,6 +285,10 @@ export function OrdersPage() {
           );
         })}
       </div>
+
+      {daySummary && (
+        <DaySalesSummaryModal summary={daySummary} onClose={() => setDaySummary(null)} />
+      )}
     </Card>
   );
 }

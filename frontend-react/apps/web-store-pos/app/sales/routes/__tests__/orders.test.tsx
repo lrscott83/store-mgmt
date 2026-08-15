@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import { OrderType, PaymentType } from '@store-mgmt/domain';
-import type { InventoryEntry, Order, Product } from '@store-mgmt/domain';
+import type { InventoryEntry, Order, OrderItem, Product } from '@store-mgmt/domain';
 import { toLocalDayKey } from '~/shared/lib/date-utils';
 import { OrdersPage } from '../orders';
 
@@ -32,6 +32,17 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 vi.mock('~/sales/lib/services/order-offline-service', () => ({
   OrderOfflineService: vi.fn().mockImplementation(() => ({
     getStorageOrders: vi.fn(() => fixtures.orders),
+    // Local calendar-day window — same day-part comparison as fromLocalDayKey + localDayRange.
+    getOrdersInDay: vi.fn((date: Date) =>
+      fixtures.orders.filter((o) => {
+        const d = new Date(o.date);
+        return (
+          d.getFullYear() === date.getFullYear() &&
+          d.getMonth() === date.getMonth() &&
+          d.getDate() === date.getDate()
+        );
+      }),
+    ),
   })),
 }));
 
@@ -86,6 +97,22 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     isActive: true,
     createdDate: new Date(2026, 0, 1, 12, 0, 0),
     createdByName: 'test',
+    ...overrides,
+  };
+}
+
+function makeOrderItem(overrides: Partial<OrderItem> = {}): OrderItem {
+  return {
+    productId: 'p1',
+    productName: 'Ron',
+    categoryId: 'c1',
+    categoryName: 'Bebidas',
+    name: 'Ron',
+    quantity: 1,
+    price: 10,
+    productBusinessId: 'biz-1',
+    productCosts: [],
+    order: 1,
     ...overrides,
   };
 }
@@ -236,5 +263,184 @@ describe('OrdersPage — per-day inventory-at-sale-price export', () => {
     );
     // The PDF still exports with the suspect row data.
     await waitFor(() => expect(fixtures.exportPdf).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
+  beforeEach(() => {
+    fixtures.orders = [];
+    fixtures.products = [];
+    fixtures.entries = {};
+    fixtures.generateRows.mockReset().mockReturnValue({ rows: [], suspectProductNames: [] });
+    fixtures.exportPdf.mockReset().mockResolvedValue(undefined);
+    fixtures.showBlockingInfo.mockReset();
+  });
+
+  it('renders a "Resumen de ventas del día" option in each day gear menu', () => {
+    fixtures.orders = [makeOrder({ id: 'o1', date: new Date(2026, 0, 1, 12, 0, 0) })];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('day-actions-toggle-2026-01-01'));
+    expect(screen.getByText('Resumen de ventas del día')).toBeInTheDocument();
+  });
+
+  it('opens a popup with that day order count, revenue, cost and profit (title carries the day)', () => {
+    fixtures.orders = [
+      makeOrder({
+        id: 'o1',
+        date: new Date(2026, 0, 1, 12, 0, 0),
+        orderItems: [
+          makeOrderItem({
+            quantity: 2,
+            price: 10,
+            productCosts: [{ inventoryId: 'i1', quantity: 2, costPrice: 4 }],
+          }),
+        ],
+      }),
+      makeOrder({
+        id: 'o2',
+        date: new Date(2026, 0, 1, 15, 0, 0),
+        orderItems: [
+          makeOrderItem({
+            quantity: 1,
+            price: 5,
+            productCosts: [{ inventoryId: 'i2', quantity: 1, costPrice: 1 }],
+          }),
+        ],
+      }),
+      // Another day — must NOT leak into the 01-01 popup.
+      makeOrder({
+        id: 'o3',
+        date: new Date(2026, 0, 2, 12, 0, 0),
+        orderItems: [makeOrderItem({ quantity: 1, price: 100, productCosts: [] })],
+      }),
+    ];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('day-actions-toggle-2026-01-01'));
+    fireEvent.click(screen.getByTestId('day-summary-button-2026-01-01'));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Resumen de ventas del 01/01/2026')).toBeInTheDocument();
+    // Revenue: 2*10 + 1*5 = 25; Cost: 2*4 + 1*1 = 9; Profit: 16.
+    expect(within(dialog).getByText('2')).toBeInTheDocument();
+    expect(within(dialog).getByText('$25.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$9.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$16.00')).toBeInTheDocument();
+  });
+
+  it('excludes inactive orders from the day summary (isActive filter, matching the today report)', () => {
+    fixtures.orders = [
+      makeOrder({
+        id: 'oActive',
+        date: new Date(2026, 0, 1, 12, 0, 0),
+        orderItems: [
+          makeOrderItem({
+            quantity: 1,
+            price: 10,
+            productCosts: [{ inventoryId: 'i1', quantity: 1, costPrice: 4 }],
+          }),
+        ],
+      }),
+      makeOrder({
+        id: 'oInactive',
+        date: new Date(2026, 0, 1, 11, 0, 0),
+        isActive: false,
+        orderItems: [makeOrderItem({ quantity: 5, price: 100, productCosts: [] })],
+      }),
+    ];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('day-actions-toggle-2026-01-01'));
+    fireEvent.click(screen.getByTestId('day-summary-button-2026-01-01'));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('1')).toBeInTheDocument();
+    expect(within(dialog).getByText('$10.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$4.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$6.00')).toBeInTheDocument();
+  });
+
+  it('ignores the page payment filter — the popup reports the whole day, like the today report', () => {
+    fixtures.orders = [
+      makeOrder({
+        id: 'oEfectivo',
+        date: new Date(2026, 0, 1, 12, 0, 0),
+        paymentType: PaymentType.Efectivo,
+        orderItems: [
+          makeOrderItem({
+            quantity: 1,
+            price: 10,
+            productCosts: [{ inventoryId: 'i1', quantity: 1, costPrice: 3 }],
+          }),
+        ],
+      }),
+      makeOrder({
+        id: 'oTarjeta',
+        date: new Date(2026, 0, 1, 13, 0, 0),
+        paymentType: PaymentType.Tarjeta,
+        orderItems: [
+          makeOrderItem({
+            quantity: 1,
+            price: 20,
+            productCosts: [{ inventoryId: 'i2', quantity: 1, costPrice: 8 }],
+          }),
+        ],
+      }),
+    ];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+
+    // Filter the page to Tarjeta only — the day group still exists (one order).
+    fireEvent.click(screen.getByText('Tarjeta'));
+    fireEvent.click(screen.getByTestId('day-actions-toggle-2026-01-01'));
+    fireEvent.click(screen.getByTestId('day-summary-button-2026-01-01'));
+
+    const dialog = screen.getByRole('dialog');
+    // Both orders of the day: revenue 10 + 20 = 30, cost 3 + 8 = 11, profit 19.
+    expect(within(dialog).getByText('2')).toBeInTheDocument();
+    expect(within(dialog).getByText('$30.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$11.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$19.00')).toBeInTheDocument();
+  });
+
+  it('closes the popup via the close buttons', () => {
+    fixtures.orders = [makeOrder({ id: 'o1', date: new Date(2026, 0, 1, 12, 0, 0) })];
+
+    render(
+      <Wrapper>
+        <OrdersPage />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('day-actions-toggle-2026-01-01'));
+    fireEvent.click(screen.getByTestId('day-summary-button-2026-01-01'));
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    // Both the header X and the footer button carry GENERAL.CLOSE ('Cerrar').
+    const closeButtons = within(dialog).getAllByRole('button', { name: 'Cerrar' });
+    expect(closeButtons.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(closeButtons[0]);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

@@ -413,6 +413,12 @@ const messages: Record<string, string> = {
   // stock exceeding the received quantity). Interpolates the comma-joined product names.
   'SALES.ORDERS.REPORT_SUSPECT_WARNING':
     'El stock de estos productos pudo ser editado después de ese día: {names}',
+  // SALES.ORDERS.DAY_SALES_SUMMARY / _TITLE — per-day "Resumen de ventas" popup from the
+  // sales-history day gear menu (React-only feature: Angular's orders history has no gear
+  // menu at all). Shows the same four metrics as the reports/today sales-summary section,
+  // scoped to a single day; the title interpolates the day (dd/mm/yyyy).
+  'SALES.ORDERS.DAY_SALES_SUMMARY': 'Resumen de ventas del día',
+  'SALES.ORDERS.DAY_SALES_SUMMARY_TITLE': 'Resumen de ventas del {date}',
   'ORDERS.TODAY_TITLE': 'Pedidos de hoy',
   'ORDERS.STATS_TITLE': 'Estadísticas de hoy',
   'ORDERS.DATE': 'Fecha',
