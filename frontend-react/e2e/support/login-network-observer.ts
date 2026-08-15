@@ -36,14 +36,15 @@ export interface LoginResponseCapture {
  * Thrown by `waitForLoginResponse()` when the backend answers 429 — login
  * quota exhausted (`RateLimitPolicies.cs:15-24`, `LoginPolicy`).
  *
- * Verified trap #2: these are the LOGIN thresholds — 5 attempts per minute,
- * sliding window of 3 segments — NOT `RegisterPolicy`'s 10/10min/10. Never
- * copy the sibling's constants into this file.
+ * Verified trap #2: these are the LOGIN thresholds — 15 attempts per minute,
+ * sliding window of 3 segments (raised 10 -> 15 on 2026-08-15) — NOT
+ * `RegisterPolicy`'s 50/10min/10. Never copy the sibling's constants into
+ * this file.
  *
  * Constructed HERE, never in `network-observer-core.ts` — same reasoning as
  * `RegisterRateLimitError` in `network-observer.ts` (`e2e-network-observer-core`
  * REQ-4): the core receives a `rateLimitError` factory instead, so this
- * class's identity and its own 5/1min threshold text stay owned by this
+ * class's identity and its own 15/1min threshold text stay owned by this
  * module alone, never merged with the register sibling's.
  */
 export class LoginRateLimitError extends Error {}
@@ -231,10 +232,10 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
         subject: 'login',
         rateLimitError: () =>
           new LoginRateLimitError(
-            'Login quota exhausted for this IP: 5 login attempts per 1-minute sliding window, ' +
-              '3 segments (RateLimitPolicies.cs:15-24, LoginPolicy). Wait roughly a minute — the ' +
-              'window releases permits gradually, not all at once. This failure does NOT indicate ' +
-              'an app defect.'
+            'Login quota exhausted for this IP: 15 login attempts per 1-minute sliding window, ' +
+              '3 segments (RateLimitPolicies.cs:15-24, LoginPolicy, PermitLimit=15). Wait roughly ' +
+              'a minute — the window releases permits gradually, not all at once. This failure ' +
+              'does NOT indicate an app defect.'
           ),
       });
     },

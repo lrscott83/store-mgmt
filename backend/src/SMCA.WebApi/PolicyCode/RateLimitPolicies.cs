@@ -17,7 +17,11 @@ public static class RateLimitPolicies
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new SlidingWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                // Raised 10 -> 15 (user decision 2026-08-15): the E2E suite's
+                // real logins cluster within a minute under full parallel load
+                // (persona mints + live-login tests), tripping the old limit and
+                // failing login-heavy tests intermittently with 429s.
+                PermitLimit = 15,
                 Window = TimeSpan.FromMinutes(1),
                 SegmentsPerWindow = 3,
                 QueueLimit = 0
@@ -28,7 +32,12 @@ public static class RateLimitPolicies
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new SlidingWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                // Raised 10 -> 50 (user decision 2026-08-15): the E2E suite grew past
+                // the old 10-per-window budget (register.spec + persona mints + roster
+                // recovery ≈ 8-10 registrations per run), so repeated full runs tripped
+                // the limiter. SegmentsPerWindow stays 10 -> each 1-min segment
+                // replenishes 5 permits.
+                PermitLimit = 50,
                 Window = TimeSpan.FromMinutes(10),
                 SegmentsPerWindow = 10,
                 QueueLimit = 0

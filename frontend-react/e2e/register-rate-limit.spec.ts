@@ -10,7 +10,12 @@ const TOO_MANY_ATTEMPTS_TEXT =
 // `pnpm test:e2e` run (design.md §9): the loop cuts as soon as a 429
 // arrives, whichever attempt number that turns out to be — it does not
 // assume the window starts empty.
-const MAX_ATTEMPTS = 11;
+//
+// RegisterPolicy PermitLimit raised 10 -> 50 (RateLimitPolicies.cs,
+// 2026-08-15): the loop must now submit 50 requests to consume the quota
+// (attempt 1 registers; attempts 2-50 are duplicate 400s that still burn a
+// permit, design.md §9) plus one more to actually observe the 429.
+const MAX_ATTEMPTS = 51;
 
 // Isolated by TAG, not by config or a dedicated Playwright `project`
 // (design.md §9): `playwright.config.ts`'s single `projects` entry has no
@@ -22,9 +27,10 @@ const MAX_ATTEMPTS = 11;
 // selects it.
 test.describe('register — rate limit (REQ-9)', { tag: '@rate-limit' }, () => {
   // Spec-level timeout (design.md §9: "a nivel spec, no en la config") — up
-  // to 11 sequential real submissions plus page loads comfortably exceed the
-  // default 30s test timeout.
-  test.setTimeout(120_000);
+  // to 51 sequential submissions plus page loads take several minutes (each
+  // attempt is a full goto + form fill + submit + response wait), so the
+  // timeout is scaled well past the default 30s.
+  test.setTimeout(480_000);
 
   test('a duplicate-login flood eventually shows the too-many-attempts banner', async ({
     page,

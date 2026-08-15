@@ -87,11 +87,11 @@ Ningún escenario está completo en ambas capas.
 
 **Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`), `login-offline.spec.ts` cubre S1-03 (11 tests, capability `e2e-offline-login-ui`, corre sin backend levantado — verificado sin proceso `dotnet` activo el 2026-08-08), y `store-plan-activation.spec.ts` cubre S2-01 (2 tests: un `test()` continuo con las 10 aserciones DOM+red del plan, y un `test()` independiente para el fallo de carga — SÍ necesita backend real levantado, a diferencia de `login-offline.spec.ts`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto pasó de 31 a **42 tests** (31 + los 11 de `login-offline.spec.ts`), observada verde contra backend real el 2026-08-08 (`42 passed (55.3s)`, 8 workers, corrido por el usuario). Con `store-plan-activation.spec.ts` la corrida por defecto pasa de 42 a **44 tests** (`pnpm test:e2e`) — aritmética **42 + 2 = 44**, confirmada por `pnpm exec playwright test --list --grep-invert @rate-limit` (`Total: 44 tests in 6 files`, no necesita backend ni navegador), pero **no** es una corrida observada: quien implementó S2-01 no tuvo backend disponible en su sesión para correr Playwright de verdad, así que si esos 44 pasan en verde queda pendiente de confirmación por el usuario. Además, `login-offline.spec.ts` en solitario se corrió **sin backend levantado** y dio 11/11 verdes, lo que sostiene aparte que S1-03 no necesita servidor.
 
-Los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. También se corrieron el **2026-08-08 tras el refactor del núcleo de observers**: `2 passed (18.2s)`. Eso importa más que un verde cualquiera: cada uno de esos specs lanza un error explícito si su bucle termina sin observar un 429, así que verde ⇒ el límite se disparó ⇒ las dos clases de error (`RegisterRateLimitError` con su umbral 10/10min y `LoginRateLimitError` con su 5/1min) siguen construyéndose bien cada una en su módulo. Es la única evidencia por ejecución de que el núcleo compartido no las unificó.
+Los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. También se corrieron el **2026-08-08 tras el refactor del núcleo de observers**: `2 passed (18.2s)`. Eso importa más que un verde cualquiera: cada uno de esos specs lanza un error explícito si su bucle termina sin observar un 429, así que verde ⇒ el límite se disparó ⇒ las dos clases de error (`RegisterRateLimitError` con su umbral 50/10min — subido de 10 el 2026-08-15 — y `LoginRateLimitError` con su 15/1min — subido de 10 el 2026-08-15) siguen construyéndose bien cada una en su módulo. Es la única evidencia por ejecución de que el núcleo compartido no las unificó.
 
 Una limitación que conviene no perder: **la línea base de los 31 verdes ANTES del refactor de observers nunca se re-corrió en la rama de S1-03**. La evidencia de "verde antes" es la corrida documentada del 2026-08-07. Lo que sí está observado es el "verde después", con los 42.
 
-**La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 5/min**, amortizados con `storageState`. Ese margen de uno es la restricción a respetar al escribir el próximo escenario.
+**La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 15/min** (subido de 5→10→15; 2026-08-15), amortizados con `storageState`. Ese margen es la restricción a respetar al escribir el próximo escenario.
 
 **Rate limiting hoy**: `SMCA.WebApi.E2ETests/RateLimiting/RateLimitPoliciesTests.cs` tiene 4 tests (`:38,49,72,83`) y **todos** son de la política **Register**. La política **Login** está cubierta por 4 tests .NET (`LoginRateLimitPoliciesTests.cs`, fábrica: options+partición); el 429 HTTP lo sigue probando Playwright. Y ninguno de los ocho es de extremo a extremo: son unitarios de la fábrica de políticas, con el limitador construido a mano (`RateLimitPoliciesTests.cs:24-35`), porque bajo `Testing` el middleware ni se registra (**H-12**).
 
@@ -278,8 +278,8 @@ Los umbrales están **hardcodeados**, no configurados (`SMCA.WebApi/PolicyCode/R
 
 | Política | Límite | Ventana | Segmentos | Cola | Partición |
 |---|---|---|---|---|---|
-| `LoginPolicy` (`:15-24`) | 5 | 1 min | 3 | 0 | IP remota |
-| `RegisterPolicy` (`:26-35`) | 10 | 10 min | 10 | 0 | IP remota |
+| `LoginPolicy` (`:15-24`) | 15 | 1 min | 3 | 0 | IP remota |
+| `RegisterPolicy` (`:26-35`) | 50 | 10 min | 10 | 0 | IP remota |
 
 Aplicadas vía `[EnableRateLimiting("LoginPolicy")]` (`AuthController.cs:27`) y `[EnableRateLimiting("RegisterPolicy")]` (`AuthController.cs:102`). `RejectionStatusCode = 429` (`Program.cs:114`). La partición es por **IP**, no por login: varios usuarios detrás de un mismo NAT comparten cupo.
 
@@ -364,7 +364,7 @@ Bitácora de cierre, para que el próximo lector sepa qué se resolvió y dónde
 | 4 | Scoping por tienda en `/management/users/edit/:id` | **Negativo documentado**: no existe en el cliente ni en el handler | [S3-03](S3-03.md) (aserciones 🔴/🆕) + **H-11** |
 | 5 | `resolveUserHomePath` | **Resuelto**: dos ramas, tabla completa por persona | [S1-02](S1-02.md) (tabla + 6 aserciones), [S1-01](S1-01.md), [S1-03](S1-03.md) |
 | 6 | Formato de `serializeRoster` | **Resuelto**: ZIP AES de una entrada, password `${master}${storeId}` | [S3-01](S3-01.md) (5 aserciones) |
-| 7 | Umbrales de rate limiting | **Resuelto**: login 5/1min, register 10/10min, por IP, hardcodeados | [S1-01](S1-01.md), [S1-02](S1-02.md) + **H-12**, **H-13** |
+| 7 | Umbrales de rate limiting | **Resuelto**: login 15/1min (subido de 10 el 2026-08-15), register 50/10min (subido de 10 el 2026-08-15), por IP, hardcodeados | [S1-01](S1-01.md), [S1-02](S1-02.md) + **H-12**, **H-13** |
 | 8 | ¿`GET /v1/stores/{id}` devuelve solo módulos activos? | **Resuelto y la suposición del frontend SE SOSTIENE** | [S2-01](S2-01.md) (bloque "De dónde sale cada mitad") |
 
 ### La incógnita deliberada quedó respondida por corrida real

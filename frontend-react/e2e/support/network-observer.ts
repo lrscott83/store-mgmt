@@ -36,7 +36,7 @@ export interface RegisterResponseCapture {
  *
  * Constructed HERE, never in `network-observer-core.ts` — the core receives
  * a `rateLimitError` factory instead, so this class's identity (and its
- * 10/10min threshold text) stays entirely owned by this module
+ * 50/10min threshold text) stays entirely owned by this module
  * (`e2e-network-observer-core` REQ-4).
  */
 export class RegisterRateLimitError extends Error {}
@@ -138,10 +138,10 @@ export function installRegisterNetworkObserver(page: Page): RegisterNetworkObser
         subject: 'registro',
         rateLimitError: () =>
           new RegisterRateLimitError(
-            'Registration quota exhausted for this IP: 10 registrations per 10-minute window ' +
+            'Registration quota exhausted for this IP: 50 registrations per 10-minute window ' +
               '(RateLimitPolicies.cs:26-35). Wait up to 10 minutes — the limiter releases permits ' +
-              'at roughly 1 per minute (SegmentsPerWindow=10). This failure does NOT indicate an ' +
-              'app defect.'
+              'at roughly 5 per minute (SegmentsPerWindow=10, PermitLimit=50). This failure does ' +
+              'NOT indicate an app defect.'
           ),
       });
     },

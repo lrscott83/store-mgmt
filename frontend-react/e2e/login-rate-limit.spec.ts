@@ -8,10 +8,11 @@ import { LoginRateLimitError } from './support/login-network-observer';
 const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Esperá un momento antes de volver a intentar.';
 
 // Verified trap #4 / constants that SHRINK, never get copied from the
-// sibling (design.md ��8): `LoginPolicy` is 10 attempts / 1 minute / 3
-// segments �?" NOT `RegisterPolicy`'s 10/10min/10. MAX_ATTEMPTS = 12, not 11:
-// PermitLimit=10 plus 2 of margin in case a segment releases mid-loop.
-const MAX_ATTEMPTS = 12;
+// sibling (design.md ��8): `LoginPolicy` is 15 attempts / 1 minute / 3
+// segments �?" NOT `RegisterPolicy`'s 50/10min/10. MAX_ATTEMPTS = 17, not 16:
+// PermitLimit=15 (raised 10 -> 15 on 2026-08-15) plus 2 of margin in case a
+// segment releases mid-loop.
+const MAX_ATTEMPTS = 17;
 
 // Isolated by TAG, not by config or a dedicated Playwright `project` — same
 // reasoning as register-rate-limit.spec.ts (design.md §8/§9):
@@ -20,10 +21,10 @@ const MAX_ATTEMPTS = 12;
 // `api-health.spec.ts`. `package.json`'s scripts already exist and already
 // filter by this tag — `package.json` is NOT touched.
 test.describe('login — rate limit (REQ-8)', { tag: '@rate-limit' }, () => {
-  // Spec-level timeout (design.md §8) — 60s, not the register sibling's
-  // 120s: the login window is 10x shorter, so the whole loop resolves much
-  // sooner (or the limiter trips much sooner).
-  test.setTimeout(60_000);
+  // Spec-level timeout (design.md §8) — 90s: the login window is much
+  // shorter than the register sibling's, so the whole loop resolves sooner —
+  // but 17 attempts still need more than the default 30s.
+  test.setTimeout(90_000);
 
   test('a flood of bad logins eventually shows the too-many-attempts banner', async ({
     page,

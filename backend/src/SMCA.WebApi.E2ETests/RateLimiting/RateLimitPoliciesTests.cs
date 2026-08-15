@@ -39,7 +39,7 @@ public class RateLimitPoliciesTests
     {
         var options = OptionsOf(RateLimitPolicies.Register(ContextWithIp(null)));
 
-        options.PermitLimit.Should().Be(10);
+        options.PermitLimit.Should().Be(50);
         options.Window.Should().Be(TimeSpan.FromMinutes(10));
         options.SegmentsPerWindow.Should().Be(10);
         options.QueueLimit.Should().Be(0);
@@ -54,15 +54,15 @@ public class RateLimitPoliciesTests
         limiter.ReplenishmentPeriod.Should().Be(TimeSpan.FromMinutes(1));
 
         // Fresh limiter starts with exactly PermitLimit permits available
-        limiter.GetStatistics().CurrentAvailablePermits.Should().Be(10);
+        limiter.GetStatistics().CurrentAvailablePermits.Should().Be(50);
 
         // Requesting more than PermitLimit throws; the runtime message confirms the limit
-        var act = () => limiter.AttemptAcquire(11);
+        var act = () => limiter.AttemptAcquire(51);
         act.Should().Throw<ArgumentOutOfRangeException>()
-            .WithMessage("*permit limit of 10*");
+            .WithMessage("*permit limit of 50*");
 
         // Exactly PermitLimit permits can be acquired at once
-        using (var full = limiter.AttemptAcquire(10))
+        using (var full = limiter.AttemptAcquire(50))
         {
             full.IsAcquired.Should().BeTrue();
         }
