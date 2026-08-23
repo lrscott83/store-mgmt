@@ -52,7 +52,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
-| [S4-01](S4-01.md) | Editar el perfil propio | MEDIA | **PENDIENTE** | **CUBIERTO** |
+| [S4-01](S4-01.md) | Editar el perfil propio | MEDIA | **CUBIERTO** — 3 tests, 6 aserciones (`e2e/edit-profile.spec.ts`): pre-carga + payload + éxito, formulario pre-cargado, offline | **CUBIERTO** |
 | [S4-02](S4-02.md) | Cambiar la contraseña propia | ALTA | **CUBIERTO** — 2 tests, 5 aserciones (`e2e/change-password.spec.ts`): logout forzado + re-login con nueva contraseña + offline | **CUBIERTO** |
 
 ### Invariante transversal
@@ -65,7 +65,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 10 CUBIERTO · 1 PARCIAL · 1 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E frontend**: 11 CUBIERTO · 1 PARCIAL · 0 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
 - **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
