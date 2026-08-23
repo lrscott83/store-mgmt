@@ -136,16 +136,13 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddApiVersioningExtension();
 builder.Services.AddHealthChecks();
 
-if (!builder.Environment.IsEnvironment("Testing"))
+builder.Services.AddRateLimiter(options =>
 {
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-        options.AddPolicy("LoginPolicy", RateLimitPolicies.Login);
-        options.AddPolicy("RegisterPolicy", RateLimitPolicies.Register);
-    });
-}
+    options.AddPolicy("LoginPolicy", RateLimitPolicies.Login);
+    options.AddPolicy("RegisterPolicy", RateLimitPolicies.Register);
+});
 
 var app = builder.Build();
 
@@ -181,10 +178,7 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    app.UseRateLimiter();
-}
+app.UseRateLimiter();
 
 app.UseMiddleware<ErrorHandlerMiddleware>();
 app.UseHealthChecks("/health");

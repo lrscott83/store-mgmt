@@ -28,7 +28,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
 | [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **PARCIAL** — REQ-1…REQ-9 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); REQ-9 (429) **verificado en vivo** el 2026-08-07 — el spec lanza error explícito si nunca observa un 429, así que verde ⇒ el límite se disparó; falta el destino post-registro ([F-2](plan-frontend.md#f-2)) | **CUBIERTO** |
-| [S1-02](S1-02.md) | Login online | CRÍTICA | **CUBIERTO** — REQ-1…REQ-16 implementados y verificados en vivo contra backend real el 2026-08-07 (`e2e/login.spec.ts`; REQ-8/429 en `e2e/login-rate-limit.spec.ts`, que corre aparte con `pnpm test:e2e:rate-limit`) | **PARCIAL** — tienda inactiva → 403 **ya cubierta** (`Auth/AuthLoginFailureTests.cs:64`); **el 429 en la capa .NET sigue sin ser alcanzable**: hoy `Program.cs:112-121` y `:157-160` siguen excluyendo `AddRateLimiter`/`UseRateLimiter` bajo `Testing` (verificado 2026-08-13), así que H-12 **no queda refutada para la suite .NET** — el 429 que Playwright observó el 2026-08-07 es contra la app real en entorno no-`Testing`, donde el límite sí está registrado. Cubrir el 429 en .NET exigiría registrar el limitador también bajo `Testing` (cambio de producción, decisión aparte) |
+| [S1-02](S1-02.md) | Login online | CRÍTICA | **CUBIERTO** — REQ-1…REQ-16 implementados y verificados en vivo contra backend real el 2026-08-07 (`e2e/login.spec.ts`; REQ-8/429 en `e2e/login-rate-limit.spec.ts`, que corre aparte con `pnpm test:e2e:rate-limit`) | **CUBIERTO** — tienda inactiva → 403 cubierta (`AuthLoginFailureTests.cs:64`); **429 ahora alcanzable en .NET** tras fix H-12 (2026-08-23): `Program.cs` ya no excluye `AddRateLimiter`/`UseRateLimiter` bajo `Testing`. Login subió a 40/min para dar margen a la suite paralela. |
 | [S1-03](S1-03.md) | Login offline en dispositivo aprovisionado | CRÍTICA | **CUBIERTO** — 11 tests / 12 aserciones implementados y verificados el 2026-08-08 sin backend levantado (`e2e/login-offline.spec.ts`), corre en la suite por defecto | **N/A** — cero HTTP; la contraparte de servidor es S3-01 |
 | [S1-04](S1-04.md) | Hidratación de sesión: la caché válida no llama al backend | CRÍTICA | **PARCIAL** — REQ-1…REQ-11 implementados y verificados en vivo (`e2e/login.spec.ts`, T1-T11, capability `e2e-session-hydration`, backend real, 2026-08-07: 31 passed); la rama del 404 real de REQ-4 es brecha declarada (H-6, G1) y la guarda de pathname de REQ-8 no es discriminable en Playwright por timing de arranque (G2, cubierta en `auth-store.test.ts`) | **CUBIERTO** |
 
@@ -93,9 +93,9 @@ Los dos specs de rate-limit quedan fuera a propósito —gastan decenas de inten
 
 Una limitación que conviene no perder: **la línea base de los 31 verdes ANTES del refactor de observers nunca se re-corrió en la rama de S1-03**. La evidencia de "verde antes" es la corrida documentada del 2026-08-07. Lo que sí está observado es el "verde después", con los 42.
 
-**La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 15/min** (subido de 5→10→15; 2026-08-15), amortizados con `storageState`. Ese margen es la restricción a respetar al escribir el próximo escenario.
+**La fixture de sesión ya existe.** `signedInPage` (capacidad `e2e-session-fixture`) nació con S1-02 y es de lo que dependen los diez escenarios restantes: todos arrancan con "usuario autenticado" en sus precondiciones. Presupuesto vigente: **4 logins reales por corrida contra un techo de 40/min** (subido de 5→10→15→40; 2026-08-23 para H-12), amortizados con `storageState`. Ese margen es la restricción a respetar al escribir el próximo escenario.
 
-**Rate limiting hoy**: `SMCA.WebApi.E2ETests/RateLimiting/RateLimitPoliciesTests.cs` tiene 4 tests (`:38,49,72,83`) y **todos** son de la política **Register**. La política **Login** está cubierta por 4 tests .NET (`LoginRateLimitPoliciesTests.cs`, fábrica: options+partición); el 429 HTTP lo sigue probando Playwright. Y ninguno de los ocho es de extremo a extremo: son unitarios de la fábrica de políticas, con el limitador construido a mano (`RateLimitPoliciesTests.cs:24-35`), porque bajo `Testing` el middleware ni se registra (**H-12**).
+**Rate limiting hoy** (H-12 resuelto 2026-08-23): `Program.cs` ya no excluye `AddRateLimiter`/`UseRateLimiter` bajo `Testing` — el middleware está activo. Login 40/min (subido de 15 para margen de suite paralela), Register 50/10min. `RateLimitPoliciesTests.cs` (4 tests Register) y `LoginRateLimitPoliciesTests.cs` (4 tests Login) verifican opciones y partición. La suite .NET E2E ahora sí puede ejercitar 429s reales.
 
 ---
 
@@ -270,20 +270,20 @@ Traducido: *"o sos vos mismo, o sos admin"*. **Y es correcto**: el OwnerAdmin es
 
 **Consecuencia sobre la cobertura**: la mitad "cross-store" de la aserción de S3-03 era una expectativa equivocada (aislamiento por tienda), no un defecto. El comportamiento medido —un OwnerAdmin edita a un usuario de otra tienda del mismo tenant y el cambio se aplica (`UsersIsolationTests.cs:48`)— es la regla de negocio. La única consideración que queda es de UI (qué lista ve el OwnerAdmin según `SelectedStoreId`), que es producto, no seguridad.
 
-### H-12 — El rate limiting está **apagado** en el entorno de pruebas
+### H-12 — El rate limiting estaba **apagado** en el entorno de pruebas — **RESUELTO** (2026-08-23)
 
-`Program.cs:110` y `:156` envuelven tanto `AddRateLimiter` como `UseRateLimiter` en `if (!Environment.IsEnvironment("Testing"))`. La suite E2E corre precisamente bajo ese entorno (`SMCA.WebApi.E2ETests/Infrastructure/WebAppFixture.cs:25` lo menciona explícitamente al justificar por qué aplica migraciones a mano).
+`Program.cs` envolvía `AddRateLimiter` y `UseRateLimiter` en `if (!Environment.IsEnvironment("Testing"))`. La suite E2E corre precisamente bajo ese entorno (`WebAppFixture.cs:25`). **Fix**: se eliminaron ambos guards, de modo que el rate limiter ahora está activo bajo todos los entornos incluyendo `Testing`.
 
-Consecuencia: las ramas 429 del frontend (`register.tsx:137-138`, `login.tsx:175-176`) **no son alcanzables desde la suite .NET E2E**. Solo pueden probarse en Playwright contra un entorno no-`Testing`.
+Consecuencia resuelta: la suite .NET E2E ahora **sí puede ejercitar el 429** — no requiere un entorno externo.
 
 Los umbrales están **hardcodeados**, no configurados (`SMCA.WebApi/PolicyCode/RateLimitPolicies.cs`):
 
 | Política | Límite | Ventana | Segmentos | Cola | Partición |
 |---|---|---|---|---|---|
-| `LoginPolicy` (`:15-24`) | 15 | 1 min | 3 | 0 | IP remota |
+| `LoginPolicy` (`:15-24`) | 40 | 1 min | 3 | 0 | IP remota |
 | `RegisterPolicy` (`:26-35`) | 50 | 10 min | 10 | 0 | IP remota |
 
-Aplicadas vía `[EnableRateLimiting("LoginPolicy")]` (`AuthController.cs:27`) y `[EnableRateLimiting("RegisterPolicy")]` (`AuthController.cs:102`). `RejectionStatusCode = 429` (`Program.cs:114`). La partición es por **IP**, no por login: varios usuarios detrás de un mismo NAT comparten cupo.
+El límite de login subió de 15→40 para dar margen a la suite E2E (que ejecuta tests de login en paralelo, todos compartiendo la misma partición IP). Aplicadas vía `[EnableRateLimiting("LoginPolicy")]` (`AuthController.cs:27`) y `[EnableRateLimiting("RegisterPolicy")]` (`AuthController.cs:102`). La partición es por **IP**, no por login.
 
 ### H-13 — `POST /v1/auth/refresh` y `POST /v1/auth/revoke` existen y no tienen rate limit
 

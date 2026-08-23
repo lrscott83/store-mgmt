@@ -37,7 +37,7 @@ export interface LoginResponseCapture {
  * quota exhausted (`RateLimitPolicies.cs:15-24`, `LoginPolicy`).
  *
  * Verified trap #2: these are the LOGIN thresholds — 15 attempts per minute,
- * sliding window of 3 segments (raised 10 -> 15 on 2026-08-15) — NOT
+ * sliding window of 3 segments (raised 15 -> 30 on 2026-08-23) — NOT
  * `RegisterPolicy`'s 50/10min/10. Never copy the sibling's constants into
  * this file.
  *
@@ -232,8 +232,8 @@ export function installLoginNetworkObserver(page: Page): LoginNetworkObserver {
         subject: 'login',
         rateLimitError: () =>
           new LoginRateLimitError(
-            'Login quota exhausted for this IP: 15 login attempts per 1-minute sliding window, ' +
-              '3 segments (RateLimitPolicies.cs:15-24, LoginPolicy, PermitLimit=15). Wait roughly ' +
+            'Login quota exhausted for this IP: 40 login attempts per 1-minute sliding window, ' +
+              '3 segments (RateLimitPolicies.cs:15-24, LoginPolicy, PermitLimit=40). Wait roughly ' +
               'a minute — the window releases permits gradually, not all at once. This failure ' +
               'does NOT indicate an app defect.'
           ),

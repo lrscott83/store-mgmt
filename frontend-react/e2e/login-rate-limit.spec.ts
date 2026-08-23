@@ -8,11 +8,11 @@ import { LoginRateLimitError } from './support/login-network-observer';
 const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Esperá un momento antes de volver a intentar.';
 
 // Verified trap #4 / constants that SHRINK, never get copied from the
-// sibling (design.md ��8): `LoginPolicy` is 15 attempts / 1 minute / 3
-// segments �?" NOT `RegisterPolicy`'s 50/10min/10. MAX_ATTEMPTS = 17, not 16:
-// PermitLimit=15 (raised 10 -> 15 on 2026-08-15) plus 2 of margin in case a
+// sibling (design.md ��8): `LoginPolicy` is 40 attempts / 1 minute / 3
+// segments �?" NOT `RegisterPolicy`'s 50/10min/10. MAX_ATTEMPTS = 42, not 41:
+// PermitLimit=40 (raised 15 -> 30 on 2026-08-23 for H-12) plus 2 of margin in case a
 // segment releases mid-loop.
-const MAX_ATTEMPTS = 17;
+const MAX_ATTEMPTS = 42;
 
 // Isolated by TAG, not by config or a dedicated Playwright `project` — same
 // reasoning as register-rate-limit.spec.ts (design.md §8/§9):

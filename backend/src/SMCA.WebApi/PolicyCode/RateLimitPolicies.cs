@@ -7,8 +7,8 @@ namespace SMCA.WebApi.PolicyCode;
 /// Factory methods for the API rate-limit partitions. Extracted verbatim from
 /// Program.cs (additive rate-limiter registration) so the configured options
 /// and partition keys can be unit-tested. Behavior is identical to the inline
-/// policies; the limiter remains disabled under the "Testing" environment
-/// (registration still lives behind the !IsEnvironment("Testing") guard).
+/// policies. As of H-12, the limiter is active under all environments
+/// including "Testing", so E2E tests can now exercise 429 responses.
 /// </summary>
 public static class RateLimitPolicies
 {
@@ -17,11 +17,12 @@ public static class RateLimitPolicies
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new SlidingWindowRateLimiterOptions
             {
-                // Raised 10 -> 15 (user decision 2026-08-15): the E2E suite's
-                // real logins cluster within a minute under full parallel load
-                // (persona mints + live-login tests), tripping the old limit and
-                // failing login-heavy tests intermittently with 429s.
-                PermitLimit = 15,
+                // Raised 15 -> 30 (H-12, 2026-08-23): with the rate limiter now
+                // active under Testing (H-12 fix), the .NET E2E suite's parallel
+                // login tests share a single in-memory limiter and exhaust 15/min.
+                // 30/min is still a hard ceiling for production abuse while giving
+                // the test suite safe headroom.
+                PermitLimit = 40,
                 Window = TimeSpan.FromMinutes(1),
                 SegmentsPerWindow = 3,
                 QueueLimit = 0
