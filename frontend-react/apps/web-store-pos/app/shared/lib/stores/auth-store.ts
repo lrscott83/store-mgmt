@@ -286,7 +286,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const authData = response.data;
-      const expiresIn = Date.now() + THIRTY_FIVE_DAYS_MS;
+      // H-3 fix: use the server's expiresIn (ISO-8601 DateTime string from
+      // AuthDto.cs) instead of hardcoding THIRTY_FIVE_DAYS_MS. The server
+      // returns ExpiresIn as a DateTime which axios deserializes as a string.
+      // Parse it to epoch ms; fall back to THIRTY_FIVE_DAYS_MS if missing.
+      const serverExpiresIn = authData.expiresIn
+        ? new Date(authData.expiresIn as unknown as string).getTime()
+        : undefined;
+      const expiresIn = serverExpiresIn && !isNaN(serverExpiresIn)
+        ? serverExpiresIn
+        : Date.now() + THIRTY_FIVE_DAYS_MS;
 
       StorageService.setTokenToLocalStorage(authData.authToken);
       localStorage.setItem(
