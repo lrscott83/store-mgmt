@@ -37,23 +37,23 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
 | [S2-01](S2-01.md) | DG-7 — El OwnerAdmin activa el plan pago una sola vez, en una sola dirección | CRÍTICA | **CUBIERTO** — 11 aserciones, 2 tests (`e2e/store-plan-activation.spec.ts`); G1 (rama `succeeded===false` no cubierta) y G2 (`Stores=73` sin re-observar tras la degradación) quedan declaradas, no disfrazadas | **CUBIERTO** |
-| [S2-02](S2-02.md) | Regresión DG-7 — el candado no puede volver a colgarse de `paymentStartDate` | CRÍTICA | **PENDIENTE** | **CUBIERTO** |
-| [S2-03](S2-03.md) | Seguridad — un OwnerAdmin en `/management/stores/create` no puede crear una tienda | CRÍTICA | **PENDIENTE** | **CUBIERTO** — el fix está entregado en `fix/s2-03-backend-h10` (`93c829c2` test 403, `96fa69d3` restringe `POST /v1/stores` a SuperAdmin, `115515ab` endurece el handler y quita el re-point, `04e6868f` archive, 2026-08-12). El merge a `main` no es un problema a resolver (decisión del usuario, 2026-08-13) |
+| [S2-02](S2-02.md) | Regresión DG-7 — el candado no puede volver a colgarse de `paymentStartDate` | CRÍTICA | **CUBIERTO** — 3 aserciones (`e2e/store-plan-lock-regression.spec.ts`) | **CUBIERTO** |
+| [S2-03](S2-03.md) | Seguridad — un OwnerAdmin en `/management/stores/create` no puede crear una tienda | CRÍTICA | **CUBIERTO** — 2 tests, 6 aserciones (`e2e/store-create-security.spec.ts`): OwnerAdmin edita (PUT, nunca POST) + StoreUser deslogueado. Camino B maneja OwnerAdmin sin feature Stores | **CUBIERTO** — el fix está entregado en `fix/s2-03-backend-h10` (`93c829c2` test 403, `96fa69d3` restringe `POST /v1/stores` a SuperAdmin, `115515ab` endurece el handler y quita el re-point, `04e6868f` archive, 2026-08-12). El merge a `main` no es un problema a resolver (decisión del usuario, 2026-08-13) |
 
 ### Bloque C — Gestión de usuarios
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
 | [S3-01](S3-01.md) | Exportar el roster de aprovisionamiento | ALTA | **PENDIENTE** | **CUBIERTO** |
-| [S3-02](S3-02.md) | Crear cuenta StoreUser | ALTA | **PENDIENTE** | **CUBIERTO** |
-| [S3-03](S3-03.md) | Listar, editar, activar y dar de baja usuarios | ALTA | **PENDIENTE** | **CUBIERTO** — CRUD + ciclo de vida + aislamiento medido (`Users/UsersIsolationTests.cs`): **cross-tenant SÍ aísla** (envelope 404, sin escritura). **Cross-store 200 es REGLA DE NEGOCIO**: el OwnerAdmin es dueño del tenant y de todas sus tiendas; la frontera de seguridad es el tenant, no la tienda (ver H-11) |
+| [S3-02](S3-02.md) | Crear cuenta StoreUser | ALTA | **CUBIERTO** — 3 tests, 5 aserciones (`e2e/create-store-user.spec.ts`): payload roleIds[3] + storeId, offline, StoreUser guard | **CUBIERTO** |
+| [S3-03](S3-03.md) | Listar, editar, activar y dar de baja usuarios | ALTA | **CUBIERTO** — 3 tests, 15 aserciones (`e2e/users-crud.spec.ts`): listar + editar, activar/desactivar (DELETE vs activate), offline no-op | **CUBIERTO** — CRUD + ciclo de vida + aislamiento medido (`Users/UsersIsolationTests.cs`): **cross-tenant SÍ aísla** (envelope 404, sin escritura). **Cross-store 200 es REGLA DE NEGOCIO**: el OwnerAdmin es dueño del tenant y de todas sus tiendas; la frontera de seguridad es el tenant, no la tienda (ver H-11) |
 
 ### Bloque D — Perfil propio
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
 | [S4-01](S4-01.md) | Editar el perfil propio | MEDIA | **PENDIENTE** | **CUBIERTO** |
-| [S4-02](S4-02.md) | Cambiar la contraseña propia | ALTA | **PENDIENTE** | **CUBIERTO** |
+| [S4-02](S4-02.md) | Cambiar la contraseña propia | ALTA | **CUBIERTO** — 2 tests, 5 aserciones (`e2e/change-password.spec.ts`): logout forzado + re-login con nueva contraseña + offline | **CUBIERTO** |
 
 ### Invariante transversal
 
@@ -65,7 +65,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 3 CUBIERTO · 2 PARCIAL · 7 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E frontend**: 8 CUBIERTO · 2 PARCIAL · 2 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
 - **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
@@ -85,7 +85,9 @@ Sin plan propio, porque su cobertura se verificó y coincide con lo declarado: S
 
 Ningún escenario está completo en ambas capas.
 
-**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`), `login-offline.spec.ts` cubre S1-03 (11 tests, capability `e2e-offline-login-ui`, corre sin backend levantado — verificado sin proceso `dotnet` activo el 2026-08-08), y `store-plan-activation.spec.ts` cubre S2-01 (2 tests: un `test()` continuo con las 10 aserciones DOM+red del plan, y un `test()` independiente para el fallo de carga — SÍ necesita backend real levantado, a diferencia de `login-offline.spec.ts`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto pasó de 31 a **42 tests** (31 + los 11 de `login-offline.spec.ts`), observada verde contra backend real el 2026-08-08 (`42 passed (55.3s)`, 8 workers, corrido por el usuario). Con `store-plan-activation.spec.ts` la corrida por defecto pasa de 42 a **44 tests** (`pnpm test:e2e`) — aritmética **42 + 2 = 44**, confirmada por `pnpm exec playwright test --list --grep-invert @rate-limit` (`Total: 44 tests in 6 files`, no necesita backend ni navegador), pero **no** es una corrida observada: quien implementó S2-01 no tuvo backend disponible en su sesión para correr Playwright de verdad, así que si esos 44 pasan en verde queda pendiente de confirmación por el usuario. Además, `login-offline.spec.ts` en solitario se corrió **sin backend levantado** y dio 11/11 verdes, lo que sostiene aparte que S1-03 no necesita servidor.
+**Playwright hoy** (`frontend-react/e2e/`): `register.spec.ts` + `register-rate-limit.spec.ts` cubren S1-01, `login.spec.ts` + `login-rate-limit.spec.ts` cubren S1-02 y S1-04 (T1-T11, capability `e2e-session-hydration`), `login-offline.spec.ts` cubre S1-03 (11 tests, capability `e2e-offline-login-ui`, corre sin backend levantado — verificado sin proceso `dotnet` activo el 2026-08-08), y `store-plan-activation.spec.ts` cubre S2-01 (2 tests: un `test()` continuo con las 10 aserciones DOM+red del plan, y un `test()` independiente para el fallo de carga — SÍ necesita backend real levantado, a diferencia de `login-offline.spec.ts`); `smoke.spec.ts` y `api-health.spec.ts` son infraestructura, no negocio. La corrida por defecto pasó de 31 a **42 tests** (31 + los 11 de `login-offline.spec.ts`), observada verde contra backend real el 2026-08-08 (`42 passed (55.3s)`, 8 workers, corrido por el usuario). Con `store-plan-activation.spec.ts` la corrida por defecto pasa de 42 a **44 tests** (`pnpm test:e2e`) — aritmética **42 + 2 = 44**, confirmada por `pnpm exec playwright test --list --grep-invert @rate-limit` (`Total: 44 tests in 6 files`, no necesita backend ni navegador), pero **no** es una corrida observada: quien implementó S2-01 no tuvo backend disponible en su sesión para correr Playwright de verdad, así que si esos 44 pasan en verde queda pendiente de confirmación por el usuario. Además, `login-offline.spec.ts` en solitario se corrió **sin backend levantado** y dio 11/11 verdes, lo que sostiene aparte que S1-03 no necesita servidor. La corrida completa actual (2026-08-23) es **72 passed** (grep-invert @rate-limit), incluyendo los 5 specs nuevos de S2-02, S2-03, S3-02, S3-03 y S4-02.
+
+Además: `store-create-security.spec.ts` (S2-03, 2 tests), `users-crud.spec.ts` (S3-03, 3 tests), `create-store-user.spec.ts` (S3-02, 3 tests), `change-password.spec.ts` (S4-02, 2 tests) y `store-plan-lock-regression.spec.ts` (S2-02, 3 aserciones). Todos verificados contra backend real el 2026-08-23.
 
 Los dos specs de rate-limit quedan fuera a propósito —gastan decenas de intentos— y corren con `pnpm test:e2e:rate-limit`. También se corrieron el **2026-08-08 tras el refactor del núcleo de observers**: `2 passed (18.2s)`. Eso importa más que un verde cualquiera: cada uno de esos specs lanza un error explícito si su bucle termina sin observar un 429, así que verde ⇒ el límite se disparó ⇒ las dos clases de error (`RegisterRateLimitError` con su umbral 50/10min — subido de 10 el 2026-08-15 — y `LoginRateLimitError` con su 15/1min — subido de 10 el 2026-08-15) siguen construyéndose bien cada una en su módulo. Es la única evidencia por ejecución de que el núcleo compartido no las unificó.
 
