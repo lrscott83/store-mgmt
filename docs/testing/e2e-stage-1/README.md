@@ -44,7 +44,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
-| [S3-01](S3-01.md) | Exportar el roster de aprovisionamiento | ALTA | **PENDIENTE** | **CUBIERTO** |
+| [S3-01](S3-01.md) | Exportar el roster de aprovisionamiento | ALTA | **CUBIERTO** — 3 tests, 7 aserciones (`e2e/roster-export.spec.ts`): descarga ZIP + PK signature + panel cierra, empty password error, button enabled online. 5 aserciones restantes cubiertas por vitest | **CUBIERTO** |
 | [S3-02](S3-02.md) | Crear cuenta StoreUser | ALTA | **CUBIERTO** — 3 tests, 5 aserciones (`e2e/create-store-user.spec.ts`): payload roleIds[3] + storeId, offline, StoreUser guard | **CUBIERTO** |
 | [S3-03](S3-03.md) | Listar, editar, activar y dar de baja usuarios | ALTA | **CUBIERTO** — 3 tests, 15 aserciones (`e2e/users-crud.spec.ts`): listar + editar, activar/desactivar (DELETE vs activate), offline no-op | **CUBIERTO** — CRUD + ciclo de vida + aislamiento medido (`Users/UsersIsolationTests.cs`): **cross-tenant SÍ aísla** (envelope 404, sin escritura). **Cross-store 200 es REGLA DE NEGOCIO**: el OwnerAdmin es dueño del tenant y de todas sus tiendas; la frontera de seguridad es el tenant, no la tienda (ver H-11) |
 
@@ -65,7 +65,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 8 CUBIERTO · 2 PARCIAL · 2 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E frontend**: 9 CUBIERTO · 2 PARCIAL · 1 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
 - **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).
