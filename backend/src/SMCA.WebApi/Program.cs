@@ -24,6 +24,11 @@ using SMCA.WebApi.OptionsSetup;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// E2E override: load appsettings.E2E.json unconditionally when present.
+// This file points ConnectionStrings:Application to smca_test and is the
+// single source of truth for the E2E database — no env-var juggling needed.
+builder.Configuration.AddJsonFile("appsettings.E2E.json", optional: true, reloadOnChange: false);
+
 var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 var elasticUri = builder.Configuration.GetValue<string>("ElasticConfiguration:Uri");
 string indexPrefix = $"{Assembly.GetExecutingAssembly().GetName().Name!.ToLower().Replace(".", "-")}";
@@ -69,6 +74,28 @@ builder.Services.Configure<TenantConnectionSettings>(options =>
     builder.Configuration.GetSection(nameof(TenantConnectionSettings)).Bind(options));
 
 string? connectionString = builder.Configuration.GetConnectionString("Application");
+
+// E2E guard: verify the connection string points to the test database.
+// Prevents accidental writes to production when running E2E tests.
+if (connectionString != null && connectionString.Contains("Database=", StringComparison.OrdinalIgnoreCase))
+{
+    var dbMatch = System.Text.RegularExpressions.Regex.Match(connectionString, @"Database=([^;]+)");
+    if (dbMatch.Success)
+    {
+        var dbName = dbMatch.Groups[1].Value;
+        Console.WriteLine($"[E2E Guard] ConnectionStrings:Application -> Database={dbName}");
+        if (builder.Environment.IsEnvironment("Testing") || Environment.GetEnvironmentVariable("E2E_DB_GUARD") == "1")
+        {
+            if (!dbName.Equals("smca_test", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"[E2E Guard] Expected database 'smca_test' but got '{dbName}'. " +
+                    $"Ensure appsettings.E2E.json is loaded or ConnectionStrings__Application env var is set.");
+            }
+        }
+    }
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString,
     b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
