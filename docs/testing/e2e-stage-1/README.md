@@ -27,7 +27,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 | US | Título | Prioridad | E2E frontend (Playwright) | E2E backend (.NET) |
 |---|---|---|---|---|
-| [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **PARCIAL** — REQ-1…REQ-9 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); REQ-9 (429) **verificado en vivo** el 2026-08-07 — el spec lanza error explícito si nunca observa un 429, así que verde ⇒ el límite se disparó; falta el destino post-registro ([F-2](plan-frontend.md#f-2)) | **CUBIERTO** |
+| [S1-01](S1-01.md) | Auto-registro crea cuenta y tienda en un solo paso | CRÍTICA | **CUBIERTO** — REQ-1…REQ-9 + F-2 implementados (`e2e/register.spec.ts`, `e2e/register-rate-limit.spec.ts`); F-2 verifica destino post-registro `/sales/products` | **CUBIERTO** |
 | [S1-02](S1-02.md) | Login online | CRÍTICA | **CUBIERTO** — REQ-1…REQ-16 implementados y verificados en vivo contra backend real el 2026-08-07 (`e2e/login.spec.ts`; REQ-8/429 en `e2e/login-rate-limit.spec.ts`, que corre aparte con `pnpm test:e2e:rate-limit`) | **CUBIERTO** — tienda inactiva → 403 cubierta (`AuthLoginFailureTests.cs:64`); **429 ahora alcanzable en .NET** tras fix H-12 (2026-08-23): `Program.cs` ya no excluye `AddRateLimiter`/`UseRateLimiter` bajo `Testing`. Login subió a 40/min para dar margen a la suite paralela. |
 | [S1-03](S1-03.md) | Login offline en dispositivo aprovisionado | CRÍTICA | **CUBIERTO** — 11 tests / 12 aserciones implementados y verificados el 2026-08-08 sin backend levantado (`e2e/login-offline.spec.ts`), corre en la suite por defecto | **N/A** — cero HTTP; la contraparte de servidor es S3-01 |
 | [S1-04](S1-04.md) | Hidratación de sesión: la caché válida no llama al backend | CRÍTICA | **PARCIAL** — REQ-1…REQ-11 implementados y verificados en vivo (`e2e/login.spec.ts`, T1-T11, capability `e2e-session-hydration`, backend real, 2026-08-07: 31 passed); la rama del 404 real de REQ-4 es brecha declarada (H-6, G1) y la guarda de pathname de REQ-8 no es discriminable en Playwright por timing de arranque (G2, cubierta en `auth-store.test.ts`) | **CUBIERTO** |
@@ -65,7 +65,7 @@ Cobertura `vitest`/`jsdom` **no** cuenta como E2E frontend. Playwright es la ún
 
 12 User Stories + 1 invariante transversal.
 
-- **E2E frontend**: 9 CUBIERTO · 2 PARCIAL · 1 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
+- **E2E frontend**: 10 CUBIERTO · 1 PARCIAL · 1 PENDIENTE · 1 N/A (AUTH-INV-01 no es observable desde la UI).
 - **E2E backend**: 9 CUBIERTO · 3 PARCIAL · 1 N/A (S1-03 es cero HTTP; su contraparte de servidor es S3-01).
 
 Trabajo diferido, uno por capa: [plan-frontend.md](plan-frontend.md) y [plan-backend.md](plan-backend.md).

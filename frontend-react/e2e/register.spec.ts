@@ -1,5 +1,6 @@
 import { test, expect } from './support/test';
 import { RegisterPage } from './support/register-page';
+import { LoginPage } from './support/login-page';
 import { newTestIdentity } from './support/identity';
 
 // Literal Spanish copy asserted below, cited from
@@ -190,5 +191,38 @@ test.describe.serial('register — one real registration + one duplicate 400 (RE
     // REGISTRATION.VALIDATION_ERROR (the generic client string).
     await expect(banner).toBeVisible();
     await expect(banner).not.toHaveText(GENERIC_VALIDATION_ERROR_TEXT);
+  });
+});
+
+// ── F-2: destination after registration + login ────────────────────────
+
+test.describe.serial('register → login lands on /sales/products (F-2)', () => {
+  const identity = newTestIdentity();
+
+  test('F-2: newly registered OwnerAdmin lands on /sales/products', async ({
+    page,
+    registerNetwork,
+  }) => {
+    // Step 1: Register.
+    const registerPage = new RegisterPage(page);
+    await registerPage.goto();
+    await registerPage.fillValidForm(identity);
+    await registerPage.acceptTerms.check();
+    await registerPage.submit();
+
+    const response = await registerNetwork.waitForResponse();
+    expect(response.status).toBe(201);
+
+    // Landed on /login.
+    await expect(page).toHaveURL(/\/login$/);
+
+    // Step 2: Login with the registered credentials.
+    const loginPage = new LoginPage(page);
+    await loginPage.fill(identity);
+    await loginPage.submit();
+
+    // F-2: A newly registered store has no products, so
+    // resolveUserHomePath returns /sales/products (user-home.ts:24-25).
+    await expect(page).toHaveURL(/\/sales\/products/, { timeout: 15_000 });
   });
 });
