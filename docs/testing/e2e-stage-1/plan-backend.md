@@ -19,8 +19,8 @@ Varios ítems de acá **tocan tests E2E existentes**. Cada uno declara si necesi
 | [B-1](#b-1) | `ToCollectTests` vencido por fecha hardcodeada | **Alta** | **RESUELTO** — `fb273edb` | Fue sí — autorización otorgada, pin aplicado |
 | [B-2](#b-2) | 20 fechas hardcodeadas más, sin reloj congelado | Alta | **RESUELTO EN SU MAYORÍA** — la ola de pins llegó; los archivos citados ya pinan el reloj | Fue sí — pins aplicados en los archivos de "ventana móvil" |
 | [B-3](#b-3) | `MintToken` saltea el endpoint de login | Alta | No | No — solo agrega tests nuevos |
-| [B-4](#b-4) | `GetPagedReponseAsync`: `Skip`/`Take` sin `OrderBy` | Media | No — código muerto | No |
-| [B-5](#b-5) | Rechazos esperados logueados como `Unhandled exception` | Baja | No | No |
+| [B-4](#b-4) | `GetPagedReponseAsync`: `Skip`/`Take` sin `OrderBy` | Media | **RESUELTO** — método borrado (código muerto, cero call sites) | No — código eliminado |
+| [B-5](#b-5) | Rechazos esperados logueados como `Unhandled exception` | Baja | **RESUELTO EN CÓDIGO** — `ValidationException`/`ApiException` ya van a `LogWarning` sin stack (`ErrorHandlerMiddleware.cs:73-76`). Plan desactualizado. | No |
 | [B-6](#b-6) | No hay forma de desactivar una cuenta, así que el 404 de `/me` no se ejerce | Media | **RESUELTO** — `Auth/AuthMeDeactivationTests.cs` | No — tests nuevos |
 
 Lo ya cerrado en la rama `feat/e2e-playwright-login-s1-02` está en [Antecedentes](#antecedentes) — leerlo primero, porque explica por qué esta lista existe.

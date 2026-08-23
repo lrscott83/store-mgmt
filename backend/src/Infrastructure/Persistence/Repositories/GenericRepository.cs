@@ -15,16 +15,6 @@ namespace Infrastructure.Persistence.Repositories
             _dbContext = dbContext;
         }
 
-        public async Task<IReadOnlyList<TEntity>> GetPagedReponseAsync(int pageNumber, int pageSize)
-        {
-            return await _dbContext
-                .Set<TEntity>()
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .AsNoTracking()
-                .ToListAsync();
-        }
-
         public async Task<TEntity> AddAsync(TEntity entity)
         {
             await _dbContext.Set<TEntity>().AddAsync(entity);

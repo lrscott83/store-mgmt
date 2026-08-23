@@ -10,7 +10,6 @@ namespace Domain.Common.Repositories
         Task<bool> DeleteAsync(IEnumerable<TEntity> entities);
         Task<bool> DeleteAsync(TEntity entity);
         Task<IReadOnlyCollection<TEntity>> GetAllAsync();
-        Task<IReadOnlyList<TEntity>> GetPagedReponseAsync(int pageNumber, int pageSize);
         Task<bool> UpdateAsync(TEntity entity);
         IQueryable<TEntity> Where(Expression<Func<TEntity, bool>> predicate);
     }
