@@ -662,13 +662,17 @@ test.describe('recuperación por roster, bytes intactos y rechazo del login', ()
  * Un 429 se manifiesta como `LoginRateLimitError` y NO es un defecto de la
  * app.
  */
-test.describe('el cifrado no depende del modo de autenticación (backend real)', () => {
+test.describe('el cifrado no depende del modo de autenticación (backend real) @rate-limit', () => {
   // Serial y con presupuesto amplio, por el mismo criterio que
   // `login.spec.ts:96-105`: cada test acá paga un registro completo, DOS
   // logins reales y dos siembras por la UI antes de su última aserción. No se
   // parten en tests más chicos justamente porque partirlos gastaría más
   // logins, que es el recurso escaso.
-  test.describe.configure({ mode: 'serial', timeout: 180_000 });
+  //
+  // Tagged @rate-limit: these two tests do 2 real logins each (4 total)
+  // and run serially — separate from the default suite to avoid exceeding
+  // LoginPolicy's ceiling of 15/min under parallel load. Run with
+  // `pnpm test:e2e:rate-limit` or `--grep @rate-limit`.
 
   /**
    * E2E 2 — REGLA 3 (los datos siempre son recuperables), mitad ONLINE.
