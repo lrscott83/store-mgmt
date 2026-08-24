@@ -36,7 +36,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
 | [S2-B1](S2-B1.md) | Crear venta (nueva orden) | CRÍTICA | ✅ CUBIERTO — `create-sale.spec.ts` (4 tests, 5 aserciones) |
-| [S2-B2](S2-B2.md) | Editar y eliminar órdenes | ALTA | Modificar órdenes existentes, eliminar |
+| [S2-B2](S2-B2.md) | Editar y eliminar órdenes | ALTA | ✅ CUBIERTO — `edit-delete-order.spec.ts` (2 tests, 2 aserciones) |
 | [S2-B3](S2-B3.md) | Órdenes del día | ALTA | Listado de órdenes del día actual |
 | [S2-B4](S2-B4.md) | Historial de órdenes | MEDIA | Listado de todas las órdenes |
 
