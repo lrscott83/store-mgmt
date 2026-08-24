@@ -10,19 +10,19 @@
 
 | Repositorio | Test unit | Crypto test | Métodos | Estado |
 |---|---|---|---|---|
-| `product-category-repository.ts` | ✅ | ✅ | 12 | CUBIERTO |
-| `product-repository.ts` | ✅ | ✅ | 14 | CUBIERTO |
+| `product-category-repository.ts` | ✅ | ✅ | 12 | ✅ CUBIERTO |
+| `product-repository.ts` | ✅ | ✅ | 14 | ✅ CUBIERTO |
 
 ### Servicios Offline
 
 | Servicio | Test unit | Crypto test | Métodos | Estado |
 |---|---|---|---|---|
-| `expense-offline-service.ts` | ❌ FALTA | ✅ | 13 | **GAP CRÍTICO** |
-| `product-category-offline-service.ts` | ✅ | ❌ FALTA | 7 | GAP |
-| `product-offline-service.ts` | ✅ | ❌ FALTA | 14 | GAP |
-| `order-offline-service.ts` | ✅ | ✅ | 18 | CUBIERTO |
-| `inventory-offline-service.ts` | ✅ | ✅ | 16 | CUBIERTO |
-| `sale-credit-offline-service.ts` | ✅ | ✅ | 16 | CUBIERTO |
+| `expense-offline-service.ts` | ✅ | ✅ | 13 | ✅ CUBIERTO |
+| `product-category-offline-service.ts` | ✅ | ✅ | 7 | ✅ CUBIERTO |
+| `product-offline-service.ts` | ✅ | ✅ | 14 | ✅ CUBIERTO |
+| `order-offline-service.ts` | ✅ | ✅ | 18 | ✅ CUBIERTO |
+| `inventory-offline-service.ts` | ✅ | ✅ | 16 | ✅ CUBIERTO |
+| `sale-credit-offline-service.ts` | ✅ | ✅ | 16 | ✅ CUBIERTO |
 
 ---
 
@@ -81,26 +81,32 @@
 
 ## 3. Plan de implementación
 
-### Fase 1: Tests unitarios faltantes (CRÍTICO)
+### Fase 1: Tests unitarios faltantes (CRÍTICO) ✅
 
-| # | Archivo | Prioridad | Descripción |
+| # | Archivo | Prioridad | Estado |
 |---|---|---|---|
-| 1 | `expense-offline-service.test.ts` | CRÍTICA | Test unitario completo (13 métodos) |
+| 1 | `expense-offline-service.test.ts` | CRÍTICA | ✅ 29 tests |
 
-### Fase 2: Crypto tests faltantes (ALTA)
+### Fase 2: Crypto tests faltantes (ALTA) ✅
 
-| # | Archivo | Prioridad | Descripción |
+| # | Archivo | Prioridad | Estado |
 |---|---|---|---|
-| 2 | `product-category-offline-service.crypto.test.ts` | ALTA | Verificar round-trip cifrado |
-| 3 | `product-offline-service.crypto.test.ts` | ALTA | Verificar round-trip cifrado |
+| 2 | `product-category-offline-service.crypto.test.ts` | ALTA | ✅ 3 tests |
+| 3 | `product-offline-service.crypto.test.ts` | ALTA | ✅ 3 tests |
 
-### Fase 3: Cobertura completa de métodos (MEDIA)
+### Fase 3: Cobertura completa de métodos (MEDIA) ✅
 
-| # | Archivo | Prioridad | Descripción |
+| # | Archivo | Prioridad | Estado |
 |---|---|---|---|
-| 4 | Verificar cobertura de `order-offline-service.test.ts` | MEDIA | Asegurar que todos los métodos están cubiertos |
-| 5 | Verificar cobertura de `inventory-offline-service.test.ts` | MEDIA | Asegurar que todos los métodos están cubiertos |
-| 6 | Verificar cobertura de `sale-credit-offline-service.test.ts` | MEDIA | Asegurar que todos los métodos están cubiertos |
+| 4 | Verificar cobertura de `order-offline-service.test.ts` | MEDIA | ✅ CUBIERTO |
+| 5 | Verificar cobertura de `inventory-offline-service.test.ts` | MEDIA | ✅ CUBIERTO |
+| 6 | Verificar cobertura de `sale-credit-offline-service.test.ts` | MEDIA | ✅ CUBIERTO |
+
+---
+
+## 5. Estado final
+
+**Todas las fases completadas.** Total de tests de integración: **35 tests** (29 expense + 3 crypto category + 3 crypto product).
 
 ---
 
