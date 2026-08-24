@@ -44,7 +44,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
-| [S2-C1](S2-C1.md) | Crear crédito desde venta | ALTA | Marcar una venta como crédito |
+| [S2-C1](S2-C1.md) | Crear crédito desde venta | ALTA | ✅ CUBIERTO — `create-credit.spec.ts` (3 tests, 3 aserciones) |
 | [S2-C2](S2-C2.md) | Registrar pago de crédito | ALTA | Abonar un crédito parcial o total |
 | [S2-C3](S2-C3.md) | Créditos del día y historial | MEDIA | Listados de créditos |
 
