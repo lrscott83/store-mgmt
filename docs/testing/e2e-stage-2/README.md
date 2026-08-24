@@ -52,7 +52,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
-| [S2-D1](S2-D1.md) | Entradas de inventario | ALTA | Registrar entradas de stock |
+| [S2-D1](S2-D1.md) | Entradas de inventario | ALTA | ✅ CUBIERTO — `inventory-entry.spec.ts` (3 tests, 3 aserciones) |
 | [S2-D2](S2-D2.md) | Egreso de inventario | ALTA | Registrar egresos de stock |
 | [S2-D3](S2-D3.md) | Cantidades del día | MEDIA | Resumen de cantidadesmovidas |
 | [S2-D4](S2-D4.md) | Productos disponibles en inventario | MEDIA | Stock disponible por producto |
