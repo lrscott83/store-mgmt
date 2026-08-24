@@ -45,7 +45,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
 | [S2-C1](S2-C1.md) | Crear crédito desde venta | ALTA | ✅ CUBIERTO — `create-credit.spec.ts` (3 tests, 3 aserciones) |
-| [S2-C2](S2-C2.md) | Registrar pago de crédito | ALTA | Abonar un crédito parcial o total |
+| [S2-C2](S2-C2.md) | Registrar pago de crédito | ALTA | ✅ CUBIERTO — `pay-credit.spec.ts` (1 test, 1 aserción) |
 | [S2-C3](S2-C3.md) | Créditos del día y historial | MEDIA | Listados de créditos |
 
 ### Bloque D — Inventario
@@ -53,7 +53,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
 | [S2-D1](S2-D1.md) | Entradas de inventario | ALTA | ✅ CUBIERTO — `inventory-entry.spec.ts` (3 tests, 3 aserciones) |
-| [S2-D2](S2-D2.md) | Egreso de inventario | ALTA | Registrar egresos de stock |
+| [S2-D2](S2-D2.md) | Egreso de inventario | ALTA | ✅ CUBIERTO — `wholesale-sale.spec.ts` (2 tests, 2 aserciones) |
 | [S2-D3](S2-D3.md) | Cantidades del día | MEDIA | Resumen de cantidadesmovidas |
 | [S2-D4](S2-D4.md) | Productos disponibles en inventario | MEDIA | Stock disponible por producto |
 | [S2-D5](S2-D5.md) | Cálculo de ganancia | MEDIA | Ganancia neta del día |
