@@ -62,7 +62,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
-| [S2-E1](S2-E1.md) | Registrar gasto | ALTA | Crear un gasto del día |
+| [S2-E1](S2-E1.md) | Registrar gasto | ALTA | ✅ CUBIERTO — `register-expense.spec.ts` (3 tests, 3 aserciones) |
 | [S2-E2](S2-E2.md) | Historial de gastos | MEDIA | Listado de gastos |
 
 ### Bloque F — Reportes y estadísticas
