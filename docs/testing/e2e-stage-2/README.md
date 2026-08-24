@@ -28,7 +28,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 |---|---|---|---|
 | [S2-A1](S2-A1.md) | CRUD offline de productos | CRÍTICA | ✅ CUBIERTO — `products-crud.spec.ts` (6 tests, 6 aserciones) |
 | [S2-A2](S2-A2.md) | CRUD offline de categorías | CRÍTICA | ✅ CUBIERTO — `category-crud.spec.ts` (5 tests, 5 aserciones) |
-| [S2-A3](S2-A3.md) | Importación CSV de productos | ALTA | Parsear CSV, validar, importar masivamente |
+| [S2-A3](S2-A3.md) | Importación CSV de productos | ALTA | ✅ CUBIERTO — `csv-import.spec.ts` (3 tests, 3 aserciones) |
 | [S2-A4](S2-A4.md) | Disponibilidad de productos | ALTA | Filtrar productos por categoría, búsqueda, estado |
 
 ### Bloque B — Ventas y órdenes
