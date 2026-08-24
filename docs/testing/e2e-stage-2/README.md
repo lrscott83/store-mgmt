@@ -69,7 +69,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
-| [S2-F1](S2-F1.md) | Reporte del día | ALTA | Resumen de ventas, gastos, ganancia |
+| [S2-F1](S2-F1.md) | Reporte del día | ALTA | ✅ CUBIERTO — `daily-report.spec.ts` (3 tests, 3 aserciones) |
 | [S2-F2](S2-F2.md) | Dashboard de estadísticas | MEDIA | Métricas agregadas |
 
 ### Bloque G — Sincronización
