@@ -59,8 +59,28 @@ async function createEntry(page: Page, productName: string, quantity: string, co
   await expect(page.getByText(NEW_ENTRY_TITLE)).toHaveCount(0);
 }
 
-test.describe.serial('S2-D1 — Entradas de inventario', () => {
-  test.describe.configure({ timeout: 120_000 });
+const EDIT_ENTRY_TITLE = 'Editar Entrada'; // INVENTORY_ENTRY.EDIT_INVENTORY_ENTRY
+const DELETE_CONFIRM = '¿Está seguro que desea eliminar esta entrada?'; // GENERAL.DELETE_CONFIRM_MESSAGE_A with INVENTORY_ENTRY.TEXT
+
+/**
+ * Opens the gear menu on an entry row and clicks an action.
+ */
+async function openEntryGearAction(page: Page, productName: string, action: 'edit' | 'delete'): Promise<void> {
+  // Find the entry row by product name, then click its gear menu
+  const row = page.locator('tr').filter({ hasText: productName });
+  const gear = row.locator('[data-testid^="entry-actions-toggle-"]');
+  await expect(gear).toBeVisible();
+  await gear.click();
+
+  if (action === 'edit') {
+    await page.getByRole('menuitem', { name: 'Editar' }).click();
+  } else {
+    await page.getByRole('menuitem', { name: 'Eliminar' }).click();
+  }
+}
+
+test.describe.serial('S2-D1 + S3-B1/B2 — Entradas de inventario', () => {
+  test.describe.configure({ timeout: 180_000 });
 
   test.use({ persona: 'owner-admin-with-products' });
 
@@ -114,5 +134,56 @@ test.describe.serial('S2-D1 — Entradas de inventario', () => {
     await expect(page.getByText('E2E Product')).toBeVisible();
 
     await page.context().setOffline(false);
+  });
+
+  // S3-B1 — Editar entrada existente
+  test('S3-B1: editar una entrada cambia cantidad y costo', async ({ signedInPage }) => {
+    const { page } = signedInPage;
+
+    await navigateToEntries(page);
+
+    // Create an entry first
+    await createEntry(page, 'E2E Product', '10', '5');
+    await expect(page.getByText('E2E Product')).toBeVisible();
+
+    // Open the edit modal via gear menu
+    await openEntryGearAction(page, 'E2E Product', 'edit');
+
+    // Wait for edit modal
+    await expect(page.getByText(EDIT_ENTRY_TITLE)).toBeVisible();
+
+    // Change quantity to 20
+    await page.locator('#entry-quantity').clear();
+    await page.locator('#entry-quantity').fill('20');
+
+    // Save
+    await page.getByRole('button', { name: 'Actualizar' }).click();
+
+    // Modal should close
+    await expect(page.getByText(EDIT_ENTRY_TITLE)).toHaveCount(0);
+
+    // The entry should still be visible
+    await expect(page.getByText('E2E Product')).toBeVisible();
+  });
+
+  // S3-B2 — Eliminar entrada
+  test('S3-B2: eliminar una entrada la remueve de la lista', async ({ signedInPage }) => {
+    const { page } = signedInPage;
+
+    await navigateToEntries(page);
+
+    // Create an entry first
+    await createEntry(page, 'E2E Product', '10', '5');
+    await expect(page.getByText('E2E Product')).toBeVisible();
+
+    // Delete via gear menu
+    await openEntryGearAction(page, 'E2E Product', 'delete');
+
+    // Confirm dialog
+    await expect(page.getByText(DELETE_CONFIRM)).toBeVisible();
+    await page.getByRole('button', { name: 'Si' }).click();
+
+    // The entry should be removed
+    await expect(page.getByText('E2E Product')).toHaveCount(0);
   });
 });
