@@ -29,7 +29,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 | [S2-A1](S2-A1.md) | CRUD offline de productos | CRÍTICA | ✅ CUBIERTO — `products-crud.spec.ts` (6 tests, 6 aserciones) |
 | [S2-A2](S2-A2.md) | CRUD offline de categorías | CRÍTICA | ✅ CUBIERTO — `category-crud.spec.ts` (5 tests, 5 aserciones) |
 | [S2-A3](S2-A3.md) | Importación CSV de productos | ALTA | ✅ CUBIERTO — `csv-import.spec.ts` (3 tests, 3 aserciones) |
-| [S2-A4](S2-A4.md) | Disponibilidad de productos | ALTA | Filtrar productos por categoría, búsqueda, estado |
+| [S2-A4](S2-A4.md) | Disponibilidad de productos | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
 
 ### Bloque B — Ventas y órdenes
 
@@ -37,8 +37,8 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 |---|---|---|---|
 | [S2-B1](S2-B1.md) | Crear venta (nueva orden) | CRÍTICA | ✅ CUBIERTO — `create-sale.spec.ts` (4 tests, 5 aserciones) |
 | [S2-B2](S2-B2.md) | Editar y eliminar órdenes | ALTA | ✅ CUBIERTO — `edit-delete-order.spec.ts` (2 tests, 2 aserciones) |
-| [S2-B3](S2-B3.md) | Órdenes del día | ALTA | Listado de órdenes del día actual |
-| [S2-B4](S2-B4.md) | Historial de órdenes | MEDIA | Listado de todas las órdenes |
+| [S2-B3](S2-B3.md) | Órdenes del día | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
+| [S2-B4](S2-B4.md) | Historial de órdenes | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
 
 ### Bloque C — Créditos
 
@@ -46,7 +46,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 |---|---|---|---|
 | [S2-C1](S2-C1.md) | Crear crédito desde venta | ALTA | ✅ CUBIERTO — `create-credit.spec.ts` (3 tests, 3 aserciones) |
 | [S2-C2](S2-C2.md) | Registrar pago de crédito | ALTA | ✅ CUBIERTO — `pay-credit.spec.ts` (1 test, 1 aserción) |
-| [S2-C3](S2-C3.md) | Créditos del día y historial | MEDIA | Listados de créditos |
+| [S2-C3](S2-C3.md) | Créditos del día y historial | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
 
 ### Bloque D — Inventario
 
@@ -54,23 +54,23 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 |---|---|---|---|
 | [S2-D1](S2-D1.md) | Entradas de inventario | ALTA | ✅ CUBIERTO — `inventory-entry.spec.ts` (3 tests, 3 aserciones) |
 | [S2-D2](S2-D2.md) | Egreso de inventario | ALTA | ✅ CUBIERTO — `wholesale-sale.spec.ts` (2 tests, 2 aserciones) |
-| [S2-D3](S2-D3.md) | Cantidades del día | MEDIA | Resumen de cantidadesmovidas |
-| [S2-D4](S2-D4.md) | Productos disponibles en inventario | MEDIA | Stock disponible por producto |
-| [S2-D5](S2-D5.md) | Cálculo de ganancia | MEDIA | Ganancia neta del día |
+| [S2-D3](S2-D3.md) | Cantidades del día | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
+| [S2-D4](S2-D4.md) | Productos disponibles en inventario | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
+| [S2-D5](S2-D5.md) | Cálculo de ganancia | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
 
 ### Bloque E — Gastos
 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
 | [S2-E1](S2-E1.md) | Registrar gasto | ALTA | ✅ CUBIERTO — `register-expense.spec.ts` (3 tests, 3 aserciones) |
-| [S2-E2](S2-E2.md) | Historial de gastos | MEDIA | Listado de gastos |
+| [S2-E2](S2-E2.md) | Historial de gastos | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
 
 ### Bloque F — Reportes y estadísticas
 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
 | [S2-F1](S2-F1.md) | Reporte del día | ALTA | ✅ CUBIERTO — `daily-report.spec.ts` (3 tests, 3 aserciones) |
-| [S2-F2](S2-F2.md) | Dashboard de estadísticas | MEDIA | Métricas agregadas |
+| [S2-F2](S2-F2.md) | Dashboard de estadísticas | MEDIA | ✅ CUBIERTO — `read-only-screens.spec.ts` |
 
 ### Bloque G — Sincronización
 
