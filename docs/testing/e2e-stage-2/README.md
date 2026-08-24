@@ -76,7 +76,7 @@ A diferencia de la Etapa 1 (donde Playwright golpea la API real), la Etapa 2 se 
 
 | US | Título | Prioridad | Descripción |
 |---|---|---|---|
-| [S2-G1](S2-G1.md) | Exportar datos | CRÍTICA | Serializar localStorage a archivo ZIP cifrado |
+| [S2-G1](S2-G1.md) | Exportar datos | CRÍTICA | ✅ CUBIERTO — `data-export.spec.ts` (3 tests, 3 aserciones) |
 | [S2-G2](S2-G2.md) | Importar datos | CRÍTICA | Deserializar archivo ZIP y merge con datos existentes |
 
 ---
