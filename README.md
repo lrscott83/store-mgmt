@@ -5,11 +5,11 @@
 ### 1. Backup de la base de datos
 
 ```bash
-# Backup compactado (.sql.gz)
-podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ~/smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+# Backup compactado (.sql.gz) en el directorio actual
+podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ./smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
-# Restaurar desde backup
-gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca_postgres_db psql -U postgres -d smca
+# Restaurar desde el directorio actual
+gunzip -c ./smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca_postgres_db psql -U postgres -d smca
 ```
 
 ### 2. Cambiar password del usuario admin
