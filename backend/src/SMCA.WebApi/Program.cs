@@ -24,10 +24,12 @@ using SMCA.WebApi.OptionsSetup;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// E2E override: load appsettings.E2E.json unconditionally when present.
-// This file points ConnectionStrings:Application to smca_test and is the
-// single source of truth for the E2E database — no env-var juggling needed.
-builder.Configuration.AddJsonFile("appsettings.E2E.json", optional: true, reloadOnChange: false);
+// E2E override: load appsettings.E2E.json only when NOT in Production.
+// In Production the connection string comes from appsettings.json or .env vars.
+if (!builder.Environment.IsProduction())
+{
+    builder.Configuration.AddJsonFile("appsettings.E2E.json", optional: true, reloadOnChange: false);
+}
 
 var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 var elasticUri = builder.Configuration.GetValue<string>("ElasticConfiguration:Uri");
