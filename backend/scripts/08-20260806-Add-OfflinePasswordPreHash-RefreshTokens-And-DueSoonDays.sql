@@ -45,5 +45,5 @@ CREATE INDEX IF NOT EXISTS "IX_RefreshTokens_UserId" ON "RefreshTokens" ("UserId
 
 -- 6) Registrar la migración en el historial de EF Core
 INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-VALUES ('20260806024450_Add-OfflinePasswordPreHash-RefreshTokens-And-DueSoonDays', '9.0.0')
+VALUES ('20260806024450_Add-OfflinePasswordPreHash-RefreshTokens-And-DueSoonDays', '8.0.3')
 ON CONFLICT ("MigrationId") DO NOTHING;
