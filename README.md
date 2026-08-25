@@ -21,7 +21,7 @@ gunzip -c ./smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca_postgres_db
 
 **Desde la BD directamente:**
 ```bash
-podman exec -it smca_postgres_db psql -U postgres -d smca -c "UPDATE \"User\" SET \"Password\" = 'HASH_ARGON2ID' WHERE login = 'admin';"
+podman exec -it smca_postgres_db psql -U postgres -d smca -c "UPDATE \"User\" SET \"Password\" = 'HASH_ARGON2ID' WHERE \"Login\" = 'admin';"
 ```
 
 ### 3. Verificar migraciones pendientes
