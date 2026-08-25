@@ -94,8 +94,8 @@ Rutas que un Owner puede acceder y que hoy no tiene ningún spec E2E.
 
 | US | Título | Prioridad | Esfuerzo | Descripción |
 |---|---|---|---|---|
-| FC-B1 | Stores edit `/:id` | 🟡 MEDIA | Bajo | `/management/stores/edit/:id` formulario prefilled + save sin `moduleIds` (mismo contrato que `store-update.spec.ts` que usa `/management/stores/update`). Spec nueva: `store-edit-by-id.spec.ts` |
-| FC-B2 | Configurations | 🟡 MEDIA | Bajo | `/management/configurations` carga y permite persistir un cambio. Spec nueva: `configurations.spec.ts` |
+| FC-B1 | Stores edit `/:id` | ✅ CUBIERTO | Bajo | `/management/stores/edit/:id` formulario prefilled + save sin `moduleIds` (mismo contrato que `store-update.spec.ts` que usa `/management/stores/update`). Spec nueva: `store-edit-by-id.spec.ts` |
+| FC-B2 | Configurations | ✅ CUBIERTO | Bajo | `/management/configurations` carga y permite persistir un cambio. Spec nueva: `configurations.spec.ts` |
 
 ### Bloque C — Integración Vitest (huecos puntuales)
 
@@ -144,7 +144,7 @@ No depende de persona ni de backend. Puede avanzar en paralelo a los bloques A y
 | 4 | FC-A4 | Créditos: más que carga | Medio |
 | 5 | FC-A5 | Dashboard: aserciones de valores | Medio |
 
-### 🟡 PENDIENTE — Bloque B: Owner pantallas management (2 items)
+### ✅ CUBIERTO — Bloque B: Owner pantallas management (2 items)
 
 | # | US | Descripción | Esfuerzo |
 |---|---|---|---|
@@ -229,13 +229,13 @@ Profundidad: **FUNC** = flujo funcional (crea/edita/borra, afirma resultado en U
 | `/management/stores` | `store-plan-activation.spec.ts` (7), `store-plan-lock-regression.spec.ts` (2) | FUNC + EDGE |
 | `/management/stores/update` | `store-update.spec.ts` | FUNC |
 | `/management/stores/create` | `store-create-security.spec.ts` (2) | FUNC + seguridad |
-| `/management/stores/edit/:id` | — | **UNCOVERED** |
+| `/management/stores/edit/:id` | `store-edit-by-id.spec.ts` | FUNC |
 | `/management/stores/collections` | — | **UNCOVERED** |
 | `/management/stores/commissions` | — | **UNCOVERED** |
 | `/management/users` | `users-crud.spec.ts` (3), `roster-export.spec.ts` (3) | FUNC |
 | `/management/users/create/:storeId?` | `create-store-user.spec.ts` (3) | FUNC + seguridad |
 | `/management/users/edit/:id` | `users-crud.spec.ts` | FUNC |
-| `/management/configurations` | — | **UNCOVERED** |
+| `/management/configurations` | `configurations.spec.ts` | SMOKE |
 | `/admin/features` | — | **UNCOVERED** |
 | `/admin/stores` | — | **UNCOVERED** |
 | `/admin/dashboard` | — | **UNCOVERED** |
