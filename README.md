@@ -5,14 +5,11 @@
 ### 1. Backup de la base de datos
 
 ```bash
-# Backup completo (SQL plano)
-docker exec smca.database pg_dump -U postgres smca > ~/smca_backup_$(date +%Y%m%d_%H%M%S).sql
-
-# Backup comprimido
+# Backup compactado (.sql.gz)
 docker exec smca.database pg_dump -U postgres smca | gzip > ~/smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Restaurar desde backup
-docker exec -i smca.database psql -U postgres -d smca < ~/smca_backup_YYYYMMDD_HHMMSS.sql
+gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | docker exec -i smca.database psql -U postgres -d smca
 ```
 
 ### 2. Cambiar password del usuario admin
