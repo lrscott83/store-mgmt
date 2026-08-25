@@ -62,7 +62,31 @@ dotnet ef database update --project ../Infrastructure --startup-project . --conn
 > podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ./smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 > ```
 
-### 5. Conexión a la BD (referencia)
+### 5. Ver logs del backend
+
+```bash
+# Logs en tiempo real (últimas 100 líneas)
+podman logs -f --tail 100 smca_api
+
+# Logs solo de errores
+podman logs smca_api 2>&1 | grep -i "error\|exception\|fail"
+
+# Logs de una fecha específica
+podman logs smca_api 2>&1 | grep "2026-08-25"
+
+# Logs de autenticación (útiles para debuggear login 400)
+podman logs smca_api 2>&1 | grep -i "auth\|login\|token"
+
+# Últimas 50 líneas con timestamps
+podman logs --tail 50 smca_api 2>&1 | tail -50
+```
+
+**Nota:** El nombre del contenedor del backend puede variar. Verifica con:
+```bash
+podman ps --format "{{.Names}}" | grep -i api
+```
+
+### 6. Conexión a la BD (referencia)
 
 | Campo | Valor |
 |---|---|
