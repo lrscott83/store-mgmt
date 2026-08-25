@@ -127,8 +127,8 @@ No depende de persona ni de backend. Puede avanzar en paralelo a los bloques A y
 
 | US | Título | Prioridad | Esfuerzo | Descripción |
 |---|---|---|---|---|
-| FC-E1 | `/auth/provision` E2E | 🟢 BAJA | Medio | Provisioning offline de dispositivo (ya tiene tests unitarios fuertes: `provision.test.tsx`, `roster-import`, `offline-auth-service`) |
-| FC-E2 | Tutorial + health + 404 | 🟢 BAJA | Bajo | `/help/tutorial` (público), `/health`, página 404 con URL desconocida. Spec nueva: `misc-screens.spec.ts` |
+| FC-E1 | `/auth/provision` E2E | ✅ CUBIERTO | Medio | Page loads sin auth, validación, password toggle. En `provision.spec.ts` |
+| FC-E2 | Tutorial + 404 | ✅ CUBIERTO | Bajo | Tutorial expand/collapse + 404 redirect. En `misc-screens.spec.ts` |
 
 ---
 
@@ -173,12 +173,12 @@ No depende de persona ni de backend. Puede avanzar en paralelo a los bloques A y
 | 18 | FC-D7 | Collections (reseller) | Medio |
 | 19 | FC-D8 | Commissions (reseller) | Bajo |
 
-### 🟢 PENDIENTE — Bloque E: Baja prioridad (2 items)
+### ✅ CUBIERTO — Bloque E: Baja prioridad (2 items)
 
 | # | US | Descripción | Esfuerzo |
 |---|---|---|---|
 | 20 | FC-E1 | `/auth/provision` E2E | Medio |
-| 21 | FC-E2 | Tutorial + health + 404 E2E | Bajo |
+| 21 | FC-E2 | Tutorial + 404 E2E | Bajo |
 
 ---
 
@@ -206,7 +206,7 @@ Profundidad: **FUNC** = flujo funcional (crea/edita/borra, afirma resultado en U
 | `/` | `smoke.spec.ts`, `csp-report-only.spec.ts`, `pwa-install-capture.spec.ts` | SMOKE / infra |
 | `/login` | `login.spec.ts` (19), `login-offline.spec.ts` (12), `login-rate-limit.spec.ts`, `offline-shell.spec.ts`, `offline-access-panel.spec.ts`, `roster-recovery.spec.ts`, `t8-navigation-source.spec.ts`, `smoke.spec.ts` | FUNC + EDGE (la más profunda) |
 | `/register` | `register.spec.ts` (9), `register-rate-limit.spec.ts`, `roster-recovery.spec.ts`, `t8-navigation-source.spec.ts` | FUNC + EDGE |
-| `/auth/provision` | — | **UNCOVERED** |
+| `/auth/provision` | `provision.spec.ts` | FUNC |
 | `/sales/products` | `products-crud.spec.ts` (6), `category-crud.spec.ts` (5), `csv-import.spec.ts` (3), `login.spec.ts` | FUNC |
 | `/sales/new` | `create-sale.spec.ts` (4), `create-credit.spec.ts`, `edit-delete-order.spec.ts`, `inventory-profit.spec.ts`, `inventory-quantities.spec.ts`, `report-consistency.spec.ts`, `sync-roundtrip.spec.ts` | FUNC |
 | `/sales/today-orders` | `create-sale.spec.ts`, `edit-delete-order.spec.ts` (2) | FUNC |
@@ -243,9 +243,9 @@ Profundidad: **FUNC** = flujo funcional (crea/edita/borra, afirma resultado en U
 | `/admin/owners` (+ create, edit) | `admin-routes.spec.ts` | FUNC |
 | `/profile/edit` | `edit-profile.spec.ts` (3) | FUNC |
 | `/profile/change-password` | `change-password.spec.ts` (2) | FUNC + EDGE |
-| `/help/tutorial` | — | **UNCOVERED** |
+| `/help/tutorial` | `misc-screens.spec.ts` | FUNC |
 | `/health` | — (solo el API `/api/v1/auth/ping` vía `api-health.spec.ts`) | **UNCOVERED** como ruta |
-| 404 (`$.tsx`) | — | **UNCOVERED** |
+| 404 (`$.tsx`) | `misc-screens.spec.ts` | FUNC |
 
 ## Anexo B — Cobertura Vitest al detalle (0% y débiles)
 
