@@ -6,10 +6,10 @@
 
 ```bash
 # Backup compactado (.sql.gz)
-docker exec smca.database pg_dump -U postgres smca | gzip > ~/smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+podman exec smca.database pg_dump -U postgres smca | gzip > ~/smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Restaurar desde backup
-gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | docker exec -i smca.database psql -U postgres -d smca
+gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca.database psql -U postgres -d smca
 ```
 
 ### 2. Cambiar password del usuario admin
@@ -21,7 +21,7 @@ gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | docker exec -i smca.database ps
 
 **Desde la BD directamente:**
 ```bash
-docker exec -it smca.database psql -U postgres -d smca -c "UPDATE \"User\" SET \"Password\" = 'HASH_ARGON2ID' WHERE login = 'admin';"
+podman exec -it smca.database psql -U postgres -d smca -c "UPDATE \"User\" SET \"Password\" = 'HASH_ARGON2ID' WHERE login = 'admin';"
 ```
 
 ### 3. Conexión a la BD (referencia)
@@ -38,6 +38,6 @@ docker exec -it smca.database psql -U postgres -d smca -c "UPDATE \"User\" SET \
 # Conectar desde el host
 psql -h localhost -p 5432 -U postgres -d smca
 
-# Conectar desde Docker
-docker exec -it smca.database psql -U postgres -d smca
+# Conectar desde Podman
+podman exec -it smca.database psql -U postgres -d smca
 ```
