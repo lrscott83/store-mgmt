@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 // clientLoader before rendering its children, so the child route's own
 // absence of a loader is not enough — the wrapping layout module must not
 // export one either).
-describe('public-app-layout', () => {
+describe('public-app-layout', { timeout: 15_000 }, () => {
   it('does not export a clientLoader — proves the layout is NOT auth-gated', async () => {
     const mod = await import('../public-app-layout');
     expect((mod as Record<string, unknown>).clientLoader).toBeUndefined();

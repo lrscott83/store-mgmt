@@ -440,11 +440,19 @@ export function createPersonaCache(browser: Browser): PersonaCache {
   ): Promise<void> {
     const alreadyResolving = slot === 'owner-admin' ? ownerAdminPromise : storeUserPromise;
     if (alreadyResolving) {
-      throw new Error(
-        `prime${slot === 'owner-admin' ? 'OwnerAdmin' : 'StoreUser'}() called after the "${slot}" ` +
-          'persona already started resolving — call it BEFORE any signedInPage(...)/resolve(...) call ' +
-          `that would trigger the "${slot}" persona (directly, or via a persona derived from it).`
-      );
+      // Idempotent: the persona was already resolved by another test in the
+      // same worker (e.g. restoreSignedInSession). Capture this test's own
+      // live-observed snapshot as the primed value so derived personas
+      // (owner-admin-with-products, store-user-with-products) build from it.
+      const selectedStoreId = await readSelectedStoreId(page);
+      const homePath = new URL(page.url()).pathname;
+      const snapshot = await captureSnapshot(page.context(), page, identity, selectedStoreId, homePath);
+      if (slot === 'owner-admin') {
+        primedOwnerAdmin = snapshot;
+      } else {
+        primedStoreUser = snapshot;
+      }
+      return;
     }
     const selectedStoreId = await readSelectedStoreId(page);
     const homePath = new URL(page.url()).pathname;
