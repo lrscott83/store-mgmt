@@ -90,6 +90,31 @@ podman logs --tail 50 smca_backend 2>&1 | tail -50
 podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
+### 6. Solucionar problemas comunes
+
+**Backend apunta a BD de testing (smca_test) en vez de producción (smca):**
+
+El archivo `appsettings.E2E.json` sobreescribe la conexión en cualquier entorno. Si existe en el VPS:
+```bash
+# Verificar
+podman exec -it smca_backend ls /app/appsettings.E2E.json
+
+# Eliminar
+podman exec -it smca_backend rm /app/appsettings.E2E.json
+
+# Reiniciar
+podman restart smca_backend
+```
+
+**Verificar la conexión del backend a la BD:**
+```bash
+# Testear conexión desde el contenedor del backend
+podman exec -it smca_backend pg_isready -h smca_postgres_db -p 5432
+
+# Ver qué BD usa el backend
+podman exec -it smca_backend cat /app/appsettings.json | grep -A2 ConnectionStrings
+```
+
 ### 6. Conexión a la BD (referencia)
 
 | Campo | Valor |
