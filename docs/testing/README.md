@@ -52,5 +52,15 @@ Ninguna de las dos prueba el comportamiento offline puro sobre `localStorage`.
 | Etapa | Alcance | Escenarios | Estado | Plan |
 |---|---|---|---|---|
 | **Etapa 1** | Las operaciones que efectivamente cruzan la frontera hacia la API: sesión y acceso, ciclo de vida de tienda y plan, gestión de usuarios, perfil propio | 12 US + 1 invariante | En curso — 1 US con cobertura Playwright | [e2e-stage-1/](e2e-stage-1/README.md) |
+| **Etapa 2** | Servicios offline del módulo de ventas | 22 US | Cubierta | [e2e-stage-2/](e2e-stage-2/README.md) |
+| **Etapa 3** | Módulo de Inventario | 13 US | Parcial | [e2e-stage-3/](e2e-stage-3/README.md) |
+| **Etapa 4** | Gastos, Sincronización, Reportes, Estadísticas | 6 US | Cubierta | [e2e-stage-4/](e2e-stage-4/README.md) |
 
-No hay más etapas definidas todavía. Las siguientes se agregan como filas de esta tabla, con su propia carpeta hermana.
+Planes transversales (no numerados por etapa):
+
+| Plan | Alcance | Escenarios | Estado | Documento |
+|---|---|---|---|---|
+| **Cobertura del frontend** | Auditoría completa (Vitest + Playwright) y cierre de gaps: 16 rutas sin E2E (las 9 de admin incluidas) + 4 huecos de integración | 21 US | Pendiente de implementar | [frontend-coverage/](frontend-coverage/README.md) |
+| **Tests de integración** | Repositorios y servicios offline al 100% (Vitest) | — | Implementado | [integration-tests/](integration-tests/README.md) |
+
+Las siguientes etapas se agregan como filas de la tabla, con su propia carpeta hermana.
