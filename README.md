@@ -33,7 +33,36 @@ podman exec -it smca_postgres_db psql -U postgres -d smca -c "SELECT \"Migration
 
 Las que NO aparezcan en esa lista son las que faltan correr.
 
-### 4. Conexión a la BD (referencia)
+### 4. Ejecutar migraciones
+
+**Opción A — Con Entity Framework (recomendado si el backend está desplegado):**
+```bash
+cd /ruta/al/backend/src/SMCA.WebApi
+dotnet ef database update --project ../Infrastructure --startup-project .
+```
+
+**Opción B — Con scripts SQL manuales (si EF no está disponible en el VPS):**
+```bash
+# Listar scripts disponibles
+ls backend/scripts/
+
+# Ejecutar un script específico (ej: el 08)
+podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/08-20260806-Add-OfflinePasswordPreHash-RefreshTokens-And-DueSoonDays.sql
+```
+
+**Opción C — Aplicar todas las migraciones pendientes de una:**
+```bash
+# Desde el directorio del backend
+cd /ruta/al/backend/src/SMCA.WebApi
+dotnet ef database update --project ../Infrastructure --startup-project . --connection "Host=localhost;Port=5432;Database=smca;Username=postgres;Password=postgres"
+```
+
+> ⚠️ **IMPORTANTE:** Siempre haz backup ANTES de ejecutar migraciones:
+> ```bash
+> podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ./smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+> ```
+
+### 5. Conexión a la BD (referencia)
 
 | Campo | Valor |
 |---|---|
