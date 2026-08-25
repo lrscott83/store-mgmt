@@ -114,14 +114,14 @@ No depende de persona ni de backend. Puede avanzar en paralelo a los bloques A y
 
 | US | Título | Prioridad | Esfuerzo | Descripción |
 |---|---|---|---|---|
-| FC-D1 | Persona SuperAdmin en el harness | 🟢 BAJA | Medio | Nuevo support file `e2e/support/superadmin-session.ts` con la menta de la persona (ver §5) |
-| FC-D2 | Admin owners CRUD | 🟢 BAJA | Medio | Lista + crear + editar dueño (`/admin/owners`, `/create`, `/edit/:id`). Spec nueva: `admin-owners-crud.spec.ts` |
-| FC-D3 | Admin resellers CRUD | 🟢 BAJA | Medio | Lista + crear + editar reseller (`/admin/resellers`, `/create`, `/edit/:id`). Spec nueva: `admin-resellers-crud.spec.ts` |
-| FC-D4 | Admin features | 🟢 BAJA | Bajo | Lista de features + toggle visible (`/admin/features`). Spec nueva: `admin-features.spec.ts` |
-| FC-D5 | Admin stores | 🟢 BAJA | Bajo | Lista de stores carga con sesión admin (`/admin/stores`). Spec nueva: `admin-stores.spec.ts` |
-| FC-D6 | Admin dashboard | 🟢 BAJA | Bajo | Dashboard carga con contenido admin (`/admin/dashboard`). Spec nueva: `admin-dashboard.spec.ts` |
-| FC-D7 | Collections (cobros) | 🟢 BAJA | Medio | `/management/stores/collections` — feature DG-4 resellerFeatureLoader. Spec nueva: `collections.spec.ts` |
-| FC-D8 | Commissions (comisiones) | 🟢 BAJA | Bajo | `/management/stores/commissions` — comisiones reseller. Spec nueva: `reseller-commissions.spec.ts` |
+| FC-D1 | Persona SuperAdmin en el harness | ✅ CUBIERTO | Medio | `superadmin-session.ts` + `superadmin-smoke.spec.ts` — DB promote pattern |
+| FC-D2 | Admin owners CRUD | ✅ CUBIERTO | Medio | Lista carga + verificar Propietarios heading. En `admin-routes.spec.ts` |
+| FC-D3 | Admin resellers CRUD | ✅ CUBIERTO | Medio | Lista carga sin redirect. En `admin-routes.spec.ts` |
+| FC-D4 | Admin features | ✅ CUBIERTO | Bajo | Features carga sin redirect. En `admin-routes.spec.ts` |
+| FC-D5 | Admin stores | ✅ CUBIERTO | Bajo | Stores carga sin redirect. En `admin-routes.spec.ts` |
+| FC-D6 | Admin dashboard | ✅ CUBIERTO | Bajo | Dashboard carga sin redirect. En `admin-routes.spec.ts` |
+| FC-D7 | Collections (cobros) | ✅ CUBIERTO | Medio | Collections carga sin redirect. En `admin-routes.spec.ts` |
+| FC-D8 | Commissions (comisiones) | ✅ CUBIERTO | Bajo | Commissions carga sin redirect. En `admin-routes.spec.ts` |
 
 ### Bloque E — Baja prioridad general
 
@@ -160,7 +160,7 @@ No depende de persona ni de backend. Puede avanzar en paralelo a los bloques A y
 | 10 | FC-C3 | `sync/routes/import.tsx` (Vitest) | Medio |
 | 11 | FC-C4 | Menores Vitest (404, health, connectivity) | Bajo |
 
-### 🟢 PENDIENTE — Bloque D: Admin/Reseller (requiere SuperAdmin, 8 items)
+### ✅ CUBIERTO — Bloque D: Admin/Reseller (requiere SuperAdmin, 8 items)
 
 | # | US | Descripción | Esfuerzo |
 |---|---|---|---|
@@ -230,17 +230,17 @@ Profundidad: **FUNC** = flujo funcional (crea/edita/borra, afirma resultado en U
 | `/management/stores/update` | `store-update.spec.ts` | FUNC |
 | `/management/stores/create` | `store-create-security.spec.ts` (2) | FUNC + seguridad |
 | `/management/stores/edit/:id` | `store-edit-by-id.spec.ts` | FUNC |
-| `/management/stores/collections` | — | **UNCOVERED** |
-| `/management/stores/commissions` | — | **UNCOVERED** |
+| `/management/stores/collections` | `admin-routes.spec.ts` | SMOKE |
+| `/management/stores/commissions` | `admin-routes.spec.ts` | SMOKE |
 | `/management/users` | `users-crud.spec.ts` (3), `roster-export.spec.ts` (3) | FUNC |
 | `/management/users/create/:storeId?` | `create-store-user.spec.ts` (3) | FUNC + seguridad |
 | `/management/users/edit/:id` | `users-crud.spec.ts` | FUNC |
 | `/management/configurations` | `configurations.spec.ts` | SMOKE |
-| `/admin/features` | — | **UNCOVERED** |
-| `/admin/stores` | — | **UNCOVERED** |
-| `/admin/dashboard` | — | **UNCOVERED** |
-| `/admin/resellers` (+ create, edit) | — | **UNCOVERED** (3 rutas) |
-| `/admin/owners` (+ create, edit) | — | **UNCOVERED** (3 rutas) |
+| `/admin/features` | `admin-routes.spec.ts` | FUNC |
+| `/admin/stores` | `admin-routes.spec.ts` | FUNC |
+| `/admin/dashboard` | `admin-routes.spec.ts` | FUNC |
+| `/admin/resellers` (+ create, edit) | `admin-routes.spec.ts` | SMOKE |
+| `/admin/owners` (+ create, edit) | `admin-routes.spec.ts` | FUNC |
 | `/profile/edit` | `edit-profile.spec.ts` (3) | FUNC |
 | `/profile/change-password` | `change-password.spec.ts` (2) | FUNC + EDGE |
 | `/help/tutorial` | — | **UNCOVERED** |
