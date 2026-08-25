@@ -6,10 +6,10 @@
 
 ```bash
 # Backup compactado (.sql.gz)
-podman exec smca.database pg_dump -U postgres smca | gzip > ~/smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ~/smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Restaurar desde backup
-gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca.database psql -U postgres -d smca
+gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca_postgres_db psql -U postgres -d smca
 ```
 
 ### 2. Cambiar password del usuario admin
@@ -21,14 +21,14 @@ gunzip -c ~/smca_backup_YYYYMMDD_HHMMSS.sql.gz | podman exec -i smca.database ps
 
 **Desde la BD directamente:**
 ```bash
-podman exec -it smca.database psql -U postgres -d smca -c "UPDATE \"User\" SET \"Password\" = 'HASH_ARGON2ID' WHERE login = 'admin';"
+podman exec -it smca_postgres_db psql -U postgres -d smca -c "UPDATE \"User\" SET \"Password\" = 'HASH_ARGON2ID' WHERE login = 'admin';"
 ```
 
 ### 3. Conexión a la BD (referencia)
 
 | Campo | Valor |
 |---|---|
-| Container | `smca.database` |
+| Container | `smca_postgres_db` |
 | DB | `smca` |
 | User | `postgres` |
 | Password | `postgres` |
@@ -39,5 +39,5 @@ podman exec -it smca.database psql -U postgres -d smca -c "UPDATE \"User\" SET \
 psql -h localhost -p 5432 -U postgres -d smca
 
 # Conectar desde Podman
-podman exec -it smca.database psql -U postgres -d smca
+podman exec -it smca_postgres_db psql -U postgres -d smca
 ```
