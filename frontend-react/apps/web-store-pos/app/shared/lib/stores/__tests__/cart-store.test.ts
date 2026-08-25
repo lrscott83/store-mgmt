@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Product } from '@store-mgmt/domain';
-import { OrderType } from '@store-mgmt/domain';
+import { OrderType, PaymentType } from '@store-mgmt/domain';
 import { useCartStore } from '../cart-store';
 
 // getItemQuantity is a 1:1 port of Angular's ShoppingCartService.getCartItemQuantity
@@ -145,5 +145,138 @@ describe('useCartStore — orderDescription (edit-order-details parity)', () => 
     useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 1, OrderType.Mayorista);
     expect(useCartStore.getState().orderType).toBe(OrderType.Mayorista);
     expect(useCartStore.getState().orderDescription).toBe('nota previa');
+  });
+});
+
+// ─── removeItem ────────────────────────────────────────────────────────────────
+
+describe('useCartStore.removeItem', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('removes an item by productId', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }));
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-2' }));
+    useCartStore.getState().removeItem('prod-1');
+    expect(useCartStore.getState().items).toHaveLength(1);
+    expect(useCartStore.getState().items[0].product.id).toBe('prod-2');
+  });
+
+  it('does nothing when removing a non-existent productId', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }));
+    useCartStore.getState().removeItem('missing');
+    expect(useCartStore.getState().items).toHaveLength(1);
+  });
+});
+
+// ─── updateQuantity ────────────────────────────────────────────────────────────
+
+describe('useCartStore.updateQuantity', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('updates the quantity of an existing item', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 2);
+    useCartStore.getState().updateQuantity('prod-1', 5);
+    expect(useCartStore.getState().items[0].quantity).toBe(5);
+  });
+
+  it('removes the item when qty <= 0 (branch coverage)', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 3);
+    useCartStore.getState().updateQuantity('prod-1', 0);
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+
+  it('removes the item when qty is negative', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 3);
+    useCartStore.getState().updateQuantity('prod-1', -1);
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
+});
+
+// ─── setPaymentType ────────────────────────────────────────────────────────────
+
+describe('useCartStore.setPaymentType', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('defaults to Efectivo', () => {
+    expect(useCartStore.getState().paymentType).toBe(PaymentType.Efectivo);
+  });
+
+  it('sets the payment type', () => {
+    useCartStore.getState().setPaymentType(PaymentType.Tarjeta);
+    expect(useCartStore.getState().paymentType).toBe(PaymentType.Tarjeta);
+  });
+});
+
+// ─── setClientName ─────────────────────────────────────────────────────────────
+
+describe('useCartStore.setClientName', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('defaults to empty string', () => {
+    expect(useCartStore.getState().clientName).toBe('');
+  });
+
+  it('sets the client name', () => {
+    useCartStore.getState().setClientName('Juan Pérez');
+    expect(useCartStore.getState().clientName).toBe('Juan Pérez');
+  });
+});
+
+// ─── toggleCredit ──────────────────────────────────────────────────────────────
+
+describe('useCartStore.toggleCredit', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('defaults to false', () => {
+    expect(useCartStore.getState().isCredit).toBe(false);
+  });
+
+  it('toggles credit on and off', () => {
+    useCartStore.getState().toggleCredit();
+    expect(useCartStore.getState().isCredit).toBe(true);
+    useCartStore.getState().toggleCredit();
+    expect(useCartStore.getState().isCredit).toBe(false);
+  });
+});
+
+// ─── clear ─────────────────────────────────────────────────────────────────────
+
+describe('useCartStore.clear', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useCartStore.getState().clear();
+  });
+
+  it('resets all state to defaults', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 3, OrderType.Mayorista, 8);
+    useCartStore.getState().setPaymentType(PaymentType.Zelle);
+    useCartStore.getState().setClientName('Test');
+    useCartStore.getState().toggleCredit();
+    useCartStore.getState().updateOrderDetails(OrderType.Otro, 'note');
+
+    useCartStore.getState().clear();
+
+    const state = useCartStore.getState();
+    expect(state.items).toHaveLength(0);
+    expect(state.orderType).toBe(OrderType.Normal);
+    expect(state.orderDescription).toBe('');
+    expect(state.paymentType).toBe(PaymentType.Efectivo);
+    expect(state.isCredit).toBe(false);
+    expect(state.clientName).toBe('');
   });
 });
