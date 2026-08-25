@@ -103,10 +103,10 @@ No depende de persona ni de backend. Puede avanzar en paralelo a los bloques A y
 
 | US | Título | Prioridad | Esfuerzo | Descripción |
 |---|---|---|---|---|
-| FC-C1 | Charts de estadísticas | 🟡 MEDIA | Medio | `chart-core.tsx` (0%, 50 stmts), `sales-chart.tsx` (0%), `profit-chart.tsx` (0%) — render con recharts mockeado/lazy |
-| FC-C2 | Service worker | 🟡 MEDIA | Medio | `service-worker.ts` (0%, 62 stmts) — eventos de lifecycle |
-| FC-C3 | `sync/routes/import.tsx` al 39% | 🟡 MEDIA | Medio | Caminos de error e import parcial que hoy no se ejecutan |
-| FC-C4 | Menores | 🟢 BAJA | Bajo | `$.tsx` 404 (57%), `health.tsx`, `connectivity-service.ts`, `entry.client.tsx` |
+| FC-C1 | Charts de estadísticas | ✅ CUBIERTO | Medio | `chart-core.tsx` (0%, 50 stmts), `sales-chart.tsx` (0%), `profit-chart.tsx` (0%) — render con recharts mockeado/lazy |
+| FC-C2 | Service worker | ✅ CUBIERTO | Medio | `service-worker.ts` (0%, 62 stmts) — resolveStrategy routing logic + constants |
+| FC-C3 | `sync/routes/import.tsx` al 39% | ✅ CUBIERTO | Medio | Caminos de éxito parcial y error manejado |
+| FC-C4 | Menores | ✅ CUBIERTO | Bajo | `$.tsx` 404 (57%), `health.tsx`, `connectivity-service.ts` |
 
 ### Bloque D — E2E Admin/Reseller/Comisiones (requiere SuperAdmin)
 
@@ -151,14 +151,14 @@ No depende de persona ni de backend. Puede avanzar en paralelo a los bloques A y
 | 6 | FC-B1 | Stores edit `/:id` (Owner) | Bajo |
 | 7 | FC-B2 | Configurations (Owner) | Bajo |
 
-### 🟡 PENDIENTE — Bloque C: Integración Vitest (4 items)
+### ✅ CUBIERTO — Bloque C: Integración Vitest (4 items)
 
 | # | US | Descripción | Esfuerzo |
 |---|---|---|---|
 | 8 | FC-C1 | Charts de estadísticas (Vitest) | Medio |
 | 9 | FC-C2 | Service worker (Vitest) | Medio |
 | 10 | FC-C3 | `sync/routes/import.tsx` (Vitest) | Medio |
-| 11 | FC-C4 | Menores Vitest (404, health, connectivity, entry.client) | Bajo |
+| 11 | FC-C4 | Menores Vitest (404, health, connectivity) | Bajo |
 
 ### 🟢 PENDIENTE — Bloque D: Admin/Reseller (requiere SuperAdmin, 8 items)
 
