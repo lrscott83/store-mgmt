@@ -651,11 +651,10 @@ public sealed class ExportOfflineRosterTests
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var storeUsers = await db.Set<StoreUser>().IgnoreQueryFilters()
-            .Where(su => su.StoreId == storeId).ToListAsync();
-        var userIds = storeUsers.Select(su => su.UserId).ToList();
-        db.Set<StoreUser>().RemoveRange(storeUsers);
-        await db.SaveChangesAsync();
+        var userIds = await db.Set<StoreUser>().IgnoreQueryFilters()
+            .Where(su => su.StoreId == storeId).Select(su => su.UserId).ToListAsync();
+        await db.Set<StoreUser>().IgnoreQueryFilters()
+            .Where(su => su.StoreId == storeId).ExecuteDeleteAsync();
 
         foreach (var uid in userIds)
         {
@@ -667,8 +666,7 @@ public sealed class ExportOfflineRosterTests
     private static async Task RemoveWhere<T>(ApplicationDbContext db,
         System.Linq.Expressions.Expression<Func<T, bool>> pred) where T : class
     {
-        db.Set<T>().RemoveRange(await db.Set<T>().IgnoreQueryFilters().Where(pred).ToListAsync());
-        await db.SaveChangesAsync();
+        await db.Set<T>().IgnoreQueryFilters().Where(pred).ExecuteDeleteAsync();
     }
 
     /// <summary>

@@ -67,17 +67,20 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                 throw new ApiException(_localizer["OwnerNotFound"], HttpStatusCode.BadRequest);
 
             Owner owner = await _ownerRepository.GetOwnerWithAllDataToDeleteByIdAsync(request.Id);
-            await _userRoleRepository.DeleteAsync(owner.User.UserRoles);
-            await _storeUsageRepository.DeleteAsync(owner.User.StoreUsages);
-            await _userRepository.DeleteAsync(owner.User);
 
-            await _storeUserRepository.DeleteAsync(owner.Stores.SelectMany(s => s.StoreUsers).ToList());
-            await _storeModuleRepository.DeleteAsync(owner.Stores.SelectMany(s => s.StoreModules).ToList());
-            await _storeRoleFeatureRepository.DeleteAsync(owner.Stores.SelectMany(s => s.StoreRoleFeatures).ToList());
-            await _storeRepository.DeleteAsync(owner.Stores);
+            // Hard delete: physically removes all data (not soft delete)
+            // This is a permanent, irreversible operation.
+            await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
+            await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
+            await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
+            await _userRepository.HardDeleteAsync(owner.User);
 
-            await _reSellerOwnerRepository.DeleteAsync(owner.ReSellerOwner);
-            await _ownerRepository.DeleteAsync(owner);
+            await _storeUserRepository.HardDeleteAsync(owner.Stores.SelectMany(s => s.StoreUsers).ToList());
+            await _storeModuleRepository.HardDeleteAsync(owner.Stores.SelectMany(s => s.StoreModules).ToList());
+            await _storeRoleFeatureRepository.HardDeleteAsync(owner.Stores.SelectMany(s => s.StoreRoleFeatures).ToList());
+            await _storeRepository.HardDeleteAsync(owner.Stores);
+
+            await _ownerRepository.HardDeleteAsync(owner);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }

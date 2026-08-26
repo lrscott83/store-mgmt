@@ -58,7 +58,75 @@ namespace Infrastructure.Persistence.Repositories
             foreach (var entity in entities)
                 _dbContext.Entry(entity).State = EntityState.Deleted;
 
-            //await _dbContext.SaveChangesAsync();
+            return true;
+        }
+
+        /// <summary>
+        /// Soft delete: sets IsActive = false instead of removing the row.
+        /// This preserves the record in the database for audit/history purposes.
+        /// Does NOT trigger the SaveChanges interceptor — caller must call SaveChangesAsync.
+        /// </summary>
+        public async Task<bool> SoftDeleteAsync(TEntity entity)
+        {
+            if (entity == null) return false;
+            if (entity is AuditableEntity auditable)
+            {
+                auditable.IsActive = false;
+                auditable.UpdatedDate = DateTimeOffset.UtcNow;
+            }
+            _dbContext.Entry(entity).State = EntityState.Modified;
+            return true;
+        }
+
+        public async Task<bool> SoftDeleteAsync(IEnumerable<TEntity> entities)
+        {
+            if (entities == null) return false;
+            foreach (var entity in entities)
+            {
+                if (entity is AuditableEntity auditable)
+                {
+                    auditable.IsActive = false;
+                    auditable.UpdatedDate = DateTimeOffset.UtcNow;
+                }
+                _dbContext.Entry(entity).State = EntityState.Modified;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Hard delete: physically removes the entity from the database.
+        /// Unlike DeleteAsync (soft delete), this bypasses the auditable interceptor
+        /// and issues a DELETE SQL statement that cannot be undone.
+        /// Uses IgnoreQueryFilters to ensure the entity is found even if soft-deleted.
+        /// </summary>
+        public async Task<bool> HardDeleteAsync(TEntity entity)
+        {
+            if (entity == null) return false;
+            // Use the entity's Id to delete directly via SQL, bypassing change tracker
+            // and FK cascade logic that would fail with Remove/RemoveRange.
+            var idProperty = _dbContext.Model.FindEntityType(typeof(TEntity))?.FindPrimaryKey()?.Properties.FirstOrDefault();
+            if (idProperty == null) return false;
+
+            var idValue = idProperty.PropertyInfo?.GetValue(entity);
+            if (idValue == null) return false;
+
+            var param = System.Linq.Expressions.Expression.Parameter(typeof(TEntity), "e");
+            var property = System.Linq.Expressions.Expression.Property(param, idProperty.Name);
+            var constant = System.Linq.Expressions.Expression.Constant(idValue, idValue.GetType());
+            var predicate = System.Linq.Expressions.Expression.Lambda<Func<TEntity, bool>>(
+                System.Linq.Expressions.Expression.Equal(property, constant), param);
+
+            await _dbContext.Set<TEntity>().IgnoreQueryFilters().Where(predicate).ExecuteDeleteAsync();
+            return true;
+        }
+
+        public async Task<bool> HardDeleteAsync(IEnumerable<TEntity> entities)
+        {
+            if (entities == null || !entities.Any()) return false;
+            foreach (var entity in entities)
+            {
+                await HardDeleteAsync(entity);
+            }
             return true;
         }
     }

@@ -57,6 +57,8 @@ namespace Domain.Common.Extensions
                         entry.Entity.UpdatedDate = DateTime.UtcNow;
                         entry.Entity.UpdatedBy = userId;
                         break;
+                    // Soft delete: use SoftDeleteAsync (explicit) not via interceptor.
+                    // Do NOT uncomment — see README/soft-delete-strategy.md.
                     //case EntityState.Deleted:
                     //    entry.Entity.IsActive = false;
                     //    entry.Entity.UpdatedDate = DateTime.UtcNow;

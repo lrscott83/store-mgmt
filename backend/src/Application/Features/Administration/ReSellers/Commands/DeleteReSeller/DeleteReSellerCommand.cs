@@ -43,7 +43,7 @@ namespace Application.Features.Administration.ReSellers.Commands.DeleteReSeller
                 throw new ApiException(_localizer["ReSellerNotFound"], HttpStatusCode.BadRequest);
 
             var reSeller = await _reSellerRepository.GetByIdAsync(request.Id);
-            await _reSellerRepository.DeleteAsync(reSeller);
+            await _reSellerRepository.HardDeleteAsync(reSeller);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }

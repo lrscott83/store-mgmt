@@ -44,6 +44,8 @@ namespace Infrastructure.Persistence.Interceptors
                         entry.Entity.UpdatedDate = _dateTimeProvider.UtcNow;
                         entry.Entity.UpdatedBy = _httpContextService.UserExternalId.ToGuid();
                         break;
+                    // Soft delete: use DeleteAsync (soft) or HardDeleteAsync explicitly.
+                    // Do NOT uncomment — see README/soft-delete-strategy.md.
                     //case EntityState.Deleted:
                     //    entry.Entity.IsActive = false;
                     //    entry.Entity.UpdatedDate = _dateTimeProvider.UtcNow;

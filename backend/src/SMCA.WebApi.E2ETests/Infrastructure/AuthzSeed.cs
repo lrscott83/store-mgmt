@@ -110,10 +110,8 @@ public static class AuthzSeed
         await RemoveWhere<StoreRoleFeature>(db, x => x.StoreId == storeId);
         await RemoveWhere<StoreUser>(db, x => x.StoreId == storeId);
         await RemoveWhere<StoreModule>(db, x => x.StoreId == storeId);
-        var stores = await db.Set<Store>().IgnoreQueryFilters().Where(s => s.Id == storeId).ToListAsync();
-        var ownerIds = stores.Select(s => s.OwnerId).ToList();
-        db.Set<Store>().RemoveRange(stores);
-        await db.SaveChangesAsync();
+        var ownerIds = await db.Set<Store>().IgnoreQueryFilters().Where(s => s.Id == storeId).Select(s => s.OwnerId).ToListAsync();
+        await RemoveWhere<Store>(db, s => s.Id == storeId);
         await RemoveWhere<Owner>(db, o => ownerIds.Contains(o.Id));
         foreach (var uid in userIds)
         {
@@ -122,9 +120,13 @@ public static class AuthzSeed
         }
     }
 
+    /// <summary>
+    /// Uses ExecuteDeleteAsync deliberately: it issues DELETE SQL directly, so it neither
+    /// triggers cascade-delete logic nor relies on EF change tracking state management.
+    /// This avoids FK constraint violations when the parent entity is being removed.
+    /// </summary>
     private static async Task RemoveWhere<T>(ApplicationDbContext db, System.Linq.Expressions.Expression<Func<T, bool>> pred) where T : class
     {
-        db.Set<T>().RemoveRange(await db.Set<T>().IgnoreQueryFilters().Where(pred).ToListAsync());
-        await db.SaveChangesAsync();
+        await db.Set<T>().IgnoreQueryFilters().Where(pred).ExecuteDeleteAsync();
     }
 }
