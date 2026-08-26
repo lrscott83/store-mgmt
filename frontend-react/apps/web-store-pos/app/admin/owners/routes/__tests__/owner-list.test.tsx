@@ -288,11 +288,11 @@ describe('OwnerListPage — state indicator classes (Req: Owners State CSS Class
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-OWNERS-LIST-5 — delete button (no confirmation)
+// S-ADMIN-OWNERS-LIST-5 — delete button with confirmation dialog
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('OwnerListPage — delete button', () => {
-  it('calls deleteOwner without confirmation and refreshes the list', async () => {
+  it('opens confirmation dialog before deleting and refreshes list after confirm', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
@@ -322,14 +322,66 @@ describe('OwnerListPage — delete button', () => {
       expect(screen.getByText('To Delete')).toBeInTheDocument();
     });
 
+    // Open gear menu and click delete
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     const deleteBtn = screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] });
     fireEvent.click(deleteBtn);
+
+    // Confirmation dialog should appear
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-dialog-confirm')).toBeInTheDocument();
+    });
+    expect(screen.getByText(esMessages['OWNER.DELETE_CONFIRM_TITLE'])).toBeInTheDocument();
+
+    // Confirm deletion
+    fireEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
     await waitFor(() => {
       expect(ownerHttpService.deleteOwner).toHaveBeenCalledWith('o99');
       // list refreshed — listOwners called twice (mount + after delete)
       expect(ownerHttpService.listOwners).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('closes dialog without deleting when cancel is clicked', async () => {
+    const { ownerHttpService } = await import(
+      '~/admin/owners/lib/services/owner-http-service'
+    );
+    vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
+      succeeded: true,
+      data: [makeOwner({ id: 'o99', fullName: 'To Delete' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { OwnerListPage } = await import('../owner-list');
+    render(
+      <Wrapper>
+        <OwnerListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('To Delete')).toBeInTheDocument();
+    });
+
+    // Open gear menu and click delete
+    fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
+    const deleteBtn = screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] });
+    fireEvent.click(deleteBtn);
+
+    // Confirmation dialog should appear
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-dialog-confirm')).toBeInTheDocument();
+    });
+
+    // Cancel
+    fireEvent.click(screen.getByText(esMessages['GENERAL.CANCEL']));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(ownerHttpService.deleteOwner).not.toHaveBeenCalled();
     });
   });
 });

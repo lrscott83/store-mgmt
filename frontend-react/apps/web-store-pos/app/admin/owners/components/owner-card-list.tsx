@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Owner } from '@store-mgmt/domain';
 import { Card } from '~/shared/components/ui/card';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
+import { ConfirmDialog } from '~/shared/components/ui/confirm-dialog';
 import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface OwnerCardListProps {
@@ -26,47 +28,71 @@ function getCardClass(owner: Owner): string {
 
 export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) {
   const intl = useIntl();
+  const [ownerToDelete, setOwnerToDelete] = useState<Owner | null>(null);
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {owners.map((owner) => {
-        const totalPrice = owner.storeModules.reduce(
-          (sum, m) => sum + m.storeModuleTotalCurrentPrice,
-          0
-        );
-        const storeCount = owner.storeModules.length;
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {owners.map((owner) => {
+          const totalPrice = owner.storeModules.reduce(
+            (sum, m) => sum + m.storeModuleTotalCurrentPrice,
+            0
+          );
+          const storeCount = owner.storeModules.length;
 
-        return (
-          <Card key={owner.id} title={owner.fullName} className={getCardClass(owner)}>
-            <div className="space-y-2">
-              <p className="text-sm text-text-muted">
-                {formatCurrency(totalPrice)}
-                {' en '}
-                {intl.formatMessage({ id: 'OWNER.STORE_PRICE_LABEL' }, { count: storeCount })}
-              </p>
-              <p className="text-sm text-text-muted">
-                {intl.formatMessage({ id: 'GENERAL.RESELLER' })}
-                {': '}
-                {owner.reSellerName || 'ADMIN'}
-              </p>
-              <p className="text-sm text-text-muted">{owner.cellPhone}</p>
-              {owner.email && <p className="text-sm text-text-muted">{owner.email}</p>}
-              {owner.description && <p className="text-sm text-text-muted">{owner.description}</p>}
-              <div className="flex justify-end pt-2">
-                <ActionMenu widthClass="min-w-40">
-                  <ActionMenuItem intent="edit" onClick={() => onEdit(owner.id)}>
-                    {intl.formatMessage({ id: 'OWNER.EDIT_OWNER' })}
-                  </ActionMenuItem>
-                  <ActionMenuItem intent="delete" separatorBefore onClick={() => onDelete(owner.id)}>
-                    {intl.formatMessage({ id: 'GENERAL.DELETE' })}
-                  </ActionMenuItem>
-                </ActionMenu>
+          return (
+            <Card key={owner.id} title={owner.fullName} className={getCardClass(owner)}>
+              <div className="space-y-2">
+                <p className="text-sm text-text-muted">
+                  {formatCurrency(totalPrice)}
+                  {' en '}
+                  {intl.formatMessage({ id: 'OWNER.STORE_PRICE_LABEL' }, { count: storeCount })}
+                </p>
+                <p className="text-sm text-text-muted">
+                  {intl.formatMessage({ id: 'GENERAL.RESELLER' })}
+                  {': '}
+                  {owner.reSellerName || 'ADMIN'}
+                </p>
+                <p className="text-sm text-text-muted">{owner.cellPhone}</p>
+                {owner.email && <p className="text-sm text-text-muted">{owner.email}</p>}
+                {owner.description && <p className="text-sm text-text-muted">{owner.description}</p>}
+                <div className="flex justify-end pt-2">
+                  <ActionMenu widthClass="min-w-40">
+                    <ActionMenuItem intent="edit" onClick={() => onEdit(owner.id)}>
+                      {intl.formatMessage({ id: 'OWNER.EDIT_OWNER' })}
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      intent="delete"
+                      separatorBefore
+                      onClick={() => setOwnerToDelete(owner)}
+                    >
+                      {intl.formatMessage({ id: 'GENERAL.DELETE' })}
+                    </ActionMenuItem>
+                  </ActionMenu>
+                </div>
               </div>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <ConfirmDialog
+        open={ownerToDelete !== null}
+        onClose={() => setOwnerToDelete(null)}
+        onConfirm={() => {
+          if (ownerToDelete) {
+            onDelete(ownerToDelete.id);
+            setOwnerToDelete(null);
+          }
+        }}
+        title={intl.formatMessage({ id: 'OWNER.DELETE_CONFIRM_TITLE' })}
+        description={intl.formatMessage(
+          { id: 'OWNER.DELETE_CONFIRM_MESSAGE' },
+          { name: ownerToDelete?.fullName ?? '' }
+        )}
+        confirmLabel={intl.formatMessage({ id: 'OWNER.DELETE_CONFIRM_BUTTON' })}
+      />
+    </>
   );
 }
 

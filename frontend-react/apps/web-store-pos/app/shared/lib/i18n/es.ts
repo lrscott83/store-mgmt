@@ -826,6 +826,10 @@ const messages: Record<string, string> = {
   'OWNER.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
   'OWNER.PHONE_REQUIRED': 'El teléfono es obligatorio.',
   'OWNER.EDIT_TITLE_LABEL': 'Editar propietario',
+  'OWNER.DELETE_CONFIRM_TITLE': 'Eliminar propietario permanentemente',
+  'OWNER.DELETE_CONFIRM_MESSAGE': '¿Está seguro que desea eliminar permanentemente a {name}? Se eliminarán la tienda, todos los usuarios asociados y todos los datos. Esta acción no se puede deshacer.',
+  'OWNER.DELETE_CONFIRM_BUTTON': 'Eliminar permanentemente',
+  'OWNER.DELETE_SUCCESS': 'El propietario fue eliminado correctamente.',
   'OWNER.USERS_TAB_PLACEHOLDER': 'Gestión de usuarios próximamente.',
 
   // Admin — Owners — tab labels (uses GENERAL.DETAILS / GENERAL.STORES / GENERAL.USERS)
