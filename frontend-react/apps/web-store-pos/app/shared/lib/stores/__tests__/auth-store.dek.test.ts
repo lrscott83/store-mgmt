@@ -310,3 +310,66 @@ describe('useAuthStore.login — eager entity migration wiring (design §12, WU1
     vi.doUnmock('~/shared/lib/http/auth-http-service');
   });
 });
+
+describe('useAuthStore.login — SuperAdmin/Reseller without store skips DEK resolution', () => {
+  const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+  });
+
+  it('SuperAdmin with no assigned store (empty GUID) logs in without DekUnwrapError', async () => {
+    const superAdminUser = makeAuthUser({
+      isSuperAdmin: true,
+      isOwnerAdmin: false,
+      selectedStoreId: EMPTY_GUID,
+    });
+    // Backend returns empty wrap fields for users without a store
+    mockAuthHttp(successEnvelope(), superAdminUser);
+
+    // This should NOT throw DekUnwrapError
+    await useAuthStore.getState().login('admin', 'password123');
+
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.user?.isSuperAdmin).toBe(true);
+    expect(state.user?.selectedStoreId).toBe(EMPTY_GUID);
+    // DEK was NOT resolved (skipped for users without a store)
+    expect(getDek()).toBeNull();
+
+    vi.doUnmock('~/shared/lib/http/auth-http-service');
+  });
+
+  it('Reseller with no assigned store logs in without DekUnwrapError', async () => {
+    const resellerUser = makeAuthUser({
+      isSuperAdmin: false,
+      isReSeller: true,
+      selectedStoreId: EMPTY_GUID,
+    });
+    mockAuthHttp(successEnvelope(), resellerUser);
+
+    await useAuthStore.getState().login('reseller@test.com', 'password123');
+
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.user?.isReSeller).toBe(true);
+    expect(state.user?.selectedStoreId).toBe(EMPTY_GUID);
+    expect(getDek()).toBeNull();
+
+    vi.doUnmock('~/shared/lib/http/auth-http-service');
+  });
+
+  it('User WITH a store still resolves DEK as before (no regression)', async () => {
+    await seedV2Roster(await wrapDek('secret', FIXED_DEK));
+    mockAuthHttp(successEnvelope(), makeAuthUser({ selectedStoreId: 's1' }));
+
+    await useAuthStore.getState().login('ana@example.com', 'secret');
+
+    expect(getDek()).not.toBeNull();
+    expect(Array.from(getDek()!)).toEqual(Array.from(FIXED_DEK));
+
+    vi.doUnmock('~/shared/lib/http/auth-http-service');
+  });
+});
