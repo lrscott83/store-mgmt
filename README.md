@@ -92,7 +92,53 @@ podman logs --tail 50 smca_backend 2>&1 | tail -50
 podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
-### 6. Solucionar problemas comunes
+### 6. Limpiar tiendas, owners y usuarios (con rollback)
+
+⚠️ **Úsalo solo en producción cuando necesites empezar de cero** (problemas con el wizard de setup, datos corruptos, etc.)
+
+**Antes de ejecutar, haz un backup:**
+```bash
+podman exec smca_postgres_db pg_dump -U postgres smca | gzip > ./smca_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+```
+
+**Paso 1: Ejecutar la limpieza**
+```bash
+# IMPORTANTE: Usa la misma conexión/sesión para todos los scripts
+podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/09-delete-all-stores-users.sql
+```
+
+**Paso 2: Verificar el resultado**
+```bash
+podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/11-verify-cleanup.sql
+```
+
+**Si necesitas revertir (deshacer la limpieza):**
+```bash
+# ⚠️ Solo funciona si la conexión del paso 1 sigue abierta
+# (las tablas temporales se borran al cerrar la conexión)
+podman exec -i smca_postgres_db psql -U postgres -d smca < backend/scripts/10-revert-delete-stores-users.sql
+```
+
+**¿Qué hace cada script?**
+
+| Script | Función |
+|---|---|
+| `09-delete-all-stores-users.sql` | Crea respaldos en tablas temporales, borra todos los datos (respeta Module, Feature, Role, Tenant, SystemConfiguration) |
+| `10-revert-delete-stores-users.sql` | Restaura todos los datos desde las tablas temporales (solo funciona en la misma conexión) |
+| `11-verify-cleanup.sql` | Verifica el estado de la BD, muestra conteos de todas las tablas |
+
+**¿Qué se conserva?**
+- Tablas Module, Feature, Role, Tenant (seed data)
+- Tabla StorePaymentStatus (catálogo de estados)
+- Tabla SystemConfiguration (configuraciones del sistema)
+- Migraciones aplicadas (`__EFMigrationsHistory`)
+
+**¿Qué se borra?**
+- Todas las tablas: User, Owner, Store, ReSeller, UserRole, StoreUser, StoreModule, StoreRoleFeature, StorePayment, StoreUsage, ProductCategory, Product, Order, OrderItem, InventoryEntry, InventoryEntryCost, RefreshTokens, ReSellerOwner, OutboxMessage
+
+---
+
+### 7. Solucionar problemas comunes
 
 **Backend apunta a BD de testing (smca_test) en vez de producción (smca):**
 
@@ -117,7 +163,7 @@ podman exec -it smca_backend pg_isready -h smca_postgres_db -p 5432
 podman exec -it smca_backend cat /app/appsettings.json | grep -A2 ConnectionStrings
 ```
 
-### 6. Conexión a la BD (referencia)
+### 8. Conexión a la BD (referencia)
 
 | Campo | Valor |
 |---|---|
