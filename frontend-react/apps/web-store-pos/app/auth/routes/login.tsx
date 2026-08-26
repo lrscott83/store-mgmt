@@ -62,6 +62,26 @@ function offlineErrorMessageId(err: unknown): string {
   return 'AUTH.SERVER_ERROR';
 }
 
+/**
+ * Translates known backend error descriptions (English) to Spanish.
+ * The backend hardcodes English in UserErrors.cs; this mapping ensures
+ * all user-facing copy stays in neutral Latin American Spanish.
+ */
+function translateBackendError(desc: string): string {
+  const map: Record<string, string> = {
+    'Invalid credentials': 'Credenciales incorrectas',
+    'Invalid login or password': 'Usuario o contraseña incorrectos',
+  };
+  // If the description is not in the map but contains 'contrase', it is
+  // already a Spanish string. Normalize voseo/informal to neutral Latin American.
+  if (desc.includes('contrase')) {
+    return desc
+      .replace(/inval[ií]dos/gi, 'incorrectos')
+      .replace(/inv[aá]lidas/gi, 'incorrectas');
+  }
+  return map[desc] ?? desc;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const intl = useIntl();
@@ -182,15 +202,15 @@ export default function LoginPage() {
       }
       // Angular login.component.ts:162-167 INVALID_ERROR path: a body-level
       // failure (HTTP 200 + succeeded:false) carries the backend's own message
-      // (auth-store tags it as loginRejectionDescription). Surface it verbatim,
-      // interpolated into AUTH.INVALID_ERROR, instead of a generic fallback.
+      // (auth-store tags it as loginRejectionDescription). Translate to Spanish
+      // before interpolating into AUTH.INVALID_ERROR.
       const rejectionDescription = (err as { loginRejectionDescription?: string })
         ?.loginRejectionDescription;
       if (rejectionDescription) {
         setErrors({
           form: intl.formatMessage(
             { id: 'AUTH.INVALID_ERROR' },
-            { error: rejectionDescription }
+            { error: translateBackendError(rejectionDescription) }
           ),
         });
         return;

@@ -66,7 +66,7 @@ const messages: Record<string, string> = {
 
   // Auth
   'AUTH.SIGN_IN': 'Iniciar sesión',
-  'AUTH.SIGN_IN_TITLE': 'Ingresá a tu cuenta',
+  'AUTH.SIGN_IN_TITLE': 'Inicia sesión en tu cuenta',
   'AUTH.REGISTER': 'Crear cuenta',
   'AUTH.REGISTER_TITLE': 'Crear nueva cuenta',
   'AUTH.EMAIL': 'Email',
@@ -81,32 +81,32 @@ const messages: Record<string, string> = {
   'AUTH.FULL_NAME_REQUIRED': 'El nombre completo es requerido',
   'AUTH.CELL_PHONE': 'Teléfono celular',
   'AUTH.CELL_PHONE_REQUIRED': 'El teléfono es requerido',
-  'AUTH.NO_ACCOUNT': '¿No tenés cuenta?',
-  'AUTH.HAVE_ACCOUNT': '¿Ya tenés cuenta?',
+  'AUTH.NO_ACCOUNT': '¿No tienes cuenta?',
+  'AUTH.HAVE_ACCOUNT': '¿Ya tienes cuenta?',
   'AUTH.SIGNING_IN': 'Ingresando...',
   'AUTH.REGISTERING': 'Registrando...',
-  'AUTH.INVALID_CREDENTIALS': 'Usuario o contraseña inválidos',
-  'AUTH.ACCOUNT_INACTIVE': 'Tu cuenta está inactiva. Contactá soporte.',
-  'AUTH.SERVER_ERROR': 'Algo salió mal. Intentá de nuevo.',
-  'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Esperá un momento antes de volver a intentar.',
+  'AUTH.INVALID_CREDENTIALS': 'Usuario o contraseña incorrectos',
+  'AUTH.ACCOUNT_INACTIVE': 'Tu cuenta está inactiva. Contacta soporte.',
+  'AUTH.SERVER_ERROR': 'Ocurrió un error. Inténtalo de nuevo.',
+  'AUTH.TOO_MANY_ATTEMPTS': 'Demasiados intentos. Espera un momento antes de volver a intentar.',
   'AUTH.INVALID_ERROR': 'La autenticación no es válida por el siguiente error: {error}',
-  'AUTH.OFFLINE_LOGIN': 'Estás offline. Se requiere conexión para iniciar sesión.',
+  'AUTH.OFFLINE_LOGIN': 'Estás sin conexión. Se requiere conexión para iniciar sesión.',
   // at-rest-encryption-errors spec §"unlock banner and failure copy exact
   // strings" — ratified verbatim, do not reword. AUTH.UNLOCK_FAILED is
   // asserted byte-for-byte by e2e/login-offline.spec.ts T7 (:359,
   // UNLOCK_FAILED_TEXT) — that file is untouchable without authorization, so
   // this string may never be reworded or removed without it.
-  'AUTH.UNLOCK_REQUIRED': 'Ingresá tu contraseña para desbloquear los datos de este dispositivo.',
+  'AUTH.UNLOCK_REQUIRED': 'Ingresa tu contraseña para desbloquear los datos de este dispositivo.',
   'AUTH.UNLOCK_FAILED':
-    'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.',
+    'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, solicita una nueva activación.',
   'AUTH.UNSAVED_TITLE': 'Cambios sin guardar',
-  'AUTH.UNSAVED_MESSAGE': 'Tenés cambios sin guardar. ¿Qué querés hacer?',
+  'AUTH.UNSAVED_MESSAGE': 'Tienes cambios sin guardar. ¿Qué deseas hacer?',
 
   // Offline device provisioning (offline-auth-frontend) — own PROVISION.*
   // namespace, not reused from SYNC.*: its copy is domain-specific (design
   // correction #5, no plan task covered this).
   'PROVISION.TITLE': 'Activar dispositivo sin conexión',
-  'PROVISION.SUCCESS': 'Dispositivo activado. Ya podés iniciar sesión sin conexión.',
+  'PROVISION.SUCCESS': 'Dispositivo activado. Ya puedes iniciar sesión sin conexión.',
   'PROVISION.STORE_ID_LABEL': 'Identificador de tienda',
   'PROVISION.MASTER_PASSWORD_LABEL': 'Contraseña maestra',
   'PROVISION.FILE_LABEL': 'Archivo de roster (.smcabundle)',
@@ -120,23 +120,23 @@ const messages: Record<string, string> = {
 
   'OFFLINE_ACCESS.MODAL_TITLE': 'Activar acceso sin conexión',
   'OFFLINE_ACCESS.MODAL_INTRO':
-    'Con esto vas a poder entrar a este equipo aunque no haya internet. Necesitás el archivo de activación y su contraseña — pedíselos al administrador de tu tienda.',
+    'Con esto podrás entrar a este equipo aunque no haya internet. Necesitas el archivo de activación y su contraseña — pídeselos al administrador de tu tienda.',
   'OFFLINE_ACCESS.FILE_LABEL': 'Archivo de activación',
   'OFFLINE_ACCESS.PASSWORD_LABEL': 'Contraseña de activación',
   'OFFLINE_ACCESS.SUBMIT': 'Activar',
-  'OFFLINE_ACCESS.ERROR_NO_FILE': 'Elegí el archivo de activación.',
+  'OFFLINE_ACCESS.ERROR_NO_FILE': 'Elige el archivo de activación.',
   'OFFLINE_ACCESS.ENABLE_BUTTON': 'Activar acceso sin conexión',
   'OFFLINE_ACCESS.DISABLE_BUTTON': 'Desactivar acceso sin conexión',
   'OFFLINE_ACCESS.ENABLED': 'Listo. Este equipo ya puede entrar sin internet.',
   'OFFLINE_ACCESS.DISABLED': 'Acceso sin conexión desactivado.',
   'OFFLINE_ACCESS.DISABLE_TITLE': '¿Desactivar el acceso sin conexión?',
   'OFFLINE_ACCESS.DISABLE_MESSAGE':
-    'Este equipo va a necesitar internet para entrar. Para volver a activarlo vas a tener que pedir un archivo nuevo: el que usaste ya no sirve.',
+    'Este equipo necesitará internet para entrar. Para volver a activarlo tendrás que solicitar un archivo nuevo: el que usaste ya no sirve.',
   'OFFLINE_ACCESS.DISABLE_MESSAGE_DATA_LOSS':
-    'Este equipo va a necesitar internet para entrar. Para volver a activarlo vas a tener que pedir un archivo nuevo: el que usaste ya no sirve. Además, los datos guardados en este equipo van a quedar ilegibles.',
+    'Este equipo necesitará internet para entrar. Para volver a activarlo tendrás que solicitar un archivo nuevo: el que usaste ya no sirve. Además, los datos guardados en este equipo quedarán ilegibles.',
   'OFFLINE_ACCESS.DISABLE_CONFIRM': 'Sí, desactivar',
   'OFFLINE_ACCESS.ERROR_UNAVAILABLE':
-    'No pudimos completar la acción. Recargá la página e intentá de nuevo.',
+    'No pudimos completar la acción. Recarga la página e intenta de nuevo.',
 
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)
@@ -146,7 +146,7 @@ const messages: Record<string, string> = {
   'REGISTRATION.SIGNUP_BUTTON': 'Registrar',
   // NEW — Angular register.component.ts has no connectivity check/banner at all;
   // wording follows AUTH.OFFLINE_LOGIN pattern (view-text-parity spec).
-  'REGISTRATION.OFFLINE_BANNER': 'Estás offline. Se requiere conexión para registrarte.',
+  'REGISTRATION.OFFLINE_BANNER': 'Estás sin conexión. Se requiere conexión para registrarte.',
   // REGISTRATION.UNEXPECTED_ERROR (Angular vocabs/es.ts:135-136) — generic network/unknown
   // error fallback for register's catch block (view-text-parity DoD: no leftover English
   // literals in touched files).
@@ -435,7 +435,7 @@ const messages: Record<string, string> = {
   'ORDERS.CREDIT_BADGE': 'Crédito',
   'ORDERS.EMPTY_STATE': 'No hay pedidos',
   'ORDERS.DEACTIVATE': 'Anular pedido',
-  'ORDERS.DEACTIVATE_CONFIRM': '¿Estás seguro de que querés anular este pedido?',
+  'ORDERS.DEACTIVATE_CONFIRM': '¿Estás seguro de que deseas anular este pedido?',
   'ORDERS.DEACTIVATE_WITH_CREDIT_WARNING': 'Este pedido tiene un crédito asociado que también será anulado.',
   'ORDERS.DATE_FROM': 'Desde',
   'ORDERS.DATE_TO': 'Hasta',
@@ -566,7 +566,7 @@ const messages: Record<string, string> = {
   'EXPENSES.EMPTY_STATE': 'No existe ningún gasto en el día',
   'EXPENSES.EDIT': 'Editar',
   'EXPENSES.DELETE': 'Eliminar',
-  'EXPENSES.DELETE_CONFIRM': '¿Estás seguro de que querés eliminar este gasto?',
+  'EXPENSES.DELETE_CONFIRM': '¿Estás seguro de que deseas eliminar este gasto?',
   'EXPENSES.ADD_BUTTON': 'Gasto',
 
   // Expenses — History (Angular EXPENSE.EXPENSES_HISTORY/NO_EXPENSE_FOUND, vocabs/es.ts).
@@ -818,9 +818,9 @@ const messages: Record<string, string> = {
   'OWNER.EDIT_TITLE': 'Editar propietario',
   'OWNER.EDIT_OWNER': 'Editar Propietario',
   'OWNER.STORE_PRICE_LABEL': '{count, plural, one {# tienda} other {# tiendas}}',
-  'OWNER.ERROR': 'Ocurrió un error. Intentá de nuevo.',
-  'OWNER.DUPLICATE_LOGIN': 'Ese login ya está en uso. Elegí otro.',
-  'OWNER.FORBIDDEN': 'No tenés permiso para esta acción.',
+  'OWNER.ERROR': 'Ocurrió un error. Inténtalo de nuevo.',
+  'OWNER.DUPLICATE_LOGIN': 'Ese login ya está en uso. Elige otro.',
+  'OWNER.FORBIDDEN': 'No tienes permiso para esta acción.',
   'OWNER.NOT_FOUND': 'El propietario no existe o fue eliminado.',
   'OWNER.PASSWORD_POLICY': 'La contraseña debe tener entre 8 y 30 caracteres, e incluir al menos una mayúscula, una minúscula y un número.',
   'OWNER.PASSWORDS_MUST_MATCH': 'Las contraseñas no coinciden.',
@@ -862,7 +862,7 @@ const messages: Record<string, string> = {
   'SYNC.IMPORT_SUCCESS': 'Los datos se importaron correctamente.',
   'SYNC.IMPORT_ERROR': 'Ha ocurrido un error al importar los datos. Si el error persiste contacte al servicio técnico.',
   'SYNC.ERROR_EMPTY_PASSWORD': 'La contraseña no puede estar vacía.',
-  'SYNC.ERROR_NO_FILE': 'Seleccioná un archivo de respaldo.',
+  'SYNC.ERROR_NO_FILE': 'Selecciona un archivo de respaldo.',
   // sync-export-import-v2 (V2-10): shown when the backup was exported from a
   // DIFFERENT store — a store mismatch is not a password problem, so the user
   // must retry with the right file/password, not just retype theirs.

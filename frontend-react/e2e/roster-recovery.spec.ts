@@ -69,7 +69,7 @@ import { readEntityBytes } from './support/entity-storage';
 // -------------------------------------------------------------------------
 // Copia castellana literal (es.ts)
 // -------------------------------------------------------------------------
-const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña inválidos'; // es.ts:82
+const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña incorrectos'; // es.ts:82
 const UNLOCK_FAILED_TEXT =
   'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.'; // es.ts:94-95
 const DISABLE_BUTTON = 'Desactivar acceso sin conexión'; // es.ts:123 (OFFLINE_ACCESS.DISABLE_BUTTON)

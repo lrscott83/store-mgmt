@@ -31,7 +31,7 @@ import { readAuthModel } from './support/auth-storage';
 // apps/web-store-pos/app/shared/lib/i18n/es.ts — the browser is the black
 // box under test, the app's own source is not (same policy as
 // login.spec.ts:14-17).
-const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña inválidos'; // es.ts:82
+const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña incorrectos'; // es.ts:82
 const ACCOUNT_INACTIVE_TEXT = 'Tu cuenta está inactiva. Contactá soporte.'; // es.ts:83
 const SERVER_ERROR_TEXT = 'Algo salió mal. Intentá de nuevo.'; // es.ts:84
 const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Esperá un momento antes de volver a intentar.'; // es.ts:85

@@ -21,7 +21,7 @@ const OFFLINE_LOGIN_TEXT = 'Estás offline. Se requiere conexión para iniciar s
 // The 401 branch's text (login.tsx:172). REQ-3's control negative must prove
 // the banner is NOT this — that would mean the body-level (200 +
 // succeeded:false) branch never ran.
-const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña inválidos'; // es.ts:82
+const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña incorrectos'; // es.ts:82
 
 // Verified trap #3 (storage-keys.ts:5): AUTH_MODEL's key is
 // `${APP_VERSION}-authf496fc5a9f17`, version-prefixed. Never hardcode the
@@ -185,8 +185,14 @@ test.describe.serial('login — authenticated flows (A1-A3, A6-A7, D1, D3-D6)', 
     expect(response.status).toBe(401);
 
     const body = JSON.parse(response.bodyText) as { errors: Array<{ description: string }> };
+    // The frontend translates backend English errors to Spanish before display.
+    const translationMap: Record<string, string> = {
+      'Invalid credentials': 'Credenciales incorrectas',
+      'Invalid login or password': 'Usuario o contraseña incorrectos',
+    };
+    const translated = translationMap[body.errors[0].description] ?? body.errors[0].description;
     const banner = page.getByText(
-      `La autenticación no es válida por el siguiente error: ${body.errors[0].description}`,
+      `La autenticación no es válida por el siguiente error: ${translated}`,
       { exact: true }
     );
 

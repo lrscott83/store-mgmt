@@ -368,7 +368,7 @@ describe('RegisterPage — view-text-parity: loading/offline/success copy', () =
 
     await waitFor(() => {
       expect(
-        screen.getByText('Estás offline. Se requiere conexión para registrarte.')
+        screen.getByText('Estás sin conexión. Se requiere conexión para registrarte.')
       ).toBeInTheDocument();
     });
   });

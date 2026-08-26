@@ -146,7 +146,7 @@ describe('LoginPage — offline mode fork (offline-auth-mode: "Mode switch, not 
       await submit();
 
       await waitFor(() => {
-        expect(screen.getByText('Usuario o contraseña inválidos')).toBeInTheDocument();
+        expect(screen.getByText('Usuario o contraseña incorrectos')).toBeInTheDocument();
       });
       expect(loginFn).not.toHaveBeenCalled();
     });
@@ -200,7 +200,7 @@ describe('LoginPage — offline mode fork (offline-auth-mode: "Mode switch, not 
       await submit();
 
       await waitFor(() => {
-        expect(screen.getByText(/offline/i)).toBeInTheDocument();
+        expect(screen.getByText(/estás sin conexión/i)).toBeInTheDocument();
       });
       expect(loginFn).not.toHaveBeenCalled();
       expect(loginOfflineFn).not.toHaveBeenCalled();

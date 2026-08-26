@@ -74,7 +74,7 @@ const KEY_UNAVAILABLE =
 // Byte-for-byte the string e2e/login-offline.spec.ts T7 asserts
 // (UNLOCK_FAILED_TEXT, :40-41) — pinned there, restored here.
 const UNLOCK_FAILED =
-  'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.';
+  'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, solicita una nueva activación.';
 const CATEGORIES_KEY = 'lizoft.store-product-categories-s1';
 const SEEDED_BYTES = 'enc:v1:AAAA';
 
@@ -138,7 +138,7 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     await submit();
 
     await waitFor(() => {
-      expect(screen.getByText('Usuario o contraseña inválidos')).toBeInTheDocument();
+      expect(screen.getByText('Usuario o contraseña incorrectos')).toBeInTheDocument();
     });
     expect(screen.queryByText(KEY_UNAVAILABLE)).not.toBeInTheDocument();
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
@@ -172,7 +172,7 @@ describe('LoginPage — refuses a device that cannot open its own data (Task 5)'
     await waitFor(() => {
       expect(screen.getByText(UNLOCK_FAILED)).toBeInTheDocument();
     });
-    expect(screen.queryByText('Usuario o contraseña inválidos')).not.toBeInTheDocument();
+    expect(screen.queryByText('Usuario o contraseña incorrectos')).not.toBeInTheDocument();
     expect(screen.queryByText(KEY_UNAVAILABLE)).not.toBeInTheDocument();
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
     expect(logoutMock).not.toHaveBeenCalled();

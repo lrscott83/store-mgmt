@@ -146,8 +146,8 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
 
     await waitFor(() => {
-      // AUTH.OFFLINE_LOGIN = "Estás offline. Se requiere conexión para iniciar sesión."
-      expect(screen.getByText(/offline/i)).toBeInTheDocument();
+      // AUTH.OFFLINE_LOGIN = "Estás sin conexión. Se requiere conexión para iniciar sesión."
+      expect(screen.getByText(/estás sin conexión/i)).toBeInTheDocument();
     });
   });
 
@@ -164,10 +164,10 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
 
     await waitFor(() => {
-      // AUTH.INVALID_CREDENTIALS = "Usuario o contraseña inválidos". Assert the
+      // AUTH.INVALID_CREDENTIALS = "Usuario o contraseña incorrectos". Assert the
       // exact error text — a loose /contraseña/i regex also matches the
       // "Contraseña" password label, which is ambiguous (multiple elements).
-      expect(screen.getByText('Usuario o contraseña inválidos')).toBeInTheDocument();
+      expect(screen.getByText('Usuario o contraseña incorrectos')).toBeInTheDocument();
     });
   });
 
@@ -184,9 +184,9 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
 
     await waitFor(() => {
-      // AUTH.TOO_MANY_ATTEMPTS = "Demasiados intentos. Esperá un momento antes de volver a intentar."
+      // AUTH.TOO_MANY_ATTEMPTS = "Demasiados intentos. Espera un momento antes de volver a intentar."
       expect(
-        screen.getByText('Demasiados intentos. Esperá un momento antes de volver a intentar.')
+        screen.getByText('Demasiados intentos. Espera un momento antes de volver a intentar.')
       ).toBeInTheDocument();
     });
   });
@@ -199,7 +199,7 @@ describe('LoginPage (AUTH-01)', () => {
   // the generic AUTH.SERVER_ERROR.
   it('surfaces the exact backend error message on a body-level login rejection (INVALID_ERROR parity)', async () => {
     const rejection = Object.assign(new Error('rejected'), {
-      loginRejectionDescription: 'El usuario o la contraseña no es correcta',
+      loginRejectionDescription: 'Invalid credentials',
     });
     const loginFn = vi.fn().mockRejectedValue(rejection);
     renderLogin(loginFn);
@@ -210,12 +210,12 @@ describe('LoginPage (AUTH-01)', () => {
     fireEvent.change(screen.getByLabelText('Contraseña'), {
       target: { value: 'password123' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesi/i }));
 
     await waitFor(() => {
       expect(
         screen.getByText(
-          'La autenticación no es válida por el siguiente error: El usuario o la contraseña no es correcta'
+          'La autenticación no es válida por el siguiente error: Credenciales incorrectas'
         )
       ).toBeInTheDocument();
     });
@@ -338,7 +338,7 @@ describe('LoginPage — unlock gate banner + DekUnwrapError copy (design §10)',
     renderLoginAt('/login?unlock=1');
     expect(
       screen.getByText(
-        'Ingresá tu contraseña para desbloquear los datos de este dispositivo.'
+        'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'
       )
     ).toBeInTheDocument();
   });
@@ -347,7 +347,7 @@ describe('LoginPage — unlock gate banner + DekUnwrapError copy (design §10)',
     renderLoginAt('/login');
     expect(
       screen.queryByText(
-        'Ingresá tu contraseña para desbloquear los datos de este dispositivo.'
+        'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'
       )
     ).not.toBeInTheDocument();
   });
