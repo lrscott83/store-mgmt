@@ -343,13 +343,6 @@ const messages: Record<string, string> = {
   // Sale / POS screen (Angular SALES.* — frontend/src/app/_modules/i18n/vocabs/es.ts)
   'SALES.HEADER': 'Productos para vender',
   'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE': 'Seleccione primero una categoría para adicionar productos a la venta.',
-  // SALES.SHOW_LIMIT_* / SALES.SHOWING_COUNT — React-only product-list limiter on the
-  // Sale/POS screen (no Angular correlate). A compact "Mostrar N" selector caps how many
-  // product rows render at once (20/50/100/Todos) so a long list stays short; the
-  // shown/total count appears only while the list is truncated.
-  'SALES.SHOW_LIMIT_LABEL': 'Mostrar',
-  'SALES.SHOW_LIMIT_ALL': 'Todos',
-  'SALES.SHOWING_COUNT': 'Mostrando {shown} de {total}',
   'SALES.PRODUCT_ADDED_TO_CART': 'El producto fue adicionado a la venta',
   'SALES.PRODUCT_NOT_ADDED_TO_CART':
     'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
