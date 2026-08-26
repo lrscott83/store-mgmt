@@ -113,6 +113,13 @@ export class ProductCategoryRepository {
    * behavior. No call-site in Angular or React branches on a falsy/null result.
    */
   addProductCategoryByName(name: string): string {
+    // If category already exists, return its ID (don't generate a new one).
+    // Without this guard, a CSV with multiple products in the same category
+    // would fail on the 2nd+ product because addProductCategoryData silently
+    // discards the Result and the caller gets a dangling new ID.
+    const existing = this.getStorageCategories().find((c) => c.name === name);
+    if (existing) return existing.id;
+
     const id = generateId();
     const order = this.getNextOrder();
     this.addProductCategoryData(id, name, order, true);

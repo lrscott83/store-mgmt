@@ -234,11 +234,11 @@ describe('ProductCategoryRepository — 1:1 port of Angular product-category.rep
       expect(created?.order).toBe(1);
     });
 
-    it('still returns a string id even when the name already exists (ratified literal parity with Angular product-category.repository.ts:94-98 — the internal collision failure is silent to the caller)', () => {
+    it('returns the existing category id when the name already exists', () => {
       seedCategories([makeCategory('c1', { name: 'Bebidas' })]);
       const id = repo.addProductCategoryByName('Bebidas');
-      expect(id).toEqual(expect.any(String));
-      expect(repo.getProductCategoryById(id)).toBeUndefined();
+      expect(id).toBe('c1');
+      expect(repo.getProductCategoryById(id)).toBeDefined();
     });
   });
 
