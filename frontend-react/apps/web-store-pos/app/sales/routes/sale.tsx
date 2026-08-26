@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
 import { EFeatures, OrderType } from '@store-mgmt/domain';
@@ -43,6 +43,12 @@ export function SalePage() {
   // render at once. 0 = no limit ("Todos"). Default 50 keeps a long list short without
   // hiding anything permanently.
   const [visibleLimit, setVisibleLimit] = useState(50);
+  // Tracks category IDs that have at least one product available to sale.
+  // Updated by a useEffect; categories with no sellable products are hidden from tabs.
+  const [sellableCategoryIds, setSellableCategoryIds] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const sellableLoadedRef = useRef(false);
 
   // Angular parity (sale.component.ts:39-40): getAvailableProductCategories() already
   // returns active-only categories sorted by order (ProductCategoryRepository.
@@ -86,8 +92,37 @@ export function SalePage() {
       categories.map((category) => productService.getProductsToSaleByCategoryId(category.id)),
     ).then((results) => {
       setAllProducts(results.flatMap((result) => result.data ?? []));
+      // Update sellable category IDs from the results
+      const sellableIds = new Set<string>();
+      for (const result of results) {
+        const products = result.data ?? [];
+        for (const product of products) {
+          sellableIds.add(product.categoryId);
+        }
+      }
+      setSellableCategoryIds(sellableIds);
+      sellableLoadedRef.current = true;
     });
   }, [storeId, categories]);
+
+  // Derived: filter out categories that have no products available to sell.
+  const displayableCategories = useMemo(() => {
+    if (!sellableLoadedRef.current) return categories;
+    return categories.filter((c) => sellableCategoryIds.has(c.id));
+  }, [categories, sellableCategoryIds]);
+
+  // Auto-select the first sellable category if the current selection was filtered out
+  useEffect(() => {
+    if (
+      selectedCategoryId &&
+      selectedCategoryId !== ALL_CATEGORIES_ID &&
+      sellableCategoryIds.size > 0 &&
+      !sellableCategoryIds.has(selectedCategoryId)
+    ) {
+      const firstAvailable = displayableCategories[0];
+      setSelectedCategoryId(firstAvailable?.id);
+    }
+  }, [selectedCategoryId, sellableCategoryIds, displayableCategories]);
 
   function selectCategory(categoryId: string) {
     setSelectedCategoryId(categoryId);
@@ -152,7 +187,7 @@ export function SalePage() {
         />
       </div>
       <div className="no-scrollbar mb-3 flex gap-1 overflow-x-auto pb-1">
-        {categories.length > 0 && (
+        {displayableCategories.length > 0 && (
           <button
             key={ALL_CATEGORIES_ID}
             type="button"
@@ -166,7 +201,7 @@ export function SalePage() {
             {intl.formatMessage({ id: 'SALES.ALL_CATEGORIES' })}
           </button>
         )}
-        {categories.map((category) => (
+        {displayableCategories.map((category) => (
           <button
             key={category.id}
             type="button"
@@ -215,7 +250,7 @@ export function SalePage() {
         checkAvailability={checkAvailability}
       />
 
-      {categories.length > 0 && !selectedCategoryId && (
+      {displayableCategories.length > 0 && !selectedCategoryId && (
         <InfoBox variant="primary" className="mt-4 text-center">
           {/* SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE */}
           {intl.formatMessage({ id: 'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE' })}
