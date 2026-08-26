@@ -321,27 +321,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // recoverable by nobody. The three fields are forwarded exactly as
       // received — empty strings are the contract's "no wrap available" signal
       // and the resolver reads them as absent.
-      // Dynamic import (D6): `dek-provisioning` is an `offline/`
-      // module and this file is evaluated on every page load.
-      // NOT wrapped in a swallowing try/catch — a DekUnwrapError here (the
-      // step 3b hard-fail, where this login's roster wrap does not open with
-      // the password just used, or D2's refusal, where the device has no key
-      // material at all) MUST fail this login call, never be swallowed.
-      // Task 5 turns that rejection into a message the user can act on.
-      // Swallowing it would authenticate
-      // the user with `needsUnlock` permanently true, looping authLoader
-      // -> /login -> "successful" login -> authLoader. `resolveDekForLogin`
-      // also runs the eager entity migration pass itself (design §5 step
-      // 6), so the old direct call here is gone.
-      const { resolveDekForLogin } = await import('../offline/dek-provisioning');
-      await resolveDekForLogin({
-        login: user.login,
-        password,
-        sessionStoreId: user.selectedStoreId,
-        wrappedDek: authData.wrappedDek,
-        wrapSalt: authData.wrapSalt,
-        wrapIv: authData.wrapIv,
-      });
+      //
+      // SKIP for users without an assigned store (SuperAdmin / Reseller): the
+      // DEK is per-store encryption material; a user with no store (selectedStoreId
+      // is the empty GUID) has no wrap, no roster entry, and no device table —
+      // attempting resolution would always hit the F5 dead end and throw
+      // DekUnwrapError, blocking login for a user who doesn't need data encryption.
+      const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+      if (user.selectedStoreId && user.selectedStoreId !== EMPTY_GUID) {
+        const { resolveDekForLogin } = await import('../offline/dek-provisioning');
+        await resolveDekForLogin({
+          login: user.login,
+          password,
+          sessionStoreId: user.selectedStoreId,
+          wrappedDek: authData.wrappedDek,
+          wrapSalt: authData.wrapSalt,
+          wrapIv: authData.wrapIv,
+        });
+      }
 
       // Task 4: a login that RESOLVED a key is the one event meaning "this
       // device can read again", so it re-arms the decryption-failure policy's
