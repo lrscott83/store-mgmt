@@ -46,8 +46,12 @@ export class ProductOfflineService implements ProductService {
     productRepository?: ProductRepository,
     categoryRepository?: ProductCategoryRepository,
   ) {
-    this.productRepository = productRepository ?? new ProductRepository(storeId, new ProductCategoryRepository(storeId));
+    // BUG-FIX: Share a single ProductCategoryRepository instance between
+    // productRepository and categoryRepository so their in-memory caches
+    // stay in sync. Previously each got its own instance, so categories
+    // created via categoryRepository were invisible to productRepository.
     this.categoryRepository = categoryRepository ?? new ProductCategoryRepository(storeId);
+    this.productRepository = productRepository ?? new ProductRepository(storeId, this.categoryRepository);
   }
 
   /**
@@ -245,8 +249,8 @@ export class ProductOfflineService implements ProductService {
     const created: CsvProductCreated[] = [];
     const failed: CsvProduct[] = [];
     csvProducts.forEach((csvProduct) => {
-      const category = this.categoryRepository.getProductCategoryByName(csvProduct.category);
-      const categoryId = category ? category.id : this.categoryRepository.addProductCategoryByName(csvProduct.category);
+      const existingCat = this.categoryRepository.getProductCategoryByName(csvProduct.category);
+      const categoryId = existingCat ? existingCat.id : this.categoryRepository.addProductCategoryByName(csvProduct.category);
       const order = this.getNextOrder(categoryId);
       const id = generateId();
       const result = this.productRepository.addProductData(
