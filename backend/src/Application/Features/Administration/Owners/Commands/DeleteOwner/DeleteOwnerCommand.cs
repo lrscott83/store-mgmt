@@ -4,20 +4,13 @@ using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
 using Domain.Entities.Owners;
-using Domain.Entities.Stores;
-using Domain.Entities.StoreModules;
-using Domain.Entities.StoreRoleFeatures;
-using Domain.Entities.StoreUsers;
-using Domain.Entities.StoreUsages;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Resources;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Application.Features.Administration.Owners.Commands.DeleteOwner
@@ -68,7 +61,6 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             _logger = logger;
         }
 
-
         public async Task<ResponseResult<bool>> Handle(DeleteOwnerCommand request, CancellationToken cancellationToken)
         {
             if (!_httpContextService.IsSuperAdminOrOwnerAdmin)
@@ -76,75 +68,50 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
 
             Owner owner = await _ownerRepository.GetOwnerWithAllDataToDeleteByIdAsync(request.Id);
             if (owner == null)
-            {
-                _logger.LogWarning("DeleteOwner: owner {OwnerId} not found", request.Id);
                 throw new ApiException(_localizer["OwnerNotFound"], HttpStatusCode.NotFound);
-            }
 
-            _logger.LogInformation("DeleteOwner: deleting owner {OwnerId} (User={HasUser}, Stores={StoreCount}, ReSellerOwner={HasRSO})",
-                owner.Id, owner.User != null, owner.Stores?.Count ?? 0, owner.ReSellerOwner != null);
+            _logger.LogInformation("DeleteOwner: {OwnerId}", owner.Id);
 
-            // Step 1: ReSellerOwner
+            // 1. ReSellerOwner
             if (owner.ReSellerOwner != null)
-            {
-                _logger.LogDebug("DeleteOwner: step 1 - deleting ReSellerOwner");
                 await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
-            }
 
-            // Step 2: UserRoles
-            if (owner.User?.UserRoles?.Any() == true)
-            {
-                _logger.LogDebug("DeleteOwner: step 2 - deleting {Count} UserRoles", owner.User.UserRoles.Count);
+            // 2. UserRoles
+            if (owner.User?.UserRoles != null && owner.User.UserRoles.Any())
                 await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
-            }
 
-            // Step 3: StoreUsages by UserId
-            if (owner.User != null)
+            // 3. StoreUsages (by user)
+            if (owner.User?.StoreUsages != null && owner.User.StoreUsages.Any())
+                await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
+
+            // 4. Per-store children — only if Stores collection is loaded
+            if (owner.Stores != null)
             {
-                _logger.LogDebug("DeleteOwner: step 3 - deleting StoreUsages for User {userId}", owner.User.Id);
-                await _storeUsageRepository.HardDeleteWhereAsync(su => su.UserId == owner.User.Id);
-            }
-
-            // Step 4: Per-store child tables
-            if (owner.Stores?.Any() == true)
-            {
-                var storeIds = owner.Stores.Select(s => s.Id).ToList();
-                _logger.LogDebug("DeleteOwner: step 4 - processing {Count} stores: {StoreIds}",
-                    storeIds.Count, string.Join(", ", storeIds));
-
-                foreach (var storeId in storeIds)
+                foreach (var store in owner.Stores)
                 {
-                    _logger.LogDebug("DeleteOwner: step 4a - HardDeleteWhereAsync StoreUsers for Store {storeId}, repo={RepoType}",
-                        storeId, _storeUserRepository?.GetType().FullName ?? "NULL");
-                    await _storeUserRepository.HardDeleteWhereAsync(su => su.StoreId == storeId);
+                    if (store.StoreUsers != null && store.StoreUsers.Any())
+                        await _storeUserRepository.HardDeleteAsync(store.StoreUsers);
 
-                    _logger.LogDebug("DeleteOwner: step 4b - HardDeleteWhereAsync StoreModules for Store {storeId}", storeId);
-                    await _storeModuleRepository.HardDeleteWhereAsync(sm => sm.StoreId == storeId);
+                    if (store.StoreModules != null && store.StoreModules.Any())
+                        await _storeModuleRepository.HardDeleteAsync(store.StoreModules);
 
-                    _logger.LogDebug("DeleteOwner: step 4c - HardDeleteWhereAsync StoreRoleFeatures for Store {storeId}", storeId);
-                    await _storeRoleFeatureRepository.HardDeleteWhereAsync(srf => srf.StoreId == storeId);
+                    if (store.StoreRoleFeatures != null && store.StoreRoleFeatures.Any())
+                        await _storeRoleFeatureRepository.HardDeleteAsync(store.StoreRoleFeatures);
+
+                    if (store.StoreUsages != null && store.StoreUsages.Any())
+                        await _storeUsageRepository.HardDeleteAsync(store.StoreUsages);
+
+                    await _storeRepository.HardDeleteAsync(store);
                 }
             }
 
-            // Step 5: Stores
-            if (owner.Stores?.Any() == true)
-            {
-                _logger.LogDebug("DeleteOwner: step 5 - deleting {Count} Stores", owner.Stores.Count);
-                await _storeRepository.HardDeleteAsync(owner.Stores);
-            }
-
-            // Step 6: Owner BEFORE User (FK_Owner_User_UserId RESTRICT)
-            _logger.LogDebug("DeleteOwner: step 6 - deleting Owner");
+            // 5. Owner BEFORE User
             await _ownerRepository.HardDeleteAsync(owner);
 
-            // Step 7: User
+            // 6. User
             if (owner.User != null)
-            {
-                _logger.LogDebug("DeleteOwner: step 7 - deleting User");
                 await _userRepository.HardDeleteAsync(owner.User);
-            }
 
-            _logger.LogInformation("DeleteOwner: saving changes for owner {OwnerId}", owner.Id);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }
