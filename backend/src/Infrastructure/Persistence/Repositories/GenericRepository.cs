@@ -117,6 +117,9 @@ namespace Infrastructure.Persistence.Repositories
                 System.Linq.Expressions.Expression.Equal(property, constant), param);
 
             await _dbContext.Set<TEntity>().IgnoreQueryFilters().Where(predicate).ExecuteDeleteAsync();
+            // Detach from change tracker to prevent SaveChangesAsync from
+            // trying to process an entity already deleted by ExecuteDeleteAsync.
+            _dbContext.Entry(entity).State = EntityState.Detached;
             return true;
         }
 
