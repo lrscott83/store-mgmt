@@ -98,11 +98,9 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                     _logger.LogDebug("DeleteOwner: deleting {Count} UserRoles", owner.User.UserRoles.Count);
                     await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
                 }
-                if (owner.User.StoreUsages?.Any() == true)
-                {
-                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreUsages", owner.User.StoreUsages.Count);
-                    await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
-                }
+                // Delete StoreUsages by UserId (covers all stores this user touched)
+                _logger.LogDebug("DeleteOwner: deleting StoreUsages for User {userId}", owner.User.Id);
+                await _storeUsageRepository.HardDeleteWhereAsync(su => su.UserId == owner.User.Id);
             }
 
             if (owner.Stores?.Any() == true)
