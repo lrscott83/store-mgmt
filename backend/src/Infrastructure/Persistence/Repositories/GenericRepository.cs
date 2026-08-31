@@ -132,6 +132,11 @@ namespace Infrastructure.Persistence.Repositories
             }
             return true;
         }
+
+        public async Task<int> DeleteWhereAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            return await _dbContext.Set<TEntity>().IgnoreQueryFilters().Where(predicate).ExecuteDeleteAsync();
+        }
     }
 
     public abstract class GenericRepository<TEntity, TId> : GenericRepository<TEntity> where TEntity : Entity<TId>

@@ -8,6 +8,7 @@ using Domain.Entities.Stores;
 using Domain.Entities.StoreModules;
 using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.StoreUsers;
+using Domain.Entities.StoreUsages;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
@@ -106,28 +107,22 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
 
             if (owner.Stores?.Any() == true)
             {
-                var storeUsers = owner.Stores
-                    .SelectMany(s => (ICollection<StoreUser>?)s.StoreUsers ?? Enumerable.Empty<StoreUser>()).ToList();
-                if (storeUsers.Any())
+                // StoreUser/StoreModule/StoreRoleFeature have composite PKs —
+                // HardDeleteAsync only handles single-PK. Use DeleteWhereAsync.
+                var storeIds = owner.Stores.Select(s => s.Id).ToList();
+                foreach (var storeId in storeIds)
                 {
-                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreUsers", storeUsers.Count);
-                    await _storeUserRepository.HardDeleteAsync(storeUsers);
-                }
+                    _logger.LogDebug("DeleteOwner: deleting StoreUsers for Store {storeId}", storeId);
+                    await _storeUserRepository.DeleteWhereAsync(su => su.StoreId == storeId);
 
-                var storeModules = owner.Stores
-                    .SelectMany(s => (ICollection<StoreModule>?)s.StoreModules ?? Enumerable.Empty<StoreModule>()).ToList();
-                if (storeModules.Any())
-                {
-                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreModules", storeModules.Count);
-                    await _storeModuleRepository.HardDeleteAsync(storeModules);
-                }
+                    _logger.LogDebug("DeleteOwner: deleting StoreModules for Store {storeId}", storeId);
+                    await _storeModuleRepository.DeleteWhereAsync(sm => sm.StoreId == storeId);
 
-                var storeRoleFeatures = owner.Stores
-                    .SelectMany(s => (ICollection<StoreRoleFeature>?)s.StoreRoleFeatures ?? Enumerable.Empty<StoreRoleFeature>()).ToList();
-                if (storeRoleFeatures.Any())
-                {
-                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreRoleFeatures", storeRoleFeatures.Count);
-                    await _storeRoleFeatureRepository.HardDeleteAsync(storeRoleFeatures);
+                    _logger.LogDebug("DeleteOwner: deleting StoreRoleFeatures for Store {storeId}", storeId);
+                    await _storeRoleFeatureRepository.DeleteWhereAsync(srf => srf.StoreId == storeId);
+
+                    _logger.LogDebug("DeleteOwner: deleting StoreUsages for Store {storeId}", storeId);
+                    await _storeUsageRepository.DeleteWhereAsync(su => su.StoreId == storeId);
                 }
 
                 _logger.LogDebug("DeleteOwner: deleting {Count} Stores", owner.Stores.Count);
