@@ -118,34 +118,26 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             {
                 foreach (var store in owner.Stores)
                 {
-                    try
-                    {
-                        _logger.LogDebug("DeleteOwner: Store {StoreId} StoreUsers={Count}, StoreModules={Count2}, StoreRoleFeatures={Count3}",
-                            store.Id,
-                            store.StoreUsers?.Count ?? -1,
-                            store.StoreModules?.Count ?? -1,
-                            store.StoreRoleFeatures?.Count ?? -1);
+                    // Snapshot the IDs before detaching from change tracker
+                    var storeId = store.Id;
+                    var storeUsers = store.StoreUsers?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreUsers.StoreUser>();
+                    var storeModules = store.StoreModules?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreModules.StoreModule>();
+                    var storeRoleFeatures = store.StoreRoleFeatures?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreRoleFeatures.StoreRoleFeature>();
+                    var storeUsages = store.StoreUsages?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreUsages.StoreUsage>();
 
-                        if (store.StoreUsers != null && store.StoreUsers.Any())
-                            await _storeUserRepository.HardDeleteAsync(store.StoreUsers);
+                    _logger.LogDebug("DeleteOwner: Store {StoreId} SU={SU} SM={SM} SRF={SRF} SU2={SU2}",
+                        storeId, storeUsers.Count, storeModules.Count, storeRoleFeatures.Count, storeUsages.Count);
 
-                        if (store.StoreModules != null && store.StoreModules.Any())
-                            await _storeModuleRepository.HardDeleteAsync(store.StoreModules);
+                    if (storeUsers.Any())
+                        await _storeUserRepository.HardDeleteAsync(storeUsers);
+                    if (storeModules.Any())
+                        await _storeModuleRepository.HardDeleteAsync(storeModules);
+                    if (storeRoleFeatures.Any())
+                        await _storeRoleFeatureRepository.HardDeleteAsync(storeRoleFeatures);
+                    if (storeUsages.Any())
+                        await _storeUsageRepository.HardDeleteAsync(storeUsages);
 
-                        if (store.StoreRoleFeatures != null && store.StoreRoleFeatures.Any())
-                            await _storeRoleFeatureRepository.HardDeleteAsync(store.StoreRoleFeatures);
-
-                        if (store.StoreUsages != null && store.StoreUsages.Any())
-                            await _storeUsageRepository.HardDeleteAsync(store.StoreUsages);
-
-                        _logger.LogDebug("DeleteOwner: Store {StoreId} children OK", store.Id);
-                        await _storeRepository.HardDeleteAsync(store);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "DeleteOwner: FAILED at Store {StoreId}. Inner: {Inner}", store.Id, ex.InnerException?.Message);
-                        throw;
-                    }
+                    await _storeRepository.HardDeleteAsync(store);
                 }
             }
 
