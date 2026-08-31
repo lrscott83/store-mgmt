@@ -62,6 +62,7 @@ namespace Infrastructure.Persistence.Repositories
         {
             return await _owners.Where(o => o.Id == ownerId)
                 .Include(o => o.User).ThenInclude(u => u.UserRoles)
+                .Include(o => o.User).ThenInclude(u => u.StoreUsages)
                 .Include(o => o.ReSellerOwner).ThenInclude(rso => rso.ReSeller)
                 .Include(o => o.Stores).ThenInclude(s => s.StoreUsers).ThenInclude(su => su.User)
                 .Include(o => o.Stores).ThenInclude(s => s.StoreModules)
