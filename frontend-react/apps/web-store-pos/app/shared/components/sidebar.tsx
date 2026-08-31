@@ -65,6 +65,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <li key={item.path}>
                     <NavLink
                       to={item.path}
+                      end={item.exact}
                       onClick={onClose}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg mx-2 transition-colors ${

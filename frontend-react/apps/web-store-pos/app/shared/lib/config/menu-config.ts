@@ -6,6 +6,8 @@ export interface MenuItem {
   featureIds?: number[];
   moduleId?: number;
   icon?: string;
+  /** When true NavLink uses end prop so it only matches exact path */
+  exact?: boolean;
 }
 
 export interface MenuGroup {
@@ -86,7 +88,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     moduleId: EModules.Management,
     items: [
       // Plan/update split: two entries, same authorization (EFeatures.Stores).
-      { label: 'MENU.STORES_PLAN', path: '/management/stores', featureIds: [EFeatures.Stores], moduleId: EModules.Management },
+      { label: 'MENU.STORES_PLAN', path: '/management/stores', featureIds: [EFeatures.Stores], moduleId: EModules.Management, exact: true },
       { label: 'MENU.STORES_UPDATE', path: '/management/stores/update', featureIds: [EFeatures.Stores], moduleId: EModules.Management },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management },
       { label: 'MENU.CONFIGURATIONS', path: '/management/configurations', featureIds: [EFeatures.Configurations], moduleId: EModules.Management },
