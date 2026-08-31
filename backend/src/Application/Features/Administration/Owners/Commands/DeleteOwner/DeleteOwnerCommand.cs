@@ -72,105 +72,97 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
 
             _logger.LogInformation("DeleteOwner: {OwnerId}", owner.Id);
 
-            try
+            // 1. ReSellerOwner
+            if (owner.ReSellerOwner != null)
             {
-                if (owner.ReSellerOwner != null)
+                _logger.LogInformation("DeleteOwner: 1. ReSellerOwner");
+                await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
+                _logger.LogInformation("DeleteOwner: 1. OK");
+            }
+
+            // 2. UserRoles
+            if (owner.User?.UserRoles != null && owner.User.UserRoles.Any())
+            {
+                _logger.LogInformation("DeleteOwner: 2. UserRoles count={Count}", owner.User.UserRoles.Count);
+                await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
+                owner.User.UserRoles.Clear();
+                _logger.LogInformation("DeleteOwner: 2. OK");
+            }
+
+            // 3. User.StoreUsages
+            if (owner.User?.StoreUsages != null && owner.User.StoreUsages.Any())
+            {
+                _logger.LogInformation("DeleteOwner: 3. User.StoreUsages count={Count}", owner.User.StoreUsages.Count);
+                await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
+                owner.User.StoreUsages.Clear();
+                _logger.LogInformation("DeleteOwner: 3. OK");
+            }
+
+            // 4. Per-store children
+            if (owner.Stores != null && owner.Stores.Any())
+            {
+                var storesList = owner.Stores.ToList();
+                _logger.LogInformation("DeleteOwner: 4. Stores count={Count}", storesList.Count);
+
+                foreach (var store in storesList)
                 {
-                    _logger.LogDebug("DeleteOwner: ReSellerOwner");
-                    await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "DeleteOwner: FAILED ReSellerOwner. Inner: {Inner}", ex.InnerException?.Message);
-                throw;
-            }
+                    _logger.LogInformation("DeleteOwner: 4. Store {StoreId}", store.Id);
 
-            try
-            {
-                if (owner.User?.UserRoles != null && owner.User.UserRoles.Any())
-                {
-                    _logger.LogDebug("DeleteOwner: UserRoles count={Count}", owner.User.UserRoles.Count);
-                    await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
-                    owner.User.UserRoles.Clear();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "DeleteOwner: FAILED UserRoles. Inner: {Inner}", ex.InnerException?.Message);
-                throw;
-            }
+                    var su = store.StoreUsers?.ToList();
+                    _logger.LogInformation("DeleteOwner: 4a. StoreUsers count={Count}", su?.Count ?? -1);
+                    if (su != null && su.Any())
+                    {
+                        await _storeUserRepository.HardDeleteAsync(su);
+                        _logger.LogInformation("DeleteOwner: 4a. OK");
+                    }
 
-            try
-            {
-                if (owner.User?.StoreUsages != null && owner.User.StoreUsages.Any())
-                {
-                    _logger.LogDebug("DeleteOwner: User.StoreUsages count={Count}", owner.User.StoreUsages.Count);
-                    await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
-                    owner.User.StoreUsages.Clear();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "DeleteOwner: FAILED User.StoreUsages. Inner: {Inner}", ex.InnerException?.Message);
-                throw;
-            }
+                    var sm = store.StoreModules?.ToList();
+                    _logger.LogInformation("DeleteOwner: 4b. StoreModules count={Count}", sm?.Count ?? -1);
+                    if (sm != null && sm.Any())
+                    {
+                        await _storeModuleRepository.HardDeleteAsync(sm);
+                        _logger.LogInformation("DeleteOwner: 4b. OK");
+                    }
 
-            if (owner.Stores != null)
-            {
-                foreach (var store in owner.Stores)
-                {
-                    // Snapshot the IDs before detaching from change tracker
-                    var storeId = store.Id;
-                    var storeUsers = store.StoreUsers?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreUsers.StoreUser>();
-                    var storeModules = store.StoreModules?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreModules.StoreModule>();
-                    var storeRoleFeatures = store.StoreRoleFeatures?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreRoleFeatures.StoreRoleFeature>();
-                    var storeUsages = store.StoreUsages?.ToList() ?? new System.Collections.Generic.List<Domain.Entities.StoreUsages.StoreUsage>();
+                    var srf = store.StoreRoleFeatures?.ToList();
+                    _logger.LogInformation("DeleteOwner: 4c. StoreRoleFeatures count={Count}", srf?.Count ?? -1);
+                    if (srf != null && srf.Any())
+                    {
+                        await _storeRoleFeatureRepository.HardDeleteAsync(srf);
+                        _logger.LogInformation("DeleteOwner: 4c. OK");
+                    }
 
-                    _logger.LogDebug("DeleteOwner: Store {StoreId} SU={SU} SM={SM} SRF={SRF} SU2={SU2}",
-                        storeId, storeUsers.Count, storeModules.Count, storeRoleFeatures.Count, storeUsages.Count);
+                    var su2 = store.StoreUsages?.ToList();
+                    _logger.LogInformation("DeleteOwner: 4d. Store.StoreUsages count={Count}", su2?.Count ?? -1);
+                    if (su2 != null && su2.Any())
+                    {
+                        await _storeUsageRepository.HardDeleteAsync(su2);
+                        _logger.LogInformation("DeleteOwner: 4d. OK");
+                    }
 
-                    if (storeUsers.Any())
-                        await _storeUserRepository.HardDeleteAsync(storeUsers);
-                    if (storeModules.Any())
-                        await _storeModuleRepository.HardDeleteAsync(storeModules);
-                    if (storeRoleFeatures.Any())
-                        await _storeRoleFeatureRepository.HardDeleteAsync(storeRoleFeatures);
-                    if (storeUsages.Any())
-                        await _storeUsageRepository.HardDeleteAsync(storeUsages);
-
+                    _logger.LogInformation("DeleteOwner: 4e. Store itself");
                     await _storeRepository.HardDeleteAsync(store);
+                    _logger.LogInformation("DeleteOwner: 4e. OK");
                 }
-                // Clear the collection so SaveChangesAsync doesn't try to
-                // process Stores that were already deleted via HardDeleteAsync.
+
                 owner.Stores.Clear();
+                _logger.LogInformation("DeleteOwner: 4. ALL OK");
             }
 
-            try
+            // 5. Owner
+            _logger.LogInformation("DeleteOwner: 5. Owner");
+            await _ownerRepository.HardDeleteAsync(owner);
+            _logger.LogInformation("DeleteOwner: 5. OK");
+
+            // 6. User
+            if (owner.User != null)
             {
-                _logger.LogDebug("DeleteOwner: Owner");
-                await _ownerRepository.HardDeleteAsync(owner);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "DeleteOwner: FAILED Owner. Inner: {Inner}", ex.InnerException?.Message);
-                throw;
+                _logger.LogInformation("DeleteOwner: 6. User");
+                await _userRepository.HardDeleteAsync(owner.User);
+                _logger.LogInformation("DeleteOwner: 6. OK");
             }
 
-            try
-            {
-                if (owner.User != null)
-                {
-                    _logger.LogDebug("DeleteOwner: User");
-                    await _userRepository.HardDeleteAsync(owner.User);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "DeleteOwner: FAILED User. Inner: {Inner}", ex.InnerException?.Message);
-                throw;
-            }
-
+            _logger.LogInformation("DeleteOwner: SAVING");
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }
