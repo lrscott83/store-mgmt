@@ -699,6 +699,7 @@ const messages: Record<string, string> = {
   'STORES.PLAN.SELECTED': 'Plan seleccionado',
   'STORES.PLAN.ACTIVATE': 'Activar este plan',
   'STORES.PLAN.WILL_ACTIVATE_ON_SAVE': 'Se activará al guardar',
+  'STORES.PLAN.CURRENCY_NOTICE': 'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
   'STORES.MODULES_LABEL': 'Módulos',
   'STORES.MODULES_TOTAL': 'Total',
   'STORES.MODULES_PRICE': 'Precio',

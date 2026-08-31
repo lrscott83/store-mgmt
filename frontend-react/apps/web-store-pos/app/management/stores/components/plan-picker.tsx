@@ -63,6 +63,10 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
         {t('STORES.PLAN.BILLING_NOTICE')}
       </p>
 
+      <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        {t('STORES.PLAN.CURRENCY_NOTICE')}
+      </p>
+
       <div className="flex border-b border-gray-200" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'free'}
           onClick={() => setTab('free')} className={tabClass(tab === 'free')}>

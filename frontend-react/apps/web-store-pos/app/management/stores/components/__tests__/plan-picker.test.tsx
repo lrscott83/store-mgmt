@@ -40,6 +40,9 @@ describe('PlanPicker — PLAN-1: section title + billing notice', () => {
     expect(
       screen.getByText('Plan Pago: 1 mes GRATIS. Luego se cobra por mes vencido → el primer pago después del segundo mes.')
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.')
+    ).toBeInTheDocument();
   });
 });
 
