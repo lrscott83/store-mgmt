@@ -69,18 +69,20 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             Owner owner = await _ownerRepository.GetOwnerWithAllDataToDeleteByIdAsync(request.Id);
 
             // Hard delete: physically removes all data (not soft delete)
-            // This is a permanent, irreversible operation.
+            // Order matters: FK_Owner_User_UserId is RESTRICT, so Owner must be
+            // deleted BEFORE User. Leaf tables first, then parents.
             await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
             await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
             await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
-            await _userRepository.HardDeleteAsync(owner.User);
 
             await _storeUserRepository.HardDeleteAsync(owner.Stores.SelectMany(s => s.StoreUsers).ToList());
             await _storeModuleRepository.HardDeleteAsync(owner.Stores.SelectMany(s => s.StoreModules).ToList());
             await _storeRoleFeatureRepository.HardDeleteAsync(owner.Stores.SelectMany(s => s.StoreRoleFeatures).ToList());
             await _storeRepository.HardDeleteAsync(owner.Stores);
 
+            // Owner BEFORE User (FK_Owner_User_UserId RESTRICT)
             await _ownerRepository.HardDeleteAsync(owner);
+            await _userRepository.HardDeleteAsync(owner.User);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }
