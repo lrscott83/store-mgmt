@@ -108,21 +108,21 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             if (owner.Stores?.Any() == true)
             {
                 // StoreUser/StoreModule/StoreRoleFeature have composite PKs —
-                // HardDeleteAsync only handles single-PK. Use DeleteWhereAsync.
+                // HardDeleteAsync only handles single-PK. Use HardDeleteWhereAsync.
                 var storeIds = owner.Stores.Select(s => s.Id).ToList();
                 foreach (var storeId in storeIds)
                 {
                     _logger.LogDebug("DeleteOwner: deleting StoreUsers for Store {storeId}", storeId);
-                    await _storeUserRepository.DeleteWhereAsync(su => su.StoreId == storeId);
+                    await _storeUserRepository.HardDeleteWhereAsync(su => su.StoreId == storeId);
 
                     _logger.LogDebug("DeleteOwner: deleting StoreModules for Store {storeId}", storeId);
-                    await _storeModuleRepository.DeleteWhereAsync(sm => sm.StoreId == storeId);
+                    await _storeModuleRepository.HardDeleteWhereAsync(sm => sm.StoreId == storeId);
 
                     _logger.LogDebug("DeleteOwner: deleting StoreRoleFeatures for Store {storeId}", storeId);
-                    await _storeRoleFeatureRepository.DeleteWhereAsync(srf => srf.StoreId == storeId);
+                    await _storeRoleFeatureRepository.HardDeleteWhereAsync(srf => srf.StoreId == storeId);
 
                     _logger.LogDebug("DeleteOwner: deleting StoreUsages for Store {storeId}", storeId);
-                    await _storeUsageRepository.DeleteWhereAsync(su => su.StoreId == storeId);
+                    await _storeUsageRepository.HardDeleteWhereAsync(su => su.StoreId == storeId);
                 }
 
                 _logger.LogDebug("DeleteOwner: deleting {Count} Stores", owner.Stores.Count);

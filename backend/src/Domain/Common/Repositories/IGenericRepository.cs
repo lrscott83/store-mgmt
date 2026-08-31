@@ -16,7 +16,7 @@ namespace Domain.Common.Repositories
         Task<IReadOnlyCollection<TEntity>> GetAllAsync();
         Task<bool> UpdateAsync(TEntity entity);
         IQueryable<TEntity> Where(Expression<Func<TEntity, bool>> predicate);
-        Task<int> DeleteWhereAsync(Expression<Func<TEntity, bool>> predicate);
+        Task<int> HardDeleteWhereAsync(Expression<Func<TEntity, bool>> predicate);
     }
 
     public interface IGenericRepository<TEntity, TId> 

@@ -133,7 +133,7 @@ namespace Infrastructure.Persistence.Repositories
             return true;
         }
 
-        public async Task<int> DeleteWhereAsync(Expression<Func<TEntity, bool>> predicate)
+        public async Task<int> HardDeleteWhereAsync(Expression<Func<TEntity, bool>> predicate)
         {
             return await _dbContext.Set<TEntity>().IgnoreQueryFilters().Where(predicate).ExecuteDeleteAsync();
         }
