@@ -92,6 +92,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                 {
                     _logger.LogDebug("DeleteOwner: UserRoles count={Count}", owner.User.UserRoles.Count);
                     await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
+                    owner.User.UserRoles.Clear();
                 }
             }
             catch (Exception ex)
@@ -106,6 +107,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                 {
                     _logger.LogDebug("DeleteOwner: User.StoreUsages count={Count}", owner.User.StoreUsages.Count);
                     await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
+                    owner.User.StoreUsages.Clear();
                 }
             }
             catch (Exception ex)
@@ -139,6 +141,9 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
 
                     await _storeRepository.HardDeleteAsync(store);
                 }
+                // Clear the collection so SaveChangesAsync doesn't try to
+                // process Stores that were already deleted via HardDeleteAsync.
+                owner.Stores.Clear();
             }
 
             try
