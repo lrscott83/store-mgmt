@@ -119,11 +119,9 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "DeleteOwner: 4a. EXCEPTION. Entity0Type={Type}, UserId={UserId}, StoreId={StoreId}, RepoType={Repo}",
-                                su[0]?.GetType().FullName ?? "NULL",
-                                su[0]?.UserId ?? Guid.Empty,
-                                su[0]?.StoreId ?? Guid.Empty,
-                                _storeUserRepository.GetType().FullName);
+                            var first = su.FirstOrDefault();
+                            _logger.LogError(ex, "DeleteOwner: 4a. EXCEPTION. FirstIsNull={IsNull}, Count={Count}, RepoType={Repo}",
+                                first == null, su.Count, _storeUserRepository.GetType().FullName);
                             throw;
                         }
                     }
