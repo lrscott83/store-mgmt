@@ -112,8 +112,20 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                     _logger.LogInformation("DeleteOwner: 4a. StoreUsers count={Count}", su?.Count ?? -1);
                     if (su != null && su.Any())
                     {
-                        await _storeUserRepository.HardDeleteAsync(su);
-                        _logger.LogInformation("DeleteOwner: 4a. OK");
+                        try
+                        {
+                            await _storeUserRepository.HardDeleteAsync(su);
+                            _logger.LogInformation("DeleteOwner: 4a. OK");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "DeleteOwner: 4a. EXCEPTION. Entity0Type={Type}, UserId={UserId}, StoreId={StoreId}, RepoType={Repo}",
+                                su[0]?.GetType().FullName ?? "NULL",
+                                su[0]?.UserId ?? Guid.Empty,
+                                su[0]?.StoreId ?? Guid.Empty,
+                                _storeUserRepository.GetType().FullName);
+                            throw;
+                        }
                     }
 
                     var sm = store.StoreModules?.ToList();
