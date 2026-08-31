@@ -41,7 +41,25 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
           const storeCount = owner.storeModules.length;
 
           return (
-            <Card key={owner.id} title={owner.fullName} className={getCardClass(owner)}>
+            <Card
+              key={owner.id}
+              title={owner.fullName}
+              className={getCardClass(owner)}
+              headerAction={
+                <ActionMenu widthClass="min-w-40">
+                  <ActionMenuItem intent="edit" onClick={() => onEdit(owner.id)}>
+                    {intl.formatMessage({ id: 'OWNER.EDIT_OWNER' })}
+                  </ActionMenuItem>
+                  <ActionMenuItem
+                    intent="delete"
+                    separatorBefore
+                    onClick={() => setOwnerToDelete(owner)}
+                  >
+                    {intl.formatMessage({ id: 'GENERAL.DELETE' })}
+                  </ActionMenuItem>
+                </ActionMenu>
+              }
+            >
               <div className="space-y-2">
                 <p className="text-sm text-text-muted">
                   {formatCurrency(totalPrice)}
@@ -56,20 +74,6 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
                 <p className="text-sm text-text-muted">{owner.cellPhone}</p>
                 {owner.email && <p className="text-sm text-text-muted">{owner.email}</p>}
                 {owner.description && <p className="text-sm text-text-muted">{owner.description}</p>}
-                <div className="flex justify-end pt-2">
-                  <ActionMenu widthClass="min-w-40">
-                    <ActionMenuItem intent="edit" onClick={() => onEdit(owner.id)}>
-                      {intl.formatMessage({ id: 'OWNER.EDIT_OWNER' })}
-                    </ActionMenuItem>
-                    <ActionMenuItem
-                      intent="delete"
-                      separatorBefore
-                      onClick={() => setOwnerToDelete(owner)}
-                    >
-                      {intl.formatMessage({ id: 'GENERAL.DELETE' })}
-                    </ActionMenuItem>
-                  </ActionMenu>
-                </div>
               </div>
             </Card>
           );

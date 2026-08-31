@@ -40,26 +40,30 @@ export function StoreCardList({ stores, onEdit, onApprove, onDisapprove }: Store
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {stores.map((store) => (
-        <Card key={store.id} title={store.name} className={getStoreCardClass(store)}>
+        <Card
+          key={store.id}
+          title={store.name}
+          className={getStoreCardClass(store)}
+          headerAction={
+            <ActionMenu testId={`store-actions-toggle-${store.id}`} widthClass="min-w-40">
+              <ActionMenuItem intent="edit" onClick={() => onEdit(store.id)}>
+                {intl.formatMessage({ id: 'STORES.EDIT' })}
+              </ActionMenuItem>
+              {store.approved ? (
+                <ActionMenuItem intent="disapprove" onClick={() => onDisapprove(store.id)}>
+                  {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
+                </ActionMenuItem>
+              ) : (
+                <ActionMenuItem intent="approve" onClick={() => onApprove(store.id)}>
+                  {intl.formatMessage({ id: 'STORES.APPROVE' })}
+                </ActionMenuItem>
+              )}
+            </ActionMenu>
+          }
+        >
           <div className="space-y-2">
             <p className="text-sm text-text-muted">{store.address}</p>
             {store.description && <p className="text-sm text-text-muted">{store.description}</p>}
-            <div className="flex justify-end pt-2">
-              <ActionMenu testId={`store-actions-toggle-${store.id}`} widthClass="min-w-40">
-                <ActionMenuItem intent="edit" onClick={() => onEdit(store.id)}>
-                  {intl.formatMessage({ id: 'STORES.EDIT' })}
-                </ActionMenuItem>
-                {store.approved ? (
-                  <ActionMenuItem intent="disapprove" onClick={() => onDisapprove(store.id)}>
-                    {intl.formatMessage({ id: 'STORES.DISAPPROVE' })}
-                  </ActionMenuItem>
-                ) : (
-                  <ActionMenuItem intent="approve" onClick={() => onApprove(store.id)}>
-                    {intl.formatMessage({ id: 'STORES.APPROVE' })}
-                  </ActionMenuItem>
-                )}
-              </ActionMenu>
-            </div>
           </div>
         </Card>
       ))}

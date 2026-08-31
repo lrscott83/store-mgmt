@@ -41,7 +41,18 @@ export function ResellerCardList({ resellers, onCreate, onEdit }: ResellerCardLi
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {resellers.map((reseller) => (
-          <Card key={reseller.id} title={reseller.fullName} className={getCardClass(reseller)}>
+          <Card
+            key={reseller.id}
+            title={reseller.fullName}
+            className={getCardClass(reseller)}
+            headerAction={
+              <ActionMenu widthClass="min-w-40">
+                <ActionMenuItem intent="edit" onClick={() => onEdit(reseller.id)}>
+                  {intl.formatMessage({ id: 'GENERAL.EDIT' })}
+                </ActionMenuItem>
+              </ActionMenu>
+            }
+          >
             <div className="space-y-2">
               <p className="text-sm text-text-muted">
                 {intl.formatMessage({ id: 'RESELLERS.PERCENT_DISCOUNT' })}
@@ -58,13 +69,6 @@ export function ResellerCardList({ resellers, onCreate, onEdit }: ResellerCardLi
               {reseller.description && (
                 <p className="text-sm text-text-muted">{reseller.description}</p>
               )}
-              <div className="flex justify-end pt-2">
-                <ActionMenu widthClass="min-w-40">
-                  <ActionMenuItem intent="edit" onClick={() => onEdit(reseller.id)}>
-                    {intl.formatMessage({ id: 'GENERAL.EDIT' })}
-                  </ActionMenuItem>
-                </ActionMenu>
-              </div>
             </div>
           </Card>
         ))}
