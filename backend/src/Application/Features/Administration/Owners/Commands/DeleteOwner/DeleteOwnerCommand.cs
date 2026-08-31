@@ -1,4 +1,4 @@
-﻿using Application.Abstractions.HttpContext;
+using Application.Abstractions.HttpContext;
 using Application.Abstractions.Messaging;
 using Application.Exceptions;
 using Application.ResponseModels;
@@ -54,7 +54,6 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             IStoreRoleFeatureRepository storeRoleFeatureRepository,
             ILogger<DeleteOwnerCommandHandler> logger)
         {
-            _logger = logger;
             _ownerRepository = ownerRepository;
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -66,6 +65,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             _storeUsageRepository = storeUsageRepository;
             _storeModuleRepository = storeModuleRepository;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
+            _logger = logger;
         }
 
 
@@ -84,57 +84,125 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             _logger.LogInformation("DeleteOwner: deleting owner {OwnerId} (User={HasUser}, Stores={StoreCount}, ReSellerOwner={HasRSO})",
                 owner.Id, owner.User != null, owner.Stores?.Count ?? 0, owner.ReSellerOwner != null);
 
-            // Hard delete: leaf tables → parents. Each step guarded by null checks.
-            if (owner.ReSellerOwner != null)
+            try
             {
-                _logger.LogDebug("DeleteOwner: deleting ReSellerOwner");
-                await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
+                // Step 1: ReSellerOwner
+                if (owner.ReSellerOwner != null)
+                {
+                    _logger.LogDebug("DeleteOwner: step 1 - deleting ReSellerOwner");
+                    await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
+                    _logger.LogDebug("DeleteOwner: step 1 - OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteOwner: FAILED at step 1 (ReSellerOwner)");
+                throw;
             }
 
-            if (owner.User != null)
+            try
             {
-                if (owner.User.UserRoles?.Any() == true)
+                // Step 2: UserRoles
+                if (owner.User?.UserRoles?.Any() == true)
                 {
-                    _logger.LogDebug("DeleteOwner: deleting {Count} UserRoles", owner.User.UserRoles.Count);
+                    _logger.LogDebug("DeleteOwner: step 2 - deleting {Count} UserRoles", owner.User.UserRoles.Count);
                     await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
+                    _logger.LogDebug("DeleteOwner: step 2 - OK");
                 }
-                // Delete StoreUsages by UserId (covers all stores this user touched)
-                _logger.LogDebug("DeleteOwner: deleting StoreUsages for User {userId}", owner.User.Id);
-                await _storeUsageRepository.HardDeleteWhereAsync(su => su.UserId == owner.User.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteOwner: FAILED at step 2 (UserRoles)");
+                throw;
             }
 
-            if (owner.Stores?.Any() == true)
+            try
             {
-                // StoreUser/StoreModule/StoreRoleFeature have composite PKs —
-                // HardDeleteAsync only handles single-PK. Use HardDeleteWhereAsync.
-                var storeIds = owner.Stores.Select(s => s.Id).ToList();
-                foreach (var storeId in storeIds)
+                // Step 3: StoreUsages by UserId
+                if (owner.User != null)
                 {
-                    _logger.LogDebug("DeleteOwner: deleting StoreUsers for Store {storeId}", storeId);
-                    await _storeUserRepository.HardDeleteWhereAsync(su => su.StoreId == storeId);
-
-                    _logger.LogDebug("DeleteOwner: deleting StoreModules for Store {storeId}", storeId);
-                    await _storeModuleRepository.HardDeleteWhereAsync(sm => sm.StoreId == storeId);
-
-                    _logger.LogDebug("DeleteOwner: deleting StoreRoleFeatures for Store {storeId}", storeId);
-                    await _storeRoleFeatureRepository.HardDeleteWhereAsync(srf => srf.StoreId == storeId);
-
-                    _logger.LogDebug("DeleteOwner: deleting StoreUsages for Store {storeId}", storeId);
-                    await _storeUsageRepository.HardDeleteWhereAsync(su => su.StoreId == storeId);
+                    _logger.LogDebug("DeleteOwner: step 3 - deleting StoreUsages for User {userId}", owner.User.Id);
+                    await _storeUsageRepository.HardDeleteWhereAsync(su => su.UserId == owner.User.Id);
+                    _logger.LogDebug("DeleteOwner: step 3 - OK");
                 }
-
-                _logger.LogDebug("DeleteOwner: deleting {Count} Stores", owner.Stores.Count);
-                await _storeRepository.HardDeleteAsync(owner.Stores);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteOwner: FAILED at step 3 (StoreUsages by UserId)");
+                throw;
             }
 
-            // Owner BEFORE User (FK_Owner_User_UserId RESTRICT)
-            _logger.LogDebug("DeleteOwner: deleting Owner");
-            await _ownerRepository.HardDeleteAsync(owner);
-
-            if (owner.User != null)
+            try
             {
-                _logger.LogDebug("DeleteOwner: deleting User");
-                await _userRepository.HardDeleteAsync(owner.User);
+                // Step 4: StoreUsers, StoreModules, StoreRoleFeatures per store
+                if (owner.Stores?.Any() == true)
+                {
+                    var storeIds = owner.Stores.Select(s => s.Id).ToList();
+                    foreach (var storeId in storeIds)
+                    {
+                        _logger.LogDebug("DeleteOwner: step 4a - deleting StoreUsers for Store {storeId}", storeId);
+                        await _storeUserRepository.HardDeleteWhereAsync(su => su.StoreId == storeId);
+                        _logger.LogDebug("DeleteOwner: step 4a - OK");
+
+                        _logger.LogDebug("DeleteOwner: step 4b - deleting StoreModules for Store {storeId}", storeId);
+                        await _storeModuleRepository.HardDeleteWhereAsync(sm => sm.StoreId == storeId);
+                        _logger.LogDebug("DeleteOwner: step 4b - OK");
+
+                        _logger.LogDebug("DeleteOwner: step 4c - deleting StoreRoleFeatures for Store {storeId}", storeId);
+                        await _storeRoleFeatureRepository.HardDeleteWhereAsync(srf => srf.StoreId == storeId);
+                        _logger.LogDebug("DeleteOwner: step 4c - OK");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteOwner: FAILED at step 4 (StoreUsers/Modules/RoleFeatures)");
+                throw;
+            }
+
+            try
+            {
+                // Step 5: Stores
+                if (owner.Stores?.Any() == true)
+                {
+                    _logger.LogDebug("DeleteOwner: step 5 - deleting {Count} Stores", owner.Stores.Count);
+                    await _storeRepository.HardDeleteAsync(owner.Stores);
+                    _logger.LogDebug("DeleteOwner: step 5 - OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteOwner: FAILED at step 5 (Stores)");
+                throw;
+            }
+
+            try
+            {
+                // Step 6: Owner (BEFORE User — FK_Owner_User_UserId RESTRICT)
+                _logger.LogDebug("DeleteOwner: step 6 - deleting Owner");
+                await _ownerRepository.HardDeleteAsync(owner);
+                _logger.LogDebug("DeleteOwner: step 6 - OK");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteOwner: FAILED at step 6 (Owner)");
+                throw;
+            }
+
+            try
+            {
+                // Step 7: User
+                if (owner.User != null)
+                {
+                    _logger.LogDebug("DeleteOwner: step 7 - deleting User");
+                    await _userRepository.HardDeleteAsync(owner.User);
+                    _logger.LogDebug("DeleteOwner: step 7 - OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteOwner: FAILED at step 7 (User)");
+                throw;
             }
 
             _logger.LogInformation("DeleteOwner: saving changes for owner {OwnerId}", owner.Id);
