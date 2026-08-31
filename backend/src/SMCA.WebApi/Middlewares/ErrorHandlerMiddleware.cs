@@ -60,9 +60,21 @@ namespace SMCA.WebApi.Middlewares
             catch (Exception error)
             {
                 if (error is ValidationException or ApiException)
-                    _logger.LogWarning("Request rejected: {Message}", error.Message);   // no exception arg → no stack
+                    _logger.LogWarning("Request rejected: {Message}", error.Message);
                 else
-                    _logger.LogError(error, "Unhandled exception: {Message}", error.Message);
+                {
+                    _logger.LogError(error,
+                        "Unhandled exception: {ExceptionType}: {Message}\n{StackTrace}",
+                        error.GetType().FullName,
+                        error.Message,
+                        error.StackTrace);
+                    if (error.InnerException != null)
+                        _logger.LogError(error.InnerException,
+                            "Inner exception: {ExceptionType}: {Message}\n{StackTrace}",
+                            error.InnerException.GetType().FullName,
+                            error.InnerException.Message,
+                            error.InnerException.StackTrace);
+                }
 
                 var response = context.Response;
                 response.ContentType = "application/json";

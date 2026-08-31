@@ -10,6 +10,7 @@ using Domain.Entities.StoreRoleFeatures;
 using Domain.Entities.StoreUsers;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Resources;
 using System;
 using System.Collections.Generic;
@@ -36,6 +37,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
+        private readonly ILogger<DeleteOwnerCommandHandler> _logger;
 
         public DeleteOwnerCommandHandler(
             IOwnerRepository ownerRepository,
@@ -48,8 +50,10 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             IUserRoleRepository userRoleRepository,
             IStoreUsageRepository storeUsageRepository,
             IStoreModuleRepository storeModuleRepository,
-            IStoreRoleFeatureRepository storeRoleFeatureRepository)
+            IStoreRoleFeatureRepository storeRoleFeatureRepository,
+            ILogger<DeleteOwnerCommandHandler> logger)
         {
+            _logger = logger;
             _ownerRepository = ownerRepository;
             _applicationUnitOfWork = applicationUnitOfWork;
             _httpContextService = httpContextService;
@@ -71,43 +75,76 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
 
             Owner owner = await _ownerRepository.GetOwnerWithAllDataToDeleteByIdAsync(request.Id);
             if (owner == null)
+            {
+                _logger.LogWarning("DeleteOwner: owner {OwnerId} not found", request.Id);
                 throw new ApiException(_localizer["OwnerNotFound"], HttpStatusCode.NotFound);
+            }
 
-            // Hard delete: physically removes all data (not soft delete)
-            // Order matters: FK_Owner_User_UserId is RESTRICT, so Owner must be
-            // deleted BEFORE User. Leaf tables first, then parents.
+            _logger.LogInformation("DeleteOwner: deleting owner {OwnerId} (User={HasUser}, Stores={StoreCount}, ReSellerOwner={HasRSO})",
+                owner.Id, owner.User != null, owner.Stores?.Count ?? 0, owner.ReSellerOwner != null);
+
+            // Hard delete: leaf tables → parents. Each step guarded by null checks.
             if (owner.ReSellerOwner != null)
+            {
+                _logger.LogDebug("DeleteOwner: deleting ReSellerOwner");
                 await _reSellerOwnerRepository.HardDeleteAsync(owner.ReSellerOwner);
+            }
 
             if (owner.User != null)
             {
                 if (owner.User.UserRoles?.Any() == true)
+                {
+                    _logger.LogDebug("DeleteOwner: deleting {Count} UserRoles", owner.User.UserRoles.Count);
                     await _userRoleRepository.HardDeleteAsync(owner.User.UserRoles);
+                }
                 if (owner.User.StoreUsages?.Any() == true)
+                {
+                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreUsages", owner.User.StoreUsages.Count);
                     await _storeUsageRepository.HardDeleteAsync(owner.User.StoreUsages);
+                }
             }
 
             if (owner.Stores?.Any() == true)
             {
-                var storeUsers = owner.Stores.SelectMany(s => (ICollection<StoreUser>?)s.StoreUsers ?? Enumerable.Empty<StoreUser>()).ToList();
+                var storeUsers = owner.Stores
+                    .SelectMany(s => (ICollection<StoreUser>?)s.StoreUsers ?? Enumerable.Empty<StoreUser>()).ToList();
                 if (storeUsers.Any())
+                {
+                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreUsers", storeUsers.Count);
                     await _storeUserRepository.HardDeleteAsync(storeUsers);
+                }
 
-                var storeModules = owner.Stores.SelectMany(s => (ICollection<StoreModule>?)s.StoreModules ?? Enumerable.Empty<StoreModule>()).ToList();
+                var storeModules = owner.Stores
+                    .SelectMany(s => (ICollection<StoreModule>?)s.StoreModules ?? Enumerable.Empty<StoreModule>()).ToList();
                 if (storeModules.Any())
+                {
+                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreModules", storeModules.Count);
                     await _storeModuleRepository.HardDeleteAsync(storeModules);
+                }
 
-                var storeRoleFeatures = owner.Stores.SelectMany(s => (ICollection<StoreRoleFeature>?)s.StoreRoleFeatures ?? Enumerable.Empty<StoreRoleFeature>()).ToList();
+                var storeRoleFeatures = owner.Stores
+                    .SelectMany(s => (ICollection<StoreRoleFeature>?)s.StoreRoleFeatures ?? Enumerable.Empty<StoreRoleFeature>()).ToList();
                 if (storeRoleFeatures.Any())
+                {
+                    _logger.LogDebug("DeleteOwner: deleting {Count} StoreRoleFeatures", storeRoleFeatures.Count);
                     await _storeRoleFeatureRepository.HardDeleteAsync(storeRoleFeatures);
+                }
 
+                _logger.LogDebug("DeleteOwner: deleting {Count} Stores", owner.Stores.Count);
                 await _storeRepository.HardDeleteAsync(owner.Stores);
             }
 
             // Owner BEFORE User (FK_Owner_User_UserId RESTRICT)
+            _logger.LogDebug("DeleteOwner: deleting Owner");
             await _ownerRepository.HardDeleteAsync(owner);
+
             if (owner.User != null)
+            {
+                _logger.LogDebug("DeleteOwner: deleting User");
                 await _userRepository.HardDeleteAsync(owner.User);
+            }
+
+            _logger.LogInformation("DeleteOwner: saving changes for owner {OwnerId}", owner.Id);
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }
