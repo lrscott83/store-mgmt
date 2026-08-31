@@ -6,6 +6,8 @@ import { resellerFeatureLoader } from '~/auth/routes/loaders';
 import { ownerHttpService } from '~/admin/owners/lib/services/owner-http-service';
 import { OwnerCardList } from '~/admin/owners/components/owner-card-list';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
+import { Button } from '~/shared/components/ui/button';
+import { PlusIcon } from '~/shared/components/ui/icons';
 import type { Owner } from '@store-mgmt/domain';
 
 export const clientLoader = resellerFeatureLoader([EFeatures.Owners]);
@@ -49,6 +51,10 @@ export function OwnerListPage() {
         <h1 className="text-xl font-semibold">
           {intl.formatMessage({ id: 'OWNER.LIST_TITLE' })}
         </h1>
+        <Button variant="fab" onClick={() => navigate('/admin/owners/create')}>
+          <PlusIcon />
+          {intl.formatMessage({ id: 'GENERAL.ADD' })}
+        </Button>
       </div>
 
       {error && (

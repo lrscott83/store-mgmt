@@ -387,11 +387,11 @@ describe('OwnerListPage — delete button', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// S-ADMIN-OWNERS-LIST-6 — no create button
+// S-ADMIN-OWNERS-LIST-6 — create button
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('OwnerListPage — no create button', () => {
-  it('does NOT render a create/add button', async () => {
+describe('OwnerListPage — create button', () => {
+  it('renders an Adicionar button that navigates to /admin/owners/create', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
@@ -414,8 +414,10 @@ describe('OwnerListPage — no create button', () => {
       expect(screen.getByText(esMessages['OWNER.LIST_TITLE'])).toBeInTheDocument();
     });
 
-    // Should not find any button that says "crear", "agregar", "nuevo" etc.
-    expect(screen.queryByRole('button', { name: /crear|agregar|nuevo|add|create/i })).not.toBeInTheDocument();
+    const addBtn = screen.getByRole('button', { name: /Adicionar/i });
+    expect(addBtn).toBeInTheDocument();
+    fireEvent.click(addBtn);
+    expect(mockNavigate).toHaveBeenCalledWith('/admin/owners/create');
   });
 });
 
