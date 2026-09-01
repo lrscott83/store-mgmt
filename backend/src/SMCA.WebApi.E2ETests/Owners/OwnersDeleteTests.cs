@@ -12,10 +12,8 @@ public sealed class OwnersDeleteTests
     private readonly AppTestFactory _f;
     public OwnersDeleteTests(WebAppFixture fixture) => _f = fixture.Factory;
 
-    // PIN BUG: DeleteOwnerCommandHandler._storeUserRepository is declared but never injected -> NRE -> 500
-    // on any authorized valid delete. Update when the injection is fixed.
     [Fact]
-    public async Task Delete_owner_currently_returns_500()
+    public async Task Delete_existing_owner_returns_200()
     {
         var login = $"sa-{Guid.NewGuid():N}@test.com";
         var admin = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
@@ -23,9 +21,9 @@ public sealed class OwnersDeleteTests
         try
         {
             var r = await DbTestHelpers.AuthedClient(_f, admin, login).DeleteAsync($"/api/v1/Owners/{owner.OwnerId}");
-            r.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
         }
-        finally { await StoreSeed.CleanupOwnerAsync(_f, owner.OwnerId, owner.UserId); await DbTestHelpers.CleanupUserAsync(_f, admin); }
+        finally { await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
 
     [Fact]
