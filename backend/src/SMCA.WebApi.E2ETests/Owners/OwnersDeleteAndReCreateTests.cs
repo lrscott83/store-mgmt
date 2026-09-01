@@ -67,17 +67,16 @@ public sealed class OwnersDeleteAndReCreateTests
             getBody.ActionCode.Should().Be(404);
             getBody.Errors.Should().Contain(e => e.Code == "Owner.NotFound");
 
-            // ── act 3: re-create the owner with a new login ────────────────
-            var ownerLogin2 = $"owner-{Guid.NewGuid():N}@test.com";
+            // ── act 3: re-create the owner with the SAME login and data ───
             var recreateRes = await client.PostAsJsonAsync("/api/v1/Owners", new
             {
-                Login = ownerLogin2,
+                Login = ownerLogin1,
                 Password = "Password123",
-                FullName = "Lifecycle Owner v2",
+                FullName = "Lifecycle Owner",
                 Cellphone = "0000000000",
                 ReSellerId = (Guid?)null,
                 Email = (string?)null,
-                Description = "e2e lifecycle re-created"
+                Description = "e2e lifecycle"
             });
             recreateRes.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -85,8 +84,8 @@ public sealed class OwnersDeleteAndReCreateTests
             recreated!.Succeeded.Should().BeTrue();
             recreated.Data!.Id.Should().NotBeEmpty();
             recreated.Data.Id.Should().NotBe(ownerId, "a new GUID must be assigned");
-            recreated.Data.Login.Should().Be(ownerLogin2);
-            recreated.Data.FullName.Should().Be("Lifecycle Owner v2");
+            recreated.Data.Login.Should().Be(ownerLogin1);
+            recreated.Data.FullName.Should().Be("Lifecycle Owner");
 
             // ── assert 3: the new owner is reachable via GET ───────────────
             var getRes2 = await client.GetAsync($"/api/v1/Owners/{recreated.Data.Id}");
