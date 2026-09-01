@@ -686,6 +686,9 @@ const messages: Record<string, string> = {
   'STORES.UPDATE_SUCCESS': 'Tienda actualizada correctamente.',
   // L6 parity: Angular is register-neutral, no voseo ("Intentá" -> "Intente")
   'STORES.ERROR': 'Ocurrió un error. Intente de nuevo.',
+  'STORES.FILTER_LABEL': 'Mostrar:',
+  'STORES.PAID_PLAN': 'Plan de Pago',
+  'STORES.FREE_PLAN': 'Plan Gratis',
   'STORES.EMPTY_STATE': 'No hay tiendas registradas.',
   'STORES.NAME_REQUIRED': 'El nombre es obligatorio.',
   'STORES.PLAN.SECTION_TITLE': 'Plan de la tienda',
