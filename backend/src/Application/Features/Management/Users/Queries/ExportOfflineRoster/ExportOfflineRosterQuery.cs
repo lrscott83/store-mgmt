@@ -25,6 +25,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
         private readonly IHttpContextService _httpContextService;
         private readonly IStoreUserRepository _storeUserRepository;
         private readonly IStoreRepository _storeRepository;
+        private readonly IOwnerRepository _ownerRepository;
         private readonly IStoreModuleRepository _storeModuleRepository;
         private readonly IStoreRoleFeatureRepository _storeRoleFeatureRepository;
         private readonly IUserRoleRepository _userRoleRepository;
@@ -44,6 +45,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             IHttpContextService httpContextService,
             IStoreUserRepository storeUserRepository,
             IStoreRepository storeRepository,
+            IOwnerRepository ownerRepository,
             IStoreModuleRepository storeModuleRepository,
             IStoreRoleFeatureRepository storeRoleFeatureRepository,
             IUserRoleRepository userRoleRepository,
@@ -60,6 +62,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             _httpContextService = httpContextService;
             _storeUserRepository = storeUserRepository;
             _storeRepository = storeRepository;
+            _ownerRepository = ownerRepository;
             _storeModuleRepository = storeModuleRepository;
             _storeRoleFeatureRepository = storeRoleFeatureRepository;
             _userRoleRepository = userRoleRepository;
@@ -92,6 +95,26 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             List<int> storeModuleIds = StoreBillingUtils.FilterForBilling(storeModules.Select(sm => sm.Module), billing);
 
             var storeUsers = (await _storeUserRepository.GetStoreUsersByStoreIdAsync(query.StoreId, includeInactive: true)).ToList();
+
+            // Include the store owner in the roster if not already present as a StoreUser.
+            // The owner is linked via the Owner entity, not StoreUser, so they would be
+            // missing from the roster — preventing offline authentication.
+            var store = await _storeRepository.GetStoreByIdAsync(query.StoreId);
+            if (store is not null)
+            {
+                var ownerAlreadyIncluded = storeUsers.Any(su => su.UserId == store.OwnerId);
+                if (!ownerAlreadyIncluded)
+                {
+                    var owner = await _ownerRepository.GetOwnerIncludingUserByIdAsync(store.OwnerId);
+                    if (owner?.User != null)
+                    {
+                        var syntheticStoreUser = Domain.Entities.StoreUsers.StoreUser.Create(
+                            owner.User.Id, query.StoreId, store.TenantId);
+                        syntheticStoreUser.User = owner.User;
+                        storeUsers.Add(syntheticStoreUser);
+                    }
+                }
+            }
 
             var dek = _storeDataKeyProvider.GetDek(query.StoreId);
 

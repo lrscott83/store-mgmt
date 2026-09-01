@@ -58,7 +58,8 @@ public sealed class ExportOfflineRosterTests
             var msPerDay = 24 * 60 * 60 * 1000L;
             (roster.ExpiresAt - roster.IssuedAt).Should().Be(35 * msPerDay);
 
-            roster.Users.Should().HaveCount(2);
+            // Owner + 2 store users = 3 total
+            roster.Users.Should().HaveCount(3);
             foreach (var user in roster.Users)
             {
                 user.Verifier.Should().NotBeNull();
@@ -72,6 +73,9 @@ public sealed class ExportOfflineRosterTests
                 user.WrapIterations.Should().Be(210_000);
                 user.PaymentStatus.Should().NotBeNullOrEmpty();
             }
+
+            // Owner is included in the roster
+            roster.Users.Should().Contain(u => u.IsOwnerAdmin);
         }
         finally
         {
@@ -96,7 +100,8 @@ public sealed class ExportOfflineRosterTests
 
             var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
-            body.Data!.Users.Should().HaveCount(1);
+            // Owner + 1 store user = 2 total
+            body.Data!.Users.Should().HaveCount(2);
         }
         finally
         {
@@ -133,14 +138,15 @@ public sealed class ExportOfflineRosterTests
 
         try
         {
-            // No StoreUsers seeded — store is empty
+            // No StoreUsers seeded, but the owner is always included
             var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
             var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
-            body.Data!.Users.Should().BeEmpty();
+            body.Data!.Users.Should().HaveCount(1);
+            body.Data.Users.Single().IsOwnerAdmin.Should().BeTrue();
         }
         finally
         {
@@ -210,7 +216,8 @@ public sealed class ExportOfflineRosterTests
             body1!.Succeeded.Should().BeTrue();
             var roster1 = body1.Data!;
             roster1.FormatVersion.Should().Be(3);
-            roster1.Users.Should().HaveCount(2);
+            // Owner + 2 store users = 3 total
+            roster1.Users.Should().HaveCount(3);
 
             foreach (var user in roster1.Users)
             {
@@ -226,7 +233,7 @@ public sealed class ExportOfflineRosterTests
             body2!.Succeeded.Should().BeTrue();
             var roster2 = body2.Data!;
             roster2.FormatVersion.Should().Be(3);
-            roster2.Users.Should().HaveCount(2);
+            roster2.Users.Should().HaveCount(3);
 
             foreach (var user in roster2.Users)
             {
@@ -294,12 +301,13 @@ public sealed class ExportOfflineRosterTests
             var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
 
-            var user = body.Data!.Users.Single();
+            // Owner + 1 store user; assert on the store user (non-owner)
+            var storeUser = body.Data!.Users.Single(u => !u.IsOwnerAdmin);
             // Vencido → only PriceIncluded (Management=7) survives; paid Statistics=6 is filtered out
-            user.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId });
-            user.PaymentStatus.Should().Be("Vencido");
-            user.PaymentDueDate.Should().NotBeNull();
-            user.IsInTrial.Should().BeFalse();
+            storeUser.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId });
+            storeUser.PaymentStatus.Should().Be("Vencido");
+            storeUser.PaymentDueDate.Should().NotBeNull();
+            storeUser.IsInTrial.Should().BeFalse();
         }
         finally
         {
@@ -334,10 +342,11 @@ public sealed class ExportOfflineRosterTests
             var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
 
-            var user = body.Data!.Users.Single();
+            // Owner + 1 store user; assert on the store user (non-owner)
+            var storeUser = body.Data!.Users.Single(u => !u.IsOwnerAdmin);
             // AlDia → all modules survive the gate (free + paid)
-            user.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
-            user.PaymentStatus.Should().BeOneOf("AlDia", "PorVencer");
+            storeUser.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
+            storeUser.PaymentStatus.Should().BeOneOf("AlDia", "PorVencer");
         }
         finally
         {
@@ -363,12 +372,13 @@ public sealed class ExportOfflineRosterTests
             var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
             body!.Succeeded.Should().BeTrue();
 
-            var user = body.Data!.Users.Single();
+            // Owner + 1 store user; assert on the store user (non-owner)
+            var storeUser = body.Data!.Users.Single(u => !u.IsOwnerAdmin);
             // NoAplica (never started billing) → all modules survive the gate
-            user.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
-            user.PaymentStatus.Should().Be("NoAplica");
-            user.PaymentDueDate.Should().BeNull();
-            user.IsInTrial.Should().BeFalse();
+            storeUser.StoreModuleIds.Should().BeEquivalentTo(new[] { BillingSeed.ManagementModuleId, BillingSeed.StatisticsModuleId });
+            storeUser.PaymentStatus.Should().Be("NoAplica");
+            storeUser.PaymentDueDate.Should().BeNull();
+            storeUser.IsInTrial.Should().BeFalse();
         }
         finally
         {
@@ -525,7 +535,7 @@ public sealed class ExportOfflineRosterTests
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
-            var user = body!.Data!.Users.Single();
+            var user = body!.Data!.Users.Single(u => !u.IsOwnerAdmin);
 
             user.WrapIterations.Should().Be(210_000);
 
@@ -575,7 +585,7 @@ public sealed class ExportOfflineRosterTests
             r.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
-            var user = body!.Data!.Users.Single();
+            var user = body!.Data!.Users.Single(u => !u.IsOwnerAdmin);
 
             // KEK derived from the RAW password instead of the stored hash → tag mismatch
             var act = () => UnwrapDek("Password123", user.WrappedDek, user.WrapSalt, user.WrapIv, user.WrapIterations);
