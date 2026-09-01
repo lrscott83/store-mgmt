@@ -28,6 +28,7 @@ namespace Application.Mappings.StoreManagement
 
             CreateMap<Store, OwnerStoreModuleDto>()
                 .IgnoreAllSourcePropertiesWithAnInaccessibleSetter()
+                .ForMember(dest => dest.StoreId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Name))
                 .ForMember(dest => dest.StoreModuleTotalCurrentPrice, opt => opt.MapFrom(src => GetStoreModuleTotalCurrentPrice(src.StoreModules)));
 

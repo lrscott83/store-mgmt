@@ -8,7 +8,9 @@ namespace Application.Dtos.Administration.Owners
 {
     public sealed class OwnerStoreModuleDto
     {
+        public Guid StoreId { get; set; }
         public string StoreName { get; set; }
         public float StoreModuleTotalCurrentPrice { get; set; }
+        public DateOnly? NextDueDate { get; set; }
     }
 }

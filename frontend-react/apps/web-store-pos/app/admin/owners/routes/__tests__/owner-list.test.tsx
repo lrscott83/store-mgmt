@@ -30,8 +30,13 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function makeModule(price = 100): OwnerStoreModule {
-  return { storeName: 'Store A', storeModuleTotalCurrentPrice: price };
+function makeModule(price = 100, nextDueDate: string | null = '2099-12-31'): OwnerStoreModule {
+  return {
+    storeId: `s-${Math.random()}`,
+    storeName: 'Store A',
+    storeModuleTotalCurrentPrice: price,
+    nextDueDate,
+  };
 }
 
 function makeOwner(overrides: Partial<Owner> = {}): Owner {
@@ -120,7 +125,7 @@ describe('OwnerListPage — render and title', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('OwnerListPage — card fields', () => {
-  it('shows fullName, computed total price (sum), store count, reSellerName, cellPhone, email, description', async () => {
+  it('shows fullName, computed total price (sum), store count, reSellerName, cellPhone, description', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
@@ -150,7 +155,6 @@ describe('OwnerListPage — card fields', () => {
       expect(screen.getByText('Jane Owner')).toBeInTheDocument();
       expect(screen.getByText(/My Reseller/)).toBeInTheDocument();
       expect(screen.getByText('+53 5 555-1234')).toBeInTheDocument();
-      expect(screen.getByText('jane@test.com')).toBeInTheDocument();
       expect(screen.getByText('Top owner')).toBeInTheDocument();
     });
   });
@@ -161,7 +165,7 @@ describe('OwnerListPage — card fields', () => {
     );
     vi.mocked(ownerHttpService.listOwners).mockResolvedValue({
       succeeded: true,
-      data: [makeOwner({ reSellerName: '', storeModules: [] })],
+      data: [makeOwner({ reSellerName: '', storeModules: [makeModule()] })],
       message: '',
       actionCode: 0,
       errors: [],
@@ -179,7 +183,7 @@ describe('OwnerListPage — card fields', () => {
     });
   });
 
-  it('shows 0 stores and $0.00 when storeModules is empty', async () => {
+  it('shows 0 stores and $0.00 when storeModules is empty (All filter)', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );
@@ -197,6 +201,12 @@ describe('OwnerListPage — card fields', () => {
         <OwnerListPage />
       </Wrapper>
     );
+
+    // The empty-owned owner has no paid-plan store, so it is hidden by the default
+    // "paid plan only" filter; switch to "all" to reveal it.
+    fireEvent.change(screen.getByRole('combobox'), {
+      target: { value: 'all' },
+    });
 
     await waitFor(() => {
       // 0 stores in i18n plural

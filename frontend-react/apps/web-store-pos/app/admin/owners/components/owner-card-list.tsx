@@ -13,21 +13,39 @@ interface OwnerCardListProps {
 }
 
 /**
- * Owner card grid at `/admin/owners`. L5 parity: shared Card chrome + a per-card gear action
- * menu replace the old raw-div markup, mirroring `management/users/components/user-card-list.tsx`
- * and `admin/stores/components/store-card-list.tsx`. Angular's `owners.component.html:31-59`
- * gear menu also renders Approve/Activate/Deactivate, but those handlers are empty no-op stubs
- * (`owners.component.ts:345-355`) — only Edit (routerLink, LIVE) and Delete (`deleteOwner`,
- * LIVE ts:337, no confirm dialog) are wired here (Req: Owners Gear Menu — Live Actions Only).
+ * Owner card grid at `/admin/owners`. The `{date}T00:00:00Z` ISO-parse in `daysFromToday`
+ * keeps the next-payment-date calendar day stable across local timezone offsets, so the
+ * overdue window matches the backend's `DateOnly` today.
  */
+function daysFromToday(isoDate: string, today: Date): number {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const target = Date.UTC(year, month - 1, day);
+  const now = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((target - now) / 86_400_000);
+}
+
 function getCardClass(owner: Owner): string {
   if (!owner.isActive) return 'bg-danger/10 border border-danger';
   if (!owner.approved) return 'bg-success/10 border border-success';
   return '';
 }
 
+// Worst-store-wins overdue state: danger overrides warning overrides normal. A store is
+// overdue when its next payment date is in the past (`daysOverdue = today - due > 0`).
+function getOverdueClass(owner: Owner, today: Date): string {
+  let worst: 'danger' | 'warning' | '' = '';
+  for (const module of owner.storeModules) {
+    if (!module.nextDueDate) continue;
+    const daysOverdue = -daysFromToday(module.nextDueDate, today);
+    if (daysOverdue > 5) worst = 'danger';
+    else if (daysOverdue >= 1 && worst !== 'danger') worst = 'warning';
+  }
+  return worst;
+}
+
 export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) {
   const intl = useIntl();
+  const today = new Date();
   const [ownerToDelete, setOwnerToDelete] = useState<Owner | null>(null);
 
   return (
@@ -39,12 +57,30 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
             0
           );
           const storeCount = owner.storeModules.length;
+          const nextDueDates = owner.storeModules
+            .filter((m) => m.nextDueDate !== null)
+            .map((m) => m.nextDueDate as string)
+            .sort();
+          const daysRemaining = nextDueDates.length > 0 ? daysFromToday(nextDueDates[0], today) : null;
+          const showDaysRemaining = daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 5;
+          const overdueClass = getOverdueClass(owner, today);
 
           return (
             <Card
               key={owner.id}
-              title={owner.fullName}
-              className={getCardClass(owner)}
+              title={
+                <>
+                  {owner.fullName}
+                  {showDaysRemaining && (
+                    <span className="text-sm text-warning">
+                      {' ('}
+                      {intl.formatMessage({ id: 'OWNER.DAYS_LEFT' }, { count: daysRemaining })}
+                      {')'}
+                    </span>
+                  )}
+                </>
+              }
+              className={overdueClass || getCardClass(owner)}
               headerAction={
                 <ActionMenu widthClass="min-w-40">
                   <ActionMenuItem intent="edit" onClick={() => onEdit(owner.id)}>
@@ -65,6 +101,13 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
                   {formatCurrency(totalPrice)}
                   {' en '}
                   {intl.formatMessage({ id: 'OWNER.STORE_PRICE_LABEL' }, { count: storeCount })}
+                  {nextDueDates.length > 0 && (
+                    <span className="text-success">
+                      {' ('}
+                      {nextDueDates.join(', ')}
+                      {')'}
+                    </span>
+                  )}
                 </p>
                 <p className="text-sm text-text-muted">
                   {intl.formatMessage({ id: 'GENERAL.RESELLER' })}
@@ -72,7 +115,6 @@ export function OwnerCardList({ owners, onEdit, onDelete }: OwnerCardListProps) 
                   {owner.reSellerName || 'ADMIN'}
                 </p>
                 <p className="text-sm text-text-muted">{owner.cellPhone}</p>
-                {owner.email && <p className="text-sm text-text-muted">{owner.email}</p>}
                 {owner.description && <p className="text-sm text-text-muted">{owner.description}</p>}
               </div>
             </Card>

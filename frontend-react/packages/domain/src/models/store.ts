@@ -67,8 +67,12 @@ export interface ReSellerCommission {
 }
 
 export interface OwnerStoreModule {
+  storeId: string;
   storeName: string;
   storeModuleTotalCurrentPrice: number;
+  // Nullable ISO date string (backend `DateOnly?`, raw passthrough). `null` means
+  // the store has no calculable next payment date (never activated the paid plan).
+  nextDueDate: string | null;
 }
 
 export interface Owner extends AuditableBaseModel {

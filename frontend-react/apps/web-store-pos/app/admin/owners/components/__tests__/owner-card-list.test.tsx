@@ -4,8 +4,13 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Owner, OwnerStoreModule } from '@store-mgmt/domain';
 
-function makeModule(price = 100): OwnerStoreModule {
-  return { storeName: 'Store A', storeModuleTotalCurrentPrice: price };
+function makeModule(price = 100, nextDueDate: string | null = null): OwnerStoreModule {
+  return {
+    storeId: `s-${Math.random()}`,
+    storeName: 'Store A',
+    storeModuleTotalCurrentPrice: price,
+    nextDueDate,
+  };
 }
 
 function makeOwner(overrides: Partial<Owner> = {}): Owner {
@@ -80,7 +85,6 @@ describe('OwnerCardList — renders a Card grid (Req: Owners List Card Grid)', (
       screen.getByText(new RegExp(`${esMessages['GENERAL.RESELLER']}.*My Reseller`))
     ).toBeInTheDocument();
     expect(screen.getByText('+53 5 555-1234')).toBeInTheDocument();
-    expect(screen.getByText('jane@test.com')).toBeInTheDocument();
     expect(screen.getByText('Top owner')).toBeInTheDocument();
   });
 
@@ -175,7 +179,7 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     expect(onEdit).toHaveBeenCalledWith('o-edit');
   });
 
-  it('calls onDelete(id) when Eliminar is clicked (no confirm)', async () => {
+  it('opens confirm dialog on Eliminar and calls onDelete(id) only after confirming', async () => {
     const onDelete = vi.fn();
     const { OwnerCardList } = await import('../owner-card-list');
     render(
@@ -185,6 +189,13 @@ describe('OwnerCardList — gear action menu (Req: Owners Gear Menu — Live Act
     );
     fireEvent.click(screen.getByRole('button', { name: /acciones/i }));
     fireEvent.click(screen.getByRole('menuitem', { name: esMessages['GENERAL.DELETE'] }));
+
+    // The delete action opens a confirm dialog; onDelete must NOT fire until confirmed.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: esMessages['OWNER.DELETE_CONFIRM_BUTTON'] }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onDelete).toHaveBeenCalledWith('o-del');
   });
 

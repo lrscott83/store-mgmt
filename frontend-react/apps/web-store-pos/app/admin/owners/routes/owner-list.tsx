@@ -17,6 +17,9 @@ export function OwnerListPage() {
   const intl = useIntl();
   const [owners, setOwners] = useState<Owner[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
+  // "paid plan only" is the default visibility: an owner counts as on a paid plan
+  // when at least one store has a calculable next payment date (`nextDueDate`).
+  const [filter, setFilter] = useState<'paid-plan-only' | 'all'>('paid-plan-only');
 
   const loadOwners = useCallback(async () => {
     try {
@@ -45,6 +48,10 @@ export function OwnerListPage() {
     }
   }
 
+  const visibleOwners = filter === 'paid-plan-only'
+    ? owners.filter((o) => o.storeModules.some((m) => m.nextDueDate !== null))
+    : owners;
+
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
@@ -63,8 +70,27 @@ export function OwnerListPage() {
         </p>
       )}
 
+      <div className="flex items-center gap-2">
+        <label htmlFor="owner-visibility-filter" className="text-sm font-medium text-text">
+          {intl.formatMessage({ id: 'OWNER.FILTER_LABEL' })}
+        </label>
+        <select
+          id="owner-visibility-filter"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as 'paid-plan-only' | 'all')}
+          className="rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="paid-plan-only">
+            {intl.formatMessage({ id: 'OWNER.PAID_PLAN_ONLY' })}
+          </option>
+          <option value="all">
+            {intl.formatMessage({ id: 'OWNER.ALL_OWNERS' })}
+          </option>
+        </select>
+      </div>
+
       <OwnerCardList
-        owners={owners}
+        owners={visibleOwners}
         onEdit={(id) => navigate(`/admin/owners/edit/${id}`)}
         onDelete={handleDelete}
       />
