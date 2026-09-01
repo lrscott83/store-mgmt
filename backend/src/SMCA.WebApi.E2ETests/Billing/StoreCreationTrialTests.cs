@@ -4,7 +4,9 @@ using Application.Dtos.Authentication;
 using Application.Dtos.StoreManagement;
 using Domain.Common.Constants;
 using Domain.Common.Enums;
+using Domain.Common.Utils;
 using Domain.Entities.Owners;
+using Domain.Entities.StoreModules;
 using Domain.Entities.StorePayments;
 using Domain.Entities.Stores;
 using Domain.Entities.Users;
@@ -621,11 +623,23 @@ public sealed class StoreCreationTrialTests
                 .OrderByDescending(sp => sp.PaymentBeforeDate)
                 .FirstAsync();
 
-            // Six qualifying paid modules from GetAvailableModulesToStore() — 5 Reportes,
-            // 6 Estadísticas, 8 Gastos, 9 Facturación, 10 Historiales, 11 Créditos — each
-            // GetCurrentPrice(2000, 75, 0) = 2000 - 1500 - 0 = 500. 6 * 500 = 3000.
-            // This is the corrected value (design.md ⚠ correction) — NOT 500.
-            payment.Price.Should().Be(6 * 500f);
+            // Derived oracle — the price of a fresh payment must equal the sum of
+            // GetCurrentPrice over the store's active, non-included StoreModules (the exact
+            // rule in RegisterStorePaymentCommandHandler). Deriving it from the persisted
+            // StoreModules instead of hardcoding keeps this test green across catalog/price
+            // changes (they moved from 2000/75% to 2/50% in commit 229f1b90 without the test
+            // noticing in time). Precondition first: if no paid modules are attached, "sum is
+            // zero" is indistinguishable from "store never resolved" — fail loudly on that shape.
+            var paidStoreModules = await db.Set<StoreModule>().IgnoreQueryFilters().AsNoTracking()
+                .Where(sm => sm.StoreId == registered.StoreId && sm.IsActive && !sm.ModulePriceIncluded)
+                .ToListAsync();
+
+            paidStoreModules.Should().NotBeEmpty();
+            var expectedPrice = paidStoreModules.Sum(sm =>
+                CurrentPriceServiceUtils.GetCurrentPrice(sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+
+            expectedPrice.Should().BeGreaterThan(0f); // catalog changed but still priced
+            payment.Price.Should().Be(expectedPrice);
 
             var expectedDue = Start.AddMonths(3); // current due (Start + 2mo) advances by 1 month
             payment.PaymentBeforeDate.Should().Be(new DateTimeOffset(expectedDue.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
