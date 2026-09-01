@@ -37,6 +37,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly ISystemConfigurationRepository _systemConfigurationRepository;
         private readonly IBillingService _billingService;
+        private readonly IJwtProvider _jwtProvider;
         private readonly IStringLocalizer<I18n> _localizer;
 
         private const int FormatVersion = 3;
@@ -57,6 +58,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             IDateTimeProvider dateTimeProvider,
             ISystemConfigurationRepository systemConfigurationRepository,
             IBillingService billingService,
+            IJwtProvider jwtProvider,
             IStringLocalizer<I18n> localizer)
         {
             _httpContextService = httpContextService;
@@ -74,6 +76,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             _dateTimeProvider = dateTimeProvider;
             _systemConfigurationRepository = systemConfigurationRepository;
             _billingService = billingService;
+            _jwtProvider = jwtProvider;
             _localizer = localizer;
         }
 
@@ -118,6 +121,13 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
 
             var dek = _storeDataKeyProvider.GetDek(query.StoreId);
 
+            // Roster expiry is computed up front: each user's offline auth token
+            // (JWT) must share exactly the same lifetime as the bundle, so a
+            // token can never outlive the roster that carried it.
+            int ttlDays = await _systemConfigurationRepository.GetOfflineRosterTtlDaysAsync();
+            var now = _dateTimeProvider.UtcNow;
+            var expiresAt = now.UtcDateTime.AddDays(ttlDays);
+
             var rosterUsers = new List<OfflineRosterUserDto>(storeUsers.Count);
             foreach (var su in storeUsers)
             {
@@ -141,6 +151,19 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                 var preHash = _preHashProtector.Unprotect(su.User.OfflinePasswordPreHash, su.UserId);
                 var verifier = preHash is null ? null : _offlineVerifierService.CreateVerifier(preHash);
                 var wrapped = preHash is null ? null : _storeKeyWrapService.WrapDek(preHash, dek);
+
+                // Mint the offline auth token valid until the roster expires. May be
+                // empty only if token generation fails; the frontend falls back to the
+                // offline-session sentinel when absent (legacy bundles / failure).
+                string offlineAuthToken;
+                try
+                {
+                    offlineAuthToken = _jwtProvider.GenerateToken(su.UserId, su.User.Login, expiresAt);
+                }
+                catch
+                {
+                    offlineAuthToken = string.Empty;
+                }
 
                 rosterUsers.Add(new OfflineRosterUserDto
                 {
@@ -167,12 +190,11 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                     PaymentDueDate = billing.NextDueDate,
                     IsInTrial = billing.IsInTrial,
                     PaymentStatus = billing.Status.ToString(),
-                    WrapIterations = wrapped?.Iterations ?? 0
+                    WrapIterations = wrapped?.Iterations ?? 0,
+                    OfflineAuthToken = offlineAuthToken
                 });
             }
 
-            int ttlDays = await _systemConfigurationRepository.GetOfflineRosterTtlDaysAsync();
-            var now = _dateTimeProvider.UtcNow;
             var dto = new OfflineRosterDto
             {
                 BundleId = Guid.NewGuid().ToString(),

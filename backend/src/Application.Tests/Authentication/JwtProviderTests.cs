@@ -52,6 +52,23 @@ namespace Application.Tests.Authentication
             jwt.ValidTo.Should().BeBefore(DateTime.UtcNow.AddDays(5));
         }
 
+        [Fact]
+        public void GenerateToken_WithExplicitExpiry_UsesThatExpiry_IgnoringConfiguredLifetime()
+        {
+            // Arrange
+            var options = CreateOptions(tokenLifetimeDays: 35);
+            var sut = new JwtProvider(Options.Create(options));
+
+            // Act
+            var explicitExpiry = DateTime.UtcNow.AddDays(7);
+            var token = sut.GenerateToken(Guid.NewGuid(), "offline-user", explicitExpiry);
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+
+            // Assert — the explicit expiry (roster lifespan) wins over the configured 35-day default
+            jwt.ValidTo.Should().BeCloseTo(explicitExpiry, TimeSpan.FromMinutes(5));
+            jwt.ValidTo.Should().BeBefore(DateTime.UtcNow.AddDays(20));
+        }
+
         #region GenerateRefreshToken Tests
 
         [Fact]

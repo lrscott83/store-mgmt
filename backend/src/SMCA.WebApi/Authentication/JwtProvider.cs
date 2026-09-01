@@ -17,6 +17,14 @@ namespace SMCA.WebApi.Authentication
         }
         public string GenerateToken(Guid userId, string userLogin)
         {
+            // Fallback to 35 days if unconfigured/zero — a 0 would mint
+            // instantly-expired tokens. Matches the client's offline window.
+            var lifetimeDays = _jwtOptions.TokenLifetimeDays > 0 ? _jwtOptions.TokenLifetimeDays : 35;
+            return GenerateToken(userId, userLogin, DateTime.UtcNow.AddDays(lifetimeDays));
+        }
+
+        public string GenerateToken(Guid userId, string userLogin, DateTime expiresAt)
+        {
             var claims = new Claim[] 
             { 
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
@@ -32,16 +40,12 @@ namespace SMCA.WebApi.Authentication
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256);
 
-            // Fallback to 35 days if unconfigured/zero — a 0 would mint
-            // instantly-expired tokens. Matches the client's offline window.
-            var lifetimeDays = _jwtOptions.TokenLifetimeDays > 0 ? _jwtOptions.TokenLifetimeDays : 35;
-
             var token = new JwtSecurityToken(
                 _jwtOptions.Issuer,
                 _jwtOptions.Audience,
                 claims,
                 null,
-                DateTime.UtcNow.AddDays(lifetimeDays),
+                expiresAt,
                 signingCredentials);
 
             string userToken = new JwtSecurityTokenHandler().WriteToken(token);

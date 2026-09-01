@@ -38,6 +38,15 @@ export interface OfflineRosterUser {
   wrappedDek?: string;
   wrapSalt?: string;
   wrapIv?: string;
+  /**
+   * Signed JWT minted by the backend at export time, valid until the roster
+   * bundle's `expiresAt`. Used as the offline session's bearer token so
+   * API calls (e.g. daily store-usage telemetry) authenticate without an
+   * online login. Absent on legacy bundles and on exports from backends
+   * predating this field — `offline-auth-service.ts` falls back to the
+   * `OFLINE_SESSION_TOKEN` sentinel, exactly today's behavior.
+   */
+  offlineAuthToken?: string;
 }
 
 export interface OfflineRosterBundle {

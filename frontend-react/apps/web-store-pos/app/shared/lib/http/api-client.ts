@@ -34,8 +34,12 @@ apiClient.interceptors.request.use((config) => {
   if (!config.skipLoading) {
     useLoadingStore.getState().start();
   }
+  // An explicitly-provided `Authorization` wins over the session token: the
+  // store-usage tracker passes the roster JWT for its telemetry POST so an
+  // offline session (whose stored token is the non-JWT 'offline-session'
+  // sentinel) can still authenticate. Nothing else sets it today.
   const token = StorageService.getTokenFromLocalStorage();
-  if (token) {
+  if (token && !config.headers['Authorization']) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;

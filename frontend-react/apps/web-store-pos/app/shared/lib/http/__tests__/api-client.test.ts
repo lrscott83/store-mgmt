@@ -88,6 +88,25 @@ describe('api-client (AUTH-06)', () => {
       const result = fulfilled(config);
       expect(result.headers?.['Authorization']).toBeUndefined();
     });
+
+    it('does not overwrite an explicitly-provided Authorization header (roster JWT override)', async () => {
+      // Session token exists, but the caller already pinned a bearer for this
+      // request (e.g. the store-usage tracker's roster JWT). The interceptor
+      // must let the explicit header win.
+      localStorage.setItem(TOKEN_KEY, 'session-token-123');
+      const { apiClient } = await import('../api-client');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+
+      const config = {
+        headers: { ...axios.defaults.headers.common, Authorization: 'Bearer roster-jwt-abc' },
+        url: '/v1/usages/store-daily-usage',
+        method: 'post',
+      } as unknown as InternalAxiosRequestConfig;
+
+      const result = fulfilled(config);
+      expect(result.headers?.['Authorization']).toBe('Bearer roster-jwt-abc');
+    });
   });
 
   describe('Response interceptor — 401 does NOT logout (offline-first: local session is authoritative)', () => {

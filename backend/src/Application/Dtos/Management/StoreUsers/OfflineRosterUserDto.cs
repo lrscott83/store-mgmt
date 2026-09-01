@@ -23,4 +23,11 @@ public sealed class OfflineRosterUserDto
     public bool IsInTrial { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public int WrapIterations { get; set; }
+    /// <summary>
+    /// A signed JWT valid until the roster bundle's own <c>ExpiresAt</c>,
+    /// minted at export time so an offline session can authenticate against
+    /// the API (e.g. the daily store-usage telemetry POST) without an online
+    /// login. Empty for legacy bundles that predate this field.
+    /// </summary>
+    public string OfflineAuthToken { get; set; } = string.Empty;
 }
