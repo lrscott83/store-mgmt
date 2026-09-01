@@ -17,9 +17,7 @@ export function OwnerListPage() {
   const intl = useIntl();
   const [owners, setOwners] = useState<Owner[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
-  // "paid plan only" is the default visibility: an owner counts as on a paid plan
-  // when at least one store has a calculable next payment date (`nextDueDate`).
-  const [filter, setFilter] = useState<'paid-plan-only' | 'all'>('paid-plan-only');
+  const [filter, setFilter] = useState<'paid-plan' | 'free-plan'>('paid-plan');
 
   const loadOwners = useCallback(async () => {
     try {
@@ -48,9 +46,11 @@ export function OwnerListPage() {
     }
   }
 
-  const visibleOwners = filter === 'paid-plan-only'
+  // An owner is on a paid plan when at least one store has a calculable next payment
+  // date (`nextDueDate`). On a free plan, no store has one.
+  const visibleOwners = filter === 'paid-plan'
     ? owners.filter((o) => o.storeModules.some((m) => m.nextDueDate !== null))
-    : owners;
+    : owners.filter((o) => o.storeModules.every((m) => m.nextDueDate === null));
 
   return (
     <div className="space-y-4 p-4">
@@ -77,14 +77,14 @@ export function OwnerListPage() {
         <select
           id="owner-visibility-filter"
           value={filter}
-          onChange={(e) => setFilter(e.target.value as 'paid-plan-only' | 'all')}
+          onChange={(e) => setFilter(e.target.value as 'paid-plan' | 'free-plan')}
           className="rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          <option value="paid-plan-only">
-            {intl.formatMessage({ id: 'OWNER.PAID_PLAN_ONLY' })}
+          <option value="paid-plan">
+            {intl.formatMessage({ id: 'OWNER.PAID_PLAN' })}
           </option>
-          <option value="all">
-            {intl.formatMessage({ id: 'OWNER.ALL_OWNERS' })}
+          <option value="free-plan">
+            {intl.formatMessage({ id: 'OWNER.FREE_PLAN' })}
           </option>
         </select>
       </div>

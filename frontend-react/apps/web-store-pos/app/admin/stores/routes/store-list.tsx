@@ -23,6 +23,9 @@ export function AdminStoreListPage() {
   const { formatMessage } = useIntl();
   const [stores, setStores] = useState<Store[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
+  // A store is on a paid plan when it has activated one (`paymentStartDate` set);
+  // otherwise (null) it is on the free plan.
+  const [filter, setFilter] = useState<'paid-plan' | 'free-plan'>('paid-plan');
 
   const loadStores = useCallback(async () => {
     try {
@@ -86,8 +89,31 @@ export function AdminStoreListPage() {
 
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
 
+      <div className="flex items-center gap-2">
+        <label htmlFor="store-visibility-filter" className="text-sm font-medium text-text">
+          {formatMessage({ id: 'STORES.FILTER_LABEL' })}
+        </label>
+        <select
+          id="store-visibility-filter"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as 'paid-plan' | 'free-plan')}
+          className="rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="paid-plan">
+            {formatMessage({ id: 'STORES.PAID_PLAN' })}
+          </option>
+          <option value="free-plan">
+            {formatMessage({ id: 'STORES.FREE_PLAN' })}
+          </option>
+        </select>
+      </div>
+
       <StoreCardList
-        stores={stores}
+        stores={
+          filter === 'paid-plan'
+            ? stores.filter((s) => s.paymentStartDate !== null)
+            : stores.filter((s) => s.paymentStartDate === null)
+        }
         onEdit={(id) => navigate(`/management/stores/edit/${id}`)}
         onApprove={handleApprove}
         onDisapprove={handleDisapprove}

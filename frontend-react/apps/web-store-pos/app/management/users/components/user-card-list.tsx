@@ -44,29 +44,29 @@ export function UserCardList({ users, onCreate, onEdit, onActivate, onDeactivate
             <Card
               key={user.id}
               title={user.login}
+              headerAction={
+                <ActionMenu widthClass="min-w-40">
+                  <ActionMenuItem intent="edit" onClick={() => onEdit(user.id)}>
+                    {intl.formatMessage({ id: 'USERS.EDIT' })}
+                  </ActionMenuItem>
+                  {!user.isActive && (
+                    <ActionMenuItem intent="activate" onClick={() => onActivate(user.id)}>
+                      {intl.formatMessage({ id: 'USERS.ACTIVATE' })}
+                    </ActionMenuItem>
+                  )}
+                  {user.isActive && (
+                    <ActionMenuItem intent="deactivate" onClick={() => onDeactivate(user.id)}>
+                      {intl.formatMessage({ id: 'USERS.DEACTIVATE' })}
+                    </ActionMenuItem>
+                  )}
+                </ActionMenu>
+              }
               className={!user.isActive ? 'bg-danger/10 border border-danger' : ''}
             >
               <div className="space-y-2">
                 <p className="text-sm font-medium text-text">{user.fullName}</p>
                 <p className="text-sm text-text-muted">{user.cellPhone}</p>
                 {user.email && <p className="text-sm text-text-muted">{user.email}</p>}
-                <div className="flex justify-end pt-2">
-                  <ActionMenu widthClass="min-w-40">
-                    <ActionMenuItem intent="edit" onClick={() => onEdit(user.id)}>
-                      {intl.formatMessage({ id: 'USERS.EDIT' })}
-                    </ActionMenuItem>
-                    {!user.isActive && (
-                      <ActionMenuItem intent="activate" onClick={() => onActivate(user.id)}>
-                        {intl.formatMessage({ id: 'USERS.ACTIVATE' })}
-                      </ActionMenuItem>
-                    )}
-                    {user.isActive && (
-                      <ActionMenuItem intent="deactivate" onClick={() => onDeactivate(user.id)}>
-                        {intl.formatMessage({ id: 'USERS.DEACTIVATE' })}
-                      </ActionMenuItem>
-                    )}
-                  </ActionMenu>
-                </div>
               </div>
             </Card>
           ))}
