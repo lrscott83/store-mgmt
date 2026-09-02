@@ -69,7 +69,7 @@ export default defineConfig(({ mode }) => {
         strategies: 'injectManifest',
         srcDir: 'app',
         filename: 'service-worker.ts',
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         injectRegister: false,
         manifest: false, // We use our own public/manifest.webmanifest
         injectManifest: {
