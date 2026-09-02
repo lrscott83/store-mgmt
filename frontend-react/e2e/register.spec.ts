@@ -11,7 +11,7 @@ const STORE_NAME_REQUIRED_TEXT = 'Nombre de la tienda es requerido'; // es.ts:35
 const PASSWORD_POLICY_TEXT =
   'La contraseña debe tener al menos 8 caracteres, un número y una letra en mayúscula'; // es.ts:354-355
 const PASSWORD_MISMATCH_TEXT = 'Las contraseñas no son iguales'; // es.ts:356
-const OFFLINE_BANNER_TEXT = 'Estás offline. Se requiere conexión para registrarte.'; // es.ts:116
+const OFFLINE_BANNER_TEXT = 'Estás sin conexión. Se requiere conexión para registrarte.'; // es.ts:149
 // The client's generic fallback (register.tsx:135). REQ-6 must prove the
 // banner is NOT this — that would mean `description` arrived `undefined`.
 const GENERIC_VALIDATION_ERROR_TEXT = 'Error de validación. Por favor, revise sus datos.'; // es.ts:125

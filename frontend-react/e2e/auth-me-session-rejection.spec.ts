@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { Client } from 'pg';
-import { mintSuperAdmin, applySuperAdminSnapshot } from './support/superadmin-session';
+import { mintSuperAdmin } from './support/superadmin-session';
 import type { SuperAdminSnapshot } from './support/superadmin-session';
+import { mutateAuthModel } from './support/auth-storage';
+import { LoginPage } from './support/login-page';
 
 /**
  * S7 — auth/me session-rejection scenarios
@@ -19,8 +21,8 @@ import type { SuperAdminSnapshot } from './support/superadmin-session';
  *
  * Backend behavior (GetMeQueryHandler + ClaimsTransformerService):
  *   - User inactive  → 404 + AccountInactive → SessionRejectedError → logout ✅
- *   - Store inactive → NOT checked by GetMeQuery → 200 → no logout ❌ (backend gap)
- *   - Owner inactive → NOT checked by GetMeQuery → 200 → no logout ❌ (backend gap)
+ *   - Store inactive → 404 + StoreErrors.Inactive → SessionRejectedError → logout ✅ (gap closed — GetMeQuery.cs:81)
+ *   - Owner inactive → 404 + OwnerErrors.Inactive → SessionRejectedError → logout ✅ (gap closed — GetMeQuery.cs:89)
  *   - Token blacklisted → auth middleware → 401 → isSessionRejection → logout ✅
  *   - Token expired → auth-store.ts checks expiresIn client-side → logout ✅
  *   - Reactivate + re-login → new token issued → session restored ✅
@@ -84,9 +86,12 @@ async function blacklistTokenViaDeactivation(login: string): Promise<void> {
 }
 
 /**
- * Apply snapshot but force getUserByToken() to call getMe() on next load.
+ * Apply a snapshot but force getUserByToken() to call getMe() on next load.
+ * Desyncs ONLY AUTH_MODEL.authToken (same pattern as login.spec.ts T2/T3, D3)
+ * so the cached profile keeps its SuperAdmin claims and the guards let the
+ * best-effort user through — the getMe() verdict alone decides the session.
  */
-async function applySnapshotAndInvalidateCache(
+async function applySnapshotAndForceMeRefresh(
   page: import('@playwright/test').Page,
   snapshot: SuperAdminSnapshot,
 ): Promise<void> {
@@ -96,7 +101,7 @@ async function applySnapshotAndInvalidateCache(
       window.localStorage.setItem(name, value);
     }
   }, snapshot.localStorage);
-  await page.evaluate(() => window.localStorage.removeItem('currentUser'));
+  await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token' });
 }
 
 let superAdmin: SuperAdminSnapshot;
@@ -113,53 +118,29 @@ test.describe.serial('auth/me — session-rejection scenarios', () => {
   });
 
   // ─── Scenario 1: User inactive ────────────────────────────────────────
+  // Runs AFTER scenarios 2/3 by design: deactivating the user blacklists
+  // the shared snapshot's token (BlacklistCurrentTokenAsync), and no later
+  // scenario can un-burn it — the gap-documenting scenarios need the token
+  // clean, so they go first.
 
-  test('1a — online + user inactive: logout', async ({ page }) => {
-    await deactivateUser(superAdmin.identity.login);
+  // ─── Scenario 2: Store inactive ───────────────────────────────────────
 
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+  test('2a — online + store inactive: logout', async ({ page }) => {
+    // GetMeQueryHandler DOES check Store.IsActive (GetMeQuery.cs:81) — an
+    // inactive store answers 404, which isSessionRejection treats as a
+    // session verdict → logout. The old "backend gap" comment and the
+    // inverted assertion documented a gap that has since been closed.
+    await deactivateStore(superAdmin.identity.login);
+
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
     await page.goto(superAdmin.homePath);
 
     await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
     await page.close();
   });
 
-  test('1b — offline + user inactive: retain session', async ({ page }) => {
-    await applySnapshotAndInvalidateCache(page, superAdmin);
-    await page.route('**/v1/auth/me', (route) => route.abort('connectionrefused'));
-    await page.goto(superAdmin.homePath);
-    await page.waitForTimeout(3000);
-
-    expect(new URL(page.url()).pathname).not.toBe('/login');
-    await page.unroute('**/v1/auth/me');
-    await page.close();
-  });
-
-  // ─── Scenario 2: Store inactive ───────────────────────────────────────
-
-  test('2a — online + store inactive: logout (backend gap: may not logout)', async ({ page }) => {
-    // NOTE: GetMeQueryHandler does NOT check Store.IsActive.
-    // This test documents the expected behavior (logout) but may fail until
-    // the backend adds the check. If it fails, it proves a backend gap.
-    await deactivateStore(superAdmin.identity.login);
-
-    await applySnapshotAndInvalidateCache(page, superAdmin);
-    await page.goto(superAdmin.homePath);
-    await page.waitForTimeout(5000);
-
-    // EXPECTED: redirect to /login. CURRENT: stays on home (backend gap).
-    // When the backend adds store-inactive check, change this to:
-    //   await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
-    // For now, just document the current behavior:
-    const pathname = new URL(page.url()).pathname;
-    // If backend gap exists, this will be true (no logout):
-    expect(pathname).not.toBe('/login'); // documents the gap
-
-    await page.close();
-  });
-
   test('2b — offline + store inactive: retain session', async ({ page }) => {
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
     await page.route('**/v1/auth/me', (route) => route.abort('connectionrefused'));
     await page.goto(superAdmin.homePath);
     await page.waitForTimeout(3000);
@@ -171,24 +152,20 @@ test.describe.serial('auth/me — session-rejection scenarios', () => {
 
   // ─── Scenario 3: Owner inactive ───────────────────────────────────────
 
-  test('3a — online + owner inactive: logout (backend gap: may not logout)', async ({ page }) => {
-    // NOTE: GetMeQueryHandler does NOT check Owner.IsActive.
-    // Same gap as store inactive.
+  test('3a — online + owner inactive: logout', async ({ page }) => {
+    // GetMeQueryHandler DOES check Owner.IsActive (GetMeQuery.cs:89) — same
+    // closed gap as store-inactive: 404 → session rejection → logout.
     await deactivateOwner(superAdmin.identity.login);
 
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
     await page.goto(superAdmin.homePath);
-    await page.waitForTimeout(5000);
 
-    // EXPECTED: redirect to /login. CURRENT: stays on home (backend gap).
-    const pathname = new URL(page.url()).pathname;
-    expect(pathname).not.toBe('/login'); // documents the gap
-
+    await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
     await page.close();
   });
 
   test('3b — offline + owner inactive: retain session', async ({ page }) => {
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
     await page.route('**/v1/auth/me', (route) => route.abort('connectionrefused'));
     await page.goto(superAdmin.homePath);
     await page.waitForTimeout(3000);
@@ -205,7 +182,7 @@ test.describe.serial('auth/me — session-rejection scenarios', () => {
     // The next request with the blacklisted token gets 401 from auth middleware.
     await blacklistTokenViaDeactivation(superAdmin.identity.login);
 
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
     await page.goto(superAdmin.homePath);
 
     await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
@@ -213,7 +190,30 @@ test.describe.serial('auth/me — session-rejection scenarios', () => {
   });
 
   test('4b — offline + token blacklisted: retain session', async ({ page }) => {
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
+    await page.route('**/v1/auth/me', (route) => route.abort('connectionrefused'));
+    await page.goto(superAdmin.homePath);
+    await page.waitForTimeout(3000);
+
+    expect(new URL(page.url()).pathname).not.toBe('/login');
+    await page.unroute('**/v1/auth/me');
+    await page.close();
+  });
+
+  // ─── Scenario 1: User inactive (moved after 2/3 — blacklists the token) ──
+
+  test('1a — online + user inactive: logout', async ({ page }) => {
+    await deactivateUser(superAdmin.identity.login);
+
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
+    await page.goto(superAdmin.homePath);
+
+    await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
+    await page.close();
+  });
+
+  test('1b — offline + user inactive: retain session', async ({ page }) => {
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
     await page.route('**/v1/auth/me', (route) => route.abort('connectionrefused'));
     await page.goto(superAdmin.homePath);
     await page.waitForTimeout(3000);
@@ -236,14 +236,11 @@ test.describe.serial('auth/me — session-rejection scenarios', () => {
       }
     }, superAdmin.localStorage);
 
-    // Overwrite AUTH_MODEL with an expired expiresIn (1 hour ago)
-    await page.evaluate(() => {
-      const authModel = JSON.parse(
-        window.localStorage.getItem('AUTH_MODEL') || '{}',
-      );
-      authModel.expiresIn = Date.now() - 3_600_000; // 1 hour in the past
-      window.localStorage.setItem('AUTH_MODEL', JSON.stringify(authModel));
-    });
+    // Overwrite AUTH_MODEL with an expired expiresIn (1 hour ago).
+    // mutateAuthModel scans for the version-suffixed key — the literal
+    // 'AUTH_MODEL' key this test used before does not exist (storage-keys.ts
+    // prefixes it), so the old mutation wrote an orphan the app never read.
+    await mutateAuthModel(page, { expiresIn: Date.now() - 3_600_000 });
 
     // Navigate — getUserByToken() sees expired token → logout() → /login
     await page.goto(superAdmin.homePath);
@@ -261,23 +258,42 @@ test.describe.serial('auth/me — session-rejection scenarios', () => {
     // Step 1: Deactivate the user → forces logout on next load
     await deactivateUser(superAdmin.identity.login);
 
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
     await page.goto(superAdmin.homePath);
     await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
 
-    // Step 2: Reactivate the user in the DB
+    // Step 2: Reactivate EVERYTHING scenarios 1-3 deactivated — IsValidUserAsync
+    // rejects the login when the user, its store, OR its owner is inactive
+    // (AuthenticationService.cs:68-77, mapped to the same 403 + ACCOUNT_INACTIVE
+    // banner by LoginCommand.cs:142-143), so reactivating the user alone would
+    // still bounce the re-login off the deactivated store/owner.
     await withDb(async (c) => {
+      await c.query('UPDATE "User" SET "IsActive" = true WHERE "Login" = $1', [
+        superAdmin.identity.login,
+      ]);
       await c.query(
-        'UPDATE "User" SET "IsActive" = true WHERE "Login" = $1',
+        `UPDATE "Store" SET "IsActive" = true
+         FROM "Owner" o, "User" u
+         WHERE "Store"."OwnerId" = o."Id" AND o."UserId" = u."Id"
+           AND u."Login" = $1`,
+        [superAdmin.identity.login],
+      );
+      await c.query(
+        `UPDATE "Owner" SET "IsActive" = true
+         FROM "User" u WHERE "Owner"."UserId" = u."Id" AND u."Login" = $1`,
         [superAdmin.identity.login],
       );
     });
 
-    // Step 3: Re-login with the same credentials
-    await page.goto('/login');
-    await page.getByLabel(/login/i).fill(superAdmin.identity.login);
-    await page.getByLabel(/contraseña|password/i).fill(superAdmin.identity.password);
-    await page.getByRole('button', { name: /entrar|login|iniciar/i }).click();
+    // Step 3: Re-login with the same credentials. LoginPage's fill() anchors
+    // on the submit button and re-fills until both values stick (guards
+    // against the async guestOnlyLoader racing the fill) — the raw
+    // getByLabel(/login/i) selector this test was born with never matched
+    // the Spanish UI labels ("Usuario"/"Contraseña").
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.fill(superAdmin.identity);
+    await loginPage.submit();
 
     // Should land on the home page (admin or sales)
     await expect(page).toHaveURL(/\/admin\/|\/sales\//, { timeout: 15_000 });

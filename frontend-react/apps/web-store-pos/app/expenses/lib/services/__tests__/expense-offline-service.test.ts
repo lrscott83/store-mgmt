@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ExpenseType, PaymentType } from '@store-mgmt/domain';
+import { ExpenseType, PaymentType, type Expense, ExpenseErrors } from '@store-mgmt/domain';
 import { ExpenseOfflineService } from '../expense-offline-service';
-import { ExpenseErrors } from '@store-mgmt/domain';
 
 const storeId = 'test-store';
 
@@ -260,20 +259,20 @@ describe('ExpenseOfflineService', () => {
   // ─── addImportedExpense ───
   describe('addImportedExpense', () => {
     it('adds an imported expense and returns Result.Success', () => {
-      const expense = {
+      const expense: Expense = {
         id: 'imported-1',
         type: ExpenseType.Comida,
         total: 75,
-        date: new Date().toISOString(),
+        date: new Date(),
         paymentType: PaymentType.Efectivo,
         note: 'imported',
         isActive: true,
-        createdDate: new Date().toISOString(),
+        createdDate: new Date(),
         createdByName: 'import',
         updatedDate: undefined,
         updatedByName: undefined,
       };
-      const result = service.addImportedExpense(expense as any);
+      const result = service.addImportedExpense(expense);
       expect(result.succeeded).toBe(true);
       expect(service.getStorageExpenses()).toHaveLength(1);
       expect(service.getStorageExpenses()[0].id).toBe('imported-1');
@@ -291,7 +290,18 @@ describe('ExpenseOfflineService', () => {
     });
 
     it('is a no-op for non-existent id (returns success)', () => {
-      const result = service.updateImportedExpense({ id: 'missing' } as any);
+      const missing: Expense = {
+        id: 'missing',
+        type: ExpenseType.Otro,
+        total: 100,
+        date: new Date(),
+        paymentType: PaymentType.Efectivo,
+        note: 'test note',
+        isActive: true,
+        createdDate: new Date(),
+        createdByName: 'test',
+      };
+      const result = service.updateImportedExpense(missing);
       expect(result.succeeded).toBe(true);
       expect(service.getStorageExpenses()).toHaveLength(0);
     });

@@ -8,7 +8,6 @@ import type { OfflineRosterBundle } from '~/shared/lib/offline/roster-types';
 
 const storeId = 's1';
 const storageKey = `lizoft.store-products-${storeId}`;
-const categoryStorageKey = `lizoft.store-product-categories-${storeId}`;
 
 function v2Bundle(): OfflineRosterBundle {
   return {

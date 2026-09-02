@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
 
 /**
  * [FC-C4] Menores — health.tsx, $.tsx, connectivity-service.ts — Vitest
@@ -19,14 +18,14 @@ describe('shared/routes/health.tsx', () => {
 
 describe('shared/routes/$.tsx — CatchAll', () => {
   it('clientLoader redirects to root', async () => {
-    const { clientLoader } = await import('../routes/$.tsx');
+    const { clientLoader } = await import('../routes/$');
     const result = clientLoader();
     // redirect returns a Response-like object
     expect(result).toBeDefined();
   });
 
   it('default export renders null (no UI)', async () => {
-    const mod = await import('../routes/$.tsx');
+    const mod = await import('../routes/$');
     // The component returns null — just verify it's a valid component
     expect(typeof mod.default).toBe('function');
   });

@@ -31,14 +31,14 @@ import { readAuthModel } from './support/auth-storage';
 // apps/web-store-pos/app/shared/lib/i18n/es.ts — the browser is the black
 // box under test, the app's own source is not (same policy as
 // login.spec.ts:14-17).
-const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña incorrectos'; // es.ts:82
-const ACCOUNT_INACTIVE_TEXT = 'Tu cuenta está inactiva. Contactá soporte.'; // es.ts:83
-const SERVER_ERROR_TEXT = 'Algo salió mal. Intentá de nuevo.'; // es.ts:84
-const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Esperá un momento antes de volver a intentar.'; // es.ts:85
-const OFFLINE_LOGIN_TEXT = 'Estás offline. Se requiere conexión para iniciar sesión.'; // es.ts:87
-const UNLOCK_REQUIRED_TEXT = 'Ingresá tu contraseña para desbloquear los datos de este dispositivo.'; // es.ts:90
+const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña incorrectos'; // es.ts:88
+const ACCOUNT_INACTIVE_TEXT = 'Tu cuenta está inactiva. Contacta soporte.'; // es.ts:89
+const SERVER_ERROR_TEXT = 'Ocurrió un error. Inténtalo de nuevo.'; // es.ts:90
+const TOO_MANY_ATTEMPTS_TEXT = 'Demasiados intentos. Espera un momento antes de volver a intentar.'; // es.ts:91
+const OFFLINE_LOGIN_TEXT = 'Estás sin conexión. Se requiere conexión para iniciar sesión.'; // es.ts:93
+const UNLOCK_REQUIRED_TEXT = 'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'; // es.ts:99
 const UNLOCK_FAILED_TEXT =
-  'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.'; // es.ts:91-92
+  'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, solicita una nueva activación.'; // es.ts:100-101
 
 /**
  * A unique-enough roster login per test — no real registration happens here

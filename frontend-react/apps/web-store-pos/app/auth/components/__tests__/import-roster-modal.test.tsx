@@ -68,7 +68,7 @@ describe('ImportRosterModal', () => {
 
     typePasswordAndSubmit('master');
 
-    expect(await screen.findByText('Elegí el archivo de activación.')).toBeInTheDocument();
+    expect(await screen.findByText('Elige el archivo de activación.')).toBeInTheDocument();
     expect(onImported).not.toHaveBeenCalled();
   });
 
@@ -166,7 +166,7 @@ describe('ImportRosterModal — roster-import chunk fails to load (Finding 2)', 
 
     expect(
       await screen.findByText(
-        'No pudimos completar la acción. Recargá la página e intentá de nuevo.',
+        'No pudimos completar la acción. Recarga la página e intenta de nuevo.',
       ),
     ).toBeInTheDocument();
     expect(onImported).not.toHaveBeenCalled();

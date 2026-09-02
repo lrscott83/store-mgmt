@@ -100,7 +100,7 @@ export class ExpenseOfflineService {
   }
 
   getExpensesTotal(): number {
-    const { start, end } = localDayRange(new Date());
+    const { end } = localDayRange(new Date());
     return this.getExpensesTotalBefore(end);
   }
 

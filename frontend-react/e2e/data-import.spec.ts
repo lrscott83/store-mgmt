@@ -18,7 +18,7 @@ import path from 'path';
 // i18n literal strings from es.ts
 const IMPORT_TITLE = 'Importar datos'; // SYNC.IMPORT_TITLE
 const IMPORT_SUCCESS = 'Los datos se importaron correctamente.'; // SYNC.IMPORT_SUCCESS
-const ERROR_NO_FILE = 'Seleccioná un archivo de respaldo.'; // SYNC.ERROR_NO_FILE
+const ERROR_NO_FILE = 'Selecciona un archivo de respaldo.'; // SYNC.ERROR_NO_FILE
 const ERROR_EMPTY_PASSWORD = 'La contraseña no puede estar vacía.'; // SYNC.ERROR_EMPTY_PASSWORD
 
 /**

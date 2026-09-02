@@ -279,7 +279,7 @@ export class InventoryOfflineService {
   }
 
   getInventoryCostTotal(): number {
-    const { start, end } = localDayRange(new Date());
+    const { end } = localDayRange(new Date());
     return this.getInventoryCostTotalBefore(end);
   }
 

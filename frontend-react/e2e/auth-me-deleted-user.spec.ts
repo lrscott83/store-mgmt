@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { Client } from 'pg';
-import { mintSuperAdmin, applySuperAdminSnapshot } from './support/superadmin-session';
+import { mintSuperAdmin } from './support/superadmin-session';
 import type { SuperAdminSnapshot } from './support/superadmin-session';
+import { mutateAuthModel } from './support/auth-storage';
 
 /**
  * S6 — auth/me session validation after user deletion
@@ -77,11 +78,15 @@ async function deleteUserByLogin(login: string): Promise<void> {
 /**
  * Apply a snapshot but force getUserByToken() to call getMe() on the next
  * page load. Normally the cached currentUser matches the AUTH_MODEL token
- * and getMe() is skipped (auth-store.ts:137). Clearing currentUser breaks
- * the cache hit so getUserByToken() falls through to the getMe() call
- * (auth-store.ts:175).
+ * and getMe() is skipped (auth-store.ts:147). Desyncing ONLY
+ * AUTH_MODEL.authToken (same pattern as login.spec.ts T2/T3, D3) breaks the
+ * cache-hit check without touching the cached profile, so the best-effort
+ * user still carries its SuperAdmin claims and the route guards let it
+ * through — the getMe() verdict is then the ONLY thing that decides the
+ * session's fate. Deleting currentUser instead would strip the claims and
+ * the guard would deny before getMe() ever answered.
  */
-async function applySnapshotAndInvalidateCache(
+async function applySnapshotAndForceMeRefresh(
   page: import('@playwright/test').Page,
   snapshot: SuperAdminSnapshot,
 ): Promise<void> {
@@ -91,8 +96,7 @@ async function applySnapshotAndInvalidateCache(
       window.localStorage.setItem(name, value);
     }
   }, snapshot.localStorage);
-  // Remove currentUser to force getMe() on next initialize()
-  await page.evaluate(() => window.localStorage.removeItem('currentUser'));
+  await mutateAuthModel(page, { authToken: 'e2e-mismatched-auth-model-token' });
 }
 
 let superAdmin: SuperAdminSnapshot;
@@ -114,7 +118,7 @@ test.describe.serial('auth/me — deleted user scenarios', () => {
     await deleteUserByLogin(superAdmin.identity.login);
 
     // Apply snapshot with invalidated cache so getMe() fires
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
 
     // Navigate to home — triggers initialize() → getUserByToken() → getMe()
     // getMe() gets 404 or succeeded:false → SessionRejectedError → logout()
@@ -131,7 +135,7 @@ test.describe.serial('auth/me — deleted user scenarios', () => {
     browser,
   }) => {
     // Apply snapshot with invalidated cache so getMe() fires
-    await applySnapshotAndInvalidateCache(page, superAdmin);
+    await applySnapshotAndForceMeRefresh(page, superAdmin);
 
     // Intercept /v1/auth/me to simulate a network failure (no internet)
     await page.route('**/v1/auth/me', (route) =>

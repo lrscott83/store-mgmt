@@ -71,7 +71,7 @@ import { readEntityBytes } from './support/entity-storage';
 // -------------------------------------------------------------------------
 const INVALID_CREDENTIALS_TEXT = 'Usuario o contraseña incorrectos'; // es.ts:82
 const UNLOCK_FAILED_TEXT =
-  'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, pedí una nueva activación.'; // es.ts:94-95
+  'No se pudieron desbloquear los datos de este dispositivo. Si cambiaste tu contraseña, solicita una nueva activación.'; // es.ts:100-101
 const DISABLE_BUTTON = 'Desactivar acceso sin conexión'; // es.ts:123 (OFFLINE_ACCESS.DISABLE_BUTTON)
 const ENABLE_BUTTON = 'Activar acceso sin conexión'; // es.ts:122 (OFFLINE_ACCESS.ENABLE_BUTTON)
 const DISABLE_TITLE = '¿Desactivar el acceso sin conexión?'; // es.ts:126

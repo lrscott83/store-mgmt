@@ -17,7 +17,7 @@ import {
 // own source is not — same policy as register.spec.ts.
 const LOGIN_REQUIRED_TEXT = 'El usuario es requerido'; // es.ts:69
 const PASSWORD_REQUIRED_TEXT = 'La contraseña es requerida'; // es.ts:71
-const OFFLINE_LOGIN_TEXT = 'Estás offline. Se requiere conexión para iniciar sesión.'; // es.ts:87
+const OFFLINE_LOGIN_TEXT = 'Estás sin conexión. Se requiere conexión para iniciar sesión.'; // es.ts:93
 // The 401 branch's text (login.tsx:172). REQ-3's control negative must prove
 // the banner is NOT this — that would mean the body-level (200 +
 // succeeded:false) branch never ran.

@@ -161,7 +161,7 @@ describe('OfflineAccessPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: /desactivar acceso sin conexión/i }));
 
     await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
-    expect(confirmDialogMock.mock.calls[0][0].message).toContain('van a quedar ilegibles');
+    expect(confirmDialogMock.mock.calls[0][0].message).toContain('quedarán ilegibles');
   });
 
   it('omits the data warning when the roster carries no encryption', async () => {
@@ -257,7 +257,7 @@ describe('OfflineAccessPanel — dynamic-import failures (Finding 3)', () => {
 
     await waitFor(() =>
       expect(showToastErrorMock).toHaveBeenCalledWith(
-        'No pudimos completar la acción. Recargá la página e intentá de nuevo.',
+        'No pudimos completar la acción. Recarga la página e intenta de nuevo.',
       ),
     );
     // The confirmation dialog never opens: the failure happened before we
