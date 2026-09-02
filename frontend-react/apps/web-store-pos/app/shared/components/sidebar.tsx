@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { NavLink } from 'react-router';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { isUserAuthorized } from '~/shared/lib/auth/authorization-service';
 import { MENU_GROUPS } from '~/shared/lib/config/menu-config';
+import { HelpDialog } from '~/shared/components/ui/help-dialog';
+import type { MenuItem } from '~/shared/lib/config/menu-config';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -12,6 +15,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const intl = useIntl();
   const { user } = useAuthStore();
+  const [helpItem, setHelpItem] = useState<MenuItem | null>(null);
 
   const visibleGroups = MENU_GROUPS.map((group) => ({
     ...group,
@@ -62,7 +66,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               )}
               <ul>
                 {group.items.map((item) => (
-                  <li key={item.path}>
+                  <li key={item.path} className="flex items-center justify-between">
                     <NavLink
                       to={item.path}
                       end={item.exact}
@@ -83,6 +87,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         <span>{intl.formatMessage({ id: item.label })}</span>
                       )}
                     </NavLink>
+                    {/* Help icon */}
+                    {isOpen && item.helpContent && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setHelpItem(item);
+                        }}
+                        className="mr-2 p-1 rounded text-green-500 hover:text-green-600 hover:bg-green-50 transition-colors"
+                        aria-label="Ayuda"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -90,6 +110,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </div>
       </nav>
+      {/* Help dialog */}
+      <HelpDialog
+        open={helpItem !== null}
+        onClose={() => setHelpItem(null)}
+        title={helpItem ? intl.formatMessage({ id: helpItem.label }) : ''}
+        content={helpItem?.helpContent ?? ''}
+      />
     </>
   );
 }

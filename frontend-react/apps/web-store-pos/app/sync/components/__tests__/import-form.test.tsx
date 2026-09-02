@@ -42,11 +42,12 @@ function makeFile(name = 'test.zip'): File {
   return new File(['dummy'], name, { type: 'application/zip' });
 }
 
-const successResult: SyncResult = { succeeded: true, errors: [] } as SyncResult;
+const successResult: SyncResult = { succeeded: true, errors: [], merges: [] };
 const failedResult: SyncResult = {
   succeeded: false,
   errors: [{ entity: 'products', code: 'DuplicatedData', message: 'Duplicate product' }],
-} as unknown as SyncResult;
+  merges: [],
+};
 
 describe('ImportForm', () => {
   beforeEach(() => {
@@ -69,7 +70,7 @@ describe('ImportForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Importar' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/seleccioná un archivo/i)).toBeTruthy();
+      expect(screen.getByText(/selecciona un archivo/i)).toBeTruthy();
     });
     expect(onImport).not.toHaveBeenCalled();
   });

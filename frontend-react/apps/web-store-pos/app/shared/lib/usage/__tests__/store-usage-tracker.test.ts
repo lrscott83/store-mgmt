@@ -183,6 +183,134 @@ describe('registerStoreActivity — USAGE-3: sending mutex blocks concurrent POS
   });
 });
 
+describe('registerStoreActivity — USAGE-6: roster JWT bearer on the usage POST (offline-usage-fix)', () => {
+  const ROSTER_KEY = 'lizoft.offline-roster';
+
+  function seedRoster(users: unknown[]): void {
+    localStorage.setItem(
+      ROSTER_KEY,
+      JSON.stringify({
+        bundleId: 'bundle-1',
+        issuedAt: Date.now() - 1000,
+        expiresAt: Date.now() + 60_000,
+        formatVersion: 3,
+        storeId: STORE_ID,
+        users,
+      })
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("attaches the roster user's offlineAuthToken as the Authorization bearer for this POST only", async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] },
+    });
+
+    seedRoster([
+      {
+        id: USER_ID,
+        login: 'user-1',
+        fullName: 'User One',
+        isActive: true,
+        roles: [],
+        featureIds: [],
+        storeModuleIds: [],
+        isSuperAdmin: false,
+        isOwnerAdmin: false,
+        isReSeller: false,
+        selectedStoreId: STORE_ID,
+        verifier: null,
+        offlineAuthToken: 'roster-jwt-abc',
+      },
+    ]);
+
+    const { registerStoreActivity } = await import('../store-usage-tracker');
+    registerStoreActivity(USER_ID, STORE_ID);
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/usages/store-daily-usage',
+      { activeDays: [{ day: today(), saved: false }] },
+      expect.objectContaining({
+        skipLoading: true,
+        headers: { Authorization: 'Bearer roster-jwt-abc' },
+      })
+    );
+  });
+
+  it("falls back to today's behavior (no Authorization override) when the roster user has no offlineAuthToken", async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] },
+    });
+
+    seedRoster([
+      {
+        id: USER_ID,
+        login: 'user-1',
+        fullName: 'User One',
+        isActive: true,
+        roles: [],
+        featureIds: [],
+        storeModuleIds: [],
+        isSuperAdmin: false,
+        isOwnerAdmin: false,
+        isReSeller: false,
+        selectedStoreId: STORE_ID,
+        verifier: null,
+        // legacy bundle shape — no offlineAuthToken field
+      },
+    ]);
+
+    const { registerStoreActivity } = await import('../store-usage-tracker');
+    registerStoreActivity(USER_ID, STORE_ID);
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/usages/store-daily-usage',
+      { activeDays: [{ day: today(), saved: false }] },
+      { skipLoading: true }
+    );
+  });
+
+  it('does not attach a roster JWT of a different roster user', async () => {
+    const { apiClient } = await import('~/shared/lib/http/api-client');
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { succeeded: true, data: [], message: '', actionCode: 0, errors: [] },
+    });
+
+    seedRoster([
+      {
+        id: 'some-other-user',
+        login: 'other',
+        fullName: 'Other',
+        isActive: true,
+        roles: [],
+        featureIds: [],
+        storeModuleIds: [],
+        isSuperAdmin: false,
+        isOwnerAdmin: false,
+        isReSeller: false,
+        selectedStoreId: STORE_ID,
+        verifier: null,
+        offlineAuthToken: 'roster-jwt-other',
+      },
+    ]);
+
+    const { registerStoreActivity } = await import('../store-usage-tracker');
+    registerStoreActivity(USER_ID, STORE_ID);
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/v1/usages/store-daily-usage',
+      { activeDays: [{ day: today(), saved: false }] },
+      { skipLoading: true }
+    );
+  });
+});
+
 // ── USAGE-4 (arm/disarm lifecycle — Angular parity) ─────────────────────────
 // Mirrors Angular's `startTracking()`/`stopTracking()` (store-usage-tracker.service.ts):
 // the NavigationEnd subscription is armed ONLY by an explicit login

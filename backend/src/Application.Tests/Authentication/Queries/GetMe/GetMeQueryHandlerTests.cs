@@ -59,7 +59,9 @@ public class GetMeQueryHandlerTests
             mocks.StoreModuleRepository.Object,
             mocks.BillingService.Object,
             mocks.DateTimeProvider.Object,
-            mocks.TokenBlacklistService.Object);
+            mocks.TokenBlacklistService.Object,
+            mocks.StoreRepository.Object,
+            mocks.OwnerRepository.Object);
 
         var query = new GetMeQuery();
 
@@ -95,7 +97,9 @@ public class GetMeQueryHandlerTests
             mocks.StoreModuleRepository.Object,
             mocks.BillingService.Object,
             mocks.DateTimeProvider.Object,
-            mocks.TokenBlacklistService.Object);
+            mocks.TokenBlacklistService.Object,
+            mocks.StoreRepository.Object,
+            mocks.OwnerRepository.Object);
 
         var query = new GetMeQuery();
 
@@ -152,7 +156,9 @@ public class GetMeQueryHandlerTests
             mocks.StoreModuleRepository.Object,
             mocks.BillingService.Object,
             mocks.DateTimeProvider.Object,
-            mocks.TokenBlacklistService.Object);
+            mocks.TokenBlacklistService.Object,
+            mocks.StoreRepository.Object,
+            mocks.OwnerRepository.Object);
 
         var query = new GetMeQuery();
 
@@ -184,7 +190,9 @@ public class GetMeQueryHandlerTests
             StoreModuleRepository = new Mock<IStoreModuleRepository>(),
             BillingService = new Mock<IBillingService>(),
             DateTimeProvider = new Mock<IDateTimeProvider>(),
-            TokenBlacklistService = new Mock<ITokenBlacklistService>()
+            TokenBlacklistService = new Mock<ITokenBlacklistService>(),
+            StoreRepository = new Mock<IStoreRepository>(),
+            OwnerRepository = new Mock<IOwnerRepository>()
         };
 
         mocks.DateTimeProvider.Setup(c => c.UtcNow).Returns(new DateTimeOffset(DateTime.UtcNow, TimeSpan.Zero));
@@ -220,6 +228,8 @@ public class GetMeQueryHandlerTests
         public Mock<IBillingService> BillingService { get; set; } = null!;
         public Mock<IDateTimeProvider> DateTimeProvider { get; set; } = new();
         public Mock<ITokenBlacklistService> TokenBlacklistService { get; set; } = null!;
+        public Mock<IStoreRepository> StoreRepository { get; set; } = null!;
+        public Mock<IOwnerRepository> OwnerRepository { get; set; } = null!;
     }
 
     #endregion

@@ -268,7 +268,7 @@ describe('LoginPage — offline-auth-mode end-to-end (real roster-store + real o
     await submit();
 
     await waitFor(() => {
-      expect(screen.getByText('Tu cuenta está inactiva. Contactá soporte.')).toBeInTheDocument();
+      expect(screen.getByText('Tu cuenta está inactiva. Contacta soporte.')).toBeInTheDocument();
     });
     expect(loginFn).not.toHaveBeenCalled();
   });
@@ -322,7 +322,7 @@ describe('LoginPage — offline-auth-mode end-to-end (real roster-store + real o
     await submit();
 
     await waitFor(() => {
-      expect(screen.getByText('Tu cuenta está inactiva. Contactá soporte.')).toBeInTheDocument();
+      expect(screen.getByText('Tu cuenta está inactiva. Contacta soporte.')).toBeInTheDocument();
     });
     expect(loginFn).not.toHaveBeenCalled();
   });

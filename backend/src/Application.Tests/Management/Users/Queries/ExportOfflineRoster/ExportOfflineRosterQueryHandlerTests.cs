@@ -349,6 +349,7 @@ public class ExportOfflineRosterQueryHandlerTests
             HttpContextService = new Mock<IHttpContextService>(),
             StoreUserRepository = new Mock<IStoreUserRepository>(),
             StoreRepository = new Mock<IStoreRepository>(),
+            OwnerRepository = new Mock<IOwnerRepository>(),
             StoreModuleRepository = new Mock<IStoreModuleRepository>(),
             StoreRoleFeatureRepository = new Mock<IStoreRoleFeatureRepository>(),
             UserRoleRepository = new Mock<IUserRoleRepository>(),
@@ -360,8 +361,15 @@ public class ExportOfflineRosterQueryHandlerTests
             DateTimeProvider = new Mock<IDateTimeProvider>(),
             SystemConfigurationRepository = new Mock<ISystemConfigurationRepository>(),
             BillingService = new Mock<IBillingService>(),
+            JwtProvider = new Mock<IJwtProvider>(),
             Localizer = new Mock<IStringLocalizer<I18n>>()
         };
+
+        // Default: GenerateToken returns a deterministic opaque token so handler tests
+        // can assert it flows into the mapping without exercising real JWT logic.
+        mocks.JwtProvider
+            .Setup(x => x.GenerateToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime>()))
+            .Returns((Guid id, string login, DateTime exp) => $"offline-token-{id:N}");
 
         // Default: Unprotect passes the envelope through unchanged (identity) — in these tests
         // "envelope" IS the pre-hash (Protect/encryption is exercised separately in
@@ -381,6 +389,7 @@ public class ExportOfflineRosterQueryHandlerTests
             mocks.HttpContextService.Object,
             mocks.StoreUserRepository.Object,
             mocks.StoreRepository.Object,
+            mocks.OwnerRepository.Object,
             mocks.StoreModuleRepository.Object,
             mocks.StoreRoleFeatureRepository.Object,
             mocks.UserRoleRepository.Object,
@@ -392,6 +401,7 @@ public class ExportOfflineRosterQueryHandlerTests
             mocks.DateTimeProvider.Object,
             mocks.SystemConfigurationRepository.Object,
             mocks.BillingService.Object,
+            mocks.JwtProvider.Object,
             mocks.Localizer.Object);
     }
 
@@ -499,6 +509,7 @@ public class ExportOfflineRosterQueryHandlerTests
         public Mock<IHttpContextService> HttpContextService { get; set; } = null!;
         public Mock<IStoreUserRepository> StoreUserRepository { get; set; } = null!;
         public Mock<IStoreRepository> StoreRepository { get; set; } = null!;
+        public Mock<IOwnerRepository> OwnerRepository { get; set; } = null!;
         public Mock<IStoreModuleRepository> StoreModuleRepository { get; set; } = null!;
         public Mock<IStoreRoleFeatureRepository> StoreRoleFeatureRepository { get; set; } = null!;
         public Mock<IUserRoleRepository> UserRoleRepository { get; set; } = null!;
@@ -510,6 +521,7 @@ public class ExportOfflineRosterQueryHandlerTests
         public Mock<IDateTimeProvider> DateTimeProvider { get; set; } = null!;
         public Mock<ISystemConfigurationRepository> SystemConfigurationRepository { get; set; } = null!;
         public Mock<IBillingService> BillingService { get; set; } = null!;
+        public Mock<IJwtProvider> JwtProvider { get; set; } = null!;
         public Mock<IStringLocalizer<I18n>> Localizer { get; set; } = null!;
     }
 

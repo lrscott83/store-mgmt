@@ -6,6 +6,8 @@ using Application.Dtos.Authentication;
 using Application.ResponseModels;
 using Domain.Entities.Billing;
 using Domain.Entities.Modules;
+using Domain.Entities.Owners;
+using Domain.Entities.Stores;
 using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Billing;
@@ -30,12 +32,15 @@ namespace Application.Features.Authentication.Queries.GetMe
         private readonly IBillingService _billingService;
         private readonly IDateTimeProvider _dateTimeProvider;
         private readonly ITokenBlacklistService _tokenBlacklistService;
-
+        private readonly IStoreRepository _storeRepository;
+        private readonly IOwnerRepository _ownerRepository;
         public GetMeQueryHandler(IHttpContextService httpContextService, IUserRepository userRepository, IStoreRoleFeatureRepository storeRoleFeatureRepository,
             IAllowedFeaturesService allowedFeaturesService, IStoreModuleRepository storeModuleRepository,
             IBillingService billingService,
             IDateTimeProvider dateTimeProvider,
-            ITokenBlacklistService tokenBlacklistService)
+            ITokenBlacklistService tokenBlacklistService,
+            IStoreRepository storeRepository,
+            IOwnerRepository ownerRepository)
         {
             _httpContextService = httpContextService;
             _userRepository = userRepository;
@@ -45,6 +50,8 @@ namespace Application.Features.Authentication.Queries.GetMe
             _billingService = billingService;
             _dateTimeProvider = dateTimeProvider;
             _tokenBlacklistService = tokenBlacklistService;
+            _storeRepository = storeRepository;
+            _ownerRepository = ownerRepository;
         }
 
         public async Task<ResponseResult<CurrentUserDto>> Handle(GetMeQuery request, CancellationToken cancellationToken)
@@ -64,6 +71,24 @@ namespace Application.Features.Authentication.Queries.GetMe
             {
                 await BlacklistCurrentTokenAsync();
                 return ResponseResult.Failure<CurrentUserDto>(UserErrors.AccountInactive, (int)HttpStatusCode.NotFound);
+            }
+
+            // Check if the user's store is active
+            if (user.SelectedStoreId != Guid.Empty)
+            {
+                var store = await _storeRepository.Where(s => s.Id == user.SelectedStoreId)
+                    .IgnoreQueryFilters().FirstOrDefaultAsync();
+                if (store is not null && !store.IsActive)
+                    return ResponseResult.Failure<CurrentUserDto>(StoreErrors.Inactive, (int)HttpStatusCode.NotFound);
+
+                // Check if the store's owner is active
+                if (store is not null)
+                {
+                    var owner = await _ownerRepository.Where(o => o.Id == store.OwnerId)
+                        .IgnoreQueryFilters().FirstOrDefaultAsync();
+                    if (owner is not null && !owner.IsActive)
+                        return ResponseResult.Failure<CurrentUserDto>(OwnerErrors.Inactive, (int)HttpStatusCode.NotFound);
+                }
             }
 
             var storeModules = await _storeModuleRepository.GetAvailableModulesByStoreIdAsync(user.SelectedStoreId);

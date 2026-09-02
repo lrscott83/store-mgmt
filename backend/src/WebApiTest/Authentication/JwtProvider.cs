@@ -16,6 +16,11 @@ namespace WebApiTest.Authentication
         }
         public string GenerateToken(Guid userId, string userLogin)
         {
+            return GenerateToken(userId, userLogin, DateTime.UtcNow.AddHours(1));
+        }
+
+        public string GenerateToken(Guid userId, string userLogin, DateTime expiresAt)
+        {
             var claims = new Claim[] 
             { 
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
@@ -32,7 +37,7 @@ namespace WebApiTest.Authentication
                 _jwtOptions.Audience,
                 claims,
                 null,
-                DateTime.UtcNow.AddHours(1),
+                expiresAt,
                 signingCredentials);
 
             string userToken = new JwtSecurityTokenHandler().WriteToken(token);

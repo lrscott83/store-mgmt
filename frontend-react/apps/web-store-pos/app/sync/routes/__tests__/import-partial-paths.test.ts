@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Result, PaymentType } from '@store-mgmt/domain';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { Result, PaymentType, ExpenseType, OrderType } from '@store-mgmt/domain';
 import type { ParsedData } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import type {
@@ -145,7 +145,7 @@ describe('Import flow — partial errors', () => {
     // Mock expense service to return a failure for one expense
     const services = makeNoopServices();
     services.expense.addImportedExpense = () =>
-      Result.Failure([{ entity: 'expenses', code: 'DuplicatedData', message: 'Duplicate' }]);
+      Result.Failure([{ code: 'DuplicatedData', description: 'Duplicate' }]);
 
     const synchronizer = new DataSynchronizerService(
       STORE_ID,
@@ -162,7 +162,7 @@ describe('Import flow — partial errors', () => {
       products: [makeProduct('prod-1', 'Coca-Cola', 'cat-1')],
       inventoryEntries: [],
       orders: [],
-      expenses: [{ id: 'exp-1', type: 'rent', total: 500, note: '', paymentType: 'cash', date: new Date(), isActive: true }],
+      expenses: [{ id: 'exp-1', type: ExpenseType.Alquiler, total: 500, note: '', paymentType: PaymentType.Efectivo, date: new Date(), isActive: true, createdDate: new Date(), createdByName: 'admin' }],
       saleCredits: [],
     };
 
@@ -177,7 +177,7 @@ describe('Import flow — partial errors', () => {
 
     const services = makeNoopServices();
     services.order.addImportedOrder = () =>
-      Result.Failure([{ entity: 'orders', code: 'ValidationError', message: 'Bad order' }]);
+      Result.Failure([{ code: 'ValidationError', description: 'Bad order' }]);
 
     const synchronizer = new DataSynchronizerService(
       STORE_ID,
@@ -193,7 +193,7 @@ describe('Import flow — partial errors', () => {
       categories: [makeCategory('cat-1', 'Bebidas')],
       products: [makeProduct('prod-1', 'Coca-Cola', 'cat-1')],
       inventoryEntries: [],
-      orders: [{ id: 'ord-1', orderNumber: 1, total: 500, paymentType: PaymentType.Efectivo, date: new Date(), isActive: true }],
+      orders: [{ id: 'ord-1', orderItems: [], total: 500, itemsCount: 1, date: new Date(), type: OrderType.Normal, paymentType: PaymentType.Efectivo, isCredit: false, description: '', isActive: true, createdDate: new Date(), createdByName: 'admin' }],
       expenses: [],
       saleCredits: [],
     };

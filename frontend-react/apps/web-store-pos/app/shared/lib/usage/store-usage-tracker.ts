@@ -1,5 +1,6 @@
 import type { BaseResponseModel } from '@store-mgmt/domain';
 import { apiClient } from '~/shared/lib/http/api-client';
+import { getRoster } from '../offline/roster-store';
 
 /**
  * Client-side write-side of the daily store-usage tracker. Mirrors Angular's
@@ -100,6 +101,17 @@ function flushUsage(userId: string): void {
   const unsavedDays = usage.activeDays.filter((day) => !day.saved);
   if (unsavedDays.length === 0) return;
 
+  // Offline-first (offline-usage-fix): an offline login stores the non-JWT
+  // 'offline-session' sentinel as its token (auth-store), which the API
+  // rejects with 401. The roster's per-user JWT (`offlineAuthToken`, valid
+  // until the bundle expiresAt) is the bearer the backend accepts — sent
+  // ONLY on this telemetry POST, never stored into the session. `getRoster()`
+  // returns null when the bundle is absent or expired → identical behavior
+  // to today (api-client.ts attaches the session token, if any). Match by the
+  // roster user's `id`, which is the same id offline-auth-service maps into
+  // `UserModel.id` and therefore the `userId` this function receives.
+  const offlineAuthToken = getRoster()?.users.find((u) => u.id === userId)?.offlineAuthToken;
+
   sending = true;
   void apiClient
     .post<BaseResponseModel<DailyUsage[]>>(
@@ -108,7 +120,13 @@ function flushUsage(userId: string): void {
       // Background telemetry: never drive the global loading overlay (see
       // api-client.ts skipLoading). Deliberate divergence from Angular's
       // always-loading LoadingInterceptor.
-      { skipLoading: true },
+      {
+        skipLoading: true,
+        // Per-request bearer override: api-client.ts only sets Authorization
+        // when none is already present, so the roster JWT wins over the
+        // session token here — and only for this request.
+        ...(offlineAuthToken ? { headers: { Authorization: `Bearer ${offlineAuthToken}` } } : {}),
+      },
     )
     .then((response) => {
       if (response.data?.succeeded && response.data.data) {

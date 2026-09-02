@@ -124,7 +124,7 @@ export class SaleCreditOfflineService {
   }
 
   getSaleCreditsTotal(): number {
-    const { start, end } = localDayRange(new Date());
+    const { end } = localDayRange(new Date());
     return this.getSaleCreditsTotalBefore(end);
   }
 

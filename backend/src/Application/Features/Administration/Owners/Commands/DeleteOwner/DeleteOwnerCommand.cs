@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Exceptions;
 using Application.ResponseModels;
 using Application.UnitOfWorks;
+using Domain.Common.Constants;
 using Domain.Entities.Owners;
 using Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Localization;
@@ -28,6 +29,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
         private readonly IUserRepository _userRepository;
         private readonly IUserRoleRepository _userRoleRepository;
         private readonly IReSellerOwnerRepository _reSellerOwnerRepository;
+        private readonly ITenantRepository _tenantRepository;
         private readonly IApplicationUnitOfWork _applicationUnitOfWork;
         private readonly IHttpContextService _httpContextService;
         private readonly IStringLocalizer<I18n> _localizer;
@@ -41,6 +43,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             IStoreRepository storeRepository,
             IUserRepository userRepository,
             IReSellerOwnerRepository reSellerOwnerRepository,
+            ITenantRepository tenantRepository,
             IUserRoleRepository userRoleRepository,
             IStoreUsageRepository storeUsageRepository,
             IStoreModuleRepository storeModuleRepository,
@@ -54,6 +57,7 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
             _storeRepository = storeRepository;
             _userRepository = userRepository;
             _reSellerOwnerRepository = reSellerOwnerRepository;
+            _tenantRepository = tenantRepository;
             _userRoleRepository = userRoleRepository;
             _storeUsageRepository = storeUsageRepository;
             _storeModuleRepository = storeModuleRepository;
@@ -170,6 +174,18 @@ namespace Application.Features.Administration.Owners.Commands.DeleteOwner
                 _logger.LogInformation("DeleteOwner: 6. User");
                 await _userRepository.HardDeleteAsync(owner.User);
                 _logger.LogInformation("DeleteOwner: 6. OK");
+
+                // 7. Tenant (only if not the DefaultTenant)
+                if (owner.User.TenantId != DataUtils.DefaultTenant.Id)
+                {
+                    _logger.LogInformation("DeleteOwner: 7. Tenant {TenantId}", owner.User.TenantId);
+                    var tenant = await _tenantRepository.GetByIdAsync(owner.User.TenantId);
+                    if (tenant != null)
+                    {
+                        await _tenantRepository.HardDeleteAsync(tenant);
+                        _logger.LogInformation("DeleteOwner: 7. OK");
+                    }
+                }
             }
 
             _logger.LogInformation("DeleteOwner: SAVING");
