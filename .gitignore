@@ -12,6 +12,7 @@ lerna-debug.log*
 /out-tsc
 /bazel-out
 /.nx
+.turbo
 
 # Node
 /node_modules
