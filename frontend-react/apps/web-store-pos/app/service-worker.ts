@@ -36,9 +36,6 @@ const PRECACHE_MANIFEST = self.__WB_MANIFEST ?? [];
 // FIRST install (no existing controller) there is no `waiting` phase: the worker
 // activates directly and `activate`'s `clients.claim()` takes control.
 self.addEventListener('install', (event) => {
-  // TEMP (debugging the update flow): [SW]-prefixed console logs. Remove once
-  // the manual DevTools offline-acceptance walkthrough has been run and
-  // signed off (see openspec/changes/pwa-offline-shell/tasks.md Phase 9).
   console.info('[SW] install: precaching shell — NOT calling skipWaiting (stays waiting until user confirms)');
   event.waitUntil(
     caches.open(PRECACHE_NAME).then(async (cache) => {

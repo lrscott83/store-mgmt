@@ -10,6 +10,7 @@ using Application.ResponseModels;
 using Domain.Common.Extensions;
 using Domain.Common.Utils;
 using Domain.Entities.Billing;
+using Domain.Entities.Users;
 using Domain.Interfaces.Repositories;
 using Domain.Interfaces.Services.Billing;
 using Microsoft.Extensions.Localization;
@@ -93,19 +94,31 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                     throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
             }
 
+            // Block roster download if the store is inactive.
+            var store = await _storeRepository.GetStoreByIdAsync(query.StoreId);
+            if (store is not null && !store.IsActive)
+                throw new ApiException(_localizer["StoreNotFound"], HttpStatusCode.BadRequest);
+
+            // Block roster download if the store owner is inactive.
+            if (store is not null)
+            {
+                var ownerCheck = await _ownerRepository.GetOwnerIncludingUserByIdAsync(store.OwnerId);
+                if (ownerCheck?.User != null && !ownerCheck.User.IsActive)
+                    throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
+            }
+
             var storeModules = await _storeModuleRepository.GetStoreModulesByIdAsync(query.StoreId);
             var billing = await _billingService.GetStoreBillingSummaryAsync(query.StoreId);
             List<int> storeModuleIds = StoreBillingUtils.FilterForBilling(storeModules.Select(sm => sm.Module), billing);
 
-            var storeUsers = (await _storeUserRepository.GetStoreUsersByStoreIdAsync(query.StoreId, includeInactive: true)).ToList();
+            var allStoreUsers = (await _storeUserRepository.GetStoreUsersByStoreIdAsync(query.StoreId, includeInactive: true)).ToList();
 
             // Include the store owner in the roster if not already present as a StoreUser.
             // The owner is linked via the Owner entity, not StoreUser, so they would be
             // missing from the roster — preventing offline authentication.
-            var store = await _storeRepository.GetStoreByIdAsync(query.StoreId);
             if (store is not null)
             {
-                var ownerAlreadyIncluded = storeUsers.Any(su => su.UserId == store.OwnerId);
+                var ownerAlreadyIncluded = allStoreUsers.Any(su => su.UserId == store.OwnerId);
                 if (!ownerAlreadyIncluded)
                 {
                     var owner = await _ownerRepository.GetOwnerIncludingUserByIdAsync(store.OwnerId);
@@ -114,10 +127,13 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
                         var syntheticStoreUser = Domain.Entities.StoreUsers.StoreUser.Create(
                             owner.User.Id, query.StoreId, store.TenantId);
                         syntheticStoreUser.User = owner.User;
-                        storeUsers.Add(syntheticStoreUser);
+                        allStoreUsers.Add(syntheticStoreUser);
                     }
                 }
             }
+
+            // Filter out inactive users — they should not be in the offline roster.
+            var storeUsers = allStoreUsers.Where(su => su.User.IsActive).ToList();
 
             var dek = _storeDataKeyProvider.GetDek(query.StoreId);
 

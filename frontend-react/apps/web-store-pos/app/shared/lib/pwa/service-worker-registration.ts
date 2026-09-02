@@ -22,18 +22,20 @@ type RegisterSWFn = (options: RegisterSWOptions) => (reloadPage?: boolean) => Pr
  * mocking the `virtual:pwa-register` vite-plugin-pwa virtual module.
  */
 export function setupServiceWorker(registerSW: RegisterSWFn): void {
-  // TEMP (debugging the update flow): [PWA]-prefixed console logs. Remove before commit.
   console.info('[PWA] setupServiceWorker: wiring registerSW callbacks');
   const updateSW = registerSW({
     onNeedRefresh: () => {
       console.info('[PWA] onNeedRefresh: a new version is WAITING → showing the update dialog');
       void showUpdateAvailable(() => {
-        console.info('[PWA] user confirmed → updateSW(true): posts SKIP_WAITING, page reloads on controllerchange');
-        void updateSW(true);
+        console.info('[PWA] user confirmed → updateSW(true): posts SKIP_WAITING, then hard reload');
+        void updateSW(true).then(() => {
+          // Hard refresh: bypass the browser HTTP cache so all visual changes
+          // (CSS, JS chunks, images) are fetched fresh from the server.
+          window.location.reload();
+        });
       });
     },
     onOfflineReady: () => {
-      // Angular's UpdateService has no offline-ready UI either — best-effort log only.
       console.info('[PWA] onOfflineReady: app ready to work offline');
     },
     onRegisteredSW: (swScriptUrl, registration) => {

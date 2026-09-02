@@ -3,6 +3,15 @@ import { useIntl } from 'react-intl';
 import type { Module } from '@store-mgmt/domain';
 import { formatCurrency } from '~/shared/lib/format-currency';
 
+/** Format as "5.00 USD" (no $ symbol) — plan-picker only. */
+function formatPlanPrice(amount: number): string {
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return `${formatted} USD`;
+}
+
 interface PlanPickerProps {
   modules: Module[];
   onChange: (selectedIds: number[]) => void;
@@ -21,6 +30,8 @@ const getFreeModules = (modules: Module[]) => modules.filter((m) => m.priceInclu
 const getPaidModules = (modules: Module[]) => modules.filter((m) => !m.priceIncluded);
 const getPaidTotal = (modules: Module[]) =>
   getPaidModules(modules).reduce((sum, m) => sum + m.currentPrice, 0);
+const getPaidOriginalTotal = (modules: Module[]) =>
+  getPaidModules(modules).reduce((sum, m) => sum + m.price, 0);
 const getActivePlan = (modules: Module[]): Plan =>
   getPaidModules(modules).some((m) => m.selected) ? 'paid' : 'free';
 const getPlanModuleIds = (modules: Module[], plan: Plan) =>
@@ -42,6 +53,8 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
   }, [modules]);
 
   const paidTotal = getPaidTotal(modules);
+  const paidOriginalTotal = getPaidOriginalTotal(modules);
+  const hasDiscount = paidTotal < paidOriginalTotal;
   const panelModules = tab === 'free' ? getFreeModules(modules) : getPaidModules(modules);
 
   function choosePlan(plan: Plan) {
@@ -79,7 +92,17 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
         </button>
         <button type="button" role="tab" aria-selected={tab === 'paid'}
           onClick={() => setTab('paid')} className={tabClass(tab === 'paid')}>
-          {`${t('STORES.PLAN.PAID_TAB')} · ${formatCurrency(paidTotal)}`}
+          <span className="flex items-center gap-2">
+            {t('STORES.PLAN.PAID_TAB')} ·
+            {hasDiscount && (
+              <span className="text-gray-400 line-through">
+                {formatPlanPrice(paidOriginalTotal)}
+              </span>
+            )}
+            <span className="font-semibold">
+              {formatPlanPrice(paidTotal)}
+            </span>
+          </span>
           {active === 'paid' && (
             <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">
               {t('STORES.PLAN.ACTIVE_BADGE')}
