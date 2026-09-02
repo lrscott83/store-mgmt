@@ -50,6 +50,7 @@ describe('PlanPicker — PLAN-2: paid tab label shows the summed total', () => {
   it('shows "Pago" with the sum of paid currentPrice formatted as USD', async () => {
     const { PlanPicker } = await import('../plan-picker');
     render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
+    // No discount in test data (price === currentPrice for all paid modules)
     expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('2,000.00 USD');
   });
 });
