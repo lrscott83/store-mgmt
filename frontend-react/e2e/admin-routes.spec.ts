@@ -14,7 +14,11 @@ import type { SuperAdminSnapshot } from './support/superadmin-session';
 let superAdmin: SuperAdminSnapshot;
 
 test.describe.serial('Admin routes (SuperAdmin)', () => {
+  // mintSuperAdmin registers + logs in twice + promotes via DB; under the
+  // full 8-worker suite this routinely exceeds Playwright's 30s default hook
+  // timeout, so grant it an explicit longer budget (see load-flake evidence).
   test.beforeAll(async ({ browser }) => {
+    test.setTimeout(90_000);
     superAdmin = await mintSuperAdmin(browser);
   });
 
