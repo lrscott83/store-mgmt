@@ -1,4 +1,4 @@
-import type { UserModel } from '@store-mgmt/domain';
+import type { PaymentStatus, UserModel } from '@store-mgmt/domain';
 import { getRoster } from './roster-store';
 import type { OfflineRosterUser } from './roster-types';
 import { verifyOfflinePassword } from './offline-crypto';
@@ -53,8 +53,10 @@ export class OfflineVerifierError extends Error {
 /**
  * Design correction #1 (drops the plan's dead `bundleExpiresAt` param —
  * `auth-store.ts`'s `setUser` overwrites `expiresIn` unconditionally):
- * billing fields carry no-billing-data defaults since the roster stores no
- * billing snapshot (`offline-auth-mode` spec).
+ * the roster carries a billing snapshot for each user
+ * (`paymentDueDate`/`isInTrial`/`paymentStatus`, exported by the backend),
+ * and `toUserModel` propagates it onto the UserModel — with sober
+ * no-billing-data defaults only when the field is absent on a legacy bundle.
  */
 function toUserModel(user: OfflineRosterUser): UserModel {
   return {
@@ -72,9 +74,9 @@ function toUserModel(user: OfflineRosterUser): UserModel {
     isOwnerAdmin: user.isOwnerAdmin,
     isReSeller: user.isReSeller,
     selectedStoreId: user.selectedStoreId,
-    paymentDueDate: null,
-    isInTrial: false,
-    paymentStatus: 'NoAplica',
+    paymentDueDate: user.paymentDueDate ?? null,
+    isInTrial: user.isInTrial ?? false,
+    paymentStatus: (user.paymentStatus as PaymentStatus) ?? 'NoAplica',
     authToken: OFFLINE_SESSION_TOKEN,
     refreshToken: '',
     expiresIn: 0,
