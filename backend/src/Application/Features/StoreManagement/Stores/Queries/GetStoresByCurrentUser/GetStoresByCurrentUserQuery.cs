@@ -33,7 +33,9 @@ namespace Application.Features.StoreManagement.Stores.Queries.GetStoresByCurrent
             var userId = _httpContextService.UserExternalId.ToGuid();
             var stores = _httpContextService.IsSuperAdmin
                 ? await _storeRepository.GetAllStoresIncludingOwnerAndIgnoreQueryFiltersAsync(excludeStoreId: DataUtils.DefaultStore.Id)
-                : await _storeRepository.GetActiveStoresByUserIdAsync(userId, excludeStoreId: DataUtils.DefaultStore.Id);
+                : _httpContextService.IsReSeller
+                    ? await _storeRepository.GetActiveStoresByReSellerUserIdAsync(userId, excludeStoreId: DataUtils.DefaultStore.Id)
+                    : await _storeRepository.GetActiveStoresByUserIdAsync(userId, excludeStoreId: DataUtils.DefaultStore.Id);
             var storeDtos = _mapper.Map<IEnumerable<StoreDto>>(stores);
             return ResponseResult.Success(storeDtos);
         }

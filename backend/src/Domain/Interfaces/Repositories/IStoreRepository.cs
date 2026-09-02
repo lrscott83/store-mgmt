@@ -18,6 +18,7 @@ namespace Domain.Interfaces.Repositories
 
         Task<Store?> GetStoreWithModulesAndReSellerOwnerAsync(Guid storeId);
         Task<bool> IsStoreOwnedByReSellerUserAsync(Guid storeId, Guid reSellerUserId);
+        Task<IEnumerable<Store>> GetActiveStoresByReSellerUserIdAsync(Guid reSellerUserId, Guid? excludeStoreId = null);
 
         new Task<bool> ExistsAsync(Guid id);
         Task<IEnumerable<Store>> GetPaidStoresAsync();
