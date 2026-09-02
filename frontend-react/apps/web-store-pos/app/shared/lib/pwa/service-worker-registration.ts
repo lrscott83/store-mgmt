@@ -1,10 +1,6 @@
-import { showUpdateAvailable } from '~/shared/lib/blocking-alert';
-
-// PWA-01/Stage-6-Slice-D: 15-minute periodic `registration.update()` poll, in
-// addition to the existing update-available confirm/apply flow. Matches
-// Angular's `UpdateService` (SwUpdate → Swal confirm → activateUpdate +
-// reload) plus the periodic-check requirement so a long-lived open tab
-// discovers a new version without a manual reload.
+// PWA-01/Stage-6-Slice-D: 15-minute periodic `registration.update()` poll.
+// With `registerType: 'autoUpdate'`, the service worker activates immediately
+// and the page reloads automatically on controllerchange — no user prompt needed.
 const UPDATE_POLL_INTERVAL_MS = 15 * 60 * 1000;
 
 export interface RegisterSWOptions {
@@ -22,18 +18,15 @@ type RegisterSWFn = (options: RegisterSWOptions) => (reloadPage?: boolean) => Pr
  * mocking the `virtual:pwa-register` vite-plugin-pwa virtual module.
  */
 export function setupServiceWorker(registerSW: RegisterSWFn): void {
-  // TEMP (debugging the update flow): [PWA]-prefixed console logs. Remove before commit.
-  console.info('[PWA] setupServiceWorker: wiring registerSW callbacks');
+  console.info('[PWA] setupServiceWorker: wiring registerSW callbacks (autoUpdate)');
   const updateSW = registerSW({
     onNeedRefresh: () => {
-      console.info('[PWA] onNeedRefresh: a new version is WAITING → showing the update dialog');
-      void showUpdateAvailable(() => {
-        console.info('[PWA] user confirmed → updateSW(true): posts SKIP_WAITING, page reloads on controllerchange');
-        void updateSW(true);
-      });
+      // autoUpdate mode: the SW activates immediately via skipWaiting().
+      // The page reloads on controllerchange. No dialog needed.
+      console.info('[PWA] onNeedRefresh: new version detected → auto-updating');
+      void updateSW(true);
     },
     onOfflineReady: () => {
-      // Angular's UpdateService has no offline-ready UI either — best-effort log only.
       console.info('[PWA] onOfflineReady: app ready to work offline');
     },
     onRegisteredSW: (swScriptUrl, registration) => {

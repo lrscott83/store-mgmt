@@ -23,23 +23,13 @@ const PRECACHE_MANIFEST = self.__WB_MANIFEST ?? [];
 
 // Precache the manifest entries on install.
 //
-// NO `self.skipWaiting()` here — this is `registerType: 'prompt'`. When an UPDATE
-// is found, the new worker MUST stay in the `waiting` state so vite-plugin-pwa's
-// register client fires `onNeedRefresh` (→ the "¡Nueva versión disponible!"
-// dialog) and the user decides when to update. Calling `skipWaiting()` on install
-// activated the new worker immediately; the register client's `controlling`
-// listener (`if (event.isUpdate) window.location.reload()`) then reloaded the page
-// on its own, so the dialog appeared and vanished before the user could act.
-// Activation is instead triggered on demand by the `SKIP_WAITING` message handler
-// below (posted by `updateSW(true)` when the user clicks "Actualizar ahora"),
-// mirroring Angular's `UpdateService.activateUpdate()`-then-reload flow. On a
-// FIRST install (no existing controller) there is no `waiting` phase: the worker
-// activates directly and `activate`'s `clients.claim()` takes control.
+// `registerType: 'autoUpdate'` — skipWaiting on install so the new worker
+// activates immediately and `clients.claim()` takes control. The register
+// client's `controlling` listener fires `window.location.reload()` on update,
+// giving the user the new version automatically without a confirmation dialog.
 self.addEventListener('install', (event) => {
-  // TEMP (debugging the update flow): [SW]-prefixed console logs. Remove once
-  // the manual DevTools offline-acceptance walkthrough has been run and
-  // signed off (see openspec/changes/pwa-offline-shell/tasks.md Phase 9).
-  console.info('[SW] install: precaching shell — NOT calling skipWaiting (stays waiting until user confirms)');
+  console.info('[SW] install: precaching shell + skipWaiting (auto-update)');
+  self.skipWaiting();
   event.waitUntil(
     caches.open(PRECACHE_NAME).then(async (cache) => {
       const urls = PRECACHE_MANIFEST.map((entry) => entry.url);

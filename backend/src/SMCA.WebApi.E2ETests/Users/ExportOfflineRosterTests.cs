@@ -668,20 +668,75 @@ public sealed class ExportOfflineRosterTests
 
             var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
             var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
-            r.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
-            body!.Succeeded.Should().BeTrue();
-
-            // Inactive owner should NOT appear in the roster
-            body.Data!.Users.Should().BeEmpty();
-            body.Data.Users.Should().NotContain(u => u.Id == owner.UserId);
+            // Roster download should be blocked when the owner is inactive
+            r.StatusCode.Should().NotBe(HttpStatusCode.OK);
         }
         finally
         {
             await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
             await DbTestHelpers.CleanupUserAsync(_f, saUserId);
         }
+    }
+
+    [Fact]
+    public async Task Inactive_store_should_not_allow_roster_download()
+    {
+        var login = $"sa-inactive-store-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        try
+        {
+            // Deactivate the store
+            await DeactivateStoreAsync(owner.StoreId);
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+
+            // Should fail — inactive store should not allow roster download
+            r.StatusCode.Should().NotBe(HttpStatusCode.OK);
+        }
+        finally
+        {
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
+        }
+    }
+
+    [Fact]
+    public async Task Inactive_owner_should_not_allow_roster_download()
+    {
+        var login = $"sa-inactive-owner-dl-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        try
+        {
+            // Deactivate the owner's user
+            await DeactivateUserAsync(owner.UserId);
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+
+            // Should fail — inactive owner should not allow roster download
+            r.StatusCode.Should().NotBe(HttpStatusCode.OK);
+        }
+        finally
+        {
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
+        }
+    }
+
+    private async Task DeactivateStoreAsync(Guid storeId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var store = await db.Set<Store>().IgnoreQueryFilters().SingleAsync(s => s.Id == storeId);
+        store.IsActive = false;
+        db.Entry(store).State = EntityState.Modified;
+        await db.SaveChangesAsync();
     }
 
     private async Task DeactivateUserAsync(Guid userId)
