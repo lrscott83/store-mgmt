@@ -112,18 +112,49 @@ describe('ImportRosterModal', () => {
     expect(getRoster()?.bundleId).toBe('b1');
   });
 
-  it('blames the filename, not the password, when the file was renamed', async () => {
+  it('imports a renamed file — the name carries no contract anymore', async () => {
     const payload = await serializeRoster(makeBundle(), 'master', STORE_ID);
-    renderModal();
+    const { onImported } = renderModal();
 
     selectFile(payload, 'activacion.smcabundle');
     typePasswordAndSubmit('master');
 
+    await waitFor(() => expect(onImported).toHaveBeenCalledTimes(1));
+    expect(getRoster()?.bundleId).toBe('b1');
+  });
+
+  it('shows the unknown-file message for a zip without the activation envelope', async () => {
+    // A roster.json-only zip is NOT an activation export — the failure must
+    // stay diagnosable instead of degrading into a wrong-password blame.
+    const payload = await serializeRoster(makeBundle(), 'master', STORE_ID);
+    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } = await import(
+      '@zip.js/zip.js'
+    );
+    const reader = new ZipReader(new BlobReader(new Blob([payload])));
+    const entries = await reader.getEntries();
+    const rosterEntry = entries.find((e) => !e.directory && e.filename === 'roster.json');
+    if (!rosterEntry || rosterEntry.directory) {
+      throw new Error('fixture setup: serialized archive is missing roster.json');
+    }
+    const rosterText = await rosterEntry.getData(new TextWriter(), {
+      password: `master${STORE_ID}`,
+    });
+    await reader.close();
+    const writer = new ZipWriter(new BlobWriter('application/zip'));
+    await writer.add('roster.json', new TextReader(rosterText));
+    const noEnvelope = new Uint8Array(await (await writer.close()).arrayBuffer());
+
+    renderModal();
+
+    selectFile(noEnvelope, 'activacion.smcabundle');
+    typePasswordAndSubmit('master');
+
     expect(
       await screen.findByText(
-        'No pudimos reconocer el archivo. Usalo tal como te lo pasaron, sin cambiarle el nombre.',
+        'No pudimos reconocer el archivo. No parece un archivo de activación exportado por el sistema.',
       ),
     ).toBeInTheDocument();
+    expect(getRoster()).toBeNull();
   });
 
   it('calls onCancel when the user cancels', () => {

@@ -1,29 +1,19 @@
-import { deserializeRoster } from './roster-serializer';
+import { deserializeRoster, readRosterEnvelope } from './roster-serializer';
 import { importRoster } from './roster-store';
 
 /**
- * The export writes `roster-<storeId>.smcabundle`
- * (`management/users/components/roster-export-panel.tsx:56`), so the store id
- * the archive password needs already travels in the filename.
- *
- * The GUID shape is REQUIRED, not a convenience. A loose `(.+)` would happily
- * accept a renamed file, hand the wrong id to `deserializeRoster`, and surface
- * the result as `WrongPasswordError` — telling the user their correct password
- * is wrong. Refusing to guess is what makes `UnknownFileError` possible.
+ * The storeId the archive password needs travels INSIDE the zip, in the
+ * plaintext `meta.json` envelope (`roster-serializer.ts`), so the import
+ * works under ANY file name — the export's `roster-<storeId>.smcabundle`
+ * name is a convention, not a contract.
  */
-const ROSTER_FILENAME_PATTERN =
-  /^roster-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.smcabundle$/i;
 
-/** The filename carries no recoverable store id (renamed, or not an export at all). */
+/** The archive carries no readable activation envelope — not an export. */
 export class UnknownFileError extends Error {
-  constructor(message = 'The filename carries no store id') {
+  constructor(message = 'The archive carries no activation envelope') {
     super(message);
     this.name = 'UnknownFileError';
   }
-}
-
-export function deriveStoreIdFromFilename(filename: string): string | null {
-  return ROSTER_FILENAME_PATTERN.exec(filename)?.[1] ?? null;
 }
 
 /**
@@ -31,9 +21,9 @@ export function deriveStoreIdFromFilename(filename: string): string | null {
  * failure can never mean two different things in two places.
  *
  * `storeId` is optional: the route passes its typed field, the dialog passes
- * nothing and gets the filename derivation. A blank or whitespace-only value
- * counts as absent — `provision.tsx`'s field starts as `''` and is not
- * required, and falling back to the filename beats failing as "wrong password".
+ * nothing and gets the envelope's. A blank or whitespace-only value counts as
+ * absent — `provision.tsx`'s field starts as `''` and is not required, and
+ * falling back to the envelope beats failing as "wrong password".
  *
  * Throws `UnknownFileError`, or propagates `WrongPasswordError`,
  * `CorruptFileError`, `ExpiredBundleError` and `ReplayBundleError` untouched.
@@ -45,12 +35,13 @@ export async function importRosterFile(args: {
 }): Promise<void> {
   const { file, master } = args;
   const explicit = args.storeId?.trim();
-  const storeId = explicit ? explicit : deriveStoreIdFromFilename(file.name);
-  if (storeId === null) {
+  const payload = new Uint8Array(await file.arrayBuffer());
+
+  const storeId = explicit ? explicit : (await readRosterEnvelope(payload))?.storeId;
+  if (storeId === null || storeId === undefined || storeId === '') {
     throw new UnknownFileError();
   }
 
-  const payload = new Uint8Array(await file.arrayBuffer());
   const bundle = await deserializeRoster(payload, master, storeId);
   importRoster(bundle);
 }

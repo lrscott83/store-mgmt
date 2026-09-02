@@ -116,7 +116,7 @@ const messages: Record<string, string> = {
   'PROVISION.ERROR_EXPIRED': 'Este archivo de activación ya venció. Pedile uno nuevo al administrador.',
   'PROVISION.ERROR_REPLAY': 'Este archivo ya se usó en este equipo. Pedile uno nuevo al administrador.',
   'PROVISION.ERROR_UNKNOWN_FILE':
-    'No pudimos reconocer el archivo. Usalo tal como te lo pasaron, sin cambiarle el nombre.',
+    'No pudimos reconocer el archivo. No parece un archivo de activación exportado por el sistema.',
 
   'OFFLINE_ACCESS.MODAL_TITLE': 'Activar acceso sin conexión',
   'OFFLINE_ACCESS.MODAL_INTRO':

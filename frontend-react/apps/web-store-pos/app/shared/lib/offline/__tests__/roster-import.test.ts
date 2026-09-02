@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  deriveStoreIdFromFilename,
   importRosterFile,
   rosterImportErrorMessageId,
   UnknownFileError,
 } from '../roster-import';
+import * as rosterImportModule from '../roster-import';
 import { serializeRoster } from '../roster-serializer';
 import { getRoster, importRoster } from '../roster-store';
 import type { OfflineRosterBundle } from '../roster-types';
@@ -28,23 +28,13 @@ function makeFile(payload: Uint8Array, name = `roster-${STORE_ID}.smcabundle`): 
 }
 
 describe('deriveStoreIdFromFilename', () => {
-  it('recovers the store id from an unmodified export filename', () => {
-    expect(deriveStoreIdFromFilename(`roster-${STORE_ID}.smcabundle`)).toBe(STORE_ID);
-  });
-
-  it('is case-insensitive about the GUID', () => {
-    expect(deriveStoreIdFromFilename(`roster-${STORE_ID.toUpperCase()}.smcabundle`)).toBe(
-      STORE_ID.toUpperCase(),
-    );
-  });
-
-  it('returns null when the name carries no GUID', () => {
-    expect(deriveStoreIdFromFilename('roster.smcabundle')).toBeNull();
-    expect(deriveStoreIdFromFilename('roster-mi-tienda.smcabundle')).toBeNull();
-  });
-
-  it('returns null for the right GUID under the wrong extension', () => {
-    expect(deriveStoreIdFromFilename(`roster-${STORE_ID}.zip`)).toBeNull();
+  it('has been removed — the envelope inside the archive replaced it', async () => {
+    // roster-any-filename: the storeId now travels in the plaintext
+    // meta.json envelope, so this module must no longer export the
+    // filename regex.
+    const m = await import('../roster-import');
+    expect('deriveStoreIdFromFilename' in m).toBe(false);
+    expect('deriveStoreIdFromFilename' in rosterImportModule).toBe(false);
   });
 });
 
@@ -53,7 +43,18 @@ describe('importRosterFile', () => {
     localStorage.clear();
   });
 
-  it('imports using the store id taken from the filename', async () => {
+  it('imports using the store id taken from the envelope, with any file name', async () => {
+    const bundle = makeBundle();
+    // The name is deliberately NOT the export name — the envelope inside
+    // the archive is the only storeId source now.
+    const file = makeFile(await serializeRoster(bundle, 'master', STORE_ID), 'activacion.smcabundle');
+
+    await importRosterFile({ file, master: 'master' });
+
+    expect(getRoster()?.bundleId).toBe('b1');
+  });
+
+  it('imports with the unmodified export filename too', async () => {
     const bundle = makeBundle();
     const file = makeFile(await serializeRoster(bundle, 'master', STORE_ID));
 
@@ -62,30 +63,50 @@ describe('importRosterFile', () => {
     expect(getRoster()?.bundleId).toBe('b1');
   });
 
-  it('prefers an explicit store id over the filename', async () => {
-    // Serialized under EXPLICIT_ID while the filename advertises STORE_ID:
+  it('prefers an explicit store id over the envelope', async () => {
+    // Serialized under EXPLICIT_ID while the envelope carries STORE_ID:
     // only the explicit argument can open it, so a pass proves precedence.
     const EXPLICIT_ID = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
     const bundle = makeBundle({ storeId: EXPLICIT_ID });
-    const file = makeFile(await serializeRoster(bundle, 'master', EXPLICIT_ID));
+    const file = makeFile(await serializeRoster(bundle, 'master', EXPLICIT_ID), 'renamed.smcabundle');
 
     await importRosterFile({ file, master: 'master', storeId: EXPLICIT_ID });
 
     expect(getRoster()?.bundleId).toBe('b1');
   });
 
-  it('falls back to the filename when the explicit store id is blank', async () => {
+  it('falls back to the envelope when the explicit store id is blank', async () => {
     const bundle = makeBundle();
-    const file = makeFile(await serializeRoster(bundle, 'master', STORE_ID));
+    const file = makeFile(await serializeRoster(bundle, 'master', STORE_ID), 'renamed.smcabundle');
 
     await importRosterFile({ file, master: 'master', storeId: '   ' });
 
     expect(getRoster()?.bundleId).toBe('b1');
   });
 
-  it('throws UnknownFileError for a renamed file instead of blaming the password', async () => {
+  it('throws UnknownFileError for a zip without the envelope instead of blaming the password', async () => {
+    // A roster.json-only zip (no meta.json): a file that is NOT an export,
+    // so the failure must be "unknown file", not "wrong password".
     const bundle = makeBundle();
-    const file = makeFile(await serializeRoster(bundle, 'master', STORE_ID), 'activacion.smcabundle');
+    const payload = await serializeRoster(bundle, 'master', STORE_ID);
+    const { ZipWriter, BlobWriter, TextReader, BlobReader, ZipReader, TextWriter } = await import(
+      '@zip.js/zip.js'
+    );
+    const reader = new ZipReader(new BlobReader(new Blob([payload])));
+    const entries = await reader.getEntries();
+    const rosterEntry = entries.find((e) => !e.directory && e.filename === 'roster.json');
+    if (!rosterEntry || rosterEntry.directory) {
+      throw new Error('fixture setup: serialized archive is missing roster.json');
+    }
+    const rosterText = await rosterEntry.getData(new TextWriter(), {
+      password: `master${STORE_ID}`,
+    });
+    await reader.close();
+    const writer = new ZipWriter(new BlobWriter('application/zip'));
+    await writer.add('roster.json', new TextReader(rosterText));
+    const noEnvelope = new Uint8Array(await (await writer.close()).arrayBuffer());
+
+    const file = makeFile(noEnvelope, 'activacion.smcabundle');
 
     await expect(importRosterFile({ file, master: 'master' })).rejects.toThrow(UnknownFileError);
     expect(getRoster()).toBeNull();
@@ -101,12 +122,24 @@ describe('importRosterFile', () => {
     expect(getRoster()).toBeNull();
   });
 
-  it('propagates CorruptFileError untouched', async () => {
-    const file = makeFile(new Uint8Array([1, 2, 3, 4, 5]));
+  it('propagates CorruptFileError untouched for an export missing its roster.json entry', async () => {
+    // Envelope present (so the storeId resolves) but no roster.json inside:
+    // this is a DAMAGED export, distinct from "not an export at all".
+    const { ZipWriter, BlobWriter, TextReader } = await import('@zip.js/zip.js');
+    const writer = new ZipWriter(new BlobWriter('application/zip'));
+    await writer.add('meta.json', new TextReader(JSON.stringify({ storeId: STORE_ID })));
+    const payload = new Uint8Array(await (await writer.close()).arrayBuffer());
+    const file = makeFile(payload, 'activacion.smcabundle');
 
     await expect(importRosterFile({ file, master: 'master' })).rejects.toMatchObject({
       name: 'CorruptFileError',
     });
+  });
+
+  it('maps garbage bytes to UnknownFileError — not an activation file at all', async () => {
+    const file = makeFile(new Uint8Array([1, 2, 3, 4, 5]));
+
+    await expect(importRosterFile({ file, master: 'master' })).rejects.toThrow(UnknownFileError);
   });
 
   it('propagates ExpiredBundleError untouched', async () => {
