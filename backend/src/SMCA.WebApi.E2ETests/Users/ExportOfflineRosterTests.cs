@@ -621,7 +621,80 @@ public sealed class ExportOfflineRosterTests
         return dek;
     }
 
-    private async Task SeedStoreUserAsync(Guid storeId, Guid tenantId, string prefix, string fullName)
+    [Fact]
+    public async Task Inactive_store_user_is_excluded_from_roster()
+    {
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        try
+        {
+            // Seed an active store user
+            var activeUserId = await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "active-u", "Active User");
+            // Seed an inactive store user
+            var inactiveUserId = await SeedStoreUserAsync(owner.StoreId, owner.TenantId, "inactive-u", "Inactive User");
+            await DeactivateUserAsync(inactiveUserId);
+
+            var client = DbTestHelpers.AuthedClient(_f, owner.UserId, owner.Login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+
+            // Owner + 1 active user = 2 (inactive user excluded)
+            body.Data!.Users.Should().HaveCount(2);
+            body.Data.Users.Should().Contain(u => u.Id == activeUserId);
+            body.Data.Users.Should().NotContain(u => u.Id == inactiveUserId);
+        }
+        finally
+        {
+            await CleanupStoreUsersAsync(owner.StoreId);
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+        }
+    }
+
+    [Fact]
+    public async Task Inactive_owner_is_excluded_from_roster()
+    {
+        // Use SuperAdmin to export so the middleware doesn't block the deactivated owner
+        var login = $"sa-inactiveowner-{Guid.NewGuid():N}@test.com";
+        var saUserId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var owner = await AuthzSeed.SeedOwnerAdminAsync(_f, withManagementModule: true);
+
+        try
+        {
+            // Deactivate the owner's user
+            await DeactivateUserAsync(owner.UserId);
+
+            var client = DbTestHelpers.AuthedClient(_f, saUserId, login);
+            var r = await client.GetAsync($"/api/v1/StoreUsers/{owner.StoreId}/offline-roster");
+            r.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await r.Content.ReadFromJsonAsync<ApiResponse<RosterData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+
+            // Inactive owner should NOT appear in the roster
+            body.Data!.Users.Should().BeEmpty();
+            body.Data.Users.Should().NotContain(u => u.Id == owner.UserId);
+        }
+        finally
+        {
+            await AuthzSeed.CleanupStoreGraphAsync(_f, owner.StoreId, owner.UserId);
+            await DbTestHelpers.CleanupUserAsync(_f, saUserId);
+        }
+    }
+
+    private async Task DeactivateUserAsync(Guid userId)
+    {
+        using var scope = _f.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var user = await db.Set<User>().IgnoreQueryFilters().SingleAsync(u => u.Id == userId);
+        user.IsActive = false;
+        db.Entry(user).State = EntityState.Modified;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<Guid> SeedStoreUserAsync(Guid storeId, Guid tenantId, string prefix, string fullName)
     {
         using var scope = _f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -634,6 +707,7 @@ public sealed class ExportOfflineRosterTests
         db.Set<StoreUser>().Add(StoreUser.Create(user.Id, storeId, tenantId));
         db.Set<UserRole>().Add(UserRole.Create(user.Id, (int)RoleType.StoreUser, tenantId));
         await db.SaveChangesAsync();
+        return user.Id;
     }
 
     /// <summary>
