@@ -1,6 +1,7 @@
 import type { InventoryEntry, Order, Product } from '@store-mgmt/domain';
 import { isInLocalDay, localDayRange } from '~/shared/lib/date-utils';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
+import { round2 } from '~/shared/lib/money';
 
 /**
  * Input bundle for {@link generateProductRowsForDate}. The caller (the
@@ -188,7 +189,7 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
     const vendido = soldItems.reduce((total, oi) => total + oi.quantity, 0);
     const precioVenta =
       soldItems.length > 0 ? soldItems.reduce((total, oi) => total + oi.price, 0) / soldItems.length : 0;
-    const importeVenta = vendido * precioVenta;
+    const importeVenta = round2(vendido * precioVenta);
 
     const entries = inventories.get(prod.id) ?? [];
     const entriesAtDay = reconstructEntriesAtDay(entries, day, consumedAfterByEntry);
@@ -216,10 +217,10 @@ export function generateProductRowsForDate(input: GenerateProductRowsForDateInpu
         ? costEntries.reduce((total, x) => total + x.entry.costPrice * x.entry.quantity, 0) /
           costEntries.reduce((total, x) => total + x.entry.quantity, 0)
         : 0;
-    const costoTotal = vendido * costoUnitario;
-    const cpVenta = importeVenta > 0 ? costoTotal / importeVenta : 0;
+    const costoTotal = round2(vendido * costoUnitario);
+    const cpVenta = round2(importeVenta > 0 ? costoTotal / importeVenta : 0);
     const final = disponible - vendido;
-    const importeFinal = final * costoUnitario;
+    const importeFinal = round2(final * costoUnitario);
 
     return {
       productId: prod.id,

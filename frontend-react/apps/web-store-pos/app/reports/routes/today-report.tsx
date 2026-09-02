@@ -10,6 +10,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { generateProductRows } from '~/reports/lib/pdf/generate-product-rows';
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
+import { round2 } from '~/shared/lib/money';
 import { Button } from '~/shared/components/ui/button';
 import { DownloadIcon } from '~/shared/components/ui/icons';
 
@@ -47,12 +48,12 @@ function computeTodayReport(storeId: string, date: Date = new Date()): TodayRepo
   for (const order of orders) {
     for (const item of order.orderItems) {
       const result = calculateOrderProfit(item);
-      totalRevenue += result.revenue;
-      totalCost += result.cost;
+      totalRevenue = round2(totalRevenue + result.revenue);
+      totalCost = round2(totalCost + result.cost);
     }
   }
 
-  const totalProfit = totalRevenue - totalCost;
+  const totalProfit = round2(totalRevenue - totalCost);
 
   return {
     date,

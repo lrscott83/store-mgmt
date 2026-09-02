@@ -14,6 +14,7 @@ import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { EntryList } from '../components/entry-list';
+import { round2 } from '~/shared/lib/money';
 
 export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
 
@@ -90,7 +91,7 @@ export function EntriesPage() {
     0,
   );
   const entriesTotal = dayGroups.reduce(
-    (total, d) => total + d.items.reduce((t, e) => t + e.costPrice * e.quantity, 0),
+    (total, d) => total + d.items.reduce((t, e) => t + round2(e.costPrice * e.quantity), 0),
     0,
   );
 
@@ -134,7 +135,7 @@ export function EntriesPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-primary">
-                      ${dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0).toFixed(2)}
+                      ${round2(dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0)).toFixed(2)}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

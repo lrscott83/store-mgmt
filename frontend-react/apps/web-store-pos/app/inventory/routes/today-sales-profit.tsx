@@ -11,6 +11,7 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { calculateOrderProfit } from '../lib/profit-calculator';
+import { round2 } from '~/shared/lib/money';
 
 export const clientLoader = featureLoader([EFeatures.InventoryTodaySaleProfit]);
 
@@ -120,7 +121,7 @@ export function InventoryTodaySalesProfitPage() {
 
       const sold = orderItems.reduce((total, oi) => total + oi.quantity, 0);
       const salePrice = prod.price;
-      const amount = sold * salePrice;
+      const amount = round2(sold * salePrice);
 
       const productTodayEntries = todayEntries.filter((e) => e.productId === prod.id);
 
@@ -131,7 +132,7 @@ export function InventoryTodaySalesProfitPage() {
         // Gap #3c fix: sum each order item's already-recorded (non-mutating) FIFO cost
         // breakdown instead of recomputing it live against currently-available entries.
         totalCost = orderItems.reduce((sum, oi) => sum + calculateOrderProfit(oi).cost, 0);
-        unitCost = totalCost / sold;
+        unitCost = round2(totalCost / sold);
       } else if (productTodayEntries.length > 0) {
         // Angular lines 98-103: entry-only row — informational average cost from today's
         // entries, contributes 0 to totals (no sale occurred).
@@ -144,7 +145,7 @@ export function InventoryTodaySalesProfitPage() {
         totalCost = 0;
       }
 
-      const profit = amount - totalCost;
+      const profit = round2(amount - totalCost);
 
       return {
         productId: prod.id,
@@ -193,9 +194,9 @@ export function InventoryTodaySalesProfitPage() {
       productsWithActivity.reduce(
         (acc, p) => ({
           sold: acc.sold + p.sold,
-          amount: acc.amount + p.amount,
-          cost: acc.cost + p.totalCost,
-          profit: acc.profit + p.profit,
+          amount: round2(acc.amount + p.amount),
+          cost: round2(acc.cost + p.totalCost),
+          profit: round2(acc.profit + p.profit),
         }),
         ZERO_TOTALS,
       ),

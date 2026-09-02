@@ -3,6 +3,7 @@ import type { Order } from '@store-mgmt/domain';
 import { Button } from '~/shared/components/ui/button';
 import { confirmDialog, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { round2 } from '~/shared/lib/money';
 
 interface OrderItemListProps {
   order: Order;
@@ -99,7 +100,7 @@ export function OrderItemList({
                   </td>
                   <td className="p-2 text-right">
                     <span className="font-semibold text-text">
-                      {formatCurrency(item.price * item.quantity)}
+                      {formatCurrency(round2(item.price * item.quantity))}
                     </span>
                   </td>
                 </tr>

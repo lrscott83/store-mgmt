@@ -18,6 +18,7 @@ import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-ret
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
 import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
+import { round2 } from '~/shared/lib/money';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -415,7 +416,7 @@ export function CartShell() {
                         {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}${(item.price ?? item.product.price).toFixed(2)}
                       </p>
                     </div>
-                    <p className="text-sm text-text">${((item.price ?? item.product.price) * item.quantity).toFixed(2)}</p>
+                    <p className="text-sm text-text">${(round2((item.price ?? item.product.price) * item.quantity)).toFixed(2)}</p>
                     {/* Quantity controls */}
                     <div className="flex items-center gap-1">
                       <button

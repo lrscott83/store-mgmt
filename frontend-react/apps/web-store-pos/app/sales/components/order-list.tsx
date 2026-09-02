@@ -61,7 +61,7 @@ export function OrderList({ orders, readOnly = true, onEditOrder, onDeactivateOr
               aria-expanded={isExpanded}
             >
               <span className="text-sm font-medium text-text">
-                {formatTime(order.date)} ({getOrderItemsCount(order).toFixed(2)})
+                {formatTime(order.date)} ({getOrderItemsCount(order)})
               </span>
               <span className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-text">

@@ -1,6 +1,7 @@
 import type { BaseResponseModel, InventoryEntry, InventoryEntryView, Order, Product } from '@store-mgmt/domain';
 import type { InventoryCategoryView } from '~/inventory/lib/services/inventory-offline-service';
 import type { InventoryTodaySaleRow } from './inventory-today-sale-pdf';
+import { round2 } from '~/shared/lib/money';
 
 /**
  * Narrow dependency slices — only the methods `generateProductRows` actually calls.
@@ -66,17 +67,17 @@ export function generateProductRows(
     const inicio = available + vendido - entryQuantity;
     const precioVenta =
       orderItems.length > 0 ? orderItems.reduce((total, oi) => total + oi.price, 0) / orderItems.length : 0;
-    const importeVenta = vendido * precioVenta;
+    const importeVenta = round2(vendido * precioVenta);
     let costoUnitario = 0;
     if (productAvailableEntries.length > 0) {
       costoUnitario =
         productAvailableEntries.reduce((total, e) => total + e.costPrice * e.quantity, 0) /
         productAvailableEntries.reduce((total, e) => total + e.quantity, 0);
     }
-    const costoTotal = vendido * costoUnitario;
-    const cpVenta = importeVenta > 0 ? costoTotal / importeVenta : 0;
+    const costoTotal = round2(vendido * costoUnitario);
+    const cpVenta = round2(importeVenta > 0 ? costoTotal / importeVenta : 0);
     const final = disponible - vendido;
-    const importeFinal = final * costoUnitario;
+    const importeFinal = round2(final * costoUnitario);
 
     return {
       productId: prod.id,
