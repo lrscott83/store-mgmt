@@ -3,6 +3,15 @@ import { useIntl } from 'react-intl';
 import type { Module } from '@store-mgmt/domain';
 import { formatCurrency } from '~/shared/lib/format-currency';
 
+/** Format as "5.00 USD" (no $ symbol) — plan-picker only. */
+function formatPlanPrice(amount: number): string {
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return `${formatted} USD`;
+}
+
 interface PlanPickerProps {
   modules: Module[];
   onChange: (selectedIds: number[]) => void;
@@ -79,7 +88,7 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
         </button>
         <button type="button" role="tab" aria-selected={tab === 'paid'}
           onClick={() => setTab('paid')} className={tabClass(tab === 'paid')}>
-          {`${t('STORES.PLAN.PAID_TAB')} · ${formatCurrency(paidTotal)}`}
+          {`${t('STORES.PLAN.PAID_TAB')} · ${formatPlanPrice(paidTotal)}`}
           {active === 'paid' && (
             <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">
               {t('STORES.PLAN.ACTIVE_BADGE')}
@@ -94,7 +103,21 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
         </p>
         <ul className="list-inside list-disc text-sm text-gray-700">
           {panelModules.map((m) => (
-            <li key={m.id}>{m.name}</li>
+            <li key={m.id} className="flex items-center gap-2">
+              <span>{m.name}</span>
+              {!m.priceIncluded && (
+                <span className="flex items-center gap-1">
+                  {m.price !== m.currentPrice && (
+                    <span className="text-gray-400 line-through">
+                      {formatPlanPrice(m.price)}
+                    </span>
+                  )}
+                  <span className="font-semibold">
+                    {formatPlanPrice(m.currentPrice)}
+                  </span>
+                </span>
+              )}
+            </li>
           ))}
         </ul>
 
