@@ -56,10 +56,17 @@ test.describe.serial('Owner hard delete (SuperAdmin)', () => {
   test('canceling dialog does not delete owner', async ({ page }) => {
     await applySuperAdminSnapshot(page, superAdmin);
     await page.goto('/admin/owners');
-    await page.waitForTimeout(1000);
+
+    // The owner list is fetched asynchronously from the API, so a raw
+    // `.count()` right after goto routinely reads 0 under the 8-worker dev
+    // machine (the ~1s compile/serve turns the blind waitForTimeout into a
+    // race). Anchor first on a rendered card with an auto-retrying expect —
+    // only then is the count a real baseline.
+    const ownerCards = page.locator('[data-slot="card"]');
+    await expect(ownerCards).not.toHaveCount(0);
 
     // Get initial owner count
-    const initialCards = await page.locator('[data-slot="card"]').count();
+    const initialCards = await ownerCards.count();
 
     // Open gear menu and click delete
     const gearButton = page.getByRole('button', { name: /acciones/i }).first();
@@ -71,11 +78,7 @@ test.describe.serial('Owner hard delete (SuperAdmin)', () => {
     const cancelButton = page.getByRole('button', { name: /cancelar/i });
     await cancelButton.click();
 
-    // Wait a moment
-    await page.waitForTimeout(500);
-
-    // Owner count should remain the same
-    const finalCards = await page.locator('[data-slot="card"]').count();
-    expect(finalCards).toBe(initialCards);
+    // Owner count should remain the same — auto-retrying, no blind sleep.
+    await expect(ownerCards).toHaveCount(initialCards);
   });
 });

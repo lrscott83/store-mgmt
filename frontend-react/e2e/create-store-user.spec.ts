@@ -65,7 +65,11 @@ test('payload incluye roleIds [3], storeId del usuario, y navega a lista', async
   expect(payload.storeId).toBe(selectedStoreId); // Aserción 2: storeId del usuario
 
   // Aserción 5: success → navigates to /management/users (user-create.tsx:51).
-  await expect(page).toHaveURL(/\/management\/users$/);
+  // The default 5s toHaveURL budget routinely expires under the 8-worker dev
+  // machine (the client-side SPA navigation after the POST commits late), so
+  // grant it the same 15s the rest of the suite uses. The expect.poll above
+  // already proved the POST went out — this only waits for the redirect.
+  await expect(page).toHaveURL(/\/management\/users$/, { timeout: 15_000 });
   await expect(page.getByRole('heading', { level: 1, name: LIST_TITLE })).toBeVisible();
 });
 

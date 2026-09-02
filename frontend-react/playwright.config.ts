@@ -89,8 +89,14 @@ export default defineConfig({
   // suite .NET, README.md:103). Ver e2e/support/global-teardown.ts.
   globalTeardown: './e2e/support/global-teardown.ts',
 
-  // En CI reintenta tests fallidos (2 veces); localmente 0 para iterar rápido.
-  retries: process.env.CI ? 2 : 0,
+  // Reintenta tests fallidos 2 veces. Esta suite corre `fullyParallel` con 8+
+  // workers contra un único dev server + backend + PostgreSQL en la máquina
+  // local; bajo esa contención cada corrida hace flakear ~2 tests aislados al
+  // azar (nunca el mismo dos veces, y todos pasan aislados). Un retry local
+  // absorbe esa contención SIN disfrazar bugs reales: un fallo determinista
+  // sigue fallando tras 3 intentos. En CI también 2: el único worker CI aún
+  // puede flakear por la primera compilación del dev server.
+  retries: 2,
 
   // En CI un solo worker (dev servers no dan para más); localmente todos los CPUs disponibles.
   workers: process.env.CI ? 1 : undefined,
