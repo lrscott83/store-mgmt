@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
-import { superAdminLoader } from '~/auth/routes/loaders';
+import { resellerLoader } from '~/auth/routes/loaders';
 import { storeHttpService } from '~/management/stores/lib/services/store-http-service';
 import { StoreCardList } from '~/admin/stores/components/store-card-list';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
@@ -10,7 +10,7 @@ import { Button } from '~/shared/components/ui/button';
 import { PlusIcon } from '~/shared/components/ui/icons';
 import type { Store } from '@store-mgmt/domain';
 
-export const clientLoader = superAdminLoader;
+export const clientLoader = resellerLoader;
 
 /**
  * Sole super-admin store lifecycle list (design.md: "Super-admin lifecycle list stays SOLE
@@ -77,6 +77,31 @@ export function AdminStoreListPage() {
     }
   }
 
+  async function handleToggle(id: string) {
+    const store = stores.find((s) => s.id === id);
+    if (!store) return;
+    // Direction-aware copy (spec store-plan-toggle R3): Free (null date) →
+    // "Activar plan pago", Paid (non-null date) → "Desactivar plan pago".
+    const activating = store.paymentStartDate === null;
+    const confirmed = await confirmDialog({
+      title: formatMessage({
+        id: activating ? 'STORES.ACTIVATE_PAID_TITLE' : 'STORES.DEACTIVATE_PAID_TITLE',
+      }),
+      message: formatMessage({
+        id: activating ? 'STORES.ACTIVATE_PAID_MESSAGE' : 'STORES.DEACTIVATE_PAID_MESSAGE',
+      }),
+      confirmButtonText: formatMessage({ id: 'GENERAL.YES' }),
+      cancelButtonText: formatMessage({ id: 'GENERAL.NO' }),
+    });
+    if (!confirmed) return;
+    try {
+      await storeHttpService.toggleStorePlan(id);
+      await loadStores();
+    } catch (error) {
+      setError(formatMessage({ id: httpErrorKey(error, 'STORES.ERROR') }));
+    }
+  }
+
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
@@ -117,6 +142,7 @@ export function AdminStoreListPage() {
         onEdit={(id) => navigate(`/management/stores/edit/${id}`)}
         onApprove={handleApprove}
         onDisapprove={handleDisapprove}
+        onToggle={handleToggle}
       />
     </div>
   );
