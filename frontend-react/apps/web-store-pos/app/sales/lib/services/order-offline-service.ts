@@ -15,6 +15,7 @@ import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
+import { round2 } from '~/shared/lib/money';
 
 /**
  * TopProduct — view model for getTopProductsProfitInLastMonth/getTopProductsSaleQuantityInLastMonth.
@@ -49,7 +50,7 @@ function groupBy<T>(items: T[], key: keyof T): Map<string, T[]> {
 }
 
 function getOrderItemsTotal(items: OrderItem[]): number {
-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return round2(items.reduce((sum, item) => sum + round2(item.price * item.quantity), 0));
 }
 
 function getOrderItemsCount(items: OrderItem[]): number {
@@ -424,9 +425,11 @@ export class OrderOfflineService {
       };
     });
 
-    const total = cartItems.reduce(
-      (sum, item) => sum + (item.price ?? item.product.price) * item.quantity,
-      0,
+    const total = round2(
+      cartItems.reduce(
+        (sum, item) => sum + round2((item.price ?? item.product.price) * item.quantity),
+        0,
+      ),
     );
     const itemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 

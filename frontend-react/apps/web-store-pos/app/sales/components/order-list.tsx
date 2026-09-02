@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Order } from '@store-mgmt/domain';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { round2 } from '~/shared/lib/money';
 import { OrderItemList } from './order-item-list';
 
 interface OrderListProps {
@@ -18,7 +19,7 @@ function formatTime(date: Date): string {
 }
 
 function getOrderTotal(order: Order): number {
-  return order.orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return round2(order.orderItems.reduce((sum, item) => sum + round2(item.price * item.quantity), 0));
 }
 
 function getOrderItemsCount(order: Order): number {
@@ -60,7 +61,7 @@ export function OrderList({ orders, readOnly = true, onEditOrder, onDeactivateOr
               aria-expanded={isExpanded}
             >
               <span className="text-sm font-medium text-text">
-                {formatTime(order.date)} ({getOrderItemsCount(order)})
+                {formatTime(order.date)} ({getOrderItemsCount(order).toFixed(2)})
               </span>
               <span className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-text">

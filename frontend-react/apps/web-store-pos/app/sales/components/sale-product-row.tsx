@@ -75,7 +75,8 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
         {intl.formatMessage({ id: 'GENERAL.QUANTITY' })}
         <input
           type="number"
-          min={1}
+          min={0}
+          step="any"
           value={quantity}
           onChange={(e) => setQuantity(Number(e.target.value))}
           className="w-16 rounded-md border border-border px-2 py-1 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"

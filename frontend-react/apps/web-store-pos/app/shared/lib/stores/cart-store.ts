@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Product } from '@store-mgmt/domain';
 import { OrderType, PaymentType } from '@store-mgmt/domain';
+import { round2 } from '~/shared/lib/money';
 
 export interface CartItem {
   product: Product;
@@ -120,9 +121,11 @@ export const useCartStore = create<CartState>()(
       },
 
       total: () => {
-        return get().items.reduce(
-          (sum, item) => sum + (item.price ?? item.product.price) * item.quantity,
-          0
+        return round2(
+          get().items.reduce(
+            (sum, item) => sum + round2((item.price ?? item.product.price) * item.quantity),
+            0
+          )
         );
       },
 

@@ -759,6 +759,18 @@ describe('OrderOfflineService', () => {
       expect(result[0].itemsCount).toBe(5); // 2 + 3
     });
 
+    it('rounds getOrderItemsTotal to 2 accounting decimals for fractional price*quantity', async () => {
+      // 0.1 * 0.3 would otherwise be 0.030000000000000002; getOrderItemsTotal rounds to 0.03.
+      const items = makeCartItems([
+        { product: makeProduct({ id: 'p1', categoryId: 'cat1', categoryName: 'Bebidas', price: 0.1 }), quantity: 0.3 },
+      ]);
+      await createTestOrder(service, items, PaymentType.Efectivo, false, '');
+
+      const result = unwrap(service.getCategoryCartItemsView(new Date()));
+      expect(result[0].total).toBe(0.03);
+      expect(result[0].itemsCount).toBeCloseTo(0.3, 10); // fractional count, not integer-rounded
+    });
+
     it('further groups by productId within each category, with per-product total/itemsCount', async () => {
       const items = makeCartItems([
         { product: makeProduct({ id: 'p1', name: 'Cola', categoryId: 'cat1', categoryName: 'Bebidas', price: 5 }), quantity: 2 },

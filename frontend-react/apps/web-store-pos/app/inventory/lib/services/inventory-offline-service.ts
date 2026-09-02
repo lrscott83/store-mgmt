@@ -16,6 +16,7 @@ import {
   type ProductAvailabilityFields,
 } from '~/sales/lib/product-availability';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
+import { approxEqual, round2 } from '~/shared/lib/money';
 
 /**
  * Optional eligibility context for {@link InventoryOfflineService.getAvailableInventoryCosts}.
@@ -420,9 +421,9 @@ export class InventoryOfflineService {
 
     for (const entry of entries) {
       if (remaining <= 0) break;
-      const taken = Math.min(remaining, entry.available);
-      entry.available -= taken;
-      remaining -= taken;
+      const taken = round2(Math.min(remaining, entry.available));
+      entry.available = round2(entry.available - taken);
+      remaining = round2(remaining - taken);
       costs.push({ inventoryId: entry.id, costPrice: entry.costPrice, quantity: taken });
     }
 
@@ -457,9 +458,9 @@ export class InventoryOfflineService {
     let remaining = quantity;
     for (const entry of entries) {
       if (remaining <= 0) break;
-      const consumed = Math.min(remaining, entry.available);
-      entry.available -= consumed;
-      remaining -= consumed;
+      const consumed = round2(Math.min(remaining, entry.available));
+      entry.available = round2(entry.available - consumed);
+      remaining = round2(remaining - consumed);
     }
 
     this.setInventoriesLocalStorage(map);
@@ -692,7 +693,7 @@ export class InventoryOfflineService {
     if (!entry) {
       return Result.Failure([InventoryErrors.EntryNotExists]);
     }
-    if (entry.quantity === entry.available) {
+    if (approxEqual(entry.quantity, entry.available)) {
       return Result.Failure([InventoryErrors.SaleNotExistsWithThisEntry]);
     }
 
@@ -723,7 +724,7 @@ export class InventoryOfflineService {
     const entry = entries.find((e) => e.id === entryId);
     if (!entry) return Result.Failure([InventoryErrors.EntryNotExists]);
 
-    return entry.quantity === entry.available
+    return approxEqual(entry.quantity, entry.available)
       ? Result.Success()
       : Result.Failure([InventoryErrors.SaleExistsWithThisEntry]);
   }

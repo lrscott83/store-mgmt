@@ -110,6 +110,24 @@ describe('useCartStore — orderType + price threading (Egress/Mayorista realign
     useCartStore.getState().addItem(makeProduct({ id: 'prod-2', price: 3 }), 1);
     expect(useCartStore.getState().total()).toBe(13); // 5*2 + 3*1, identical to pre-change behavior
   });
+
+  it('total() rounds fractional price*quantity to 2 accounting decimals without float drift', () => {
+    // 0.1 * 0.3 would otherwise be 0.030000000000000002; round2 fixes it to 0.03.
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 0.1 }), 0.3);
+    expect(useCartStore.getState().total()).toBe(0.03);
+  });
+
+  it('total() rounds the summed line totals to avoid 0.1+0.2 !== 0.3 drift', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1', price: 0.1 }), 1);
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-2', price: 0.2 }), 1);
+    expect(useCartStore.getState().total()).toBe(0.3);
+  });
+
+  it('getItemQuantity returns a fractional sum without integer rounding', () => {
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 1.5);
+    useCartStore.getState().addItem(makeProduct({ id: 'prod-1' }), 1.25);
+    expect(useCartStore.getState().getItemQuantity('prod-1')).toBe(2.75);
+  });
 });
 
 // 1:1 port of Angular's ShoppingCartService.orderDescription field + updateOrderDetails/
