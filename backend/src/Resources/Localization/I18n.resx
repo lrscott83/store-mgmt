@@ -225,6 +225,12 @@
   <data name="StoreNotFound" xml:space="preserve">
     <value>Tienda no encontrada</value>
   </data>
+  <data name="StoreInactive" xml:space="preserve">
+    <value>La tienda está inactiva</value>
+  </data>
+  <data name="OwnerUserInactive" xml:space="preserve">
+    <value>El usuario propietario está inactivo</value>
+  </data>
   <data name="StoreNotSelected" xml:space="preserve">
     <value>El usuario {0} no tiene tienda seleccionada</value>
   </data>
