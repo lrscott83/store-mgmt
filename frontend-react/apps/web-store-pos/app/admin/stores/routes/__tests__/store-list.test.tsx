@@ -11,10 +11,10 @@ vi.mock('react-router', () => ({
   useNavigate: () => mockNavigate,
 }));
 
-// ─── superAdminLoader mock ────────────────────────────────────────────────────
+// ─── resellerLoader mock ─────────────────────────────────────────────────────
 
 vi.mock('~/auth/routes/loaders', () => ({
-  superAdminLoader: vi.fn().mockResolvedValue(null),
+  resellerLoader: vi.fn().mockResolvedValue(null),
 }));
 
 // ─── storeHttpService mock ────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ vi.mock('~/management/stores/lib/services/store-http-service', () => ({
     listStores: vi.fn(),
     approveStore: vi.fn(),
     disapproveStore: vi.fn(),
+    toggleStorePlan: vi.fn(),
   },
 }));
 
@@ -68,7 +69,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('AdminStoreListPage — exports', () => {
-  it('exports a named loader function equal to superAdminLoader', async () => {
+  it('exports a named loader function equal to resellerLoader', async () => {
     const mod = await import('../store-list');
     expect(typeof mod.clientLoader).toBe('function');
   });
@@ -442,5 +443,143 @@ describe('AdminStoreListPage — no activate/deactivate buttons', () => {
     expect(
       screen.queryByRole('button', { name: esMessages['STORES.DEACTIVATE'] })
     ).not.toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// store-plan-toggle R3 — Change Plan action: direction-aware confirm dialog,
+// cancel-no-call, POST + list refresh (spec scenarios: Free→Paid dialog copy,
+// Paid→Free dialog copy, Cancel dialog, List refreshes after toggle)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminStoreListPage — toggle plan', () => {
+  beforeEach(async () => {
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.toggleStorePlan).mockResolvedValue({
+      succeeded: true,
+      data: true,
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+  });
+
+  it('Free→Paid store shows "Activar plan pago" dialog copy and re-fetches after confirm', async () => {
+    mockConfirmDialog.mockResolvedValue(true);
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [makeStore({ id: 's1', name: 'Store One', paymentStartDate: null })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    // Free stores are only visible under the "free-plan" filter.
+    fireEvent.change(screen.getByLabelText(esMessages['STORES.FILTER_LABEL']), {
+      target: { value: 'free-plan' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Store One')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+
+    await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.ACTIVATE_PAID_TITLE'],
+        message: esMessages['STORES.ACTIVATE_PAID_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
+      expect(storeHttpService.toggleStorePlan).toHaveBeenCalledWith('s1');
+      expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('Paid→Free store shows "Desactivar plan pago" dialog copy and re-fetches after confirm', async () => {
+    mockConfirmDialog.mockResolvedValue(true);
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [makeStore({ id: 's2', name: 'Store Two', paymentStartDate: '2024-01-01' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Two')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s2'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+
+    await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledWith({
+        title: esMessages['STORES.DEACTIVATE_PAID_TITLE'],
+        message: esMessages['STORES.DEACTIVATE_PAID_MESSAGE'],
+        confirmButtonText: esMessages['GENERAL.YES'],
+        cancelButtonText: esMessages['GENERAL.NO'],
+      });
+      expect(storeHttpService.toggleStorePlan).toHaveBeenCalledWith('s2');
+      expect(storeHttpService.listStores).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('cancel (false) -> does NOT call toggleStorePlan, list NOT re-fetched', async () => {
+    mockConfirmDialog.mockResolvedValue(false);
+    const { storeHttpService } = await import(
+      '~/management/stores/lib/services/store-http-service'
+    );
+    vi.mocked(storeHttpService.listStores).mockResolvedValue({
+      succeeded: true,
+      data: [makeStore({ id: 's3', name: 'Store Three' })],
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminStoreListPage } = await import('../store-list');
+    render(
+      <Wrapper>
+        <AdminStoreListPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Store Three')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('store-actions-toggle-s3'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+
+    await waitFor(() => {
+      expect(mockConfirmDialog).toHaveBeenCalledTimes(1);
+    });
+    expect(storeHttpService.toggleStorePlan).not.toHaveBeenCalled();
+    expect(storeHttpService.listStores).toHaveBeenCalledTimes(1);
   });
 });
