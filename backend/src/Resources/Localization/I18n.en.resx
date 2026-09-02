@@ -453,6 +453,9 @@
   <data name="PlanLocked" xml:space="preserve">
     <value>The store plan is locked. Only a SuperAdmin can change the store's modules.</value>
   </data>
+  <data name="OwnerUserInactive" xml:space="preserve">
+    <value>The owner user is inactive</value>
+  </data>
   <data name="PspNotFound" xml:space="preserve">
     <value>PSP not found</value>
   </data>
@@ -491,6 +494,9 @@
   </data>
   <data name="StateNotFound" xml:space="preserve">
     <value>State not found</value>
+  </data>
+  <data name="StoreInactive" xml:space="preserve">
+    <value>The store is inactive</value>
   </data>
   <data name="UnexpectedErrorUploadingFile" xml:space="preserve">
     <value>UnexpectedErrorUploadingFile</value>

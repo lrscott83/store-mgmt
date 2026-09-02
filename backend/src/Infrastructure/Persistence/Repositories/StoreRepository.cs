@@ -115,6 +115,8 @@ namespace Infrastructure.Persistence.Repositories
                 .Include(s => s.StoreModules)
                     .ThenInclude(sm => sm.Module)
                 .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
+                .Include(s => s.Owner)
                     .ThenInclude(o => o.ReSellerOwner)
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(s => s.Id == storeId);
@@ -125,6 +127,25 @@ namespace Infrastructure.Persistence.Repositories
                 .AnyAsync(s => s.Id == storeId
                     && s.Owner.ReSellerOwner != null
                     && s.Owner.ReSellerOwner.ReSeller.UserId == reSellerUserId);
+
+        public async Task<IEnumerable<Store>> GetActiveStoresByReSellerUserIdAsync(Guid reSellerUserId, Guid? excludeStoreId = null)
+        {
+            IQueryable<Store> query = _stores
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.User)
+                .Include(s => s.Owner)
+                    .ThenInclude(o => o.ReSellerOwner)
+                        .ThenInclude(rso => rso.ReSeller)
+                .Where(s => s.IsActive
+                    && s.Owner.ReSellerOwner != null
+                    && s.Owner.ReSellerOwner.ReSeller.UserId == reSellerUserId)
+                .IgnoreQueryFilters();
+
+            if (excludeStoreId.HasValue)
+                query = query.Where(s => s.Id != excludeStoreId.Value);
+
+            return await query.ToListAsync();
+        }
 
         public async Task<IEnumerable<Store>> GetPaidStoresAsync()
             => await _stores

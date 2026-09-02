@@ -84,6 +84,17 @@ export const storeHttpService = {
     return response.data;
   },
 
+  /**
+   * Toggles the store plan between Free and Paid (POST /v1/stores/{id}/toggle-plan,
+   * no request body — direction is derived server-side from PaymentStartDate).
+   */
+  async toggleStorePlan(id: string): Promise<BaseResponseModel<boolean>> {
+    const response = await apiClient.post<BaseResponseModel<boolean>>(
+      `/v1/stores/${id}/toggle-plan`
+    );
+    return response.data;
+  },
+
   async approveStore(id: string): Promise<BaseResponseModel<boolean>> {
     const response = await apiClient.post<BaseResponseModel<boolean>>(
       '/v1/stores/approve',

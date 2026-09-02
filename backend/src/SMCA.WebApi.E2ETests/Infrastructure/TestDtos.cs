@@ -83,6 +83,7 @@ public sealed class RosterUserData
     public bool IsInTrial { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public int WrapIterations { get; set; }
+    public string OfflineAuthToken { get; set; } = string.Empty;
 }
 
 public sealed class RosterData

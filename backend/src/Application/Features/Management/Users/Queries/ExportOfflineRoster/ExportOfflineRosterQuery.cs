@@ -140,9 +140,23 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             // Roster expiry is computed up front: each user's offline auth token
             // (JWT) must share exactly the same lifetime as the bundle, so a
             // token can never outlive the roster that carried it.
-            int ttlDays = await _systemConfigurationRepository.GetOfflineRosterTtlDaysAsync();
+            //
+            // Paid plan: expires 5 days after the next payment due date, giving
+            // the owner a small buffer before the roster (and its JWTs) stop
+            // working offline.
+            // Free plan (or paid without a known NextDueDate): falls back to the
+            // configured OfflineRosterTtlDays (default 35).
             var now = _dateTimeProvider.UtcNow;
-            var expiresAt = now.UtcDateTime.AddDays(ttlDays);
+            DateTime expiresAt;
+            if (billing.PlanType == "Paid" && billing.NextDueDate.HasValue)
+            {
+                expiresAt = billing.NextDueDate.Value.AddDays(5).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            }
+            else
+            {
+                int ttlDays = await _systemConfigurationRepository.GetOfflineRosterTtlDaysAsync();
+                expiresAt = now.UtcDateTime.AddDays(ttlDays);
+            }
 
             var rosterUsers = new List<OfflineRosterUserDto>(storeUsers.Count);
             foreach (var su in storeUsers)
@@ -215,7 +229,7 @@ namespace Application.Features.Management.Users.Queries.ExportOfflineRoster
             {
                 BundleId = Guid.NewGuid().ToString(),
                 IssuedAt = now.ToUnixTimeMilliseconds(),
-                ExpiresAt = now.AddDays(ttlDays).ToUnixTimeMilliseconds(),
+                ExpiresAt = new DateTimeOffset(expiresAt).ToUnixTimeMilliseconds(),
                 FormatVersion = FormatVersion,
                 StoreId = query.StoreId,
                 Users = rosterUsers

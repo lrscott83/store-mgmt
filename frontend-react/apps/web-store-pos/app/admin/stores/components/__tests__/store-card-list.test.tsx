@@ -38,7 +38,7 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
     ];
     render(
       <Wrapper>
-        <StoreCardList stores={stores} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} />
+        <StoreCardList stores={stores} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
       </Wrapper>
     );
     expect(screen.getByText('Store Alpha')).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('StoreCardList — renders a Card grid (Req: Card-Grid List Uses Shared
     const { StoreCardList } = await import('../store-card-list');
     const { container } = render(
       <Wrapper>
-        <StoreCardList stores={[makeStore()]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} />
+        <StoreCardList stores={[makeStore()]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
       </Wrapper>
     );
     expect(container.querySelector('[data-slot="card"]')).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('StoreCardList — empty state', () => {
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
-        <StoreCardList stores={[]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} />
+        <StoreCardList stores={[]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
       </Wrapper>
     );
     expect(screen.getByText(/no hay tiendas/i)).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe('StoreCardList — gear menu actions wired', () => {
           stores={[makeStore({ id: 'store-x', name: 'Store X' })]}
           onEdit={onEdit}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -98,7 +98,7 @@ describe('StoreCardList — gear menu actions wired', () => {
           stores={[makeStore({ id: 'store-y', name: 'Store Y', approved: false })]}
           onEdit={vi.fn()}
           onApprove={onApprove}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -135,7 +135,7 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
           stores={[makeStore({ id: 'store-a', approved: true })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -158,7 +158,7 @@ describe('StoreCardList — Approve XOR Disapprove (Req: Card-Grid List Uses Sha
           stores={[makeStore({ id: 'store-b', approved: false })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -181,7 +181,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: false, approved: true })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -197,7 +197,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: true, approved: false })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -214,7 +214,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: true, approved: true })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -231,7 +231,7 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
           stores={[makeStore({ isActive: false, approved: false })]}
           onEdit={vi.fn()}
           onApprove={vi.fn()}
-          onDisapprove={vi.fn()}
+          onDisapprove={vi.fn()} onToggle={vi.fn()}
         />
       </Wrapper>
     );
@@ -241,12 +241,53 @@ describe('StoreCardList — state CSS (Req: Store Card Visual Lifecycle State)',
   });
 });
 
+describe('StoreCardList — Change Plan gear item (spec store-plan-toggle R3)', () => {
+  it('renders "Cambiar plan" for an active store and calls onToggle with the id', async () => {
+    const onToggle = vi.fn();
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-t', name: 'Store T', isActive: true })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={onToggle}
+        />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-t'));
+    fireEvent.click(screen.getByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] }));
+    expect(onToggle).toHaveBeenCalledWith('store-t');
+  });
+
+  it('hides "Cambiar plan" when the store is inactive (spec scenario: Inactive store hides Change Plan)', async () => {
+    const onToggle = vi.fn();
+    const { StoreCardList } = await import('../store-card-list');
+    render(
+      <Wrapper>
+        <StoreCardList
+          stores={[makeStore({ id: 'store-i', name: 'Store I', isActive: false })]}
+          onEdit={vi.fn()}
+          onApprove={vi.fn()}
+          onDisapprove={vi.fn()}
+          onToggle={onToggle}
+        />
+      </Wrapper>
+    );
+    fireEvent.click(screen.getByTestId('store-actions-toggle-store-i'));
+    expect(
+      screen.queryByRole('menuitem', { name: esMessages['STORES.CHANGE_PLAN'] })
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('StoreCardList — Activate/Deactivate removed (Req: Activate/Deactivate Controls Removed)', () => {
   it('does NOT render Activate or Deactivate buttons', async () => {
     const { StoreCardList } = await import('../store-card-list');
     render(
       <Wrapper>
-        <StoreCardList stores={[makeStore()]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} />
+        <StoreCardList stores={[makeStore()]} onEdit={vi.fn()} onApprove={vi.fn()} onDisapprove={vi.fn()} onToggle={vi.fn()} />
       </Wrapper>
     );
     expect(

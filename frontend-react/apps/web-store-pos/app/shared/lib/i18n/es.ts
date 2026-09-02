@@ -717,6 +717,12 @@ const messages: Record<string, string> = {
   'STORES.APPROVE_CONFIRM_MESSAGE': '¿Está seguro que desea aprobar esta tienda?',
   'STORES.DISAPPROVE_CONFIRM_TITLE': 'Confirmación para desaprobar',
   'STORES.DISAPPROVE_CONFIRM_MESSAGE': '¿Está seguro que desea desaprobar esta tienda?',
+  // Plan toggle (spec store-plan-toggle R3: gear item + direction-aware confirm dialog)
+  'STORES.CHANGE_PLAN': 'Cambiar plan',
+  'STORES.ACTIVATE_PAID_TITLE': 'Activar plan pago',
+  'STORES.ACTIVATE_PAID_MESSAGE': '¿Está seguro que desea activar el plan de pago para esta tienda? Se habilitarán todos los módulos de pago.',
+  'STORES.DEACTIVATE_PAID_TITLE': 'Desactivar plan pago',
+  'STORES.DEACTIVATE_PAID_MESSAGE': '¿Está seguro que desea desactivar el plan de pago? Se deshabilitarán los módulos de pago asociados.',
 
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)
   'BILLING.TRIAL_NOTICE': 'Probando el plan de pago. El primer cobro del plan pago será el {date}.',

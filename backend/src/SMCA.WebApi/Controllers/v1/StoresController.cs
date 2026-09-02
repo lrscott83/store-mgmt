@@ -2,6 +2,7 @@
 using Application.Dtos.StoreManagement;
 using Application.Features.ApplicationManagement.Tenants.Queries.GetTenantById;
 using Application.Features.StoreManagement.Stores.Commands.SetStorePaymentDate;
+using Application.Features.StoreManagement.Stores.Commands.ToggleStorePlan;
 using Application.Features.StoreManagement.StorePayments.Commands.RegisterStorePayment;
 using Application.Features.StoreManagement.StorePayments.Queries.GetReSellerCommissions;
 using Application.Features.StoreManagement.StorePayments.Queries.GetStoresToCollect;
@@ -188,6 +189,20 @@ namespace SMCA.WebApi.Controllers.v1
         [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
         public async Task<IActionResult> RegisterStorePaymentAsync(Guid storeId)
             => Ok(await Sender.Send(new RegisterStorePaymentCommand(storeId)));
+
+        /// <summary>
+        /// Atomic Free &lt;-&gt; Paid plan toggle. No request body. Gated by the same
+        /// (SuperAdmin, StorePaymentAdmin) permission set as RegisterStorePaymentAsync;
+        /// the handler re-verifies ReSeller ownership for non-SuperAdmin callers.
+        /// </summary>
+        [HttpPost("{storeId}/toggle-plan")]
+        [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
+        [ProducesResponseType(typeof(ResponseResult<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> ToggleStorePlanAsync(Guid storeId)
+            => Ok(await Sender.Send(new ToggleStorePlanCommand(storeId)));
 
         [HttpGet("to-collect")]
         [HasPermission(StoreRoleFeatures.SuperAdmin, StoreRoleFeatures.StorePaymentAdmin)]
