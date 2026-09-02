@@ -8,7 +8,7 @@ import { Button } from '~/shared/components/ui/button';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { PlusIcon, PaperclipIcon, ChevronDownIcon, TrashIcon } from '~/shared/components/ui/icons';
-import { showBlockingError, showBlockingInfo, confirmDialog } from '~/shared/lib/blocking-alert';
+import { showBlockingError, confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { isOwnerAdmin } from '~/shared/lib/auth/authorization-service';
@@ -300,6 +300,12 @@ export function ProductsPage() {
   // carrying a qualifying quantity, via the same primitive as manual entry
   // (`InventoryOfflineService.createInventoryEntry`). The orchestration lives HERE, not inside
   // `ProductOfflineService` — sales must not depend on inventory at the service layer.
+  //
+  // 2026-09-02 ROW-LEVEL IMPORT RULE: every processed row lands in `created` (with its resolved
+  // product id and an `existing` flag), so the handler now creates one inventory entry per row —
+  // created OR reused — carrying a qualifying quantity. `createCsvProducts` already updated the
+  // reused product's sale price, so the handler does NOT repeat it. There are no duplicate
+  // failures, so the "ya existen" dialog is gone.
   async function handleCsvImport(rows: ParsedProductRow[]) {
     const csvProducts: CsvProduct[] = rows
       .filter((row) => row.category)
@@ -315,7 +321,7 @@ export function ProductsPage() {
     // createCsvProducts always resolves success(...) by design (ADR-1): failure() hardcodes
     // data:null (envelope.ts:19-27), which would destroy the {created,failed} payload. This ??
     // is TS narrowing on the BaseResponseModel union, NOT a runtime failure path.
-    const { created, failed } = result.data ?? { created: [], failed: [] };
+    const { created } = result.data ?? { created: [] };
 
     const inventoryService = new InventoryOfflineService(
       storeId,
@@ -339,25 +345,13 @@ export function ProductsPage() {
 
     setModal(null);
 
-    // Angular handleSuccess (csv-product-importer-modal.component.ts:52-65): ALWAYS a success
-    // toast (no title), PLUS a conditional info dialog when there are duplicates. DIVERGES
-    // DELIBERATELY (decisions #6/#14/#17): the toast reports REAL successes (products created +
-    // entries created), unconditionally, with no branching — even a legacy 3-column CSV reads
-    // "... y 0 entradas correctamente." The info dialog enumerates each duplicate as
-    // "Categoría - Nombre" instead of the generic literal. Both strings stay hardcoded Spanish
-    // (no i18n key), matching Angular's own and the pre-existing React literal — introducing
-    // keys is out of scope (R6). Swal renders `text` as `textContent` with no
-    // `white-space: pre-line` (sweetalert2 11.26.25, css `.swal2-html-container`), so the list
-    // MUST be single-line comma-joined, never newline-separated.
+    // The toast reports REAL successes (products created + entries created), unconditionally,
+    // with no branching — even a legacy 3-column CSV reads "... y 0 entradas correctamente."
+    // Both counts derive from the processed rows and the created entries; with the 2026-09-02
+    // rule every row is processed (created or reused), so `created.length` equals the row count.
+    // The string stays hardcoded Spanish (no i18n key), matching Angular's own and the
+    // pre-existing React literal — introducing keys is out of scope (R6).
     showToastSuccess(`Importados ${created.length} productos y ${entriesCreated} entradas correctamente.`);
-    if (failed.length > 0) {
-      await showBlockingInfo(
-        intl.formatMessage({ id: 'GENERAL.INFORMATION' }),
-        `Algunos productos no fueron importados porque ya existen: ${failed
-          .map((p) => `${p.category} - ${p.name}`)
-          .join(', ')}.`,
-      );
-    }
 
     void loadData();
   }

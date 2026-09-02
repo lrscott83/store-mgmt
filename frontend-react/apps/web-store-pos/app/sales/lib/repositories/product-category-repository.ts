@@ -65,6 +65,17 @@ export class ProductCategoryRepository {
     return this.getStorageCategories().find((c) => c.name === name);
   }
 
+  /**
+   * Product-import-only lookup (2026-09-02 row-level import rule): finds a category by name
+   * CASE-INSENSITIVELY. The normal UI's `getProductCategoryByName`/`addProductCategoryByName`
+   * keep their case-SENSITIVE match — this exists solely for the CSV import flow, which must
+   * resolve "bebidas" to an existing "Bebidas" category.
+   */
+  findProductCategoryByNameIgnoreCase(name: string): ProductCategory | undefined {
+    const key = name.trim().toLowerCase();
+    return this.getStorageCategories().find((c) => c.name.trim().toLowerCase() === key);
+  }
+
   /** 1:1 port of Angular `getProductCategories` (repo.ts:59-61) — ALL, sorted ascending by order. */
   getProductCategories(): ProductCategory[] {
     return this.getStorageCategories().sort((c1, c2) => c1.order - c2.order);
