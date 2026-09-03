@@ -248,7 +248,7 @@ describe('parseCsvProducts', () => {
     it('parses the exact 5-column sample template shown in the importer', () => {
       const csv = [
         'categoria,nombre,precio,costo,cantidad',
-        'Pizzas,Pizza de Queso,150,100,10',
+        'Pizzas,Pizza con Queso,150,100,10',
         'Pizzas,Pizza Especial,200,140,5',
         'Confituras,Caramelo,20,12,50',
       ].join('\n');
@@ -257,7 +257,7 @@ describe('parseCsvProducts', () => {
       expect(result.errors).toHaveLength(0);
       expect(result.products[0]).toMatchObject({
         category: 'Pizzas',
-        name: 'Pizza de Queso',
+        name: 'Pizza con Queso',
         price: 150,
         cost: 100,
         quantity: 10,

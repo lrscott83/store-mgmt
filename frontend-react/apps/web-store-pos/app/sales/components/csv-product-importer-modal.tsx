@@ -16,7 +16,7 @@ import { showBlockingError } from '~/shared/lib/blocking-alert';
 // name and accepts both this Spanish set and the legacy English set
 // (category,name,price,cost,quantity), so old files keep importing unchanged.
 const SAMPLE_DATA = `categoria,nombre,precio,costo,cantidad
-Pizzas,Pizza de Queso,150,100,10
+Pizzas,Pizza con Queso,150,100,10
 Pizzas,Pizza Especial,200,140,5
 Confituras,Caramelo,20,12,50`;
 

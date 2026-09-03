@@ -47,7 +47,7 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
     );
     expect(screen.getByText('Estructura requerida del archivo (.csv):')).toBeInTheDocument();
     // sampleData is a single <code> node — assert on its text content.
-    expect(screen.getByText(/Pizzas,Pizza de Queso,150/)).toBeInTheDocument();
+    expect(screen.getByText(/Pizzas,Pizza con Queso,150/)).toBeInTheDocument();
     expect(screen.getByText('Descargar Ejemplo')).toBeInTheDocument();
   });
 
@@ -60,7 +60,7 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
         <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
-    const sample = screen.getByText(/Pizzas,Pizza de Queso/).textContent ?? '';
+    const sample = screen.getByText(/Pizzas,Pizza con Queso/).textContent ?? '';
     const lines = sample.trim().split('\n');
     expect(lines[0]).toBe('categoria,nombre,precio,costo,cantidad');
     expect(lines).toHaveLength(4);
