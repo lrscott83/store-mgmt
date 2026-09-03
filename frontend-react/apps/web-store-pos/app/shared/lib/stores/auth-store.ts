@@ -95,7 +95,7 @@ interface AuthState {
   error: string | null;
   initialize: () => void;
   getUserByToken: () => Promise<UserModel | null>;
-  setUser: (user: UserModel, token: string) => void;
+  setUser: (user: UserModel, token: string, expiresIn?: number) => void;
   updateUser: (user: UserModel) => void;
   // First argument is the LOGIN — the username credential, not an email
   // address. See docs/contracts/login-is-not-email.md.
@@ -211,12 +211,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  setUser: (user: UserModel, token: string) => {
-    const expiresIn = Date.now() + THIRTY_FIVE_DAYS_MS;
-    const userWithExpiry: UserModel = { ...user, expiresIn, password: '' };
+  setUser: (user: UserModel, token: string, expiresIn?: number) => {
+    // The 35-day default is the legacy fallback. loginOffline passes the roster
+    // bundle's `expiresAt` (offline-session-expiry rule): the offline session
+    // must die at the SAME instant as the roster that minted it — and its
+    // offlineAuthToken JWT — whatever value the backend gave the bundle
+    // (paid: next due date + 5d; free: configured TTL).
+    const stamped = expiresIn ?? Date.now() + THIRTY_FIVE_DAYS_MS;
+    const userWithExpiry: UserModel = { ...user, expiresIn: stamped, password: '' };
     StorageService.setTokenToLocalStorage(token);
     StorageService.setCurrentUser(userWithExpiry);
-    localStorage.setItem(StorageKeys.AUTH_MODEL, JSON.stringify({ authToken: token, expiresIn }));
+    localStorage.setItem(
+      StorageKeys.AUTH_MODEL,
+      JSON.stringify({ authToken: token, expiresIn: stamped })
+    );
     set({ user: userWithExpiry, isAuthenticated: true, error: null });
   },
 
@@ -402,7 +410,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // The ONE hydration seam (auth-session spec: "loginOffline hydrates
       // through the existing setUser seam") — writes TOKEN/CURRENT_USER/
       // AUTH_MODEL exactly like online login().
-      get().setUser(user, user.authToken);
+      //
+      // offline-session-expiry rule: stamp the session with the roster bundle's
+      // `expiresAt` so the session, the roster and its offlineAuthToken JWT all
+      // die at the same instant. `authenticateOffline` already validated the
+      // bundle is present and unexpired; this is the same D6 dynamic import as
+      // the other offline modules. A null bundle here (roster vanished or
+      // expired between the two reads) degrades to setUser's default.
+      const { getRoster } = await import('../offline/roster-store');
+      const sessionBundle = getRoster();
+      get().setUser(user, user.authToken, sessionBundle?.expiresAt);
       set({ isLoading: false });
       // Return the hydrated `get().user`, not the raw `user` — setUser()
       // stamps a fresh `expiresIn` and blanks `password`, so the returned

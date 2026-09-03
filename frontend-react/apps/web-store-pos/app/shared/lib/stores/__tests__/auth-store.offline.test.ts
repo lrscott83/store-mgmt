@@ -11,13 +11,13 @@ import type { OfflineRosterBundle } from '../../offline/roster-types';
 const FIXED_SALT = 'AAAAAAAAAAAAAAAAAAAAAA==';
 const ITERATIONS = 210_000;
 
-async function seedRoster(): Promise<void> {
+async function seedRoster(expiresInMs: number = 1_000_000): Promise<void> {
   const preHash = await sha256Base64('secret');
   const hash = await pbkdf2Base64(preHash, FIXED_SALT, ITERATIONS);
   const bundle: OfflineRosterBundle = {
     bundleId: 'b1',
     issuedAt: 1000,
-    expiresAt: Date.now() + 1_000_000,
+    expiresAt: Date.now() + expiresInMs,
     formatVersion: 1,
     storeId: 's1',
     users: [
@@ -411,5 +411,49 @@ describe('useAuthStore.loginOffline — DEK provisioning (device-wrapped-dek des
     } finally {
       vi.doUnmock('../../offline/dek-provisioning');
     }
+  });
+});
+
+// offline-session-expiry rule: the OFFLINE session must expire at the SAME
+// instant as the roster bundle that authenticated it — whatever value the
+// backend gave the bundle (paid: next due date + 5d; free: configured TTL) —
+// never at the legacy hardcoded now+35d stamp setUser used to apply.
+// `loginOffline` now passes `getRoster().expiresAt` through the optional
+// `setUser` parameter.
+describe('useAuthStore.loginOffline — session expiry = roster bundle expiresAt (offline-session-expiry rule)', () => {
+  const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+  const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearDek();
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false, error: null });
+  });
+
+  async function expectExpiryFollowsRoster(rosterExpiresInMs: number): Promise<void> {
+    const expiresAt = Date.now() + rosterExpiresInMs;
+    await seedRoster(rosterExpiresInMs);
+    await seedProvisionedDevice('ana', 'secret', 's1');
+
+    await useAuthStore.getState().loginOffline('ana', 'secret');
+
+    const auth = JSON.parse(localStorage.getItem(StorageKeys.AUTH_MODEL)!) as {
+      authToken?: string;
+      expiresIn?: number;
+    };
+    expect(auth.authToken).toBe('offline-session');
+    // The stamped value is the roster's ABSOLUTE expiresAt — not now+35d, and
+    // not capped at 35 days when the bundle horizon is longer.
+    expect(auth.expiresIn).toBeGreaterThanOrEqual(expiresAt - 2_000);
+    expect(auth.expiresIn).toBeLessThanOrEqual(expiresAt + 2_000);
+    expect(useAuthStore.getState().user?.expiresIn).toBe(auth.expiresIn);
+  }
+
+  it('paid-like bundle (expiresAt = +5 days) → session expires at +5 days, not the legacy +35', async () => {
+    await expectExpiryFollowsRoster(FIVE_DAYS_MS);
+  });
+
+  it('bundle with a horizon beyond the legacy default (+60 days) → session keeps the roster horizon', async () => {
+    await expectExpiryFollowsRoster(SIXTY_DAYS_MS);
   });
 });
