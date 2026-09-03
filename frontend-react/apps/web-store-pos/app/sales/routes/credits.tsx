@@ -9,6 +9,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
 
@@ -85,7 +86,7 @@ export function SaleCreditsPage() {
               ({creditsCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-danger">${creditsTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-danger">{formatCurrency(creditsTotal)}</span>
         </div>
       }
     >
@@ -115,7 +116,9 @@ export function SaleCreditsPage() {
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-danger">
-                    ${dateSaleCredit.items.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0).toFixed(2)}
+                    {formatCurrency(
+                      dateSaleCredit.items.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0),
+                    )}
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>

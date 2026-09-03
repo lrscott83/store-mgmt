@@ -233,10 +233,10 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
         <InventoryProductList categories={MOCK_CATEGORIES} />
       </Wrapper>,
     );
-    expect(screen.getByText('$35.00')).toBeInTheDocument();
-    // $40.00 appears twice: the Snacks category total AND Papas Lays' product total value
+    expect(screen.getByText('$35')).toBeInTheDocument();
+    // $40 appears twice: the Snacks category total AND Papas Lays' product total value
     // (5 * 8 = 40) — same numeric coincidence documented in the test below.
-    expect(screen.getAllByText('$40.00').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('$40').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows each product weighted-average unit cost (category expanded)', () => {
@@ -246,9 +246,9 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
-    // Coca Cola: avgCostPrice=2 -> $2.00; Fanta: avgCostPrice=3 -> $3.00
-    expect(screen.getByText('$2.00')).toBeInTheDocument();
-    expect(screen.getByText('$3.00')).toBeInTheDocument();
+    // Coca Cola: avgCostPrice=2 -> $2; Fanta: avgCostPrice=3 -> $3
+    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('$3')).toBeInTheDocument();
   });
 
   it('shows each product total value (avgCostPrice · totalAvailable, category expanded)', () => {
@@ -259,11 +259,11 @@ describe('InventoryProductList — weighted avg cost + total value (Angular pari
     );
     fireEvent.click(screen.getByTestId('inventory-category-toggle-cat1'));
     fireEvent.click(screen.getByTestId('inventory-category-toggle-cat2'));
-    // Coca Cola: 2 * 10 = $20.00; Fanta: 3 * 5 = $15.00; Papas Lays: 5 * 8 = $40.00
-    expect(screen.getByText('$20.00')).toBeInTheDocument();
-    expect(screen.getByText('$15.00')).toBeInTheDocument();
-    // $40.00 also appears as the Snacks category total (same numeric value, expected coincidence)
-    expect(screen.getAllByText('$40.00').length).toBeGreaterThanOrEqual(1);
+    // Coca Cola: 2 * 10 = $20; Fanta: 3 * 5 = $15; Papas Lays: 5 * 8 = $40
+    expect(screen.getByText('$20')).toBeInTheDocument();
+    expect(screen.getByText('$15')).toBeInTheDocument();
+    // $40 also appears as the Snacks category total (same numeric value, expected coincidence)
+    expect(screen.getAllByText('$40').length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -284,8 +284,8 @@ describe('InventoryProductList — Disponible row cleanup (Angular parity)', () 
     expect(screen.queryByText('INVENTORY.ENTRY.AVAILABLE')).not.toBeInTheDocument();
     expect(screen.queryByText(esMessages['INVENTORY.ENTRY.AVAILABLE'])).not.toBeInTheDocument();
     // Currency cells (avg cost, total value) still render.
-    expect(screen.getByText('$2.00')).toBeInTheDocument();
-    expect(screen.getByText('$20.00')).toBeInTheDocument();
+    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('$20')).toBeInTheDocument();
   });
 });
 

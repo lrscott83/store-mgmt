@@ -8,6 +8,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
 import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
@@ -108,7 +109,7 @@ export function ExpensesHistoryPage() {
               ({expensesCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-danger">${expensesTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-danger">{formatCurrency(expensesTotal)}</span>
         </div>
       }
     >
@@ -160,7 +161,7 @@ export function ExpensesHistoryPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-danger">
-                      ${dayGroup.items.reduce((total, e) => total + e.total, 0).toFixed(2)}
+                      {formatCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

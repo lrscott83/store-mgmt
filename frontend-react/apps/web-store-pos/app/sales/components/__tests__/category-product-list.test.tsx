@@ -73,7 +73,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
       </Wrapper>,
     );
     expect(screen.getByText('Sprite')).toBeInTheDocument();
-    expect(screen.getByText('$2.00')).toBeInTheDocument();
+    expect(screen.getByText('$2')).toBeInTheDocument();
   });
 
   it('formats the price with a thousands separator via formatCurrency (WU7 list-parity sweep)', () => {
@@ -87,7 +87,7 @@ describe('CategoryProductList — per-category product panel (Angular parity)', 
         />
       </Wrapper>,
     );
-    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 
   it('opens a per-product actions menu with "Editar Producto" / "Desactivar Producto"', () => {

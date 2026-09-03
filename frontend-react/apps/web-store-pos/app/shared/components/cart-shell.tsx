@@ -19,6 +19,7 @@ import { validateCartSubmission } from '~/shared/lib/cart-submission-validation'
 import { showBlockingError, showAcknowledgeError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess, showToastError } from '~/shared/lib/toast';
 import { round2 } from '~/shared/lib/money';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { Switch } from '~/shared/components/ui/switch';
 import { InfoBox } from '~/shared/components/ui/info-box';
 
@@ -321,7 +322,7 @@ export function CartShell() {
                   : 'text-xs font-medium text-text-muted'
               }
             >
-              Vuelto: {paymentReturn < 0 ? '-' : ''}${Math.abs(paymentReturn).toFixed(2)}
+              Vuelto: {paymentReturn < 0 ? '-' : ''}{formatCurrency(Math.abs(paymentReturn))}
             </span>
             <input
               type="number"
@@ -413,10 +414,10 @@ export function CartShell() {
                         {item.product.name} ({item.quantity})
                       </p>
                       <p className="text-xs text-text-muted">
-                        {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}${(item.price ?? item.product.price).toFixed(2)}
+                        {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}{formatCurrency(item.price ?? item.product.price)}
                       </p>
                     </div>
-                    <p className="text-sm text-text">${(round2((item.price ?? item.product.price) * item.quantity)).toFixed(2)}</p>
+                    <p className="text-sm text-text">{formatCurrency(round2((item.price ?? item.product.price) * item.quantity))}</p>
                     {/* Quantity controls */}
                     <div className="flex items-center gap-1">
                       <button
@@ -462,7 +463,7 @@ export function CartShell() {
     </div>
     {/* Cart total, always visible next to the icon — matches Angular's header getCartTotal() */}
     <span className="text-sm font-medium text-primary whitespace-nowrap">
-      ${totalAmount.toFixed(2)}
+      {formatCurrency(totalAmount)}
     </span>
     </>
   );

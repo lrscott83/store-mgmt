@@ -75,7 +75,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         <SaleProductRow product={makeProduct({ price: 2 })} orderType={OrderType.Normal} onAdded={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.getByText('$2.00')).toBeInTheDocument();
+    expect(screen.getByText('$2')).toBeInTheDocument();
     expect(screen.queryByLabelText('Precio')).not.toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
         <SaleProductRow product={makeProduct({ price: 2000 })} orderType={OrderType.Normal} onAdded={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 
   it('shows an editable price input for a non-Normal sale (e.g. Mayorista)', () => {
@@ -95,7 +95,7 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
       </Wrapper>,
     );
     expect(screen.getByLabelText('Precio')).toBeInTheDocument();
-    expect(screen.queryByText('$2.00')).not.toBeInTheDocument();
+    expect(screen.queryByText('$2')).not.toBeInTheDocument();
   });
 
   it('quantity input defaults to 1', () => {

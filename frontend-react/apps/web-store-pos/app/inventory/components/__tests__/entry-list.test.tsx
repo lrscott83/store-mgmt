@@ -57,6 +57,6 @@ describe('EntryList — list/table parity sweep (WU5)', () => {
         <EntryList entries={[makeEntry({ costPrice: 2000 })]} isOwnerAdmin onEdit={vi.fn()} onDeactivate={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 });

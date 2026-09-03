@@ -126,7 +126,7 @@ describe('ReSellerCommissionsPage — rows', () => {
     await waitFor(() => {
       expect(screen.getByText('07/2026')).toBeInTheDocument();
       expect(screen.getByText('5')).toBeInTheDocument();
-      expect(screen.getByText('$1,234.50')).toBeInTheDocument();
+      expect(screen.getByText('$1 234.50')).toBeInTheDocument();
     });
 
     expect(storeHttpService.getReSellerCommissions).toHaveBeenCalledTimes(1);
@@ -153,7 +153,7 @@ describe('ReSellerCommissionsPage — rows', () => {
 
     await waitFor(() => {
       expect(screen.getByText('12/2025')).toBeInTheDocument();
-      expect(screen.getByText('$10.00')).toBeInTheDocument();
+      expect(screen.getByText('$10')).toBeInTheDocument();
     });
   });
 });

@@ -74,6 +74,6 @@ describe('OrderItemList — list/table parity sweep (WU6)', () => {
         <OrderItemList order={makeOrder()} readOnly />
       </Wrapper>,
     );
-    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 });

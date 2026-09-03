@@ -11,6 +11,7 @@ import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatLocalDate, fromLocalDayKey, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { showBlockingInfo } from '~/shared/lib/blocking-alert';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-rows-for-date';
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
@@ -164,7 +165,7 @@ export function OrdersPage() {
               ({ordersCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-text">${ordersTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-text">{formatCurrency(ordersTotal)}</span>
         </div>
       }
     >
@@ -252,7 +253,7 @@ export function OrdersPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-text">
-                      ${g.items.reduce((t, o) => t + o.total, 0).toFixed(2)}
+                      {formatCurrency(g.items.reduce((t, o) => t + o.total, 0))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

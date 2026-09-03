@@ -129,7 +129,7 @@ describe('CollectionsPage — rows', () => {
     await waitFor(() => {
       expect(screen.getByText('Store One')).toBeInTheDocument();
       expect(screen.getByText('Owner One')).toBeInTheDocument();
-      expect(screen.getByText('$1,234.50')).toBeInTheDocument();
+      expect(screen.getByText('$1 234.50')).toBeInTheDocument();
       expect(screen.getByText(esMessages['BILLING.STATUS.EnGracia'])).toBeInTheDocument();
     });
 

@@ -238,9 +238,9 @@ describe('SaleCreditsPage (history) — behavioral (Angular parity)', () => {
     );
 
     // Header unpaid-count badge + total appear once the async filter resolves. The total
-    // ($40.00) shows twice — the card header and the single day-panel — so match all.
+    // ($40) shows twice — the card header and the single day-panel — so match all.
     expect(await screen.findByText('(1)')).toBeInTheDocument();
-    expect(screen.getAllByText('$40.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$40').length).toBeGreaterThan(0);
     // Angular parity: history always calls the filter with four nulls.
     expect(filter).toHaveBeenCalledWith(null, null, null, null);
   });

@@ -256,17 +256,17 @@ describe('InventoryAvailablePage — header total inventory value', () => {
       </Wrapper>,
     );
 
-    // 60 + 40 = 100.00 — loadData is now async (WU10), await the resolved effect.
-    expect(await screen.findByText('$100.00')).toBeInTheDocument();
+    // 60 + 40 = 100 — loadData is now async (WU10), await the resolved effect.
+    expect(await screen.findByText('$100')).toBeInTheDocument();
   });
 
-  it('shows $0.00 when there is no inventory yet', () => {
+  it('shows $0 when there is no inventory yet', () => {
     render(
       <Wrapper>
         <InventoryAvailablePage />
       </Wrapper>,
     );
-    expect(screen.getByText('$0.00')).toBeInTheDocument();
+    expect(screen.getByText('$0')).toBeInTheDocument();
   });
 });
 
@@ -907,7 +907,7 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
     );
     // count = 2+1+5 = 8; total = 2*3 + 1*10 + 5*2 = 6+10+10 = 26
     expect(screen.getByText('(8)')).toBeInTheDocument();
-    expect(screen.getByText('$26.00')).toBeInTheDocument();
+    expect(screen.getByText('$26')).toBeInTheDocument();
   });
 
   it('groups entries into one panel per calendar day with the correct per-day total', () => {
@@ -919,9 +919,9 @@ describe('EntriesPage — day grouping (Angular parity)', () => {
     );
     const toggles = screen.getAllByTestId(/entry-day-panel-toggle-/);
     expect(toggles).toHaveLength(2);
-    // day 1 total = 6+10 = 16.00; day 2 total = 10.00
-    expect(screen.getByText('$16.00')).toBeInTheDocument();
-    expect(screen.getByText('$10.00')).toBeInTheDocument();
+    // day 1 total = 6+10 = 16; day 2 total = 10
+    expect(screen.getByText('$16')).toBeInTheDocument();
+    expect(screen.getByText('$10')).toBeInTheDocument();
   });
 
   it('sorts day panels ascending (oldest day first)', () => {
@@ -1422,20 +1422,20 @@ describe('InventoryTodaySalesProfitPage — product inclusion filter (Angular pa
       </Wrapper>,
     );
 
-    // Product row renders: name, sold=5, amount=50.00 and profit=50.00 (no cost, since no
+    // Product row renders: name, sold=5, amount=$50 and profit=$50 (no cost, since no
     // productCosts were recorded) — proves the discountFromInvantory=false product was NOT
-    // excluded and its sale is fully counted. Angular's table has no currency symbol in cells
-    // (template uses `| number: '1.2-2'`, not `| currency`), so amounts render as plain "50.00".
+    // excluded and its sale is fully counted. Amounts render via formatCurrency ("$50",
+    // no trailing .00).
     // Scoped to the desktop table — the mobile card view (md:hidden) renders the same
     // product text a second time.
     const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent('5'); // sold
-    expect(row).toHaveTextContent('50.00'); // amount (5 * price 10)
-    expect(row).toHaveTextContent('0.00'); // unitCost/totalCost (no productCosts)
+    expect(row).toHaveTextContent('$50'); // amount (5 * price 10)
+    expect(row).toHaveTextContent('$0'); // unitCost/totalCost (no productCosts)
     // Total row reflects the same values since it's the only product/sale today.
     const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).toHaveTextContent('50.00');
+    expect(totalRow).toHaveTextContent('$50');
   });
 });
 
@@ -1588,12 +1588,12 @@ describe('InventoryTodaySalesProfitPage — entry-only rows (gap #4)', () => {
     expect(row).not.toBeNull();
     // sold = 0
     expect(row).toHaveTextContent('0');
-    // avg unitCost = ((10*2) + (10*4)) / 20 = 3.00 (informational only)
-    expect(row).toHaveTextContent('3.00');
+    // avg unitCost = ((10*2) + (10*4)) / 20 = $3 (informational only)
+    expect(row).toHaveTextContent('$3');
 
     // Totals unaffected: nothing was sold, so sold/amount/cost/profit all stay at 0.
     const totalRow = screen.getByText('Total').closest('tr');
-    expect(totalRow).toHaveTextContent('0.00');
+    expect(totalRow).toHaveTextContent('$0');
   });
 });
 
@@ -1670,9 +1670,9 @@ describe('InventoryTodaySalesProfitPage — non-mutating FIFO cost (gap #3c, del
     // product text a second time.
     const row = within(screen.getByRole('table')).getByText(/Ron/).closest('tr');
     expect(row).toHaveTextContent('3'); // sold
-    expect(row).toHaveTextContent('30.00'); // amount (3 * price 10)
-    expect(row).toHaveTextContent('7.00'); // totalCost (FIFO: 2*2 + 1*3)
-    expect(row).toHaveTextContent('23.00'); // profit (30 - 7)
+    expect(row).toHaveTextContent('$30'); // amount (3 * price 10)
+    expect(row).toHaveTextContent('$7'); // totalCost (FIFO: 2*2 + 1*3)
+    expect(row).toHaveTextContent('$23'); // profit (30 - 7)
   });
 
   it('is idempotent: rendering the page twice with the same fixtures yields identical totals and never mutates the source order/entries (no double-deduct, unlike Angular)', () => {

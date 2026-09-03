@@ -13,6 +13,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import type { ChartData } from '~/sales/lib/services/order-offline-service';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 const MONTHS_ES = [
   'Ene',
@@ -62,9 +63,9 @@ export function SalesChartCore({ data, emptyMessage }: SalesChartCoreProps) {
       <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis dataKey="label" tick={{ fontSize: 10 }} tickFormatter={formatLabel} />
-        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `$${v}`} />
+        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => formatCurrency(v)} />
         <Tooltip
-          formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ingresos']}
+          formatter={(value: number) => [formatCurrency(value), 'Ingresos']}
           labelFormatter={(label: Date) => formatLabel(label)}
         />
         <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} dot={false} name="value" />
@@ -96,9 +97,9 @@ export function ProfitChartCore({ data, emptyMessage }: ProfitChartCoreProps) {
       <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis dataKey="label" tick={{ fontSize: 10 }} tickFormatter={formatLabel} />
-        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `$${v}`} />
+        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => formatCurrency(v)} />
         <Tooltip
-          formatter={(value: number) => [`$${(value as number).toFixed(2)}`, 'Ganancia bruta']}
+          formatter={(value: number) => [formatCurrency(value as number), 'Ganancia bruta']}
           labelFormatter={(label: Date) => formatLabel(label)}
         />
         <Bar dataKey="value" fill="#16a34a" name="value" radius={[2, 2, 0, 0]} />

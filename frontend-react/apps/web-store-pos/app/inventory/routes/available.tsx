@@ -4,6 +4,7 @@ import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { InventoryOfflineService } from '../lib/services/inventory-offline-service';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -49,7 +50,7 @@ export function InventoryAvailablePage() {
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'INVENTORY.AVAILABLE.TITLE' })}</span>
           <span className="text-lg font-bold text-primary">
-            ${totalInventoryValue.toFixed(2)}
+            {formatCurrency(totalInventoryValue)}
           </span>
         </div>
       }

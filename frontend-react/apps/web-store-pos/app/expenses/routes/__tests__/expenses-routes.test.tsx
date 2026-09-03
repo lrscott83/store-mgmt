@@ -434,7 +434,7 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
     // Overall header count/total (all-time, unbounded — no 30-day window).
     // loadExpenses is now async (filterExpensesObservable) — wait for the grouped data to render.
     expect(await screen.findByText('(3)')).toBeInTheDocument();
-    expect(screen.getByText('$30.00')).toBeInTheDocument();
+    expect(screen.getByText('$30')).toBeInTheDocument();
 
     // Day panels present; content collapsed by default.
     expect(screen.getByText('15/03/2024 (2)')).toBeInTheDocument();
@@ -531,8 +531,8 @@ describe('ExpensesHistoryPage — strict Angular parity', () => {
 
     fireEvent.click(screen.getByLabelText('Tarjeta'));
     expect(await screen.findByText('(1)')).toBeInTheDocument();
-    // $25.00 now appears twice: the header total and the (single) day-panel total.
-    expect(screen.getAllByText('$25.00')).toHaveLength(2);
+    // $25 now appears twice: the header total and the (single) day-panel total.
+    expect(screen.getAllByText('$25')).toHaveLength(2);
   });
 });
 

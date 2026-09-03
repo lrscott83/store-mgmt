@@ -6,6 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { OrderList } from '../components/order-list';
 import { EditOrderModal } from '../components/edit-order-modal';
@@ -81,7 +82,7 @@ export function TodayOrdersPage() {
               ({ordersItemsCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-primary">${ordersTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-primary">{formatCurrency(ordersTotal)}</span>
         </div>
       }
     >

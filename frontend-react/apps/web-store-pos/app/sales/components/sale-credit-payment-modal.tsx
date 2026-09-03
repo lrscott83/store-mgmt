@@ -6,6 +6,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, PaymentIcon } from '~/shared/components/ui/icons';
 import { confirmDialog, showBlockingError } from '~/shared/lib/blocking-alert';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface SaleCreditPaymentModalProps {
   saleCredit: SaleCredit;
@@ -104,7 +105,7 @@ export function SaleCreditPaymentModal({
         >
           <div className="mb-3 space-y-1 text-sm text-text">
             <p>Cliente: {saleCredit?.client || 'N/A'}</p>
-            <p>Pagar: ${(saleCredit?.total ?? 0).toFixed(2)}</p>
+            <p>Pagar: {formatCurrency(saleCredit?.total ?? 0)}</p>
           </div>
 
           <div className="mb-4">

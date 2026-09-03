@@ -12,6 +12,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { OrderOfflineService } from '~/sales/lib/services/order-offline-service';
 import { calculateOrderProfit } from '../lib/profit-calculator';
 import { round2 } from '~/shared/lib/money';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.InventoryTodaySaleProfit]);
 
@@ -214,7 +215,7 @@ export function InventoryTodaySalesProfitPage() {
       title={
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'INVENTORY.PROFIT.TITLE' })}</span>
-          <span className="text-lg font-bold text-success">${totals.profit.toFixed(2)}</span>
+          <span className="text-lg font-bold text-success">{formatCurrency(totals.profit)}</span>
         </div>
       }
     >
@@ -264,15 +265,15 @@ export function InventoryTodaySalesProfitPage() {
                         {product.sold}
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
-                        <div>{product.salePrice.toFixed(2)}</div>
-                        <div className="text-xs text-text-muted/70">{product.amount.toFixed(2)}</div>
+                        <div>{formatCurrency(product.salePrice)}</div>
+                        <div className="text-xs text-text-muted/70">{formatCurrency(product.amount)}</div>
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
-                        <div>{product.unitCost.toFixed(2)}</div>
-                        <div className="text-xs text-text-muted/70">{product.totalCost.toFixed(2)}</div>
+                        <div>{formatCurrency(product.unitCost)}</div>
+                        <div className="text-xs text-text-muted/70">{formatCurrency(product.totalCost)}</div>
                       </td>
                       <td className={`px-4 py-3 text-right font-semibold ${profitClass(product.profit)}`}>
-                        {product.profit.toFixed(2)}
+                        {formatCurrency(product.profit)}
                       </td>
                     </tr>
                   )),
@@ -284,10 +285,10 @@ export function InventoryTodaySalesProfitPage() {
                     {intl.formatMessage({ id: 'INVENTORY.PROFIT.TOTAL' })}
                   </td>
                   <td className="px-4 py-3 text-right text-text">{totals.sold}</td>
-                  <td className="px-4 py-3 text-right text-text">{totals.amount.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right text-text">{totals.cost.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-text">{formatCurrency(totals.amount)}</td>
+                  <td className="px-4 py-3 text-right text-text">{formatCurrency(totals.cost)}</td>
                   <td className={`px-4 py-3 text-right ${profitClass(totals.profit)}`}>
-                    {totals.profit.toFixed(2)}
+                    {formatCurrency(totals.profit)}
                   </td>
                 </tr>
               </tfoot>
@@ -318,22 +319,22 @@ export function InventoryTodaySalesProfitPage() {
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRICE' })}
                     </p>
-                    <p className="text-text">{product.salePrice.toFixed(2)}</p>
-                    <p className="text-text-muted/70">{product.amount.toFixed(2)}</p>
+                    <p className="text-text">{formatCurrency(product.salePrice)}</p>
+                    <p className="text-text-muted/70">{formatCurrency(product.amount)}</p>
                   </div>
                   <div>
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.COST' })}
                     </p>
-                    <p className="text-text">{product.unitCost.toFixed(2)}</p>
-                    <p className="text-text-muted/70">{product.totalCost.toFixed(2)}</p>
+                    <p className="text-text">{formatCurrency(product.unitCost)}</p>
+                    <p className="text-text-muted/70">{formatCurrency(product.totalCost)}</p>
                   </div>
                   <div>
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.PROFIT' })}
                     </p>
                     <p className={`font-semibold ${profitClass(product.profit)}`}>
-                      {product.profit.toFixed(2)}
+                      {formatCurrency(product.profit)}
                     </p>
                   </div>
                 </div>

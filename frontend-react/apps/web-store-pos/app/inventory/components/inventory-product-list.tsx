@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import type { InventoryCategoryView } from '../lib/services/inventory-offline-service';
 
 interface InventoryProductListProps {
@@ -91,7 +92,7 @@ export function InventoryProductList({ categories }: InventoryProductListProps) 
                   {/* Category total inventory value — Angular's mat-expansion-panel-header
                       category.totalCostPrice chip (inventory-available.component.html:26). */}
                   <span className="text-sm font-semibold text-primary">
-                    ${cat.totalCostPrice.toFixed(2)}
+                    {formatCurrency(cat.totalCostPrice)}
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
@@ -110,10 +111,10 @@ export function InventoryProductList({ categories }: InventoryProductListProps) 
                             product.costPrice / product.costPrice*product.quantity currency cells
                             (inventory-product-list.component.html:20-29). */}
                         <p className="text-sm font-semibold text-success">
-                          ${p.avgCostPrice.toFixed(2)}
+                          {formatCurrency(p.avgCostPrice)}
                         </p>
                         <p className="text-sm font-semibold text-primary">
-                          ${(p.avgCostPrice * p.totalAvailable).toFixed(2)}
+                          {formatCurrency(p.avgCostPrice * p.totalAvailable)}
                         </p>
                       </div>
                     </div>
