@@ -103,6 +103,21 @@ function isBlankRow(row: string[]): boolean {
 }
 
 /**
+ * First header matching any alias, or -1. Headers arrive trimmed + lowercased. Spanish is the
+ * canonical header language of the importer template (categoria,nombre,precio,costo,cantidad,
+ * 2026-09-03); the English aliases are kept so legacy files written against the Angular-era
+ * template (category,name,price[,cost,quantity]) still import unchanged (decision #4 — headers
+ * are matched by name, never by position).
+ */
+function indexOfHeader(headers: string[], ...aliases: string[]): number {
+  for (const alias of aliases) {
+    const idx = headers.indexOf(alias);
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+/**
  * Decision #7: absent, non-numeric or negative -> undefined (caller falls back to price). 0 is
  * legal. Validated with `Number(raw)` (not bare `parseFloat`) because `parseFloat`/`parseInt`
  * stop at the first invalid character instead of rejecting the whole string — `parseFloat("15O")`
@@ -147,11 +162,11 @@ export function parseCsvProducts(csvText: string): CsvParseResult {
 
   const headers = rows[headerIndex].map((h) => h.trim().toLowerCase());
 
-  const nameIdx = headers.indexOf('name');
-  const priceIdx = headers.indexOf('price');
-  const categoryIdx = headers.indexOf('category');
-  const costIdx = headers.indexOf('cost');
-  const quantityIdx = headers.indexOf('quantity');
+  const nameIdx = indexOfHeader(headers, 'nombre', 'name');
+  const priceIdx = indexOfHeader(headers, 'precio', 'price');
+  const categoryIdx = indexOfHeader(headers, 'categoria', 'category');
+  const costIdx = indexOfHeader(headers, 'costo', 'cost');
+  const quantityIdx = indexOfHeader(headers, 'cantidad', 'quantity');
 
   let dataRowNum = 0;
   for (let i = headerIndex + 1; i < rows.length; i++) {

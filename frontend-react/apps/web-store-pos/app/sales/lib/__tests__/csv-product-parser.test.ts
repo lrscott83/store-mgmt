@@ -243,4 +243,57 @@ describe('parseCsvProducts', () => {
       });
     });
   });
+
+  describe('CSV-08: Spanish headers are canonical (categoria,nombre,precio,costo,cantidad)', () => {
+    it('parses the exact 5-column sample template shown in the importer', () => {
+      const csv = [
+        'categoria,nombre,precio,costo,cantidad',
+        'Pizzas,Pizza de Queso,150,100,10',
+        'Pizzas,Pizza Especial,200,140,5',
+        'Confituras,Caramelo,20,12,50',
+      ].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(3);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0]).toMatchObject({
+        category: 'Pizzas',
+        name: 'Pizza de Queso',
+        price: 150,
+        cost: 100,
+        quantity: 10,
+      });
+    });
+
+    it('is case-insensitive for Spanish headers', () => {
+      const csv = ['CATEGORIA,NOMBRE,PRECIO,COSTO,CANTIDAD', 'Bebidas,Coca Cola,1.50,1,2'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.errors).toHaveLength(0);
+      expect(result.products[0]).toMatchObject({
+        category: 'Bebidas',
+        name: 'Coca Cola',
+        price: 1.5,
+        cost: 1,
+        quantity: 2,
+      });
+    });
+
+    it('matches Spanish headers by name regardless of column order', () => {
+      const csv = ['cantidad,costo,categoria,nombre,precio', '10,120,Pizzas,Pizza de Queso,150'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products[0]).toMatchObject({
+        name: 'Pizza de Queso',
+        price: 150,
+        category: 'Pizzas',
+        cost: 120,
+        quantity: 10,
+      });
+    });
+
+    it('falls back to the required-field validations identically for Spanish headers', () => {
+      const csv = ['categoria,nombre,precio,costo,cantidad', 'Pizzas,Pizza de Queso,,100,10'].join('\n');
+      const result = parseCsvProducts(csv);
+      expect(result.products).toHaveLength(0);
+      expect(result.errors[0].errorCode).toBe('MISSING_PRICE');
+    });
+  });
 });

@@ -20,8 +20,20 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Canonical template shape since 2026-09-03 — Spanish headers (categoria,nombre,precio,costo,cantidad).
 function makeFile(): File {
-  return new File(['category,name,price\nBebidas,Coke,1.5'], 'products.csv', { type: 'text/csv' });
+  return new File(
+    ['categoria,nombre,precio,costo,cantidad\nBebidas,Coke,1.5,1,2'],
+    'products.csv',
+    { type: 'text/csv' },
+  );
+}
+
+// Legacy Angular-era headers (English) — must still import unchanged (decision #4).
+function makeLegacyFile(): File {
+  return new File(['category,name,price\nBebidas,Coke,1.5'], 'products-legacy.csv', {
+    type: 'text/csv',
+  });
 }
 
 // Strict parity with Angular's csv-product-importer-modal: expected-structure card + sample
@@ -39,9 +51,10 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
     expect(screen.getByText('Descargar Ejemplo')).toBeInTheDocument();
   });
 
-  // REQ-7: the sample template gains cost/quantity columns, English header, concrete non-blank
-  // example values in every row (csv-import-cost-quantity-entries, 2026-08-04).
-  it('renders the 5-column header exactly, with concrete cost/quantity values on every example row', () => {
+  // REQ-7: the sample template gains cost/quantity columns with concrete non-blank values on
+  // every example row (csv-import-cost-quantity-entries, 2026-08-04). The header row is in
+  // Spanish — categoria,nombre,precio,costo,cantidad (2026-09-03).
+  it('renders the 5-column Spanish header exactly, with concrete cost/quantity values on every example row', () => {
     render(
       <Wrapper>
         <CsvProductImporterModal onImport={vi.fn()} onClose={vi.fn()} />
@@ -49,7 +62,7 @@ describe('CsvProductImporterModal — Angular structure/sample parity', () => {
     );
     const sample = screen.getByText(/Pizzas,Pizza de Queso/).textContent ?? '';
     const lines = sample.trim().split('\n');
-    expect(lines[0]).toBe('category,name,price,cost,quantity');
+    expect(lines[0]).toBe('categoria,nombre,precio,costo,cantidad');
     expect(lines).toHaveLength(4);
     for (const line of lines.slice(1)) {
       const cells = line.split(',');
@@ -113,6 +126,32 @@ describe('CsvProductImporterModal — parse-on-import + error text parity', () =
       </Wrapper>,
     );
     fireEvent.change(screen.getByTestId('csv-file-input'), { target: { files: [makeFile()] } });
+    fireEvent.click(screen.getByTestId('csv-import-button'));
+
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
+    expect(onImport).toHaveBeenCalledWith([
+      expect.objectContaining({
+        name: 'Coke',
+        price: 1.5,
+        category: 'Bebidas',
+        cost: 1,
+        quantity: 2,
+      }),
+    ]);
+  });
+
+  // Legacy Angular-era files keep importing unchanged — headers are matched by name and the
+  // English aliases (category,name,price,cost,quantity) are still accepted (decision #4).
+  it('imports a legacy English-header file unchanged', async () => {
+    const onImport = vi.fn();
+    render(
+      <Wrapper>
+        <CsvProductImporterModal onImport={onImport} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('csv-file-input'), {
+      target: { files: [makeLegacyFile()] },
+    });
     fireEvent.click(screen.getByTestId('csv-import-button'));
 
     await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));

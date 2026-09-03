@@ -10,7 +10,12 @@ import { showBlockingError } from '~/shared/lib/blocking-alert';
 // DIVERGES DELIBERATELY (decision #15, csv-import-cost-quantity-entries, 2026-08-04): the
 // template advertises the 5-column React shape. A 3-column Angular-era file still imports
 // unchanged (headers matched by name, decision #4). Do not restore the 3-column template.
-const SAMPLE_DATA = `category,name,price,cost,quantity
+//
+// Headers are in Spanish (categoria,nombre,precio,costo,cantidad) since 2026-09-03 — the
+// template a user downloads must match what they type back. The parser matches headers by
+// name and accepts both this Spanish set and the legacy English set
+// (category,name,price,cost,quantity), so old files keep importing unchanged.
+const SAMPLE_DATA = `categoria,nombre,precio,costo,cantidad
 Pizzas,Pizza de Queso,150,100,10
 Pizzas,Pizza Especial,200,140,5
 Confituras,Caramelo,20,12,50`;
