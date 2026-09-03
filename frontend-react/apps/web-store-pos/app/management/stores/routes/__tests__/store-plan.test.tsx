@@ -170,8 +170,9 @@ describe('StorePlanPage — renders the plan picker with the store plan merged i
     await waitFor(() => {
       expect(screen.getAllByText(esMessages['STORES.PLAN.SECTION_TITLE']).length).toBeGreaterThan(0);
     });
-    // The store's paid module is selected → paid tab carries the ACTIVE badge
-    expect(screen.getByRole('tab', { name: /Pago/ }).textContent).toContain('$8.00');
+    // The store's paid module is selected → paid tab carries the ACTIVE badge.
+    // Price format is "8.00 USD" (plan-picker's formatPlanPrice — no $ symbol).
+    expect(screen.getByRole('tab', { name: /Pago/ }).textContent).toContain('8.00 USD');
     expect(screen.getByRole('tab', { name: /Pago/ }).textContent).toContain('Activo');
   });
 });

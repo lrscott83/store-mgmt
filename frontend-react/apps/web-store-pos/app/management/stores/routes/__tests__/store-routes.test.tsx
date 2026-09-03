@@ -307,7 +307,8 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
     // before switching tabs — otherwise the async modules update races the click and
     // resets the tab back to the active plan.
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('$8.00');
+      // Price format is "8.00 USD" (plan-picker's formatPlanPrice — no $ symbol).
+      expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('8.00 USD');
     });
     fireEvent.click(screen.getByRole('tab', { name: /Pago/ }));
     expect(screen.getByText('Catalog Module')).toBeInTheDocument();

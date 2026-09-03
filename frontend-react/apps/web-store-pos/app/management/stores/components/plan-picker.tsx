@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Module } from '@store-mgmt/domain';
-import { formatCurrency } from '~/shared/lib/format-currency';
 
 /** Format as "5.00 USD" (no $ symbol) — plan-picker only. */
 function formatPlanPrice(amount: number): string {
