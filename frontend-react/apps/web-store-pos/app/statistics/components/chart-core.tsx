@@ -14,11 +14,29 @@ import {
 } from 'recharts';
 import type { ChartData } from '~/sales/lib/services/order-offline-service';
 
-/** Formats a chart-point `label` Date as MM-DD for axis ticks / tooltip labels. */
+const MONTHS_ES = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+] as const;
+
+/**
+ * Formats a chart-point `label` Date as `d-MMM` in Spanish, e.g. `3-Jul`.
+ * Day without leading zero (3, not 03); abbreviated month name (Jul).
+ */
 function formatLabel(label: Date): string {
-  const month = String(label.getMonth() + 1).padStart(2, '0');
-  const day = String(label.getDate()).padStart(2, '0');
-  return `${month}-${day}`;
+  const day = label.getDate();
+  const month = MONTHS_ES[label.getMonth()];
+  return `${day}-${month}`;
 }
 
 // ─── Sales Chart (LastMonthSalesComponent — STAT-9) ───────────────────────────
