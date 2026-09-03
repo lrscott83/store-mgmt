@@ -253,6 +253,35 @@ límite corre en el pipeline antes del endpoint, así que un intento fallido con
 `pnpm test:e2e` va a chocar — la ventana de login es corta pero la cuota queda agotada, y
 `pnpm test:e2e` va a ver 429 donde esperaba 200. Dejá pasar el minuto entre uno y otro.
 
+## Specs que mutan estado server-side — regla de identidad privada
+
+Las personas (`owner-admin`, `store-user` y sus variantes) son un **cache worker-scoped**
+(`support/test.ts:83-88`): un worker las munea una vez y todos los specs que ese worker corre
+reutilizan la MISMA identidad y snapshot. Con `fullyParallel: true` y ~8 workers, qué archivos
+caen juntos en un worker es decisión del scheduler — no algo que ningún spec pueda asumir.
+
+Eso hace que las personas sean perfectas para specs de **solo lectura** y letales para specs que
+**mutan estado del usuario en el backend**. El caso real: `change-password.spec.ts` consumía la
+persona `owner-admin` y cambiaba su contraseña server-side. Si `change-password` corría antes que
+`login.spec.ts` en el mismo worker, `login.spec` heredaba la snapshot memoizada con la contraseña
+VIEJA — su REQ-9 (re-login real) recibía 401 "Credenciales incorrectas" y agotaba el timeout. Flaky
+por orden de scheduling: el retry pasaba solo porque toca un worker nuevo con cache limpio.
+Root-cause documentado el 2026-09-03; el fix fue que `change-password.spec.ts` munee identidad
+propia en vivo (registro + login), sin tocar `signedInPage`.
+
+**Regla para todo spec nuevo (y para editar los existentes):**
+
+- ¿Tu spec SOLO LEE (navega, aserta, observa red)? → usá la persona compartida
+  (`test.use({ persona: ... })` + `signedInPage`). Es el diseño pensado: costo amortizado.
+- ¿Tu spec MUTA estado server-side del usuario (contraseña, perfil, desactivación, plan)?
+  → muneá **identidad privada en vivo** (registro + login propios, ver `change-password.spec.ts`
+  2026-09-03 o el primer test de `login.spec.ts`), y NO consumas `signedInPage`. La cuota de
+  login (40/min, `RateLimitPolicies.cs:15-29`) tiene margen de sobra.
+- Vectores latentes de la misma clase: `edit-profile.spec.ts` (fullName server-side) y los
+  `store-plan-*` (módulos de la tienda) hoy mutan la persona compartida. No rompen REQ-9 (no
+  tocan credenciales) pero sí contaminan a cualquier spec posterior del mismo worker que aserte
+  ese estado. Si un flaky de esa forma aparece, esta es la primera hipótesis.
+
 ## Suite de login offline (`login-offline.spec.ts`)
 
 Cubre las 12 aserciones de UI de [S1-03] (`docs/testing/e2e-stage-1/S1-03.md`): login contra un
