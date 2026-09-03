@@ -337,3 +337,17 @@ export function EmptyTrendingIcon({ className = '' }: IconProps) {
     </svg>
   );
 }
+
+/** Heroicons `qr-code`-style barcode scan icon — sale view scanner entry point. */
+export function ScanBarcodeIcon({ className = '' }: IconProps) {
+  return (
+    <svg className={`${BASE} ${className}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M3 5V3h2m14 2V3h-2M3 19v2h2m14-2v2h-2M7 4v16M10 4v16M13 4v16M16 4v16"
+      />
+    </svg>
+  );
+}
