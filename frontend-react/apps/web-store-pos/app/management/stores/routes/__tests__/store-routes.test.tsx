@@ -308,12 +308,12 @@ describe('EditStorePage — create mode: module catalog fetched on mount', () =>
     const { EditStorePage } = await import('../edit-store');
     render(<Wrapper><EditStorePage /></Wrapper>);
     // The plan shows a single price: the paid total on the "Pago" tab — never a
-    // per-module price. A free catalog (paid total = 0) renders "0.00 USD" and
-    // lists modules by name only. Wait for the catalog to land in the default
-    // free tab, so the assertion cannot race the async module update.
+    // per-module price. A free catalog (paid total = 0) renders "0 USD" (trailing
+    // zeros dropped) and lists modules by name only. Wait for the catalog to land
+    // in the default free tab, so the assertion cannot race the async module update.
     await waitFor(() => {
       expect(screen.getByText('Catalog Module')).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('0.00 USD');
+      expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('0 USD');
     });
     expect(mockGetModulesToStore).toHaveBeenCalledTimes(1);
   });

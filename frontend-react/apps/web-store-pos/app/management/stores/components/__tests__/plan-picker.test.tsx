@@ -51,7 +51,42 @@ describe('PlanPicker — PLAN-2: paid tab label shows the summed total', () => {
     const { PlanPicker } = await import('../plan-picker');
     render(<Wrapper><PlanPicker modules={CATALOG} onChange={vi.fn()} /></Wrapper>);
     // No discount in test data (price === currentPrice for all paid modules)
-    expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('2,000.00 USD');
+    expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('2,000 USD');
+  });
+});
+
+describe('PlanPicker — PLAN-2b: paid tab shows decimas only when present', () => {
+  it('omits trailing zeros but keeps fractional decimals on the paid total', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    // paid total = 1500 + 500.25 = 2000.25 → keeps decimals
+    const fractional = CATALOG.map((m) =>
+      m.id === 3 ? { ...m, currentPrice: 500.25 } : m,
+    );
+    render(<Wrapper><PlanPicker modules={fractional} onChange={vi.fn()} /></Wrapper>);
+    expect(screen.getByRole('tab', { name: /Pago/ })).toHaveTextContent('2,000.25 USD');
+  });
+});
+
+describe('PlanPicker — PLAN-2c: discounted original price is struck-through in red without USD', () => {
+  it('shows the red struck-through original and the discounted total', async () => {
+    const { PlanPicker } = await import('../plan-picker');
+    // original price (m.price) > currentPrice (m.currentPrice) → discount
+    const discounted = [
+      makeModule({ id: 1, name: 'Ventas', priceIncluded: true, currentPrice: 0 }),
+      makeModule({ id: 2, name: 'Reportes', priceIncluded: false, price: 10, currentPrice: 5 }),
+    ];
+    render(<Wrapper><PlanPicker modules={discounted} onChange={vi.fn()} /></Wrapper>);
+
+    const tab = screen.getByRole('tab', { name: /Pago/ });
+    // original struck-through: bare number, no USD
+    expect(tab).toHaveTextContent('10');
+    expect(tab).not.toHaveTextContent('10 USD');
+    // discounted total still carries USD
+    expect(tab).toHaveTextContent('5 USD');
+    // struck-through span is red
+    const struck = tab.querySelector('span.line-through');
+    expect(struck).not.toBeNull();
+    expect(struck?.className).toContain('text-red-600');
   });
 });
 

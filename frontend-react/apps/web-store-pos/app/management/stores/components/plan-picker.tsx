@@ -2,13 +2,21 @@ import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Module } from '@store-mgmt/domain';
 
-/** Format as "5.00 USD" (no $ symbol) — plan-picker only. */
-function formatPlanPrice(amount: number): string {
-  const formatted = new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
+/**
+ * Format a plan amount as a bare number — decimals shown only when present
+ * (10 → "10", 10.5 → "10.5"), no currency. Used for the struck-through
+ * original price, which drops the trailing "USD" to avoid doubling it.
+ */
+function formatPlanAmount(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
-  return `${formatted} USD`;
+}
+
+/** Format as "5 USD" or "5.5 USD" (no $ symbol) — plan-picker only. */
+function formatPlanPrice(amount: number): string {
+  return `${formatPlanAmount(amount)} USD`;
 }
 
 interface PlanPickerProps {
@@ -94,8 +102,8 @@ export function PlanPicker({ modules, onChange, readOnly = false }: PlanPickerPr
           <span className="flex items-center gap-2">
             {t('STORES.PLAN.PAID_TAB')} ·
             {hasDiscount && (
-              <span className="text-gray-400 line-through">
-                {formatPlanPrice(paidOriginalTotal)}
+              <span className="text-red-600 line-through">
+                {formatPlanAmount(paidOriginalTotal)}
               </span>
             )}
             <span className="font-semibold">

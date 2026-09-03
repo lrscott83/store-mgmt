@@ -171,8 +171,9 @@ describe('StorePlanPage — renders the plan picker with the store plan merged i
       expect(screen.getAllByText(esMessages['STORES.PLAN.SECTION_TITLE']).length).toBeGreaterThan(0);
     });
     // The store's paid module is selected → paid tab carries the ACTIVE badge.
-    // Price format is "8.00 USD" (plan-picker's formatPlanPrice — no $ symbol).
-    expect(screen.getByRole('tab', { name: /Pago/ }).textContent).toContain('8.00 USD');
+    // Price format is "8 USD" (plan-picker's formatPlanPrice — no $ symbol;
+    // trailing zeros dropped because the total is an integer).
+    expect(screen.getByRole('tab', { name: /Pago/ }).textContent).toContain('8 USD');
     expect(screen.getByRole('tab', { name: /Pago/ }).textContent).toContain('Activo');
   });
 });
