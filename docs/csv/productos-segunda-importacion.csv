@@ -1,0 +1,24 @@
+categoria,nombre,precio,costo,cantidad
+Carnes,Carne de cerdo (libra),900,745,18
+Carnes,Pechuga de pollo (libra),850,700,22
+Carnes,Picadillo de cerdo (libra),320,260,30
+Carnes,Salchichas de pollo (paquete),650,530,20
+Granos y pastas,Arroz (libra),300,250,80
+Granos y pastas,Frijol negro (libra),295,240,50
+Granos y pastas,Espaguetis (1/2 kg),330,270,25
+Lácteos y huevos,Huevos (cartón),3200,2700,4
+Lácteos y huevos,Leche en polvo (900 g),1750,1480,6
+Lácteos y huevos,Queso blanco (libra),580,480,12
+Aceites y grasas,Aceite comestible (1 L),1250,1050,15
+Verduras y hortalizas,Tomate (libra),160,130,30
+Verduras y hortalizas,Boniato (libra),70,58,25
+Despensa,Azúcar (libra),310,255,35
+Despensa,Café (libra),260,210,12
+Bebidas,Cerveza Cristal (lata 355 ml),450,380,36
+Aseo e higiene,Pasta dental (100 ml),135,105,15
+Aseo e higiene,Detergente en polvo (500 g),300,240,20
+Panadería,Pan de agua (unidad),120,95,60
+Panadería,Pan dulce (unidad),150,118,40
+Snacks,Galletas (paquete),350,285,30
+Bebidas,Agua (botella 1.5 L),300,245,48
+Bebidas,Refresco (lata 355 ml),250,205,36

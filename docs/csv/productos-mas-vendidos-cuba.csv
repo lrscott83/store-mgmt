@@ -1,0 +1,46 @@
+categoria,nombre,precio,costo,cantidad
+Carnes,Carne de cerdo (libra),850,700,20
+Carnes,Costilla de cerdo (libra),750,620,15
+Carnes,Lomo de cerdo (libra),800,660,12
+Carnes,Pechuga de pollo (libra),800,660,18
+Carnes,Picadillo de cerdo (libra),300,245,25
+Carnes,Picadillo de res (libra),350,290,20
+Carnes,Salchichas de pollo (paquete),600,495,24
+Carnes,Jamón (libra),550,455,10
+Carnes,Mortadella (libra),400,330,12
+Granos y pastas,Arroz (libra),280,230,60
+Granos y pastas,Frijol negro (libra),280,230,40
+Granos y pastas,Frijol colorado (libra),300,250,15
+Granos y pastas,Garbanzo (libra),400,330,10
+Granos y pastas,Chícharo (libra),300,250,12
+Granos y pastas,Espaguetis (1/2 kg),300,250,30
+Granos y pastas,Harina de maíz (libra),150,122,20
+Lácteos y huevos,Huevos (cartón),3000,2550,5
+Lácteos y huevos,Leche en polvo (900 g),1650,1400,8
+Lácteos y huevos,Yogur (1.5 L),400,330,15
+Lácteos y huevos,Queso blanco (libra),550,455,10
+Aceites y grasas,Aceite comestible (1 L),1200,1010,12
+Aceites y grasas,Manteca de cerdo (libra),600,500,10
+Verduras y hortalizas,Tomate (libra),175,140,25
+Verduras y hortalizas,Cebolla (ristra),250,205,10
+Verduras y hortalizas,Ajo (unidad),65,52,50
+Verduras y hortalizas,Ají cachucha (libra),95,78,12
+Verduras y hortalizas,Calabaza (libra),55,44,15
+Verduras y hortalizas,Boniato (libra),75,60,20
+Verduras y hortalizas,Yuca (libra),40,32,25
+Verduras y hortalizas,Plátano macho (libra),32,26,30
+Frutas,Frutabomba (libra),85,70,15
+Frutas,Guayaba (libra),70,58,15
+Frutas,Mango (libra),60,50,20
+Frutas,Piña (unidad),175,145,10
+Frutas,Manzana (libra),280,230,15
+Frutas,Limón (libra),325,270,12
+Despensa,Azúcar (libra),290,240,40
+Despensa,Sal (libra),61,50,30
+Despensa,Café (libra),240,196,15
+Bebidas,Cerveza Cristal (lata 355 ml),420,355,48
+Aseo e higiene,Pasta dental (100 ml),120,95,12
+Aseo e higiene,Jabón de baño (100 g),150,120,24
+Aseo e higiene,Detergente en polvo (500 g),280,228,18
+Aseo e higiene,Detergente líquido (800 g),450,370,12
+Aseo e higiene,Champú (400 ml),520,430,10
