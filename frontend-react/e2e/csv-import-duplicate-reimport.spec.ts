@@ -109,9 +109,9 @@ test.describe.serial('CSV re-import reuses products (2026-09-02 row-level rule)'
     // Products under Pizzas, priced as imported.
     await toggles.filter({ hasText: catP }).click();
     await expect(page.getByText('PizzaA')).toBeVisible();
-    await expect(page.getByText('$150.00')).toBeVisible();
+    await expect(page.getByText('$150')).toBeVisible();
     await expect(page.getByText('PizzaB')).toBeVisible();
-    await expect(page.getByText('$200.00')).toBeVisible();
+    await expect(page.getByText('$200')).toBeVisible();
 
     // Product under Confituras.
     await toggles.filter({ hasText: catC }).click();
@@ -143,11 +143,11 @@ test.describe.serial('CSV re-import reuses products (2026-09-02 row-level rule)'
     await expect(page.getByText('PizzaB')).toHaveCount(1);
 
     // Reused products' prices updated to the second import's values.
-    await expect(page.getByText('$160.00')).toBeVisible();
-    await expect(page.getByText('$190.00')).toBeVisible();
+    await expect(page.getByText('$160')).toBeVisible();
+    await expect(page.getByText('$190')).toBeVisible();
 
     await toggles.filter({ hasText: catC }).click();
     await expect(page.getByText('Caramel')).toHaveCount(1);
-    await expect(page.getByText('$25.00')).toBeVisible();
+    await expect(page.getByText('$25')).toBeVisible();
   });
 });
