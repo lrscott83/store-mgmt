@@ -3,19 +3,18 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { seedDemoDataForStore } from '~/shared/lib/dev/demo-data-generator';
 
 /**
- * DEMO-SEED — development-only floating button that fills the current store's LOCAL
- * storage with ~90 days of demo data (orders cycling Efectivo/Tarjeta/Zelle without
- * credits + monthly expenses). Only rendered when `import.meta.env.DEV` (root.tsx),
- * only when a store is selected, and only for the demo/dev login `lrscott`; the
- * production build drops the component entirely.
+ * DEMO-SEED — floating button that fills the current store's LOCAL storage with
+ * ~90 days of demo data (orders cycling Efectivo/Tarjeta/Zelle without credits +
+ * monthly expenses). Available in every build (DEV and production); it only
+ * renders when a store is selected and only for the demo/dev login `lrscott`.
  */
 export function DemoSeedButton() {
   const user = useAuthStore((state) => state.user);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Dev-only login gate: the generator is for the demo/dev user only, never for
-  // other store users (logins are compared case-insensitively).
+  // Login gate: the generator is for the demo/dev user only, never for other
+  // store users (logins are compared case-insensitively).
   const isAllowedDevUser = user?.login?.toLowerCase() === 'lrscott';
   const storeId = user?.selectedStoreId;
   if (!isAllowedDevUser || !storeId) return null;

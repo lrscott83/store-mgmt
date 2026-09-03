@@ -117,9 +117,10 @@ export default function App() {
           root is RR7's true equivalent of AppComponent, so it must mount here
           — not in app-layout.tsx, which only wraps authenticated routes. */}
       <InstallAppButton />
-      {/* DEMO-SEED: dev-only 90-day data generator (orders + expenses). Rendered only
-          in development builds; dead-code-eliminated from production. */}
-      {import.meta.env.DEV && <DemoSeedButton />}
+      {/* DEMO-SEED: 90-day data generator (orders + expenses). Available in all
+          builds; visibility is gated inside the component to the lrscott login
+          (and to a selected store). */}
+      <DemoSeedButton />
     </>
   );
 }
