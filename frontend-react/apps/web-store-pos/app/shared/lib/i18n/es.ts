@@ -730,7 +730,7 @@ const messages: Record<string, string> = {
   'STORES.DEACTIVATE_PAID_MESSAGE': '¿Está seguro que desea desactivar el plan de pago? Se deshabilitarán los módulos de pago asociados.',
 
   // Billing — payment status banner (neutral Latin American Spanish, no voseo)
-  'BILLING.TRIAL_NOTICE': 'Probando el plan de pago. El primer cobro del plan pago será el {date}.',
+  'BILLING.TRIAL_NOTICE': 'Probando el plan de pago. Primer cobro será el {date}, PERO si no pagas pasas al plan gratis.',
   'BILLING.DUE_NOTICE': 'El pago del plan vence el {date}. Realice el pago para evitar interrupciones en el servicio.',
   'BILLING.OVERDUE_NOTICE': 'El pago del plan está vencido. Algunas funciones pueden estar restringidas hasta regularizar la situación.',
 
