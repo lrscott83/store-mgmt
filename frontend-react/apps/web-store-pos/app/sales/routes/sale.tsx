@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
-import { EFeatures, OrderType } from '@store-mgmt/domain';
+import { EFeatures, OrderType, ProductErrors } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Switch } from '~/shared/components/ui/switch';
+import { ScanBarcodeIcon } from '~/shared/components/ui/icons';
+import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -16,6 +19,7 @@ import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { hasAvailableProductToSale } from '../lib/product-availability';
 import { SaleCategoryProducts } from '../components/sale-category-products';
+import { ScannerModal } from '../components/scanner-modal';
 
 export const clientLoader = featureLoader([EFeatures.Sale]);
 
@@ -39,6 +43,7 @@ export function SalePage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchAllCategories, setSearchAllCategories] = useState(true);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   // Tracks category IDs that have at least one product available to sale.
   // Updated by a useEffect; categories with no sellable products are hidden from tabs.
   const [sellableCategoryIds, setSellableCategoryIds] = useState<Set<string>>(
@@ -136,15 +141,14 @@ export function SalePage() {
   function handleAdded(productId: string, quantity: number, price: number) {
     const product = displayedProducts.find((p) => p.id === productId);
     if (!product) return;
-    addItem(product, quantity, OrderType.Normal, price);
+    addProductToSale(product, quantity, price);
   }
 
-  // 1:1 port of Angular's addProductToCart's inventory check (sale-product-row.component.ts
-  // :58-104 -> InventoryOfflineService.hasAvailableProductToSale). Includes the cart's
-  // existing quantity for this product (Angular's shoppingCartService.getCartItemQuantity)
-  // and is gated by hasInventoryModuleAvailable + product.discountFromInvantory internally.
-  function checkAvailability(productId: string, quantity: number) {
-    const product = displayedProducts.find((p) => p.id === productId);
+  /** Shared inventory gate — 1:1 port of Angular's addProductToCart check
+   * (sale-product-row.component.ts:58-104 -> hasAvailableProductToSale),
+   * including the cart's existing quantity and the inventory-module +
+   * discountFromInvantory gate living inside the predicate itself. */
+  function availabilityGate(product: Product | undefined, productId: string, quantity: number) {
     const inventoryService = new InventoryOfflineService(
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
@@ -155,6 +159,60 @@ export function SalePage() {
       cartQuantity: getCartItemQuantity(productId),
       hasInventoryModule: user ? hasInventoryModuleAvailable(user) : false,
       inventory: inventoryService.getAvailableQuantity(productId),
+    });
+  }
+
+  function checkAvailability(productId: string, quantity: number) {
+    const product = displayedProducts.find((p) => p.id === productId);
+    return availabilityGate(product, productId, quantity);
+  }
+
+  /**
+   * SHARED add-to-sale chokepoint — the manual row add (via handleAdded)
+   * and the barcode scanner both land here: gate, then add. Zero behavior
+   * change for the manual path (the row pre-checks with checkAvailability;
+   * the gate is pure, so re-running it here is deterministic).
+   */
+  function addProductToSale(product: Product, quantity: number, price?: number) {
+    const availability = availabilityGate(product, product.id, quantity);
+    if (!availability.succeeded) {
+      return availability;
+    }
+    addItem(product, quantity, OrderType.Normal, price ?? product.price);
+    return availability;
+  }
+
+  /**
+   * Scanner flow: barcode -> lookup -> sellability -> the SAME shared
+   * addProductToSale gate as the manual add. The repository's barcode
+   * lookup does NOT filter isActive/availableToSale (unlike the
+   * category-scoped sellable query the manual rows come from), so the
+   * scanner must check both before adding — a non-sellable product gets
+   * its own message, NOT "not found", so the merchant knows the barcode
+   * works but the product can't be sold.
+   */
+  function handleScanned(barcode: string) {
+    const productService = createProductService(storeId);
+    productService.getProductByBarcode(barcode).then((result) => {
+      const product = result.data;
+      if (!product) {
+        showToastError(intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_FOUND' }, { barcode }));
+        return;
+      }
+      if (!product.isActive || !product.availableToSale) {
+        showToastError(intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_SELLABLE' }, { name: product.name }));
+        return;
+      }
+      const availability = addProductToSale(product, 1);
+      if (!availability.succeeded) {
+        // Same blocking-alert contract as the manual row add
+        // (sale-product-row.tsx:44-45).
+        const message =
+          availability.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
+        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
+        return;
+      }
+      showToastSuccess(intl.formatMessage({ id: 'SCANNER.PRODUCT_ADDED' }, { name: product.name }));
     });
   }
 
@@ -169,6 +227,16 @@ export function SalePage() {
           placeholder={intl.formatMessage({ id: 'SALES.SEARCH_PLACEHOLDER' })}
           className="min-w-0 flex-1 rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
+        <button
+          type="button"
+          onClick={() => setIsScannerOpen(true)}
+          aria-label={intl.formatMessage({ id: 'SCANNER.TITLE' })}
+          title={intl.formatMessage({ id: 'SCANNER.TITLE' })}
+          data-testid="quick-sale-scanner"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-primary transition-colors hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <ScanBarcodeIcon />
+        </button>
         <Switch
           checked={searchAllCategories}
           onChange={setSearchAllCategories}
@@ -219,6 +287,9 @@ export function SalePage() {
           {/* SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE */}
           {intl.formatMessage({ id: 'SALES.NO_SELECTED_CATEGORY_ALERT_MESSAGE' })}
         </InfoBox>
+      )}
+      {isScannerOpen && (
+        <ScannerModal onScanned={handleScanned} onClose={() => setIsScannerOpen(false)} />
       )}
     </Card>
   );

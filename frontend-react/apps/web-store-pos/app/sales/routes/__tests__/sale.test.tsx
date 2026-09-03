@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
-import { EModules } from '@store-mgmt/domain';
+import { EModules, OrderType } from '@store-mgmt/domain';
 
 const mockUser = vi.hoisted(() => ({ selectedStoreId: 's1', storeModuleIds: [] as number[] }));
 
@@ -26,6 +26,25 @@ const { bm } = vi.hoisted(() => ({
 const saleServiceSpies = vi.hoisted(() => ({
   getProductsToSaleByCategoryId: vi.fn(),
   getAvailableProductCategories: vi.fn(),
+  getProductByBarcode: vi.fn(),
+}));
+
+// Scanner camera lib — mocked so opening the modal never loads the real
+// @zxing/browser (lazy chunk) in jsdom; the camera effect's rejection path
+// is what the sale-level tests exercise anyway.
+vi.mock('@zxing/browser', () => ({
+  BrowserMultiFormatReader: vi.fn().mockImplementation(() => ({
+    decodeFromVideoDevice: vi.fn().mockRejectedValue(new Error('no camera in jsdom')),
+  })),
+}));
+
+// Scanner flow feedback — mocked so tests assert the message choice
+// (not-found vs not-sellable vs added) without mounting react-toastify.
+const showToastErrorMock = vi.hoisted(() => vi.fn());
+const showToastSuccessMock = vi.hoisted(() => vi.fn());
+vi.mock('~/shared/lib/toast', () => ({
+  showToastError: showToastErrorMock,
+  showToastSuccess: showToastSuccessMock,
 }));
 
 vi.mock('~/sales/lib/services/product-offline-service', () => ({
@@ -33,6 +52,7 @@ vi.mock('~/sales/lib/services/product-offline-service', () => ({
     // Angular parity: getProductsToSaleByCategoryId -> categoryId + isActive + availableToSale,
     // sorted by order. Implementation is set in beforeEach so the spy stays inspectable.
     getProductsToSaleByCategoryId: saleServiceSpies.getProductsToSaleByCategoryId,
+    getProductByBarcode: saleServiceSpies.getProductByBarcode,
   })),
 }));
 
@@ -118,6 +138,10 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     saleServiceSpies.getAvailableProductCategories.mockImplementation(async () =>
       bm(mockCategories.filter((c) => c.isActive).sort((a, b) => a.order - b.order)),
     );
+    saleServiceSpies.getProductByBarcode.mockReset();
+    saleServiceSpies.getProductByBarcode.mockImplementation(async () => bm(null));
+    showToastErrorMock.mockClear();
+    showToastSuccessMock.mockClear();
   });
 
   it('renders the exact Angular header text SALES.HEADER', () => {
@@ -129,14 +153,18 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(screen.getByText('Productos para vender')).toBeInTheDocument();
   });
 
-  it('does NOT render a barcode-scanner entry point (Angular has it fully commented out)', () => {
+  it('renders the scanner entry point and opens the modal (React-only feature; Angular had it commented out)', async () => {
     render(
       <Wrapper>
         <SalePage />
       </Wrapper>,
     );
-    expect(screen.queryByTestId('quick-sale-scanner')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Escaneando/i)).not.toBeInTheDocument();
+    const scannerButton = screen.getByTestId('quick-sale-scanner');
+    expect(scannerButton).toBeInTheDocument();
+    expect(screen.queryByTestId('scanner-modal')).not.toBeInTheDocument();
+
+    fireEvent.click(scannerButton);
+    expect(await screen.findByTestId('scanner-modal')).toBeInTheDocument();
   });
 
   it('renders one category button per active category', async () => {
@@ -379,6 +407,112 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     await waitFor(() => expect(screen.queryByText('Papas')).not.toBeInTheDocument());
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'coca' } });
     expect(screen.getByText('Coca Cola')).toBeInTheDocument();
+  });
+
+  // ─── Barcode scanner flow (React-only feature) ────────────────────────────────
+
+  it('scanner: unknown barcode shows PRODUCT_NOT_FOUND and adds nothing', async () => {
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('quick-sale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '999999' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
+    expect(showToastErrorMock).toHaveBeenCalledWith('Producto no encontrado: 999999');
+    expect(addItemMock).not.toHaveBeenCalled();
+  });
+
+  it('scanner: sellable product is added to the cart with quantity 1 and OrderType.Normal', async () => {
+    saleServiceSpies.getProductByBarcode.mockImplementation(async () =>
+      bm(makeProduct({ id: 'p1', name: 'Coca Cola', price: 1.5, barcode: '7501' })),
+    );
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('quick-sale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
+    const [product, quantity, orderType, price] = addItemMock.mock.calls[0];
+    expect(product.id).toBe('p1');
+    expect(quantity).toBe(1);
+    expect(orderType).toBe(OrderType.Normal);
+    expect(price).toBe(1.5);
+    expect(showToastSuccessMock).toHaveBeenCalledWith('Coca Cola agregado a la venta');
+  });
+
+  it('scanner: non-sellable product gets NOT_SELLABLE (distinct from not-found) and is not added', async () => {
+    saleServiceSpies.getProductByBarcode.mockImplementation(async () =>
+      bm(makeProduct({ id: 'p1', name: 'Vieja Coca', availableToSale: false })),
+    );
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('quick-sale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
+    expect(showToastErrorMock).toHaveBeenCalledWith(
+      'El producto Vieja Coca no está disponible para la venta',
+    );
+    expect(addItemMock).not.toHaveBeenCalled();
+  });
+
+  it('scanner: repeated scans of the same sellable barcode accumulate via addItem (cart semantics)', async () => {
+    saleServiceSpies.getProductByBarcode.mockImplementation(async () =>
+      bm(makeProduct({ id: 'p1', name: 'Coca Cola', barcode: '7501' })),
+    );
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('quick-sale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('scanner: inventory gate failure shows the blocking alert and does not add', async () => {
+    mockUser.storeModuleIds = [EModules.Inventory];
+    saleServiceSpies.getProductByBarcode.mockImplementation(async () =>
+      bm(makeProduct({ id: 'p1', name: 'Coca Cola', discountFromInvantory: true })),
+    );
+    showBlockingErrorMock.mockClear();
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('quick-sale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
+    expect(addItemMock).not.toHaveBeenCalled();
+    const [, text] = showBlockingErrorMock.mock.calls[0];
+    expect(text).toBe('El producto no está disponible en el inventario.');
   });
 });
 

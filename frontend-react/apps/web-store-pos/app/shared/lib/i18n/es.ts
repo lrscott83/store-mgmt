@@ -555,6 +555,12 @@ const messages: Record<string, string> = {
   'INVENTORY.EMPTY_STATE': 'No hay entradas de inventario',
 
   // Scanner
+  'SCANNER.TITLE': 'Escanear producto',
+  'SCANNER.DONE': 'Listo',
+  'SCANNER.MANUAL_ENTRY': 'Ingresar código de barras',
+  'SCANNER.MANUAL_ENTRY_PLACEHOLDER': 'Código de barras',
+  'SCANNER.PRODUCT_ADDED': '{name} agregado a la venta',
+  'SCANNER.PRODUCT_NOT_SELLABLE': 'El producto {name} no está disponible para la venta',
   'SCANNER.CAMERA_PERMISSION_DENIED': 'Permiso de cámara denegado. Habilitá el acceso a la cámara para usar el escáner.',
   'SCANNER.PRODUCT_NOT_FOUND': 'Producto no encontrado: {barcode}',
   'SCANNER.SCANNING': 'Escaneando...',
