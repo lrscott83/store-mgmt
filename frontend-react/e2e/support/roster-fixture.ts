@@ -32,6 +32,12 @@ interface OfflineRosterUser {
   wrappedDek?: string;
   wrapSalt?: string;
   wrapIv?: string;
+  /**
+   * Backend-signed JWT minted at export time (roster-types.ts). Set only
+   * when the spec asks for it — absent on legacy bundles, which is exactly
+   * the degradation the interceptor's swap must survive.
+   */
+  offlineAuthToken?: string;
 }
 
 export interface OfflineRosterBundle {
@@ -193,6 +199,17 @@ export interface RosterUserSpec {
   wrap?: 'none' | 'kat' | 'tampered';
   /** default `true` */
   isOwnerAdmin?: boolean;
+  /**
+   * default: a synthetic `e2e-roster-user-<login>` id. Override with a REAL
+   * user id when the fixture must impersonate a backend-created user — the
+   * roster-JWT swap matches `roster.users[].id` against `currentUser.id`.
+   */
+  id?: string;
+  /**
+   * default absent (legacy bundle). Set to a backend-signed JWT to exercise
+   * the interceptor's sentinel→JWT swap end to end.
+   */
+  offlineAuthToken?: string;
 }
 
 export interface RosterSpec {
@@ -222,7 +239,7 @@ async function buildRosterUser(userSpec: RosterUserSpec, storeId: string): Promi
   }
 
   const user: OfflineRosterUser = {
-    id: `e2e-roster-user-${userSpec.login}`,
+    id: userSpec.id ?? `e2e-roster-user-${userSpec.login}`,
     login: userSpec.login,
     fullName: `E2E Roster ${userSpec.login}`,
     isActive: userSpec.isActive ?? true,
@@ -245,6 +262,10 @@ async function buildRosterUser(userSpec: RosterUserSpec, storeId: string): Promi
     user.wrapSalt = KAT.wrapSalt;
     user.wrapIv = KAT.wrapIv;
     user.wrappedDek = tamperWrappedDek(KAT.wrappedDek);
+  }
+
+  if (userSpec.offlineAuthToken) {
+    user.offlineAuthToken = userSpec.offlineAuthToken;
   }
 
   return user;

@@ -3,6 +3,7 @@ import { StorageService } from '../auth/storage-service';
 import { useLoadingStore } from '../stores/loading-store';
 import { showBlockingError } from '../blocking-alert';
 import esMessages from '../i18n/es';
+import { OFFLINE_SESSION_TOKEN } from '../offline/offline-session';
 
 const API_TIMEOUT = 30000;
 
@@ -34,16 +35,56 @@ apiClient.interceptors.request.use((config) => {
   if (!config.skipLoading) {
     useLoadingStore.getState().start();
   }
-  // An explicitly-provided `Authorization` wins over the session token: the
-  // store-usage tracker passes the roster JWT for its telemetry POST so an
-  // offline session (whose stored token is the non-JWT 'offline-session'
-  // sentinel) can still authenticate. Nothing else sets it today.
-  const token = StorageService.getTokenFromLocalStorage();
-  if (token && !config.headers['Authorization']) {
-    config.headers['Authorization'] = `Bearer ${token}`;
+
+  // An explicitly-provided `Authorization` wins over any session-derived
+  // bearer: the store-usage tracker passes the roster JWT for its telemetry
+  // POST. Nothing else sets it today.
+  if (config.headers['Authorization']) {
+    return config;
   }
+
+  const token = StorageService.getTokenFromLocalStorage();
+  if (!token) {
+    return config;
+  }
+
+  // Offline-born session: the stored token is the non-JWT 'offline-session'
+  // sentinel, which the backend rejects with 401. The roster carries a real
+  // signed JWT (`offlineAuthToken`) for that user — present it instead so
+  // every online operation works after an offline authentication, exactly as
+  // the store-usage tracker's telemetry POST already did. Absent/expired
+  // roster or no matching user degrades to today's behavior (the sentinel).
+  //
+  // Dynamic import is deliberate (design D1): the roster store is only ever
+  // evaluated on the sentinel path, never on an ordinary online session.
+  if (token === OFFLINE_SESSION_TOKEN) {
+    return resolveOfflineSessionJwt().then((rosterJwt) => {
+      config.headers['Authorization'] = `Bearer ${rosterJwt ?? token}`;
+      return config;
+    });
+  }
+
+  config.headers['Authorization'] = `Bearer ${token}`;
   return config;
 });
+
+/**
+ * Resolves the roster's per-user JWT (`offlineAuthToken`) for the CURRENT
+ * user, or `undefined` when there is nothing to present (no roster, expired
+ * bundle, no current user, or no JWT on that roster user). Same match
+ * criterion the store-usage tracker uses: the roster user's `id` equals
+ * `UserModel.id` (offline-auth-service maps it 1:1) and `CURRENT_USER.id`.
+ */
+async function resolveOfflineSessionJwt(): Promise<string | undefined> {
+  const currentUser = StorageService.getCurrentUser();
+  if (!currentUser?.id) {
+    return undefined;
+  }
+  const { getRoster } = await import('../offline/roster-store');
+  const roster = getRoster();
+  const rosterUser = roster?.users.find((u) => u.id === currentUser.id);
+  return rosterUser?.offlineAuthToken || undefined;
+}
 
 // Mirrors Angular's _interceptors/error-interceptor.service.ts response-error
 // handling (rule 9 — error contract, not RxJS mechanics): 30s timeout (already

@@ -4,9 +4,13 @@ import type { InternalAxiosRequestConfig, AxiosError } from 'axios';
 import { StorageKeys } from '../../storage/storage-keys';
 import esMessages from '../../i18n/es';
 import { useLoadingStore } from '../../stores/loading-store';
+import { importRoster } from '../../offline/roster-store';
 
 // StorageKeys.TOKEN = 'token' (hard-coded to avoid circular config import in tests)
 const TOKEN_KEY = 'token';
+
+// StorageKeys.CURRENT_USER = 'currentUser' (hard-coded the same way).
+const CURRENT_USER_KEY = 'currentUser';
 
 // Angular's source of truth (`frontend/`) has no global Swal.mixin/theme override anywhere
 // (confirmed by repo-wide grep), so the 500 branch reproduces the same library with stock
@@ -106,6 +110,134 @@ describe('api-client (AUTH-06)', () => {
 
       const result = fulfilled(config);
       expect(result.headers?.['Authorization']).toBe('Bearer roster-jwt-abc');
+    });
+  });
+
+  // offline-jwt-as-session-credential (Option 2): an offline-born session
+  // stores the 'offline-session' sentinel as its token; the request
+  // interceptor must SWAP it for the roster's per-user JWT (`offlineAuthToken`)
+  // so every online operation authenticates — matching what the store-usage
+  // tracker's telemetry POST already did, but for ALL requests.
+  describe('Request interceptor — roster JWT swap for offline sessions (offline-jwt-as-session-credential)', () => {
+    // Plants a valid roster bundle (same shape guard the app enforces) and
+    // sets CURRENT_USER to a user whose id matches roster user `u1`.
+    async function seedOfflineSession(rosterOverrides: {
+      offlineAuthToken?: string;
+    }): Promise<void> {
+      localStorage.setItem(TOKEN_KEY, 'offline-session');
+      localStorage.setItem(
+        CURRENT_USER_KEY,
+        JSON.stringify({ id: 'u1', login: 'ana', authToken: 'offline-session' })
+      );
+      const verifier = { hash: 'h', salt: 's', iterations: 1 };
+      importRoster({
+        bundleId: 'b1',
+        issuedAt: Date.now() - 1000,
+        expiresAt: Date.now() + 1_000_000,
+        formatVersion: 2,
+        storeId: 's1',
+        users: [
+          {
+            id: 'u1',
+            login: 'ana',
+            fullName: 'Ana',
+            isActive: true,
+            roles: [],
+            featureIds: [1],
+            storeModuleIds: [],
+            isSuperAdmin: false,
+            isOwnerAdmin: false,
+            isReSeller: false,
+            selectedStoreId: 's1',
+            verifier,
+            ...rosterOverrides,
+          },
+        ],
+      });
+    }
+
+    it('swaps the sentinel for the roster JWT when the roster user has an offlineAuthToken', async () => {
+      await seedOfflineSession({ offlineAuthToken: 'roster-jwt-abc' });
+      const { apiClient } = await import('../api-client');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+      const config = {
+        headers: { ...axios.defaults.headers.common },
+        url: '/v1/users/all/true',
+        method: 'get',
+      } as unknown as InternalAxiosRequestConfig;
+
+      const result = (await fulfilled(config)) as InternalAxiosRequestConfig;
+      expect(result.headers?.['Authorization']).toBe('Bearer roster-jwt-abc');
+    });
+
+    it('keeps the sentinel when the roster user has no offlineAuthToken (roster v1 / legacy bundle)', async () => {
+      await seedOfflineSession({}); // no offlineAuthToken field
+      const { apiClient } = await import('../api-client');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+      const config = {
+        headers: { ...axios.defaults.headers.common },
+        url: '/v1/users/all/true',
+        method: 'get',
+      } as unknown as InternalAxiosRequestConfig;
+
+      const result = (await fulfilled(config)) as InternalAxiosRequestConfig;
+      expect(result.headers?.['Authorization']).toBe('Bearer offline-session');
+    });
+
+    it('keeps the sentinel when no roster is provisioned (or it expired)', async () => {
+      // No importRoster call — just the sentinel token + current user, the
+      // state of a stale/expired bundle whose roster key is gone.
+      localStorage.setItem(TOKEN_KEY, 'offline-session');
+      localStorage.setItem(
+        CURRENT_USER_KEY,
+        JSON.stringify({ id: 'u1', login: 'ana', authToken: 'offline-session' })
+      );
+      const { apiClient } = await import('../api-client');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+      const config = {
+        headers: { ...axios.defaults.headers.common },
+        url: '/v1/users/all/true',
+        method: 'get',
+      } as unknown as InternalAxiosRequestConfig;
+
+      const result = (await fulfilled(config)) as InternalAxiosRequestConfig;
+      expect(result.headers?.['Authorization']).toBe('Bearer offline-session');
+    });
+
+    it('does not swap for an online session token — the stored JWT is used as-is', async () => {
+      localStorage.setItem(TOKEN_KEY, 'online-jwt-123');
+      const { apiClient } = await import('../api-client');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+      const config = {
+        headers: { ...axios.defaults.headers.common },
+        url: '/v1/auth/me',
+        method: 'get',
+      } as unknown as InternalAxiosRequestConfig;
+
+      const result = fulfilled(config);
+      expect(result.headers?.['Authorization']).toBe('Bearer online-jwt-123');
+    });
+
+    it('lets an explicitly-provided Authorization win over the roster swap', async () => {
+      await seedOfflineSession({ offlineAuthToken: 'roster-jwt-abc' });
+      const { apiClient } = await import('../api-client');
+
+      const fulfilled = getRequestInterceptor(apiClient);
+      const config = {
+        headers: {
+          ...axios.defaults.headers.common,
+          Authorization: 'Bearer explicit-header-wins',
+        },
+        url: '/v1/usages/store-daily-usage',
+        method: 'post',
+      } as unknown as InternalAxiosRequestConfig;
+
+      const result = fulfilled(config);
+      expect(result.headers?.['Authorization']).toBe('Bearer explicit-header-wins');
     });
   });
 
