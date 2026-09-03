@@ -125,9 +125,11 @@ public class ExportOfflineRosterQueryHandlerTests
         var msPerDay = 24 * 60 * 60 * 1000L;
         (dto.ExpiresAt - dto.IssuedAt).Should().Be(35 * msPerDay);
 
-        dto.Users.Should().HaveCount(2);
+        // The inactive "clerk" user is excluded from the roster (see the
+        // exclude-inactive-users behavior), so only the active admin is exported.
+        dto.Users.Should().HaveCount(1);
 
-        // Both users should have a verifier attached
+        // The exported (active) user should have a verifier attached
         foreach (var user in dto.Users)
         {
             user.Verifier.Should().NotBeNull();

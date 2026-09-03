@@ -161,7 +161,7 @@ describe('offline-auth-service — authenticateOffline (offline-auth-mode spec)'
   });
 
   // offline-auth-mode: "Offline-hydrated UserModel carries no-billing-data defaults"
-  it('maps billing fields to the no-billing-data defaults (design correction #1)', async () => {
+  it('maps billing fields to the no-billing-data defaults for a legacy bundle without billing fields (design correction #1)', async () => {
     await seedBundle();
     const user = await authenticateOffline('ana', 'secret');
     expect(user.paymentDueDate).toBeNull();
@@ -172,6 +172,20 @@ describe('offline-auth-service — authenticateOffline (offline-auth-mode spec)'
     expect(user.password).toBe('');
     expect(user.refreshToken).toBe('');
     expect(user.expiresIn).toBe(0);
+  });
+
+  // offline-auth-mode: a roster user whose bundle carries the backend's
+  // billing snapshot must map it onto the hydrated UserModel.
+  it('propagates the roster billing snapshot onto the hydrated UserModel', async () => {
+    await seedBundle({
+      paymentDueDate: '2026-10-01',
+      isInTrial: true,
+      paymentStatus: 'AlDia',
+    });
+    const user = await authenticateOffline('ana', 'secret');
+    expect(user.paymentDueDate).toBe('2026-10-01');
+    expect(user.isInTrial).toBe(true);
+    expect(user.paymentStatus).toBe('AlDia');
   });
 });
 

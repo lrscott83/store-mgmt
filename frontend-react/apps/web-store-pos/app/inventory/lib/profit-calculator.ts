@@ -1,4 +1,5 @@
 import type { OrderItem } from '@store-mgmt/domain';
+import { round2 } from '~/shared/lib/money';
 
 export interface OrderProfitResult {
   revenue: number;
@@ -16,12 +17,11 @@ export interface OrderProfitResult {
  * Spec §6.5; Scenarios S-I7, S-I8.
  */
 export function calculateOrderProfit(orderItem: OrderItem): OrderProfitResult {
-  const revenue = orderItem.price * orderItem.quantity;
-  const cost = orderItem.productCosts.reduce(
-    (sum, pc) => sum + pc.costPrice * pc.quantity,
-    0,
+  const revenue = round2(orderItem.price * orderItem.quantity);
+  const cost = round2(
+    orderItem.productCosts.reduce((sum, pc) => sum + round2(pc.costPrice * pc.quantity), 0),
   );
-  const profit = revenue - cost;
+  const profit = round2(revenue - cost);
   const margin = revenue === 0 ? 0 : (profit / revenue) * 100;
 
   return { revenue, cost, profit, margin };

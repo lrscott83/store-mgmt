@@ -1224,11 +1224,22 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     }
 
     function mockCreateCsvProductsOnce(
-      created: { id: string; category: string; name: string; price: number; cost?: number; quantity?: number }[],
+      created: {
+        id: string;
+        category: string;
+        name: string;
+        price: number;
+        cost?: number;
+        quantity?: number;
+        existing?: boolean;
+      }[],
       failed: { category: string; name: string; price: number; cost?: number; quantity?: number }[] = [],
     ) {
       productServiceSpies.createCsvProducts.mockResolvedValueOnce({
-        data: { created, failed },
+        data: {
+          created: created.map((c) => ({ ...c, existing: c.existing ?? false })),
+          failed,
+        },
         succeeded: true,
         message: '',
         actionCode: 200,
@@ -1433,14 +1444,15 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       );
     });
 
-    it('shows one blocking dialog enumerating each duplicate as "Categoría - Nombre", comma-joined', async () => {
-      mockCreateCsvProductsOnce(
-        [],
-        [
-          { category: 'Pizzas', name: 'Pizza de Queso', price: 150 },
-          { category: 'Confituras', name: 'Caramelo', price: 20 },
-        ],
-      );
+    // 2026-09-02 row-level import rule: there are NO duplicate failures — a row that matches an
+    // existing product is REUSED (already-updated price) and processed like any other row. The
+    // old "Algunos productos no fueron importados porque ya existen" dialog is gone, so reused
+    // (existing) rows must NOT trigger it.
+    it('does NOT show the "ya existen" dialog for reused (existing) rows — they create entries like new rows', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p1', category: 'Pizzas', name: 'Pizza de Queso', price: 150, existing: true },
+        { id: 'p2', category: 'Confituras', name: 'Caramelo', price: 20, existing: true },
+      ]);
       render(
         <Wrapper>
           <ProductsPage />
@@ -1453,13 +1465,9 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
       await waitFor(() =>
-        expect(showBlockingInfoMock).toHaveBeenCalledWith(
-          'Información',
-          'Algunos productos no fueron importados porque ya existen: Pizzas - Pizza de Queso, Confituras - Caramelo.',
-        ),
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 2 productos y 0 entradas correctamente.'),
       );
-      expect(showBlockingInfoMock).toHaveBeenCalledTimes(1);
-      expect(inventoryServiceSpies.createInventoryEntry).not.toHaveBeenCalled();
+      expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
 
     it('does not show the duplicate dialog when there are no failed rows', async () => {
@@ -1479,25 +1487,19 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
 
-    // sdd-verify WARNING #1 (csv-import-cost-quantity-entries): each half of REQ-6 scenario 1
-    // (real non-zero counts, aggregated duplicate dialog) was independently pinned above, but the
-    // INTERACTION — does the toast still report correct non-zero counts when a duplicate dialog
-    // ALSO fires in the same import — was untested. The old pre-change test explicitly asserted
-    // showToastSuccessMock was called once alongside the dialog; that check was dropped during the
-    // succeeded->failed.length contract rewrite and not replaced. This restores it in the new
-    // counts-based shape, from ONE createCsvProducts response carrying both created and failed rows.
-    it('reports real non-zero counts AND shows the duplicate dialog together, from a single import (REQ-6 sc.1)', async () => {
-      mockCreateCsvProductsOnce(
-        [
-          { id: 'p10', category: 'Pizzas', name: 'Pizza de Queso', price: 150, cost: 120, quantity: 10 },
-          { id: 'p11', category: 'Pizzas', name: 'Pizza Especial', price: 200, cost: 150, quantity: 5 },
-          { id: 'p12', category: 'Confituras', name: 'Caramelo', price: 20, cost: undefined, quantity: undefined },
-        ],
-        [
-          { category: 'Pizzas', name: 'Pizza Vieja', price: 100 },
-          { category: 'Confituras', name: 'Chocolate', price: 30 },
-        ],
-      );
+    // sdd-verify WARNING #1 (csv-import-cost-quantity-entries) — updated for the 2026-09-02
+    // row-level import rule: the old "created + failed" split no longer exists. Every processed
+    // row (created OR reused) lands in `created`, so a batch of mixed new/existing rows reports
+    // one aggregate toast with real counts and NO duplicate dialog, and creates one entry per
+    // row carrying a qualifying quantity.
+    it('reports real non-zero counts for a mixed new/existing batch, from a single import, with NO duplicate dialog', async () => {
+      mockCreateCsvProductsOnce([
+        { id: 'p10', category: 'Pizzas', name: 'Pizza de Queso', price: 150, cost: 120, quantity: 10, existing: false },
+        { id: 'p11', category: 'Pizzas', name: 'Pizza Especial', price: 200, cost: 150, quantity: 5, existing: false },
+        { id: 'p12', category: 'Confituras', name: 'Caramelo', price: 20, cost: undefined, quantity: undefined, existing: false },
+        { id: 'p13', category: 'Pizzas', name: 'Pizza Vieja', price: 100, cost: undefined, quantity: undefined, existing: true },
+        { id: 'p14', category: 'Confituras', name: 'Chocolate', price: 30, cost: undefined, quantity: undefined, existing: true },
+      ]);
       render(
         <Wrapper>
           <ProductsPage />
@@ -1509,22 +1511,17 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
       await waitFor(() => expect(screen.getByTestId('csv-import-button')).toBeInTheDocument());
       fireEvent.click(screen.getByTestId('csv-import-button'));
 
-      // Real counts: 3 products created (not 5 rows attempted), 2 entries (only the 2 rows
-      // carrying a qualifying quantity — the 3rd created row has no quantity).
+      // 5 rows processed, 2 entries (only the 2 rows carrying a qualifying quantity).
       await waitFor(() =>
-        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 3 productos y 2 entradas correctamente.'),
+        expect(showToastSuccessMock).toHaveBeenCalledWith('Importados 5 productos y 2 entradas correctamente.'),
       );
       expect(showToastSuccessMock).toHaveBeenCalledTimes(1);
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenCalledTimes(2);
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(1, 'p10', 10, 120);
       expect(inventoryServiceSpies.createInventoryEntry).toHaveBeenNthCalledWith(2, 'p11', 5, 150);
 
-      // The SAME import also aggregates the 2 duplicate rows into ONE dialog.
-      expect(showBlockingInfoMock).toHaveBeenCalledWith(
-        'Información',
-        'Algunos productos no fueron importados porque ya existen: Pizzas - Pizza Vieja, Confituras - Chocolate.',
-      );
-      expect(showBlockingInfoMock).toHaveBeenCalledTimes(1);
+      // No duplicate dialog anymore.
+      expect(showBlockingInfoMock).not.toHaveBeenCalled();
     });
 
     it('keeps the modal open when createCsvProducts rejects with MissingDataKeyError', async () => {

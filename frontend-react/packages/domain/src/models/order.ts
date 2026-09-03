@@ -8,6 +8,7 @@ export interface OrderItem {
   categoryId: string;
   categoryName: string;
   name: string;
+  /** Quantity sold. May be a decimal (fractional, e.g. 1.5, 0.25, 2.75); not limited to integers. */
   quantity: number;
   price: number;
   productBusinessId: string;

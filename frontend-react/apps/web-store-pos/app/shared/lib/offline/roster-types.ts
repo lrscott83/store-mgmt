@@ -47,6 +47,16 @@ export interface OfflineRosterUser {
    * `OFLINE_SESSION_TOKEN` sentinel, exactly today's behavior.
    */
   offlineAuthToken?: string;
+  /**
+   * Billing snapshot exported by the backend for each roster user
+   * (`PaymentDueDate` serialized as ISO "yyyy-MM-dd", `IsInTrial`,
+   * `PaymentStatus`). Absent on legacy bundles saved before the backend
+   * shipped these fields — `offline-auth-service.ts` falls back to sober
+   * no-billing-data defaults for those.
+   */
+  paymentDueDate?: string | null;
+  isInTrial?: boolean;
+  paymentStatus?: string;
 }
 
 export interface OfflineRosterBundle {

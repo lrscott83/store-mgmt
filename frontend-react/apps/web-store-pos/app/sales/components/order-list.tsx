@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Order } from '@store-mgmt/domain';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { round2 } from '~/shared/lib/money';
 import { OrderItemList } from './order-item-list';
 
 interface OrderListProps {
@@ -18,7 +19,7 @@ function formatTime(date: Date): string {
 }
 
 function getOrderTotal(order: Order): number {
-  return order.orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return round2(order.orderItems.reduce((sum, item) => sum + round2(item.price * item.quantity), 0));
 }
 
 function getOrderItemsCount(order: Order): number {

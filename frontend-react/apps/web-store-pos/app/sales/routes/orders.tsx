@@ -16,6 +16,7 @@ import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-r
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
 import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
+import { round2 } from '~/shared/lib/money';
 import { ProductRepository } from '../lib/repositories/product-repository';
 import { ProductCategoryRepository } from '../lib/repositories/product-category-repository';
 import { OrderList } from '../components/order-list';
@@ -50,8 +51,8 @@ function computeDaySalesSummary(storeId: string, dateId: string): DaySalesSummar
   for (const order of orders) {
     for (const item of order.orderItems) {
       const result = calculateOrderProfit(item);
-      totalRevenue += result.revenue;
-      totalCost += result.cost;
+      totalRevenue = round2(totalRevenue + result.revenue);
+      totalCost = round2(totalCost + result.cost);
     }
   }
 
@@ -60,7 +61,7 @@ function computeDaySalesSummary(storeId: string, dateId: string): DaySalesSummar
     orderCount: orders.length,
     totalRevenue,
     totalCost,
-    totalProfit: totalRevenue - totalCost,
+    totalProfit: round2(totalRevenue - totalCost),
   };
 }
 

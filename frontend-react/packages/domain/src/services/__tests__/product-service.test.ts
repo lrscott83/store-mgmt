@@ -68,7 +68,7 @@ class FakeProductService implements ProductService {
     const created: CsvProductCreated[] = csvProducts.map((row, index) => {
       const id = `csv-${index}`;
       this.items.push(makeProduct({ id, name: row.name, price: row.price, categoryName: row.category }));
-      return { ...row, id };
+      return { ...row, id, existing: false };
     });
     return success({ created, failed: [] });
   }

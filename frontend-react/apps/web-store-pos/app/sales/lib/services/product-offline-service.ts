@@ -10,6 +10,7 @@ import type {
 import { failure, ProductErrors, success } from '@store-mgmt/domain';
 import { ProductRepository } from '../repositories/product-repository';
 import { ProductCategoryRepository } from '../repositories/product-category-repository';
+import { normalizeDisplayName } from '../csv-product-normalizer';
 
 // Module-local id generator (same pattern as inventory-offline-service.ts:89,
 // order-offline-service.ts:58, expense-offline-service.ts:9,
@@ -237,35 +238,65 @@ export class ProductOfflineService implements ProductService {
   /**
    * Was a 1:1 port of Angular `createCsvProducts` (product-offline.service.ts:74-84). DIVERGES
    * DELIBERATELY (decisions #2/#3/#13/#15). Unchanged: per-row category resolve-or-create, the
-   * hardcoded flags, no barcode, the non-short-circuited forEach. Changed: the id is generated
-   * HERE and handed to `addProductData` (instead of `addProduct` generating and discarding it) so
-   * the caller can address inventory entries to the created products; the return is a per-row
-   * `CsvImportResult` instead of `Success(true)`/`Failure([])`. It ALWAYS resolves `success(...)`
-   * — `failure()` hardcodes `data:null` (envelope.ts:19-27) and would destroy the payload — so
-   * callers branch on `data.failed.length > 0`, never on `succeeded`. ANGULAR-BUG-SUSPECT #1 is
-   * retired for THIS method only; `createProducts` still mirrors it.
+   * hardcoded flags, no barcode, the non-short-circuited forEach, and an id generated HERE so the
+   * caller can address inventory entries to the created products. Changed: the return is a
+   * per-row `CsvImportResult` instead of `Success(true)`/`Failure([])`.
+   *
+   * 2026-09-02 ROW-LEVEL IMPORT RULE: product uniqueness is category + name, compared
+   * CASE-INSENSITIVELY, and rows are import entries — there are NO duplicate failures.
+   * For each row: (1) resolve-or-create the category case-insensitively; (2) find an existing
+   * product by (category, name) case-insensitively; (3) if found, REUSE its id and update its
+   * sale price to this row's (via `updateProduct`/`updateImportedProduct`); (4) if not found,
+   * generate an id and `addProductData` with the normalized name and this row's price. Names and
+   * categories are persisted normalized (first letter capitalized). Repeated rows of the same
+   * product create N inventory entries against ONE product, and the sale price ends with the
+   * LAST row's value. Every processed row lands in `created` with its resolved id and an
+   * `existing` flag (created vs reused); `failed` is always empty — the parser validates rows.
+   *
+   * It ALWAYS resolves `success(...)` — `failure()` hardcodes `data:null` (envelope.ts:19-27)
+   * and would destroy the payload — so callers branch on the returned rows, never on `succeeded`
+   * (ADR-1; ANGULAR-BUG-SUSPECT #1 is retired for THIS method only).
    */
   async createCsvProducts(csvProducts: CsvProduct[]): Promise<BaseResponseModel<CsvImportResult>> {
     const created: CsvProductCreated[] = [];
     const failed: CsvProduct[] = [];
     csvProducts.forEach((csvProduct) => {
-      const existingCat = this.categoryRepository.getProductCategoryByName(csvProduct.category);
-      const categoryId = existingCat ? existingCat.id : this.categoryRepository.addProductCategoryByName(csvProduct.category);
-      const order = this.getNextOrder(categoryId);
-      const id = generateId();
-      const result = this.productRepository.addProductData(
-        id,
-        categoryId,
-        csvProduct.name,
-        csvProduct.price,
-        '',
-        order,
-        true,
-        true,
-        true,
-      );
-      if (result.succeeded) created.push({ ...csvProduct, id });
-      else failed.push(csvProduct);
+      const categoryName = normalizeDisplayName(csvProduct.category);
+      const productName = normalizeDisplayName(csvProduct.name);
+
+      const existingCat = this.categoryRepository.findProductCategoryByNameIgnoreCase(categoryName);
+      const categoryId = existingCat
+        ? existingCat.id
+        : this.categoryRepository.addProductCategoryByName(categoryName);
+
+      const existingProduct = this.productRepository.findProductByCategoryAndName(categoryId, productName);
+      if (existingProduct) {
+        // Reuse the existing product's id and refresh its sale price to this row's value. The
+        // row keeps its own cost/quantity for the inventory entry.
+        this.productRepository.updateImportedProduct({
+          ...existingProduct,
+          price: csvProduct.price,
+          name: productName,
+          categoryName,
+        });
+        created.push({ ...csvProduct, category: categoryName, name: productName, id: existingProduct.id, existing: true });
+      } else {
+        const order = this.getNextOrder(categoryId);
+        const id = generateId();
+        const result = this.productRepository.addProductData(
+          id,
+          categoryId,
+          productName,
+          csvProduct.price,
+          '',
+          order,
+          true,
+          true,
+          true,
+        );
+        if (result.succeeded) created.push({ ...csvProduct, category: categoryName, name: productName, id, existing: false });
+        else failed.push(csvProduct);
+      }
     });
     return success({ created, failed });
   }

@@ -206,6 +206,34 @@ describe('InventoryOfflineService', () => {
       expect(costs[0].inventoryId).toBe('e1');
       expect(costs[0].quantity).toBe(3);
     });
+
+    it('deducts a fractional quantity (1.5) from available without float drift', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { order: 0, available: 10, costPrice: 2.5 }),
+      ]);
+      seedInventory(storeId, map);
+
+      const costs = service.getAvailableInventoryCosts('p1', 1.5);
+
+      expect(costs).toHaveLength(1);
+      expect(costs[0].quantity).toBe(1.5);
+      expect(findRawEntry(storeId, 'e1')?.available).toBeCloseTo(8.5, 10);
+    });
+
+    it('rounds a fractional deduction to 2 accounting decimal places', () => {
+      const map = new Map<string, InventoryEntry[]>();
+      map.set('p1', [
+        makeEntry('e1', 'p1', { order: 0, available: 0.3, costPrice: 2.5 }),
+      ]);
+      seedInventory(storeId, map);
+
+      // 0.3 - 0.1 yields 0.19999999999999998 without round2; with it, available stays 0.2.
+      const costs = service.getAvailableInventoryCosts('p1', 0.1);
+
+      expect(costs[0].quantity).toBe(0.1);
+      expect(findRawEntry(storeId, 'e1')?.available).toBeCloseTo(0.2, 10);
+    });
   });
 
   // Angular parity: InventoryOfflineService.getAvailableInventories ->

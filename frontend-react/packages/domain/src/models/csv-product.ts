@@ -16,9 +16,20 @@ export interface CsvProduct {
   quantity?: number;
 }
 
-/** A row that `createCsvProducts` actually persisted, plus the id it generated for it. */
+/**
+ * A CSV row that `createCsvProducts` processed, plus the id of the product it resolved to.
+ *
+ * With the 2026-09-02 row-level import rule, a row ALWAYS lands here (created or reused):
+ * a product that already exists (same normalized category + name, case-insensitive) is reused
+ * — its id is NOT a new one. `existing` distinguishes "this row created a brand-new product"
+ * (`false`) from "this row reused an already-present product and only updated its price"
+ * (`true`). Together with `failed` (always empty — the parser validates rows), the handler can
+ * report created-vs-updated without a separate outcome type.
+ */
 export interface CsvProductCreated extends CsvProduct {
   id: string;
+  /** `false` when this row created a new product, `true` when it reused an existing one. */
+  existing: boolean;
 }
 
 /** Per-row outcome of a CSV import. `failed.length > 0` replaces the old `hasError` flag. */

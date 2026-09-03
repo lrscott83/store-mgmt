@@ -113,6 +113,18 @@ export class ProductRepository {
   }
 
   /**
+   * Product-import-only lookup (2026-09-02 row-level import rule): finds a product by category +
+   * name CASE-INSENSITIVELY. The normal UI's `addProductData`/`updateProduct` keep their
+   * case-SENSITIVE uniqueness — this exists solely for the CSV import flow, which must match
+   * "Coca Cola" to a previously-imported "coca cola". Reuses `getProductsByCategoryId` and does
+   * not touch the persistence guarantee of the regular create/update path.
+   */
+  findProductByCategoryAndName(categoryId: string, name: string): Product | undefined {
+    const key = name.trim().toLowerCase();
+    return this.getProductsByCategoryId(categoryId).find((p) => p.name.trim().toLowerCase() === key);
+  }
+
+  /**
    * 1:1 port of Angular `getAvailableToSaleProductsByCategoryId` (product.repository.ts:78-82) —
    * `isActive && availableToSale`, sorted by order.
    */
