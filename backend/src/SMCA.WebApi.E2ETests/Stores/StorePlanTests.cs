@@ -29,6 +29,7 @@ public sealed class StorePlanTests
         public Guid StoreId { get; set; }
         public string StoreName { get; set; } = string.Empty;
         public DateOnly? PaymentStartDate { get; set; }
+        public DateOnly? NextDueDate { get; set; }
         public List<ModuleData> Modules { get; set; } = new();
     }
 
@@ -81,6 +82,47 @@ public sealed class StorePlanTests
             var body = await response.Content.ReadFromJsonAsync<ApiResponse<PlanData>>(ApiResponse.Json);
             body!.Data!.PaymentStartDate.Should().BeNull();
             body.Data.Modules.Select(m => m.Id).Should().Equal(BillingSeed.ManagementModuleId);
+        }
+        finally { await BillingSeed.CleanupAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task Get_plan_paid_store_reports_next_due_date()
+    {
+        // Paid store, no payment rows: NextDueDate = PaymentStartDate + trial + 1
+        // post-paid month. E2E seed configures TestingPeriodInMonths = 1
+        // (BillingConfigSeed), so 2026-06-01 → 2026-08-01.
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await BillingSeed.SeedPaidStoreAsync(_f, new DateOnly(2026, 6, 1));
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .GetAsync($"/api/v1/stores/{fx.StoreId}/plan");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PlanData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            body.Data!.NextDueDate.Should().Be(new DateOnly(2026, 8, 1));
+        }
+        finally { await BillingSeed.CleanupAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
+    }
+
+    [Fact]
+    public async Task Get_plan_free_store_reports_null_next_due_date()
+    {
+        // Free store: PaymentStartDate is null → no billing clock → NextDueDate null.
+        var login = $"admin-{Guid.NewGuid():N}@test.com";
+        var adminId = await DbTestHelpers.SeedSuperAdminAsync(_f, login, "Password123");
+        var fx = await BillingSeed.SeedFreeStoreAsync(_f);
+        try
+        {
+            var response = await DbTestHelpers.AuthedClient(_f, adminId, login)
+                .GetAsync($"/api/v1/stores/{fx.StoreId}/plan");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PlanData>>(ApiResponse.Json);
+            body!.Succeeded.Should().BeTrue();
+            body.Data!.PaymentStartDate.Should().BeNull();
+            body.Data.NextDueDate.Should().BeNull();
         }
         finally { await BillingSeed.CleanupAsync(_f, fx); await DbTestHelpers.CleanupUserAsync(_f, adminId); }
     }

@@ -47,6 +47,9 @@ export interface StorePlan {
   approved: boolean;
   isActive: boolean;
   paymentStartDate: string | null;
+  // Nullable ISO date string (backend `DateOnly?`). Null when the store has no
+  // calculable next billing date (never activated the paid plan).
+  nextDueDate: string | null;
   modules: Module[];
 }
 

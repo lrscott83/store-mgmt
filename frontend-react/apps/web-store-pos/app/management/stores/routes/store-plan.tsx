@@ -10,6 +10,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 import { mergeStoreModules } from '~/management/stores/lib/store-modules';
+import { formatDateOnly } from '~/shared/lib/date-utils';
 import type { StorePlan, Module } from '@store-mgmt/domain';
 
 export const clientLoader = adminFeatureLoader([EFeatures.Stores]);
@@ -149,6 +150,17 @@ export function StorePlanPage() {
           </div>
         }
       >
+        {/* Next billing date — only meaningful while the store is on a paid plan
+            (a paid module is active); hidden on the free plan. */}
+        {isOnPaidPlan && plan.nextDueDate && (
+          <p
+            data-testid="plan-next-billing-date"
+            className="mb-3 rounded border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-800"
+          >
+            {intl.formatMessage({ id: 'STORES.PLAN.NEXT_BILLING_DATE' })}:{' '}
+            <span className="font-semibold">{formatDateOnly(plan.nextDueDate)}</span>
+          </p>
+        )}
         <PlanPicker
           modules={modules}
           onChange={setModuleIds}
