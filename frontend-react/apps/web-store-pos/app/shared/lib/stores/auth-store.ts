@@ -436,6 +436,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // remove ONLY the AUTH_MODEL key. `token` and `currentUser` intentionally
     // stay stale (Angular 1:1 parity, not a bug).
     localStorage.removeItem(StorageKeys.AUTH_MODEL);
+    // Trial-notice preference lifecycle (payment-banner.tsx): the dismissible
+    // billing TRIAL banner must reappear after a fresh authentication, so every
+    // logout path (explicit, session rejection, expired session, idle-lock)
+    // drops the "dismissed" flag here — this action is the single logout seam.
+    localStorage.removeItem(StorageKeys.TRIAL_NOTICE_DISMISSED);
     // design §11: release the in-memory DEK on every logout, including the
     // offline idle-lock's 1h-inactivity call (app-layout.tsx's
     // `useAuthStore.getState().logout()`) — that call site needed no

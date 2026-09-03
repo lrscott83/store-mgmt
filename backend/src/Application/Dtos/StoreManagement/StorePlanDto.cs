@@ -17,6 +17,13 @@ namespace Application.Dtos.StoreManagement
         public bool Approved { get; set; }
         public bool IsActive { get; set; }
         public DateOnly? PaymentStartDate { get; set; }
+        /// <summary>
+        /// Next billing date computed from <c>PaymentStartDate</c> + trial period and
+        /// the store's last payment (same <c>StoreBillingUtils.GetNextDueDate</c>
+        /// the to-collect/billing flows use). Null when the billing clock has not
+        /// started (never-activated store).
+        /// </summary>
+        public DateOnly? NextDueDate { get; set; }
         public List<ModuleDto> Modules { get; set; } = new();
     }
 }

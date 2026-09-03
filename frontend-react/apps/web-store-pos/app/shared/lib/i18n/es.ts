@@ -711,6 +711,7 @@ const messages: Record<string, string> = {
   'STORES.PLAN.INCLUDES': 'Incluye:',
   'STORES.PLAN.INCLUDES_FREE_PLUS': 'Todo lo del plan Gratis, y además:',
   'STORES.PLAN.SELECTED': 'Plan seleccionado',
+  'STORES.PLAN.NEXT_BILLING_DATE': 'Próximo cobro',
   'STORES.PLAN.ACTIVATE': 'Activar este plan',
   'STORES.PLAN.WILL_ACTIVATE_ON_SAVE': 'Se activará al guardar',
   'STORES.PLAN.CURRENCY_NOTICE': 'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',

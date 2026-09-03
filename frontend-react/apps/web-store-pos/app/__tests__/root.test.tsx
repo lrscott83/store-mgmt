@@ -40,6 +40,14 @@ vi.mock('~/shared/lib/i18n/i18n-provider', () => ({
   I18nProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// The demo-seed button lives inside App() in every build (root.tsx). These
+// tests only assert the ROOT wiring (redirect, loading overlay, PWA install
+// button, decryption policy) and already mock auth-store without useAuthStore
+// — the button consumes it, so stub it out here rather than enrich that mock.
+vi.mock('~/shared/components/demo-seed-button', () => ({
+  DemoSeedButton: () => null,
+}));
+
 // design D5: root.tsx owns the two seams through which a decryption failure
 // reaches the app-wide policy. The policy itself is unit-tested in
 // storage/__tests__/decryption-failure-policy.test.ts; these tests assert only

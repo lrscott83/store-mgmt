@@ -15,6 +15,7 @@ function makePlan(overrides: Partial<StorePlan> = {}): StorePlan {
     approved: true,
     isActive: true,
     paymentStartDate: '2024-01-01',
+    nextDueDate: null,
     modules: [],
     ...overrides,
   };
@@ -255,6 +256,57 @@ describe('StorePlanPage — save', () => {
     // The key is present but undefined — JSON.stringify omits it from the wire
     // body, so the backend binds null and skips the payment date.
     expect(payload.paymentStartDate).toBeUndefined();
+  });
+});
+
+describe('StorePlanPage — next billing date', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.clear();
+    mockUser = makeUser();
+    mockParams = {};
+    mockGetModulesToStore = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: [
+        makeModule({ id: 1 }),
+        makeModule({ id: 2, name: 'Free Module', priceIncluded: true, currentPrice: 0 }),
+      ],
+    });
+  });
+
+  it('shows the next billing date when the store is on a paid plan', async () => {
+    mockGetStorePlan = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makePlan({
+        modules: [makeModule({ id: 1, selected: true })],
+        nextDueDate: '2026-08-01',
+      }),
+    });
+
+    const { StorePlanPage } = await import('../store-plan');
+    render(<Wrapper><StorePlanPage /></Wrapper>);
+
+    const banner = await screen.findByTestId('plan-next-billing-date');
+    expect(banner).toHaveTextContent(esMessages['STORES.PLAN.NEXT_BILLING_DATE']);
+    expect(banner).toHaveTextContent('01/08/2026');
+  });
+
+  it('does not show the next billing date on a free plan', async () => {
+    mockGetStorePlan = vi.fn().mockResolvedValue({
+      succeeded: true,
+      data: makePlan({
+        modules: [makeModule({ id: 2, priceIncluded: true, currentPrice: 0 })],
+        nextDueDate: '2026-08-01',
+      }),
+    });
+
+    const { StorePlanPage } = await import('../store-plan');
+    render(<Wrapper><StorePlanPage /></Wrapper>);
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /Gratis/ })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('plan-next-billing-date')).not.toBeInTheDocument();
   });
 });
 

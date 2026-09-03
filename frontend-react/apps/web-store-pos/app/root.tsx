@@ -22,6 +22,7 @@ import {
 } from '~/shared/lib/storage/decryption-failure-policy';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { InstallAppButton } from '~/shared/components/install-app-button';
+import { DemoSeedButton } from '~/shared/components/demo-seed-button';
 import { ToastContainer } from 'react-toastify';
 
 import '@store-mgmt/web-common/styles.css';
@@ -116,6 +117,10 @@ export default function App() {
           root is RR7's true equivalent of AppComponent, so it must mount here
           — not in app-layout.tsx, which only wraps authenticated routes. */}
       <InstallAppButton />
+      {/* DEMO-SEED: 90-day data generator (orders + expenses). Available in all
+          builds; visibility is gated inside the component to the lrscott login
+          (and to a selected store). */}
+      <DemoSeedButton />
     </>
   );
 }

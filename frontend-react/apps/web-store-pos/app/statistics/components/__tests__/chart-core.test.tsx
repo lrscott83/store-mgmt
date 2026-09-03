@@ -9,7 +9,17 @@ import { render, screen } from '@testing-library/react';
  * to avoid JSDOM canvas limitations.
  */
 
-// Mock recharts — JSDOM doesn't support canvas/SVG rendering
+// Mock recharts — JSDOM doesn't support canvas/SVG rendering.
+// XAxis renders the tickFormatter output for two sample dates so the
+// internal formatLabel can be asserted; the dates come from `xAxisSamples`
+// (set per test via the hoisted store below).
+const { xAxisSamples } = vi.hoisted(() => ({
+  xAxisSamples: {
+    first: new Date(2026, 6, 3),
+    second: new Date(2026, 2, 15),
+  },
+}));
+
 vi.mock('recharts', () => ({
   LineChart: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="line-chart">{children}</div>
@@ -19,7 +29,18 @@ vi.mock('recharts', () => ({
     <div data-testid="bar-chart">{children}</div>
   ),
   Bar: () => null,
-  XAxis: () => null,
+  XAxis: ({
+    dataKey,
+    tickFormatter,
+  }: {
+    dataKey?: string;
+    tickFormatter?: (label: Date) => string;
+  }) =>
+    dataKey === 'label' && tickFormatter ? (
+      <span data-testid="x-axis-ticks">
+        {`${tickFormatter(xAxisSamples.first)}|${tickFormatter(xAxisSamples.second)}`}
+      </span>
+    ) : null,
   YAxis: () => null,
   Tooltip: () => null,
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -87,14 +108,33 @@ describe('chart-core.tsx — ProfitChartCore', () => {
 });
 
 describe('chart-core.tsx — formatLabel', () => {
-  it('formats dates as MM-DD', () => {
-    // formatLabel is internal, but we can verify it through the component's
-    // tooltip formatter by checking the rendered output doesn't crash
+  it('formats dates as d-MMM in Spanish without leading zero (3-Jul, not 03-Jul)', () => {
     const data: ChartData[] = [
-      { label: new Date('2026-03-15'), value: 42 },
+      { label: new Date(2026, 6, 3), value: 42 },
     ];
-    render(<SalesChartCore data={data} emptyMessage="Sin datos" />);
-    // Component renders without error = formatLabel works
-    expect(screen.getByTestId('line-chart')).toBeTruthy();
+    const { container, unmount } = render(
+      <SalesChartCore data={data} emptyMessage="Sin datos" />,
+    );
+    // formatLabel is internal — verified through the XAxis tickFormatter mock.
+    // 2026-07-03 -> "3-Jul" (day 3, no leading zero; abbreviated Spanish month).
+    expect(container.querySelector('[data-testid="x-axis-ticks"]')?.textContent).toBe(
+      '3-Jul|15-Mar',
+    );
+    unmount();
+  });
+
+  it('formats ProfitChartCore ticks identically', () => {
+    xAxisSamples.first = new Date(2026, 0, 31);
+    const data: ChartData[] = [
+      { label: new Date(2026, 0, 31), value: 42 },
+    ];
+    const { container, unmount } = render(
+      <ProfitChartCore data={data} emptyMessage="Sin datos" />,
+    );
+    expect(container.querySelector('[data-testid="x-axis-ticks"]')?.textContent).toBe(
+      '31-Ene|15-Mar',
+    );
+    unmount();
+    xAxisSamples.first = new Date(2026, 6, 3);
   });
 });
