@@ -5,6 +5,10 @@ export const StorageKeys = {
   AUTH_MODEL: `${GlobalConfig.APP_VERSION}-authf496fc5a9f17`,
   CURRENT_USER: 'currentUser',
   LANGUAGE: 'language',
+  // Dismissed-flag for the closable billing TRIAL notice (payment-banner.tsx).
+  // Lifecycle: set when the user closes the banner; cleared by logout() so the
+  // notice reappears after the next authentication.
+  TRIAL_NOTICE_DISMISSED: 'trialNoticeDismissed',
   entityKey: (entity: string, storeId: string) =>
     `lizoft.store-${entity}-${storeId}`,
 } as const;

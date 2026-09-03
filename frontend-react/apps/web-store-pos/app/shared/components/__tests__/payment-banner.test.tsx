@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { UserModel } from '@store-mgmt/domain';
@@ -118,6 +118,42 @@ describe('PaymentBanner — due notice (PorVencer/EnGracia + isInTrial=false)', 
     expect(
       screen.getByText('El pago del plan vence el 01/09/2026. Realice el pago para evitar interrupciones en el servicio.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('PaymentBanner — dismissible trial notice', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('shows a close (X) button on the trial notice', async () => {
+    mockUser = makeUser({ paymentStatus: 'AlDia', isInTrial: true, paymentDueDate: '2026-10-04' });
+    await renderBanner();
+    expect(
+      screen.getByRole('button', { name: esMessages['GENERAL.CLOSE'] }),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the trial notice when the X is clicked and persists the dismissal', async () => {
+    mockUser = makeUser({ paymentStatus: 'AlDia', isInTrial: true, paymentDueDate: '2026-10-04' });
+    const { unmount } = await renderBanner();
+
+    fireEvent.click(screen.getByRole('button', { name: esMessages['GENERAL.CLOSE'] }));
+    // Gone from the DOM immediately…
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    unmount();
+
+    // …and stays hidden on a fresh render (preference persisted in localStorage).
+    await renderBanner();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('does not add the close button to the due or overdue notices', async () => {
+    mockUser = makeUser({ paymentStatus: 'PorVencer', isInTrial: false, paymentDueDate: '2026-08-15' });
+    await renderBanner();
+    expect(
+      screen.queryByRole('button', { name: esMessages['GENERAL.CLOSE'] }),
+    ).not.toBeInTheDocument();
   });
 });
 

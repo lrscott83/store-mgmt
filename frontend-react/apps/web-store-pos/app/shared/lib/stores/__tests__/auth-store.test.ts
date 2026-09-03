@@ -305,6 +305,16 @@ describe('useAuthStore', () => {
     });
   });
 
+  describe('logout — clears the trial-notice dismissal preference (payment-banner.tsx)', () => {
+    it('removes TRIAL_NOTICE_DISMISSED so the billing trial banner reappears after re-auth', () => {
+      localStorage.setItem(StorageKeys.TRIAL_NOTICE_DISMISSED, '1');
+
+      useAuthStore.getState().logout();
+
+      expect(localStorage.getItem(StorageKeys.TRIAL_NOTICE_DISMISSED)).toBeNull();
+    });
+  });
+
   describe('logout — AUTH_MODEL-only clear (Decision 1)', () => {
     it('removes only AUTH_MODEL; token and currentUser survive (Angular parity)', () => {
       const user = makeUser();
