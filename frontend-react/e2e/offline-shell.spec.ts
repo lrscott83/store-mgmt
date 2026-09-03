@@ -30,7 +30,7 @@ import { test, expect } from '@playwright/test';
 // navegador es la caja negra bajo prueba (misma política que los demás
 // specs E2E).
 
-const SIGN_IN_TITLE = 'Ingresá a tu cuenta'; // es.ts:64 AUTH.SIGN_IN_TITLE
+const SIGN_IN_TITLE = 'Inicia sesión en tu cuenta'; // es.ts:69 AUTH.SIGN_IN_TITLE (fixed to match es.ts by 3e34d9d6)
 // PRECACHE_NAME en app/service-worker.ts:15.
 const PRECACHE_NAME = 'app-shell-v3';
 
