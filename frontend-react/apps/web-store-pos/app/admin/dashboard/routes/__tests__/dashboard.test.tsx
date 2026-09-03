@@ -266,11 +266,13 @@ describe('AdminDashboardPage — error state', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PAGE-5 — activeStoreCount NOT rendered
+// PAGE-5 — activeStoreCount rendered in the horizontal bar
+// (REWRITTEN: this test used to pin that activeStoreCount was NOT rendered;
+// the dashboard now shows it as the horizontal active-stores bar).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('AdminDashboardPage — activeStoreCount not rendered', () => {
-  it('does NOT render the activeStoreCount value in the DOM', async () => {
+describe('AdminDashboardPage — activeStoreCount rendered in the horizontal bar', () => {
+  it('renders the active store count next to the horizontal bar', async () => {
     const { usageHttpService } = await import(
       '~/admin/dashboard/lib/services/usage-http-service'
     );
@@ -290,7 +292,44 @@ describe('AdminDashboardPage — activeStoreCount not rendered', () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText('9999')).not.toBeInTheDocument();
+      expect(
+        screen.getByText(`${esMessages['ADMIN_DASHBOARD.ACTIVE_STORES']}: 9999`)
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('admin-active-stores-bar')).toBeInTheDocument();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGE-7 — Total | Promedio summary line (owner dashboard table parity)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('AdminDashboardPage — Total | Promedio summary line', () => {
+  it('shows the sum and the average of the daily counts', async () => {
+    const { usageHttpService } = await import(
+      '~/admin/dashboard/lib/services/usage-http-service'
+    );
+    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
+      succeeded: true,
+      data: { storeUsagesCountDays: [10, 20, 30, 40, 50, 60, 70], activeStoreCount: 5 },
+      message: '',
+      actionCode: 0,
+      errors: [],
+    });
+
+    const { AdminDashboardPage } = await import('../dashboard');
+    render(
+      <Wrapper>
+        <AdminDashboardPage />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          `${esMessages['ADMIN_DASHBOARD.TOTAL']}: 280 | ${esMessages['ADMIN_DASHBOARD.AVERAGE']}: 40.00`
+        )
+      ).toBeInTheDocument();
     });
   });
 });

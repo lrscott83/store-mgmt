@@ -795,6 +795,9 @@ const messages: Record<string, string> = {
   'ADMIN_DASHBOARD.LAST_30_DAYS': 'Últimos 30 días',
   'ADMIN_DASHBOARD.COL_CATEGORY': 'Categoría',
   'ADMIN_DASHBOARD.COL_VALUE': 'Valor',
+  'ADMIN_DASHBOARD.ACTIVE_STORES': 'Tiendas activas',
+  'ADMIN_DASHBOARD.TOTAL': 'Total',
+  'ADMIN_DASHBOARD.AVERAGE': 'Promedio',
   'ADMIN_DASHBOARD.ERROR': 'Ocurrió un error. Intentá de nuevo.',
 
   // Admin — Resellers
