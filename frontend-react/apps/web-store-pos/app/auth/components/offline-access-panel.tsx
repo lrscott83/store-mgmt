@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Button } from '~/shared/components/ui/button';
+import { Card } from '~/shared/components/ui/card';
+import { CloseIcon, HelpIcon } from '~/shared/components/ui/icons';
 import { confirmDialog } from '~/shared/lib/blocking-alert';
 import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { ImportRosterModal } from './import-roster-modal';
@@ -21,6 +23,7 @@ export function OfflineAccessPanel() {
   const intl = useIntl();
   const [rosterState, setRosterState] = useState<RosterState>('unknown');
   const [modalOpen, setModalOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +107,62 @@ export function OfflineAccessPanel() {
         <Button type="button" variant="outline" onClick={handleDisable}>
           {intl.formatMessage({ id: 'OFFLINE_ACCESS.DISABLE_BUTTON' })}
         </Button>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setHelpOpen((v) => !v)}
+        className="ml-2 inline-flex items-center justify-center p-1 text-green-500 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
+        aria-label={intl.formatMessage({ id: 'OFFLINE_ACCESS.HELP_BUTTON' })}
+      >
+        <HelpIcon />
+      </button>
+
+      {helpOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={intl.formatMessage({ id: 'OFFLINE_ACCESS.HELP_TITLE' })}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setHelpOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md">
+            <Card
+              title={
+                <div className="flex items-center justify-between">
+                  <span>{intl.formatMessage({ id: 'OFFLINE_ACCESS.HELP_TITLE' })}</span>
+                  <button
+                    onClick={() => setHelpOpen(false)}
+                    className="text-text-muted hover:text-text"
+                    aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-2">
+                <p className="mb-2 text-sm text-text-muted leading-relaxed">
+                  {intl.formatMessage({ id: 'OFFLINE_ACCESS.HELP_STEP1' })}
+                </p>
+                <p className="mb-2 text-sm text-text-muted leading-relaxed">
+                  {intl.formatMessage({ id: 'OFFLINE_ACCESS.HELP_STEP2' })}
+                </p>
+                <p className="mb-2 text-sm text-text-muted leading-relaxed">
+                  {intl.formatMessage({ id: 'OFFLINE_ACCESS.HELP_STEP3' })}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="fab" onClick={() => setHelpOpen(false)}>
+                  <CloseIcon />
+                  {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
       )}
 
       {modalOpen && (

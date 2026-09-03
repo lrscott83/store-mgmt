@@ -137,6 +137,11 @@ const messages: Record<string, string> = {
   'OFFLINE_ACCESS.DISABLE_CONFIRM': 'Sí, desactivar',
   'OFFLINE_ACCESS.ERROR_UNAVAILABLE':
     'No pudimos completar la acción. Recarga la página e intenta de nuevo.',
+  'OFFLINE_ACCESS.HELP_BUTTON': 'Ayuda para activar el acceso sin conexión',
+  'OFFLINE_ACCESS.HELP_TITLE': 'Cómo activar el acceso sin conexión',
+  'OFFLINE_ACCESS.HELP_STEP1': '1. Desde un equipo ya activado, el administrador exporta el roster con una contraseña usando el botón "Exportar roster sin conexión" de la página de Empleados.',
+  'OFFLINE_ACCESS.HELP_STEP2': '2. Transfiere ese archivo de roster a este equipo.',
+  'OFFLINE_ACCESS.HELP_STEP3': '3. En este equipo toca "Activar acceso sin conexión", elige el archivo y escribe la contraseña.',
 
   // Registration (Angular REGISTRATION.* — vocabs/es.ts:131-134, top-level sibling of
   // AUTH/GENERAL, not nested. view-text-parity.)

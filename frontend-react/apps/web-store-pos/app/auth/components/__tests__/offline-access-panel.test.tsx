@@ -269,3 +269,67 @@ describe('OfflineAccessPanel — dynamic-import failures (Finding 3)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('OfflineAccessPanel — help popup', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    confirmDialogMock.mockReset();
+    showToastSuccessMock.mockReset();
+    showToastErrorMock.mockReset();
+  });
+
+  it('opens a dialog with the three help steps when the help button is clicked', async () => {
+    renderPanel();
+
+    await screen.findByRole('button', { name: /^activar acceso sin conexión$/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }));
+
+    const dialog = await screen.findByRole('dialog', { name: /cómo activar el acceso sin conexión/i });
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('1. Desde un equipo ya activado');
+    expect(dialog).toHaveTextContent('2. Transfiere ese archivo');
+    expect(dialog).toHaveTextContent('3. En este equipo toca');
+  });
+
+  it('closes the help dialog when the close button is clicked', async () => {
+    renderPanel();
+
+    await screen.findByRole('button', { name: /^activar acceso sin conexión$/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }));
+    const dialog = await screen.findByRole('dialog', { name: /cómo activar el acceso sin conexión/i });
+
+    const closeButtons = screen.getAllByRole('button', { name: /^cerrar$/i });
+    fireEvent.click(closeButtons[0]);
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: /cómo activar el acceso sin conexión/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('closes the help dialog when the backdrop is clicked', async () => {
+    renderPanel();
+
+    await screen.findByRole('button', { name: /^activar acceso sin conexión$/i });
+
+    fireEvent.click(screen.getByRole('button', { name: /ayuda para activar el acceso sin conexión/i }));
+    const dialog = await screen.findByRole('dialog', { name: /cómo activar el acceso sin conexión/i });
+
+    fireEvent.click(dialog);
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: /cómo activar el acceso sin conexión/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('does not render the help button when roster state is unknown', () => {
+    const { container } = render(
+      <IntlProvider locale="es" messages={messages}>
+        <OfflineAccessPanel />
+      </IntlProvider>,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+});
