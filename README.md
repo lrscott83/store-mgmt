@@ -233,6 +233,16 @@ dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
 - Corre contra PostgreSQL real (`localhost:5432`, base `smca_test`): `WebAppFixture` aplica las migraciones y ejecuta `ResetDataAsync` al iniciar (borra filas de datos, preserva los seeds).
 - ⚠️ **Nunca en paralelo con la suite Playwright**: el `ResetDataAsync` de `WebAppFixture` borraría las filas vivas que los tests del frontend están usando. En secuencia es seguro.
 
+### Comando único del backend
+
+Los 3 proyectos de tests (los 2 unitarios + el E2E) en un solo comando, verificado:
+
+```bash
+dotnet test backend/src/SMCA.sln
+```
+
+> Nota: corre también el build implícito de todos los proyectos. Si ya hiciste el build de la sección 1, agregar `--no-build` lo acelera.
+
 ### 4. Frontend React — checks
 
 Desde **`frontend-react/`**:
@@ -247,6 +257,16 @@ pnpm lint        # ESLint con --max-warnings=0
 ```bash
 pnpm test        # todos los workspaces vía turbo
 ```
+
+### Comando único del frontend (checks + tests)
+
+Un solo comando corre typecheck, lint y tests de todos los workspaces (turbo los ejecuta en paralelo donde puede):
+
+```bash
+pnpm turbo run typecheck lint test
+```
+
+> ⚠️ En PowerShell 5.1 **no funciona** `pnpm typecheck && pnpm lint && pnpm test` (el shell no soporta `&&`); ese es el reemplazo correcto de un comando. Si una tarea falla, turbo corta ahí y muestra qué tarea/fue — el resto ya ejecutándose termina su corrida.
 
 ### 6. Frontend React — tests E2E (Playwright)
 
@@ -282,20 +302,17 @@ Notas:
 ### Recorrido completo (resumen)
 
 ```bash
-# ── Raíz del repo ──
-dotnet build backend/src/SMCA.sln
-dotnet test backend/src/Domain.UnitTests/Domain.UnitTests.csproj
-dotnet test backend/src/Application.Tests/Application.Tests.csproj
-dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
+# ── Raíz del repo: backend completo (build + los 3 proyectos de tests) ──
+dotnet test backend/src/SMCA.sln
 
-# ── frontend-react/ ──
-pnpm typecheck
-pnpm lint
-pnpm test
+# ── frontend-react/: checks + tests de todos los workspaces ──
+pnpm turbo run typecheck lint test
 
-# ── Terminal aparte, raíz del repo: backend para E2E ──
+# ── Terminal aparte, raíz del repo: backend para E2E del frontend ──
 dotnet run --project backend/src/SMCA.WebApi --launch-profile http-e2e
 
 # ── frontend-react/ ──
 pnpm test:e2e
 ```
+
+El detalle paso a paso (proyecto por proyecto, tarea por tarea) está en las secciones 1–6 de arriba.
