@@ -6,24 +6,6 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 
 const storeId = 's1';
 
-function makeProduct(id: string, overrides: Partial<Product> = {}): Product {
-  return {
-    id,
-    name: `Product ${id}`,
-    categoryId: 'cat-1',
-    categoryName: 'Cat 1',
-    price: 10,
-    order: 0,
-    availableToSale: true,
-    discountFromInvantory: true,
-    businessId: '',
-    isActive: true,
-    createdDate: new Date('2024-01-01T00:00:00.000Z'),
-    createdByName: 'test',
-    ...overrides,
-  };
-}
-
 function makeCategory(id: string, overrides: Partial<ProductCategory> = {}): ProductCategory {
   return {
     id,
