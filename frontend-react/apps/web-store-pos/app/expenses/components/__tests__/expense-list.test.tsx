@@ -82,6 +82,6 @@ describe('ExpenseList — list/table parity sweep (WU4)', () => {
         <ExpenseList expenses={[makeExpense({ total: 2000 })]} readOnly onEdit={vi.fn()} onDelete={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 });

@@ -174,7 +174,7 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
       </Wrapper>,
     );
     // salesCashTotal = 100 only (excludes card payment + credit sale)
-    expect(screen.getAllByText('$100.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$100').length).toBeGreaterThan(0);
   });
 
   it('renders a Ventas ({itemsCount} productos) panel using getCategoryCartItemsView totals', () => {
@@ -215,7 +215,7 @@ describe('TodayStatsPage (Angular today-stats.component.html 1:1 port)', () => {
         <TodayStatsPage />
       </Wrapper>,
     );
-    expect(screen.getAllByText('$2,000.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$2 000').length).toBeGreaterThan(0);
   });
 });
 
@@ -271,7 +271,7 @@ describe('TodayStatsPage — with Expenses + Credits modules available', () => {
     const row = screen.getByText('Otro').closest('tr');
     expect(row).not.toBeNull();
     expect((row as HTMLElement).querySelector('svg')).toBeNull();
-    const totalWrapper = within(row as HTMLElement).getByText('$15.00');
+    const totalWrapper = within(row as HTMLElement).getByText('$15');
     expect(totalWrapper.firstChild?.nodeName.toLowerCase()).not.toBe('svg');
   });
 

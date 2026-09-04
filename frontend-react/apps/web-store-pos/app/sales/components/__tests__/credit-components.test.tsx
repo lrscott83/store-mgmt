@@ -54,7 +54,7 @@ describe('SaleCreditList', () => {
       </Wrapper>,
     );
     expect(screen.getByText('María García')).toBeInTheDocument();
-    expect(screen.getByText('$150.00')).toBeInTheDocument();
+    expect(screen.getByText('$150')).toBeInTheDocument();
   });
 
   it('shows paid date label only when the credit is paid', () => {
@@ -350,7 +350,7 @@ describe('SaleCreditPaymentModal', () => {
       </Wrapper>,
     );
     expect(screen.getByText(/Pedro/)).toBeInTheDocument();
-    expect(screen.getByText(/\$320\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/\$320/)).toBeInTheDocument();
   });
 
   it('defaults the payment-type select to Efectivo', () => {

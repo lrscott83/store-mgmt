@@ -99,6 +99,7 @@ describe('Import flow — full success', () => {
       orders: [],
       expenses: [],
       saleCredits: [],
+      exchangeRates: [],
     };
 
     const result = await synchronizer.sync(data);
@@ -128,6 +129,7 @@ describe('Import flow — full success', () => {
       orders: [],
       expenses: [],
       saleCredits: [],
+      exchangeRates: [],
     };
 
     await synchronizer.sync(data);
@@ -164,6 +166,7 @@ describe('Import flow — partial errors', () => {
       orders: [],
       expenses: [{ id: 'exp-1', type: ExpenseType.Alquiler, total: 500, note: '', paymentType: PaymentType.Efectivo, date: new Date(), isActive: true, createdDate: new Date(), createdByName: 'admin' }],
       saleCredits: [],
+      exchangeRates: [],
     };
 
     const result = await synchronizer.sync(data);
@@ -196,6 +199,7 @@ describe('Import flow — partial errors', () => {
       orders: [{ id: 'ord-1', orderItems: [], total: 500, itemsCount: 1, date: new Date(), type: OrderType.Normal, paymentType: PaymentType.Efectivo, isCredit: false, description: '', isActive: true, createdDate: new Date(), createdByName: 'admin' }],
       expenses: [],
       saleCredits: [],
+      exchangeRates: [],
     };
 
     const result = await synchronizer.sync(data);

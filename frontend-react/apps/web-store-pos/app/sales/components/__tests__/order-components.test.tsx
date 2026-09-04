@@ -59,7 +59,7 @@ describe('OrderList', () => {
       </Wrapper>,
     );
     expect(screen.getByTestId('order-panel-toggle-o1')).toBeInTheDocument();
-    expect(screen.getByText('$100.00')).toBeInTheDocument(); // getOrderTotal from orderItems, not order.total
+    expect(screen.getByText('$100')).toBeInTheDocument(); // getOrderTotal from orderItems, not order.total
   });
 
   it('expands a panel on click and reveals order items', () => {

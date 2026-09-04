@@ -70,7 +70,7 @@ test.describe.serial('S2-E1 — Registrar gasto', () => {
     await createExpense(page, '50', 'E2E test expense');
 
     // The expense should appear in the list (type + amount)
-    await expect(page.getByText('$50.00')).toBeVisible();
+    await expect(page.getByText('$50')).toBeVisible();
 
     // The empty state should be gone
     await expect(page.getByText(NO_EXPENSE_FOUND)).toHaveCount(0);
@@ -110,7 +110,7 @@ test.describe.serial('S2-E1 — Registrar gasto', () => {
     await createExpense(page, '25', 'Offline expense');
 
     // The expense should appear even offline (check amount)
-    await expect(page.getByText('$25.00')).toBeVisible();
+    await expect(page.getByText('$25')).toBeVisible();
 
     await page.context().setOffline(false);
   });

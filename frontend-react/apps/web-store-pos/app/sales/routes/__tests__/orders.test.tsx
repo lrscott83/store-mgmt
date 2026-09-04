@@ -334,9 +334,9 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
     expect(within(dialog).getByText('Resumen de ventas del 01/01/2026')).toBeInTheDocument();
     // Revenue: 2*10 + 1*5 = 25; Cost: 2*4 + 1*1 = 9; Profit: 16.
     expect(within(dialog).getByText('2')).toBeInTheDocument();
-    expect(within(dialog).getByText('$25.00')).toBeInTheDocument();
-    expect(within(dialog).getByText('$9.00')).toBeInTheDocument();
-    expect(within(dialog).getByText('$16.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$25')).toBeInTheDocument();
+    expect(within(dialog).getByText('$9')).toBeInTheDocument();
+    expect(within(dialog).getByText('$16')).toBeInTheDocument();
   });
 
   it('excludes inactive orders from the day summary (isActive filter, matching the today report)', () => {
@@ -371,9 +371,9 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('1')).toBeInTheDocument();
-    expect(within(dialog).getByText('$10.00')).toBeInTheDocument();
-    expect(within(dialog).getByText('$4.00')).toBeInTheDocument();
-    expect(within(dialog).getByText('$6.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$10')).toBeInTheDocument();
+    expect(within(dialog).getByText('$4')).toBeInTheDocument();
+    expect(within(dialog).getByText('$6')).toBeInTheDocument();
   });
 
   it('ignores the page payment filter — the popup reports the whole day, like the today report', () => {
@@ -418,9 +418,9 @@ describe('OrdersPage — per-day sales summary popup (gear menu)', () => {
     const dialog = screen.getByRole('dialog');
     // Both orders of the day: revenue 10 + 20 = 30, cost 3 + 8 = 11, profit 19.
     expect(within(dialog).getByText('2')).toBeInTheDocument();
-    expect(within(dialog).getByText('$30.00')).toBeInTheDocument();
-    expect(within(dialog).getByText('$11.00')).toBeInTheDocument();
-    expect(within(dialog).getByText('$19.00')).toBeInTheDocument();
+    expect(within(dialog).getByText('$30')).toBeInTheDocument();
+    expect(within(dialog).getByText('$11')).toBeInTheDocument();
+    expect(within(dialog).getByText('$19')).toBeInTheDocument();
   });
 
   it('closes the popup via the close buttons', () => {

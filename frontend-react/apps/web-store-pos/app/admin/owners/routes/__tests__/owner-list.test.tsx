@@ -183,7 +183,7 @@ describe('OwnerListPage — card fields', () => {
     });
   });
 
-  it('shows 0 stores and $0.00 when storeModules is empty (All filter)', async () => {
+  it('shows 0 stores and $0 when storeModules is empty (All filter)', async () => {
     const { ownerHttpService } = await import(
       '~/admin/owners/lib/services/owner-http-service'
     );

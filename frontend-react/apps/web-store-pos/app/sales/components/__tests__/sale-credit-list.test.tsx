@@ -61,6 +61,6 @@ describe('SaleCreditList — list/table parity sweep (WU5)', () => {
         <SaleCreditList saleCredits={[makeSaleCredit({ total: 2000 })]} readOnly />
       </Wrapper>,
     );
-    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 });

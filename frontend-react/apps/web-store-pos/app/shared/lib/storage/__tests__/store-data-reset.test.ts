@@ -17,7 +17,7 @@ describe('clearStoreData', () => {
     vi.restoreAllMocks();
   });
 
-  it('covers exactly the six business entities', () => {
+  it('covers exactly the seven business entities', () => {
     expect([...BUSINESS_ENTITY_NAMES]).toEqual([
       'products',
       'product-categories',
@@ -25,6 +25,7 @@ describe('clearStoreData', () => {
       'orders',
       'expenses',
       'saleCredits',
+      'exchangeRates',
     ]);
   });
 

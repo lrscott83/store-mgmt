@@ -64,7 +64,7 @@ test.describe.serial('S4-A1/A2/A3 — Gastos: editar, eliminar, historial', () =
     await expect(page.getByText(EDIT_EXPENSE_TITLE)).toHaveCount(0);
 
     // The updated amount should be visible
-    await expect(page.getByText('$75.00')).toBeVisible();
+    await expect(page.getByText('$75')).toBeVisible();
   });
 
   // S4-A2 — Eliminar gasto

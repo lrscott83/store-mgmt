@@ -153,7 +153,7 @@ describe('exportInventoryTodaySalePdf', () => {
 
     const [, options] = mockAutoTable.mock.calls[0];
     expect(options.body).toEqual([
-      ['Vodka', 'U', 1, 2, 3, 4, '10.00', '30.00', '16.00', '48.00', '1.60', 10, '160.00'],
+      ['Vodka', 'U', 1, 2, 3, 4, '$10', '$30', '$16', '$48', '$1.60', 10, '$160'],
     ]);
   });
 

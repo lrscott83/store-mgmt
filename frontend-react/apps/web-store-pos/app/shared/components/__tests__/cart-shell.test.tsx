@@ -181,12 +181,12 @@ describe('CartShell — payment input and Vuelto (change)', () => {
     expect(screen.getByLabelText('Pago')).not.toBeDisabled();
   });
 
-  it('shows Vuelto: $0.00 when no payment has been entered', () => {
+  it('shows Vuelto: $0 when no payment has been entered', () => {
     const product = makeProduct();
     mockCartState({ items: [{ product, quantity: 1 }], total: vi.fn().mockReturnValue(5) });
     renderCartShell();
     openCart();
-    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $0.00');
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $0');
   });
 
   it('computes Vuelto as payment - total once a payment is typed', () => {
@@ -195,7 +195,7 @@ describe('CartShell — payment input and Vuelto (change)', () => {
     renderCartShell();
     openCart();
     fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '10' } });
-    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $5.00');
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: $5');
   });
 
   it('shows a negative Vuelto when payment is less than total', () => {
@@ -204,7 +204,7 @@ describe('CartShell — payment input and Vuelto (change)', () => {
     renderCartShell();
     openCart();
     fireEvent.change(screen.getByLabelText('Pago'), { target: { value: '4' } });
-    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: -$6.00');
+    expect(screen.getByText(/Vuelto:/)).toHaveTextContent('Vuelto: -$6');
   });
 });
 

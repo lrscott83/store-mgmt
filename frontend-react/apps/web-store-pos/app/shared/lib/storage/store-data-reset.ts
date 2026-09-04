@@ -1,7 +1,7 @@
 // The irreversible wipe behind the catalog's "Limpiar" button
 // (openspec/changes/catalog-show-all-and-clear-data/superpowers-design.md §D5).
 //
-// SCOPE: the six business entities of ONE store. It never touches `token`,
+// SCOPE: the seven business entities of ONE store. It never touches `token`,
 // `AUTH_MODEL`, `currentUser`, `language`, the offline roster, or the
 // device-wrapped DEK — the session survives the wipe and the device keeps its
 // offline access.
@@ -17,9 +17,9 @@ import { StorageKeys, BUSINESS_ENTITY_NAMES } from './storage-keys';
  *
  * Per-key isolation mirrors `entity-migration.ts`'s `runEntityMigration`:
  * each removal is wrapped on its own so a storage failure on one entity
- * cannot abort the remaining five. A partial wipe is a worse outcome than a
+ * cannot abort the remaining six. A partial wipe is a worse outcome than a
  * full one, but a far better outcome than "the first key threw and the
- * other five are still there without anyone knowing which".
+ * other six are still there without anyone knowing which".
  *
  * Returns the list of entity names whose removal failed — empty when every
  * key was removed. This is an irreversible action: the caller cannot verify

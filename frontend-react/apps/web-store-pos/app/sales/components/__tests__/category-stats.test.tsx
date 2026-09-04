@@ -20,7 +20,7 @@ describe('CategoryStats (Angular category-stats.component.html 1:1 port)', () =>
     render(<CategoryStats category={makeCategory()} />);
     expect(screen.getByText('Bebidas')).toBeInTheDocument();
     expect(screen.getByText('(5)')).toBeInTheDocument();
-    expect(screen.getByText('$25.00')).toBeInTheDocument();
+    expect(screen.getByText('$25')).toBeInTheDocument();
   });
 
   it('renders one row per product in productItems', () => {
@@ -35,9 +35,9 @@ describe('CategoryStats (Angular category-stats.component.html 1:1 port)', () =>
       />,
     );
     expect(screen.getByText('Cola')).toBeInTheDocument();
-    expect(screen.getByText('$10.00')).toBeInTheDocument();
+    expect(screen.getByText('$10')).toBeInTheDocument();
     expect(screen.getByText('Fanta')).toBeInTheDocument();
-    expect(screen.getByText('$3.00')).toBeInTheDocument();
+    expect(screen.getByText('$3')).toBeInTheDocument();
   });
 
   it('renders nothing when category is falsy (matches Angular @if(category))', () => {
@@ -62,6 +62,6 @@ describe('CategoryStats (Angular category-stats.component.html 1:1 port)', () =>
 
   it('formats totals with thousands separator via formatCurrency (WU7 list-parity sweep)', () => {
     render(<CategoryStats category={makeCategory({ total: 2000 })} />);
-    expect(screen.getByText('$2,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 });
