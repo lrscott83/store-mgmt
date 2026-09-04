@@ -3,6 +3,7 @@ import { useIntl } from 'react-intl';
 import type { Product } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { Button } from '~/shared/components/ui/button';
+import { BarcodeInput } from './barcode-input';
 
 interface EditProductModalProps {
   product: Product;
@@ -11,15 +12,18 @@ interface EditProductModalProps {
 }
 
 // Angular parity source: edit-product-modal.component.html — the ONE real modal, reused for
-// both create+edit. Field order: Nombre, Precio, Orden, Activo, Disponible para
-// Vender, Descuenta del Inventario. Barcode + category dropdown stay commented out in Angular
-// (never rendered). categoryId stays pinned to product.categoryId — never user-editable. No
-// in-modal delete — deletion lives at list-row level (products.tsx onDeleteProduct).
+// both create+edit. Field order: Nombre, Precio, Código de barras, Orden, Activo, Disponible
+// para Vender, Descuenta del Inventario. Barcode stayed commented out in Angular (never
+// rendered there) — the React form now OWNS an editable barcode field with scanner capture
+// (Angular is legacy; its commented-out control is history). categoryId stays pinned to
+// product.categoryId — never user-editable. No in-modal delete — deletion lives at list-row
+// level (products.tsx onDeleteProduct).
 export function EditProductModal({ product, onSave, onClose }: EditProductModalProps) {
   const intl = useIntl();
   const [form, setForm] = useState({
     name: product.name,
     price: product.price.toString(),
+    barcode: product.barcode ?? '',
     order: product.order.toString(),
     isActive: product.isActive,
     availableToSale: product.availableToSale,
@@ -71,6 +75,7 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
       ...product,
       name: form.name.trim(),
       price: parseFloat(form.price),
+      barcode: form.barcode.trim() || undefined,
       order: parseInt(form.order, 10),
       isActive: form.isActive,
       availableToSale: form.availableToSale,
@@ -116,6 +121,13 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
             />
             {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
           </div>
+
+          <BarcodeInput
+            value={form.barcode}
+            onChange={(barcode) => setForm((f) => ({ ...f, barcode }))}
+            inputTestId="edit-product-barcode-input"
+            scanTestId="edit-product-barcode-scan"
+          />
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">

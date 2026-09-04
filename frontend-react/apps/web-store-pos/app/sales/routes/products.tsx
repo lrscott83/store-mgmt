@@ -171,10 +171,11 @@ export function ProductsPage() {
       product.isActive,
       product.availableToSale,
       product.discountFromInvantory,
-      // Angular parity (edit-product-modal.component.ts:125): the barcode FormControl is
-      // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
-      // that already has a stored barcode.
-      undefined,
+      // The React edit form now OWNS an editable barcode field (prefilled with the stored
+      // barcode, scanner-capturable), so the update threads product.barcode through — the
+      // old always-undefined forwarding mirrored Angular's commented-out control, and
+      // Angular is legacy: its commented-out barcode FormControl is history.
+      product.barcode,
     );
     if (!result.succeeded) {
       showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
@@ -216,8 +217,7 @@ export function ProductsPage() {
   // Mirror of handleDeactivateProduct for an inactive catalog row. ProductService has NO
   // activateProduct (exact Angular parity surface, untouchable — see packages/domain
   // src/services/product-service.ts), so activation reuses updateProduct with isActive: true
-  // and the product's own unchanged fields, including its stored barcode (unlike the edit
-  // modal, which deliberately always sends undefined per Angular parity).
+  // and the product's own unchanged fields, including its stored barcode.
   async function handleActivateProduct(product: Product) {
     const confirmed = await confirmDialog({
       title: 'Confirmación para activar',

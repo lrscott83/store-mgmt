@@ -3,10 +3,12 @@ import { useIntl } from 'react-intl';
 import type { ProductCategory } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { Button } from '~/shared/components/ui/button';
+import { BarcodeInput } from './barcode-input';
 
 interface CreateProductForm {
   name: string;
   price: string;
+  barcode: string;
   order: string;
   isActive: boolean;
   availableToSale: boolean;
@@ -30,14 +32,17 @@ interface CreateProductModalProps {
 }
 
 // Angular parity source: edit-product-modal.component.html — the ONE real modal, reused for
-// both create+edit. Field order: Nombre, Precio, Orden, Activo, Disponible para
-// Vender, Descuenta del Inventario. Barcode + category dropdown stay commented out in Angular
-// (never rendered) — category is pinned to the click-context `category` prop instead.
+// both create+edit. Field order: Nombre, Precio, Código de barras, Orden, Activo, Disponible
+// para Vender, Descuenta del Inventario. Barcode stayed commented out in Angular (never
+// rendered there) — the React form now OWNS an editable barcode field with scanner capture
+// (Angular is legacy; its commented-out control is history). The category dropdown stays
+// pinned to the click-context `category` prop instead.
 export function CreateProductModal({ category, defaultOrder, onSave, onClose }: CreateProductModalProps) {
   const intl = useIntl();
   const [form, setForm] = useState<CreateProductForm>({
     name: '',
     price: '',
+    barcode: '',
     order: defaultOrder.toString(),
     isActive: true,
     availableToSale: true,
@@ -88,7 +93,7 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
     onSave({
       name: form.name.trim(),
       price: parseFloat(form.price),
-      barcode: undefined,
+      barcode: form.barcode.trim() || undefined,
       categoryId: category.id,
       order: parseInt(form.order, 10),
       isActive: form.isActive,
@@ -136,6 +141,14 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
             />
             {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price}</p>}
           </div>
+
+          {/* Barcode */}
+          <BarcodeInput
+            value={form.barcode}
+            onChange={(barcode) => setForm((f) => ({ ...f, barcode }))}
+            inputTestId="product-barcode-input"
+            scanTestId="product-barcode-scan"
+          />
 
           {/* Order */}
           <div>

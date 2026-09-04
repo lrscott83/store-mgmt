@@ -5,10 +5,20 @@ import esMessages from '~/shared/lib/i18n/es';
 import type { ProductCategory } from '@store-mgmt/domain';
 import { CreateProductModal } from '../create-product-modal';
 
+// Scanner camera lib — mocked so opening the modal never loads the real @zxing/browser
+// (lazy chunk) in jsdom; the manual-entry path needs no camera. Same pattern as
+// sale.test.tsx.
+vi.mock('@zxing/browser', () => ({
+  BrowserMultiFormatReader: vi.fn().mockImplementation(() => ({
+    decodeFromVideoDevice: vi.fn().mockRejectedValue(new Error('no camera in jsdom')),
+  })),
+}));
+
 // Angular parity source: edit-product-modal.component.html (the ONE real modal, used for both
-// create+edit). Fields top-to-bottom: Nombre, Precio ($ prefix), Orden, Activo, Disponible para
-// Vender, Descuenta del Inventario. NO barcode input, NO category dropdown (both commented out
-// in Angular). Category is pinned to click-context (single `category` prop), never user-editable.
+// create+edit). Fields top-to-bottom: Nombre, Precio, Código de barras, Orden, Activo,
+// Disponible para Vender, Descuenta del Inventario. The barcode field is React-owned — Angular's
+// commented-out control is legacy history. NO category dropdown (commented out in Angular).
+// Category is pinned to click-context (single `category` prop), never user-editable.
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <IntlProvider messages={esMessages} locale="es" defaultLocale="es">
@@ -90,13 +100,16 @@ describe('CreateProductModal — Angular field set/order parity', () => {
     expect(screen.queryByTestId('product-price-prefix')).not.toBeInTheDocument();
   });
 
-  it('does not render a barcode input', () => {
+  it('renders the barcode input empty and the scan button beside it (React-owned field)', () => {
     render(
       <Wrapper>
         <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
-    expect(screen.queryByTestId('product-barcode-input')).not.toBeInTheDocument();
+    expect(screen.getByTestId('product-barcode-input')).toHaveValue('');
+    expect(screen.getByTestId('product-barcode-scan')).toBeInTheDocument();
+    // The scan button must never submit the host form — a barcode capture is not a save.
+    expect(screen.getByTestId('product-barcode-scan')).toHaveAttribute('type', 'button');
   });
 
   it('does not render a category dropdown', () => {
@@ -148,6 +161,99 @@ describe('CreateProductModal — Angular field set/order parity', () => {
       availableToSale: true,
       discountFromInvantory: true,
     });
+  });
+});
+
+describe('CreateProductModal — barcode field (React-owned, scanner-capturable)', () => {
+  it('fills the barcode from typing and threads it into onSave as barcode', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '1.5' } });
+    fireEvent.change(screen.getByTestId('product-barcode-input'), { target: { value: '7501234567890' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Coca Cola', price: 1.5, barcode: '7501234567890' }),
+    );
+  });
+
+  it('threads barcode=undefined when the barcode field is left empty', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '1.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ barcode: undefined }));
+  });
+
+  it('threads barcode=undefined when the barcode field is whitespace-only', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '1.5' } });
+    fireEvent.change(screen.getByTestId('product-barcode-input'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ barcode: undefined }));
+  });
+
+  it('opens the scanner when the scan button is clicked', () => {
+    render(
+      <Wrapper>
+        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    expect(screen.queryByTestId('scanner-modal')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('product-barcode-scan'));
+    expect(screen.getByTestId('scanner-modal')).toBeInTheDocument();
+  });
+
+  it('a manual scanner entry fills the barcode field AND closes the scanner (capture-once cadence)', () => {
+    render(
+      <Wrapper>
+        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={vi.fn()} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('product-barcode-scan'));
+    fireEvent.change(screen.getByTestId('scanner-manual-input'), { target: { value: '7790561234567' } });
+    fireEvent.click(screen.getByTestId('scanner-manual-submit'));
+
+    expect(screen.getByTestId('product-barcode-input')).toHaveValue('7790561234567');
+    expect(screen.queryByTestId('scanner-modal')).not.toBeInTheDocument();
+  });
+
+  it('a scanned barcode threads into onSave alongside the other form fields', () => {
+    const onSave = vi.fn();
+    render(
+      <Wrapper>
+        <CreateProductModal category={makeCategory()} defaultOrder={1} onSave={onSave} onClose={vi.fn()} />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('product-barcode-scan'));
+    fireEvent.change(screen.getByTestId('scanner-manual-input'), { target: { value: '7790561234567' } });
+    fireEvent.click(screen.getByTestId('scanner-manual-submit'));
+
+    fireEvent.change(screen.getByTestId('product-name-input'), { target: { value: 'Coca Cola' } });
+    fireEvent.change(screen.getByTestId('product-price-input'), { target: { value: '1.5' } });
+    fireEvent.click(screen.getByTestId('create-product-submit'));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Coca Cola', price: 1.5, barcode: '7790561234567' }),
+    );
   });
 });
 

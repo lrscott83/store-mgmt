@@ -617,11 +617,11 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     expect(screen.queryByTestId('edit-product-name-input')).not.toBeInTheDocument();
   });
 
-  // Angular parity (edit-product-modal.component.ts:86,125): the barcode FormControl is
-  // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product that
-  // already has a stored barcode. React mirrors this by forwarding undefined regardless of
-  // product.barcode.
-  it('threads barcode=undefined into updateProduct even for a product with a stored barcode (parity fix)', async () => {
+  // The React edit form OWNS an editable barcode field (barcode-input.tsx), prefilled with
+  // the product's stored barcode — Angular's commented-out barcode FormControl (always
+  // undefined on update) is legacy history. Saving without touching the field threads the
+  // stored barcode through to updateProduct.
+  it('threads the stored barcode into updateProduct (React form owns barcode)', async () => {
     mockCategories = [makeCategory()];
     mockProducts = [makeProduct({ barcode: '7501234567890' })];
 
@@ -634,11 +634,12 @@ describe('ProductsPage — strict Angular parity (products.component.html)', () 
     fireEvent.click(await screen.findByTestId('category-panel-toggle-cat-1'));
     fireEvent.click(await screen.findByLabelText('Acciones'));
     fireEvent.click(screen.getByText('Editar Producto'));
+    expect(screen.getByTestId('edit-product-barcode-input')).toHaveValue('7501234567890');
     fireEvent.click(screen.getByTestId('edit-product-submit'));
 
     await waitFor(() => expect(productServiceSpies.updateProduct).toHaveBeenCalledTimes(1));
     const args = productServiceSpies.updateProduct.mock.calls[0];
-    expect(args[9]).toBeUndefined(); // barcode positional arg — always undefined, mirrors Angular
+    expect(args[9]).toBe('7501234567890'); // barcode positional arg — the stored barcode, prefilled+untouched
   });
 
   // Angular parity (product-modal-parity): EditProductModal no longer accepts onDelete/categories
