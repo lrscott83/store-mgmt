@@ -6,7 +6,6 @@ import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { SaleCreditOfflineService } from './sale-credit-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
-import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { addDays, localDayRange } from '~/shared/lib/date-utils';
@@ -72,7 +71,6 @@ function generateId(): string {
 export class OrderOfflineService {
   private readonly creditService: SaleCreditOfflineService;
   private readonly inventoryService: InventoryOfflineService;
-  private readonly expenseService: ExpenseOfflineService;
 
   private orders: Order[] | null = null;
   private lastOrdersKey: string | undefined;
@@ -83,9 +81,6 @@ export class OrderOfflineService {
       storeId,
       new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
     );
-    // Angular parity: OrderOfflineService injects ExpenseOfflineService directly
-    // (order-offline.service.ts:24,38) — used by getLastMonthSaleProfits' expense-netting.
-    this.expenseService = new ExpenseOfflineService(storeId);
   }
 
   /** 1:1 port of Angular `getStorageOrders` (order-offline.service.ts:400-405). */
@@ -210,16 +205,17 @@ export class OrderOfflineService {
   }
 
   /**
-   * 1:1 port of Angular `getLastMonthSaleProfits` (order-offline.service.ts:211-227) — same
-   * rule-12 relocation as `getLastMonthSales`. NO parameters. Nets out each bucket's active
-   * expenses: `value = orderProfit(day) - expenseService.getActiveExpensesPriceBetweenDates
-   * (dayStart, dayStart+1)`.
+   * Port of Angular `getLastMonthSaleProfits` (order-offline.service.ts:211-227) — same
+   * rule-12 relocation as `getLastMonthSales`. NO parameters. Returns the daily GROSS profit
+   * (`value = orderProfit(day)`), where orderProfit = sale price minus cost
+   * (calculated via `calculateOrderProfit`). Expenses are deliberately NOT netted out: this
+   * feeds the owner dashboard's "ganancias brutas" (gross-profit) chart, which shows only
+   * sale price minus cost, excluding expenses.
    *
    * Same date-window divergence as `getLastMonthSales` above (angular-bugs-policy, rule 8 —
    * CONSCIOUS, approved, NOT replicated): Angular's own `getLastMonthSaleProfits` has the
    * identical `startDate = startOfDay(today)` recomputed-every-iteration bug, so React keeps
-   * the fixed per-bucket [dayStart, dayStart+1) window and only adds the expense
-   * subtraction on top.
+   * the fixed per-bucket [dayStart, dayStart+1) window.
    */
   getLastMonthSaleProfits(): ChartData[] {
     const today = new Date();
@@ -228,10 +224,9 @@ export class OrderOfflineService {
       const label = addDays(today, -i);
       const { start: dayStart, end: dayEnd } = localDayRange(label);
       const orderProfit = this.getActiveOrdersProfitBetweenDates(dayStart, dayEnd);
-      const dayExpenses = this.expenseService.getActiveExpensesPriceBetweenDates(dayStart, dayEnd);
       data.push({
         label,
-        value: orderProfit - dayExpenses,
+        value: orderProfit,
       });
     }
     return data;

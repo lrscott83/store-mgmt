@@ -107,7 +107,7 @@ export function EntriesPage() {
               ({entriesCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-primary">{formatCurrency(entriesTotal)}</span>
+          <span className="text-sm font-semibold text-primary whitespace-nowrap">{formatCurrency(entriesTotal)}</span>
         </div>
       }
     >
@@ -135,10 +135,8 @@ export function EntriesPage() {
                     {formatLocalDate(dayGroup.date)}
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-primary">
-                      {formatCurrency(
-                        round2(dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0)),
-                      )}
+                    <span className="text-sm font-semibold text-primary whitespace-nowrap">
+                      {formatCurrency(round2(dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0)))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

@@ -215,7 +215,7 @@ export function InventoryTodaySalesProfitPage() {
       title={
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'INVENTORY.PROFIT.TITLE' })}</span>
-          <span className="text-lg font-bold text-success">{formatCurrency(totals.profit)}</span>
+          <span className="text-lg font-bold text-success whitespace-nowrap">{formatCurrency(totals.profit)}</span>
         </div>
       }
     >
@@ -265,14 +265,14 @@ export function InventoryTodaySalesProfitPage() {
                         {product.sold}
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
-                        <div>{formatCurrency(product.salePrice)}</div>
-                        <div className="text-xs text-text-muted/70">{formatCurrency(product.amount)}</div>
+                        <div className="whitespace-nowrap">{formatCurrency(product.salePrice)}</div>
+                        <div className="whitespace-nowrap text-xs text-text-muted/70">{formatCurrency(product.amount)}</div>
                       </td>
                       <td className="px-4 py-3 text-right text-text-muted">
-                        <div>{formatCurrency(product.unitCost)}</div>
-                        <div className="text-xs text-text-muted/70">{formatCurrency(product.totalCost)}</div>
+                        <div className="whitespace-nowrap">{formatCurrency(product.unitCost)}</div>
+                        <div className="whitespace-nowrap text-xs text-text-muted/70">{formatCurrency(product.totalCost)}</div>
                       </td>
-                      <td className={`px-4 py-3 text-right font-semibold ${profitClass(product.profit)}`}>
+                      <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${profitClass(product.profit)}`}>
                         {formatCurrency(product.profit)}
                       </td>
                     </tr>
@@ -285,9 +285,9 @@ export function InventoryTodaySalesProfitPage() {
                     {intl.formatMessage({ id: 'INVENTORY.PROFIT.TOTAL' })}
                   </td>
                   <td className="px-4 py-3 text-right text-text">{totals.sold}</td>
-                  <td className="px-4 py-3 text-right text-text">{formatCurrency(totals.amount)}</td>
-                  <td className="px-4 py-3 text-right text-text">{formatCurrency(totals.cost)}</td>
-                  <td className={`px-4 py-3 text-right ${profitClass(totals.profit)}`}>
+                  <td className="px-4 py-3 text-right text-text whitespace-nowrap">{formatCurrency(totals.amount)}</td>
+                  <td className="px-4 py-3 text-right text-text whitespace-nowrap">{formatCurrency(totals.cost)}</td>
+                  <td className={`px-4 py-3 text-right whitespace-nowrap ${profitClass(totals.profit)}`}>
                     {formatCurrency(totals.profit)}
                   </td>
                 </tr>
@@ -319,21 +319,21 @@ export function InventoryTodaySalesProfitPage() {
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.PRICE' })}
                     </p>
-                    <p className="text-text">{formatCurrency(product.salePrice)}</p>
-                    <p className="text-text-muted/70">{formatCurrency(product.amount)}</p>
+                    <p className="text-text whitespace-nowrap">{formatCurrency(product.salePrice)}</p>
+                    <p className="text-text-muted/70 whitespace-nowrap">{formatCurrency(product.amount)}</p>
                   </div>
                   <div>
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.COST' })}
                     </p>
-                    <p className="text-text">{formatCurrency(product.unitCost)}</p>
-                    <p className="text-text-muted/70">{formatCurrency(product.totalCost)}</p>
+                    <p className="text-text whitespace-nowrap">{formatCurrency(product.unitCost)}</p>
+                    <p className="text-text-muted/70 whitespace-nowrap">{formatCurrency(product.totalCost)}</p>
                   </div>
                   <div>
                     <p className="text-text-muted">
                       {intl.formatMessage({ id: 'INVENTORY.PROFIT.PROFIT' })}
                     </p>
-                    <p className={`font-semibold ${profitClass(product.profit)}`}>
+                    <p className={`font-semibold whitespace-nowrap ${profitClass(product.profit)}`}>
                       {formatCurrency(product.profit)}
                     </p>
                   </div>

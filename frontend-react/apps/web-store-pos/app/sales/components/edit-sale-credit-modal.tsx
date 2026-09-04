@@ -85,7 +85,7 @@ export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: Edi
           }
         >
           <div className="space-y-3">
-            <p className="text-sm text-text">
+            <p className="text-sm text-text whitespace-nowrap">
               Pagar: {formatCurrency(saleCredit?.total ?? 0)}
             </p>
             <div>

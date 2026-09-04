@@ -63,7 +63,6 @@ vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
 import { OrderOfflineService } from '../order-offline-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { SaleCreditOfflineService } from '../sale-credit-offline-service';
-import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
@@ -1599,10 +1598,11 @@ describe('OrderOfflineService', () => {
       }
     });
 
-    // WU6: Daily Profit Nets Out Expenses (Angular parity — getLastMonthSaleProfits
-    // subtracts expenseService.getActiveExpensesPriceBetweenDates, order-offline.service.ts:223).
-    describe('expense netting', () => {
-      it('nets orders and expenses for the day: value = orderProfit(day) - expenses(day)', () => {
+    // Gross profit chart (owner dashboard) — expenses are deliberately NOT netted out
+    // (order-offline.service.ts getLastMonthSaleProfits): value = orderProfit(day) only,
+    // where orderProfit = sale price minus cost. This feeds the "ganancias brutas" chart.
+    describe('gross-profit chart does NOT net out expenses', () => {
+      it('returns orderProfit only when expenses exist for the day', () => {
         const orderDate = dayAgo(0);
         seedOrders(storeId, [
           makeOrder({
@@ -1617,24 +1617,24 @@ describe('OrderOfflineService', () => {
 
         const result = service.getLastMonthSaleProfits();
         const todayPoint = result.find((p) => dayStr(p.label) === dayStr(TODAY));
-        // 24 - 10 = 14
-        expect(todayPoint!.value).toBe(14);
+        // Expenses are ignored: 24, not 24 - 10 = 14.
+        expect(todayPoint!.value).toBe(24);
       });
 
-      it('a day with only expenses (no orders) yields a negative value', () => {
+      it('a day with only expenses (no orders) yields zero', () => {
         // Seed a 30-total expense on EVERY one of the 30 bucket days.
         for (let i = 0; i <= 29; i++) {
           seedExpense(dayAgo(i), 30);
         }
 
         const result = service.getLastMonthSaleProfits();
-        // Every bucket has 0 order profit and 30 in expenses -> -30 everywhere.
+        // No orders -> orderProfit 0 everywhere; expenses are ignored -> 0, not -30.
         for (const point of result) {
-          expect(point.value).toBe(-30);
+          expect(point.value).toBe(0);
         }
       });
 
-      it('a day with 0 expenses is unaffected (matches Angular no-expense baseline)', () => {
+      it('a day with 0 expenses is unaffected', () => {
         const orderDate = dayAgo(0);
         seedOrders(storeId, [
           makeOrder({
@@ -1650,28 +1650,7 @@ describe('OrderOfflineService', () => {
         expect(todayPoint!.value).toBe(24);
       });
 
-      it("queries expenses per-bucket with each day's OWN [dayStart, dayStart+1) window — NOT Angular's buggy always-today window", () => {
-        const spy = vi.spyOn(ExpenseOfflineService.prototype, 'getActiveExpensesPriceBetweenDates');
-
-        service.getLastMonthSaleProfits();
-
-        // 30 calls, one per bucket, each with a DIFFERENT start date (proves per-day windows,
-        // not a single repeated "today" window like Angular's getLastMonthSaleProfits bug).
-        expect(spy).toHaveBeenCalledTimes(30);
-        const callStarts = spy.mock.calls.map((args) => (args[0] as Date).getTime());
-        const uniqueStarts = new Set(callStarts);
-        expect(uniqueStarts.size).toBe(30);
-
-        // Each call's end = start + 1 day.
-        for (const [start, end] of spy.mock.calls as [Date, Date][]) {
-          const diffMs = end.getTime() - start.getTime();
-          expect(diffMs).toBe(24 * 60 * 60 * 1000);
-        }
-
-        spy.mockRestore();
-      });
-
-      it('nets expenses independently per bucket (per-bucket isolation)', () => {
+      it('ignores expenses independently per bucket', () => {
         const day0 = dayAgo(0);
         const day5 = dayAgo(5);
         seedOrders(storeId, [
@@ -1693,7 +1672,7 @@ describe('OrderOfflineService', () => {
 
         const result = service.getLastMonthSaleProfits();
         expect(result.find((p) => dayStr(p.label) === dayStr(TODAY))!.value).toBe(10); // unaffected
-        expect(result.find((p) => dayStr(p.label) === dayStr(day5))!.value).toBe(30); // 50 - 20
+        expect(result.find((p) => dayStr(p.label) === dayStr(day5))!.value).toBe(50); // 50, not 50 - 20
       });
     });
   });

@@ -417,7 +417,7 @@ export function CartShell() {
                         {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}{formatCurrency(item.price ?? item.product.price)}
                       </p>
                     </div>
-                    <p className="text-sm text-text">{formatCurrency(round2((item.price ?? item.product.price) * item.quantity))}</p>
+                    <p className="text-sm text-text whitespace-nowrap">{formatCurrency(round2((item.price ?? item.product.price) * item.quantity))}</p>
                     {/* Quantity controls */}
                     <div className="flex items-center gap-1">
                       <button

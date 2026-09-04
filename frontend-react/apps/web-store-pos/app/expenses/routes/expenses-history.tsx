@@ -8,11 +8,11 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { ChevronDownIcon, PaymentMethodIcon } from '~/shared/components/ui/icons';
 import { getPaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
-import { formatCurrency } from '~/shared/lib/format-currency';
 import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { ExpenseOfflineService } from '../lib/services/expense-offline-service';
 import { ExpenseList } from '../components/expense-list';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.ExpensesHistory]);
 
@@ -109,7 +109,7 @@ export function ExpensesHistoryPage() {
               ({expensesCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-danger">{formatCurrency(expensesTotal)}</span>
+          <span className="text-sm font-semibold text-danger whitespace-nowrap">{formatCurrency(expensesTotal)}</span>
         </div>
       }
     >
@@ -160,7 +160,7 @@ export function ExpensesHistoryPage() {
                     {formatLocalDate(dayGroup.date)} ({dayGroup.items.length})
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-danger">
+                    <span className="text-sm font-semibold text-danger whitespace-nowrap">
                       {formatCurrency(dayGroup.items.reduce((total, e) => total + e.total, 0))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />

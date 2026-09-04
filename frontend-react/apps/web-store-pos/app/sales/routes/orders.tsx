@@ -11,7 +11,6 @@ import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatLocalDate, fromLocalDayKey, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { showBlockingInfo } from '~/shared/lib/blocking-alert';
-import { formatCurrency } from '~/shared/lib/format-currency';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { generateProductRowsForDate } from '~/reports/lib/pdf/generate-product-rows-for-date';
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
@@ -23,6 +22,7 @@ import { ProductCategoryRepository } from '../lib/repositories/product-category-
 import { OrderList } from '../components/order-list';
 import { DaySalesSummaryModal } from '../components/day-sales-summary-modal';
 import type { DaySalesSummary } from '../components/day-sales-summary-modal';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
@@ -165,7 +165,7 @@ export function OrdersPage() {
               ({ordersCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-text">{formatCurrency(ordersTotal)}</span>
+          <span className="text-sm font-semibold text-text whitespace-nowrap">{formatCurrency(ordersTotal)}</span>
         </div>
       }
     >
@@ -252,7 +252,7 @@ export function OrdersPage() {
                     {formatLocalDate(g.date)} ({g.items.length})
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-text">
+                    <span className="text-sm font-semibold text-text whitespace-nowrap">
                       {formatCurrency(g.items.reduce((t, o) => t + o.total, 0))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />

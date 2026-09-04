@@ -133,7 +133,7 @@ export function TodayReportPage() {
             </div>
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
-            <div className="text-2xl font-bold text-green-700">
+            <div className="text-2xl font-bold text-green-700 whitespace-nowrap">
               {formatCurrency(summary.totalRevenue)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
@@ -141,7 +141,7 @@ export function TodayReportPage() {
             </div>
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-2xl font-bold text-red-600 whitespace-nowrap">
               {formatCurrency(summary.totalCost)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
@@ -149,7 +149,7 @@ export function TodayReportPage() {
             </div>
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-blue-700 whitespace-nowrap">
               {formatCurrency(summary.totalProfit)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
