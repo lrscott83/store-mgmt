@@ -192,7 +192,7 @@ const messages: Record<string, string> = {
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.SALE': 'Vender',
-  'MENU.WHOLESALE': 'Ventas Mayoristas',
+  'MENU.WHOLESALE': 'Vender Mayorista',
   'MENU.TODAY_ORDERS': 'Ventas del día',
   'MENU.TODAY_CREDITS': 'Créditos del día',
   'MENU.TODAY_STATS': 'Cuadre del día',
