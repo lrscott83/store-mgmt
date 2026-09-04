@@ -15,6 +15,7 @@ import type {
   Order,
   Expense,
   SaleCredit,
+  ExchangeRate,
 } from '@store-mgmt/domain';
 import type { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import type { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -69,6 +70,9 @@ export const EDataFileName = {
   Orders: 'orders.json',
   Expenses: 'expenses.json',
   SaleCredits: 'sale-credits.json',
+  // daily-exchange-rate: the seventh data entry, absent from legacy v1/
+  // Angular archives (parsed as [] on import) and always written by exports.
+  ExchangeRates: 'exchange-rates.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -77,7 +81,7 @@ export const EDataFileName = {
 //
 // v2 adds an unencrypted `meta.json` FIRST entry (V2-01) so a password-free
 // central-directory scan can detect the format and validate the store claim
-// before any decryption or write (V2-05). The 6 data entries keep the
+// before any decryption or write (V2-05). The 7 data entries keep the
 // Angular-compatible names and stay AES-encrypted under a password-only Web
 // Crypto PBKDF2 key (V2-03). Legacy v1 archives — which have no meta.json —
 // are still imported via the `password + selectedStoreId` fallback (V2-07).
@@ -159,6 +163,7 @@ export interface ParsedData {
   orders: Order[];
   expenses: Expense[];
   saleCredits: SaleCredit[];
+  exchangeRates: ExchangeRate[];
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +192,10 @@ export interface SaleCreditReader {
   getStorageSaleCredits(): SaleCredit[];
 }
 
+export interface ExchangeRateReader {
+  getStorageExchangeRates(): ExchangeRate[];
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -210,7 +219,8 @@ function parseJson<T>(contents: Map<string, string>, name: string, fallback: T):
  *
  * v2 envelope (sync-export-import-v2): a ZIP whose FIRST entry is the
  * unencrypted `meta.json` envelope (formatVersion 2, fresh per-export salt,
- * iterations, storeId, exportedAt) followed by the 6 Angular-named data
+ * iterations, storeId, exportedAt) followed by the 7 data entries (the 6
+ * Angular-named originals + `exchange-rates.json`, daily-exchange-rate)
  * entries (data.file.model.ts EDataFileName parity) each AES-encrypted under
  * the password-only PBKDF2 key described by meta.json. Legacy v1 archives —
  * and real Angular-exported archives, which carry no meta.json — import via
@@ -227,6 +237,10 @@ export class DataSerializerService {
     private readonly orderReader: OrderReader,
     private readonly expenseReader: ExpenseReader,
     private readonly saleCreditReader: SaleCreditReader,
+    // Optional (daily-exchange-rate): legacy call sites/tests that predate the
+    // register omit it; exports then write an empty entry and imports parse []
+    // for archives that carry none.
+    private readonly exchangeRateReader?: ExchangeRateReader,
   ) {}
 
   private derivePassword(password: string): string {
@@ -236,8 +250,8 @@ export class DataSerializerService {
   }
 
   /**
-   * Reads all 6 entities and writes them as a v2 ZIP: an unencrypted
-   * `meta.json` envelope first, then the 6 Angular-named data entries each
+   * Reads all 7 entities and writes them as a v2 ZIP: an unencrypted
+   * `meta.json` envelope first, then the 7 data entries each
    * AES-encrypted with the per-export password-only key. zip.js's internal
    * PBKDF2-SHA-1 @ 1000-iteration KDF still runs over the per-entry key — it
    * is buried, not replaced (V2-04); the outer Web Crypto KDF dominates the
@@ -247,6 +261,7 @@ export class DataSerializerService {
     const orders = this.orderReader.getStorageOrders();
     const expenses = this.expenseReader.getStorageExpenses();
     const saleCredits = this.saleCreditReader.getStorageSaleCredits();
+    const exchangeRates = this.exchangeRateReader?.getStorageExchangeRates() ?? [];
 
     // Angular parity (data-serializer.service.ts:83-84): reads the RAW stored
     // JSON string straight from the repository, no re-derivation via
@@ -271,6 +286,7 @@ export class DataSerializerService {
     const ordersJson = JSON.stringify(orders);
     const expensesJson = JSON.stringify(expenses);
     const saleCreditsJson = JSON.stringify(saleCredits);
+    const exchangeRatesJson = JSON.stringify(exchangeRates);
 
     // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
     const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
@@ -309,13 +325,16 @@ export class DataSerializerService {
     await zipWriter.add(EDataFileName.SaleCredits, new TextReader(saleCreditsJson), {
       rawPassword: key,
     });
+    await zipWriter.add(EDataFileName.ExchangeRates, new TextReader(exchangeRatesJson), {
+      rawPassword: key,
+    });
 
     const blob = await zipWriter.close();
     return new Uint8Array(await blob.arrayBuffer());
   }
 
   /**
-   * Decrypts and parses all 6 entries. v2 archives (meta.json present)
+   * Decrypts and parses all 7 entries. v2 archives (meta.json present)
    * validate the store claim BEFORE any decryption (WrongStoreError, V2-05);
    * legacy v1 archives (no meta.json — including Angular exports) fall back
    * to `password + selectedStoreId` (V2-07). Throws WrongPasswordError /
@@ -326,7 +345,7 @@ export class DataSerializerService {
     const blob = new Blob([payload]);
     // No reader-level password on purpose: zip.js reads the central directory
     // password-free for ANY archive, which is what lets a mixed v2 ZIP expose
-    // meta.json plaintext while the 6 data entries stay encrypted (V2-01).
+    // meta.json plaintext while the 7 data entries stay encrypted (V2-01).
     const zipReader = new ZipReader(new BlobReader(blob));
 
     let entries: Awaited<ReturnType<typeof zipReader.getEntries>>;
@@ -353,7 +372,7 @@ export class DataSerializerService {
   /**
    * v2 path: reads the plaintext meta.json envelope, validates it, checks the
    * store claim (V2-05 — throws WrongStoreError BEFORE deriving the key or
-   * writing anything), then decrypts the 6 data entries with the derived key
+   * writing anything), then decrypts the 7 data entries with the derived key
    * (V2-06 wrong-password semantics unchanged).
    */
   private async importV2(
@@ -465,6 +484,8 @@ export class DataSerializerService {
       orders: parseJson<Order[]>(contents, EDataFileName.Orders, []),
       expenses: parseJson<Expense[]>(contents, EDataFileName.Expenses, []),
       saleCredits: parseJson<SaleCredit[]>(contents, EDataFileName.SaleCredits, []),
+      // Legacy archives (v1/Angular) carry no exchange-rates entry → [].
+      exchangeRates: parseJson<ExchangeRate[]>(contents, EDataFileName.ExchangeRates, []),
     };
   }
 }

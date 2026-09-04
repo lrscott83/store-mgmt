@@ -81,6 +81,12 @@ export default [
     route('management/stores/collections', 'management/stores/routes/collections.tsx'),
     route('management/stores/commissions', 'management/stores/routes/reseller-commissions.tsx'),
 
+    // Management — Exchange rates (daily USD→MN register; same guard as
+    // Configurations — daily-exchange-rate)
+    route('management/exchange-rates', 'management/exchange-rates/routes/exchange-rates.tsx', {
+      id: 'management-exchange-rates',
+    }),
+
     // Management — Users
     route('management/users', 'management/users/routes/user-list.tsx'),
     // storeId is optional: matches both /create (from user list) and /create/:storeId

@@ -226,6 +226,7 @@ const messages: Record<string, string> = {
   // (/management/stores/update), same authorization (EFeatures.Stores).
   'MENU.STORES_PLAN': 'Plan de la tienda',
   'MENU.STORES_UPDATE': 'Editar la tienda',
+  'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
   'MENU.USERS': 'Empleados',
   'MENU.CONFIGURATIONS': 'Configuraciones',
   'MENU.TUTORIAL': 'Tutorial',
@@ -715,6 +716,16 @@ const messages: Record<string, string> = {
   'STORES.PLAN.ACTIVATE': 'Activar este plan',
   'STORES.PLAN.WILL_ACTIVATE_ON_SAVE': 'Se activará al guardar',
   'STORES.PLAN.CURRENCY_NOTICE': 'Los precios se muestran en USD. El pago se realiza en MN al cambio oficial del día.',
+
+  // Exchange rates — daily USD→MN register (daily-exchange-rate)
+  'EXCHANGE_RATES.TITLE': 'Registro del cambio de USD a MN',
+  'EXCHANGE_RATES.INFO': 'Cada día se añade automáticamente un registro con el valor del día anterior (el primer día usa el valor por defecto 1). El valor indica cuántos pesos (MN) equivale 1 USD en esa fecha. Solo se puede editar el valor de cada día.',
+  'EXCHANGE_RATES.DATE_COLUMN': 'Fecha',
+  'EXCHANGE_RATES.VALUE_COLUMN': '1 USD = (MN)',
+  'EXCHANGE_RATES.SAVE': 'Guardar',
+  'EXCHANGE_RATES.SAVED': 'Valor actualizado correctamente.',
+  'EXCHANGE_RATES.INVALID_VALUE': 'El valor debe ser un número mayor que 0.',
+  'EXCHANGE_RATES.NO_RECORDS': 'No hay registros todavía.',
   'STORES.MODULES_LABEL': 'Módulos',
   'STORES.MODULES_TOTAL': 'Total',
   'STORES.MODULES_PRICE': 'Precio',

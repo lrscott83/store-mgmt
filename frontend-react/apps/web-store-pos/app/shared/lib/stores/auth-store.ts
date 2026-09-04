@@ -13,6 +13,21 @@ import { clearDek } from '../storage/data-key-store';
 // a network failure — silently degrading the user instead of failing loudly.
 import { SessionRejectedError } from '../http/session-rejected-error';
 
+// daily-exchange-rate: fire-and-forget auth-time backfill of the daily USD→MN
+// register. Dynamic import (D6) — auth-store.ts is evaluated on every cold
+// boot, and the register's service drags storage/encryption seams that belong
+// only to authenticated owner sessions.
+async function ensureExchangeRates(user: UserModel | null): Promise<void> {
+  try {
+    const { ensureExchangeRateDailyRecords } = await import(
+      '../exchange-rates/exchange-rate-daily'
+    );
+    await ensureExchangeRateDailyRecords(user);
+  } catch {
+    // Fire-and-forget: a register failure must never block authentication.
+  }
+}
+
 const THIRTY_FIVE_DAYS_MS = 35 * 24 * 60 * 60 * 1000;
 
 // Decision 2 (auth-service-parity, Slice 3): the store is framework-agnostic
@@ -156,6 +171,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // shared HTTP error interceptor (api-client.ts / Angular error-interceptor
       // .service.ts:62), which breaks offline use — so the revalidation is removed.
       set({ user: userWithExpiry, isAuthenticated: true, error: null });
+      // daily-exchange-rate (cold boot): session already valid on this device —
+      // backfill the register through today without blocking hydration.
+      void ensureExchangeRates(userWithExpiry);
       return userWithExpiry;
     }
 
@@ -363,6 +381,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       );
       resetDecryptionFailureLatch();
 
+      // daily-exchange-rate (online login): stamp first-login anchor + backfill.
+      void ensureExchangeRates(user);
+
       set({ isLoading: false });
       return user;
     } catch (err) {
@@ -420,6 +441,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { getRoster } = await import('../offline/roster-store');
       const sessionBundle = getRoster();
       get().setUser(user, user.authToken, sessionBundle?.expiresAt);
+      // daily-exchange-rate (offline login): stamp first-login anchor + backfill.
+      void ensureExchangeRates(get().user);
       set({ isLoading: false });
       // Return the hydrated `get().user`, not the raw `user` — setUser()
       // stamps a fresh `expiresIn` and blanks `password`, so the returned

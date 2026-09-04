@@ -1,5 +1,13 @@
 import { Result } from '@store-mgmt/domain';
-import type { Expense, InventoryEntry, Order, Product, ProductCategory, SaleCredit } from '@store-mgmt/domain';
+import type {
+  ExchangeRate,
+  Expense,
+  InventoryEntry,
+  Order,
+  Product,
+  ProductCategory,
+  SaleCredit,
+} from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
 
 // ---------------------------------------------------------------------------
@@ -62,6 +70,10 @@ export const SynchronizerErrors = {
   SaleCreditsUnexpectedError: {
     code: 'Synchronizer.SaleCreditsUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar los créditos.',
+  },
+  ExchangeRatesUnexpectedError: {
+    code: 'Synchronizer.ExchangeRatesUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar el registro de cambio.',
   },
 } as const;
 
@@ -160,6 +172,18 @@ export interface OrderImportService {
   updateImportedOrder(order: Order): Result;
 }
 
+/**
+ * Exchange-rate import routes through the offline SERVICE (Angular-parity
+ * shape: the service owns the domain-command layer). Upsert by id — the id IS
+ * the local day key, so the merge is "one record per day, last import wins"
+ * (daily-exchange-rate).
+ */
+export interface ExchangeRateImportService {
+  getStorageExchangeRates(): ExchangeRate[];
+  addImportedExchangeRate(rate: ExchangeRate): Result;
+  updateImportedExchangeRate(rate: ExchangeRate): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -191,7 +215,7 @@ interface MergeOutcome {
  * - InventoryEntries/Orders/Expenses/SaleCredits: break-only semantics — the
  *   first failed item stops that entity type's loop, but prior successful
  *   writes for that type are NOT reverted.
- * - `sync()` aggregates errors across ALL 6 entity types and continues
+ * - `sync()` aggregates errors across ALL 7 entity types and continues
  *   processing subsequent types even if an earlier type failed (mirrors
  *   Angular's `synchronizeFiles`, which is NOT abort-on-first).
  */
@@ -204,6 +228,9 @@ export class DataSynchronizerService {
     private readonly orderService: OrderImportService,
     private readonly expenseService: ExpenseImportService,
     private readonly saleCreditService: SaleCreditImportService,
+    // Optional (daily-exchange-rate): legacy call sites/tests that predate the
+    // register omit it — the merge then degrades to a zero-count no-op.
+    private readonly exchangeRateService?: ExchangeRateImportService,
   ) {}
 
   async sync(data: ParsedData): Promise<SyncResult> {
@@ -238,6 +265,14 @@ export class DataSynchronizerService {
     // revert), with a paid-guard partial-merge inside updateImportedSaleCredit. Emits its own
     // SaleCreditsUnexpectedError (Angular's copy-paste bug is fixed here).
     push(this.mergeSaleCreditsViaService(data.saleCredits));
+
+    // 7. ExchangeRates — routed through the offline SERVICE (daily-exchange-rate),
+    // upsert-by-day-key, break-only (no revert). Only when the service was
+    // injected: legacy constructor call sites (and their tests) predate the
+    // register and must keep a 6-entity merge contract.
+    if (this.exchangeRateService) {
+      push(this.mergeExchangeRatesViaService(data.exchangeRates));
+    }
 
     return { succeeded: errors.length === 0, errors, merges };
   }
@@ -521,6 +556,66 @@ export class DataSynchronizerService {
   // ---------------------------------------------------------------------------
   // InventoryEntries — grouped by productId, break-only, no revert
   // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // ExchangeRates — routed through the offline SERVICE (daily-exchange-rate)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Upsert-by-day-key merge of the imported daily USD→MN register. The id IS
+   * the local day key (`YYYY-MM-DD`), so add-vs-update is decided per day and
+   * the register can never hold two records for the same day after an import.
+   * Break-only (no revert); an unexpected throw yields
+   * `ExchangeRatesUnexpectedError`. When the service was not injected (legacy
+   * constructor call sites) the merge is a zero-count no-op.
+   */
+  private mergeExchangeRatesViaService(incoming: ExchangeRate[]): MergeOutcome {
+    if (!this.exchangeRateService || incoming.length === 0) {
+      return { merge: { entity: 'exchangeRates', inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    try {
+      const existing = new Map(
+        this.exchangeRateService.getStorageExchangeRates().map((r) => [r.id, r]),
+      );
+      for (const rate of incoming) {
+        const isNew = !existing.has(rate.id);
+        if (isNew) {
+          existing.set(rate.id, rate);
+          inserted++;
+        } else {
+          updated++;
+        }
+        const result = isNew
+          ? this.exchangeRateService.addImportedExchangeRate(rate)
+          : this.exchangeRateService.updateImportedExchangeRate(rate);
+        if (!result.succeeded) {
+          return {
+            merge: { entity: 'exchangeRates', inserted, updated },
+            error: {
+              entity: 'exchangeRates',
+              code: SynchronizerErrors.ExchangeRatesUnexpectedError.code,
+              message: SynchronizerErrors.ExchangeRatesUnexpectedError.message,
+            },
+          };
+        }
+      }
+      return { merge: { entity: 'exchangeRates', inserted, updated } };
+    } catch {
+      // Break-only: no revert — writes already applied before the failure persist.
+      return {
+        merge: { entity: 'exchangeRates', inserted, updated },
+        error: {
+          entity: 'exchangeRates',
+          code: SynchronizerErrors.ExchangeRatesUnexpectedError.code,
+          message: SynchronizerErrors.ExchangeRatesUnexpectedError.message,
+        },
+      };
+    }
+  }
 
   private mergeInventoryBreakOnly(incoming: InventoryEntry[]): MergeOutcome {
     const entity = 'inventoryEntries';

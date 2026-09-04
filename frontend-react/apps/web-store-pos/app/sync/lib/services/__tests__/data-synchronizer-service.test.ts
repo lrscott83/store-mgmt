@@ -355,6 +355,7 @@ function emptyData(): ParsedData {
     orders: [],
     expenses: [],
     saleCredits: [],
+    exchangeRates: [],
   };
 }
 
@@ -455,6 +456,7 @@ describe('DataSynchronizerService', () => {
         orders: [makeOrder('order-1')],
         expenses: [makeExpense('exp-1')],
         saleCredits: [makeSaleCredit('sc-1')],
+        exchangeRates: [],
       };
 
       await svc.sync(data);
@@ -963,6 +965,7 @@ describe('DataSynchronizerService', () => {
         orders: [makeOrder('o1')],
         expenses: [makeExpense('e1')],
         saleCredits: [makeSaleCredit('sc1')],
+        exchangeRates: [],
       };
       const result = await svc.sync(data);
       const entities = result.merges.map((r) => r.entity);
@@ -1000,6 +1003,7 @@ describe('DataSynchronizerService', () => {
         orders: [order],
         expenses: [expense],
         saleCredits: [credit],
+        exchangeRates: [],
       };
 
       const result = await svc.sync(data);
