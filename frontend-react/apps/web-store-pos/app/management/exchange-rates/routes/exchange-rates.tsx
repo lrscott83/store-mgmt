@@ -6,8 +6,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
-import { SaveIcon } from '~/shared/components/ui/icons';
-import { formatLocalDate } from '~/shared/lib/date-utils';
+import { ChevronDownIcon, CloseIcon, EditIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { ExchangeRateOfflineService } from '../lib/services/exchange-rate-offline-service';
 import { getExchangeRateAnchor } from '~/shared/lib/exchange-rates/exchange-rate-daily';
 
@@ -15,30 +14,73 @@ import { getExchangeRateAnchor } from '~/shared/lib/exchange-rates/exchange-rate
 // SuperAdmin bypass plus the feature-gate for the rest.
 export const clientLoader = adminFeatureLoader([EFeatures.Configurations]);
 
-interface RowState {
-  draft: string;
-  saving: boolean;
-  error?: string;
-  saved?: boolean;
+/** Month bucket: 'YYYY-MM' key, the month's first record date (for the label), and its records. */
+interface MonthGroup {
+  monthKey: string;
+  date: Date;
+  records: ExchangeRate[];
 }
 
 /**
- * Daily USD→MN exchange-rate register.
- *
- * The list runs from TODAY down to the first day the store owner authenticated
- * on this device (`getExchangeRateAnchor`). Records are auto-generated — one
- * per local day, each inheriting the previous day's value (default 1) — so
- * this screen offers no create/delete: each row's value is editable, and that
- * is the only operation. Opening the view backfills any missing days first
- * (the auth-time backfill in auth-store covers the days the app runs without
- * anyone navigating here).
+ * Groups records into month buckets keyed 'YYYY-MM' (derived from the record's
+ * day-key id, which is already 'YYYY-MM-DD'), newest month first, days within
+ * each month newest first. Mirrors the collapsed-panel pattern of the history
+ * views (entries.tsx / expenses-history.tsx) but grouped by MONTH, not by day.
+ */
+function groupByMonth(records: ExchangeRate[]): MonthGroup[] {
+  const byMonth = new Map<string, MonthGroup>();
+  for (const record of records) {
+    const monthKey = record.id.slice(0, 7); // 'YYYY-MM' from 'YYYY-MM-DD'
+    let group = byMonth.get(monthKey);
+    if (!group) {
+      group = { monthKey, date: record.date, records: [] };
+      byMonth.set(monthKey, group);
+    }
+    group.records.push(record);
+  }
+  return [...byMonth.values()].sort((a, b) => (a.monthKey < b.monthKey ? 1 : -1));
+}
+
+const MONTH_NAMES_ES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+/**
+ * "septiembre 2026"-style month label from a fixed Spanish month-name table —
+ * deterministic across Node/jsdom/browser builds (toLocaaleDateString('es', …)
+ * month-part output varies by environment, which the test suite must not depend on).
+ */
+function monthLabelStable(date: Date): string {
+  return `${MONTH_NAMES_ES[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** 'YYYY-MM' month key of a date, local time. */
+function toLocalMonthKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+/**
+ * Daily USD→MN exchange-rate register, grouped by month with collapsed panels
+ * (only the CURRENT month starts expanded — the register grows one day at a
+ * time, so past months are read-mostly history). Each row shows the day number
+ * and the value; the edit icon on the right opens a popup modal (the app's
+ * standard modal shape) to edit that day's value — the register's only write
+ * operation (no create/delete by design).
  */
 export function ExchangeRatesPage() {
   const intl = useIntl();
   const storeId = useAuthStore((s) => s.user?.selectedStoreId ?? '');
 
   const [records, setRecords] = useState<ExchangeRate[]>([]);
-  const [rows, setRows] = useState<Record<string, RowState>>({});
+  const [expandedMonthKeys, setExpandedMonthKeys] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState<ExchangeRate | null>(null);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [savedMessage, setSavedMessage] = useState(false);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
 
   const load = useCallback(async () => {
@@ -51,10 +93,10 @@ export function ExchangeRatesPage() {
       a.id < b.id ? 1 : a.id > b.id ? -1 : 0,
     );
     setRecords(stored);
-    setRows(
-      Object.fromEntries(
-        stored.map((r) => [r.id, { draft: String(r.value), saving: false } satisfies RowState]),
-      ),
+    // Only the CURRENT month starts expanded; every other month stays collapsed.
+    const currentMonthKey = toLocalMonthKey(new Date());
+    setExpandedMonthKeys(
+      new Set(stored.some((r) => r.id.startsWith(currentMonthKey)) ? [currentMonthKey] : []),
     );
     setLoadError(undefined);
   }, [storeId]);
@@ -63,35 +105,55 @@ export function ExchangeRatesPage() {
     void load();
   }, [load]);
 
-  function setRow(id: string, patch: Partial<RowState>) {
-    setRows((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  function toggleMonthPanel(monthKey: string) {
+    setExpandedMonthKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(monthKey)) next.delete(monthKey);
+      else next.add(monthKey);
+      return next;
+    });
   }
 
-  async function handleSave(record: ExchangeRate) {
-    const state = rows[record.id];
-    if (!state) return;
-    const parsed = Number(state.draft);
+  function openEdit(record: ExchangeRate) {
+    setEditing(record);
+    setDraft(String(record.value));
+    setError(undefined);
+  }
+
+  function closeEdit() {
+    setEditing(null);
+    setDraft('');
+    setError(undefined);
+  }
+
+  async function handleSave() {
+    if (!editing) return;
+    const parsed = Number(draft);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setRow(record.id, { error: intl.formatMessage({ id: 'EXCHANGE_RATES.INVALID_VALUE' }) });
+      setError(intl.formatMessage({ id: 'EXCHANGE_RATES.INVALID_VALUE' }));
       return;
     }
 
-    setRow(record.id, { saving: true, error: undefined, saved: undefined });
+    setSaving(true);
     const svc = new ExchangeRateOfflineService(storeId);
-    const result = svc.updateValue(record.id, parsed);
-    setRow(record.id, { saving: false });
+    const result = svc.updateValue(editing.id, parsed);
+    setSaving(false);
 
     if (!result.succeeded) {
       // The only failure mode is a missing record — reload to resync the list.
-      setRow(record.id, { error: result.errors[0]?.description ?? '' });
+      setError(result.errors[0]?.description ?? '');
       void load();
       return;
     }
-    setRow(record.id, { saved: true });
     setRecords((prev) =>
-      prev.map((r) => (r.id === record.id ? (result.data as ExchangeRate) : r)),
+      prev.map((r) => (r.id === editing.id ? (result.data as ExchangeRate) : r)),
     );
+    closeEdit();
+    setSavedMessage(true);
+    setTimeout(() => setSavedMessage(false), 3000);
   }
+
+  const monthGroups = groupByMonth(records);
 
   return (
     <div className="space-y-4 p-4">
@@ -108,6 +170,12 @@ export function ExchangeRatesPage() {
 
       <InfoBox>{intl.formatMessage({ id: 'EXCHANGE_RATES.INFO' })}</InfoBox>
 
+      {savedMessage && (
+        <p role="status" className="text-sm text-success">
+          {intl.formatMessage({ id: 'EXCHANGE_RATES.SAVED' })}
+        </p>
+      )}
+
       {loadError && (
         <p role="alert" className="text-sm text-red-600">
           {loadError}
@@ -120,67 +188,136 @@ export function ExchangeRatesPage() {
         </p>
       ) : (
         <Card padding="tight">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border bg-background">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium text-text-muted">
-                    {intl.formatMessage({ id: 'EXCHANGE_RATES.DATE_COLUMN' })}
-                  </th>
-                  <th className="px-4 py-2 text-left font-medium text-text-muted">
-                    {intl.formatMessage({ id: 'EXCHANGE_RATES.VALUE_COLUMN' })}
-                  </th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {records.map((record) => {
-                  const state = rows[record.id];
-                  return (
-                    <tr key={record.id} className="hover:bg-background">
-                      <td className="px-4 py-3 font-medium text-text">
-                        {formatLocalDate(record.date)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={state?.draft ?? String(record.value)}
-                            onChange={(e) => setRow(record.id, { draft: e.target.value })}
-                            className="w-32 rounded-md border border-border px-3 py-1.5 text-sm text-text focus:border-primary focus:outline-none"
-                            aria-label={`${formatLocalDate(record.date)}`}
-                          />
-                          {state?.saved && (
-                            <span className="text-sm text-success">
-                              {intl.formatMessage({ id: 'EXCHANGE_RATES.SAVED' })}
+          <div className="space-y-2">
+            {monthGroups.map((monthGroup) => {
+              const isExpanded = expandedMonthKeys.has(monthGroup.monthKey);
+              return (
+                <div
+                  key={monthGroup.monthKey}
+                  className="rounded-lg border border-border bg-background"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleMonthPanel(monthGroup.monthKey)}
+                    className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                    data-testid={`rate-month-panel-toggle-${monthGroup.monthKey}`}
+                    aria-expanded={isExpanded}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm font-medium capitalize text-text">
+                        {monthLabelStable(monthGroup.date)}
+                      </span>
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                        ({monthGroup.records.length})
+                      </span>
+                    </span>
+                    <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
+                  </button>
+                  {isExpanded && (
+                    <div className="border-t border-border px-4 py-3">
+                      <ul className="divide-y divide-border">
+                        {monthGroup.records.map((record) => (
+                          <li
+                            key={record.id}
+                            className="flex items-center justify-between gap-4 py-2"
+                            data-testid={`rate-row-${record.id}`}
+                          >
+                            <span className="text-sm font-medium text-text">
+                              {record.date.getDate()}
                             </span>
-                          )}
-                        </div>
-                        {state?.error && (
-                          <p role="alert" className="mt-1 text-xs text-red-600">
-                            {state.error}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          onClick={() => void handleSave(record)}
-                          disabled={state?.saving}
-                          className="px-3 py-1.5 text-xs"
-                        >
-                          <SaveIcon className="h-4 w-4" />
-                          {intl.formatMessage({ id: 'EXCHANGE_RATES.SAVE' })}
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            <span className="flex items-center gap-3">
+                              <span className="text-sm whitespace-nowrap text-text">
+                                {record.value}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(record)}
+                                aria-label={`${intl.formatMessage({ id: 'EXCHANGE_RATES.EDIT' })} ${record.date.getDate()}`}
+                                title={intl.formatMessage({ id: 'EXCHANGE_RATES.EDIT' })}
+                                data-testid={`rate-edit-${record.id}`}
+                                className="rounded p-1 text-text-muted hover:bg-background-hover hover:text-primary"
+                              >
+                                <EditIcon className="h-4 w-4" />
+                              </button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
+      )}
+
+      {/* Edit popup — the app's standard modal shape (fixed overlay + card). */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-900">
+                {intl.formatMessage({ id: 'EXCHANGE_RATES.EDIT_TITLE' })}
+              </h2>
+              <button
+                type="button"
+                onClick={closeEdit}
+                aria-label={intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+                data-testid="rate-edit-close"
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <p className="mb-3 text-sm text-text">
+              {monthLabelStable(editing.date)} — {editing.date.getDate()}
+            </p>
+
+            <div className="mb-4">
+              <label
+                htmlFor="rate-value-input"
+                className="mb-1 block text-xs font-medium text-gray-600"
+              >
+                {intl.formatMessage({ id: 'EXCHANGE_RATES.VALUE_COLUMN' })}
+              </label>
+              <input
+                id="rate-value-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                data-testid="rate-value-input"
+                autoFocus
+              />
+              {error && (
+                <p role="alert" className="mt-1 text-xs text-red-600" data-testid="rate-edit-error">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="fab" type="button" onClick={closeEdit} data-testid="rate-edit-cancel">
+                <CloseIcon />
+                {intl.formatMessage({ id: 'GENERAL.CLOSE' })}
+              </Button>
+              <Button
+                variant="fab"
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={saving}
+                data-testid="rate-edit-submit"
+              >
+                <SaveIcon />
+                {intl.formatMessage({ id: 'EXCHANGE_RATES.SAVE' })}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

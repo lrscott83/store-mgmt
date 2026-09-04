@@ -4,7 +4,7 @@ import { IntlProvider } from 'react-intl';
 import type { UserModel } from '@store-mgmt/domain';
 import esMessages from '~/shared/lib/i18n/es';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
-import { toLocalDayKey, formatLocalDate, addDays } from '~/shared/lib/date-utils';
+import { toLocalDayKey, addDays } from '~/shared/lib/date-utils';
 import { ExchangeRateOfflineService } from '../../lib/services/exchange-rate-offline-service';
 import { ExchangeRatesPage } from '../exchange-rates';
 
@@ -81,33 +81,42 @@ function renderPage() {
   );
 }
 
+/** 'YYYY-MM' month key, matching the view's grouping key. */
+function monthKeyOf(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
 beforeEach(() => {
   localStorage.clear();
   mockUser = makeUser();
 });
 
-describe('ExchangeRatesPage (daily-exchange-rate)', () => {
+describe('ExchangeRatesPage (daily-exchange-rate) — month-grouped collapsed panels', () => {
   it('lists every day from today down to the first owner login day', async () => {
     const anchor = addDays(new Date(), -3);
     localStorage.setItem(StorageKeys.EXCHANGE_RATES_FIRST_LOGIN, toLocalDayKey(anchor));
 
     renderPage();
 
+    // The current month's panel starts EXPANDED — its 4 day rows are rendered
+    // (anchor 3 days ago always lands in the current or previous month; when
+    // the month boundary splits the range, expand that panel too).
+    const currentMonthKey = monthKeyOf(new Date());
     await waitFor(() => {
-      expect(screen.getAllByRole('row')).toHaveLength(5); // header + 4 day rows
+      expect(
+        screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`),
+      ).toBeDefined();
     });
 
-    // Rows are rendered TODAY first, descending to the anchor day.
-    const dateCells = screen
-      .getAllByRole('row')
-      .slice(1)
-      .map((row) => row.querySelector('td')?.textContent);
-    expect(dateCells).toEqual([
-      formatLocalDate(new Date()),
-      formatLocalDate(addDays(new Date(), -1)),
-      formatLocalDate(addDays(new Date(), -2)),
-      formatLocalDate(addDays(new Date(), -3)),
-    ]);
+    const anchorMonthKey = monthKeyOf(anchor);
+    if (anchorMonthKey !== currentMonthKey) {
+      fireEvent.click(screen.getByTestId(`rate-month-panel-toggle-${anchorMonthKey}`));
+    }
+
+    await waitFor(() => {
+      const rows = screen.getAllByTestId(/^rate-row-/);
+      expect(rows).toHaveLength(4);
+    });
   });
 
   it('defaults new records to 1 and persists them through the service', async () => {
@@ -117,7 +126,7 @@ describe('ExchangeRatesPage (daily-exchange-rate)', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getAllByRole('row')).toHaveLength(4);
+      expect(screen.getAllByTestId(/^rate-row-/)).toHaveLength(3);
     });
 
     const rates = new ExchangeRateOfflineService(storeId).getStorageExchangeRates();
@@ -127,23 +136,24 @@ describe('ExchangeRatesPage (daily-exchange-rate)', () => {
     }
   });
 
-  it('edits the value of a day and persists it', async () => {
+  it('edits the value of a day via the popup and persists it', async () => {
     const anchor = new Date();
     localStorage.setItem(StorageKeys.EXCHANGE_RATES_FIRST_LOGIN, toLocalDayKey(anchor));
 
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getAllByRole('row')).toHaveLength(2);
+      expect(screen.getAllByTestId(/^rate-row-/)).toHaveLength(1);
     });
 
-    const todayLabel = formatLocalDate(new Date());
-    const input = screen.getByLabelText(todayLabel) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: '250' } });
+    // The edit icon on the row opens the popup modal.
+    const todayKey = toLocalDayKey(new Date());
+    fireEvent.click(screen.getByTestId(`rate-edit-${todayKey}`));
+    const input = screen.getByTestId('rate-value-input') as HTMLInputElement;
+    expect(input.value).toBe('1');
 
-    const row = input.closest('tr') as HTMLTableRowElement;
-    const saveButton = row.querySelector('button') as HTMLButtonElement;
-    fireEvent.click(saveButton);
+    fireEvent.change(input, { target: { value: '250' } });
+    fireEvent.click(screen.getByTestId('rate-edit-submit'));
 
     await waitFor(() => {
       const rates = new ExchangeRateOfflineService(storeId).getStorageExchangeRates();
@@ -160,20 +170,47 @@ describe('ExchangeRatesPage (daily-exchange-rate)', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getAllByRole('row')).toHaveLength(2);
+      expect(screen.getAllByTestId(/^rate-row-/)).toHaveLength(1);
     });
 
-    const todayLabel = formatLocalDate(new Date());
-    const input = screen.getByLabelText(todayLabel) as HTMLInputElement;
+    const todayKey = toLocalDayKey(new Date());
+    fireEvent.click(screen.getByTestId(`rate-edit-${todayKey}`));
+    const input = screen.getByTestId('rate-value-input') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '-5' } });
-    const row = input.closest('tr') as HTMLTableRowElement;
-    fireEvent.click(row.querySelector('button') as HTMLButtonElement);
+    fireEvent.click(screen.getByTestId('rate-edit-submit'));
 
-    expect(
-      await screen.findByText('El valor debe ser un número mayor que 0.'),
-    ).toBeDefined();
+    expect(await screen.findByTestId('rate-edit-error')).toHaveTextContent(
+      'El valor debe ser un número mayor que 0.',
+    );
 
     const rates = new ExchangeRateOfflineService(storeId).getStorageExchangeRates();
     expect(rates[0].value).toBe(1);
+  });
+
+  it('collapses non-current months and expands them on click', async () => {
+    // Anchor 40 days back guarantees at least one previous-month panel.
+    const anchor = addDays(new Date(), -40);
+    localStorage.setItem(StorageKeys.EXCHANGE_RATES_FIRST_LOGIN, toLocalDayKey(anchor));
+
+    renderPage();
+
+    const currentMonthKey = monthKeyOf(new Date());
+    await waitFor(() => {
+      expect(screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`)).toBeDefined();
+    });
+
+    // The current month starts expanded (aria-expanded=true).
+    expect(
+      screen.getByTestId(`rate-month-panel-toggle-${currentMonthKey}`),
+    ).toHaveAttribute('aria-expanded', 'true');
+
+    // Every other month panel starts collapsed (aria-expanded=false).
+    const otherToggles = screen
+      .getAllByTestId(/^rate-month-panel-toggle-/)
+      .filter((el) => !el.getAttribute('data-testid')?.endsWith(currentMonthKey));
+    expect(otherToggles.length).toBeGreaterThan(0);
+    for (const toggle of otherToggles) {
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    }
   });
 });

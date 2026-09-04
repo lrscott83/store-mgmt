@@ -119,9 +119,9 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Plan y estado de la tienda. Consulta el plan actual (Gratis, Básico, Profesional), las fechas de pago y vencimiento. Renueva o cambia de plan según necesites.' },
       { label: 'MENU.STORES_UPDATE', path: '/management/stores/update', featureIds: [EFeatures.Stores], moduleId: EModules.Management,
         helpContent: 'Editar información de la tienda. Actualiza el nombre, dirección, teléfono y otros datos de tu negocio. Estos cambios se reflejan en los reportes.' },
-      // daily-exchange-rate — sits right after the Stores features, same guard as
-      // Configurations (EFeatures.Configurations).
-      { label: 'MENU.EXCHANGE_RATES', path: '/management/exchange-rates', featureIds: [EFeatures.Configurations], moduleId: EModules.Management, icon: '💱',
+      // Convention: NO menu item carries an icon — plain text labels only
+      // (the wholesale 📦 and exchange-rate 💱 icons were removed 2026-09-04).
+      { label: 'MENU.EXCHANGE_RATES', path: '/management/exchange-rates', featureIds: [EFeatures.Configurations], moduleId: EModules.Management,
         helpContent: 'Registro diario del cambio de USD a MN. Cada día se añade un registro con el valor del día anterior (por defecto 1). Puedes editar el valor de cualquier día: escribe cuántos pesos (MN) equivale 1 USD en esa fecha y pulsa Guardar.' },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management,
         helpContent: 'Gestiona los empleados de tu tienda. Crea cuentas de usuario, asígnales roles (cajero, bodeguero, admin) y controla qué funcionalidades pueden usar. Desde aquí también puedes exportar el roster (lista de empleados) con una contraseña para activar el acceso sin conexión en otro equipo, e importarlo después en el dispositivo de destino.' },

@@ -740,6 +740,8 @@ const messages: Record<string, string> = {
   'EXCHANGE_RATES.VALUE_COLUMN': '1 USD = (MN)',
   'EXCHANGE_RATES.SAVE': 'Guardar',
   'EXCHANGE_RATES.SAVED': 'Valor actualizado correctamente.',
+  'EXCHANGE_RATES.EDIT': 'Editar',
+  'EXCHANGE_RATES.EDIT_TITLE': 'Editar valor del día',
   'EXCHANGE_RATES.INVALID_VALUE': 'El valor debe ser un número mayor que 0.',
   'EXCHANGE_RATES.NO_RECORDS': 'No hay registros todavía.',
   'STORES.MODULES_LABEL': 'Módulos',
