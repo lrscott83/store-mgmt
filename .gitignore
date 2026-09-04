@@ -162,3 +162,6 @@ lizo-models/
 
 # production-only backend config (VPS-managed, never committed)
 appsettings.Production.json
+
+# graphify code-knowledge graph (local build artifact)
+graphify-out/

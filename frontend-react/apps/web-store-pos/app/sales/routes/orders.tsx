@@ -6,7 +6,7 @@ import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { BarChartIcon, ChevronDownIcon, DownloadIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { formatLocalDate, fromLocalDayKey, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
@@ -265,12 +265,15 @@ export function OrdersPage() {
                 >
                   <ActionMenuItem
                     intent="edit"
+                    icon={<DownloadIcon />}
                     onClick={() => handleGenerateDayReport(dateId)}
                     data-testid={`day-report-button-${dateId}`}
                   >
                     {intl.formatMessage({ id: 'REPORT.INVENTORY_TODAY_SALE' })}
                   </ActionMenuItem>
                   <ActionMenuItem
+                    intent="edit"
+                    icon={<BarChartIcon />}
                     onClick={() => setDaySummary(computeDaySalesSummary(storeId, dateId))}
                     data-testid={`day-summary-button-${dateId}`}
                   >
