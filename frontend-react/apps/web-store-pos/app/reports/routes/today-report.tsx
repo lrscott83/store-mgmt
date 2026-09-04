@@ -11,6 +11,7 @@ import { calculateOrderProfit } from '~/inventory/lib/profit-calculator';
 import { generateProductRows } from '~/reports/lib/pdf/generate-product-rows';
 import { exportInventoryTodaySalePdf } from '~/reports/lib/pdf/inventory-today-sale-pdf';
 import { round2 } from '~/shared/lib/money';
+import { formatCurrency } from '~/shared/lib/format-currency';
 import { Button } from '~/shared/components/ui/button';
 import { DownloadIcon } from '~/shared/components/ui/icons';
 
@@ -132,24 +133,24 @@ export function TodayReportPage() {
             </div>
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
-            <div className="text-2xl font-bold text-green-700">
-              ${summary.totalRevenue.toFixed(2)}
+            <div className="text-2xl font-bold text-green-700 whitespace-nowrap">
+              {formatCurrency(summary.totalRevenue)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_REVENUE' })}
             </div>
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
-            <div className="text-2xl font-bold text-red-600">
-              ${summary.totalCost.toFixed(2)}
+            <div className="text-2xl font-bold text-red-600 whitespace-nowrap">
+              {formatCurrency(summary.totalCost)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_COST' })}
             </div>
           </div>
           <div className="rounded bg-gray-50 p-3 text-center">
-            <div className="text-2xl font-bold text-blue-700">
-              ${summary.totalProfit.toFixed(2)}
+            <div className="text-2xl font-bold text-blue-700 whitespace-nowrap">
+              {formatCurrency(summary.totalProfit)}
             </div>
             <div className="mt-1 text-xs text-gray-500">
               {intl.formatMessage({ id: 'REPORTS.SALES_SUMMARY.TOTAL_PROFIT' })}

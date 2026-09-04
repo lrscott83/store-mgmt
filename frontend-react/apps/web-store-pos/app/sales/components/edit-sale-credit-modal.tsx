@@ -5,6 +5,7 @@ import { Card } from '~/shared/components/ui/card';
 import { Button } from '~/shared/components/ui/button';
 import { CloseIcon, PaymentIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 interface EditSaleCreditModalProps {
   saleCredit: SaleCredit;
@@ -84,8 +85,8 @@ export function EditSaleCreditModal({ saleCredit, isOpen, onClose, onSave }: Edi
           }
         >
           <div className="space-y-3">
-            <p className="text-sm text-text">
-              Pagar: ${(saleCredit?.total ?? 0).toFixed(2)}
+            <p className="text-sm text-text whitespace-nowrap">
+              Pagar: {formatCurrency(saleCredit?.total ?? 0)}
             </p>
             <div>
               <label className="mb-1 block text-sm font-medium text-text">

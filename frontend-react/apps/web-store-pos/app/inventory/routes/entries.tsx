@@ -15,6 +15,7 @@ import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { EntryList } from '../components/entry-list';
 import { round2 } from '~/shared/lib/money';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.EntriesHistory]);
 
@@ -106,7 +107,7 @@ export function EntriesPage() {
               ({entriesCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-primary">${entriesTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-primary whitespace-nowrap">{formatCurrency(entriesTotal)}</span>
         </div>
       }
     >
@@ -134,8 +135,8 @@ export function EntriesPage() {
                     {formatLocalDate(dayGroup.date)}
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-primary">
-                      ${round2(dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0)).toFixed(2)}
+                    <span className="text-sm font-semibold text-primary whitespace-nowrap">
+                      {formatCurrency(round2(dayGroup.items.reduce((total, e) => total + e.costPrice * e.quantity, 0)))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

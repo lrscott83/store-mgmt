@@ -9,6 +9,7 @@ import type { InventoryCategoryView } from '../lib/services/inventory-offline-se
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { InventoryProductList } from '../components/inventory-product-list';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.Available]);
 
@@ -48,8 +49,8 @@ export function InventoryAvailablePage() {
       title={
         <div className="flex items-center justify-between">
           <span>{intl.formatMessage({ id: 'INVENTORY.AVAILABLE.TITLE' })}</span>
-          <span className="text-lg font-bold text-primary">
-            ${totalInventoryValue.toFixed(2)}
+          <span className="text-lg font-bold text-primary whitespace-nowrap">
+            {formatCurrency(totalInventoryValue)}
           </span>
         </div>
       }

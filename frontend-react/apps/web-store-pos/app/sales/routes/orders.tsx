@@ -22,6 +22,7 @@ import { ProductCategoryRepository } from '../lib/repositories/product-category-
 import { OrderList } from '../components/order-list';
 import { DaySalesSummaryModal } from '../components/day-sales-summary-modal';
 import type { DaySalesSummary } from '../components/day-sales-summary-modal';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.SalesHistory]);
 
@@ -164,7 +165,7 @@ export function OrdersPage() {
               ({ordersCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-text">${ordersTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-text whitespace-nowrap">{formatCurrency(ordersTotal)}</span>
         </div>
       }
     >
@@ -251,8 +252,8 @@ export function OrdersPage() {
                     {formatLocalDate(g.date)} ({g.items.length})
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-text">
-                      ${g.items.reduce((t, o) => t + o.total, 0).toFixed(2)}
+                    <span className="text-sm font-semibold text-text whitespace-nowrap">
+                      {formatCurrency(g.items.reduce((t, o) => t + o.total, 0))}
                     </span>
                     <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                   </span>

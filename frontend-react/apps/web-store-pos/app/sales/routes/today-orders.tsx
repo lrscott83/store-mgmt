@@ -9,6 +9,7 @@ import { InfoBox } from '~/shared/components/ui/info-box';
 import { OrderOfflineService } from '../lib/services/order-offline-service';
 import { OrderList } from '../components/order-list';
 import { EditOrderModal } from '../components/edit-order-modal';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.TodayOrders]);
 
@@ -81,7 +82,7 @@ export function TodayOrdersPage() {
               ({ordersItemsCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-primary">${ordersTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-primary whitespace-nowrap">{formatCurrency(ordersTotal)}</span>
         </div>
       }
     >

@@ -11,6 +11,7 @@ import { formatLocalDate, groupByLocalDay } from '~/shared/lib/date-utils';
 import type { LocalDayGroup } from '~/shared/lib/date-utils';
 import { SaleCreditOfflineService } from '../lib/services/sale-credit-offline-service';
 import { SaleCreditList } from '../components/sale-credit-list';
+import { formatCurrency } from '~/shared/lib/format-currency';
 
 export const clientLoader = featureLoader([EFeatures.CreditSale]);
 
@@ -85,7 +86,7 @@ export function SaleCreditsPage() {
               ({creditsCount})
             </span>
           </span>
-          <span className="text-sm font-semibold text-danger">${creditsTotal.toFixed(2)}</span>
+          <span className="text-sm font-semibold text-danger whitespace-nowrap">{formatCurrency(creditsTotal)}</span>
         </div>
       }
     >
@@ -114,8 +115,8 @@ export function SaleCreditsPage() {
                   {dateSaleCredit.items.reduce((count, c) => count + (!c.isPaid ? 1 : 0), 0)})
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-danger">
-                    ${dateSaleCredit.items.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0).toFixed(2)}
+                  <span className="text-sm font-semibold text-danger whitespace-nowrap">
+                    {formatCurrency(dateSaleCredit.items.reduce((total, c) => total + (!c.isPaid ? c.total : 0), 0))}
                   </span>
                   <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                 </span>
