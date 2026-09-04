@@ -1,4 +1,4 @@
-import type { Product, ProductSelectView } from '../models/product';
+import type { Product, ProductSelectView, WholesaleConfig } from '../models/product';
 import type { CsvProduct, CsvImportResult } from '../models/csv-product';
 import type { BaseResponseModel } from '../models/base';
 
@@ -50,6 +50,7 @@ export interface ProductService {
     availableToSale: boolean,
     discountFromInvantory: boolean,
     barcode?: string,
+    wholesale?: WholesaleConfig,
   ): Promise<BaseResponseModel<boolean>>;
 
   updateProduct(
@@ -63,6 +64,7 @@ export interface ProductService {
     availableToSale: boolean,
     discountFromInvantory: boolean,
     barcode?: string,
+    wholesale?: WholesaleConfig,
   ): Promise<BaseResponseModel<boolean>>;
 
   getMaxOrderByCategoryId(categoryId: string): Promise<BaseResponseModel<number>>;

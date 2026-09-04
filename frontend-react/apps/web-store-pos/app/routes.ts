@@ -36,6 +36,8 @@ export default [
     route('sales/products', 'sales/routes/products.tsx'),
     // Sales — POS & Orders
     route('sales/new', 'sales/routes/sale.tsx'),
+    // Sales — Wholesale (mismo guard de Ventas)
+    route('sales/wholesale', 'sales/routes/wholesale.tsx'),
     route('sales/today-orders', 'sales/routes/today-orders.tsx'),
     route('sales/orders', 'sales/routes/orders.tsx'),
     route('sales/today-stats', 'sales/routes/today-stats.tsx'),

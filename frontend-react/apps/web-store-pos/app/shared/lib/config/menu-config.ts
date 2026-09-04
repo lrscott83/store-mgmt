@@ -43,6 +43,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Catálogo de productos. Aquí puedes crear, editar y organizar tus productos por categoría. Puedes agregar nombre, precio, código de barras e imagen a cada producto.' },
       { label: 'MENU.SALE', path: '/sales/new', featureIds: [EFeatures.Sale], moduleId: EModules.Sales,
         helpContent: 'Realiza una nueva venta. Escanea o busca el producto, agrega cantidades, selecciona el método de pago y confirma la venta. También puedes generar ventas a crédito.' },
+      { label: 'MENU.WHOLESALE', path: '/sales/wholesale', featureIds: [EFeatures.Sale], moduleId: EModules.Sales, icon: '📦',
+        helpContent: 'Venta por mayor. Elige la cantidad en paquetes (cajas), el precio por unidad baja según los rangos configurados en el producto y la venta se descuenta del inventario en unidades. Ej: 12 cajas × 24 unidades × 660.' },
       { label: 'MENU.TODAY_ORDERS', path: '/sales/today-orders', featureIds: [EFeatures.TodayOrders], moduleId: EModules.Sales,
         helpContent: 'Lista de ventas realizadas hoy. Puedes ver el detalle de cada venta, anular una venta y revisar los métodos de pago utilizados.' },
       { label: 'MENU.TODAY_CREDITS', path: '/sales/today-credits', featureIds: [EFeatures.CreditSale], moduleId: EModules.Sales,

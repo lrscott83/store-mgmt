@@ -192,6 +192,7 @@ const messages: Record<string, string> = {
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.SALE': 'Vender',
+  'MENU.WHOLESALE': 'Ventas Mayoristas',
   'MENU.TODAY_ORDERS': 'Ventas del día',
   'MENU.TODAY_CREDITS': 'Créditos del día',
   'MENU.TODAY_STATS': 'Cuadre del día',
@@ -355,6 +356,21 @@ const messages: Record<string, string> = {
   'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE': 'El producto no está disponible en el inventario.',
   'SALES.ALL_CATEGORIES': 'Todos',
   'SALES.SEARCH_PLACEHOLDER': 'Buscar producto por nombre...',
+  'SALES.WHOLESALE.ENABLE': 'Vender por mayor',
+  'SALES.WHOLESALE.PACK_SIZE': 'Unidades por paquete/caja',
+  'SALES.WHOLESALE.TIERS_TITLE': 'Rangos de precio mayorista',
+  'SALES.WHOLESALE.MIN_PACKS': 'Mínimo de paquetes',
+  'SALES.WHOLESALE.PRICE_PER_UNIT': 'Precio por unidad',
+  'SALES.WHOLESALE.ADD_TIER': 'Agregar rango',
+  'SALES.WHOLESALE.REMOVE_TIER': 'Eliminar rango',
+  'SALES.WHOLESALE.HEADER': 'Ventas Mayoristas',
+  'SALES.WHOLESALE.PACKS': 'Paquetes',
+  'SALES.WHOLESALE.UNITS_PER_PACK': 'Unidades por paquete',
+  'SALES.WHOLESALE.FROM': 'desde',
+  'SALES.WHOLESALE.UNIT': 'unidad',
+  'SALES.WHOLESALE.ADD': 'Añadir',
+  'SALES.WHOLESALE.EMPTY': 'No hay productos configurados para la venta mayorista. Active la opción "Vender por mayor" al crear o editar un producto.',
+  'SALES.WHOLESALE.ADDED': '{name} adicionado a la venta mayorista',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
   // hardcoded Spanish literals there, not i18n keys; added here as i18n keys for React's
