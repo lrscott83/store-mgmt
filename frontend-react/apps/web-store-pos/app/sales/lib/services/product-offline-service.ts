@@ -6,6 +6,7 @@ import type {
   Product,
   ProductService,
   ProductSelectView,
+  WholesaleConfig,
 } from '@store-mgmt/domain';
 import { failure, ProductErrors, success } from '@store-mgmt/domain';
 import { ProductRepository } from '../repositories/product-repository';
@@ -176,6 +177,7 @@ export class ProductOfflineService implements ProductService {
     availableToSale: boolean,
     discountFromInvantory: boolean,
     barcode?: string,
+    wholesale?: WholesaleConfig,
   ): Promise<BaseResponseModel<boolean>> {
     const result = this.productRepository.addProduct(
       categoryId,
@@ -187,6 +189,7 @@ export class ProductOfflineService implements ProductService {
       availableToSale,
       discountFromInvantory,
       barcode,
+      wholesale,
     );
     return result.succeeded ? success(true) : failure(result.errors);
   }
@@ -203,6 +206,7 @@ export class ProductOfflineService implements ProductService {
     availableToSale: boolean,
     discountFromInvantory: boolean,
     barcode?: string,
+    wholesale?: WholesaleConfig,
   ): Promise<BaseResponseModel<boolean>> {
     const result = this.productRepository.updateProduct(
       id,
@@ -215,6 +219,9 @@ export class ProductOfflineService implements ProductService {
       availableToSale,
       discountFromInvantory,
       barcode,
+      undefined,
+      undefined,
+      wholesale,
     );
     return result.succeeded ? success(true) : failure(result.errors);
   }

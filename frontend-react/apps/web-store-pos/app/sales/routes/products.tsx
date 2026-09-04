@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { CsvProduct, Product, ProductCategory, ProductCategoryView } from '@store-mgmt/domain';
+import type { CsvProduct, Product, ProductCategory, ProductCategoryView, WholesaleConfig } from '@store-mgmt/domain';
 import { EFeatures } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
@@ -136,6 +136,7 @@ export function ProductsPage() {
     isActive: boolean;
     availableToSale: boolean;
     discountFromInvantory: boolean;
+    wholesale?: WholesaleConfig;
   }) {
     const result = await productService.createProduct(
       data.categoryId,
@@ -147,6 +148,7 @@ export function ProductsPage() {
       data.availableToSale,
       data.discountFromInvantory,
       data.barcode,
+      data.wholesale,
     );
     if (!result.succeeded) {
       showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');
@@ -175,6 +177,9 @@ export function ProductsPage() {
       // commented out, so `barcodeValue` is ALWAYS undefined on update — even for a product
       // that already has a stored barcode.
       undefined,
+      product.wholesaleEnabled
+        ? { packSize: product.wholesalePackSize ?? 24, tiers: product.wholesaleTiers ?? [] }
+        : undefined,
     );
     if (!result.succeeded) {
       showBlockingError(intl.formatMessage({ id: 'GENERAL.ERROR' }), result.errors[0]?.description ?? '');

@@ -1,4 +1,4 @@
-import type { Product } from '@store-mgmt/domain';
+import type { Product, WholesaleConfig } from '@store-mgmt/domain';
 import { ProductCategoryErrors, ProductErrors, Result } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
@@ -182,6 +182,7 @@ export class ProductRepository {
     availableToSale: boolean,
     discountFromInvantory: boolean,
     barcode?: string,
+    wholesale?: WholesaleConfig,
   ): Result {
     const category = this.categoryRepository.getProductCategoryById(categoryId);
     if (!category) return Result.Failure([ProductCategoryErrors.NotExists]);
@@ -212,6 +213,11 @@ export class ProductRepository {
       availableToSale,
       discountFromInvantory,
     };
+    if (wholesale) {
+      newProduct.wholesaleEnabled = true;
+      newProduct.wholesalePackSize = wholesale.packSize;
+      newProduct.wholesaleTiers = wholesale.tiers;
+    }
     this.updateProductsOrderByCategory(products, categoryId, order);
     newProduct.order = order;
     products.set(newProduct.id, newProduct);
@@ -230,6 +236,7 @@ export class ProductRepository {
     availableToSale: boolean,
     discountFromInvantory: boolean,
     barcode?: string,
+    wholesale?: WholesaleConfig,
   ): Result {
     return this.addProductData(
       generateId(),
@@ -242,6 +249,7 @@ export class ProductRepository {
       availableToSale,
       discountFromInvantory,
       barcode,
+      wholesale,
     );
   }
 
@@ -257,6 +265,10 @@ export class ProductRepository {
       product.isActive,
       product.availableToSale,
       product.discountFromInvantory,
+      undefined,
+      product.wholesaleEnabled
+        ? { packSize: product.wholesalePackSize ?? 0, tiers: product.wholesaleTiers ?? [] }
+        : undefined,
     );
   }
 
@@ -287,6 +299,7 @@ export class ProductRepository {
     barcode?: string,
     updatedDate: Date = new Date(),
     updatedByName: string = getCurrentUserLogin(),
+    wholesale?: WholesaleConfig,
   ): Result {
     const category = this.categoryRepository.getProductCategoryById(categoryId);
     if (!category) return Result.Failure([ProductCategoryErrors.NotExists]);
@@ -319,6 +332,11 @@ export class ProductRepository {
     product.discountFromInvantory = discountFromInvantory;
     product.updatedDate = updatedDate;
     product.updatedByName = updatedByName;
+    if (wholesale !== undefined) {
+      product.wholesaleEnabled = true;
+      product.wholesalePackSize = wholesale.packSize;
+      product.wholesaleTiers = wholesale.tiers;
+    }
 
     this.updateProductsOrderByCategory(products, categoryId, order);
     product.order = order;
@@ -342,6 +360,9 @@ export class ProductRepository {
       product.barcode,
       product.updatedDate,
       product.updatedByName,
+      product.wholesaleEnabled
+        ? { packSize: product.wholesalePackSize ?? 0, tiers: product.wholesaleTiers ?? [] }
+        : undefined,
     );
   }
 

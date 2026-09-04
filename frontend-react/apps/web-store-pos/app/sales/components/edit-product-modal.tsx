@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Product } from '@store-mgmt/domain';
+import type { Product, WholesaleConfig } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { Button } from '~/shared/components/ui/button';
+import { validateWholesaleConfig } from '~/sales/lib/wholesale';
+import { WholesaleConfigSection } from './wholesale-config-section';
 
 interface EditProductModalProps {
   product: Product;
@@ -25,7 +27,11 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
     availableToSale: product.availableToSale,
     discountFromInvantory: product.discountFromInvantory,
   });
+  const [wholesale, setWholesale] = useState<WholesaleConfig | undefined>(
+    product.wholesaleEnabled ? { packSize: product.wholesalePackSize ?? 24, tiers: product.wholesaleTiers ?? [] } : undefined,
+  );
   const [errors, setErrors] = useState<{ name?: string; price?: string; order?: string }>({});
+  const [wholesaleError, setWholesaleError] = useState<string | undefined>(undefined);
 
   function validate(): boolean {
     const newErrors: { name?: string; price?: string; order?: string } = {};
@@ -60,6 +66,13 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
     } else if (!/^[0-9]\d*$/.test(form.order.trim())) {
       orderPatternValid = false;
     }
+    const wholesaleValidation = validateWholesaleConfig(wholesale, parseFloat(form.price) || 0);
+    if (!wholesaleValidation.succeeded) {
+      setWholesaleError(wholesaleValidation.errors[0]?.description);
+      setErrors(newErrors);
+      return false;
+    }
+    setWholesaleError(undefined);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0 && orderPatternValid;
   }
@@ -75,6 +88,9 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
       isActive: form.isActive,
       availableToSale: form.availableToSale,
       discountFromInvantory: form.discountFromInvantory,
+      wholesaleEnabled: wholesale !== undefined,
+      wholesalePackSize: wholesale?.packSize,
+      wholesaleTiers: wholesale?.tiers,
       updatedDate: new Date(),
     });
   }
@@ -156,6 +172,13 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
               {intl.formatMessage({ id: 'PRODUCTS.FORM.AVAILABLE_TO_SALE' })}
             </span>
           </label>
+
+          <WholesaleConfigSection
+            value={wholesale}
+            retailPrice={parseFloat(form.price) || 0}
+            onChange={setWholesale}
+          />
+          {wholesaleError && <p className="text-xs text-red-500">{wholesaleError}</p>}
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input

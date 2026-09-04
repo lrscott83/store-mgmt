@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { ProductCategory } from '@store-mgmt/domain';
+import type { ProductCategory, WholesaleConfig } from '@store-mgmt/domain';
 import { CloseIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { Button } from '~/shared/components/ui/button';
+import { validateWholesaleConfig } from '~/sales/lib/wholesale';
+import { WholesaleConfigSection } from './wholesale-config-section';
 
 interface CreateProductForm {
   name: string;
@@ -25,6 +27,7 @@ interface CreateProductModalProps {
     isActive: boolean;
     availableToSale: boolean;
     discountFromInvantory: boolean;
+    wholesale?: WholesaleConfig;
   }) => void;
   onClose: () => void;
 }
@@ -43,7 +46,9 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
     availableToSale: true,
     discountFromInvantory: true,
   });
+  const [wholesale, setWholesale] = useState<WholesaleConfig | undefined>(undefined);
   const [errors, setErrors] = useState<Partial<Record<keyof CreateProductForm, string>>>({});
+  const [wholesaleError, setWholesaleError] = useState<string | undefined>(undefined);
 
   function validate(): boolean {
     const newErrors: Partial<Record<keyof CreateProductForm, string>> = {};
@@ -78,6 +83,16 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
     } else if (!/^[0-9]\d*$/.test(form.order.trim())) {
       orderPatternValid = false;
     }
+    // Mayorista: solo se valida si el usuario activó la sección. La validación es por
+    // reglas de negocio (validateWholesaleConfig) y muestra el primer error en pantalla.
+    const wholesaleValidation = validateWholesaleConfig(wholesale, parseFloat(form.price) || 0);
+    if (!wholesaleValidation.succeeded) {
+      setWholesaleError(wholesaleValidation.errors[0]?.description);
+      setErrors(newErrors);
+      return false;
+    }
+    setWholesaleError(undefined);
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0 && orderPatternValid;
   }
@@ -94,6 +109,7 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
       isActive: form.isActive,
       availableToSale: form.availableToSale,
       discountFromInvantory: form.discountFromInvantory,
+      wholesale,
     });
   }
 
@@ -179,6 +195,14 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
               {intl.formatMessage({ id: 'PRODUCTS.FORM.AVAILABLE_TO_SALE' })}
             </span>
           </label>
+
+          {/* Wholesale config */}
+          <WholesaleConfigSection
+            value={wholesale}
+            retailPrice={parseFloat(form.price) || 0}
+            onChange={setWholesale}
+          />
+          {wholesaleError && <p className="text-xs text-red-500">{wholesaleError}</p>}
 
           {/* Discount from inventory */}
           <label className="flex items-center gap-2 cursor-pointer">

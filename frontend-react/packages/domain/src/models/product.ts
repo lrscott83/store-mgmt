@@ -11,6 +11,21 @@ export interface ProductCategoryView extends ProductCategory {
   productsCount: number;
 }
 
+/**
+ * Escalón de precio mayorista: a partir de `minPacks` paquetes se aplica `pricePerUnit`
+ * (precio por UNIDAD dentro del paquete). Ej: beer con packSize 24 → 12×24×660.
+ */
+export interface WholesaleTier {
+  minPacks: number;
+  pricePerUnit: number;
+}
+
+/** Configuración mayorista de un producto: tamaño de paquete + escalones de precio. */
+export interface WholesaleConfig {
+  packSize: number;
+  tiers: WholesaleTier[];
+}
+
 export interface Product extends AuditableBaseModel {
   id: string;
   name: string;
@@ -22,6 +37,12 @@ export interface Product extends AuditableBaseModel {
   availableToSale: boolean;
   discountFromInvantory: boolean;
   businessId: string;
+  /** Se vende también por mayor (paquetes). Cuando es true, `wholesalePackSize`/`wholesaleTiers` están presentes. */
+  wholesaleEnabled?: boolean;
+  /** Unidades por paquete/caja (6, 10, 12, 24, 30…). */
+  wholesalePackSize?: number;
+  /** Escalones de precio mayorista, ordenados por `minPacks` ascendente. */
+  wholesaleTiers?: WholesaleTier[];
 }
 
 /**
