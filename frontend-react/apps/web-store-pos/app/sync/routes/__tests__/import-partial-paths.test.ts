@@ -98,9 +98,11 @@ describe('Import flow — full success', () => {
       inventoryEntries: [],
       orders: [],
       expenses: [],
-      saleCredits: [],
-      exchangeRates: [],
-    };
+      saleCredits: [],        exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
+      };
 
     const result = await synchronizer.sync(data);
     expect(result.succeeded).toBe(true);
@@ -128,9 +130,11 @@ describe('Import flow — full success', () => {
       inventoryEntries: [],
       orders: [],
       expenses: [],
-      saleCredits: [],
-      exchangeRates: [],
-    };
+      saleCredits: [],        exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
+      };
 
     await synchronizer.sync(data);
 
@@ -165,9 +169,11 @@ describe('Import flow — partial errors', () => {
       inventoryEntries: [],
       orders: [],
       expenses: [{ id: 'exp-1', type: ExpenseType.Alquiler, total: 500, note: '', paymentType: PaymentType.Efectivo, date: new Date(), isActive: true, createdDate: new Date(), createdByName: 'admin' }],
-      saleCredits: [],
-      exchangeRates: [],
-    };
+      saleCredits: [],        exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
+      };
 
     const result = await synchronizer.sync(data);
     expect(result.succeeded).toBe(false);
@@ -198,9 +204,11 @@ describe('Import flow — partial errors', () => {
       inventoryEntries: [],
       orders: [{ id: 'ord-1', orderItems: [], total: 500, itemsCount: 1, date: new Date(), type: OrderType.Normal, paymentType: PaymentType.Efectivo, isCredit: false, description: '', isActive: true, createdDate: new Date(), createdByName: 'admin' }],
       expenses: [],
-      saleCredits: [],
-      exchangeRates: [],
-    };
+      saleCredits: [],        exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
+      };
 
     const result = await synchronizer.sync(data);
     // Categories and products should still be synced even though orders failed

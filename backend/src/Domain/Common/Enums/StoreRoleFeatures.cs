@@ -83,6 +83,11 @@ namespace Domain.Common.Enums
         [HasModule(ModuleType.Inventory)]
         InventoryTodaySaleProfitAdmin,
 
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.Warehouses)]
+        [HasModule(ModuleType.Inventory)]
+        WarehousesAdmin,
+
         #endregion
 
         #region Expenses features

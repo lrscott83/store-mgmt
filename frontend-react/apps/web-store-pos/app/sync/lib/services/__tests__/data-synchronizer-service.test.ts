@@ -356,6 +356,9 @@ function emptyData(): ParsedData {
     expenses: [],
     saleCredits: [],
     exchangeRates: [],
+    warehouses: [],
+    warehouseStockLevels: [],
+    warehouseStockMovements: [],
   };
 }
 
@@ -457,6 +460,9 @@ describe('DataSynchronizerService', () => {
         expenses: [makeExpense('exp-1')],
         saleCredits: [makeSaleCredit('sc-1')],
         exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
       };
 
       await svc.sync(data);
@@ -966,6 +972,9 @@ describe('DataSynchronizerService', () => {
         expenses: [makeExpense('e1')],
         saleCredits: [makeSaleCredit('sc1')],
         exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
       };
       const result = await svc.sync(data);
       const entities = result.merges.map((r) => r.entity);
@@ -1004,6 +1013,9 @@ describe('DataSynchronizerService', () => {
         expenses: [expense],
         saleCredits: [credit],
         exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
       };
 
       const result = await svc.sync(data);

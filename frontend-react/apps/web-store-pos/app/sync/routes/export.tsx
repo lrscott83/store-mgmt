@@ -8,6 +8,7 @@ import { OrderOfflineService } from '~/sales/lib/services/order-offline-service'
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { ExchangeRateOfflineService } from '~/management/exchange-rates/lib/services/exchange-rate-offline-service';
+import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { ExportForm } from '~/sync/components/export-form';
 
@@ -31,6 +32,7 @@ export function ExportPage() {
     const expenseSvc = new ExpenseOfflineService(storeId);
     const creditSvc = new SaleCreditOfflineService(storeId);
     const exchangeRateSvc = new ExchangeRateOfflineService(storeId);
+    const warehouseSvc = new WarehouseOfflineService(storeId, productRepo, inventorySvc);
 
     const serializer = new DataSerializerService(
       storeId,
@@ -41,6 +43,7 @@ export function ExportPage() {
       expenseSvc,
       creditSvc,
       exchangeRateSvc,
+      warehouseSvc,
     );
 
     const payload = await serializer.export(password);

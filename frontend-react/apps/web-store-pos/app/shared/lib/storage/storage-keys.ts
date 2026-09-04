@@ -32,4 +32,7 @@ export const BUSINESS_ENTITY_NAMES = [
   'expenses',
   'saleCredits',
   'exchangeRates',
+  'warehouses',
+  'warehouse-stock-levels',
+  'warehouse-stock-movements',
 ] as const;

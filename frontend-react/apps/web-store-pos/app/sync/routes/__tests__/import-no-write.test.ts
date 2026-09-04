@@ -194,9 +194,11 @@ describe('T1.5 — shared category-repo instance (import.tsx wiring)', () => {
       inventoryEntries: [],
       orders: [],
       expenses: [],
-      saleCredits: [],
-      exchangeRates: [],
-    };
+      saleCredits: [],        exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
+      };
 
     const result = await synchronizer.sync(data);
 
@@ -247,9 +249,11 @@ describe('T1.5 — shared category-repo instance (import.tsx wiring)', () => {
       inventoryEntries: [],
       orders: [],
       expenses: [],
-      saleCredits: [],
-      exchangeRates: [],
-    };
+      saleCredits: [],        exchangeRates: [],
+        warehouses: [],
+        warehouseStockLevels: [],
+        warehouseStockMovements: [],
+      };
 
     const result = await synchronizer.sync(data);
 

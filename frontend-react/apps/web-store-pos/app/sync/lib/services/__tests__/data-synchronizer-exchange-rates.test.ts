@@ -88,6 +88,9 @@ function makeData(exchangeRates: ExchangeRate[]): ParsedData {
     expenses: [],
     saleCredits: [],
     exchangeRates,
+    warehouses: [],
+    warehouseStockLevels: [],
+    warehouseStockMovements: [],
   };
 }
 

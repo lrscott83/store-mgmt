@@ -87,6 +87,20 @@ namespace Application.Features.Administration.Features.Commands.ActivateFeatures
                 await _featureRepository.AddAsync(egressFeature);
             }
 
+            Feature warehousesFeature = await _featureRepository.GetByIdAsync((int)FeatureType.Warehouses);
+            if (warehousesFeature == null)
+            {
+                warehousesFeature = Feature.Create(
+                    (int)FeatureType.Warehouses,
+                     FeatureType.Warehouses.GetDescription(),
+                     "Funcionalidad para gestionar los almacenes y sus movimientos",
+                     (int)ModuleType.Inventory,
+                     72,
+                     true,
+                     true);
+                await _featureRepository.AddAsync(warehousesFeature);
+            }
+
             return ResponseResult.Success(await _applicationUnitOfWork.SaveChangesAsync(cancellationToken) > 0);
         }
     }

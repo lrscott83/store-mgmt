@@ -8,6 +8,7 @@ import { OrderOfflineService } from '~/sales/lib/services/order-offline-service'
 import { ExpenseOfflineService } from '~/expenses/lib/services/expense-offline-service';
 import { SaleCreditOfflineService } from '~/sales/lib/services/sale-credit-offline-service';
 import { ExchangeRateOfflineService } from '~/management/exchange-rates/lib/services/exchange-rate-offline-service';
+import { WarehouseOfflineService } from '~/inventory/lib/services/warehouse-offline-service';
 import { DataSerializerService } from '~/sync/lib/services/data-serializer-service';
 import { DataSynchronizerService } from '~/sync/lib/services/data-synchronizer-service';
 import { ImportForm } from '~/sync/components/import-form';
@@ -46,6 +47,11 @@ export function ImportPage() {
     const expenseSvc = new ExpenseOfflineService(storeId);
     const creditSvc = new SaleCreditOfflineService(storeId);
     const exchangeRateSvc = new ExchangeRateOfflineService(storeId);
+    const warehouseSvc = new WarehouseOfflineService(
+      storeId,
+      productRepoForSerializer,
+      inventorySvc,
+    );
 
     const serializer = new DataSerializerService(
       storeId,
@@ -56,6 +62,7 @@ export function ImportPage() {
       expenseSvc,
       creditSvc,
       exchangeRateSvc,
+      warehouseSvc,
     );
 
     // Read file bytes
@@ -92,6 +99,7 @@ export function ImportPage() {
       expenseSvc,
       creditSvc,
       exchangeRateSvc,
+      warehouseSvc,
     );
 
     return synchronizer.sync(parsedData);

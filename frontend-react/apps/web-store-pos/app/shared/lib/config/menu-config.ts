@@ -71,6 +71,8 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Ganancias del día. Muestra la diferencia entre el costo de los productos vendidos y el precio de venta. Calcula la ganancia real del día.' },
       { label: 'MENU.EGRESS', path: '/inventory/egress', featureIds: [EFeatures.Egress], moduleId: EModules.Inventory,
         helpContent: 'Salidas de inventario. Registra productos que salen del almacén por motivos distintos a la venta (deterioro, regalo, ajuste de stock, etc.).' },
+      { label: 'MENU.WAREHOUSES', path: '/inventory/warehouses', featureIds: [EFeatures.Warehouses], moduleId: EModules.Inventory, icon: '🏬',
+        helpContent: 'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.' },
       { label: 'MENU.ENTRIES_HISTORY', path: '/inventory/entries', featureIds: [EFeatures.EntriesHistory], moduleId: EModules.Inventory,
         helpContent: 'Historial de entradas. Consulta todas las entradas de inventario realizadas con filtros por fecha y producto. Ideal para auditorías.' },
     ],

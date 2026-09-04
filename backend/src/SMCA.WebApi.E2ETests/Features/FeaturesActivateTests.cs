@@ -38,6 +38,7 @@ public sealed class FeaturesActivateTests
             (await db.Set<Feature>().FindAsync(60))!.IsActive.Should().BeTrue(); // Dashboard
             (await db.Set<Feature>().FindAsync(50))!.IsActive.Should().BeTrue(); // TodayReports
             (await db.Set<Feature>().FindAsync(33)).Should().NotBeNull();        // Egress
+            (await db.Set<Feature>().FindAsync(36)).Should().NotBeNull();        // Warehouses
         }
         finally { await FeatureSeed.RestoreAsync(_f, snap); await DbTestHelpers.CleanupUserAsync(_f, admin); }
     }
