@@ -12,7 +12,8 @@ namespace SMCA.WebApi.E2ETests.Features;
 // Snapshot of the rows `activate` mutates, so a test can restore the shared seed in finally.
 public sealed record ActivateSnapshot(
     bool StatisticsActive, float StatisticsPrice, bool ReportsActive,
-    bool DashboardActive, bool TodayReportsActive, bool EgressExisted);
+    bool DashboardActive, bool TodayReportsActive, bool EgressExisted,
+    bool WarehousesExisted);
 
 public static class FeatureSeed
 {
@@ -46,9 +47,11 @@ public static class FeatureSeed
         var dashboard = await db.Set<Feature>().IgnoreQueryFilters().AsTracking().FirstOrDefaultAsync(fe => fe.Id == 60);
         var todayReports = await db.Set<Feature>().IgnoreQueryFilters().AsTracking().FirstOrDefaultAsync(fe => fe.Id == 50);
         var egress = await db.Set<Feature>().IgnoreQueryFilters().FirstOrDefaultAsync(fe => fe.Id == 33);
+        var warehouses = await db.Set<Feature>().IgnoreQueryFilters().FirstOrDefaultAsync(fe => fe.Id == 36);
         return new ActivateSnapshot(
             stats?.IsActive ?? false, stats?.Price ?? 0, reports?.IsActive ?? false,
-            dashboard?.IsActive ?? false, todayReports?.IsActive ?? false, egress is not null);
+            dashboard?.IsActive ?? false, todayReports?.IsActive ?? false, egress is not null,
+            warehouses is not null);
     }
 
     /// <summary>
@@ -77,6 +80,7 @@ public static class FeatureSeed
         // 🛡️ Cascade manual: remove StoreRoleFeature refs before touching features that may be referenced
         var featureIdsToClean = new List<int>();
         if (!s.EgressExisted) featureIdsToClean.Add(33);
+        if (!s.WarehousesExisted) featureIdsToClean.Add(36);
         featureIdsToClean.Add(50); // TodayReports may also have stale refs
         if (featureIdsToClean.Count > 0)
         {
@@ -99,6 +103,11 @@ public static class FeatureSeed
         {
             var egress = await db.Set<Feature>().IgnoreQueryFilters().FirstOrDefaultAsync(fe => fe.Id == 33);
             if (egress is not null) db.Set<Feature>().Remove(egress);
+        }
+        if (!s.WarehousesExisted)
+        {
+            var warehouses = await db.Set<Feature>().IgnoreQueryFilters().FirstOrDefaultAsync(fe => fe.Id == 36);
+            if (warehouses is not null) db.Set<Feature>().Remove(warehouses);
         }
         await db.SaveChangesAsync();
     }

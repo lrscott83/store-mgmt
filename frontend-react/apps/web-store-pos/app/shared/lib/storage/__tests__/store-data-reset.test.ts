@@ -26,6 +26,9 @@ describe('clearStoreData', () => {
       'expenses',
       'saleCredits',
       'exchangeRates',
+      'warehouses',
+      'warehouse-stock-levels',
+      'warehouse-stock-movements',
     ]);
   });
 

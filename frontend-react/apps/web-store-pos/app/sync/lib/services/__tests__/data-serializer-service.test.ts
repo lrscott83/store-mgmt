@@ -52,7 +52,14 @@ const ANGULAR_ENTRY_NAMES = [
 ];
 
 // daily-exchange-rate: the seventh data entry added on top of Angular's six.
-const ALL_ENTRY_NAMES = [...ANGULAR_ENTRY_NAMES, 'exchange-rates.json'];
+// warehouses-plan: three more entries (warehouses, stock levels, movements).
+const ALL_ENTRY_NAMES = [
+  ...ANGULAR_ENTRY_NAMES,
+  'exchange-rates.json',
+  'warehouses.json',
+  'warehouse-stock-levels.json',
+  'warehouse-stock-movements.json',
+];
 
 
 const mockCategory: ProductCategory = {
@@ -452,7 +459,7 @@ describe('DataSerializerService', () => {
   // -------------------------------------------------------------------------
 
   describe('T2 — v2 envelope: meta.json + all data entries', () => {
-    it('produces meta.json plus exactly the 7 data entries', async () => {
+    it('produces meta.json plus exactly the 10 data entries', async () => {
       const svc = makeService();
       const payload = await svc.export(PASSWORD);
       const { entries } = await readRawEntriesV2(payload, PASSWORD);
@@ -462,7 +469,7 @@ describe('DataSerializerService', () => {
 
     // parity-audit-remediation Slice 2: naming-only alignment with Angular's
     // EDataFileName enum (data.file.model.ts:6-13) — PascalCase members, same string values.
-    it('EDataFileName mirrors Angular\'s PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry', () => {
+    it('EDataFileName mirrors Angular\'s PascalCase member names with unchanged string values, plus the daily-exchange-rate seventh entry and the three warehouses entries', () => {
       expect(EDataFileName).toEqual({
         Categories: 'categories.json',
         Products: 'products.json',
@@ -471,6 +478,9 @@ describe('DataSerializerService', () => {
         Expenses: 'expenses.json',
         SaleCredits: 'sale-credits.json',
         ExchangeRates: 'exchange-rates.json',
+        Warehouses: 'warehouses.json',
+        WarehouseStockLevels: 'warehouse-stock-levels.json',
+        WarehouseStockMovements: 'warehouse-stock-movements.json',
       });
     });
 

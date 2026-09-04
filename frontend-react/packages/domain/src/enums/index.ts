@@ -22,6 +22,7 @@ export enum EFeatures {
   Egress = 33,
   InventoryTodayQuantities = 34,
   InventoryTodaySaleProfit = 35,
+  Warehouses = 36,
   Send = 40,
   Download = 41,
   Receive = 42,

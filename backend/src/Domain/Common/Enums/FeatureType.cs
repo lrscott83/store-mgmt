@@ -59,6 +59,9 @@ namespace Domain.Common.Enums
         [Description("Ganancias del día")]
         InventoryTodaySaleProfit = 35,
 
+        [Description("Almacenes")]
+        Warehouses = 36,
+
         // Synchronization
         [Description("Enviar")]
         Send = 40,

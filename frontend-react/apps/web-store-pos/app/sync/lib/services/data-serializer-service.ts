@@ -16,6 +16,9 @@ import type {
   Expense,
   SaleCredit,
   ExchangeRate,
+  Warehouse,
+  WarehouseStockLevel,
+  WarehouseStockMovement,
 } from '@store-mgmt/domain';
 import type { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import type { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -73,6 +76,11 @@ export const EDataFileName = {
   // daily-exchange-rate: the seventh data entry, absent from legacy v1/
   // Angular archives (parsed as [] on import) and always written by exports.
   ExchangeRates: 'exchange-rates.json',
+  // warehouses (warehouses-plan): three more data entries, absent from
+  // legacy archives (parsed as [] on import) and always written by exports.
+  Warehouses: 'warehouses.json',
+  WarehouseStockLevels: 'warehouse-stock-levels.json',
+  WarehouseStockMovements: 'warehouse-stock-movements.json',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -164,6 +172,9 @@ export interface ParsedData {
   expenses: Expense[];
   saleCredits: SaleCredit[];
   exchangeRates: ExchangeRate[];
+  warehouses: Warehouse[];
+  warehouseStockLevels: WarehouseStockLevel[];
+  warehouseStockMovements: WarehouseStockMovement[];
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +205,12 @@ export interface SaleCreditReader {
 
 export interface ExchangeRateReader {
   getStorageExchangeRates(): ExchangeRate[];
+}
+
+export interface WarehouseReader {
+  getStorageWarehouses(): Warehouse[];
+  getStorageStockLevels(): WarehouseStockLevel[];
+  getStorageMovements(): WarehouseStockMovement[];
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +258,10 @@ export class DataSerializerService {
     // register omit it; exports then write an empty entry and imports parse []
     // for archives that carry none.
     private readonly exchangeRateReader?: ExchangeRateReader,
+    // Optional (warehouses-plan): legacy call sites/tests that predate the
+    // module omit it; exports then write empty entries and imports parse []
+    // for archives that carry none.
+    private readonly warehouseReader?: WarehouseReader,
   ) {}
 
   private derivePassword(password: string): string {
@@ -262,6 +283,9 @@ export class DataSerializerService {
     const expenses = this.expenseReader.getStorageExpenses();
     const saleCredits = this.saleCreditReader.getStorageSaleCredits();
     const exchangeRates = this.exchangeRateReader?.getStorageExchangeRates() ?? [];
+    const warehouses = this.warehouseReader?.getStorageWarehouses() ?? [];
+    const warehouseStockLevels = this.warehouseReader?.getStorageStockLevels() ?? [];
+    const warehouseStockMovements = this.warehouseReader?.getStorageMovements() ?? [];
 
     // Angular parity (data-serializer.service.ts:83-84): reads the RAW stored
     // JSON string straight from the repository, no re-derivation via
@@ -287,6 +311,9 @@ export class DataSerializerService {
     const expensesJson = JSON.stringify(expenses);
     const saleCreditsJson = JSON.stringify(saleCredits);
     const exchangeRatesJson = JSON.stringify(exchangeRates);
+    const warehousesJson = JSON.stringify(warehouses);
+    const warehouseStockLevelsJson = JSON.stringify(warehouseStockLevels);
+    const warehouseStockMovementsJson = JSON.stringify(warehouseStockMovements);
 
     // v2 envelope: a fresh salt per export (V2-02), password-only key (V2-03).
     const salt = crypto.getRandomValues(new Uint8Array(V2_SALT_BYTES));
@@ -326,6 +353,15 @@ export class DataSerializerService {
       rawPassword: key,
     });
     await zipWriter.add(EDataFileName.ExchangeRates, new TextReader(exchangeRatesJson), {
+      rawPassword: key,
+    });
+    await zipWriter.add(EDataFileName.Warehouses, new TextReader(warehousesJson), {
+      rawPassword: key,
+    });
+    await zipWriter.add(EDataFileName.WarehouseStockLevels, new TextReader(warehouseStockLevelsJson), {
+      rawPassword: key,
+    });
+    await zipWriter.add(EDataFileName.WarehouseStockMovements, new TextReader(warehouseStockMovementsJson), {
       rawPassword: key,
     });
 
@@ -486,6 +522,18 @@ export class DataSerializerService {
       saleCredits: parseJson<SaleCredit[]>(contents, EDataFileName.SaleCredits, []),
       // Legacy archives (v1/Angular) carry no exchange-rates entry → [].
       exchangeRates: parseJson<ExchangeRate[]>(contents, EDataFileName.ExchangeRates, []),
+      // Legacy archives carry no warehouses entries → [].
+      warehouses: parseJson<Warehouse[]>(contents, EDataFileName.Warehouses, []),
+      warehouseStockLevels: parseJson<WarehouseStockLevel[]>(
+        contents,
+        EDataFileName.WarehouseStockLevels,
+        [],
+      ),
+      warehouseStockMovements: parseJson<WarehouseStockMovement[]>(
+        contents,
+        EDataFileName.WarehouseStockMovements,
+        [],
+      ),
     };
   }
 }

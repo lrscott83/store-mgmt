@@ -201,6 +201,7 @@ const messages: Record<string, string> = {
 
   // Menu items — Inventory (Angular MENU.INVENTORY_MGMT.*)
   'MENU.AVAILABLE': 'Disponible',
+  'MENU.WAREHOUSES': 'Almacenes',
   'MENU.TODAY_ENTRIES': 'Entradas del día',
   'MENU.TODAY_QUANTITIES': 'Cantidades del día',
   'MENU.TODAY_SALES_PROFIT': 'Ganancias del día',
@@ -526,6 +527,41 @@ const messages: Record<string, string> = {
   // Per-category "no products in this category" empty state (inventory-product-list.component
   // .html:4) — was previously covered by the overloaded INVENTORY.EMPTY_STATE.
   'INVENTORY.CATEGORY_PRODUCT_NO_FOUND': 'No existe ningún producto disponible en la categoría',
+  // Warehouses (warehouses-plan) — gestión de almacenes y movimientos.
+  'WAREHOUSES.TITLE': 'Almacenes',
+  'WAREHOUSES.NEW_WAREHOUSE': 'Nuevo almacén',
+  'WAREHOUSES.NAME': 'Nombre',
+  'WAREHOUSES.NAME_PLACEHOLDER': 'Ej: Almacén Central',
+  'WAREHOUSES.SAVE': 'Guardar',
+  'WAREHOUSES.CANCEL': 'Cancelar',
+  'WAREHOUSES.EDIT': 'Editar',
+  'WAREHOUSES.DEACTIVATE': 'Desactivar',
+  'WAREHOUSES.EMPTY': 'No hay almacenes creados. Crea uno para comenzar.',
+  'WAREHOUSES.STOCK_TITLE': 'Stock del almacén',
+  'WAREHOUSES.NO_STOCK': 'Este almacén no tiene productos en stock.',
+  'WAREHOUSES.PRODUCT': 'Producto',
+  'WAREHOUSES.ON_HAND': 'Cantidad',
+  'WAREHOUSES.AVG_COST': 'Costo promedio',
+  'WAREHOUSES.PURCHASE_IN': 'Entrada (compra)',
+  'WAREHOUSES.SALE_OUT': 'Salida a tienda',
+  'WAREHOUSES.TRANSFER': 'Transferir',
+  'WAREHOUSES.QUANTITY': 'Cantidad',
+  'WAREHOUSES.COST_PRICE': 'Costo por unidad',
+  'WAREHOUSES.REASON': 'Motivo (opcional)',
+  'WAREHOUSES.TO_WAREHOUSE': 'Almacén destino',
+  'WAREHOUSES.SELECT_WAREHOUSE': 'Seleccione un almacén…',
+  'WAREHOUSES.MOVEMENTS_TITLE': 'Movimientos',
+  'WAREHOUSES.NO_MOVEMENTS': 'No hay movimientos registrados.',
+  'WAREHOUSES.DATE': 'Fecha',
+  'WAREHOUSES.TYPE': 'Tipo',
+  'WAREHOUSES.TYPE_PURCHASE_IN': 'Entrada (compra)',
+  'WAREHOUSES.TYPE_SALE_OUT': 'Salida a tienda',
+  'WAREHOUSES.TYPE_TRANSFER_IN': 'Entrada por transferencia',
+  'WAREHOUSES.TYPE_TRANSFER_OUT': 'Salida por transferencia',
+  'WAREHOUSES.DEACTIVATE_BLOCKED': 'No se puede desactivar un almacén con stock o movimientos.',
+  'WAREHOUSES.CREATED': 'Almacén creado.',
+  'WAREHOUSES.UPDATED': 'Almacén actualizado.',
+  'WAREHOUSES.MOVEMENT_CREATED': 'Movimiento registrado.',
   // Angular INVENTORY_ENTRY.* namespace (vocabs/es.ts:420-426) — today-entries add/edit modal
   // + today-entries empty state (was previously covered by the overloaded INVENTORY.EMPTY_STATE).
   // INVENTORY_ENTRY.TEXT (Angular vocabs/es.ts:421) — used by Swal's DELETE_CONFIRM_MESSAGE_A

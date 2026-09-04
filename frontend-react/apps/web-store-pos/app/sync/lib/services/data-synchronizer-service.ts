@@ -7,6 +7,9 @@ import type {
   Product,
   ProductCategory,
   SaleCredit,
+  Warehouse,
+  WarehouseStockLevel,
+  WarehouseStockMovement,
 } from '@store-mgmt/domain';
 import type { ParsedData } from './data-serializer-service';
 
@@ -74,6 +77,18 @@ export const SynchronizerErrors = {
   ExchangeRatesUnexpectedError: {
     code: 'Synchronizer.ExchangeRatesUnexpectedError',
     message: 'Ocurrió un error inesperado al sincronizar el registro de cambio.',
+  },
+  WarehousesUnexpectedError: {
+    code: 'Synchronizer.WarehousesUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar los almacenes.',
+  },
+  WarehouseStockLevelsUnexpectedError: {
+    code: 'Synchronizer.WarehouseStockLevelsUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar el stock de los almacenes.',
+  },
+  WarehouseMovementsUnexpectedError: {
+    code: 'Synchronizer.WarehouseMovementsUnexpectedError',
+    message: 'Ocurrió un error inesperado al sincronizar los movimientos de almacén.',
   },
 } as const;
 
@@ -184,6 +199,23 @@ export interface ExchangeRateImportService {
   updateImportedExchangeRate(rate: ExchangeRate): Result;
 }
 
+/**
+ * Warehouse import routes through the offline SERVICE (warehouses-plan),
+ * mirroring the ExchangeRates seam: the service owns the domain-command
+ * layer. Upsert by id for warehouses, by (warehouseId, productId) for stock
+ * levels; movements are append-only (id-presence decides add-vs-skip).
+ */
+export interface WarehouseImportService {
+  getStorageWarehouses(): Warehouse[];
+  addImportedWarehouse(warehouse: Warehouse): Result;
+  updateImportedWarehouse(warehouse: Warehouse): Result;
+  getStorageStockLevels(): WarehouseStockLevel[];
+  addImportedStockLevel(level: WarehouseStockLevel): Result;
+  updateImportedStockLevel(level: WarehouseStockLevel): Result;
+  getStorageMovements(): WarehouseStockMovement[];
+  addImportedMovement(movement: WarehouseStockMovement): Result;
+}
+
 // ---------------------------------------------------------------------------
 // Per-type merge outcome (internal)
 // ---------------------------------------------------------------------------
@@ -231,6 +263,9 @@ export class DataSynchronizerService {
     // Optional (daily-exchange-rate): legacy call sites/tests that predate the
     // register omit it — the merge then degrades to a zero-count no-op.
     private readonly exchangeRateService?: ExchangeRateImportService,
+    // Optional (warehouses-plan): legacy call sites/tests that predate the
+    // module omit it — the merges then degrade to zero-count no-ops.
+    private readonly warehouseService?: WarehouseImportService,
   ) {}
 
   async sync(data: ParsedData): Promise<SyncResult> {
@@ -272,6 +307,16 @@ export class DataSynchronizerService {
     // register and must keep a 6-entity merge contract.
     if (this.exchangeRateService) {
       push(this.mergeExchangeRatesViaService(data.exchangeRates));
+    }
+
+    // 8-10. Warehouses — routed through the offline SERVICE (warehouses-plan),
+    // upsert by id / (warehouseId, productId), movements append-only; each
+    // break-only (no revert). Only when the service was injected: legacy
+    // constructor call sites keep the 7-entity merge contract.
+    if (this.warehouseService) {
+      push(this.mergeWarehousesViaService(data.warehouses));
+      push(this.mergeWarehouseStockLevelsViaService(data.warehouseStockLevels));
+      push(this.mergeWarehouseMovementsViaService(data.warehouseStockMovements));
     }
 
     return { succeeded: errors.length === 0, errors, merges };
@@ -612,6 +657,162 @@ export class DataSynchronizerService {
           entity: 'exchangeRates',
           code: SynchronizerErrors.ExchangeRatesUnexpectedError.code,
           message: SynchronizerErrors.ExchangeRatesUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Warehouses — routed through the offline SERVICE (warehouses-plan)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Upsert-by-id merge of the imported warehouses. Break-only (no revert); an
+   * unexpected throw yields `WarehousesUnexpectedError`. When the service was
+   * not injected (legacy constructor call sites) the merge is a zero-count
+   * no-op.
+   */
+  private mergeWarehousesViaService(incoming: Warehouse[]): MergeOutcome {
+    const entity = 'warehouses';
+    if (!this.warehouseService || incoming.length === 0) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    try {
+      const existing = new Map(
+        this.warehouseService.getStorageWarehouses().map((w) => [w.id, w]),
+      );
+      for (const warehouse of incoming) {
+        const isNew = !existing.has(warehouse.id);
+        if (isNew) {
+          existing.set(warehouse.id, warehouse);
+          inserted++;
+        } else {
+          updated++;
+        }
+        const result = isNew
+          ? this.warehouseService.addImportedWarehouse(warehouse)
+          : this.warehouseService.updateImportedWarehouse(warehouse);
+        if (!result.succeeded) {
+          return {
+            merge: { entity, inserted, updated },
+            error: {
+              entity,
+              code: SynchronizerErrors.WarehousesUnexpectedError.code,
+              message: SynchronizerErrors.WarehousesUnexpectedError.message,
+            },
+          };
+        }
+      }
+      return { merge: { entity, inserted, updated } };
+    } catch {
+      return {
+        merge: { entity, inserted, updated },
+        error: {
+          entity,
+          code: SynchronizerErrors.WarehousesUnexpectedError.code,
+          message: SynchronizerErrors.WarehousesUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  /**
+   * Upsert by the (warehouseId, productId) composite key. Break-only; an
+   * unexpected throw yields `WarehouseStockLevelsUnexpectedError`.
+   */
+  private mergeWarehouseStockLevelsViaService(incoming: WarehouseStockLevel[]): MergeOutcome {
+    const entity = 'warehouseStockLevels';
+    if (!this.warehouseService || incoming.length === 0) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    try {
+      const keyOf = (l: { warehouseId: string; productId: string }) =>
+        `${l.warehouseId}:${l.productId}`;
+      const existing = new Map(
+        this.warehouseService.getStorageStockLevels().map((l) => [keyOf(l), l]),
+      );
+      for (const level of incoming) {
+        const key = keyOf(level);
+        const isNew = !existing.has(key);
+        if (isNew) {
+          existing.set(key, level);
+          inserted++;
+        } else {
+          updated++;
+        }
+        const result = isNew
+          ? this.warehouseService.addImportedStockLevel(level)
+          : this.warehouseService.updateImportedStockLevel(level);
+        if (!result.succeeded) {
+          return {
+            merge: { entity, inserted, updated },
+            error: {
+              entity,
+              code: SynchronizerErrors.WarehouseStockLevelsUnexpectedError.code,
+              message: SynchronizerErrors.WarehouseStockLevelsUnexpectedError.message,
+            },
+          };
+        }
+      }
+      return { merge: { entity, inserted, updated } };
+    } catch {
+      return {
+        merge: { entity, inserted, updated },
+        error: {
+          entity,
+          code: SynchronizerErrors.WarehouseStockLevelsUnexpectedError.code,
+          message: SynchronizerErrors.WarehouseStockLevelsUnexpectedError.message,
+        },
+      };
+    }
+  }
+
+  /**
+   * Append-only merge: a movement with an id already present is skipped (never
+   * duplicated, never updated — movimientos no se editan ni borran). Break-only;
+   * an unexpected throw yields `WarehouseMovementsUnexpectedError`.
+   */
+  private mergeWarehouseMovementsViaService(incoming: WarehouseStockMovement[]): MergeOutcome {
+    const entity = 'warehouseStockMovements';
+    if (!this.warehouseService || incoming.length === 0) {
+      return { merge: { entity, inserted: 0, updated: 0 } };
+    }
+
+    let inserted = 0;
+    try {
+      const existingIds = new Set(
+        this.warehouseService.getStorageMovements().map((m) => m.id),
+      );
+      for (const movement of incoming) {
+        if (existingIds.has(movement.id)) continue;
+        existingIds.add(movement.id);
+        inserted++;
+        const result = this.warehouseService.addImportedMovement(movement);
+        if (!result.succeeded) {
+          return {
+            merge: { entity, inserted, updated: 0 },
+            error: {
+              entity,
+              code: SynchronizerErrors.WarehouseMovementsUnexpectedError.code,
+              message: SynchronizerErrors.WarehouseMovementsUnexpectedError.message,
+            },
+          };
+        }
+      }
+      return { merge: { entity, inserted, updated: 0 } };
+    } catch {
+      return {
+        merge: { entity, inserted, updated: 0 },
+        error: {
+          entity,
+          code: SynchronizerErrors.WarehouseMovementsUnexpectedError.code,
+          message: SynchronizerErrors.WarehouseMovementsUnexpectedError.message,
         },
       };
     }
