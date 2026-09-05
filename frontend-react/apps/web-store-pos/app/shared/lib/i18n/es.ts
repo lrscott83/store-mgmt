@@ -230,6 +230,8 @@ const messages: Record<string, string> = {
   'MENU.STORES_UPDATE': 'Editar la tienda',
   'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
   'MENU.USERS': 'Empleados',
+  'MENU.BILLING_COLLECTIONS': 'Cobros pendientes',
+  'MENU.BILLING_COMMISSIONS': 'Comisiones',
   'MENU.CONFIGURATIONS': 'Configuraciones',
   'MENU.TUTORIAL': 'Tutorial',
   'MENU.EDIT_PROFILE': 'Editar Perfil',

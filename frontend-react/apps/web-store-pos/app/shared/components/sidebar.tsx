@@ -21,6 +21,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     ...group,
     items: group.items.filter((item) => {
       if (!user) return false;
+      // Role gate first (menu-config rolesOnly): items whose ROUTE denies a
+      // role that featureIds alone would admit (billing: SuperAdmin/ReSeller
+      // only) must not render for that role at all.
+      if (item.rolesOnly && !item.rolesOnly(user)) return false;
       if (!item.featureIds || item.featureIds.length === 0) return true;
       return isUserAuthorized(user, item.featureIds, user.selectedStoreId || undefined);
     }),

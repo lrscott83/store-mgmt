@@ -378,6 +378,77 @@ describe('Sidebar — sidebar-menu-parity: no Profile group', () => {
   });
 });
 
+describe('Sidebar — billing menu entries (superadmin/reseller only, StorePayment feature)', () => {
+  const makeReseller = (): UserModel => ({
+    ...makeSuperAdmin(),
+    login: 'reseller@test.com',
+    fullName: 'Re Seller',
+    isSuperAdmin: false,
+    isReSeller: true,
+    featureIds: [EFeatures.StorePayment],
+  });
+
+  const makeResellerWithoutFeature = (): UserModel => ({
+    ...makeSuperAdmin(),
+    login: 'reseller2@test.com',
+    fullName: 'Re Seller 2',
+    isSuperAdmin: false,
+    isReSeller: true,
+    featureIds: [],
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('SuperAdmin sees "Cobros pendientes" and "Comisiones" in the MANAGEMENT group', () => {
+    renderSidebar(makeSuperAdmin());
+
+    expect(screen.getByText('Cobros pendientes')).toBeInTheDocument();
+    expect(screen.getByText('Comisiones')).toBeInTheDocument();
+
+    const hrefs = screen
+      .getAllByRole('link')
+      .map((l) => l.getAttribute('href'));
+    expect(hrefs).toContain('/management/stores/collections');
+    expect(hrefs).toContain('/management/stores/commissions');
+  });
+
+  it('ReSeller with the StorePayment feature sees both billing entries', () => {
+    renderSidebar(makeReseller());
+
+    expect(screen.getByText('Cobros pendientes')).toBeInTheDocument();
+    expect(screen.getByText('Comisiones')).toBeInTheDocument();
+  });
+
+  it('ReSeller WITHOUT the StorePayment feature does not see billing entries', () => {
+    renderSidebar(makeResellerWithoutFeature());
+
+    expect(screen.queryByText('Cobros pendientes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Comisiones')).not.toBeInTheDocument();
+  });
+
+  it('StoreUser (even with StorePayment featureId in their store roles) does not see billing entries — route guard denies non-reseller roles', () => {
+    const user = makeStoreUser([EFeatures.StorePayment], 's1');
+    renderSidebar(user);
+
+    expect(screen.queryByText('Cobros pendientes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Comisiones')).not.toBeInTheDocument();
+  });
+
+  it('billing entries point to the gated routes', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const links = screen.getAllByRole('link');
+    const collections = links.find((l) => l.textContent === 'Cobros pendientes');
+    const commissions = links.find((l) => l.textContent === 'Comisiones');
+    expect(collections).not.toBeUndefined();
+    expect(collections?.getAttribute('href')).toBe('/management/stores/collections');
+    expect(commissions).not.toBeUndefined();
+    expect(commissions?.getAttribute('href')).toBe('/management/stores/commissions');
+  });
+});
+
 describe('Sidebar — SHELL-06: brand logo at the top of the sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
