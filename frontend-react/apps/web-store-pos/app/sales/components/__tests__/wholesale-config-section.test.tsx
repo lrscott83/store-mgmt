@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
@@ -13,12 +14,38 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-function renderSection(value: WholesaleConfig | undefined, retailPrice = 700, onChange = vi.fn()) {
-  render(
+/**
+ * Harness controlado que replica al modal real (create/edit product): guarda en estado
+ * la config emitida por el componente, de modo que el input re-renderice con el valor
+ * devuelto. Sin esto, un test no podría observar el valor visual del input tras un
+ * cambio (el componente es puramente controlado).
+ */
+function Harness({
+  initialValue,
+  retailPrice,
+  onChange,
+}: {
+  initialValue: WholesaleConfig | undefined;
+  retailPrice: number;
+  onChange: (config: WholesaleConfig | undefined) => void;
+}) {
+  const [config, setConfig] = useState<WholesaleConfig | undefined>(initialValue);
+  return (
     <Wrapper>
-      <WholesaleConfigSection value={value} retailPrice={retailPrice} onChange={onChange} />
-    </Wrapper>,
+      <WholesaleConfigSection
+        value={config}
+        retailPrice={retailPrice}
+        onChange={(next) => {
+          setConfig(next);
+          onChange(next);
+        }}
+      />
+    </Wrapper>
   );
+}
+
+function renderSection(initialValue: WholesaleConfig | undefined, retailPrice = 700, onChange = vi.fn()) {
+  render(<Harness initialValue={initialValue} retailPrice={retailPrice} onChange={onChange} />);
   return onChange;
 }
 
@@ -85,5 +112,35 @@ describe('WholesaleConfigSection — formulario mayorista del producto', () => {
     const onChange = renderSection({ packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: 680 }] });
     fireEvent.click(screen.getByTestId('wholesale-toggle'));
     expect(onChange).toHaveBeenLastCalledWith(undefined);
+  });
+
+  // Vaciar un campo NO coacciona a 0: emite NaN y el input queda visualmente vacío,
+  // para que reescribir un valor no sea engorroso. La validación al guardar es la
+  // que exige enteros/precios válidos (validateWholesaleConfig rechaza NaN).
+  it('vaciar packSize emite NaN (no 0) y el input queda vacío', () => {
+    const onChange = renderSection({ packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: 680 }] });
+    const packInput = screen.getByTestId('wholesale-pack-size-input') as HTMLInputElement;
+    fireEvent.change(packInput, { target: { value: '' } });
+    const emitted = onChange.mock.calls[0][0] as WholesaleConfig;
+    expect(Number.isNaN(emitted.packSize)).toBe(true);
+    expect(packInput.value).toBe('');
+  });
+
+  it('vaciar el precio de un tier emite NaN (no 0) y el input queda vacío', () => {
+    const onChange = renderSection({ packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: 680 }] });
+    const priceInput = screen.getByTestId('wholesale-tier-price-0') as HTMLInputElement;
+    fireEvent.change(priceInput, { target: { value: '' } });
+    const emitted = onChange.mock.calls[0][0] as WholesaleConfig;
+    expect(Number.isNaN(emitted.tiers[0].pricePerUnit)).toBe(true);
+    expect(priceInput.value).toBe('');
+  });
+
+  it('vaciar el mínimo de paquetes de un tier emite NaN (no 0) y el input queda vacío', () => {
+    const onChange = renderSection({ packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: 680 }] });
+    const minInput = screen.getByTestId('wholesale-tier-min-0') as HTMLInputElement;
+    fireEvent.change(minInput, { target: { value: '' } });
+    const emitted = onChange.mock.calls[0][0] as WholesaleConfig;
+    expect(Number.isNaN(emitted.tiers[0].minPacks)).toBe(true);
+    expect(minInput.value).toBe('');
   });
 });

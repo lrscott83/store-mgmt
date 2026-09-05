@@ -111,6 +111,32 @@ describe('validateWholesaleConfig', () => {
     }
   });
 
+  // NaN = campo vaciado por el usuario (wholesale-config-section emite NaN, nunca 0).
+  // La validación al guardar es la que exige un valor correcto.
+  it('packSize NaN (campo vaciado) falla al guardar', () => {
+    const result = validateWholesaleConfig({ packSize: NaN, tiers: beerConfig.tiers }, 700);
+    expect(result.succeeded).toBe(false);
+    expect(result.errors.some((e) => e.code === 'Product.WholesalePackSizeInvalid')).toBe(true);
+  });
+
+  it('minPacks NaN (campo vaciado) falla al guardar', () => {
+    const result = validateWholesaleConfig(
+      { packSize: 24, tiers: [{ minPacks: NaN, pricePerUnit: 680 }] },
+      700,
+    );
+    expect(result.succeeded).toBe(false);
+    expect(result.errors.some((e) => e.code === 'Product.WholesaleInvalidMinPacks')).toBe(true);
+  });
+
+  it('pricePerUnit NaN (campo vaciado) falla al guardar', () => {
+    const result = validateWholesaleConfig(
+      { packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: NaN }] },
+      700,
+    );
+    expect(result.succeeded).toBe(false);
+    expect(result.errors.some((e) => e.code === 'Product.WholesaleInvalidPricePerUnit')).toBe(true);
+  });
+
   it('sin tiers falla', () => {
     const result = validateWholesaleConfig({ packSize: 24, tiers: [] }, 700);
     expect(result.succeeded).toBe(false);

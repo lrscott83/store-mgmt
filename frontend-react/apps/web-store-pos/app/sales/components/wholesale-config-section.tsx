@@ -8,6 +8,10 @@ import { PlusIcon, TrashIcon } from '~/shared/components/ui/icons';
  * (`packSize: 24`, tier base `minPacks: 1` con el precio retail). Cada edición emite la config
  * completa vía `onChange`. La validación de reglas (validateWholesaleConfig) la hace el modal
  * al guardar — este componente solo modela el estado.
+ *
+ * Campos numéricos: el contenido vacío se preserva (emite NaN, el input renderiza '')
+ * — nunca se coacciona a 0 al escribir, para que borrar y reescribir un valor no sea
+ * engorroso. La validación al guardar es la que exige enteros/precios válidos.
  */
 interface WholesaleConfigSectionProps {
   value: WholesaleConfig | undefined;
@@ -75,7 +79,7 @@ export function WholesaleConfigSection({ value, retailPrice, onChange }: Wholesa
               min="1"
               step="1"
               value={Number.isFinite(value.packSize) ? value.packSize : ''}
-              onChange={(e) => updatePackSize(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => updatePackSize(parseInt(e.target.value, 10))}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
               data-testid="wholesale-pack-size-input"
             />
@@ -109,7 +113,7 @@ export function WholesaleConfigSection({ value, retailPrice, onChange }: Wholesa
                       step="1"
                       value={Number.isFinite(tier.minPacks) ? tier.minPacks : ''}
                       onChange={(e) => {
-                        const minPacks = parseInt(e.target.value, 10) || 0;
+                        const minPacks = parseInt(e.target.value, 10);
                         updateTiers(value.tiers.map((t, i) => (i === index ? { ...t, minPacks } : t)));
                       }}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
@@ -126,7 +130,7 @@ export function WholesaleConfigSection({ value, retailPrice, onChange }: Wholesa
                       step="0.01"
                       value={Number.isFinite(tier.pricePerUnit) ? tier.pricePerUnit : ''}
                       onChange={(e) => {
-                        const pricePerUnit = parseFloat(e.target.value) || 0;
+                        const pricePerUnit = parseFloat(e.target.value);
                         updateTiers(value.tiers.map((t, i) => (i === index ? { ...t, pricePerUnit } : t)));
                       }}
                       className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
