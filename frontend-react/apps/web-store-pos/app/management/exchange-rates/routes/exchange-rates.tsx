@@ -4,7 +4,6 @@ import { EFeatures, type ExchangeRate } from '@store-mgmt/domain';
 import { adminFeatureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
-import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon, CloseIcon, EditIcon, SaveIcon } from '~/shared/components/ui/icons';
 import { ExchangeRateOfflineService } from '../lib/services/exchange-rate-offline-service';
@@ -47,12 +46,14 @@ const MONTH_NAMES_ES = [
 ];
 
 /**
- * "septiembre 2026"-style month label from a fixed Spanish month-name table —
- * deterministic across Node/jsdom/browser builds (toLocaaleDateString('es', …)
- * month-part output varies by environment, which the test suite must not depend on).
+ * "2026 - Septiembre"-style month label (year first, month capitalized) from a
+ * fixed Spanish month-name table — deterministic across Node/jsdom/browser
+ * builds (toLocaleDateString('es', …) month-part output varies by environment,
+ * which the test suite must not depend on).
  */
 function monthLabelStable(date: Date): string {
-  return `${MONTH_NAMES_ES[date.getMonth()]} ${date.getFullYear()}`;
+  const month = MONTH_NAMES_ES[date.getMonth()];
+  return `${date.getFullYear()} - ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
 }
 
 /** 'YYYY-MM' month key of a date, local time. */
@@ -157,18 +158,9 @@ export function ExchangeRatesPage() {
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {intl.formatMessage({ id: 'EXCHANGE_RATES.TITLE' })}
-        </h1>
-        {records.length > 0 && (
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-            ({records.length})
-          </span>
-        )}
-      </div>
-
-      <InfoBox>{intl.formatMessage({ id: 'EXCHANGE_RATES.INFO' })}</InfoBox>
+      <h1 className="text-xl font-semibold">
+        {intl.formatMessage({ id: 'EXCHANGE_RATES.TITLE' })}
+      </h1>
 
       {savedMessage && (
         <p role="status" className="text-sm text-success">
@@ -194,25 +186,22 @@ export function ExchangeRatesPage() {
               return (
                 <div
                   key={monthGroup.monthKey}
-                  className="rounded-lg border border-border bg-background"
+                  className="rounded-lg border border-border bg-surface"
                 >
-                  <button
-                    type="button"
-                    onClick={() => toggleMonthPanel(monthGroup.monthKey)}
-                    className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-                    data-testid={`rate-month-panel-toggle-${monthGroup.monthKey}`}
-                    aria-expanded={isExpanded}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm font-medium capitalize text-text">
+                  <div className="flex items-center gap-2 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleMonthPanel(monthGroup.monthKey)}
+                      className="flex w-full items-center justify-between gap-4 text-left"
+                      data-testid={`rate-month-panel-toggle-${monthGroup.monthKey}`}
+                      aria-expanded={isExpanded}
+                    >
+                      <span className="text-sm font-medium text-text">
                         {monthLabelStable(monthGroup.date)}
                       </span>
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                        ({monthGroup.records.length})
-                      </span>
-                    </span>
-                    <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
-                  </button>
+                      <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
+                    </button>
+                  </div>
                   {isExpanded && (
                     <div className="border-t border-border px-4 py-3">
                       <ul className="divide-y divide-border">
