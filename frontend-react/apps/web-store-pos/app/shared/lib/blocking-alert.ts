@@ -41,6 +41,15 @@ export function showBlockingInfo(title: string, message: string): Promise<void> 
   return Swal.fire({ icon: 'info', title, text: message }).then(() => undefined);
 }
 
+/**
+ * Blocking info alert with an HTML body (SweetAlert2 `html` option instead of `text`).
+ * Used when the message needs light markup (e.g. the wholesale tiers popup). The HTML is
+ * built by the caller from numeric/trusted data only — never from free-form user input.
+ */
+export function showBlockingInfoHtml(title: string, html: string): Promise<void> {
+  return Swal.fire({ icon: 'info', title, html }).then(() => undefined);
+}
+
 export interface ConfirmDialogOptions {
   title: string;
   message: string;

@@ -158,20 +158,40 @@ export function SalePage() {
     addProductToSale(product, quantity, price);
   }
 
+  const inventoryService = useMemo(
+    () =>
+      new InventoryOfflineService(
+        storeId,
+        new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+      ),
+    [storeId],
+  );
+
+  const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
+
+  /** Mapa productId → cantidad disponible (solo para productos que descuentan inventario
+   * y que tienen entradas registradas; sin entradas no se muestra nada). */
+  const availableByProductId = useMemo(() => {
+    if (!hasInventoryModule) return {};
+    const map: Record<string, number> = {};
+    for (const product of displayedProducts) {
+      if (!product.discountFromInvantory) continue;
+      const quantity = inventoryService.getAvailableQuantity(product.id);
+      if (quantity.hasEntries) map[product.id] = quantity.available;
+    }
+    return map;
+  }, [displayedProducts, hasInventoryModule, inventoryService]);
+
   /** Shared inventory gate — 1:1 port of Angular's addProductToCart check
    * (sale-product-row.component.ts:58-104 -> hasAvailableProductToSale),
    * including the cart's existing quantity and the inventory-module +
    * discountFromInvantory gate living inside the predicate itself. */
   function availabilityGate(product: Product | undefined, productId: string, quantity: number) {
-    const inventoryService = new InventoryOfflineService(
-      storeId,
-      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
-    );
     return hasAvailableProductToSale({
       product,
       quantity,
       cartQuantity: getCartItemQuantity(productId),
-      hasInventoryModule: user ? hasInventoryModuleAvailable(user) : false,
+      hasInventoryModule,
       inventory: inventoryService.getAvailableQuantity(productId),
     });
   }
@@ -294,6 +314,7 @@ export function SalePage() {
         orderType={ORDER_TYPE}
         onAdded={handleAdded}
         checkAvailability={checkAvailability}
+        availableByProductId={availableByProductId}
       />
 
       {displayableCategories.length > 0 && !selectedCategoryId && (

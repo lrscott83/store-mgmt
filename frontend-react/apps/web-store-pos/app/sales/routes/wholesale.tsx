@@ -7,7 +7,8 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { showBlockingError } from '~/shared/lib/blocking-alert';
+import { HelpIcon } from '~/shared/components/ui/icons';
+import { showBlockingError, showBlockingInfoHtml } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { formatCurrency } from '~/shared/lib/format-currency';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
@@ -17,7 +18,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { hasAvailableProductToSale } from '../lib/product-availability';
-import { resolveWholesalePrice, wholesaleUnits } from '../lib/wholesale';
+import { getWholesaleMinPacks, resolveWholesalePrice, wholesaleUnits } from '../lib/wholesale';
 
 // Mismo guard que la venta normal: feature Ventas.
 export const clientLoader = featureLoader([EFeatures.Sale]);
@@ -56,24 +57,70 @@ export function WholesalePage() {
     });
   }, [storeId]);
 
+  const inventoryService = new InventoryOfflineService(
+    storeId,
+    new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
+  );
+  const hasInventoryModule = user ? hasInventoryModuleAvailable(user) : false;
+
+  /** Cantidad disponible en unidades del producto (solo si descuenta inventario). */
+  function availableUnits(product: Product): number | undefined {
+    if (!hasInventoryModule || !product.discountFromInvantory) return undefined;
+    const quantity = inventoryService.getAvailableQuantity(product.id);
+    return quantity.hasEntries ? quantity.available : undefined;
+  }
+
   /** Mismo gate de inventario que la venta normal, pero SIEMPRE en unidades (packs × packSize). */
   function availabilityGate(product: Product | undefined, productId: string, units: number): Result {
-    const inventoryService = new InventoryOfflineService(
-      storeId,
-      new ProductRepository(storeId, new ProductCategoryRepository(storeId)),
-    );
     return hasAvailableProductToSale({
       product,
       quantity: units,
       cartQuantity: getCartItemQuantity(productId),
-      hasInventoryModule: user ? hasInventoryModuleAvailable(user) : false,
+      hasInventoryModule,
       inventory: inventoryService.getAvailableQuantity(productId),
     });
+  }
+
+  /** Popup readonly con los rangos de precio del producto (SweetAlert2 con HTML). */
+  function showTiers(product: Product) {
+    const tiers = [...(product.wholesaleTiers ?? [])].sort((a, b) => a.minPacks - b.minPacks);
+    const html = `
+      <div style="text-align:left;font-size:14px;line-height:1.7">
+        <p style="margin:0 0 8px"><strong>${intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_PACK' })}:</strong> ${product.wholesalePackSize}</p>
+        ${tiers
+          .map(
+            (tier) =>
+              `<p style="margin:0">${intl
+                .formatMessage(
+                  { id: 'SALES.WHOLESALE.TIERS_POPUP_FROM' },
+                  { min: tier.minPacks, price: formatCurrency(tier.pricePerUnit) },
+                )
+                .replace(/</g, '&lt;')}</p>`,
+          )
+          .join('')}
+      </div>`;
+    showBlockingInfoHtml(
+      intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE' }),
+      html,
+    );
   }
 
   function handleAdd(product: Product) {
     const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
     if (packs <= 0) return;
+
+    // La cantidad mínima de paquetes es el primer rango de la config mayorista.
+    const minPacks = getWholesaleMinPacks(product);
+    if (packs < minPacks) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        intl.formatMessage(
+          { id: 'SALES.WHOLESALE.MIN_PACKS_ERROR' },
+          { min: minPacks, packSize: product.wholesalePackSize ?? 0 },
+        ),
+      );
+      return;
+    }
 
     const packSize = product.wholesalePackSize ?? 0;
     const units = wholesaleUnits(packs, packSize);
@@ -106,10 +153,27 @@ export function WholesalePage() {
             const packSize = product.wholesalePackSize ?? 0;
             const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
             const { unitPrice, total } = resolveWholesalePrice(product, packs);
+            const available = availableUnits(product);
             return (
               <div key={product.id} className="flex items-center gap-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-text">{product.name}</p>
+                  <p className="truncate text-sm text-text">
+                    {product.name}
+                    {available !== undefined && (
+                      <span className="ml-2 text-xs text-muted">
+                        {intl.formatMessage({ id: 'SALES.WHOLESALE.AVAILABLE' })}: {available}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => showTiers(product)}
+                      aria-label={intl.formatMessage({ id: 'SALES.WHOLESALE.TIERS_POPUP_TITLE' })}
+                      data-testid={`wholesale-tiers-info-${product.id}`}
+                      className="ml-1 inline-flex align-middle text-text-muted transition-colors hover:text-primary"
+                    >
+                      <HelpIcon className="h-4 w-4" />
+                    </button>
+                  </p>
                   <p className="text-xs text-text-muted">
                     {intl.formatMessage({ id: 'SALES.WHOLESALE.UNITS_PER_PACK' })}: {packSize} ·{' '}
                     {intl.formatMessage({ id: 'SALES.WHOLESALE.FROM' })} {formatCurrency(unitPrice)}{' '}
@@ -126,7 +190,7 @@ export function WholesalePage() {
                   {intl.formatMessage({ id: 'SALES.WHOLESALE.PACKS' })}
                   <input
                     type="number"
-                    min={0}
+                    min={getWholesaleMinPacks(product)}
                     step="any"
                     value={packsByProduct[product.id] ?? ''}
                     onChange={(e) =>

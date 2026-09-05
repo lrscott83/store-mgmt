@@ -18,6 +18,12 @@ interface SaleProductRowProps {
    * existing callers without inventory wiring keep working (defaults to always-available).
    */
   checkAvailability?: (productId: string, quantity: number) => Result;
+  /**
+   * Cantidad disponible en inventario del producto, solo cuando el producto descuenta
+   * inventario (discountFromInvantory) y hay módulo de inventario activo. Se muestra
+   * entre paréntesis al lado del precio. Undefined → no se muestra nada.
+   */
+  availableQuantity?: number;
 }
 
 /**
@@ -25,7 +31,13 @@ interface SaleProductRowProps {
  * sale-product-row.component.html: name + price (read-only for Normal sales, editable
  * input for other order types) + quantity input + a single "add to cart" action.
  */
-export function SaleProductRow({ product, orderType, onAdded, checkAvailability }: SaleProductRowProps) {
+export function SaleProductRow({
+  product,
+  orderType,
+  onAdded,
+  checkAvailability,
+  availableQuantity,
+}: SaleProductRowProps) {
   const intl = useIntl();
   const isNormalSale = orderType === OrderType.Normal;
 
@@ -56,7 +68,12 @@ export function SaleProductRow({ product, orderType, onAdded, checkAvailability 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-text">{product.name}</p>
         {isNormalSale ? (
-          <span className="text-sm text-primary">{formatCurrency(product.price)}</span>
+          <span className="text-sm text-primary">
+            {formatCurrency(product.price)}
+            {product.discountFromInvantory && availableQuantity !== undefined && (
+              <span className="ml-1 text-xs text-muted">({availableQuantity})</span>
+            )}
+          </span>
         ) : (
           <label className="mt-1 flex items-center gap-2 text-xs text-muted">
             {intl.formatMessage({ id: 'GENERAL.PRICE' })}

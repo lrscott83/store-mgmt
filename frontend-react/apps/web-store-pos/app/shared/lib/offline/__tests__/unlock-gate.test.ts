@@ -118,4 +118,43 @@ describe('needsUnlock — per-user, all four combinations (design §5)', () => {
     });
     expect(needsUnlock({ login: 'ana' })).toBe(true);
   });
+
+  // SuperAdmin / Reseller stranding (online-login bug, reported by the admin
+  // login redirecting to /login?unlock=1 forever): a user WITHOUT a store
+  // (selectedStoreId empty) has no DEK and no wrap of their own by design —
+  // auth-store.login skips resolveDekForLogin for them (auth-store.ts:354-358).
+  // The device-level hasDeviceDekWrap() branch must NOT strand them: wrap
+  // material left by ANOTHER user (e.g. an owner who used this browser) is
+  // not theirs to unlock, and their password can never open it.
+  it('user without a store is never locked, even when the device holds wrap material from another user', () => {
+    writeDeviceDekTable({
+      formatVersion: 1,
+      dekSource: 'local',
+      storeId: 's1',
+      device: null,
+      users: { 'owner-login': { wrappedDek: 'ct', wrapSalt: 'salt', wrapIv: 'iv' } },
+    });
+    expect(
+      needsUnlock({
+        login: 'superadmin',
+        selectedStoreId: '',
+      }),
+    ).toBe(false);
+  });
+
+  it('user without a store is never locked even when selectedStoreId is the EMPTY_GUID', () => {
+    writeDeviceDekTable({
+      formatVersion: 1,
+      dekSource: 'local',
+      storeId: 's1',
+      device: null,
+      users: { 'owner-login': { wrappedDek: 'ct', wrapSalt: 'salt', wrapIv: 'iv' } },
+    });
+    expect(
+      needsUnlock({
+        login: 'reseller',
+        selectedStoreId: '00000000-0000-0000-0000-000000000000',
+      }),
+    ).toBe(false);
+  });
 });

@@ -38,6 +38,7 @@ vi.mock('~/shared/lib/stores/cart-store', () => {
 const showBlockingErrorMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingError: (...args: unknown[]) => showBlockingErrorMock(...args),
+  showBlockingInfoHtml: (...args: unknown[]) => showBlockingInfoHtmlMock(...args),
 }));
 
 const showToastSuccessMock = vi.hoisted(() => vi.fn());
@@ -45,15 +46,19 @@ vi.mock('~/shared/lib/toast', () => ({
   showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
 }));
 
+const hasInventoryModuleMock = vi.hoisted(() => vi.fn(() => false));
 vi.mock('~/shared/lib/auth/authorization-service', () => ({
-  hasInventoryModuleAvailable: () => false,
+  hasInventoryModuleAvailable: () => hasInventoryModuleMock(),
 }));
 
+const inventoryServiceMock = vi.hoisted(() => vi.fn());
 vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn().mockImplementation(() => ({
-    getAvailableQuantity: () => ({ hasEntries: false, available: 0 }),
+    getAvailableQuantity: () => inventoryServiceMock(),
   })),
 }));
+
+const showBlockingInfoHtmlMock = vi.hoisted(() => vi.fn());
 
 let mockCategories: ProductCategory[] = [];
 let mockProducts: Product[] = [];
@@ -109,6 +114,8 @@ import { WholesalePage } from '../wholesale';
 describe('WholesalePage — Ventas Mayoristas', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hasInventoryModuleMock.mockReturnValue(false);
+    inventoryServiceMock.mockReturnValue({ hasEntries: false, available: 0 });
     mockCategories = [makeCategory()];
     mockProducts = [
       makeProduct('beer-1', {
@@ -183,5 +190,111 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
     expect(addItemMock).not.toHaveBeenCalled();
+  });
+
+  it('bloquea la cantidad menor al primer rango y muestra el error de mínimo', async () => {
+    // Primer rango en 5 paquetes: 3 paquetes no alcanzan el mínimo.
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '3' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    expect(addItemMock).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('5'),
+    );
+  });
+
+  it('muestra la cantidad disponible debajo del nombre cuando descuenta inventario y hay módulo activo', async () => {
+    hasInventoryModuleMock.mockReturnValue(true);
+    inventoryServiceMock.mockReturnValue({ hasEntries: true, available: 96 });
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        discountFromInvantory: true,
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+    expect(screen.getByText(/96/)).toBeInTheDocument();
+  });
+
+  it('no muestra la cantidad disponible sin módulo de inventario', async () => {
+    hasInventoryModuleMock.mockReturnValue(false);
+    inventoryServiceMock.mockReturnValue({ hasEntries: true, available: 96 });
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        discountFromInvantory: true,
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+    expect(screen.queryByText(/96/)).not.toBeInTheDocument();
+  });
+
+  it('abre el popup readonly con los rangos y precios al tocar el icono de info', async () => {
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [
+          { minPacks: 1, pricePerUnit: 680 },
+          { minPacks: 11, pricePerUnit: 660 },
+        ],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('wholesale-tiers-info-beer-1'));
+
+    expect(showBlockingInfoHtmlMock).toHaveBeenCalledTimes(1);
+    const [title, html] = showBlockingInfoHtmlMock.mock.calls[0];
+    expect(String(title)).toContain('Rangos');
+    expect(String(html)).toContain('680');
+    expect(String(html)).toContain('660');
+    expect(String(html)).toContain('24');
+  });
+
+  it('permite agregar exactamente el mínimo del primer rango', async () => {
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    expect(addItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'beer-1' }),
+      120, // 5 × 24
+      OrderType.Mayorista,
+      680,
+    );
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
   });
 });

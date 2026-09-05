@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Product, WholesaleConfig } from '@store-mgmt/domain';
 import {
+  getWholesaleMinPacks,
   normalizeWholesaleConfig,
   resolveWholesalePrice,
   validateWholesaleConfig,
@@ -33,6 +34,57 @@ const beerConfig: WholesaleConfig = {
     { minPacks: 21, pricePerUnit: 640 },
   ],
 };
+
+describe('getWholesaleMinPacks — cantidad mínima de paquetes', () => {
+  it('sin config mayorista devuelve 0 (sin mínimo)', () => {
+    expect(getWholesaleMinPacks(makeProduct())).toBe(0);
+  });
+
+  it('devuelve el minPacks del primer rango (el menor de todos)', () => {
+    const result = getWholesaleMinPacks(
+      makeProduct({ wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+    );
+    expect(result).toBe(1);
+  });
+
+  it('primer rango que no comienza en 1: el mínimo es ese valor', () => {
+    const result = getWholesaleMinPacks(
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+      }),
+    );
+    expect(result).toBe(5);
+  });
+
+  it('con tiers desordenados toma el menor minPacks', () => {
+    const result = getWholesaleMinPacks(
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [
+          { minPacks: 11, pricePerUnit: 660 },
+          { minPacks: 1, pricePerUnit: 680 },
+        ],
+      }),
+    );
+    expect(result).toBe(1);
+  });
+
+  it('wholesaleEnabled=false o sin tiers devuelve 0', () => {
+    expect(
+      getWholesaleMinPacks(
+        makeProduct({ wholesaleEnabled: false, wholesalePackSize: 24, wholesaleTiers: beerConfig.tiers }),
+      ),
+    ).toBe(0);
+    expect(
+      getWholesaleMinPacks(
+        makeProduct({ wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [] }),
+      ),
+    ).toBe(0);
+  });
+});
 
 describe('wholesaleUnits — packs × packSize', () => {
   it('convierte paquetes a unidades (12 cajas de 24 → 288)', () => {

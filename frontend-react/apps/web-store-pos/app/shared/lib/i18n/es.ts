@@ -230,6 +230,8 @@ const messages: Record<string, string> = {
   'MENU.STORES_UPDATE': 'Editar la tienda',
   'MENU.EXCHANGE_RATES': 'Cambio USD a MN',
   'MENU.USERS': 'Empleados',
+  'MENU.BILLING_COLLECTIONS': 'Cobros pendientes',
+  'MENU.BILLING_COMMISSIONS': 'Comisiones',
   'MENU.CONFIGURATIONS': 'Configuraciones',
   'MENU.TUTORIAL': 'Tutorial',
   'MENU.EDIT_PROFILE': 'Editar Perfil',
@@ -372,6 +374,12 @@ const messages: Record<string, string> = {
   'SALES.WHOLESALE.ADD': 'Añadir',
   'SALES.WHOLESALE.EMPTY': 'No hay productos configurados para la venta mayorista. Active la opción "Venta Mayorista" al crear o editar un producto.',
   'SALES.WHOLESALE.ADDED': '{name} adicionado a la venta mayorista',
+  'SALES.WHOLESALE.MIN_PACKS_ERROR':
+    'La cantidad mínima para la venta mayorista es de {min} paquetes ({min} × {packSize} unidades).',
+  'SALES.WHOLESALE.AVAILABLE': 'Disponible',
+  'SALES.WHOLESALE.TIERS_POPUP_TITLE': 'Rangos de precio mayorista',
+  'SALES.WHOLESALE.TIERS_POPUP_PACK': 'Unidades por paquete',
+  'SALES.WHOLESALE.TIERS_POPUP_FROM': 'Desde {min} paquetes: {price} por unidad',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
   // hardcoded Spanish literals there, not i18n keys; added here as i18n keys for React's

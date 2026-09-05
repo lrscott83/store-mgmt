@@ -1,4 +1,5 @@
 import { EFeatures, EModules } from '@store-mgmt/domain';
+import type { UserModel } from '@store-mgmt/domain';
 
 export interface MenuItem {
   label: string;
@@ -10,6 +11,14 @@ export interface MenuItem {
   exact?: boolean;
   /** Brief help text shown in the ? tooltip dialog next to the menu item */
   helpContent?: string;
+  /**
+   * Role gate on top of featureIds. Needed when the underlying ROUTE denies a
+   * role that featureIds alone would admit (e.g. an OwnerAdmin holding
+   * StorePayment feature would pass isUserAuthorized but the route's
+   * resellerFeatureLoader still denies it — the menu must not offer a link
+   * that 403s). When absent, no extra role restriction applies.
+   */
+  rolesOnly?: (user: Pick<UserModel, 'isSuperAdmin' | 'isReSeller'>) => boolean;
 }
 
 export interface MenuGroup {
@@ -127,6 +136,17 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Registro diario del cambio de USD a MN. Cada día se añade un registro con el valor del día anterior (por defecto 1). Puedes editar el valor de cualquier día: escribe cuántos pesos (MN) equivale 1 USD en esa fecha y pulsa Guardar.' },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management,
         helpContent: 'Gestiona los empleados de tu tienda. Crea cuentas de usuario, asígnales roles (cajero, bodeguero, admin) y controla qué funcionalidades pueden usar. Desde aquí también puedes exportar el roster (lista de empleados) con una contraseña para activar el acceso sin conexión en otro equipo, e importarlo después en el dispositivo de destino.' },
+      // Billing (Cobros pendientes + Comisiones): routes gated by
+      // resellerFeatureLoader([EFeatures.StorePayment]) — SuperAdmin or
+      // ReSeller only. rolesOnly mirrors that role set so the menu never
+      // offers a link the route guard would deny (OwnerAdmin holding the
+      // feature would pass isUserAuthorized but still 403 on the route).
+      { label: 'MENU.BILLING_COLLECTIONS', path: '/management/stores/collections', featureIds: [EFeatures.StorePayment], moduleId: EModules.Management,
+        rolesOnly: (user) => user.isSuperAdmin || user.isReSeller,
+        helpContent: 'Cobros pendientes. Lista las tiendas con pagos atrasados o por vencer, con el monto y la fecha. Puedes registrar el pago de una tienda para ponerla al día.' },
+      { label: 'MENU.BILLING_COMMISSIONS', path: '/management/stores/commissions', featureIds: [EFeatures.StorePayment], moduleId: EModules.Management,
+        rolesOnly: (user) => user.isSuperAdmin || user.isReSeller,
+        helpContent: 'Comisiones de gestores. Consulta las comisiones acumuladas por mes de cada gestor (reseller) según los pagos registrados de sus tiendas.' },
       { label: 'MENU.CONFIGURATIONS', path: '/management/configurations', featureIds: [EFeatures.Configurations], moduleId: EModules.Management,
         helpContent: 'Configuraciones de la tienda. Administra las funcionalidades activas, módulos habilitados y permisos generales de tu negocio.' },
     ],
