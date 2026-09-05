@@ -79,6 +79,50 @@ describe('SaleProductRow — Angular parity (sale-product-row.component.html)', 
     expect(screen.queryByLabelText('Precio')).not.toBeInTheDocument();
   });
 
+  it('shows the available quantity in parentheses next to the price when discountFromInvantory is set', () => {
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ price: 2, discountFromInvantory: true })}
+          orderType={OrderType.Normal}
+          onAdded={vi.fn()}
+          availableQuantity={12}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('(12)')).toBeInTheDocument();
+  });
+
+  it('does NOT show the available quantity when discountFromInvantory is false', () => {
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ price: 2, discountFromInvantory: false })}
+          orderType={OrderType.Normal}
+          onAdded={vi.fn()}
+          availableQuantity={12}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.queryByText('(12)')).not.toBeInTheDocument();
+  });
+
+  it('does NOT show the available quantity when there is no inventory (availableQuantity undefined)', () => {
+    render(
+      <Wrapper>
+        <SaleProductRow
+          product={makeProduct({ price: 2, discountFromInvantory: true })}
+          orderType={OrderType.Normal}
+          onAdded={vi.fn()}
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.queryByText(/^\(\d+\)$/)).not.toBeInTheDocument();
+  });
+
   it('formats the read-only price with a thousands separator via formatCurrency (WU7 list-parity sweep)', () => {
     render(
       <Wrapper>

@@ -9,13 +9,21 @@ interface SaleCategoryProductsProps {
   orderType: OrderType;
   onAdded: (productId: string, quantity: number, price: number) => void;
   checkAvailability?: (productId: string, quantity: number) => Result;
+  /** Cantidad disponible por producto (ver SaleProductRow.availableQuantity). */
+  availableByProductId?: Record<string, number>;
 }
 
 /**
  * Strict parity with Angular's sale-category-products.component.html: a simple list of
  * per-product rows for the currently-selected category, no extra grouping/search/filter UI.
  */
-export function SaleCategoryProducts({ products, orderType, onAdded, checkAvailability }: SaleCategoryProductsProps) {
+export function SaleCategoryProducts({
+  products,
+  orderType,
+  onAdded,
+  checkAvailability,
+  availableByProductId,
+}: SaleCategoryProductsProps) {
   return (
     <div>
       {products.map((product) => (
@@ -25,6 +33,7 @@ export function SaleCategoryProducts({ products, orderType, onAdded, checkAvaila
           orderType={orderType}
           onAdded={onAdded}
           checkAvailability={checkAvailability}
+          availableQuantity={availableByProductId?.[product.id]}
         />
       ))}
     </div>

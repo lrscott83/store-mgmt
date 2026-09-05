@@ -374,6 +374,10 @@ const messages: Record<string, string> = {
   'SALES.WHOLESALE.ADDED': '{name} adicionado a la venta mayorista',
   'SALES.WHOLESALE.MIN_PACKS_ERROR':
     'La cantidad mínima para la venta mayorista es de {min} paquetes ({min} × {packSize} unidades).',
+  'SALES.WHOLESALE.AVAILABLE': 'Disponible',
+  'SALES.WHOLESALE.TIERS_POPUP_TITLE': 'Rangos de precio mayorista',
+  'SALES.WHOLESALE.TIERS_POPUP_PACK': 'Unidades por paquete',
+  'SALES.WHOLESALE.TIERS_POPUP_FROM': 'Desde {min} paquetes: {price} por unidad',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
   // hardcoded Spanish literals there, not i18n keys; added here as i18n keys for React's

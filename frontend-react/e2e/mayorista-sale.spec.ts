@@ -260,6 +260,25 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
     await expect(page.getByTestId('cart-badge')).toHaveText('0');
   });
 
+  test('el icono de info abre el popup readonly con los rangos y precios', async ({ signedInPage }) => {
+    const { page, selectedStoreId } = signedInPage;
+
+    const product = await openWholesaleWithSeededProduct(page, selectedStoreId);
+
+    await page.getByTestId(`wholesale-tiers-info-${product.id}`).click();
+
+    // Popup SweetAlert2 con el título de rangos y las filas de precio.
+    const popup = page.locator('.swal2-popup');
+    await expect(page.getByText('Rangos de precio mayorista')).toBeVisible();
+    await expect(popup.getByText(/Unidades por paquete: 24/)).toBeVisible();
+    await expect(popup.getByText(/Desde 1 paquetes: \$9 por unidad/)).toBeVisible();
+    await expect(popup.getByText(/Desde 11 paquetes: \$8 por unidad/)).toBeVisible();
+
+    // Cerrar el popup para liberar el puntero (patrón del test de mínimo).
+    await page.locator('.swal2-confirm').click();
+    await expect(page.getByText('Rangos de precio mayorista')).toHaveCount(0);
+  });
+
   test('una cantidad menor al primer rango se bloquea con el error de mínimo', async ({ signedInPage }) => {
     const { page, selectedStoreId } = signedInPage;
 

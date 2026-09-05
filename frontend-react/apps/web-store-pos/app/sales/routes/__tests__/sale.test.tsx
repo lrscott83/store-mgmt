@@ -280,6 +280,78 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(text).toBe('El producto no está disponible en el inventario.');
   });
 
+  it('shows the available quantity in parentheses next to the price when the inventory module is on and discountFromInvantory is set', async () => {
+    mockUser.storeModuleIds = [EModules.Inventory];
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', price: 2, discountFromInvantory: true }),
+    ];
+    const entries = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        categoryId: 'cat-1',
+        quantity: 10,
+        available: 10,
+        costPrice: 1,
+        date: new Date('2025-01-01'),
+        order: 0,
+        isActive: true,
+        createdDate: new Date('2025-01-01'),
+        createdByName: 'test',
+      },
+    ];
+    localStorage.setItem(
+      'lizoft.store-inventory-entries-s1',
+      JSON.stringify([['p1', entries]]),
+    );
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    await screen.findByText('Coca Cola');
+    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.getByText('(10)')).toBeInTheDocument();
+  });
+
+  it('does NOT show the available quantity when discountFromInvantory is false', async () => {
+    mockUser.storeModuleIds = [EModules.Inventory];
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [
+      makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1', price: 2, discountFromInvantory: false }),
+    ];
+    const entries = [
+      {
+        id: 'e1',
+        productId: 'p1',
+        categoryId: 'cat-1',
+        quantity: 10,
+        available: 10,
+        costPrice: 1,
+        date: new Date('2025-01-01'),
+        order: 0,
+        isActive: true,
+        createdDate: new Date('2025-01-01'),
+        createdByName: 'test',
+      },
+    ];
+    localStorage.setItem(
+      'lizoft.store-inventory-entries-s1',
+      JSON.stringify([['p1', entries]]),
+    );
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    await screen.findByText('Coca Cola');
+    expect(screen.getByText('$2')).toBeInTheDocument();
+    expect(screen.queryByText('(10)')).not.toBeInTheDocument();
+  });
+
   it('allows the sale when the inventory module is available, discountFromInvantory is set, and stock covers the quantity', async () => {
     mockUser.storeModuleIds = [EModules.Inventory];
     mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
