@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { test, expect } from './support/test';
 import type { Page } from '@playwright/test';
+import { E2E_API_URL } from './support/backend-url';
+import { readBearerToken } from './support/auth-storage';
+import { newTestIdentity } from './support/identity';
 
 /**
  * Almacenes — E2E Playwright (plan 2026-09-04-warehouses-plan.md)
@@ -16,6 +19,9 @@ import type { Page } from '@playwright/test';
  *   8. Exportar/importar backup /sync con las 3 entidades de almacenes.
  *   9. Ítem de menú 🏬 Almacenes solo con el feature Warehouses (36).
  *   10. Regresión venta: FIFO con el costo del almacén en today-sales-profit.
+ *   11. Acceso por rol: un StoreUser (empleado, rol 3) no ve el ítem de menú y
+ *      la ruta /inventory/warehouses lo desloguea (Warehouses es OwnerAdmin-only
+ *      en StoreRoleFeatures.cs:86-89; featureLoader sin bypass para StoreUser).
  *
  * La persona `owner-admin-with-products` NO tiene el feature Warehouses (36)
  * en su plan, así que el spec lo añade al AUTH_MODEL + currentUser en
@@ -519,5 +525,56 @@ test.describe.serial('Almacenes — flujo completo', () => {
     // today-sales-profit: margen total = 10 − 660 = −650 → "-$650".
     const profit = await readTotalProfit(page);
     expect(profit).toBe('-$650');
+  });
+
+  test('un usuario de tienda (StoreUser) no ve Almacenes y la ruta lo desloguea', async ({
+    signedInPage,
+    browser,
+  }) => {
+    const { page, selectedStoreId } = signedInPage;
+
+    // Crear un StoreUser real vía API (rol 3 = ERoles.StoreUser) desde la
+    // sesión OwnerAdmin — mismo patrón que create-store-user.spec.ts test 3.
+    const token = await readBearerToken(page);
+    const identity = newTestIdentity();
+    const storeUserEmail = `${identity.login}@e2e.test`;
+    const response = await page.request.post(`${E2E_API_URL}/v1/storeusers`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        storeId: selectedStoreId,
+        fullName: identity.fullName,
+        login: identity.login,
+        password: identity.password,
+        cellPhone: identity.cellPhone,
+        email: storeUserEmail,
+        roleIds: [3],
+      },
+    });
+    expect(response.ok()).toBeTruthy();
+
+    // Contexto fresco: login real como StoreUser (la app le asigna su home).
+    const ctx = await browser.newContext();
+    const storeUserPage = await ctx.newPage();
+    const { LoginPage } = await import('./support/login-page');
+    const loginPage = new LoginPage(storeUserPage);
+    await loginPage.goto();
+    await loginPage.fill(identity);
+    await loginPage.submit();
+    await expect(storeUserPage.getByRole('link', { name: 'Catálogo Productos' })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // El ítem de menú 🏬 Almacenes NO aparece para el StoreUser (Warehouses es
+    // OwnerAdmin-only; isUserAuthorized no tiene bypass y su rol no incluye 36).
+    await openSidebar(storeUserPage);
+    await expect(warehousesMenuLink(storeUserPage)).toHaveCount(0);
+
+    // Acceso directo a la ruta → featureLoader (sin bypass) desloguea y
+    // redirige a /login (denyAccess, loaders.ts:16-19).
+    await storeUserPage.goto('http://localhost:3333/inventory/warehouses');
+    await storeUserPage.waitForURL(/\/login/, { timeout: 10_000 });
+    await expect(storeUserPage.locator('#login')).toBeVisible();
+
+    await ctx.close();
   });
 });

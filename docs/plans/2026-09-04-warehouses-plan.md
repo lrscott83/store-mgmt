@@ -304,6 +304,7 @@ servicios reales + sync, sin backend/red), **e2e** = Playwright contra backend
 | 8 | Exportar e importar con las 3 entidades presentes → roundtrip íntegro. | ✅ Cubierto (test "exportar e importar el backup restaura las tres entidades de almacenes": ZIP real + 3 localStorage keys reseteadas) |
 | 9 | Menú: el ítem Almacenes no aparece sin el feature `Warehouses`. | ✅ Cubierto (test "el ítem de menú Almacenes solo aparece con el feature Warehouses") |
 | 10 | **Regresión venta**: tras `sale_out`, vender descuenta FIFO con el costo del almacén y `today-sales-profit` muestra el margen correcto. | ✅ Cubierto (test "venta tras salida a tienda descuenta FIFO con el costo del almacén": margen 10 − 660 → `-$650`) |
+| 11 | **Acceso por rol**: solo el OwnerAdmin de la tienda accede a Almacenes. | ✅ Cubierto (test "un usuario de tienda (StoreUser) no ve Almacenes y la ruta lo desloguea", rol 3 vía API: menú ausente + `/inventory/warehouses` → redirect `/login`; `WarehousesAdmin` es `[HasRoles(OwnerAdmin)]` en `StoreRoleFeatures.cs:86-89`) |
 
 #### Escenarios E2E 6–10 añadidos a `warehouses.spec.ts` (detalle implementado)
 
