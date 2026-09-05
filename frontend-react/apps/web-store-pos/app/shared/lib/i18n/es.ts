@@ -536,6 +536,7 @@ const messages: Record<string, string> = {
   'WAREHOUSES.CANCEL': 'Cancelar',
   'WAREHOUSES.EDIT': 'Editar',
   'WAREHOUSES.DEACTIVATE': 'Desactivar',
+  'WAREHOUSES.INACTIVE': 'Inactivo',
   'WAREHOUSES.EMPTY': 'No hay almacenes creados. Crea uno para comenzar.',
   'WAREHOUSES.STOCK_TITLE': 'Stock del almacén',
   'WAREHOUSES.NO_STOCK': 'Este almacén no tiene productos en stock.',

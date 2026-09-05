@@ -290,20 +290,69 @@ servicios reales + sync, sin backend/red), **e2e** = Playwright contra backend
 
 ### 3. E2E frontend (Playwright — `warehouses.spec.ts`, nuevo, sin tocar specs existentes)
 
-1. Crear almacén → aparece en la lista activa.
-2. Entrada por compra (`purchase_in`) → stock y costo promedio visibles en la
-   pantalla de stock.
-3. `sale_out` con stock suficiente → aparece una `InventoryEntry` en **Entradas
-   del día** con la cantidad y el costo del almacén; el stock del almacén decrece.
-4. `sale_out` con stock insuficiente → error de stock, sin entrada creada.
-5. Transferencia almacén A → B → stock A decrece, stock B crece (mismo costo).
-6. Desactivar almacén con stock → bloqueado con aviso.
-7. Cantidad decimal en `purchase_in`/`sale_out` → aceptada con round2.
-8. Exportar e importar con las 3 entidades presentes → roundtrip íntegro.
-9. Menú: el ítem Almacenes no aparece sin el feature `Warehouses`.
-10. **Regresión venta**: tras un `sale_out`, vender el producto descuenta FIFO
-    con el costo del almacén y el reporte de ganancia/`today-sales-profit`
-    muestra el margen correcto (la tienda "no sabe" que vino del almacén).
+#### Estado de cobertura del spec (`warehouses.spec.ts`, 4 tests, todos verdes)
+
+| # | Escenario del plan | Estado |
+|---|---|---|
+| 1 | Crear almacén → aparece en la lista activa. | ✅ Cubierto (test "crear almacén…") |
+| 2 | Entrada por compra (`purchase_in`) → stock y costo promedio visibles. | ✅ Cubierto (test 1: on-hand 24, `$660`) |
+| 3 | `sale_out` → `InventoryEntry` en **Entradas del día** + stock decrece. | ✅ Cubierto (test 2: 24 → 12, entrada con 660) |
+| 4 | `sale_out` con stock insuficiente → error, sin entrada. | ✅ Cubierto (test 3: mensaje `No hay suficiente stock…`) |
+| 5 | Transferencia A → B → stock A decrece, stock B crece (mismo costo). | ✅ Cubierto (test 4: 24 → 14 / 10 con `$660`) |
+| 6 | Desactivar almacén con stock → bloqueado con aviso. | ✅ Cubierto (test "desactivar almacén con stock se bloquea y almacén vacío sí se desactiva") |
+| 7 | Cantidad decimal en `purchase_in`/`sale_out` → aceptada con round2. | ✅ Cubierto (test "cantidad decimal se acepta con round2 en compra y salida": 10.555 → 10.56, sale_out 2.5 → 8.06) |
+| 8 | Exportar e importar con las 3 entidades presentes → roundtrip íntegro. | ✅ Cubierto (test "exportar e importar el backup restaura las tres entidades de almacenes": ZIP real + 3 localStorage keys reseteadas) |
+| 9 | Menú: el ítem Almacenes no aparece sin el feature `Warehouses`. | ✅ Cubierto (test "el ítem de menú Almacenes solo aparece con el feature Warehouses") |
+| 10 | **Regresión venta**: tras `sale_out`, vender descuenta FIFO con el costo del almacén y `today-sales-profit` muestra el margen correcto. | ✅ Cubierto (test "venta tras salida a tienda descuenta FIFO con el costo del almacén": margen 10 − 660 → `-$650`) |
+
+#### Escenarios E2E 6–10 añadidos a `warehouses.spec.ts` (detalle implementado)
+
+6. **Desactivar almacén con stock → bloqueado con aviso**
+   - Crear almacén, `purchase_in` con stock (p. ej. 24), intentar desactivar
+     desde el botón "Desactivar".
+   - Esperado: error visible (`No se puede desactivar un almacén con stock o
+     movimientos.` — `WarehouseErrors.CannotDeactivate`), el almacén sigue
+     activo en la lista.
+   - Contraste: un almacén vacío (sin stock ni movimientos) sí se desactiva y
+     queda marcado `(Inactivo)`.
+
+7. **Cantidad decimal → aceptada con round2**
+   - `purchase_in` de `10.555` unidades → el `StockLevel.onHand` queda en
+     `10.56` (round2) y el movimiento registra `10.56`.
+   - `sale_out` de `2.5` unidades sobre ese stock → el almacén queda en
+     `8.06` y la `InventoryEntry` de la tienda se crea con `quantity 2.5`.
+
+8. **Exportar e importar con las 3 entidades presentes → roundtrip íntegro**
+   - Con un almacén + stock + movimientos creados, exportar (descarga del ZIP).
+   - Reimportar el backup (flujo real de `/sync/import`) y verificar que
+     `warehouses`, `warehouse-stock-levels` y `warehouse-stock-movements`
+     quedan restaurados (misma UI de Almacenes), sin duplicar movimientos
+     (append-only) ni duplicar almacenes.
+
+9. **Menú: el ítem Almacenes no aparece sin el feature `Warehouses`**
+   - Usar una persona/tienda cuyo plan NO incluya `EFeatures.Warehouses` (36):
+     navegar a `/inventory/warehouses` redirige/deniega y el ítem de menú
+     "🏬 Almacenes" no se renderiza en Inventario.
+   - Activar el feature (seam de `auth/me` en localStorage, como hace el spec
+     actual en `enableWarehouseFeatures`) → el ítem aparece y la ruta carga.
+
+10. **Regresión venta: FIFO con costo del almacén**
+    - Crear almacén + `purchase_in` con costo conocido (p. ej. 24 × $660).
+    - `sale_out` de 12 unidades → la tienda tiene una `InventoryEntry` de 12 ×
+      $660 (el costo del almacén, no el retail).
+    - Vender el producto en `/sales/new` (descuenta la entrada por FIFO a $660)
+      y abrir `today-sales-profit`: el margen usa `precio_venta − 660` — la
+      tienda "no sabe" que la entrada vino del almacén.
+
+> Los 5 escenarios (6–10) se añadieron a `warehouses.spec.ts` (mismo
+> `describe.serial`), uno por test, sin tocar los specs existentes. **Resultado:
+> 9/9 tests verdes** (4 existentes intactos + 5 nuevos).
+>
+> **Fix de producción incluido:** `purchase_in` no persistía el stock level a
+> localStorage (el backup exportaba niveles vacíos y el stock desaparecía al
+> recargar). Se añadió `setLocalStorage('warehouse-stock-levels', …)` a la rama
+> `purchase_in` de `WarehouseOfflineService.recordMovement`, igual que
+> `sale_out`/`transfer_*` ya hacían.
 
 ### 4. Backend E2E (xUnit — `SMCA.WebApi.E2ETests`, con `WebAppFixture`)
 

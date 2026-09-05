@@ -254,6 +254,7 @@ export class WarehouseOfflineService {
             costPrice,
           );
           level.updatedDate = new Date();
+          this.setLocalStorage('warehouse-stock-levels', this.stockLevels!);
           return new DataResultImpl<WarehouseStockMovement>(
             this.appendMovement({
               warehouseId: params.warehouseId,
