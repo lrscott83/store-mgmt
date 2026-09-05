@@ -49,9 +49,10 @@ async function seedWholesaleProduct(
   page: Page,
   storeId: string,
   available = 1000,
+  tiers?: { minPacks: number; pricePerUnit: number }[],
 ): Promise<SeededProduct | null> {
   return page.evaluate(
-    ({ sid, units }) => {
+    ({ sid, units, customTiers }) => {
       const productKey = `lizoft.store-products-${sid}`;
       const rawProducts = localStorage.getItem(productKey);
       if (!rawProducts) return null;
@@ -67,9 +68,10 @@ async function seedWholesaleProduct(
       const [productId, product] = sellable;
 
       // Wholesale config: pack of 24, $9 from 1 pack, $8 from 11 packs (retail $10).
+      // Custom tiers (e.g. first tier > 1) win when provided.
       product['wholesaleEnabled'] = true;
       product['wholesalePackSize'] = 24;
-      product['wholesaleTiers'] = [
+      product['wholesaleTiers'] = customTiers ?? [
         { minPacks: 1, pricePerUnit: 9 },
         { minPacks: 11, pricePerUnit: 8 },
       ];
@@ -110,7 +112,7 @@ async function seedWholesaleProduct(
 
       return { name: (product['name'] as string) ?? '', id: productId };
     },
-    { sid: storeId, units: available },
+    { sid: storeId, units: available, customTiers: tiers },
   );
 }
 
@@ -122,10 +124,11 @@ async function openWholesaleWithSeededProduct(
   page: Page,
   storeId: string,
   available = 1000,
+  tiers?: { minPacks: number; pricePerUnit: number }[],
 ): Promise<SeededProduct> {
   await page.goto('/sales/wholesale');
   await expect(page.getByText(WHOLESALE_HEADER)).toBeVisible();
-  const seeded = await seedWholesaleProduct(page, storeId, available);
+  const seeded = await seedWholesaleProduct(page, storeId, available, tiers);
   expect(seeded).not.toBeNull();
   const product = seeded as SeededProduct;
 
@@ -255,5 +258,32 @@ test.describe.serial('Ventas Mayoristas — flujo completo', () => {
 
     // …y el carrito queda vacío.
     await expect(page.getByTestId('cart-badge')).toHaveText('0');
+  });
+
+  test('una cantidad menor al primer rango se bloquea con el error de mínimo', async ({ signedInPage }) => {
+    const { page, selectedStoreId } = signedInPage;
+
+    // Primer rango en 6 paquetes ($6/ud): 3 paquetes no alcanzan el mínimo.
+    const product = await openWholesaleWithSeededProduct(page, selectedStoreId, 1000, [
+      { minPacks: 6, pricePerUnit: 6 },
+      { minPacks: 12, pricePerUnit: 5 },
+    ]);
+
+    await page.getByTestId(`wholesale-packs-input-${product.id}`).fill('3');
+    await page.getByTestId(`wholesale-add-${product.id}`).click();
+
+    // El error de mínimo aparece y el carrito queda vacío.
+    await expect(page.getByText(/cantidad mínima para la venta mayorista es de 6 paquetes/)).toBeVisible();
+    await expect(page.getByTestId('cart-badge')).toHaveText('0');
+
+    // Cerrar el diálogo de error para liberar el puntero.
+    await page.locator('.swal2-confirm').click();
+    await expect(page.getByText(/cantidad mínima para la venta mayorista es de 6 paquetes/)).toHaveCount(0);
+
+    // Con exactamente el mínimo (6 paquetes) la venta sí procede.
+    await page.getByTestId(`wholesale-packs-input-${product.id}`).fill('6');
+    await page.getByTestId(`wholesale-add-${product.id}`).click();
+    await expect(page.getByText(ADDED_TEXT)).toBeVisible();
+    await expect(page.getByTestId('cart-badge')).not.toHaveText('0');
   });
 });

@@ -17,7 +17,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { hasAvailableProductToSale } from '../lib/product-availability';
-import { resolveWholesalePrice, wholesaleUnits } from '../lib/wholesale';
+import { getWholesaleMinPacks, resolveWholesalePrice, wholesaleUnits } from '../lib/wholesale';
 
 // Mismo guard que la venta normal: feature Ventas.
 export const clientLoader = featureLoader([EFeatures.Sale]);
@@ -75,6 +75,19 @@ export function WholesalePage() {
     const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
     if (packs <= 0) return;
 
+    // La cantidad mínima de paquetes es el primer rango de la config mayorista.
+    const minPacks = getWholesaleMinPacks(product);
+    if (packs < minPacks) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        intl.formatMessage(
+          { id: 'SALES.WHOLESALE.MIN_PACKS_ERROR' },
+          { min: minPacks, packSize: product.wholesalePackSize ?? 0 },
+        ),
+      );
+      return;
+    }
+
     const packSize = product.wholesalePackSize ?? 0;
     const units = wholesaleUnits(packs, packSize);
     const availability = availabilityGate(product, product.id, units);
@@ -126,7 +139,7 @@ export function WholesalePage() {
                   {intl.formatMessage({ id: 'SALES.WHOLESALE.PACKS' })}
                   <input
                     type="number"
-                    min={0}
+                    min={getWholesaleMinPacks(product)}
                     step="any"
                     value={packsByProduct[product.id] ?? ''}
                     onChange={(e) =>

@@ -26,6 +26,19 @@ export function wholesaleUnits(packs: number, packSize: number): number {
   return packs * packSize;
 }
 
+/**
+ * Cantidad mínima de paquetes para una venta mayorista: el `minPacks` del primer
+ * rango (el de menor valor). 0 si el producto no tiene config mayorista válida.
+ */
+export function getWholesaleMinPacks(
+  product: Pick<Product, 'wholesaleEnabled' | 'wholesalePackSize' | 'wholesaleTiers'>,
+): number {
+  const config = getWholesaleConfig(product);
+  if (!config) return 0;
+  const min = Math.min(...config.tiers.map((t) => t.minPacks));
+  return Number.isFinite(min) ? min : 0;
+}
+
 export function getWholesaleConfig(
   product: Pick<Product, 'wholesaleEnabled' | 'wholesalePackSize' | 'wholesaleTiers'>,
 ): WholesaleConfig | undefined {

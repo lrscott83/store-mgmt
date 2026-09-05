@@ -184,4 +184,51 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
     expect(addItemMock).not.toHaveBeenCalled();
   });
+
+  it('bloquea la cantidad menor al primer rango y muestra el error de mínimo', async () => {
+    // Primer rango en 5 paquetes: 3 paquetes no alcanzan el mínimo.
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '3' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    expect(addItemMock).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('5'),
+    );
+  });
+
+  it('permite agregar exactamente el mínimo del primer rango', async () => {
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    expect(addItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'beer-1' }),
+      120, // 5 × 24
+      OrderType.Mayorista,
+      680,
+    );
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
 });
