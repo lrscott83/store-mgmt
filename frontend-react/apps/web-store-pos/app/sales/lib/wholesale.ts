@@ -9,6 +9,9 @@ import { round2 } from '~/shared/lib/money';
  * - `resolveWholesalePrice(product, packs)`: elige el escalón con mayor `minPacks <= packs` y
  *   calcula `total = packs × packSize × unitPrice`. Sin config → precio retail (fallback).
  * - `validateWholesaleConfig(config, retailPrice)`: reglas de negocio del formulario de producto.
+ *   El primer rango NO está obligado a comenzar en 1: los packs por debajo del primer rango
+ *   siempre se venden al precio normal (fallback de `resolveWholesalePrice`). Si se quiere un
+ *   precio propio para 1 paquete, se define un rango con `minPacks: 1`.
  * - `normalizeWholesaleConfig(config)`: ordena tiers, minimos a entero, precios a 2 decimales.
  */
 
@@ -62,10 +65,6 @@ const WholesaleErrors = {
     code: 'Product.WholesaleTiersEmpty',
     description: 'Debe definir al menos un rango de precio mayorista.',
   },
-  FirstTierMustStartAtOne: {
-    code: 'Product.WholesaleFirstTierMustStartAtOne',
-    description: 'El primer rango mayorista debe comenzar en 1 paquete.',
-  },
   DuplicateMinPacks: {
     code: 'Product.WholesaleDuplicateMinPacks',
     description: 'Los rangos mayoristas no pueden repetir el mínimo de paquetes.',
@@ -96,10 +95,6 @@ export function validateWholesaleConfig(config: WholesaleConfig | undefined, ret
   if (!Array.isArray(config.tiers) || config.tiers.length === 0) {
     errors.push(WholesaleErrors.TiersEmpty);
   } else {
-    if (config.tiers[0].minPacks !== 1) {
-      errors.push(WholesaleErrors.FirstTierMustStartAtOne);
-    }
-
     const minPacksSet = new Set<number>();
     for (const tier of config.tiers) {
       if (minPacksSet.has(tier.minPacks)) {

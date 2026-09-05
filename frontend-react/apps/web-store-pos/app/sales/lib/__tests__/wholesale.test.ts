@@ -85,6 +85,34 @@ describe('resolveWholesalePrice', () => {
     expect(result.total).toBe(25 * 24 * 640);
   });
 
+  it('primer rango > 1: packs por debajo del umbral se venden al precio normal', () => {
+    const result = resolveWholesalePrice(
+      makeProduct({
+        price: 700,
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+      }),
+      4,
+    );
+    expect(result.unitPrice).toBe(700);
+    expect(result.total).toBe(4 * 24 * 700);
+  });
+
+  it('primer rango > 1: desde el umbral aplica el precio del rango', () => {
+    const result = resolveWholesalePrice(
+      makeProduct({
+        price: 700,
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }],
+      }),
+      5,
+    );
+    expect(result.unitPrice).toBe(680);
+    expect(result.total).toBe(5 * 24 * 680);
+  });
+
   it('redondea el total a 2 decimales', () => {
     const result = resolveWholesalePrice(
       makeProduct({ price: 10, wholesaleEnabled: true, wholesalePackSize: 3, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 3.333333 }] }),
@@ -143,13 +171,15 @@ describe('validateWholesaleConfig', () => {
     expect(result.errors.some((e) => e.code === 'Product.WholesaleTiersEmpty')).toBe(true);
   });
 
-  it('primer tier debe tener minPacks = 1', () => {
+  // El primer rango NO está obligado a comenzar en 1: los packs por debajo del primer rango
+  // se venden al precio normal (fallback en resolveWholesalePrice). Definir un rango que
+  // empieza en 5 es válido.
+  it('primer rango que no comienza en 1 es válido', () => {
     const result = validateWholesaleConfig(
       { packSize: 24, tiers: [{ minPacks: 5, pricePerUnit: 680 }] },
       700,
     );
-    expect(result.succeeded).toBe(false);
-    expect(result.errors.some((e) => e.code === 'Product.WholesaleFirstTierMustStartAtOne')).toBe(true);
+    expect(result.succeeded).toBe(true);
   });
 
   it('minPacks duplicados fallan', () => {
