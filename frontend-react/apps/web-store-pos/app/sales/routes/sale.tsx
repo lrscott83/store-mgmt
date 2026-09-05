@@ -54,7 +54,17 @@ export function SalePage() {
   // Angular parity (sale.component.ts:39-40): getAvailableProductCategories() already
   // returns active-only categories sorted by order (ProductCategoryRepository.
   // getAvailableProductCategories) — no manual filter/sort needed.
+  //
+  // logout() (auth-store.ts:471) releases the DEK and nulls the user synchronously,
+  // and only then redirects — through /login's async guestOnlyLoader, so this page
+  // is still mounted when storeId (above) falls back to ''. Its re-fired load then
+  // reaches the repositories' storage reads with no DEK in memory and throws
+  // MissingDataKeyError, whose blocking alert outlives the navigation to sit on top
+  // of the login screen (the user-reported logout bug, reproduced by
+  // e2e/logout-silent-dbg.spec.ts). An unselected store has nothing to load.
+  // Same guard as products.tsx:85 for the same race.
   useEffect(() => {
+    if (!storeId) return;
     const categoryService = createProductCategoryService(storeId);
     categoryService.getAvailableProductCategories().then((result) => {
       const availableCategories = result.data ?? [];
@@ -69,7 +79,9 @@ export function SalePage() {
   // getProductsToSaleByCategoryId every time the selected category changes — `products` is
   // CATEGORY-SCOPED (only the selected category's sellable products), matching Angular's
   // `products$`, not a client-side filter over a flat list.
+  // `!storeId`: mid-logout re-fire — see the first effect's comment.
   useEffect(() => {
+    if (!storeId) return;
     if (!selectedCategoryId || selectedCategoryId === ALL_CATEGORIES_ID) {
       setProducts([]);
       return;
@@ -83,7 +95,9 @@ export function SalePage() {
   // "Todos" support: concatenate every category's sellable products in category order. The
   // per-category lists already arrive sorted by product order, so the combined list is
   // ordered by category order then product order (React-only feature, no Angular correlate).
+  // `!storeId`: mid-logout re-fire — see the first effect's comment.
   useEffect(() => {
+    if (!storeId) return;
     if (categories.length === 0) {
       setAllProducts([]);
       return;
