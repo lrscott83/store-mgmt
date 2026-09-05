@@ -19,6 +19,12 @@ export interface MenuItem {
    * that 403s). When absent, no extra role restriction applies.
    */
   rolesOnly?: (user: Pick<UserModel, 'isSuperAdmin' | 'isReSeller'>) => boolean;
+  /**
+   * Renders a "NEW" badge next to the label so users notice recently added
+   * functionality. Remove the flag (and this comment) once the feature is no
+   * longer new.
+   */
+  isNew?: boolean;
 }
 
 export interface MenuGroup {
@@ -52,7 +58,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Catálogo de productos. Aquí puedes crear, editar y organizar tus productos por categoría. Puedes agregar nombre, precio, código de barras e imagen a cada producto.' },
       { label: 'MENU.SALE', path: '/sales/new', featureIds: [EFeatures.Sale], moduleId: EModules.Sales,
         helpContent: 'Realiza una nueva venta. Escanea o busca el producto, agrega cantidades, selecciona el método de pago y confirma la venta. También puedes generar ventas a crédito.' },
-      { label: 'MENU.WHOLESALE', path: '/sales/wholesale', featureIds: [EFeatures.Sale], moduleId: EModules.Sales,
+      { label: 'MENU.WHOLESALE', path: '/sales/wholesale', featureIds: [EFeatures.Sale], moduleId: EModules.Sales, isNew: true,
         helpContent: 'Venta por mayor. Elige la cantidad en paquetes (cajas), el precio por unidad baja según los rangos configurados en el producto y la venta se descuenta del inventario en unidades. Ej: 12 cajas × 24 unidades × 660.' },
       { label: 'MENU.TODAY_ORDERS', path: '/sales/today-orders', featureIds: [EFeatures.TodayOrders], moduleId: EModules.Sales,
         helpContent: 'Lista de ventas realizadas hoy. Puedes ver el detalle de cada venta, anular una venta y revisar los métodos de pago utilizados.' },
@@ -80,7 +86,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Ganancias del día. Muestra la diferencia entre el costo de los productos vendidos y el precio de venta. Calcula la ganancia real del día.' },
       { label: 'MENU.EGRESS', path: '/inventory/egress', featureIds: [EFeatures.Egress], moduleId: EModules.Inventory,
         helpContent: 'Salidas de inventario. Registra productos que salen del almacén por motivos distintos a la venta (deterioro, regalo, ajuste de stock, etc.).' },
-      { label: 'MENU.WAREHOUSES', path: '/inventory/warehouses', featureIds: [EFeatures.Warehouses], moduleId: EModules.Inventory, icon: '🏬',
+      { label: 'MENU.WAREHOUSES', path: '/inventory/warehouses', featureIds: [EFeatures.Warehouses], moduleId: EModules.Inventory, icon: '🏬', isNew: true,
         helpContent: 'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.' },
       { label: 'MENU.ENTRIES_HISTORY', path: '/inventory/entries', featureIds: [EFeatures.EntriesHistory], moduleId: EModules.Inventory,
         helpContent: 'Historial de entradas. Consulta todas las entradas de inventario realizadas con filtros por fecha y producto. Ideal para auditorías.' },

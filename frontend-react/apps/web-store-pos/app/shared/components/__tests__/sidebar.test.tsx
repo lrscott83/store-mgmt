@@ -449,6 +449,39 @@ describe('Sidebar — billing menu entries (superadmin/reseller only, StorePayme
   });
 });
 
+describe('Sidebar — NEW badge on recently added menu items', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders a NEW badge on the Almacenes item', () => {
+    renderSidebar(makeSuperAdmin());
+
+    expect(screen.getByTestId('menu-new-badge-/inventory/warehouses')).toHaveTextContent('NEW');
+  });
+
+  it('renders a NEW badge on the Vender Mayorista item', () => {
+    renderSidebar(makeSuperAdmin());
+
+    expect(screen.getByTestId('menu-new-badge-/sales/wholesale')).toHaveTextContent('NEW');
+  });
+
+  it('does NOT render NEW badges on regular items', () => {
+    renderSidebar(makeSuperAdmin());
+
+    expect(screen.queryByTestId('menu-new-badge-/sales/new')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('menu-new-badge-/sales/products')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('menu-new-badge-/management/users')).not.toBeInTheDocument();
+  });
+
+  it('NEW badge uses a color that stands out (red accent)', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const badge = screen.getByTestId('menu-new-badge-/inventory/warehouses');
+    expect(badge.className).toMatch(/bg-danger|bg-red/);
+  });
+});
+
 describe('Sidebar — SHELL-06: brand logo at the top of the sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
