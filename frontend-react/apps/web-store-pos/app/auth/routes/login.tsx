@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useIntl } from 'react-intl';
 import { LoadingOverlay } from '@store-mgmt/web-common/client';
 import { Button } from '~/shared/components/ui/button';
@@ -85,12 +85,6 @@ function translateBackendError(desc: string): string {
 export default function LoginPage() {
   const navigate = useNavigate();
   const intl = useIntl();
-  // design §5/§10: `authLoader`/`guestOnlyLoader` redirect here with
-  // `?unlock=1` when `needsUnlock` is true — a reload on a provisioned
-  // device. Without this banner the user lands on a bare login screen with
-  // no explanation, which reads as a bug.
-  const [searchParams] = useSearchParams();
-  const isUnlockRequired = searchParams.get('unlock') === '1';
   // `loginOffline` is destructured from the hook — NOT
   // `useAuthStore.getState()` — per design correction #3:
   // `login.test.tsx`'s existing mock is a bare `vi.fn()` with no `getState`,
@@ -244,12 +238,6 @@ export default function LoginPage() {
       {isOffline && (
         <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
           {intl.formatMessage({ id: 'AUTH.OFFLINE_LOGIN' })}
-        </div>
-      )}
-
-      {isUnlockRequired && (
-        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-          {intl.formatMessage({ id: 'AUTH.UNLOCK_REQUIRED' })}
         </div>
       )}
 

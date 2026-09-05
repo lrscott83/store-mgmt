@@ -305,9 +305,11 @@ describe('LoginPage (AUTH-01)', () => {
 });
 
 // design §5/§10 (dek-lifecycle-and-unlock-gate + at-rest-encryption-errors):
-// the unlock banner (?unlock=1) and the DekUnwrapError failure copy, exact
-// ratified Spanish strings.
-describe('LoginPage — unlock gate banner + DekUnwrapError copy (design §10)', () => {
+// the unlock banner (?unlock=1) was REMOVED (user decision 2026-09-05) —
+// the login screen no longer shows any unlock-required notice; reaching
+// /login?unlock=1 simply lands on the bare login form. The DekUnwrapError
+// failure copy remains, with the exact ratified Spanish string.
+describe('LoginPage — unlock gate removal + DekUnwrapError copy (design §10)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(ConnectivityService.isOnline).mockReturnValue(true);
@@ -334,17 +336,8 @@ describe('LoginPage — unlock gate banner + DekUnwrapError copy (design §10)',
     );
   }
 
-  it('renders AUTH.UNLOCK_REQUIRED when reached with ?unlock=1', () => {
+  it('does NOT render any unlock notice even when reached with ?unlock=1', () => {
     renderLoginAt('/login?unlock=1');
-    expect(
-      screen.getByText(
-        'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'
-      )
-    ).toBeInTheDocument();
-  });
-
-  it('does NOT render the unlock banner without ?unlock=1', () => {
-    renderLoginAt('/login');
     expect(
       screen.queryByText(
         'Ingresa tu contraseña para desbloquear los datos de este dispositivo.'

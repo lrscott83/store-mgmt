@@ -526,9 +526,12 @@ test.describe('login offline — dispositivo aprovisionado (S1-03)', () => {
 
     // Device-key recovery fails (F1: no key) -> unlock-gate's device-wrap
     // branch still sees the localStorage table -> degrades to a password
-    // prompt, never to plaintext, never a crash (design §6 F1/F4).
+    // prompt, never to plaintext, never a crash (design §6 F1/F4). The
+    // unlock-required banner was REMOVED (user decision 2026-09-05), so the
+    // degradation lands on the bare login form itself — the submit button
+    // IS the password prompt now.
     await page.waitForURL(/\/login\?unlock=1$/);
-    await expect(page.getByText(UNLOCK_REQUIRED_TEXT)).toBeVisible();
+    await expect(loginPage.submitButton).toBeVisible();
 
     // Recovers via this login's OWN password wrap (step 3a's "own" branch).
     await loginPage.fill({ login, password: KAT_PASSWORD });
