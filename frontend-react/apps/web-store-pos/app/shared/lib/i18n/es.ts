@@ -192,7 +192,7 @@ const messages: Record<string, string> = {
   // Menu items — Sales (Angular MENU.SALE_MGMT.*)
   'MENU.PRODUCTS': 'Catálogo Productos',
   'MENU.SALE': 'Vender',
-  'MENU.WHOLESALE': 'Ventas Mayoristas',
+  'MENU.WHOLESALE': 'Vender Mayorista',
   'MENU.TODAY_ORDERS': 'Ventas del día',
   'MENU.TODAY_CREDITS': 'Créditos del día',
   'MENU.TODAY_STATS': 'Cuadre del día',
@@ -357,7 +357,7 @@ const messages: Record<string, string> = {
   'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE': 'El producto no está disponible en el inventario.',
   'SALES.ALL_CATEGORIES': 'Todos',
   'SALES.SEARCH_PLACEHOLDER': 'Buscar producto por nombre...',
-  'SALES.WHOLESALE.ENABLE': 'Vender por mayor',
+  'SALES.WHOLESALE.ENABLE': 'Venta Mayorista',
   'SALES.WHOLESALE.PACK_SIZE': 'Unidades por paquete/caja',
   'SALES.WHOLESALE.TIERS_TITLE': 'Rangos de precio mayorista',
   'SALES.WHOLESALE.MIN_PACKS': 'Mínimo de paquetes',
@@ -370,7 +370,7 @@ const messages: Record<string, string> = {
   'SALES.WHOLESALE.FROM': 'desde',
   'SALES.WHOLESALE.UNIT': 'unidad',
   'SALES.WHOLESALE.ADD': 'Añadir',
-  'SALES.WHOLESALE.EMPTY': 'No hay productos configurados para la venta mayorista. Active la opción "Vender por mayor" al crear o editar un producto.',
+  'SALES.WHOLESALE.EMPTY': 'No hay productos configurados para la venta mayorista. Active la opción "Venta Mayorista" al crear o editar un producto.',
   'SALES.WHOLESALE.ADDED': '{name} adicionado a la venta mayorista',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
@@ -777,6 +777,8 @@ const messages: Record<string, string> = {
   'EXCHANGE_RATES.VALUE_COLUMN': '1 USD = (MN)',
   'EXCHANGE_RATES.SAVE': 'Guardar',
   'EXCHANGE_RATES.SAVED': 'Valor actualizado correctamente.',
+  'EXCHANGE_RATES.EDIT': 'Editar',
+  'EXCHANGE_RATES.EDIT_TITLE': 'Editar valor del día',
   'EXCHANGE_RATES.INVALID_VALUE': 'El valor debe ser un número mayor que 0.',
   'EXCHANGE_RATES.NO_RECORDS': 'No hay registros todavía.',
   'STORES.MODULES_LABEL': 'Módulos',

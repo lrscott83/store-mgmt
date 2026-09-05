@@ -8,7 +8,7 @@ import type {
 } from '@store-mgmt/domain';
 import { DataResult as DataResultImpl, Result, WarehouseErrors } from '@store-mgmt/domain';
 import { StorageKeys } from '~/shared/lib/storage/storage-keys';
-import { encryptEntity, decryptEntity } from '~/shared/lib/storage/entity-crypto';
+import { encryptEntity } from '~/shared/lib/storage/entity-crypto';
 import { readEntityOrThrow } from '~/shared/lib/storage/read-entity-or-throw';
 import { getCurrentUserLogin } from '~/shared/lib/auth/current-user';
 import { round2 } from '~/shared/lib/money';

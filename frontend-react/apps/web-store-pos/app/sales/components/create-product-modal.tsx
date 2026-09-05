@@ -119,8 +119,8 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-lg p-6">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 py-6">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
         <h2 className="text-base font-semibold text-gray-900 mb-4">
           {intl.formatMessage({ id: 'PRODUCT.NEW_PRODUCT' })}
         </h2>
@@ -181,6 +181,14 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
             {errors.order && <p className="mt-1 text-xs text-red-500">{errors.order}</p>}
           </div>
 
+          {/* Wholesale config — right below Orden per UX decision (2026-09-04). */}
+          <WholesaleConfigSection
+            value={wholesale}
+            retailPrice={parseFloat(form.price) || 0}
+            onChange={setWholesale}
+          />
+          {wholesaleError && <p className="text-xs text-red-500">{wholesaleError}</p>}
+
           {/* Active */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -208,14 +216,6 @@ export function CreateProductModal({ category, defaultOrder, onSave, onClose }: 
               {intl.formatMessage({ id: 'PRODUCTS.FORM.AVAILABLE_TO_SALE' })}
             </span>
           </label>
-
-          {/* Wholesale config */}
-          <WholesaleConfigSection
-            value={wholesale}
-            retailPrice={parseFloat(form.price) || 0}
-            onChange={setWholesale}
-          />
-          {wholesaleError && <p className="text-xs text-red-500">{wholesaleError}</p>}
 
           {/* Discount from inventory */}
           <label className="flex items-center gap-2 cursor-pointer">

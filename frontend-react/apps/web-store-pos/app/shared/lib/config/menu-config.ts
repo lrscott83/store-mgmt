@@ -43,7 +43,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Catálogo de productos. Aquí puedes crear, editar y organizar tus productos por categoría. Puedes agregar nombre, precio, código de barras e imagen a cada producto.' },
       { label: 'MENU.SALE', path: '/sales/new', featureIds: [EFeatures.Sale], moduleId: EModules.Sales,
         helpContent: 'Realiza una nueva venta. Escanea o busca el producto, agrega cantidades, selecciona el método de pago y confirma la venta. También puedes generar ventas a crédito.' },
-      { label: 'MENU.WHOLESALE', path: '/sales/wholesale', featureIds: [EFeatures.Sale], moduleId: EModules.Sales, icon: '📦',
+      { label: 'MENU.WHOLESALE', path: '/sales/wholesale', featureIds: [EFeatures.Sale], moduleId: EModules.Sales,
         helpContent: 'Venta por mayor. Elige la cantidad en paquetes (cajas), el precio por unidad baja según los rangos configurados en el producto y la venta se descuenta del inventario en unidades. Ej: 12 cajas × 24 unidades × 660.' },
       { label: 'MENU.TODAY_ORDERS', path: '/sales/today-orders', featureIds: [EFeatures.TodayOrders], moduleId: EModules.Sales,
         helpContent: 'Lista de ventas realizadas hoy. Puedes ver el detalle de cada venta, anular una venta y revisar los métodos de pago utilizados.' },
@@ -121,9 +121,9 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Plan y estado de la tienda. Consulta el plan actual (Gratis, Básico, Profesional), las fechas de pago y vencimiento. Renueva o cambia de plan según necesites.' },
       { label: 'MENU.STORES_UPDATE', path: '/management/stores/update', featureIds: [EFeatures.Stores], moduleId: EModules.Management,
         helpContent: 'Editar información de la tienda. Actualiza el nombre, dirección, teléfono y otros datos de tu negocio. Estos cambios se reflejan en los reportes.' },
-      // daily-exchange-rate — sits right after the Stores features, same guard as
-      // Configurations (EFeatures.Configurations).
-      { label: 'MENU.EXCHANGE_RATES', path: '/management/exchange-rates', featureIds: [EFeatures.Configurations], moduleId: EModules.Management, icon: '💱',
+      // Convention: NO menu item carries an icon — plain text labels only
+      // (the wholesale 📦 and exchange-rate 💱 icons were removed 2026-09-04).
+      { label: 'MENU.EXCHANGE_RATES', path: '/management/exchange-rates', featureIds: [EFeatures.Configurations], moduleId: EModules.Management,
         helpContent: 'Registro diario del cambio de USD a MN. Cada día se añade un registro con el valor del día anterior (por defecto 1). Puedes editar el valor de cualquier día: escribe cuántos pesos (MN) equivale 1 USD en esa fecha y pulsa Guardar.' },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management,
         helpContent: 'Gestiona los empleados de tu tienda. Crea cuentas de usuario, asígnales roles (cajero, bodeguero, admin) y controla qué funcionalidades pueden usar. Desde aquí también puedes exportar el roster (lista de empleados) con una contraseña para activar el acceso sin conexión en otro equipo, e importarlo después en el dispositivo de destino.' },

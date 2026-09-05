@@ -145,7 +145,7 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          'No hay productos configurados para la venta mayorista. Active la opción "Vender por mayor" al crear o editar un producto.',
+          'No hay productos configurados para la venta mayorista. Active la opción "Venta Mayorista" al crear o editar un producto.',
         ),
       ).toBeInTheDocument(),
     );
