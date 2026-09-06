@@ -6,7 +6,6 @@ export interface MenuItem {
   path: string;
   featureIds?: number[];
   moduleId?: number;
-  icon?: string;
   /** When true NavLink uses end prop so it only matches exact path */
   exact?: boolean;
   /** Brief help text shown in the ? tooltip dialog next to the menu item */
@@ -86,7 +85,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Ganancias del día. Muestra la diferencia entre el costo de los productos vendidos y el precio de venta. Calcula la ganancia real del día.' },
       { label: 'MENU.EGRESS', path: '/inventory/egress', featureIds: [EFeatures.Egress], moduleId: EModules.Inventory,
         helpContent: 'Salidas de inventario. Registra productos que salen del almacén por motivos distintos a la venta (deterioro, regalo, ajuste de stock, etc.).' },
-      { label: 'MENU.WAREHOUSES', path: '/inventory/warehouses', featureIds: [EFeatures.Warehouses], moduleId: EModules.Inventory, icon: '🏬', isNew: true,
+      { label: 'MENU.WAREHOUSES', path: '/inventory/warehouses', featureIds: [EFeatures.Warehouses], moduleId: EModules.Inventory, isNew: true,
         helpContent: 'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.' },
       { label: 'MENU.ENTRIES_HISTORY', path: '/inventory/entries', featureIds: [EFeatures.EntriesHistory], moduleId: EModules.Inventory,
         helpContent: 'Historial de entradas. Consulta todas las entradas de inventario realizadas con filtros por fecha y producto. Ideal para auditorías.' },
@@ -137,7 +136,8 @@ export const MENU_GROUPS: MenuGroup[] = [
       { label: 'MENU.STORES_UPDATE', path: '/management/stores/update', featureIds: [EFeatures.Stores], moduleId: EModules.Management,
         helpContent: 'Editar información de la tienda. Actualiza el nombre, dirección, teléfono y otros datos de tu negocio. Estos cambios se reflejan en los reportes.' },
       // Convention: NO menu item carries an icon — plain text labels only
-      // (the wholesale 📦 and exchange-rate 💱 icons were removed 2026-09-04).
+      // (the wholesale 📦, exchange-rate 💱 and warehouses 🏬 icons were
+      // removed; the icon property is gone from MenuItem entirely).
       { label: 'MENU.EXCHANGE_RATES', path: '/management/exchange-rates', featureIds: [EFeatures.Configurations], moduleId: EModules.Management,
         helpContent: 'Registro diario del cambio de USD a MN. Cada día se añade un registro con el valor del día anterior (por defecto 1). Puedes editar el valor de cualquier día: escribe cuántos pesos (MN) equivale 1 USD en esa fecha y pulsa Guardar.' },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management,

@@ -84,9 +84,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       }
                       title={isOpen ? undefined : intl.formatMessage({ id: item.label })}
                     >
-                      {item.icon && (
-                        <span className="shrink-0 text-base">{item.icon}</span>
-                      )}
                       {isOpen && (
                         <span className="flex items-center gap-2">
                           {intl.formatMessage({ id: item.label })}
