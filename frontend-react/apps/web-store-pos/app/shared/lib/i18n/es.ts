@@ -880,6 +880,7 @@ const messages: Record<string, string> = {
   'ADMIN_DASHBOARD.TOTAL': 'Total',
   'ADMIN_DASHBOARD.AVERAGE': 'Promedio',
   'ADMIN_DASHBOARD.ERROR': 'Ocurrió un error. Intentá de nuevo.',
+  'ADMIN_DASHBOARD.NO_OWNERS': 'Sin tiendas activas',
 
   // Admin — Resellers
   // admin-owners-resellers-parity (Stage 5 Admin), Phase 4 — LIST_TITLE/CREATE_TITLE

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { usageHttpService } from '~/admin/dashboard/lib/services/usage-http-service';
+import { StoreUsageChart } from '~/admin/dashboard/components/store-usage-chart';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 
 export const clientLoader = superAdminLoader;
@@ -27,6 +28,7 @@ export function AdminDashboardPage() {
   const [viewType, setViewType] = useState<'7days' | '30days'>('7days');
   const [categories, setCategories] = useState<string[]>([]);
   const [data, setData] = useState<number[]>([]);
+  const [ownerNamesPerDay, setOwnerNamesPerDay] = useState<string[][]>([]);
   const [activeStoreCount, setActiveStoreCount] = useState(0);
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -34,6 +36,7 @@ export function AdminDashboardPage() {
     async (view: '7days' | '30days') => {
       setCategories(view === '7days' ? getDiasSemana() : getDias30());
       setData([]);
+      setOwnerNamesPerDay([]);
       setActiveStoreCount(0);
       setError(undefined);
       try {
@@ -43,6 +46,7 @@ export function AdminDashboardPage() {
             : await usageHttpService.getStoresLastMonth();
         if (res.succeeded && res.data) {
           setData(res.data.storeUsagesCountDays);
+          setOwnerNamesPerDay(res.data.ownerNamesPerDay ?? []);
           setActiveStoreCount(res.data.activeStoreCount ?? 0);
         }
       } catch (error) {
@@ -59,6 +63,14 @@ export function AdminDashboardPage() {
   // conteo supera cualquier día individual).
   const barMax = Math.max(activeStoreCount, ...data, 1);
   const barPercent = Math.min(100, (activeStoreCount / barMax) * 100);
+  // Un punto por label de día: valor con fallback 0 y owners alineados por
+  // índice con la respuesta del backend (ownerNamesPerDay ?? [] para backends
+  // que aún no envían la lista).
+  const chartData = categories.map((category, i) => ({
+    label: category,
+    value: data[i] || 0,
+    owners: ownerNamesPerDay[i] ?? [],
+  }));
 
   useEffect(() => {
     loadData('7days');
@@ -118,27 +130,18 @@ export function AdminDashboardPage() {
             <p className="mt-4 text-xs text-gray-500">
               {`${formatMessage({ id: 'ADMIN_DASHBOARD.TOTAL' })}: ${total} | ${formatMessage({ id: 'ADMIN_DASHBOARD.AVERAGE' })}: ${promedio.toFixed(2)}`}
             </p>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left">
-                    <th className="py-2 pr-4 font-medium text-gray-700">
-                      {formatMessage({ id: 'ADMIN_DASHBOARD.COL_CATEGORY' })}
-                    </th>
-                    <th className="py-2 font-medium text-gray-700">
-                      {formatMessage({ id: 'ADMIN_DASHBOARD.COL_VALUE' })}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.map((category, i) => (
-                    <tr key={category} className="border-b border-gray-100">
-                      <td className="py-1.5 pr-4">{category}</td>
-                      <td className="py-1.5">{data[i] || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Gráfica días (X) vs cantidad de usos (Y) — lazy wrapper sobre
+                statistics/components/chart-core (único archivo con recharts) +
+                fallback de carga + estado vacío. Al hacer click en una barra se
+                fijan los nombres de los owners de las tiendas de ese día. */}
+            <div className="mt-2">
+              <StoreUsageChart
+                key={viewType}
+                data={chartData}
+                loadingMessage={formatMessage({ id: 'GENERAL.LOADING' })}
+                emptyMessage={formatMessage({ id: 'STATISTICS.EMPTY_STATE' })}
+                noOwnersMessage={formatMessage({ id: 'ADMIN_DASHBOARD.NO_OWNERS' })}
+              />
             </div>
           </>
         )}
