@@ -297,4 +297,150 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     );
     expect(showBlockingErrorMock).not.toHaveBeenCalled();
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Filtros por categoría y por nombre (paridad con /sales/new, 2026-09-05)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('filtra los productos por categoría seleccionada', async () => {
+    mockCategories = [makeCategory(), makeCategory({ id: 'cat-2', name: 'Carnes' })];
+    mockProducts = [
+      makeProduct('beer-1', { name: 'Cerveza Pilsen', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
+      makeProduct('croq-1', {
+        name: 'Croquetas',
+        categoryId: 'cat-2',
+        wholesaleEnabled: true,
+        wholesalePackSize: 10,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
+    expect(screen.getByText('Croquetas')).toBeInTheDocument();
+
+    // Seleccionar la pestaña Carnes → solo Croquetas queda visible.
+    fireEvent.click(screen.getByTestId('wholesale-category-cat-2'));
+    await waitFor(() => expect(screen.queryByText('Cerveza Pilsen')).not.toBeInTheDocument());
+    expect(screen.getByText('Croquetas')).toBeInTheDocument();
+
+    // Volver a "Todas" → ambos visibles de nuevo.
+    fireEvent.click(screen.getByTestId('wholesale-category-all'));
+    await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
+    expect(screen.getByText('Croquetas')).toBeInTheDocument();
+  });
+
+  it('filtra los productos por nombre en el searchbox', async () => {
+    mockProducts = [
+      makeProduct('beer-1', { name: 'Cerveza Nacional', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
+      makeProduct('wine-1', { name: 'Vino Tinto', wholesaleEnabled: true, wholesalePackSize: 6, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 1200 }] }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza Nacional')).toBeInTheDocument());
+    expect(screen.getByText('Vino Tinto')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('wholesale-search-input'), { target: { value: 'tinto' } });
+    await waitFor(() => expect(screen.queryByText('Cerveza Nacional')).not.toBeInTheDocument());
+    expect(screen.getByText('Vino Tinto')).toBeInTheDocument();
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Unidad de medida configurable (wholesaleUnitLabel, 2026-09-05)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('muestra la unidad configurable del producto en el label del input y en el popup de rangos', async () => {
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleUnitLabel: 'caja',
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    // El label del input de packs es la unidad del producto ("caja").
+    expect(screen.getByText('caja')).toBeInTheDocument();
+
+    // El popup de rangos usa el plural de la unidad ("Desde 1 cajas").
+    fireEvent.click(screen.getByTestId('wholesale-tiers-info-beer-1'));
+    const [, html] = showBlockingInfoHtmlMock.mock.calls[0];
+    expect(String(html)).toContain('cajas');
+    expect(String(html)).not.toContain('paquetes');
+  });
+
+  it('sin unidad configurada cae al label por defecto "paquete"', async () => {
+    mockProducts = [
+      makeProduct('croq-1', {
+        name: 'Croquetas',
+        wholesaleEnabled: true,
+        wholesalePackSize: 10,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Croquetas')).toBeInTheDocument());
+
+    expect(screen.getByText('paquete')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('wholesale-tiers-info-croq-1'));
+    const [, html] = showBlockingInfoHtmlMock.mock.calls[0];
+    expect(String(html)).toContain('paquetes');
+  });
+
+  it('el error de mínimo usa la unidad del producto', async () => {
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleUnitLabel: 'caja',
+        wholesaleTiers: [{ minPacks: 6, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '3' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    const message = showBlockingErrorMock.mock.calls[0]?.[1] ?? '';
+    expect(message).toContain('cajas');
+    expect(message).not.toContain('paquetes');
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Popup de no-disponibilidad con disponibles y faltantes (2026-09-05)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('el popup de no-disponibilidad muestra disponibles y faltantes en unidades', async () => {
+    hasInventoryModuleMock.mockReturnValue(true);
+    inventoryServiceMock.mockReturnValue({ hasEntries: true, available: 40 });
+    getItemQuantityMock.mockReturnValue(0);
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        discountFromInvantory: true,
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    // 12 packs × 24 = 288 unidades pedidas, solo 40 disponibles → faltan 248.
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const message = String(showBlockingErrorMock.mock.calls[0]?.[1] ?? '');
+    expect(message).toContain('La cantidad del producto no está disponible');
+    expect(message).toContain('Disponibles: 40');
+    expect(message).toContain('Faltan 248');
+    expect(message).toContain('288');
+    // El detalle NO se agrega cuando la falla no es de cantidad (hasEntries true,
+    // units <= available) — cubierto por el flujo de éxito de los otros tests.
+  });
 });

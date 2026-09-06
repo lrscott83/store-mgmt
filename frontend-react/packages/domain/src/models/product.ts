@@ -24,6 +24,11 @@ export interface WholesaleTier {
 export interface WholesaleConfig {
   packSize: number;
   tiers: WholesaleTier[];
+  /**
+   * Unidad de medida como la entiende el usuario para este producto ("caja", "paquete",
+   * "fardo"…). Opcional: sin valor los textos muestran "paquete" (label por defecto).
+   */
+  unitLabel?: string;
 }
 
 export interface Product extends AuditableBaseModel {
@@ -43,6 +48,8 @@ export interface Product extends AuditableBaseModel {
   wholesalePackSize?: number;
   /** Escalones de precio mayorista, ordenados por `minPacks` ascendente. */
   wholesaleTiers?: WholesaleTier[];
+  /** Unidad de medida configurable ("caja", "paquete"…). Ausente → los textos usan "paquete". */
+  wholesaleUnitLabel?: string;
 }
 
 /**

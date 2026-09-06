@@ -361,6 +361,8 @@ const messages: Record<string, string> = {
   'SALES.SEARCH_PLACEHOLDER': 'Buscar producto por nombre...',
   'SALES.WHOLESALE.ENABLE': 'Venta Mayorista',
   'SALES.WHOLESALE.PACK_SIZE': 'Unidades por paquete/caja',
+  'SALES.WHOLESALE.UNIT_LABEL': 'Unidad de medida (como se vende el paquete)',
+  'SALES.WHOLESALE.UNIT_LABEL_PLACEHOLDER': 'caja, paquete, fardo… (vacío = paquete)',
   'SALES.WHOLESALE.TIERS_TITLE': 'Rangos de precio mayorista',
   'SALES.WHOLESALE.MIN_PACKS': 'Mínimo de paquetes',
   'SALES.WHOLESALE.PRICE_PER_UNIT': 'Precio por unidad',
@@ -375,11 +377,13 @@ const messages: Record<string, string> = {
   'SALES.WHOLESALE.EMPTY': 'No hay productos configurados para la venta mayorista. Active la opción "Venta Mayorista" al crear o editar un producto.',
   'SALES.WHOLESALE.ADDED': '{name} adicionado a la venta mayorista',
   'SALES.WHOLESALE.MIN_PACKS_ERROR':
-    'La cantidad mínima para la venta mayorista es de {min} paquetes ({min} × {packSize} unidades).',
+    'La cantidad mínima para la venta mayorista es de {min} {unit} ({min} × {packSize} unidades).',
   'SALES.WHOLESALE.AVAILABLE': 'Disponible',
   'SALES.WHOLESALE.TIERS_POPUP_TITLE': 'Rangos de precio mayorista',
   'SALES.WHOLESALE.TIERS_POPUP_PACK': 'Unidades por paquete',
-  'SALES.WHOLESALE.TIERS_POPUP_FROM': 'Desde {min} paquetes: {price} por unidad',
+  'SALES.WHOLESALE.TIERS_POPUP_FROM': 'Desde {min} {unit}: {price} por unidad',
+  'SALES.WHOLESALE.QUANTITY_UNAVAILABLE': 'Disponibles: {available}. Faltan {missing} para cubrir los {requested} solicitados.',
+  'SALES.WHOLESALE.UNIT_NAME_FALLBACK': 'paquete',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —
   // hardcoded Spanish literals there, not i18n keys; added here as i18n keys for React's

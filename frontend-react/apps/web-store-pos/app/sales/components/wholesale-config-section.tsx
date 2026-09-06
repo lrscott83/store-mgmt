@@ -42,6 +42,11 @@ export function WholesaleConfigSection({ value, retailPrice, onChange }: Wholesa
     onChange({ ...value, packSize });
   }
 
+  function updateUnitLabel(unitLabel: string) {
+    if (!value) return;
+    onChange({ ...value, unitLabel: unitLabel || undefined });
+  }
+
   function addTier() {
     if (!value) return;
     const lastMin = value.tiers[value.tiers.length - 1]?.minPacks ?? 0;
@@ -82,6 +87,24 @@ export function WholesaleConfigSection({ value, retailPrice, onChange }: Wholesa
               onChange={(e) => updatePackSize(parseInt(e.target.value, 10))}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
               data-testid="wholesale-pack-size-input"
+            />
+          </div>
+
+          {/* Unidad de medida — cervezas se venden por "caja", croquetas por "paquete"…
+              el usuario nombra la unidad como la entienda. Vacío → "paquete" (label
+              por defecto en todos los textos mayoristas). */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              {intl.formatMessage({ id: 'SALES.WHOLESALE.UNIT_LABEL' })}
+            </label>
+            <input
+              type="text"
+              maxLength={24}
+              value={value.unitLabel ?? ''}
+              onChange={(e) => updateUnitLabel(e.target.value)}
+              placeholder={intl.formatMessage({ id: 'SALES.WHOLESALE.UNIT_LABEL_PLACEHOLDER' })}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              data-testid="wholesale-unit-label-input"
             />
           </div>
 

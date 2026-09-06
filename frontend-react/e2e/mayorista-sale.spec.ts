@@ -137,7 +137,10 @@ async function openWholesaleWithSeededProduct(
   await page.goto('/sales/wholesale');
   await page.waitForLoadState('networkidle');
   await expect(page.getByText(WHOLESALE_HEADER)).toBeVisible();
-  await expect(page.getByText(product.name)).toBeVisible();
+  // The seeded category and product share the same name (store-seed.ts:33,44), and the
+  // category-tabs row added 2026-09-05 renders that name a SECOND time — the product's
+  // own packs input is the unambiguous proof the product is listed (used below anyway).
+  await expect(page.getByTestId(`wholesale-packs-input-${product.id}`)).toBeVisible();
   return product;
 }
 
