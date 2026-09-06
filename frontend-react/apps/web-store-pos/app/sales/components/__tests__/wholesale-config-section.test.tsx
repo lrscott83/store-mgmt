@@ -143,4 +143,49 @@ describe('WholesaleConfigSection — formulario mayorista del producto', () => {
     expect(Number.isNaN(emitted.tiers[0].minPacks)).toBe(true);
     expect(minInput.value).toBe('');
   });
+
+  // ─── Unidad de medida configurable (2026-09-05) ─────────────────────────────
+
+  it('muestra el textbox de unidad de medida debajo del packSize cuando está activada', () => {
+    renderSection({ packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: 680 }] });
+    expect(screen.getByTestId('wholesale-unit-label-input')).toBeInTheDocument();
+  });
+
+  it('no muestra el textbox de unidad cuando la sección está desactivada', () => {
+    renderSection(undefined);
+    expect(screen.queryByTestId('wholesale-unit-label-input')).not.toBeInTheDocument();
+  });
+
+  it('escribir la unidad emite la config con unitLabel', () => {
+    const onChange = renderSection({ packSize: 24, tiers: [{ minPacks: 1, pricePerUnit: 680 }] });
+    fireEvent.change(screen.getByTestId('wholesale-unit-label-input'), { target: { value: 'caja' } });
+    const emitted = onChange.mock.calls[0][0] as WholesaleConfig;
+    expect(emitted.unitLabel).toBe('caja');
+    // El resto de la config viaja intacta.
+    expect(emitted.packSize).toBe(24);
+    expect(emitted.tiers).toEqual([{ minPacks: 1, pricePerUnit: 680 }]);
+  });
+
+  it('vaciar la unidad emite unitLabel undefined (cae al default "paquete")', () => {
+    const onChange = renderSection({
+      packSize: 24,
+      tiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      unitLabel: 'caja',
+    });
+    fireEvent.change(screen.getByTestId('wholesale-unit-label-input'), { target: { value: '' } });
+    const emitted = onChange.mock.calls[0][0] as WholesaleConfig;
+    expect(emitted.unitLabel).toBeUndefined();
+  });
+
+  it('la unidad persiste a través de otras ediciones (no se pierde al cambiar packSize)', () => {
+    const onChange = renderSection({
+      packSize: 24,
+      tiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      unitLabel: 'caja',
+    });
+    fireEvent.change(screen.getByTestId('wholesale-pack-size-input'), { target: { value: '30' } });
+    const emitted = onChange.mock.calls[0][0] as WholesaleConfig;
+    expect(emitted.packSize).toBe(30);
+    expect(emitted.unitLabel).toBe('caja');
+  });
 });

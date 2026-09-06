@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useIntl } from 'react-intl';
 import { superAdminLoader } from '~/auth/routes/loaders';
 import { usageHttpService } from '~/admin/dashboard/lib/services/usage-http-service';
+import { StoreUsageChart } from '~/admin/dashboard/components/store-usage-chart';
 import { httpErrorKey } from '~/shared/lib/http/http-error';
 
 export const clientLoader = superAdminLoader;
@@ -118,6 +119,19 @@ export function AdminDashboardPage() {
             <p className="mt-4 text-xs text-gray-500">
               {`${formatMessage({ id: 'ADMIN_DASHBOARD.TOTAL' })}: ${total} | ${formatMessage({ id: 'ADMIN_DASHBOARD.AVERAGE' })}: ${promedio.toFixed(2)}`}
             </p>
+            {/* Gráfica días (X) vs cantidad de usos (Y) — mismo patrón que las del
+                dashboard del owner: lazy wrapper sobre statistics/components/chart-core
+                (único archivo con recharts) + fallback de carga + estado vacío. */}
+            <div className="mt-2">
+              <StoreUsageChart
+                data={categories.map((category, i) => ({
+                  label: category,
+                  value: data[i] || 0,
+                }))}
+                loadingMessage={formatMessage({ id: 'GENERAL.LOADING' })}
+                emptyMessage={formatMessage({ id: 'STATISTICS.EMPTY_STATE' })}
+              />
+            </div>
             <div className="mt-2 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

@@ -54,7 +54,7 @@ vi.mock('~/sales/lib/services/order-offline-service', () => ({
   // Not actually needed for chart-core tests, but prevents import errors
 }));
 
-import { SalesChartCore, ProfitChartCore } from '../chart-core';
+import { SalesChartCore, ProfitChartCore, StoreUsageChartCore } from '../chart-core';
 import type { ChartData } from '~/sales/lib/services/order-offline-service';
 
 describe('chart-core.tsx — SalesChartCore', () => {
@@ -136,5 +136,45 @@ describe('chart-core.tsx — formatLabel', () => {
     );
     unmount();
     xAxisSamples.first = new Date(2026, 6, 3);
+  });
+});
+
+describe('chart-core.tsx — StoreUsageChartCore (admin dashboard)', () => {
+  // String labels, NOT Dates — the admin dashboard sends pre-formatted day
+  // names ('Lun'…'Dom' / '1'…'30'), so no tickFormatter may run on them.
+  const sampleData: { label: string; value: number }[] = [
+    { label: 'Lun', value: 3 },
+    { label: 'Mar', value: 5 },
+  ];
+
+  it('renders a BarChart when data has non-zero values', () => {
+    render(<StoreUsageChartCore data={sampleData} emptyMessage="Sin datos" />);
+    expect(screen.getByTestId('bar-chart')).toBeTruthy();
+    expect(screen.getByTestId('responsive-container')).toBeTruthy();
+  });
+
+  it('renders empty message when all values are zero', () => {
+    const zeroData: { label: string; value: number }[] = [
+      { label: 'Lun', value: 0 },
+      { label: 'Mar', value: 0 },
+    ];
+    render(<StoreUsageChartCore data={zeroData} emptyMessage="Sin datos" />);
+    expect(screen.getByText('Sin datos')).toBeTruthy();
+    expect(screen.queryByTestId('bar-chart')).toBeNull();
+  });
+
+  it('renders empty message when data is empty', () => {
+    render(<StoreUsageChartCore data={[]} emptyMessage="Sin datos" />);
+    expect(screen.getByText('Sin datos')).toBeTruthy();
+    expect(screen.queryByTestId('bar-chart')).toBeNull();
+  });
+
+  it('uses NO tickFormatter — string labels pass through untouched', () => {
+    // The XAxis mock only renders the x-axis-ticks span when a tickFormatter
+    // is present; for StoreUsageChartCore the span must NOT exist.
+    const { container } = render(
+      <StoreUsageChartCore data={sampleData} emptyMessage="Sin datos" />,
+    );
+    expect(container.querySelector('[data-testid="x-axis-ticks"]')).toBeNull();
   });
 });
