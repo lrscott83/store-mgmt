@@ -6,7 +6,6 @@ export interface MenuItem {
   path: string;
   featureIds?: number[];
   moduleId?: number;
-  icon?: string;
   /** When true NavLink uses end prop so it only matches exact path */
   exact?: boolean;
   /** Brief help text shown in the ? tooltip dialog next to the menu item */
@@ -86,7 +85,7 @@ export const MENU_GROUPS: MenuGroup[] = [
         helpContent: 'Ganancias del día. Muestra la diferencia entre el costo de los productos vendidos y el precio de venta. Calcula la ganancia real del día.' },
       { label: 'MENU.EGRESS', path: '/inventory/egress', featureIds: [EFeatures.Egress], moduleId: EModules.Inventory,
         helpContent: 'Salidas de inventario. Registra productos que salen del almacén por motivos distintos a la venta (deterioro, regalo, ajuste de stock, etc.).' },
-      { label: 'MENU.WAREHOUSES', path: '/inventory/warehouses', featureIds: [EFeatures.Warehouses], moduleId: EModules.Inventory, icon: '🏬', isNew: true,
+      { label: 'MENU.WAREHOUSES', path: '/inventory/warehouses', featureIds: [EFeatures.Warehouses], moduleId: EModules.Inventory, isNew: true,
         helpContent: 'Gestiona tus almacenes. Crea almacenes, registra entradas por compra, transfiere stock entre almacenes y haz salidas a la tienda: cada salida crea una entrada de inventario en la tienda con el costo promedio del almacén.' },
       { label: 'MENU.ENTRIES_HISTORY', path: '/inventory/entries', featureIds: [EFeatures.EntriesHistory], moduleId: EModules.Inventory,
         helpContent: 'Historial de entradas. Consulta todas las entradas de inventario realizadas con filtros por fecha y producto. Ideal para auditorías.' },
