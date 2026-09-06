@@ -341,6 +341,45 @@ describe('CartShell — cart line-item controls have Spanish aria-labels', () =>
   });
 });
 
+describe('CartShell — line-item layout (2026-09-06)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+  });
+
+  // User request: the quantity belongs NEXT TO THE PRICE in parens ("Precio: $1 234 (10)"),
+  // and the +/- controls sit flush against the right edge with minimal margin.
+  it('shows the quantity next to the price in parens, NOT appended to the name', () => {
+    const product = makeProduct({ name: 'Coca Cola', price: 5 });
+    mockCartState({ items: [{ product, quantity: 10 }], total: vi.fn().mockReturnValue(50) });
+    renderCartShell();
+    openCart();
+
+    const name = screen.getByText('Coca Cola');
+    expect(name).toBeInTheDocument();
+    expect(name).not.toHaveTextContent('(10)');
+    // Price line: "Precio: " label (es.ts:259) + formatted unit price + " (quantity)".
+    expect(screen.getByText('Precio: $5 (10)')).toBeInTheDocument();
+    // Line subtotal is still present (price × quantity) inside the product row.
+    const row = name.closest('li');
+    expect(row).not.toBeNull();
+    expect(row).toHaveTextContent('$50');
+  });
+
+  it('renders the +/- controls as the last element of the row so they align to the right', () => {
+    const product = makeProduct({ name: 'Coca Cola' });
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10) });
+    renderCartShell();
+    openCart();
+
+    const row = screen.getByText('Coca Cola').closest('li');
+    expect(row).not.toBeNull();
+    // The quantity-controls group (containing the increase button) must be the rightmost child.
+    const increase = screen.getByLabelText('Aumentar cantidad de Coca Cola');
+    expect(row?.lastElementChild).toContainElement(increase);
+  });
+});
+
 // 1:1 port of Angular's NavRightComponent.increaseProduct/decreaseProduct ->
 // ShoppingCartService.increaseCartItem/decreaseCartItem -> addCartItem(±1) -> addItem(),
 // which ALWAYS re-validates InventoryOfflineService.hasAvailableProductToSale(productId,
