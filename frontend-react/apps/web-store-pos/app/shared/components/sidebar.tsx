@@ -88,7 +88,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         <span className="shrink-0 text-base">{item.icon}</span>
                       )}
                       {isOpen && (
-                        <span>{intl.formatMessage({ id: item.label })}</span>
+                        <span className="flex items-center gap-2">
+                          {intl.formatMessage({ id: item.label })}
+                          {item.isNew && (
+                            <span
+                              data-testid={`menu-new-badge-${item.path}`}
+                              className="shrink-0 rounded bg-danger px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none text-white"
+                            >
+                              NEW
+                            </span>
+                          )}
+                        </span>
                       )}
                     </NavLink>
                     {/* Help icon */}
