@@ -23,10 +23,16 @@ import { newTestIdentity } from './support/identity';
  *      la ruta /inventory/warehouses lo desloguea (Warehouses es OwnerAdmin-only
  *      en StoreRoleFeatures.cs:86-89; featureLoader sin bypass para StoreUser).
  *
- * La persona `owner-admin-with-products` NO tiene el feature Warehouses (36)
- * en su plan, así que el spec lo añade al AUTH_MODEL + currentUser en
- * localStorage (mismo seam que mutateAuthModel) y recarga — el guard
- * featureLoader lo lee de ahí.
+ * La persona `owner-admin-with-products` YA tiene el feature Warehouses (36)
+ * por defecto: desde la migración 20260905224007_Add-Warehouses-Module (2026-09-05)
+ * el registro otorga todos los módulos disponibles (RegisterCommand.cs:82-83).
+ * El seam fuerza 36/31 en `currentUser` (featureIds Y roles[].featureIds) en
+ * localStorage y recarga: en cold boot la app hidrata `user` desde currentUser
+ * (auth-store.ts:161-178) y la sidebar autoriza vía isUserAuthorized, que además
+ * del featureIds top-level chequea roles[].featureIds
+ * (authorization-service.ts:35-38) — por eso el seam toca ambos. El test de
+ * gating lo QUITA primero para probar que el ítem se oculta sin él, y luego lo
+ * vuelve a habilitar.
  */
 
 const NEW_WAREHOUSE = 'Nuevo almacén'; // WAREHOUSES.NEW_WAREHOUSE
@@ -75,6 +81,67 @@ async function enableWarehouseFeatures(page: Page): Promise<void> {
         const current = JSON.parse(rawCurrent);
         if (current && Array.isArray(current.featureIds)) {
           current.featureIds = addIds(current.featureIds);
+        }
+        // isUserAuthorized grants ALSO via roles[].featureIds
+        // (authorization-service.ts:35-38), so the seam must patch the same
+        // feature on every role row or the menu stays visible for an OwnerAdmin
+        // whose role carries 36.
+        if (current && Array.isArray(current.roles)) {
+          for (const role of current.roles) {
+            if (role && Array.isArray(role.featureIds)) {
+              role.featureIds = addIds(role.featureIds);
+            }
+          }
+        }
+        window.localStorage.setItem('currentUser', JSON.stringify(current));
+      } catch {
+        /* leave as-is */
+      }
+    }
+  });
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+}
+
+/** Removes ONLY the Warehouses feature (36) from the restored persona and reloads. */
+async function disableWarehouseFeatures(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const withoutWarehouses = (featureIds: number[] | undefined): number[] =>
+      (featureIds ?? []).filter((id) => id !== 36);
+
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key || !key.includes('authf496fc5a9f17')) continue;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const model = JSON.parse(raw);
+        if (model && Array.isArray(model.featureIds)) {
+          model.featureIds = withoutWarehouses(model.featureIds);
+        }
+        if (model?.user && Array.isArray(model.user.featureIds)) {
+          model.user.featureIds = withoutWarehouses(model.user.featureIds);
+        }
+        window.localStorage.setItem(key, JSON.stringify(model));
+      } catch {
+        /* leave as-is */
+      }
+    }
+    const rawCurrent = window.localStorage.getItem('currentUser');
+    if (rawCurrent) {
+      try {
+        const current = JSON.parse(rawCurrent);
+        if (current && Array.isArray(current.featureIds)) {
+          current.featureIds = withoutWarehouses(current.featureIds);
+        }
+        // Same reason as enableWarehouseFeatures: isUserAuthorized grants via
+        // roles[].featureIds too, so strip 36 from every role row as well.
+        if (current && Array.isArray(current.roles)) {
+          for (const role of current.roles) {
+            if (role && Array.isArray(role.featureIds)) {
+              role.featureIds = withoutWarehouses(role.featureIds);
+            }
+          }
         }
         window.localStorage.setItem('currentUser', JSON.stringify(current));
       } catch {
@@ -487,7 +554,13 @@ test.describe.serial('Almacenes — flujo completo', () => {
     signedInPage,
   }) => {
     const { page } = signedInPage;
-    // Sin habilitar el feature (36): la persona restaurada no lo tiene.
+    // Hoy la persona restaurada SÍ tiene el feature (36) por defecto (el registro
+    // otorga todos los módulos disponibles). Para probar el gating, primero lo
+    // QUITAMOS del AUTH_MODEL + currentUser en localStorage (seam inverso) y
+    // recargamos.
+    await disableWarehouseFeatures(page);
+
+    // Sin el feature (36): el ítem no aparece.
     await page.goto('/inventory/available');
     await page.waitForLoadState('networkidle');
     await openSidebar(page);
