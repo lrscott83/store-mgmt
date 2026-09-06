@@ -38,17 +38,37 @@ namespace Application.Features.Management.Usages.Queries.GetStoreLastWeekUsages
                 throw new ApiException(_localizer["UserNotFound"], HttpStatusCode.BadRequest);
 
             DateTime lastWeekDay = DateTime.UtcNow.Date.AddDays(-1 * query.LastDays);
-            IEnumerable<StoreUsage> storeUsages = await _storeUsageRepository.GetStoresUsagesAfterDateAsync(lastWeekDay);
-            List<int> usagesCount = storeUsages.GroupBy(usage => usage.Day)
+            IEnumerable<StoreUsage> storeUsages = await _storeUsageRepository.GetStoresUsagesAfterDateWithOwnerAsync(lastWeekDay);
+            // Deduplicate per store per day in memory (mirrors the repository's legacy
+            // SQL GROUP BY) so the counts stay identical while the navigation chain
+            // Store → Owner → User remains loaded for the owner names.
+            var storeDayGroups = storeUsages
+                .GroupBy(usage => new { usage.StoreId, usage.Day })
+                .Select(group => group.First())
+                .ToList();
+            var groups = storeDayGroups
+                .GroupBy(usage => usage.Day)
                 .OrderBy(group => group.Key)
-                .Select(group => group.Count())
+                .ToList();
+            List<int> usagesCount = groups.Select(group => group.Count()).ToList();
+            List<IList<string>> ownerNamesPerDay = groups
+                .Select(group => (IList<string>)group
+                    .Select(usage => usage.Store?.Owner?.User?.FullName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct()
+                    .OrderBy(name => name)
+                    .ToList())
                 .ToList();
             while (usagesCount.Count < query.LastDays)
             {
                 usagesCount.Insert(0, 0);
+                ownerNamesPerDay.Insert(0, new List<string>());
             }
             int activeStoreCount = await _storeRepository.GetActiveStoreCountAsync();
-            return ResponseResult.Success(new StoreUsagesDto(usagesCount, activeStoreCount));
+            return ResponseResult.Success(new StoreUsagesDto(usagesCount, activeStoreCount)
+            {
+                OwnerNamesPerDay = ownerNamesPerDay
+            });
         }
     }
 }

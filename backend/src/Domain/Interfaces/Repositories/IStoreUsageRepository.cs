@@ -6,6 +6,7 @@ namespace Domain.Interfaces.Repositories
     public interface IStoreUsageRepository : IGenericRepository<StoreUsage, Guid>
     {
         Task<IEnumerable<StoreUsage>> GetStoresUsagesAfterDateAsync(DateTime day);
+        Task<IEnumerable<StoreUsage>> GetStoresUsagesAfterDateWithOwnerAsync(DateTime day);
         Task<IEnumerable<StoreUsage>> GetStoreUsageByStoreIdAndUserId(Guid storeId, Guid userId);
     }
 }
