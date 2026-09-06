@@ -77,6 +77,22 @@ SELECT * FROM "Tabla" WHERE condicion;
 
 El `ProductVersion` debe coincidir con el que registro `dotnet ef database update` (verificar con `SELECT "ProductVersion" FROM "__EFMigrationsHistory" WHERE "MigrationId" = '...'`).
 
+### Scripts aplicados
+
+| # | Script | Migración EF | Descripción |
+|---|--------|--------------|-------------|
+| 01 | `01-From-Initial-To-Add_Reports_Module.sql` | hasta `20250413185015_Add_Reports_Module` | Reordena features/módulos, activa Reports |
+| 02 | `02-20250730201548_Add-StoreUsage-Table.sql` | `20250730201548_Add-StoreUsage-Table` | Tabla StoreUsage |
+| 03 | `03-Add-Expenses-Billing-Histories-Credits-Modules.sql` | `20250804193255_Add-Expenses-Billing-Histories-Credits-Modules` | Módulos 8-11 (Gastos/Facturación/Historiales/Créditos) |
+| 04 | `04-Add-Inventory-Today-Quantities-And-Today-SalesProfit-Features.sql` | `20260309182537_Add-Inventory-Today-Quantities-And-Today-SalesProfit-Features` | Features 34/35 |
+| 05 | `05-20260727-Billing-Migrations.sql` | billing 2026-07-27 | Billing/comisiones |
+| 06 | `06-20260728-Backfill-PaymentStartDate.sql` | `20260728194358_Backfill-PaymentStartDate-Null` | Limpieza PaymentStartDate |
+| 07 | `07-20260804-Add-OfflineRosterTtlDays.sql` | `20260804125006_Add-OfflineRosterTtlDays` | TTL roster offline |
+| 08 | `08-20260806-Add-OfflinePasswordPreHash-RefreshTokens-And-DueSoonDays.sql` | `20260806024450_Add-OfflinePasswordPreHash-RefreshTokens-And-DueSoonDays` | PreHash/refresh tokens/DueSoonDays |
+| 09 | `09-update-module-prices.sql` | — | Repricing módulos (v2) |
+| 10 | `10-update-module-prices-v3.sql` | `20260901163808_UpdateModulePricesV3` | Repricing módulos (v3): Price=2, 50% |
+| 11 | `11-20260905-Add-Warehouses-Module.sql` | `20260905224007_Add-Warehouses-Module` | Módulo 13 Warehouses (precio 2, 100% desc) + features 36/37 + asignación a tiendas activas existentes |
+
 ### 4. Commit
 
 ```bash
