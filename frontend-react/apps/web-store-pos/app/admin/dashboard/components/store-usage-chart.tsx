@@ -3,6 +3,12 @@
 // statistics/components/sales-chart.tsx.
 import { lazy, Suspense } from 'react';
 
+export interface StoreUsageChartPoint {
+  label: string;
+  value: number;
+  owners: string[];
+}
+
 const StoreUsageChartCore = lazy(() =>
   import('~/statistics/components/chart-core').then((m) => ({
     default: m.StoreUsageChartCore,
@@ -10,12 +16,18 @@ const StoreUsageChartCore = lazy(() =>
 );
 
 interface StoreUsageChartProps {
-  data: { label: string; value: number }[];
+  data: StoreUsageChartPoint[];
   loadingMessage: string;
   emptyMessage: string;
+  noOwnersMessage?: string;
 }
 
-export function StoreUsageChart({ data, loadingMessage, emptyMessage }: StoreUsageChartProps) {
+export function StoreUsageChart({
+  data,
+  loadingMessage,
+  emptyMessage,
+  noOwnersMessage,
+}: StoreUsageChartProps) {
   return (
     <Suspense
       fallback={
@@ -24,7 +36,11 @@ export function StoreUsageChart({ data, loadingMessage, emptyMessage }: StoreUsa
         </div>
       }
     >
-      <StoreUsageChartCore data={data} emptyMessage={emptyMessage} />
+      <StoreUsageChartCore
+        data={data}
+        emptyMessage={emptyMessage}
+        noOwnersMessage={noOwnersMessage}
+      />
     </Suspense>
   );
 }

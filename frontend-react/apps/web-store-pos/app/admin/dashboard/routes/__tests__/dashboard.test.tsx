@@ -19,11 +19,19 @@ vi.mock('~/admin/dashboard/lib/services/usage-http-service', () => ({
 }));
 
 // ─── StoreUsageChart mock (same pattern as statistics-routes.test.tsx: mocks the
-// lazy chart wrapper to keep recharts out of JSDOM; asserts the data contract) ──
+// lazy chart wrapper to keep recharts out of JSDOM; asserts the data contract,
+// including the owner names the dashboard aligns per day) ──
 
 vi.mock('~/admin/dashboard/components/store-usage-chart', () => ({
-  StoreUsageChart: ({ data }: { data: { label: string; value: number }[] }) => (
-    <div data-testid="store-usage-chart">store-usage-chart({data.length})</div>
+  StoreUsageChart: ({
+    data,
+  }: {
+    data: { label: string; value: number; owners: string[] }[];
+  }) => (
+    <div data-testid="store-usage-chart">
+      {`store-usage-chart(${data.length})`}
+      {data[0]?.owners?.length ? `|owners:${data[0].owners.join(',')}` : ''}
+    </div>
   ),
 }));
 
@@ -136,7 +144,7 @@ describe('AdminDashboardPage — render', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('AdminDashboardPage — 7-day fetch on mount', () => {
-  it('calls getStoresLastWeek on mount and shows day labels in table', async () => {
+  it('calls getStoresLastWeek on mount and drives the chart with one point per day label', async () => {
     const { usageHttpService } = await import(
       '~/admin/dashboard/lib/services/usage-http-service'
     );
@@ -159,13 +167,12 @@ describe('AdminDashboardPage — 7-day fetch on mount', () => {
       expect(usageHttpService.getStoresLastWeek).toHaveBeenCalledTimes(1);
     });
 
-    // Table column headers
-    expect(screen.getByText(esMessages['ADMIN_DASHBOARD.COL_CATEGORY'])).toBeInTheDocument();
-    expect(screen.getByText(esMessages['ADMIN_DASHBOARD.COL_VALUE'])).toBeInTheDocument();
-
-    // Data row with a count value from the response
+    // The Categoría/Valor table was removed — the chart receives one point per
+    // 7-day label (empty owners when the response has no ownerNamesPerDay).
     await waitFor(() => {
-      expect(screen.getByText('10')).toBeInTheDocument();
+      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
+        'store-usage-chart(7)'
+      );
     });
   });
 });
@@ -216,10 +223,11 @@ describe('AdminDashboardPage — 30-day toggle', () => {
       expect(usageHttpService.getStoresLastMonth).toHaveBeenCalledTimes(1);
     });
 
-    // Table should now show 30-day labels — '30' appears as category label in the last row
+    // Chart should now receive 30 points, one per 30-day label
     await waitFor(() => {
-      const cells = screen.getAllByText('30');
-      expect(cells.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
+        'store-usage-chart(30)'
+      );
     });
   });
 });
@@ -406,8 +414,8 @@ describe('AdminDashboardPage — toggle back to 7-day', () => {
 //   React must NOT call setData when succeeded is false or data is null.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('AdminDashboardPage — succeeded:false leaves table empty', () => {
-  it('renders an empty table body when succeeded is false and data is null', async () => {
+describe('AdminDashboardPage — succeeded:false leaves chart with zeroed points', () => {
+  it('renders the chart with 7 zero labels when succeeded is false and data is null', async () => {
     const { usageHttpService } = await import(
       '~/admin/dashboard/lib/services/usage-http-service'
     );
@@ -437,12 +445,13 @@ describe('AdminDashboardPage — succeeded:false leaves table empty', () => {
     // No error message because no exception was thrown
     expect(screen.queryByText(esMessages['ADMIN_DASHBOARD.ERROR'])).not.toBeInTheDocument();
 
-    // Table is still rendered (categories are set before fetch)
-    expect(screen.getByRole('table')).toBeInTheDocument();
+    // Chart is still rendered (categories are set before fetch) with 7 labels
+    expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
+      'store-usage-chart(7)'
+    );
 
-    // All data cells should fall back to 0 (data array is empty, not set from null)
-    const valueCells = screen.getAllByText('0');
-    expect(valueCells.length).toBe(7);
+    // No owners are mapped when data is null
+    expect(screen.getByTestId('store-usage-chart')).not.toHaveTextContent('|owners:');
   });
 });
 
@@ -495,18 +504,24 @@ describe('AdminDashboardPage — range-button active state', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PAGE-4 (extended) — value||0 fallback when response array is shorter than labels
+// PAGE-4 (extended) — value||0 fallback when response array is shorter than labels,
+// and owner names aligned by index with storeUsagesCountDays.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('AdminDashboardPage — value||0 fallback for missing rows', () => {
-  it('renders 0 for rows beyond the length of storeUsagesCountDays', async () => {
+describe('AdminDashboardPage — value||0 fallback for missing days', () => {
+  it('hands the chart 7 points and maps ownerNamesPerDay by index', async () => {
     const { usageHttpService } = await import(
       '~/admin/dashboard/lib/services/usage-http-service'
     );
-    // Only 3 values for a 7-label window — rows 4-7 should show 0
+    // Only 3 values for a 7-label window — points 4-7 must exist with value 0.
+    // ownerNamesPerDay aligns by index: day 0 has two owners, day 3 has none.
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
-      data: { storeUsagesCountDays: [10, 20, 30], activeStoreCount: 1 },
+      data: {
+        storeUsagesCountDays: [10, 20, 30],
+        ownerNamesPerDay: [['Ana', 'Beto'], ['Carlos'], [], ['Dana'], [], [], []],
+        activeStoreCount: 1,
+      },
       message: '',
       actionCode: 0,
       errors: [],
@@ -523,134 +538,29 @@ describe('AdminDashboardPage — value||0 fallback for missing rows', () => {
       expect(usageHttpService.getStoresLastWeek).toHaveBeenCalledTimes(1);
     });
 
-    // Provided values must appear
+    // The chart always receives one point per label of the active window
     await waitFor(() => {
-      expect(screen.getByText('10')).toBeInTheDocument();
-      expect(screen.getByText('20')).toBeInTheDocument();
-      expect(screen.getByText('30')).toBeInTheDocument();
+      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
+        'store-usage-chart(7)'
+      );
     });
 
-    // Missing rows (indices 3-6) must fall back to 0 — there are 4 such rows
-    await waitFor(() => {
-      const zeroCells = screen.getAllByText('0');
-      expect(zeroCells.length).toBe(4);
-    });
+    // Owners of the first day are mapped through to the chart
+    expect(screen.getByTestId('store-usage-chart')).toHaveTextContent('|owners:Ana,Beto');
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CHART — the days-vs-count chart (owner-dashboard pattern: lazy chart-core
-// wrapper). The wrapper is mocked above (recharts stays out of JSDOM); these
-// tests pin the DATA CONTRACT the wrapper receives: one point per day label,
-// values aligned by index with the ||0 fallback, and the re-fetch on toggle.
+// CHART — empty-state contract: even all-zero responses must hand the chart one
+// point per label (chart-core draws its own empty message; the wrapper must not
+// skip the points).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('AdminDashboardPage — store-usage chart', () => {
-  it('renders the chart with one aligned point per 7-day label', async () => {
+describe('AdminDashboardPage — store-usage chart all-zero contract', () => {
+  it('hands the chart 7 points when every day is zero', async () => {
     const { usageHttpService } = await import(
       '~/admin/dashboard/lib/services/usage-http-service'
     );
-    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
-      succeeded: true,
-      data: { storeUsagesCountDays: [10, 20, 30, 40, 50, 60, 70], activeStoreCount: 5 },
-      message: '',
-      actionCode: 0,
-      errors: [],
-    });
-
-    const { AdminDashboardPage } = await import('../dashboard');
-    render(
-      <Wrapper>
-        <AdminDashboardPage />
-      </Wrapper>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(7)'
-      );
-    });
-  });
-
-  it('pads short responses with 0-valued points (same ||0 fallback as the table)', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
-    // Only 3 values for a 7-label window — points 4-7 must exist with value 0
-    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
-      succeeded: true,
-      data: { storeUsagesCountDays: [10, 20, 30], activeStoreCount: 1 },
-      message: '',
-      actionCode: 0,
-      errors: [],
-    });
-
-    const { AdminDashboardPage } = await import('../dashboard');
-    render(
-      <Wrapper>
-        <AdminDashboardPage />
-      </Wrapper>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(7)'
-      );
-    });
-  });
-
-  it('re-renders the chart with 30 points after the 30-day toggle', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
-    vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
-      succeeded: true,
-      data: { storeUsagesCountDays: [1, 2, 3, 4, 5, 6, 7], activeStoreCount: 3 },
-      message: '',
-      actionCode: 0,
-      errors: [],
-    });
-    vi.mocked(usageHttpService.getStoresLastMonth).mockResolvedValue({
-      succeeded: true,
-      data: {
-        storeUsagesCountDays: Array.from({ length: 30 }, (_, i) => i + 1),
-        activeStoreCount: 3,
-      },
-      message: '',
-      actionCode: 0,
-      errors: [],
-    });
-
-    const { AdminDashboardPage } = await import('../dashboard');
-    render(
-      <Wrapper>
-        <AdminDashboardPage />
-      </Wrapper>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(7)'
-      );
-    });
-
-    fireEvent.click(
-      screen.getByRole('button', { name: esMessages['ADMIN_DASHBOARD.LAST_30_DAYS'] })
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('store-usage-chart')).toHaveTextContent(
-        'store-usage-chart(30)'
-      );
-    });
-  });
-
-  it('renders the chart with all-zero points while no data has loaded (empty-state contract)', async () => {
-    const { usageHttpService } = await import(
-      '~/admin/dashboard/lib/services/usage-http-service'
-    );
-    // 7 zeros — chart-core's allZero branch shows the empty message, so the
-    // wrapper must still RECEIVE the 7 points (contract), not be skipped.
     vi.mocked(usageHttpService.getStoresLastWeek).mockResolvedValue({
       succeeded: true,
       data: { storeUsagesCountDays: [0, 0, 0, 0, 0, 0, 0], activeStoreCount: 0 },

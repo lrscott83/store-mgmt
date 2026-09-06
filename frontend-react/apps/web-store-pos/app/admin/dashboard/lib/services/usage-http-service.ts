@@ -4,6 +4,9 @@ import { apiClient } from '~/shared/lib/http/api-client';
 export interface StoreUsages {
   storeUsagesCountDays: number[];
   activeStoreCount: number;
+  /** Owner display names of the stores used each day, aligned by index with
+   * storeUsagesCountDays. Optional: older backends do not send it. */
+  ownerNamesPerDay?: string[][];
 }
 
 export const usageHttpService = {
