@@ -1,0 +1,28 @@
+# graphify: exclude dependency trees, build artifacts, and local tooling state
+# (.gitignore is respected automatically; this adds belt-and-suspenders coverage)
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+out-tsc/
+.angular/
+.turbo/
+coverage/
+*.tsbuildinfo
+.eslintcache
+
+# graphify's own output and caches (never index the graph into itself)
+graphify-out/
+
+# local agent tooling state — not source code
+.opencode/
+.superpowers/
+.freebuff/
+.playwright-mcp/
+.atl/
+.cursor/
+.vs/
+obj/
+bin/
