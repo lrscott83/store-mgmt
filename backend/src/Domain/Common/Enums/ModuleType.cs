@@ -37,5 +37,8 @@ namespace Domain.Common.Enums
 
         [Description("Créditos")]
         Credits = 11,
+
+        [Description("Almacenes")]
+        Warehouses = 13,
     }
 }
