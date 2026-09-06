@@ -123,7 +123,7 @@ describe('WarehousesPage', () => {
     expect(screen.getByText('No hay almacenes creados. Crea uno para comenzar.')).toBeTruthy();
   });
 
-  it('creates a warehouse from the inline form', async () => {
+  it('creates a warehouse from the modal', async () => {
     renderPage();
     fireEvent.click(screen.getByText('Nuevo almacén'));
     const input = screen.getByTestId('warehouse-name-input');
@@ -147,6 +147,43 @@ describe('WarehousesPage', () => {
     renderPage();
     expect(screen.getByText('Central')).toBeTruthy();
     expect(screen.getByText(/Cantidad: 24/)).toBeTruthy();
+  });
+
+  it('shows product count and total cost counters in the collapsed header (WUI-1-a)', async () => {
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    fakeState.levels = [
+      { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
+      { id: 'sl-2', warehouseId: 'wh-1', productId: 'prod-2', onHand: 10, costPrice: 100, createdDate: new Date() },
+    ];
+    renderPage();
+    expect(screen.getByText(/Productos: 2/)).toBeTruthy();
+    expect(screen.getByText(/Costo total: \$16 840/)).toBeTruthy();
+    expect(screen.getByText(/Cantidad: 34/)).toBeTruthy();
+  });
+
+  it('shows zeroed counters for an empty warehouse (WUI-1-b)', async () => {
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Vacío', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    renderPage();
+    expect(screen.getByText(/Productos: 0/)).toBeTruthy();
+    expect(screen.getByText(/Costo total: \$0/)).toBeTruthy();
+    expect(screen.getByText(/Cantidad: 0/)).toBeTruthy();
+  });
+
+  it('renders the gear with Editar and Desactivar, no flat buttons (WUI-2-a)', async () => {
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
+    expect(screen.getByRole('menuitem', { name: 'Editar' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Desactivar' })).toBeTruthy();
+    // Flat buttons are gone: the only "Editar"/"Desactivar" texts are menu items.
+    expect(screen.getAllByText('Editar')).toHaveLength(1);
+    expect(screen.getAllByText('Desactivar')).toHaveLength(1);
   });
 
   it('shows the movement form and records a sale_out', async () => {
@@ -188,13 +225,35 @@ describe('WarehousesPage', () => {
       { id: 'sl-1', warehouseId: 'wh-1', productId: 'prod-1', onHand: 24, costPrice: 660, createdDate: new Date() },
     ];
     renderPage();
-    fireEvent.click(screen.getByText('Desactivar'));
+    fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Desactivar' }));
     await waitFor(() => {
       expect(showBlockingErrorMock).toHaveBeenCalledWith(
         expect.any(String),
         WarehouseErrors.CannotDeactivate.description,
       );
     });
+  });
+
+  it('opens the edit modal prefilled from the gear and updates (WUI-3-c)', async () => {
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar' }));
+
+    const input = screen.getByTestId('warehouse-name-input') as HTMLInputElement;
+    expect(input.value).toBe('Central');
+    expect(screen.getByText('Editar almacén')).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: 'Central Norte' } });
+    fireEvent.click(screen.getByText('Guardar'));
+
+    await waitFor(() => {
+      expect(fakeState.warehouses[0].name).toBe('Central Norte');
+    });
+    expect(showToastSuccessMock).toHaveBeenCalled();
   });
 
   it('shows the movements history', async () => {

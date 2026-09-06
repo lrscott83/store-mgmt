@@ -17,16 +17,18 @@ import { newTestIdentity } from './support/identity';
  *   6. Desactivar almacén con stock → bloqueado (Swal); vacío → (Inactivo).
  *   7. Cantidad decimal (10.555 → 10.56) en purchase_in/sale_out con round2.
  *   8. Exportar/importar backup /sync con las 3 entidades de almacenes.
- *   9. Ítem de menú 🏬 Almacenes solo con el feature Warehouses (36).
+ *   9. Ítem de menú Almacenes: presente para toda tienda OwnerAdmin nueva
+ *       (el módulo 13 del catálogo asigna el feature 36 en runtime); el gate
+ *       por rol lo cubre el test 11.
  *   10. Regresión venta: FIFO con el costo del almacén en today-sales-profit.
  *   11. Acceso por rol: un StoreUser (empleado, rol 3) no ve el ítem de menú y
  *      la ruta /inventory/warehouses lo desloguea (Warehouses es OwnerAdmin-only
  *      en StoreRoleFeatures.cs:86-89; featureLoader sin bypass para StoreUser).
  *
- * La persona `owner-admin-with-products` NO tiene el feature Warehouses (36)
- * en su plan, así que el spec lo añade al AUTH_MODEL + currentUser en
- * localStorage (mismo seam que mutateAuthModel) y recarga — el guard
- * featureLoader lo lee de ahí.
+ * El módulo 13 (Add-Warehouses-Module, 2026-09-06) asigna Warehouses (36) a
+ * toda tienda nueva en runtime, así que la persona OwnerAdmin ya lo trae. El
+ * seam enableWarehouseFeatures sigue en uso para recargas defensivas tras
+ * manipular localStorage, pero la presencia del ítem ya no depende de él.
  */
 
 const NEW_WAREHOUSE = 'Nuevo almacén'; // WAREHOUSES.NEW_WAREHOUSE
@@ -396,7 +398,10 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await expect(onHandCell(page, 'Con Stock')).toHaveText('24');
 
     // Intentar desactivar → Swal con CannotDeactivate, el almacén sigue activo.
-    await page.getByTestId('warehouse-card-Con Stock').getByText('Desactivar').click();
+    // (2026-09-06 UI redesign: "Desactivar" lives in the per-warehouse gear menu
+    //  now — open it first, then click the menuitem. Authorized adaptation.)
+    await page.getByRole('button', { name: 'Acciones de Con Stock' }).click();
+    await page.getByRole('menuitem', { name: 'Desactivar' }).click();
     await expect(page.getByText(CANNOT_DEACTIVATE)).toBeVisible();
     await dismissSwal(page);
     await expect(page.getByTestId('warehouse-card-Con Stock')).toBeVisible();
@@ -404,7 +409,8 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     // Almacén VACÍO (sin stock ni movimientos): sí se desactiva → (Inactivo).
     await createWarehouse(page, 'Vacío');
-    await page.getByTestId('warehouse-card-Vacío').getByText('Desactivar').click();
+    await page.getByRole('button', { name: 'Acciones de Vacío' }).click();
+    await page.getByRole('menuitem', { name: 'Desactivar' }).click();
     await expect(page.getByTestId('warehouse-card-Vacío').getByText(INACTIVE_TAG)).toBeVisible();
   });
 
@@ -483,18 +489,13 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await expect(page.locator('[data-testid^="mv-qty-"]')).toHaveCount(1);
   });
 
-  test('el ítem de menú Almacenes solo aparece con el feature Warehouses', async ({
+  test('el ítem de menú Almacenes aparece para toda tienda OwnerAdmin nueva y navega', async ({
     signedInPage,
   }) => {
     const { page } = signedInPage;
-    // Sin habilitar el feature (36): la persona restaurada no lo tiene.
-    await page.goto('/inventory/available');
-    await page.waitForLoadState('networkidle');
-    await openSidebar(page);
-    await expect(warehousesMenuLink(page)).toHaveCount(0);
-
-    // Con el feature habilitado (seam localStorage + reload): aparece.
-    await enableWarehouseFeatures(page);
+    // Módulo 13 (Add-Warehouses-Module): toda tienda nueva nace con el feature
+    // Warehouses (36) para OwnerAdmin → el ítem aparece sin seam manual. El
+    // gate por rol (StoreUser no lo ve ni accede) lo cubre el test 11.
     await page.goto('/inventory/available');
     await page.waitForLoadState('networkidle');
     await openSidebar(page);
