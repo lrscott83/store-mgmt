@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Product, WholesaleConfig } from '@store-mgmt/domain';
 import {
+  getWholesaleConfig,
   getWholesaleMinPacks,
   normalizeWholesaleConfig,
   resolveWholesalePrice,
   validateWholesaleConfig,
+  wholesaleUnitName,
+  wholesaleUnitPlural,
   wholesaleUnits,
 } from '../wholesale';
 
@@ -280,6 +283,76 @@ describe('normalizeWholesaleConfig', () => {
     expect(normalized.packSize).toBe(24);
     expect(normalized.tiers.map((t) => t.minPacks)).toEqual([1, 11, 21]);
     expect(normalized.tiers[0].pricePerUnit).toBe(680.01);
+  });
+});
+
+// ─── Unidad de medida configurable (wholesaleUnitLabel, 2026-09-05) ─────────
+
+describe('wholesaleUnitName — unidad de medida del producto', () => {
+  it('devuelve la unidad configurada del producto ("caja")', () => {
+    expect(wholesaleUnitName(makeProduct({ wholesaleUnitLabel: 'caja' }))).toBe('caja');
+  });
+
+  it('cae a "paquete" sin label configurado', () => {
+    expect(wholesaleUnitName(makeProduct())).toBe('paquete');
+  });
+
+  it('cae a "paquete" con label vacío o solo espacios (trim antes del check)', () => {
+    expect(wholesaleUnitName(makeProduct({ wholesaleUnitLabel: '' }))).toBe('paquete');
+    expect(wholesaleUnitName(makeProduct({ wholesaleUnitLabel: '   ' }))).toBe('paquete');
+  });
+});
+
+describe('wholesaleUnitPlural — plural de la unidad', () => {
+  it('agrega "s" a la unidad ("caja" → "cajas")', () => {
+    expect(wholesaleUnitPlural('caja')).toBe('cajas');
+  });
+
+  it('el plural es SIEMPRE, incluso con minPacks 1 ("1 paquetes" histórico pineado por E2E)', () => {
+    expect(wholesaleUnitPlural('paquete')).toBe('paquetes');
+  });
+});
+
+describe('getWholesaleConfig — unitLabel en la config normalizada', () => {
+  it('incluye unitLabel cuando el producto lo tiene', () => {
+    const config = getWholesaleConfig(
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+        wholesaleUnitLabel: 'caja',
+      }),
+    );
+    expect(config?.unitLabel).toBe('caja');
+  });
+
+  it('omite unitLabel cuando el producto no lo tiene (clave ausente, no string vacío)', () => {
+    const config = getWholesaleConfig(
+      makeProduct({
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+    );
+    expect(config?.unitLabel).toBeUndefined();
+  });
+
+  it('normalizeWholesaleConfig preserva el unitLabel con trim', () => {
+    const normalized = normalizeWholesaleConfig({
+      packSize: 24,
+      tiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      unitLabel: '  caja  ',
+    });
+    expect(normalized.unitLabel).toBe('caja');
+  });
+
+  it('normalizeWholesaleConfig omite unitLabel vacío', () => {
+    const normalized = normalizeWholesaleConfig({
+      packSize: 24,
+      tiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      unitLabel: '   ',
+    });
+    expect(normalized.unitLabel).toBeUndefined();
   });
 });
 

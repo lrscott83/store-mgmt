@@ -33,30 +33,17 @@ The E2E suites are the only safety nets against a real system: the backend suite
 1. A request to delete two tests from `Billing/StoreActivationTests.cs` as "states that cease to exist" did not survive reading the code: both seed the store directly into the database and exercise the **update** path against a legacy row, which remains live. Asking preserved coverage that would otherwise have been deleted on a false premise.
 2. The E2E suite caught a production bug the unit tests structurally could not see: `BillingService` resolved the store with a bare `FindAsync`, so `store.StoreModules` was always empty and `PlanType` always returned `"Free"` for every store in the system. The unit test mocked the repository and hand-populated `store.StoreModules`, reproducing a world the database never produced. 303 integration tests outweighed 315 unit tests.
 
-## Planning workflow — Superpowers only, artifacts in `openspec/` (user-mandated 2026-08-12)
+## Planning workflow — SDD pipeline, artifacts in `openspec/` (user-mandated 2026-09-05)
 
-**Superpowers is the only planning workflow in this project. Do NOT use any `sdd-*` skill or `sdd-*` subagent here** — not `sdd-new`, `sdd-ff`, `sdd-continue`, `sdd-explore`, `sdd-propose`, `sdd-spec`, `sdd-design`, `sdd-tasks`, `sdd-apply`, `sdd-verify`, or `sdd-archive`. The `openspec/` directory is the artifact **store**, not an instruction to run the SDD pipeline. This applies to sub-agents too: any delegation that could reach planning artifacts must carry this rule verbatim in its prompt.
+**The SDD pipeline is the planning workflow in this project.** Use the `sdd-*` skills and subagents for planning new changes (explore → propose → spec → design → tasks → apply → verify → archive). The session artifact store is `both`: artifacts live in engram AND as files under `openspec/changes/<change-name>/`.
 
-Existing `openspec/changes/archive/**` folders were produced by the old SDD pipeline. They are history — read them, never regenerate them.
+Existing `openspec/changes/archive/**` folders were produced by earlier pipelines — the original SDD pipeline and the Superpowers era (2026-08-12 → 2026-09-05, whose design/plan files are named `superpowers-design.md` / `superpowers-plan.md`). They are history — read them, never regenerate them.
 
-### Where Superpowers writes
+### Where SDD writes
 
-Superpowers' default paths (`docs/superpowers/specs/`, `docs/superpowers/plans/`) are **overridden** here. One folder per change, named in kebab-case with no date prefix:
+One folder per change, named in kebab-case with no date prefix: `openspec/changes/<change-name>/`. SDD pipeline file names (`proposal.md`, `spec.md`, `design.md`, `tasks.md`) do not collide with the archived `superpowers-*.md` files, so nothing reads one format expecting the other.
 
-| Skill | Default path | Path in this project |
-|---|---|---|
-| `brainstorming` | `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` | `openspec/changes/<change-name>/superpowers-design.md` |
-| `writing-plans` | `docs/superpowers/plans/YYYY-MM-DD-<feature>.md` | `openspec/changes/<change-name>/superpowers-plan.md` |
-
-The `superpowers-` prefix is deliberate: it keeps these files from colliding with the `proposal.md` / `design.md` / `tasks.md` left behind by the retired SDD pipeline, so nothing reads one format expecting the other.
-
-Never create new files under `docs/superpowers/`. If that directory still exists, it is legacy.
-
-### What does NOT move
-
-`subagent-driven-development` resolves a per-plan scratch workspace via `scripts/sdd-workspace` and writes the ledger, task briefs, implementer reports, and review packages into `.superpowers/sdd/<plan-slug>/`. That directory is short-lived state, self-ignored by a generated `.gitignore`, and **stays where it is**. Do not redirect it into `openspec/` — it would commit throwaway state. The ledger's first line names its plan file; that plan file path is now the `openspec/` one.
-
-**One catch, caused by the naming rule above.** `sdd-workspace` derives that directory from the plan file's **basename**, and under this convention every plan in the repo is named `superpowers-plan.md` — so every change would resolve to the same `.superpowers/sdd/superpowers-plan/`, defeating the per-plan scoping that exists to stop one change's stale ledger from being read as another's progress. Pass an explicit path instead: `.superpowers/sdd/<change-name>/`. Both `scripts/task-brief` and `scripts/review-package` accept an OUTFILE argument, so point them at that directory too.
+Never create new files under `docs/superpowers/`. If that directory still exists, it is legacy. The `.superpowers/sdd/` scratch workspace is Superpowers-era state, git-ignored, and can be removed at any time.
 
 ### Archiving a finished change
 

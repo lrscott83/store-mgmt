@@ -174,15 +174,33 @@ namespace Infrastructure.Persistence.EntityConfigurations
                      true,
                      true
                  ),
-                 Feature.Create(
-                     (int)FeatureType.InventoryTodaySaleProfit,
-                     FeatureType.InventoryTodaySaleProfit.GetDescription(),
-                     "Funcionalidad para revisar las ganancias de las ventas del día",
-                     (int)ModuleType.Inventory,
-                     81,
-                     true,
-                     true
-                 ),
+                  Feature.Create(
+                      (int)FeatureType.InventoryTodaySaleProfit,
+                      FeatureType.InventoryTodaySaleProfit.GetDescription(),
+                      "Funcionalidad para revisar las ganancias de las ventas del día",
+                      (int)ModuleType.Inventory,
+                      81,
+                      true,
+                      true
+                  ),
+                  Feature.Create(
+                      (int)FeatureType.Warehouses,
+                      FeatureType.Warehouses.GetDescription(),
+                      "Funcionalidad para gestionar los almacenes",
+                      (int)ModuleType.Warehouses,
+                      72,
+                      true,
+                      true
+                  ),
+                  Feature.Create(
+                      (int)FeatureType.WarehouseStockMovements,
+                      FeatureType.WarehouseStockMovements.GetDescription(),
+                      "Funcionalidad para gestionar los movimientos de los almacenes",
+                      (int)ModuleType.Warehouses,
+                      73,
+                      true,
+                      true
+                  ),
 
                  // Synchronization
                  Feature.Create(

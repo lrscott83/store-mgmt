@@ -32,7 +32,13 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
     discountFromInvantory: product.discountFromInvantory,
   });
   const [wholesale, setWholesale] = useState<WholesaleConfig | undefined>(
-    product.wholesaleEnabled ? { packSize: product.wholesalePackSize ?? 24, tiers: product.wholesaleTiers ?? [] } : undefined,
+    product.wholesaleEnabled
+      ? {
+          packSize: product.wholesalePackSize ?? 24,
+          tiers: product.wholesaleTiers ?? [],
+          ...(product.wholesaleUnitLabel ? { unitLabel: product.wholesaleUnitLabel } : {}),
+        }
+      : undefined,
   );
   const [errors, setErrors] = useState<{ name?: string; price?: string; order?: string }>({});
   const [wholesaleError, setWholesaleError] = useState<string | undefined>(undefined);
@@ -96,6 +102,7 @@ export function EditProductModal({ product, onSave, onClose }: EditProductModalP
       wholesaleEnabled: wholesale !== undefined,
       wholesalePackSize: wholesale?.packSize,
       wholesaleTiers: wholesale?.tiers,
+      wholesaleUnitLabel: wholesale?.unitLabel,
       updatedDate: new Date(),
     });
   }

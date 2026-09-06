@@ -5,7 +5,9 @@ import { round2 } from '~/shared/lib/money';
 /**
  * Ventas Mayoristas — helpers puros (sin I/O ni estado):
  * - `wholesaleUnits(packs, packSize)`: unidades reales a descontar/venta (packs × packSize).
- * - `getWholesaleConfig(product)`: normaliza los 3 campos opcionales del Product a un WholesaleConfig.
+ * - `getWholesaleConfig(product)`: normaliza los campos opcionales del Product a un WholesaleConfig.
+ * - `wholesaleUnitName(product)`: unidad de medida configurable ("caja", "paquete"…), con
+ *   fallback "paquete" cuando el producto no definió una.
  * - `resolveWholesalePrice(product, packs)`: elige el escalón con mayor `minPacks <= packs` y
  *   calcula `total = packs × packSize × unitPrice`. Sin config → precio retail (fallback).
  * - `validateWholesaleConfig(config, retailPrice)`: reglas de negocio del formulario de producto.
@@ -14,6 +16,9 @@ import { round2 } from '~/shared/lib/money';
  *   precio propio para 1 paquete, se define un rango con `minPacks: 1`.
  * - `normalizeWholesaleConfig(config)`: ordena tiers, minimos a entero, precios a 2 decimales.
  */
+
+/** Label por defecto de la unidad mayorista cuando el producto no definió una. */
+export const WHOLESALE_DEFAULT_UNIT_LABEL = 'paquete';
 
 export interface ResolvedWholesalePrice {
   /** Precio de UNA unidad dentro del paquete, tras aplicar el escalón. */
@@ -24,6 +29,28 @@ export interface ResolvedWholesalePrice {
 
 export function wholesaleUnits(packs: number, packSize: number): number {
   return packs * packSize;
+}
+
+/**
+ * Unidad de medida del producto para la venta mayorista, tal como la configuró
+ * el usuario ("caja" para cervezas, "paquete" para croquetas…). Sin config o
+ * con label vacío → "paquete" (el label histórico de todos los textos).
+ */
+export function wholesaleUnitName(
+  product: Pick<Product, 'wholesaleUnitLabel'>,
+): string {
+  const label = product.wholesaleUnitLabel?.trim();
+  return label ? label : WHOLESALE_DEFAULT_UNIT_LABEL;
+}
+
+/**
+ * Plural de la unidad mayorista ("caja" → "cajas"). Los textos mayoristas
+ * muestran el plural SIEMPRE — "Desde 1 paquetes: $9" es la forma histórica
+ * pineada por e2e/mayorista-sale.spec.ts (regex "Desde 1 paquetes"), no una
+ * gramática que este cambio vaya a "corregir".
+ */
+export function wholesaleUnitPlural(unit: string): string {
+  return `${unit}s`;
 }
 
 /**
@@ -40,7 +67,7 @@ export function getWholesaleMinPacks(
 }
 
 export function getWholesaleConfig(
-  product: Pick<Product, 'wholesaleEnabled' | 'wholesalePackSize' | 'wholesaleTiers'>,
+  product: Pick<Product, 'wholesaleEnabled' | 'wholesalePackSize' | 'wholesaleTiers' | 'wholesaleUnitLabel'>,
 ): WholesaleConfig | undefined {
   if (
     !product.wholesaleEnabled ||
@@ -51,7 +78,14 @@ export function getWholesaleConfig(
   ) {
     return undefined;
   }
-  return { packSize: product.wholesalePackSize, tiers: product.wholesaleTiers };
+  const config: WholesaleConfig = {
+    packSize: product.wholesalePackSize,
+    tiers: product.wholesaleTiers,
+  };
+  if (product.wholesaleUnitLabel?.trim()) {
+    config.unitLabel = product.wholesaleUnitLabel.trim();
+  }
+  return config;
 }
 
 export function resolveWholesalePrice(
@@ -136,8 +170,13 @@ export function normalizeWholesaleConfig(config: WholesaleConfig, _retailPrice?:
       pricePerUnit: round2(tier.pricePerUnit),
     }))
     .sort((a, b) => a.minPacks - b.minPacks);
-  return {
+  const normalized: WholesaleConfig = {
     packSize: Math.round(config.packSize),
     tiers: normalizedTiers,
   };
+  const unitLabel = config.unitLabel?.trim();
+  if (unitLabel) {
+    normalized.unitLabel = unitLabel;
+  }
+  return normalized;
 }

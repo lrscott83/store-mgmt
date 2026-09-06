@@ -85,8 +85,13 @@ namespace Domain.Common.Enums
 
         [HasRoles(RoleType.OwnerAdmin)]
         [HasFeature(FeatureType.Warehouses)]
-        [HasModule(ModuleType.Inventory)]
+        [HasModule(ModuleType.Warehouses)]
         WarehousesAdmin,
+
+        [HasRoles(RoleType.OwnerAdmin)]
+        [HasFeature(FeatureType.WarehouseStockMovements)]
+        [HasModule(ModuleType.Warehouses)]
+        WarehouseStockMovementsAdmin,
 
         #endregion
 

@@ -179,7 +179,11 @@ export function ProductsPage() {
       // Angular is legacy: its commented-out barcode FormControl is history.
       product.barcode,
       product.wholesaleEnabled
-        ? { packSize: product.wholesalePackSize ?? 24, tiers: product.wholesaleTiers ?? [] }
+        ? {
+            packSize: product.wholesalePackSize ?? 24,
+            tiers: product.wholesaleTiers ?? [],
+            ...(product.wholesaleUnitLabel ? { unitLabel: product.wholesaleUnitLabel } : {}),
+          }
         : undefined,
     );
     if (!result.succeeded) {

@@ -62,6 +62,9 @@ namespace Domain.Common.Enums
         [Description("Almacenes")]
         Warehouses = 36,
 
+        [Description("Movimientos de almacén")]
+        WarehouseStockMovements = 37,
+
         // Synchronization
         [Description("Enviar")]
         Send = 40,

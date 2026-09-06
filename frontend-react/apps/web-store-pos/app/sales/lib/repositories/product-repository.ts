@@ -217,6 +217,7 @@ export class ProductRepository {
       newProduct.wholesaleEnabled = true;
       newProduct.wholesalePackSize = wholesale.packSize;
       newProduct.wholesaleTiers = wholesale.tiers;
+      newProduct.wholesaleUnitLabel = wholesale.unitLabel;
     }
     this.updateProductsOrderByCategory(products, categoryId, order);
     newProduct.order = order;
@@ -267,7 +268,11 @@ export class ProductRepository {
       product.discountFromInvantory,
       undefined,
       product.wholesaleEnabled
-        ? { packSize: product.wholesalePackSize ?? 0, tiers: product.wholesaleTiers ?? [] }
+        ? {
+            packSize: product.wholesalePackSize ?? 0,
+            tiers: product.wholesaleTiers ?? [],
+            ...(product.wholesaleUnitLabel ? { unitLabel: product.wholesaleUnitLabel } : {}),
+          }
         : undefined,
     );
   }
@@ -336,6 +341,7 @@ export class ProductRepository {
       product.wholesaleEnabled = true;
       product.wholesalePackSize = wholesale.packSize;
       product.wholesaleTiers = wholesale.tiers;
+      product.wholesaleUnitLabel = wholesale.unitLabel;
     }
 
     this.updateProductsOrderByCategory(products, categoryId, order);
@@ -361,7 +367,11 @@ export class ProductRepository {
       product.updatedDate,
       product.updatedByName,
       product.wholesaleEnabled
-        ? { packSize: product.wholesalePackSize ?? 0, tiers: product.wholesaleTiers ?? [] }
+        ? {
+            packSize: product.wholesalePackSize ?? 0,
+            tiers: product.wholesaleTiers ?? [],
+            ...(product.wholesaleUnitLabel ? { unitLabel: product.wholesaleUnitLabel } : {}),
+          }
         : undefined,
     );
   }

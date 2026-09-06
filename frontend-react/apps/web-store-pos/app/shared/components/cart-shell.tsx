@@ -408,17 +408,27 @@ export function CartShell() {
             ) : (
               <ul className="divide-y divide-border">
                 {items.map((item) => (
-                  <li key={item.product.id} className="flex items-center gap-3 px-4 py-2">
+                  <li key={item.product.id} className="flex items-center gap-2 pl-4 pr-1 py-2">
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-sm font-medium text-text">
-                        {item.product.name} ({item.quantity})
+                        {item.product.name}
                       </p>
                       <p className="text-xs text-text-muted">
-                        {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}{formatCurrency(item.price ?? item.product.price)}
+                        {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}{formatCurrency(item.price ?? item.product.price)} ({item.quantity})
                       </p>
                     </div>
                     <p className="text-sm text-text whitespace-nowrap">{formatCurrency(round2((item.price ?? item.product.price) * item.quantity))}</p>
-                    {/* Quantity controls */}
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.product.id)}
+                      className="text-border hover:text-danger transition-colors"
+                      aria-label={intl.formatMessage({ id: 'CART.REMOVE_ITEM' }, { name: item.product.name })}
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    {/* Quantity controls — always flush to the right edge (pr-1) */}
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
@@ -443,16 +453,6 @@ export function CartShell() {
                         +
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.product.id)}
-                      className="text-border hover:text-danger transition-colors"
-                      aria-label={intl.formatMessage({ id: 'CART.REMOVE_ITEM' }, { name: item.product.name })}
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
                   </li>
                 ))}
               </ul>
