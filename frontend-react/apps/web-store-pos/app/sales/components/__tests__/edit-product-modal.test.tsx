@@ -1,16 +1,25 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product } from '@store-mgmt/domain';
 import { EditProductModal } from '../edit-product-modal';
 
 // Scanner camera lib — mocked so opening the modal never loads the real @zxing/browser
-// (lazy chunk) in jsdom; the manual-entry path needs no camera. Same pattern as
-// sale.test.tsx.
+// (lazy chunk) in jsdom. The mock CAPTURES the decode callback so tests can fire
+// decoded barcodes like a camera would (the 2026-09-07 redesign removed the
+// manual-entry form, so the decode path is the only way in).
+const decodeCallbackRef = vi.hoisted(() => ({ current: null as ((result: unknown) => void) | null }));
 vi.mock('@zxing/browser', () => ({
   BrowserMultiFormatReader: vi.fn().mockImplementation(() => ({
-    decodeFromVideoDevice: vi.fn().mockRejectedValue(new Error('no camera in jsdom')),
+    decodeFromVideoDevice: vi
+      .fn()
+      .mockImplementation(
+        (_device: unknown, _video: unknown, cb: (result: unknown) => void) => {
+          decodeCallbackRef.current = cb;
+          return Promise.resolve({ stop: vi.fn() });
+        },
+      ),
   })),
 }));
 
@@ -316,21 +325,23 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
     expect(screen.getByTestId('scanner-modal')).toBeInTheDocument();
   });
 
-  it('a manual scanner entry replaces the barcode field AND closes the scanner (capture-once cadence)', () => {
+  it('a decoded scan replaces the barcode field AND closes the scanner (capture-once cadence)', async () => {
     render(
       <Wrapper>
         <EditProductModal product={makeProduct({ barcode: '111' })} onSave={vi.fn()} onClose={vi.fn()} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('edit-product-barcode-scan'));
-    fireEvent.change(screen.getByTestId('scanner-manual-input'), { target: { value: '7790561234567' } });
-    fireEvent.click(screen.getByTestId('scanner-manual-submit'));
+    await waitFor(() => expect(decodeCallbackRef.current).not.toBeNull());
+    act(() => {
+      decodeCallbackRef.current!({ getText: () => '7790561234567' });
+    });
 
     expect(screen.getByTestId('edit-product-barcode-input')).toHaveValue('7790561234567');
     expect(screen.queryByTestId('scanner-modal')).not.toBeInTheDocument();
   });
 
-  it('a scanned barcode overrides the stored barcode in onSave', () => {
+  it('a scanned barcode overrides the stored barcode in onSave', async () => {
     const onSave = vi.fn();
     render(
       <Wrapper>
@@ -338,8 +349,10 @@ describe('EditProductModal — barcode field (React-owned, scanner-capturable)',
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('edit-product-barcode-scan'));
-    fireEvent.change(screen.getByTestId('scanner-manual-input'), { target: { value: '7790561234567' } });
-    fireEvent.click(screen.getByTestId('scanner-manual-submit'));
+    await waitFor(() => expect(decodeCallbackRef.current).not.toBeNull());
+    act(() => {
+      decodeCallbackRef.current!({ getText: () => '7790561234567' });
+    });
 
     fireEvent.change(screen.getByTestId('edit-product-name-input'), { target: { value: 'Coca Cola Zero' } });
     fireEvent.click(screen.getByTestId('edit-product-submit'));

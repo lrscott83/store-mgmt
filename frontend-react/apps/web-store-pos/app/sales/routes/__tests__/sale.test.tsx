@@ -39,6 +39,52 @@ vi.mock('@zxing/browser', () => ({
   })),
 }));
 
+// ScannerModal — the 2026-09-07 redesign dropped the manual-entry form (the
+// E2E-testable path); the modal's real camera decode can't run in jsdom.
+// Tests drive the parent's onScanned(barcode, quantity) contract through this
+// mock: a barcode input + "scan" button standing in for a decoded frame.
+const scannerModalMock = vi.hoisted(() => vi.fn());
+vi.mock('../../components/scanner-modal', () => ({
+  ScannerModal: scannerModalMock.mockImplementation(
+    ({ onScanned, onClose }: { onScanned: (barcode: string, quantity: number) => void; onClose: () => void }) => (
+      <div data-testid="scanner-modal">
+        <input
+          type="text"
+          data-testid="scanner-mock-barcode"
+          onChange={(e) => {
+            (e.target as HTMLInputElement).dataset.barcode = e.target.value;
+          }}
+        />
+        <input
+          type="number"
+          data-testid="scanner-mock-quantity"
+          defaultValue={1}
+          onChange={(e) => {
+            (e.target as HTMLInputElement).dataset.quantity = e.target.value;
+          }}
+        />
+        <button
+          type="button"
+          data-testid="scanner-mock-scan"
+          onClick={() => {
+            const root = document.body;
+            const barcode = (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)?.dataset.barcode ?? '';
+            const quantity = Number(
+              (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)?.dataset.quantity ?? '1',
+            );
+            onScanned(barcode, quantity);
+          }}
+        >
+          scan
+        </button>
+        <button type="button" data-testid="scanner-mock-close" onClick={onClose}>
+          close
+        </button>
+      </div>
+    ),
+  ),
+}));
+
 // Scanner flow feedback — mocked so tests assert the message choice
 // (not-found vs not-sellable vs added) without mounting react-toastify.
 const showToastErrorMock = vi.hoisted(() => vi.fn());
@@ -148,6 +194,45 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     saleServiceSpies.getProductByBarcode.mockImplementation(async () => bm(null));
     showToastErrorMock.mockClear();
     showToastSuccessMock.mockClear();
+    scannerModalMock.mockClear();
+    scannerModalMock.mockImplementation(
+      ({ onScanned, onClose }: { onScanned: (barcode: string, quantity: number) => void; onClose: () => void }) => (
+        <div data-testid="scanner-modal">
+          <input
+            type="text"
+            data-testid="scanner-mock-barcode"
+            onChange={(e) => {
+              (e.target as HTMLInputElement).dataset.barcode = e.target.value;
+            }}
+          />
+          <input
+            type="number"
+            data-testid="scanner-mock-quantity"
+            defaultValue={1}
+            onChange={(e) => {
+              (e.target as HTMLInputElement).dataset.quantity = e.target.value;
+            }}
+          />
+          <button
+            type="button"
+            data-testid="scanner-mock-scan"
+            onClick={() => {
+              const root = document.body;
+              const barcode = (root.querySelector('[data-testid="scanner-mock-barcode"]') as HTMLInputElement)?.dataset.barcode ?? '';
+              const quantity = Number(
+                (root.querySelector('[data-testid="scanner-mock-quantity"]') as HTMLInputElement)?.dataset.quantity ?? '1',
+              );
+              onScanned(barcode, quantity);
+            }}
+          >
+            scan
+          </button>
+          <button type="button" data-testid="scanner-mock-close" onClick={onClose}>
+            close
+          </button>
+        </div>
+      ),
+    );
   });
 
   it('renders the exact Angular header text SALES.HEADER', () => {
@@ -511,6 +596,19 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
   });
 
   // ─── Barcode scanner flow (React-only feature) ────────────────────────────────
+  // The 2026-09-07 redesign dropped the modal's manual-entry form; these tests
+  // drive the onScanned(barcode, quantity) contract through the ScannerModal mock.
+
+  /** Fires a scan through the mocked ScannerModal. */
+  function fireScan(barcode: string, quantity = 1) {
+    const barcodeInput = screen.getByTestId('scanner-mock-barcode') as HTMLInputElement;
+    fireEvent.change(barcodeInput, { target: { value: barcode } });
+    barcodeInput.dataset.barcode = barcode;
+    const quantityInput = screen.getByTestId('scanner-mock-quantity') as HTMLInputElement;
+    fireEvent.change(quantityInput, { target: { value: String(quantity) } });
+    quantityInput.dataset.quantity = String(quantity);
+    fireEvent.click(screen.getByTestId('scanner-mock-scan'));
+  }
 
   it('scanner: unknown barcode shows PRODUCT_NOT_FOUND and adds nothing', async () => {
     render(
@@ -519,9 +617,8 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('quick-sale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '999999' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('999999');
 
     await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
     expect(showToastErrorMock).toHaveBeenCalledWith('Producto no encontrado: 999999');
@@ -538,9 +635,8 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('quick-sale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('7501');
 
     await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
     const [product, quantity, orderType, price] = addItemMock.mock.calls[0];
@@ -549,6 +645,24 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(orderType).toBe(OrderType.Normal);
     expect(price).toBe(1.5);
     expect(showToastSuccessMock).toHaveBeenCalledWith('Coca Cola agregado a la venta');
+  });
+
+  it('scanner: the scanned quantity multiplies the added units', async () => {
+    saleServiceSpies.getProductByBarcode.mockImplementation(async () =>
+      bm(makeProduct({ id: 'p1', name: 'Coca Cola', price: 1.5, barcode: '7501' })),
+    );
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('quick-sale-scanner'));
+    await screen.findByTestId('scanner-modal');
+    fireScan('7501', 3);
+
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
+    const [, quantity] = addItemMock.mock.calls[0];
+    expect(quantity).toBe(3);
   });
 
   it('scanner: non-sellable product gets NOT_SELLABLE (distinct from not-found) and is not added', async () => {
@@ -561,9 +675,8 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('quick-sale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('7501');
 
     await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
     expect(showToastErrorMock).toHaveBeenCalledWith(
@@ -582,14 +695,12 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('quick-sale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
+    await screen.findByTestId('scanner-modal');
 
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    fireScan('7501');
     await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    fireScan('7501');
     await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(2));
   });
 
@@ -606,13 +717,15 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId('quick-sale-scanner'));
-    const input = await screen.findByTestId('scanner-manual-input');
-    fireEvent.change(input, { target: { value: '7501' } });
-    fireEvent.submit(input.closest('form')!);
+    await screen.findByTestId('scanner-modal');
+    fireScan('7501');
 
     await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
     expect(addItemMock).not.toHaveBeenCalled();
     const [, text] = showBlockingErrorMock.mock.calls[0];
+    // The base message is the ProductNotAvailable description; the stock
+    // detail (SALES.AVAILABLE_STOCK) is appended only when the inventory read
+    // has entries — in this suite's empty localStorage it does not.
     expect(text).toBe('El producto no está disponible en el inventario.');
   });
 });

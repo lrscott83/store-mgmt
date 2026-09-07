@@ -357,6 +357,7 @@ const messages: Record<string, string> = {
   'SALES.PRODUCT_NOT_ADDED_TO_CART':
     'Ocurrío un error adicionando el producto a la venta. Por favor, vuelva a intentarlo y si persiste contacte al equipo de soporte técnico.',
   'SALES.NOT_INVENTORY_AVAILABLE_MESSAGE': 'El producto no está disponible en el inventario.',
+  'SALES.AVAILABLE_STOCK': 'Disponibles en inventario: {available}.',
   'SALES.ALL_CATEGORIES': 'Todos',
   'SALES.SEARCH_PLACEHOLDER': 'Buscar producto por nombre...',
   'SALES.WHOLESALE.ENABLE': 'Venta Mayorista',
@@ -634,6 +635,9 @@ const messages: Record<string, string> = {
 
   // Scanner
   'SCANNER.TITLE': 'Escanear producto',
+  'SCANNER.QUANTITY': 'Cantidad',
+  'SCANNER.DECREASE_QUANTITY': 'Disminuir cantidad a adicionar',
+  'SCANNER.INCREASE_QUANTITY': 'Aumentar cantidad a adicionar',
   'SCANNER.DONE': 'Listo',
   'SCANNER.MANUAL_ENTRY': 'Ingresar código de barras',
   'SCANNER.MANUAL_ENTRY_PLACEHOLDER': 'Código de barras',

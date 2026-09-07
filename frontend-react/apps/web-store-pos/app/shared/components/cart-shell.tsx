@@ -191,8 +191,14 @@ export function CartShell() {
       // Angular: Swal.fire({ title: GENERAL.RESPONSE.ERROR_TITLE, text: message,
       // icon: 'error' }) — blocking, aborts the quantity change. Angular reads
       // `availableResult.errors[0].description` directly (hardcoded Spanish text).
+      // The stock ceiling is appended when the inventory read has entries, so
+      // the merchant sees how many units are actually available.
       const message = result.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
+      const stock = inventoryService.getAvailableQuantity(productId);
+      const detail = stock.hasEntries
+        ? `\n${intl.formatMessage({ id: 'SALES.AVAILABLE_STOCK' }, { available: stock.available })}`
+        : '';
+      showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
       return;
     }
     updateQuantity(productId, currentQuantity + deltaUnits);

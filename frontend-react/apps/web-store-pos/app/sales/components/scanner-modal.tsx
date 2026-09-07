@@ -1,49 +1,60 @@
 import { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { CloseIcon } from '~/shared/components/ui/icons';
-import { Button } from '~/shared/components/ui/button';
 
 interface ScannerModalProps {
   /**
-   * Called once per decoded/entered barcode. The parent owns the full
-   * add-to-sale flow (lookup, sellability, inventory gate, cart add) —
-   * the modal only decodes and reports, exactly like the manual-entry
-   * fallback reports typed input.
+   * Called once per decoded barcode with the quantity to add (the stepper's
+   * current value at scan time). The parent owns the full add-to-sale flow
+   * (lookup, sellability, inventory gate, cart add) and its own success
+   * feedback.
    */
-  onScanned: (barcode: string) => void;
+  onScanned: (barcode: string, quantity: number) => void;
   onClose: () => void;
 }
 
 /**
- * Camera barcode scanner for the sale view. Decodes continuously with
- * `@zxing/browser` (ALREADY a dependency — installed for this feature,
- * never imported elsewhere), stays OPEN after each scan (POS cadence:
- * scan-scan-scan, then close), and also offers a manual barcode input
- * that works without a camera and doubles as the keyboard-wedge path
- * for hardware gun scanners.
+ * Camera barcode scanner for the sale/wholesale views. Decodes continuously
+ * with `@zxing/browser` (ALREADY a dependency — installed for this feature,
+ * never imported elsewhere) and stays OPEN after each scan (POS cadence:
+ * scan-scan-scan, then close via the X button or Escape).
  *
- * ALL zxing imports are DYNAMIC, inside the open effect — the library
- * is a lazy chunk that only loads when the scanner actually opens
- * (AGENTS.md heavy-dependency rule; the sale route's initial bundle
- * is unchanged).
+ * ALL zxing imports are DYNAMIC, inside the open effect — the library is a
+ * lazy chunk that only loads when the scanner actually opens (AGENTS.md
+ * heavy-dependency rule; the routes' initial bundles are unchanged).
  *
- * Continuous-scan debounce: zxing's `delayBetweenScanSuccess` (500ms)
- * plus a guard ignoring an identical consecutive barcode within a
- * short window, so a code held in front of the lens doesn't
- * double-add.
+ * Quantity stepper (2026-09-07 redesign): the manual barcode textbox, its +
+ * submit button and the "Listo" button are GONE. In their place sits a
+ * compact quantity stepper — the same round −/+ buttons as the shopping cart
+ * (cart-shell.tsx) — defaulting to 1, right-aligned and narrow. Each decoded
+ * scan adds the product `quantity` times; the stepper resets to 1 after each
+ * scan it forwards, so the next scan starts from 1 again.
+ *
+ * Double-scan guard (2026-09-07 bug: one scan added 2): zxing's own
+ * `delayBetweenScanSuccess` (500ms) is not enough on some devices — the
+ * decode callback can fire twice for the same frame burst. A local guard
+ * drops an identical consecutive barcode within a 900ms window so one
+ * physical scan never adds twice.
  */
 export function ScannerModal({ onScanned, onClose }: ScannerModalProps) {
   const intl = useIntl();
   const videoRef = useRef<HTMLVideoElement>(null);
-  // Keeps the latest onScanned without retriggering the camera effect —
-  // the decode callback reads .current, so a new parent callback identity
-  // never restarts the stream.
+  // Latest-callback refs: the camera effect must start ONCE per mount, so the
+  // decode callback reads through refs instead of closing over props/state —
+  // a new onScanned identity or a changed quantity never restarts the stream.
   const onScannedRef = useRef(onScanned);
   useEffect(() => {
     onScannedRef.current = onScanned;
   }, [onScanned]);
   const [status, setStatus] = useState<'idle' | 'starting' | 'scanning' | 'denied' | 'failed'>('idle');
-  const [manualBarcode, setManualBarcode] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const quantityRef = useRef(quantity);
+  useEffect(() => {
+    quantityRef.current = quantity;
+  }, [quantity]);
+  // Double-scan guard state — plain refs (no re-render needed).
+  const lastBarcodeRef = useRef<string>('');
+  const lastScanAtRef = useRef(0);
 
   useEffect(() => {
     let controls: { stop: () => void } | null = null;
@@ -52,8 +63,7 @@ export function ScannerModal({ onScanned, onClose }: ScannerModalProps) {
     async function start() {
       try {
         // Dynamic import: @zxing/browser lands in its own lazy chunk, only
-        // when the scanner opens. `delayBetweenScanSuccess` debounces the
-        // same code being read repeatedly while it sits under the lens.
+        // when the scanner opens.
         const { BrowserMultiFormatReader } = await import('@zxing/browser');
         if (cancelled || !videoRef.current) return;
 
@@ -66,17 +76,28 @@ export function ScannerModal({ onScanned, onClose }: ScannerModalProps) {
           undefined, // default (environment-facing where available) camera
           videoRef.current,
           (result) => {
-            if (result) {
-              onScannedRef.current(result.getText());
+            if (!result) return;
+            const barcode = result.getText();
+            // Double-scan guard: drop an identical consecutive barcode inside
+            // the window — one physical scan must add exactly once.
+            const now = Date.now();
+            if (barcode === lastBarcodeRef.current && now - lastScanAtRef.current < 900) {
+              return;
             }
+            lastBarcodeRef.current = barcode;
+            lastScanAtRef.current = now;
+            const qty = quantityRef.current;
+            onScannedRef.current(barcode, qty);
+            // Reset the stepper after the forwarded scan: the next scan adds
+            // from 1 again (the merchant nudges quantity per-scan, not as a
+            // sticky multiplier).
+            setQuantity(1);
           },
         );
         controls = streamControls;
         if (!cancelled) setStatus('scanning');
       } catch {
         // getUserMedia denied/unavailable, or the stream failed mid-flight.
-        // The manual entry below keeps the flow usable — the modal degrades
-        // to manual-only instead of dying.
         if (!cancelled) setStatus('denied');
       }
     }
@@ -90,17 +111,8 @@ export function ScannerModal({ onScanned, onClose }: ScannerModalProps) {
       controls?.stop();
     };
     // Empty deps on purpose: the camera starts once per modal mount and the
-    // decode callback reads onScannedRef.current (declared above), never a
-    // stale closure.
+    // decode callback reads the refs above, never a stale closure.
   }, []);
-
-  function handleManualSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const barcode = manualBarcode.trim();
-    if (!barcode) return;
-    onScannedRef.current(barcode);
-    setManualBarcode('');
-  }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') onClose();
@@ -154,28 +166,47 @@ export function ScannerModal({ onScanned, onClose }: ScannerModalProps) {
           </p>
         )}
 
-        {/* Manual entry — no-camera fallback, hardware gun scanners
-            (keyboard wedge), and the E2E-testable path. */}
-        <form onSubmit={handleManualSubmit} className="flex gap-2">
-          <input
-            type="text"
-            value={manualBarcode}
-            onChange={(e) => setManualBarcode(e.target.value)}
-            placeholder={intl.formatMessage({ id: 'SCANNER.MANUAL_ENTRY_PLACEHOLDER' })}
-            aria-label={intl.formatMessage({ id: 'SCANNER.MANUAL_ENTRY' })}
-            className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
-            data-testid="scanner-manual-input"
-          />
-          <Button variant="fab" type="submit" data-testid="scanner-manual-submit">
-            <span className="sr-only">{intl.formatMessage({ id: 'GENERAL.ADD' })}</span>
-            +
-          </Button>
-        </form>
-
-        <div className="mt-4 flex justify-end">
-          <Button variant="fab" type="button" onClick={onClose} data-testid="scanner-done">
-            {intl.formatMessage({ id: 'SCANNER.DONE' })}
-          </Button>
+        {/* Quantity stepper — the same round −/+ buttons as the shopping cart
+            (cart-shell.tsx), right-aligned and compact. The value is read at
+            scan time; each scan adds the product this many times and the
+            stepper resets to 1. */}
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-xs font-medium text-text-muted">
+            {intl.formatMessage({ id: 'SCANNER.QUANTITY' })}
+          </span>
+          <div className="flex items-center gap-1" data-testid="scanner-quantity-stepper">
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none disabled:opacity-40"
+              aria-label={intl.formatMessage({ id: 'SCANNER.DECREASE_QUANTITY' })}
+              data-testid="scanner-quantity-decrease"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => {
+                const parsed = parseInt(e.target.value, 10);
+                setQuantity(Number.isFinite(parsed) && parsed > 0 ? parsed : 1);
+              }}
+              aria-label={intl.formatMessage({ id: 'SCANNER.QUANTITY' })}
+              data-testid="scanner-quantity-input"
+              className="w-16 rounded-md border border-gray-300 px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            />
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => q + 1)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white text-2xl leading-none"
+              aria-label={intl.formatMessage({ id: 'SCANNER.INCREASE_QUANTITY' })}
+              data-testid="scanner-quantity-increase"
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
     </div>

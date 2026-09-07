@@ -219,17 +219,18 @@ export function WholesalePage() {
   /**
    * Scanner flow: barcode -> lookup -> sellability + wholesale config ->
    * the SAME shared addProductToWholesale gate as the manual add, with the
-   * MIN-PACKS quantity of the first tier (user decision 2026-09-07: each
-   * scan adds the first tier's minimum so the POS scan-scan-scan cadence
-   * never trips the min-packs error; exact counts are adjusted in the cart).
-   * The repository's barcode lookup does NOT filter isActive/availableToSale
-   * or wholesaleEnabled (unlike the category-scoped sellable query the
-   * manual rows come from), so the scanner must check all three before
-   * adding — a non-wholesale product gets its own message, NOT "not
-   * found", so the merchant knows the barcode works but the product can't
-   * be sold wholesale.
+   * scanned QUANTITY multiplying the first tier's minimum packs (user
+   * decision 2026-09-07: quantity 1 = minPacks of the first tier, so the
+   * stepper scales whole tier-minimums and never trips the min-packs
+   * error). The repository's barcode lookup does NOT filter
+   * isActive/availableToSale or wholesaleEnabled (unlike the
+   * category-scoped sellable query the manual rows come from), so the
+   * scanner must check all three before adding — a non-wholesale product
+   * gets its own message, NOT "not found", so the merchant knows the
+   * barcode works but the product can't be sold wholesale. An
+   * inventory-gate failure appends how many units are actually available.
    */
-  function handleScanned(barcode: string) {
+  function handleScanned(barcode: string, quantity: number) {
     const productService = createProductService(storeId);
     productService.getProductByBarcode(barcode).then((result) => {
       const product = result.data;
@@ -247,20 +248,27 @@ export function WholesalePage() {
         );
         return;
       }
-      const packs = getWholesaleMinPacks(product);
-      if (packs <= 0) {
+      const minPacks = getWholesaleMinPacks(product);
+      if (minPacks <= 0) {
         showToastError(
           intl.formatMessage({ id: 'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE' }, { name: product.name }),
         );
         return;
       }
+      const packs = minPacks * quantity;
 
       const failure = addProductToWholesale(product, packs);
       if (failure) {
-        // Same blocking-alert contract as the manual row add (sale.tsx scanner).
+        // Same blocking-alert contract as the manual row add, with the
+        // store's available stock appended so the merchant sees the
+        // inventory ceiling.
         const message =
           failure.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
-        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
+        const stock = inventoryService.getAvailableQuantity(product.id);
+        const detail = stock.hasEntries
+          ? `\n${intl.formatMessage({ id: 'SALES.AVAILABLE_STOCK' }, { available: stock.available })}`
+          : '';
+        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
         return;
       }
       const { unitPrice } = resolveWholesalePrice(product, packs);

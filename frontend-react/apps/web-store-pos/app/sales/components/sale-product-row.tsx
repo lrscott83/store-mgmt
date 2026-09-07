@@ -53,8 +53,15 @@ export function SaleProductRow({
         // Angular reads `availableResult.errors[0].description` directly (already
         // hardcoded Spanish text in ProductErrors, not an i18n key lookup), falling back to
         // ProductErrors.ProductNotAvailable.description when errors is empty.
+        // The stock ceiling is appended when the caller supplied it (sale.tsx
+        // passes availableQuantity for inventory-discounting products).
         const message = result.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
-        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
+        const detail =
+          result.errors[0]?.code === ProductErrors.ProductQuantityNotAvailable.code &&
+          availableQuantity !== undefined
+            ? `\n${intl.formatMessage({ id: 'SALES.AVAILABLE_STOCK' }, { available: availableQuantity })}`
+            : '';
+        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message + detail);
         return;
       }
     }

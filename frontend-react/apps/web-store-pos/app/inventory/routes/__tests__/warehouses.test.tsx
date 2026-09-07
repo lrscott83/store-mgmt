@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Product, Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
+import type { Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
 import { Result, WarehouseErrors } from '@store-mgmt/domain';
 
 const mockUser = vi.hoisted(() => ({
