@@ -17,16 +17,25 @@ import { newTestIdentity } from './support/identity';
  *   6. Desactivar almacén con stock → bloqueado (Swal); vacío → (Inactivo).
  *   7. Cantidad decimal (10.555 → 10.56) en purchase_in/sale_out con round2.
  *   8. Exportar/importar backup /sync con las 3 entidades de almacenes.
- *   9. Ítem de menú 🏬 Almacenes solo con el feature Warehouses (36).
+ *   9. Ítem de menú Almacenes: la persona nueva ya trae el feature Warehouses
+ *       (36) por defecto (módulo 13), así que el gating se prueba con el seam
+ *       inverso (quita 36 → oculto, re-agrega → visible); el gate por rol lo
+ *       cubre el test 11.
  *   10. Regresión venta: FIFO con el costo del almacén en today-sales-profit.
  *   11. Acceso por rol: un StoreUser (empleado, rol 3) no ve el ítem de menú y
  *      la ruta /inventory/warehouses lo desloguea (Warehouses es OwnerAdmin-only
  *      en StoreRoleFeatures.cs:86-89; featureLoader sin bypass para StoreUser).
  *
- * La persona `owner-admin-with-products` NO tiene el feature Warehouses (36)
- * en su plan, así que el spec lo añade al AUTH_MODEL + currentUser en
- * localStorage (mismo seam que mutateAuthModel) y recarga — el guard
- * featureLoader lo lee de ahí.
+ * El módulo 13 (Add-Warehouses-Module, 2026-09-05/06) asigna Warehouses (36) a
+ * toda tienda nueva en runtime, así que la persona OwnerAdmin ya lo trae. El
+ * seam fuerza 36/31 en `currentUser` (featureIds Y roles[].featureIds) en
+ * localStorage y recarga: en cold boot la app hidrata `user` desde currentUser
+ * (auth-store.ts:161-178) y la sidebar autoriza vía isUserAuthorized, que además
+ * del featureIds top-level chequea roles[].featureIds
+ * (authorization-service.ts:35-38) — por eso el seam toca ambos. El test de
+ * gating lo QUITA primero para probar que el ítem se oculta sin él, y luego lo
+ * vuelve a habilitar. (2026-09-06 UI redesign: los botones "Desactivar" viven
+ * en el menú de engranaje por almacén; los tests adaptados lo abren primero.)
  */
 
 const NEW_WAREHOUSE = 'Nuevo almacén'; // WAREHOUSES.NEW_WAREHOUSE
@@ -75,6 +84,67 @@ async function enableWarehouseFeatures(page: Page): Promise<void> {
         const current = JSON.parse(rawCurrent);
         if (current && Array.isArray(current.featureIds)) {
           current.featureIds = addIds(current.featureIds);
+        }
+        // isUserAuthorized grants ALSO via roles[].featureIds
+        // (authorization-service.ts:35-38), so the seam must patch the same
+        // feature on every role row or the menu stays visible for an OwnerAdmin
+        // whose role carries 36.
+        if (current && Array.isArray(current.roles)) {
+          for (const role of current.roles) {
+            if (role && Array.isArray(role.featureIds)) {
+              role.featureIds = addIds(role.featureIds);
+            }
+          }
+        }
+        window.localStorage.setItem('currentUser', JSON.stringify(current));
+      } catch {
+        /* leave as-is */
+      }
+    }
+  });
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+}
+
+/** Removes ONLY the Warehouses feature (36) from the restored persona and reloads. */
+async function disableWarehouseFeatures(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const withoutWarehouses = (featureIds: number[] | undefined): number[] =>
+      (featureIds ?? []).filter((id) => id !== 36);
+
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key || !key.includes('authf496fc5a9f17')) continue;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const model = JSON.parse(raw);
+        if (model && Array.isArray(model.featureIds)) {
+          model.featureIds = withoutWarehouses(model.featureIds);
+        }
+        if (model?.user && Array.isArray(model.user.featureIds)) {
+          model.user.featureIds = withoutWarehouses(model.user.featureIds);
+        }
+        window.localStorage.setItem(key, JSON.stringify(model));
+      } catch {
+        /* leave as-is */
+      }
+    }
+    const rawCurrent = window.localStorage.getItem('currentUser');
+    if (rawCurrent) {
+      try {
+        const current = JSON.parse(rawCurrent);
+        if (current && Array.isArray(current.featureIds)) {
+          current.featureIds = withoutWarehouses(current.featureIds);
+        }
+        // Same reason as enableWarehouseFeatures: isUserAuthorized grants via
+        // roles[].featureIds too, so strip 36 from every role row as well.
+        if (current && Array.isArray(current.roles)) {
+          for (const role of current.roles) {
+            if (role && Array.isArray(role.featureIds)) {
+              role.featureIds = withoutWarehouses(role.featureIds);
+            }
+          }
         }
         window.localStorage.setItem('currentUser', JSON.stringify(current));
       } catch {
@@ -396,7 +466,10 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await expect(onHandCell(page, 'Con Stock')).toHaveText('24');
 
     // Intentar desactivar → Swal con CannotDeactivate, el almacén sigue activo.
-    await page.getByTestId('warehouse-card-Con Stock').getByText('Desactivar').click();
+    // (2026-09-06 UI redesign: "Desactivar" lives in the per-warehouse gear menu
+    //  now — open it first, then click the menuitem. Authorized adaptation.)
+    await page.getByRole('button', { name: 'Acciones de Con Stock' }).click();
+    await page.getByRole('menuitem', { name: 'Desactivar' }).click();
     await expect(page.getByText(CANNOT_DEACTIVATE)).toBeVisible();
     await dismissSwal(page);
     await expect(page.getByTestId('warehouse-card-Con Stock')).toBeVisible();
@@ -404,7 +477,8 @@ test.describe.serial('Almacenes — flujo completo', () => {
 
     // Almacén VACÍO (sin stock ni movimientos): sí se desactiva → (Inactivo).
     await createWarehouse(page, 'Vacío');
-    await page.getByTestId('warehouse-card-Vacío').getByText('Desactivar').click();
+    await page.getByRole('button', { name: 'Acciones de Vacío' }).click();
+    await page.getByRole('menuitem', { name: 'Desactivar' }).click();
     await expect(page.getByTestId('warehouse-card-Vacío').getByText(INACTIVE_TAG)).toBeVisible();
   });
 
@@ -483,11 +557,17 @@ test.describe.serial('Almacenes — flujo completo', () => {
     await expect(page.locator('[data-testid^="mv-qty-"]')).toHaveCount(1);
   });
 
-  test('el ítem de menú Almacenes solo aparece con el feature Warehouses', async ({
+  test('el ítem de menú Almacenes se oculta sin el feature y aparece al habilitarlo', async ({
     signedInPage,
   }) => {
     const { page } = signedInPage;
-    // Sin habilitar el feature (36): la persona restaurada no lo tiene.
+    // Módulo 13 (Add-Warehouses-Module): toda tienda nueva nace con el feature
+    // Warehouses (36) para OwnerAdmin. Para probar el gating, primero lo
+    // QUITAMOS del AUTH_MODEL + currentUser en localStorage (seam inverso) y
+    // recargamos.
+    await disableWarehouseFeatures(page);
+
+    // Sin el feature (36): el ítem no aparece.
     await page.goto('/inventory/available');
     await page.waitForLoadState('networkidle');
     await openSidebar(page);

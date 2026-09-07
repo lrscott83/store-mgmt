@@ -14,6 +14,7 @@ import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
 import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { formatCurrency } from '~/shared/lib/format-currency';
@@ -22,6 +23,7 @@ import { InventoryOfflineService } from '../lib/services/inventory-offline-servi
 import { WarehouseOfflineService } from '../lib/services/warehouse-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
+import { WarehouseFormModal } from '../components/warehouse-form-modal';
 
 export const clientLoader = featureLoader([EFeatures.Warehouses]);
 
@@ -58,10 +60,10 @@ export function WarehousesPage() {
   const [stockLevels, setStockLevels] = useState<WarehouseStockLevel[]>([]);
   const [movements, setMovements] = useState<WarehouseStockMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [newName, setNewName] = useState('');
-  const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [renaming, setRenaming] = useState<Record<string, string>>({});
+  /** Modal state: creating XOR editing (null/undefined = closed). */
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Warehouse | null>(null);
   const [form, setForm] = useState<MovementFormState>({
     mode: null,
     warehouseId: '',
@@ -112,9 +114,9 @@ export function WarehousesPage() {
   const warehouseName = (id: string) =>
     warehouses.find((w) => w.id === id)?.name ?? id;
 
-  function handleCreate() {
-    if (!service || !newName.trim()) return;
-    const result = service.createWarehouse(newName);
+  function handleModalSave(name: string) {
+    if (!service) return;
+    const result = editing ? service.updateWarehouse(editing.id, name) : service.createWarehouse(name);
     if (!result.succeeded) {
       showBlockingError(
         intl.formatMessage({ id: 'GENERAL.ERROR' }),
@@ -122,34 +124,20 @@ export function WarehousesPage() {
       );
       return;
     }
-    setNewName('');
-    setCreating(false);
-    showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.CREATED' }));
+    setModalOpen(false);
+    setEditing(null);
+    showToastSuccess(intl.formatMessage({ id: editing ? 'WAREHOUSES.UPDATED' : 'WAREHOUSES.CREATED' }));
     load();
   }
 
-  function handleRename(warehouse: Warehouse) {
-    if (!service) return;
-    const name = renaming[warehouse.id];
-    if (name === undefined) {
-      setRenaming((prev) => ({ ...prev, [warehouse.id]: warehouse.name }));
-      return;
-    }
-    const result = service.updateWarehouse(warehouse.id, name);
-    if (!result.succeeded) {
-      showBlockingError(
-        intl.formatMessage({ id: 'GENERAL.ERROR' }),
-        result.errors[0]?.description ?? '',
-      );
-      return;
-    }
-    setRenaming((prev) => {
-      const next = { ...prev };
-      delete next[warehouse.id];
-      return next;
-    });
-    showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.UPDATED' }));
-    load();
+  function openCreateModal() {
+    setEditing(null);
+    setModalOpen(true);
+  }
+
+  function openEditModal(warehouse: Warehouse) {
+    setEditing(warehouse);
+    setModalOpen(true);
   }
 
   function handleDeactivate(warehouse: Warehouse) {
@@ -207,6 +195,9 @@ export function WarehousesPage() {
   const totalOnHand = (warehouseId: string) =>
     stockOf(warehouseId).reduce((sum, level) => sum + level.onHand, 0);
 
+  const totalCost = (warehouseId: string) =>
+    stockOf(warehouseId).reduce((sum, level) => sum + level.onHand * level.costPrice, 0);
+
   return (
     <Card
       padding="tight"
@@ -218,30 +209,22 @@ export function WarehousesPage() {
               ({warehouses.length})
             </span>
           </span>
-          <Button variant="primary" onClick={() => setCreating((prev) => !prev)}>
+          <Button variant="primary" onClick={openCreateModal}>
             {intl.formatMessage({ id: 'WAREHOUSES.NEW_WAREHOUSE' })}
           </Button>
         </div>
       }
     >
       <div className="space-y-4">
-        {creating && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-background p-3">
-            <input
-              data-testid="warehouse-name-input"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder={intl.formatMessage({ id: 'WAREHOUSES.NAME_PLACEHOLDER' })}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
-            />
-            <Button variant="primary" onClick={handleCreate}>
-              {intl.formatMessage({ id: 'WAREHOUSES.SAVE' })}
-            </Button>
-            <Button variant="outline" onClick={() => setCreating(false)}>
-              {intl.formatMessage({ id: 'WAREHOUSES.CANCEL' })}
-            </Button>
-          </div>
-        )}
+        <WarehouseFormModal
+          open={modalOpen}
+          warehouse={editing ?? undefined}
+          onClose={() => {
+            setModalOpen(false);
+            setEditing(null);
+          }}
+          onSave={handleModalSave}
+        />
 
         {warehouses.length === 0 && (
           <InfoBox variant="primary" className="text-center">
@@ -253,7 +236,6 @@ export function WarehousesPage() {
           {warehouses.map((warehouse) => {
             const isExpanded = !!expanded[warehouse.id];
             const levels = stockOf(warehouse.id);
-            const renamingValue = renaming[warehouse.id];
             return (
               <div
                 key={warehouse.id}
@@ -279,35 +261,34 @@ export function WarehousesPage() {
                       )}
                     </span>
                     <span className="text-xs text-text-muted">
+                      {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT_COUNT' })}:{' '}
+                      {levels.length} · {intl.formatMessage({ id: 'WAREHOUSES.TOTAL_COST' })}:{' '}
+                      {formatCurrency(totalCost(warehouse.id))} ·{' '}
                       {intl.formatMessage({ id: 'WAREHOUSES.ON_HAND' })}:{' '}
                       {totalOnHand(warehouse.id)}
                     </span>
                   </button>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => handleRename(warehouse)}>
+                  <ActionMenu
+                    testId={`warehouse-actions-toggle-${warehouse.id}`}
+                    label={`Acciones de ${warehouse.name}`}
+                  >
+                    <ActionMenuItem
+                      intent="edit"
+                      data-testid={`warehouse-edit-${warehouse.id}`}
+                      onClick={() => openEditModal(warehouse)}
+                    >
                       {intl.formatMessage({ id: 'WAREHOUSES.EDIT' })}
-                    </Button>
-                    <Button variant="outline" onClick={() => handleDeactivate(warehouse)}>
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      intent="deactivate"
+                      separatorBefore
+                      data-testid={`warehouse-deactivate-${warehouse.id}`}
+                      onClick={() => handleDeactivate(warehouse)}
+                    >
                       {intl.formatMessage({ id: 'WAREHOUSES.DEACTIVATE' })}
-                    </Button>
-                  </div>
+                    </ActionMenuItem>
+                  </ActionMenu>
                 </div>
-
-                {renamingValue !== undefined && (
-                  <div className="flex items-center gap-2 border-t border-border px-4 py-3">
-                    <input
-                      data-testid={`warehouse-rename-${warehouse.name}`}
-                      value={renamingValue}
-                      onChange={(e) =>
-                        setRenaming((prev) => ({ ...prev, [warehouse.id]: e.target.value }))
-                      }
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
-                    />
-                    <Button variant="primary" onClick={() => handleRename(warehouse)}>
-                      {intl.formatMessage({ id: 'WAREHOUSES.SAVE' })}
-                    </Button>
-                  </div>
-                )}
 
                 {isExpanded && (
                   <div className="border-t border-border px-4 py-3">

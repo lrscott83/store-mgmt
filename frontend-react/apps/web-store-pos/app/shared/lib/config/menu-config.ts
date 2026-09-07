@@ -136,7 +136,8 @@ export const MENU_GROUPS: MenuGroup[] = [
       { label: 'MENU.STORES_UPDATE', path: '/management/stores/update', featureIds: [EFeatures.Stores], moduleId: EModules.Management,
         helpContent: 'Editar información de la tienda. Actualiza el nombre, dirección, teléfono y otros datos de tu negocio. Estos cambios se reflejan en los reportes.' },
       // Convention: NO menu item carries an icon — plain text labels only
-      // (the wholesale 📦 and exchange-rate 💱 icons were removed 2026-09-04).
+      // (the wholesale 📦, exchange-rate 💱 and warehouses 🏬 icons were
+      // removed; the icon property is gone from MenuItem entirely).
       { label: 'MENU.EXCHANGE_RATES', path: '/management/exchange-rates', featureIds: [EFeatures.Configurations], moduleId: EModules.Management,
         helpContent: 'Registro diario del cambio de USD a MN. Cada día se añade un registro con el valor del día anterior (por defecto 1). Puedes editar el valor de cualquier día: escribe cuántos pesos (MN) equivale 1 USD en esa fecha y pulsa Guardar.' },
       { label: 'MENU.USERS', path: '/management/users', featureIds: [EFeatures.Users], moduleId: EModules.Management,
