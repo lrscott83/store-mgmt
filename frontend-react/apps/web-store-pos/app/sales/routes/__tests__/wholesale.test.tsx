@@ -55,9 +55,13 @@ vi.mock('~/shared/lib/blocking-alert', () => ({
   showBlockingInfoHtml: (...args: unknown[]) => showBlockingInfoHtmlMock(...args),
 }));
 
+const showBlockingInfoHtmlMock = vi.hoisted(() => vi.fn());
+
 const showToastSuccessMock = vi.hoisted(() => vi.fn());
+const showToastErrorMock = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/lib/toast', () => ({
   showToastSuccess: (...args: unknown[]) => showToastSuccessMock(...args),
+  showToastError: (...args: unknown[]) => showToastErrorMock(...args),
 }));
 
 const hasInventoryModuleMock = vi.hoisted(() => vi.fn(() => false));
@@ -72,10 +76,10 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   })),
 }));
 
-const showBlockingInfoHtmlMock = vi.hoisted(() => vi.fn());
-
 let mockCategories: ProductCategory[] = [];
 let mockProducts: Product[] = [];
+/** Producto retornado por getProductByBarcode — null = "no encontrado". */
+let mockBarcodeProduct: Product | null = null;
 
 const bm = <T,>(data: T) => ({ data, succeeded: true, message: '', actionCode: 200, errors: [] });
 
@@ -83,6 +87,9 @@ vi.mock('~/sales/lib/services/product-service.factory', () => ({
   createProductService: () => ({
     getProductsToSaleByCategoryId: vi.fn(async (categoryId: string) =>
       bm(mockProducts.filter((p) => p.categoryId === categoryId)),
+    ),
+    getProductByBarcode: vi.fn(async (barcode: string) =>
+      mockBarcodeProduct?.barcode === barcode ? bm(mockBarcodeProduct) : bm(null),
     ),
   }),
 }));
@@ -132,6 +139,7 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     inventoryServiceMock.mockReturnValue({ hasEntries: false, available: 0 });
     cartStateMock.items = [];
     cartStateMock.orderType = 1; // OrderType.Normal
+    mockBarcodeProduct = null;
     mockCategories = [makeCategory()];
     mockProducts = [
       makeProduct('beer-1', {
@@ -550,5 +558,189 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     expect(message).toContain('288');
     // El detalle NO se agrega cuando la falla no es de cantidad (hasEntries true,
     // units <= available) — cubierto por el flujo de éxito de los otros tests.
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Scanner + switch "Todos" (paridad con /sales/new, 2026-09-07)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('renderiza el botón del scanner junto al searchbox y abre el modal', async () => {
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    const scannerButton = screen.getByTestId('wholesale-scanner');
+    expect(scannerButton).toBeInTheDocument();
+    expect(screen.queryByTestId('scanner-modal')).not.toBeInTheDocument();
+
+    fireEvent.click(scannerButton);
+    expect(await screen.findByTestId('scanner-modal')).toBeInTheDocument();
+  });
+
+  it('scanner: barcode desconocido muestra PRODUCT_NOT_FOUND y no agrega nada', async () => {
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('wholesale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '999999' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
+    expect(showToastErrorMock).toHaveBeenCalledWith('Producto no encontrado: 999999');
+    expect(addItemMock).not.toHaveBeenCalled();
+  });
+
+  it('scanner: producto mayorista vendible se agrega con el mínimo del primer rango y OrderType.Mayorista', async () => {
+    mockBarcodeProduct = makeProduct('beer-1', {
+      name: 'Cerveza',
+      barcode: '7501',
+      wholesaleEnabled: true,
+      wholesalePackSize: 24,
+      wholesaleTiers: [
+        { minPacks: 5, pricePerUnit: 680 },
+        { minPacks: 11, pricePerUnit: 660 },
+      ],
+    });
+    mockProducts = [mockBarcodeProduct];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('wholesale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+
+    // Cada escaneo agrega el mínimo del primer rango: 5 packs → 120 unidades.
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
+    const [product, quantity, orderType, price] = addItemMock.mock.calls[0];
+    expect(product.id).toBe('beer-1');
+    expect(quantity).toBe(120); // 5 × 24
+    expect(orderType).toBe(OrderType.Mayorista);
+    expect(price).toBe(680); // precio del primer rango
+  });
+
+  it('scanner: producto sin config mayorista obtiene su propio mensaje (distinto de not-found)', async () => {
+    // La lista tiene un mayorista (Cerveza) para que el toolbar renderice; el
+    // barcode escaneado es un producto vendible SIN config mayorista (Pan).
+    mockBarcodeProduct = makeProduct('pan-1', {
+      name: 'Pan',
+      barcode: '7502',
+      availableToSale: true,
+    });
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('wholesale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '7502' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(showToastErrorMock).toHaveBeenCalledTimes(1));
+    expect(showToastErrorMock).toHaveBeenCalledWith(
+      'El producto Pan no tiene configuración mayorista y no se puede vender en esta vista',
+    );
+    expect(addItemMock).not.toHaveBeenCalled();
+  });
+
+  it('scanner: escaneos repetidos del mismo barcode acumulan vía addItem (semántica de carrito)', async () => {
+    mockBarcodeProduct = makeProduct('beer-1', {
+      name: 'Cerveza',
+      barcode: '7501',
+      wholesaleEnabled: true,
+      wholesalePackSize: 24,
+      wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+    });
+    mockProducts = [mockBarcodeProduct];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('wholesale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+    await waitFor(() => expect(addItemMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('scanner: falla del gate de inventario muestra la alerta bloqueante y no agrega', async () => {
+    hasInventoryModuleMock.mockReturnValue(true);
+    inventoryServiceMock.mockReturnValue({ hasEntries: true, available: 40 });
+    getItemQuantityMock.mockReturnValue(0);
+    mockBarcodeProduct = makeProduct('beer-1', {
+      name: 'Cerveza',
+      barcode: '7501',
+      discountFromInvantory: true,
+      wholesaleEnabled: true,
+      wholesalePackSize: 24,
+      wholesaleTiers: [{ minPacks: 5, pricePerUnit: 680 }], // 5×24=120 > 40
+    });
+    mockProducts = [mockBarcodeProduct];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('wholesale-scanner'));
+    const input = await screen.findByTestId('scanner-manual-input');
+    fireEvent.change(input, { target: { value: '7501' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => expect(showBlockingErrorMock).toHaveBeenCalledTimes(1));
+    expect(addItemMock).not.toHaveBeenCalled();
+  });
+
+  it('la búsqueda con el switch "Todos" ON recorre productos de todas las categorías', async () => {
+    mockCategories = [makeCategory(), makeCategory({ id: 'cat-2', name: 'Carnes' })];
+    mockProducts = [
+      makeProduct('beer-1', { name: 'Cerveza Pilsen', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
+      makeProduct('croq-1', {
+        name: 'Croquetas',
+        categoryId: 'cat-2',
+        wholesaleEnabled: true,
+        wholesalePackSize: 10,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
+
+    // Seleccionar la pestaña Carnes (solo Croquetas visibles)…
+    fireEvent.click(screen.getByTestId('wholesale-category-cat-2'));
+    await waitFor(() => expect(screen.queryByText('Cerveza Pilsen')).not.toBeInTheDocument());
+    expect(screen.getByText('Croquetas')).toBeInTheDocument();
+
+    // …y con "Todos" ON, buscar "pilsen" la encuentra igual (cruza categorías).
+    const searchSwitch = screen.getByRole('switch', { name: 'Todos' });
+    expect(searchSwitch).toHaveAttribute('aria-checked', 'true');
+    fireEvent.change(screen.getByTestId('wholesale-search-input'), { target: { value: 'pilsen' } });
+    await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
+  });
+
+  it('la búsqueda con el switch "Todos" OFF se restringe a la categoría seleccionada', async () => {
+    mockCategories = [makeCategory(), makeCategory({ id: 'cat-2', name: 'Carnes' })];
+    mockProducts = [
+      makeProduct('beer-1', { name: 'Cerveza Pilsen', wholesaleEnabled: true, wholesalePackSize: 24, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }] }),
+      makeProduct('croq-1', {
+        name: 'Croquetas',
+        categoryId: 'cat-2',
+        wholesaleEnabled: true,
+        wholesalePackSize: 10,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 300 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza Pilsen')).toBeInTheDocument());
+
+    // Seleccionar Carnes y apagar "Todos": la búsqueda "pilsen" ya no encuentra
+    // la cerveza (está en Bebidas), pero "croquetas" sí.
+    fireEvent.click(screen.getByTestId('wholesale-category-cat-2'));
+    fireEvent.click(screen.getByRole('switch', { name: 'Todos' }));
+    fireEvent.change(screen.getByTestId('wholesale-search-input'), { target: { value: 'pilsen' } });
+    await waitFor(() => expect(screen.queryByText('Cerveza Pilsen')).not.toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-search-input'), { target: { value: 'croquetas' } });
+    expect(screen.getByText('Croquetas')).toBeInTheDocument();
   });
 });

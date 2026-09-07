@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import type { Product, Result } from '@store-mgmt/domain';
-import { EFeatures, OrderType, ProductErrors } from '@store-mgmt/domain';
+import type { Product } from '@store-mgmt/domain';
+import { EFeatures, OrderType, ProductErrors, Result } from '@store-mgmt/domain';
 import { featureLoader } from '~/auth/routes/loaders';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
-import { HelpIcon } from '~/shared/components/ui/icons';
+import { HelpIcon, ScanBarcodeIcon } from '~/shared/components/ui/icons';
 import { showBlockingError, showBlockingInfoHtml } from '~/shared/lib/blocking-alert';
-import { showToastSuccess } from '~/shared/lib/toast';
+import { showToastError, showToastSuccess } from '~/shared/lib/toast';
 import { formatCurrency } from '~/shared/lib/format-currency';
+import { Switch } from '~/shared/components/ui/switch';
 import { hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { InventoryOfflineService } from '~/inventory/lib/services/inventory-offline-service';
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
@@ -26,6 +27,7 @@ import {
   wholesaleUnits,
 } from '../lib/wholesale';
 import { guardOrderType } from '../lib/order-type-guard';
+import { ScannerModal } from '../components/scanner-modal';
 import type { ProductCategory } from '@store-mgmt/domain';
 
 // Mismo guard que la venta normal: feature Ventas.
@@ -58,6 +60,8 @@ export function WholesalePage() {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(ALL_CATEGORIES_ID);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchAllCategories, setSearchAllCategories] = useState(true);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [packsByProduct, setPacksByProduct] = useState<Record<string, string>>({});
   // Exclusividad Normal/Mayorista: se leen en cada render (no suscriben re-render).
   const cartItems = useCartStore((s) => s.items);
@@ -137,45 +141,57 @@ export function WholesalePage() {
     );
   }
 
-  function handleAdd(product: Product) {
-    const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
-    if (packs <= 0) return;
-
+  /**
+   * SHARED add-to-wholesale chokepoint — the manual row add (via handleAdd)
+   * and the barcode scanner both land here: type guard, min-packs check,
+   * inventory gate, then add. The manual path pre-checks nothing extra;
+   * the gates are pure, so re-running them here is deterministic.
+   * Returns the failing Result (or undefined on success) so each caller
+   * can render its own error surface (row: blocking alert, scanner: toast
+   * + blocking alert for inventory, matching sale.tsx's contract).
+   */
+  function addProductToWholesale(product: Product, packs: number): Result | undefined {
     // Exclusividad: no se puede mezclar venta normal y mayorista en el mismo carrito.
     const typeGuard = guardOrderType({ items: cartItems, cartOrderType, requested: OrderType.Mayorista });
-    if (!typeGuard.succeeded) {
-      showBlockingError(
-        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-        typeGuard.errors[0]?.description ?? '',
-      );
-      return;
-    }
+    if (!typeGuard.succeeded) return typeGuard;
 
     // La cantidad mínima de paquetes es el primer rango de la config mayorista.
     const minPacks = getWholesaleMinPacks(product);
     if (packs < minPacks) {
-      showBlockingError(
-        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
-        intl.formatMessage(
-          { id: 'SALES.WHOLESALE.MIN_PACKS_ERROR' },
-          {
-            min: minPacks,
-            packSize: product.wholesalePackSize ?? 0,
-            unit: wholesaleUnitPlural(unitName(product)),
-          },
-        ),
-      );
-      return;
+      return Result.Failure([
+        {
+          code: 'Product.WholesaleMinPacks',
+          description: intl.formatMessage(
+            { id: 'SALES.WHOLESALE.MIN_PACKS_ERROR' },
+            {
+              min: minPacks,
+              packSize: product.wholesalePackSize ?? 0,
+              unit: wholesaleUnitPlural(unitName(product)),
+            },
+          ),
+        },
+      ]);
     }
 
     const packSize = product.wholesalePackSize ?? 0;
     const units = wholesaleUnits(packs, packSize);
     const availability = availabilityGate(product, product.id, units);
-    if (!availability.succeeded) {
-      const base =
-        availability.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
+    if (!availability.succeeded) return availability;
+
+    const { unitPrice } = resolveWholesalePrice(product, packs);
+    addItem(product, units, OrderType.Mayorista, unitPrice);
+    return undefined;
+  }
+
+  function handleAdd(product: Product) {
+    const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
+    if (packs <= 0) return;
+
+    const failure = addProductToWholesale(product, packs);
+    if (failure) {
       // Detalle de inventario debajo del motivo: disponibles y faltantes (en unidades).
       const stock = inventoryService.getAvailableQuantity(product.id);
+      const units = wholesaleUnits(packs, product.wholesalePackSize ?? 0);
       const detail =
         stock.hasEntries && units > stock.available
           ? `\n${intl.formatMessage(
@@ -187,12 +203,12 @@ export function WholesalePage() {
               },
             )}`
           : '';
-      showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), base + detail);
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        (failure.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description) + detail,
+      );
       return;
     }
-
-    const { unitPrice } = resolveWholesalePrice(product, packs);
-    addItem(product, units, OrderType.Mayorista, unitPrice);
     showToastSuccess(
       intl.formatMessage({ id: 'SALES.WHOLESALE.ADDED' }, { name: product.name }),
       intl.formatMessage({ id: 'GENERAL.RESPONSE.SUCCESS_TITLE' }),
@@ -200,7 +216,67 @@ export function WholesalePage() {
     setPacksByProduct((prev) => ({ ...prev, [product.id]: '' }));
   }
 
+  /**
+   * Scanner flow: barcode -> lookup -> sellability + wholesale config ->
+   * the SAME shared addProductToWholesale gate as the manual add, with the
+   * MIN-PACKS quantity of the first tier (user decision 2026-09-07: each
+   * scan adds the first tier's minimum so the POS scan-scan-scan cadence
+   * never trips the min-packs error; exact counts are adjusted in the cart).
+   * The repository's barcode lookup does NOT filter isActive/availableToSale
+   * or wholesaleEnabled (unlike the category-scoped sellable query the
+   * manual rows come from), so the scanner must check all three before
+   * adding — a non-wholesale product gets its own message, NOT "not
+   * found", so the merchant knows the barcode works but the product can't
+   * be sold wholesale.
+   */
+  function handleScanned(barcode: string) {
+    const productService = createProductService(storeId);
+    productService.getProductByBarcode(barcode).then((result) => {
+      const product = result.data;
+      if (!product) {
+        showToastError(intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_FOUND' }, { barcode }));
+        return;
+      }
+      if (!product.isActive || !product.availableToSale) {
+        showToastError(intl.formatMessage({ id: 'SCANNER.PRODUCT_NOT_SELLABLE' }, { name: product.name }));
+        return;
+      }
+      if (!product.wholesaleEnabled || !product.wholesalePackSize || !product.wholesaleTiers?.length) {
+        showToastError(
+          intl.formatMessage({ id: 'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE' }, { name: product.name }),
+        );
+        return;
+      }
+      const packs = getWholesaleMinPacks(product);
+      if (packs <= 0) {
+        showToastError(
+          intl.formatMessage({ id: 'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE' }, { name: product.name }),
+        );
+        return;
+      }
+
+      const failure = addProductToWholesale(product, packs);
+      if (failure) {
+        // Same blocking-alert contract as the manual row add (sale.tsx scanner).
+        const message =
+          failure.errors[0]?.description ?? ProductErrors.ProductNotAvailable.description;
+        showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
+        return;
+      }
+      const { unitPrice } = resolveWholesalePrice(product, packs);
+      const units = wholesaleUnits(packs, product.wholesalePackSize ?? 0);
+      showToastSuccess(
+        intl.formatMessage(
+          { id: 'SALES.WHOLESALE.SCANNER_ADDED' },
+          { name: product.name, packs, units, price: formatCurrency(unitPrice) },
+        ),
+      );
+    });
+  }
+
   // Filtros — mismo criterio que sale.tsx: categoría (tab) Y búsqueda por nombre.
+  // Con el switch "Todos" ON la búsqueda recorre TODOS los productos mayoristas;
+  // OFF la restringe a los de la categoría seleccionada (paridad con /sales/new).
   const query = searchQuery.trim().toLowerCase();
   const visibleProducts = products.filter((product) => {
     const inCategory =
@@ -208,6 +284,12 @@ export function WholesalePage() {
     const matchesQuery = !query || product.name.toLowerCase().includes(query);
     return inCategory && matchesQuery;
   });
+
+  /** Source de la búsqueda según el switch: ALL = todos los mayoristas, sino la categoría visible. */
+  const searchSource = searchAllCategories ? products : visibleProducts;
+  const searchedProducts = query
+    ? searchSource.filter((product) => product.name.toLowerCase().includes(query))
+    : visibleProducts;
 
   // Solo categorías con productos mayoristas se muestran como tabs (paridad con
   // sale.tsx, que oculta categorías sin productos vendibles).
@@ -222,16 +304,35 @@ export function WholesalePage() {
         </InfoBox>
       ) : (
         <>
-          {/* Búsqueda por nombre — mismo searchbox que /sales/new, arriba de las tabs. */}
-          <input
-            role="searchbox"
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={intl.formatMessage({ id: 'SALES.SEARCH_PLACEHOLDER' })}
-            className="mb-3 w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            data-testid="wholesale-search-input"
-          />
+          {/* Búsqueda + scanner + switch "Todos" — mismo toolbar que /sales/new:
+              searchbox, botón del scanner y switch de alcance de búsqueda. */}
+          <div className="mb-3 flex items-center gap-2">
+            <input
+              role="searchbox"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={intl.formatMessage({ id: 'SALES.SEARCH_PLACEHOLDER' })}
+              className="min-w-0 flex-1 rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              data-testid="wholesale-search-input"
+            />
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              aria-label={intl.formatMessage({ id: 'SCANNER.TITLE' })}
+              title={intl.formatMessage({ id: 'SCANNER.TITLE' })}
+              data-testid="wholesale-scanner"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-primary transition-colors hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <ScanBarcodeIcon />
+            </button>
+            <Switch
+              checked={searchAllCategories}
+              onChange={setSearchAllCategories}
+              label={intl.formatMessage({ id: 'SALES.ALL_CATEGORIES' })}
+              className="shrink-0"
+            />
+          </div>
 
           {/* Filtro por categorías — tabs con el pseudo-tab "Todas", igual que /sales/new.
               Solo categorías con productos mayoristas. */}
@@ -267,13 +368,13 @@ export function WholesalePage() {
             ))}
           </div>
 
-          {visibleProducts.length === 0 ? (
+          {searchedProducts.length === 0 ? (
             <InfoBox variant="info" className="text-center">
               {intl.formatMessage({ id: 'STATISTICS.EMPTY_STATE' })}
             </InfoBox>
           ) : (
             <div className="divide-y divide-border">
-              {visibleProducts.map((product) => {
+              {searchedProducts.map((product) => {
                 const packSize = product.wholesalePackSize ?? 0;
                 const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
                 const { unitPrice, total } = resolveWholesalePrice(product, packs);
@@ -338,6 +439,10 @@ export function WholesalePage() {
             </div>
           )}
         </>
+      )}
+
+      {isScannerOpen && (
+        <ScannerModal onScanned={handleScanned} onClose={() => setIsScannerOpen(false)} />
       )}
     </Card>
   );

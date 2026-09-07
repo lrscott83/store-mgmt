@@ -383,6 +383,8 @@ const messages: Record<string, string> = {
   'SALES.WHOLESALE.TIERS_POPUP_PACK': 'Unidades por paquete',
   'SALES.WHOLESALE.TIERS_POPUP_FROM': 'Desde {min} {unit}: {price} por unidad',
   'SALES.WHOLESALE.QUANTITY_UNAVAILABLE': 'Disponibles: {available}. Faltan {missing} para cubrir los {requested} solicitados.',
+  'SALES.WHOLESALE.SCANNER_ADDED': '{name}: {packs} paquetes ({units} unidades) a {price} por unidad, adicionado a la venta mayorista',
+  'SALES.WHOLESALE.SCANNER_NOT_WHOLESALE': 'El producto {name} no tiene configuración mayorista y no se puede vender en esta vista',
   'SALES.WHOLESALE.UNIT_NAME_FALLBACK': 'paquete',
 
   // ProductErrors (Angular frontend/src/app/domain/entities/products/product.errors.ts —

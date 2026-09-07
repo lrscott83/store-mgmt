@@ -1,6 +1,6 @@
 import type { Product } from '@store-mgmt/domain';
 import type { CartItem } from '~/shared/lib/stores/cart-store';
-import { getWholesaleConfig, resolveWholesalePrice, wholesaleUnits } from './wholesale';
+import { getWholesaleConfig, resolveWholesalePrice } from './wholesale';
 
 /**
  * Presentación del carrito para la venta mayorista (2026-09-06):
