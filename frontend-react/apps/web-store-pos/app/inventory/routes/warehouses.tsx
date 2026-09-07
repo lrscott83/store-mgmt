@@ -13,7 +13,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
-import { ChevronDownIcon } from '~/shared/components/ui/icons';
+import { ChevronDownIcon, PlusIcon } from '~/shared/components/ui/icons';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
 import { formatCurrency } from '~/shared/lib/format-currency';
@@ -44,9 +44,12 @@ const MOVEMENT_TYPE_LABEL: Record<WarehouseMovementType, string> = {
  * Almacenes — gestión de almacenes y movimientos (warehouses-plan):
  * - CRUD de almacenes (crear / renombrar / desactivar, con bloqueo si hay stock
  *   o movimientos).
- * - Stock por producto × almacén con costo promedio; acciones por fila:
- *   Entrada (compra), Salida a tienda (crea una InventoryEntry en la tienda) y
- *   Transferir a otro almacén.
+ * - Paneles colapsables con el mismo diseño que la vista Disponible del
+ *   Inventario (InventoryProductList): header "Nombre (N) $Total" con la
+ *   flecha a la derecha, y al desplegar las filas de productos con el costo
+ *   unitario y el total alineados a la derecha.
+ * - Acciones por fila: Entrada (compra), Salida a tienda (crea una
+ *   InventoryEntry en la tienda) y Transferir a otro almacén.
  * - Histórico de movimientos append-only.
  */
 export function WarehousesPage() {
@@ -204,8 +207,9 @@ export function WarehousesPage() {
     return stockLevels.filter((level) => level.warehouseId === warehouseId);
   }
 
-  const totalOnHand = (warehouseId: string) =>
-    stockOf(warehouseId).reduce((sum, level) => sum + level.onHand, 0);
+  /** Costo total del almacén: Σ(onHand × costo promedio) — el total del header. */
+  const totalCostOf = (warehouseId: string) =>
+    stockOf(warehouseId).reduce((sum, level) => sum + level.onHand * level.costPrice, 0);
 
   return (
     <Card
@@ -218,7 +222,8 @@ export function WarehousesPage() {
               ({warehouses.length})
             </span>
           </span>
-          <Button variant="primary" onClick={() => setCreating((prev) => !prev)}>
+          <Button variant="fab" onClick={() => setCreating((prev) => !prev)}>
+            <PlusIcon />
             {intl.formatMessage({ id: 'WAREHOUSES.NEW_WAREHOUSE' })}
           </Button>
         </div>
@@ -258,32 +263,39 @@ export function WarehousesPage() {
               <div
                 key={warehouse.id}
                 data-testid={`warehouse-card-${warehouse.name}`}
-                className="rounded-lg border border-border bg-background"
+                className="rounded-lg border border-border"
               >
-                <div className="flex w-full items-center justify-between gap-4 px-4 py-3">
+                {/* Header — mismo diseño que el panel de categoría de la vista
+                    Disponible (InventoryProductList): nombre (N) a la izquierda,
+                    costo total + flecha a la derecha. El costo nunca se corta
+                    (whitespace-nowrap + shrink-0); el nombre trunca si hace falta. */}
+                <div className="flex w-full items-center justify-between gap-2 px-4 py-3">
                   <button
                     type="button"
                     data-testid={`warehouse-toggle-${warehouse.name}`}
                     onClick={() =>
                       setExpanded((prev) => ({ ...prev, [warehouse.id]: !prev[warehouse.id] }))
                     }
-                    className="flex flex-1 items-center gap-2 text-left"
+                    aria-expanded={isExpanded}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
                   >
-                    <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
-                    <span className="text-sm font-medium text-text">
-                      {warehouse.name}
+                    <span className="min-w-0 truncate text-sm font-semibold uppercase tracking-wide text-text-muted">
+                      <span className="text-text">{warehouse.name}</span>{' '}
+                      ({levels.length})
                       {!warehouse.isActive && (
-                        <span className="ml-2 text-xs text-text-muted">
+                        <span className="ml-1 text-xs normal-case text-text-muted">
                           ({intl.formatMessage({ id: 'WAREHOUSES.INACTIVE' })})
                         </span>
                       )}
                     </span>
-                    <span className="text-xs text-text-muted">
-                      {intl.formatMessage({ id: 'WAREHOUSES.ON_HAND' })}:{' '}
-                      {totalOnHand(warehouse.id)}
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="whitespace-nowrap text-sm font-semibold text-primary">
+                        {formatCurrency(totalCostOf(warehouse.id))}
+                      </span>
+                      <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                     </span>
                   </button>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Button variant="outline" onClick={() => handleRename(warehouse)}>
                       {intl.formatMessage({ id: 'WAREHOUSES.EDIT' })}
                     </Button>
@@ -310,12 +322,9 @@ export function WarehousesPage() {
                 )}
 
                 {isExpanded && (
-                  <div className="border-t border-border px-4 py-3">
-                    <div className="mb-2 text-sm font-semibold text-text">
-                      {intl.formatMessage({ id: 'WAREHOUSES.STOCK_TITLE' })}
-                    </div>
+                  <div className="border-t border-border bg-surface px-4 py-3">
                     {warehouse.isActive && products.length > 0 && (
-                      <div className="mb-2 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-background p-2">
+                      <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-background p-2">
                         <div className="min-w-40 flex-1">
                           <div className="mb-1 text-xs text-text-muted">
                             {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT' })}
@@ -356,75 +365,63 @@ export function WarehousesPage() {
                       </InfoBox>
                     )}
                     {levels.length > 0 && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border text-left text-xs text-text-muted">
-                              <th className="px-2 py-1 font-medium">
-                                {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT' })}
-                              </th>
-                              <th className="px-2 py-1 font-medium">
-                                {intl.formatMessage({ id: 'WAREHOUSES.ON_HAND' })}
-                              </th>
-                              <th className="px-2 py-1 font-medium">
-                                {intl.formatMessage({ id: 'WAREHOUSES.AVG_COST' })}
-                              </th>
-                              <th className="px-2 py-1" />
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {levels.map((level) => (
-                              <tr
-                                key={`${level.warehouseId}:${level.productId}`}
-                                className="border-b border-border/50"
+                      /* Filas de productos — mismo diseño que la vista Disponible
+                         del Inventario: nombre (cantidad) a la izquierda, costo
+                         unitario (success) + total (primary) a la derecha. Las
+                         acciones de movimiento viven al final de cada fila. */
+                      <div className="divide-y divide-border rounded-lg border border-border bg-surface">
+                        {levels.map((level) => (
+                          <div
+                            key={`${level.warehouseId}:${level.productId}`}
+                            className="flex items-center justify-between gap-2 px-4 py-3"
+                          >
+                            <p className="min-w-0 flex-1 font-medium text-text">
+                              {productName(level.productId)}{' '}
+                              (<span
+                                data-testid={`stock-onhand-${level.warehouseId}-${level.productId}`}
                               >
-                                <td className="px-2 py-2 text-text">
-                                  {productName(level.productId)}
-                                </td>
-                                <td
-                                  data-testid={`stock-onhand-${level.warehouseId}-${level.productId}`}
-                                  className="px-2 py-2 text-text"
-                                >
-                                  {level.onHand}
-                                </td>
-                                <td
-                                  data-testid={`stock-cost-${level.warehouseId}-${level.productId}`}
-                                  className="px-2 py-2 text-text"
-                                >
-                                  {formatCurrency(level.costPrice)}
-                                </td>
-                                <td className="px-2 py-2">
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="outline"
-                                      onClick={() =>
-                                        openForm('purchase_in', warehouse.id, level.productId)
-                                      }
-                                    >
-                                      {intl.formatMessage({ id: 'WAREHOUSES.PURCHASE_IN' })}
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      onClick={() =>
-                                        openForm('sale_out', warehouse.id, level.productId)
-                                      }
-                                    >
-                                      {intl.formatMessage({ id: 'WAREHOUSES.SALE_OUT' })}
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      onClick={() =>
-                                        openForm('transfer_out', warehouse.id, level.productId)
-                                      }
-                                    >
-                                      {intl.formatMessage({ id: 'WAREHOUSES.TRANSFER' })}
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                {level.onHand}
+                              </span>)
+                            </p>
+                            <div className="shrink-0 text-right">
+                              <p
+                                data-testid={`stock-cost-${level.warehouseId}-${level.productId}`}
+                                className="whitespace-nowrap text-sm font-semibold text-success"
+                              >
+                                {formatCurrency(level.costPrice)}
+                              </p>
+                              <p className="whitespace-nowrap text-sm font-semibold text-primary">
+                                {formatCurrency(level.costPrice * level.onHand)}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  openForm('purchase_in', warehouse.id, level.productId)
+                                }
+                              >
+                                {intl.formatMessage({ id: 'WAREHOUSES.PURCHASE_IN' })}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  openForm('sale_out', warehouse.id, level.productId)
+                                }
+                              >
+                                {intl.formatMessage({ id: 'WAREHOUSES.SALE_OUT' })}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  openForm('transfer_out', warehouse.id, level.productId)
+                                }
+                              >
+                                {intl.formatMessage({ id: 'WAREHOUSES.TRANSFER' })}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
 
