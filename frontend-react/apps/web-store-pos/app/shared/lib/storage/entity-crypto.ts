@@ -47,6 +47,17 @@ export function isEncrypted(stored: string): boolean {
  *   1. DEK present in memory -> encrypt: `enc:v1:` + base64(iv‖ct‖tag),
  *      fresh random 12-byte iv. Checked FIRST — the roster is never read
  *      on this path.
+ *   1b. EMPTY-PAYLOAD SHORT-CIRCUIT (valid-session fix, 2026-09-06): the
+ *      JSON sentinels `'[]'` and `'{}'` (an empty collection — what every
+ *      repository's auto-init writes for a fresh store) are stored as
+ *      PLAINTEXT even with a DEK. Ciphertext proves "this device once had
+ *      a key" and gated the unlock hijack on it; a fresh store whose only
+ *      encrypted values are empty ones was indistinguishable from a store
+ *      with real encrypted data, so its valid session got hijacked to
+ *      /login on every reload (user report 2026-09-06). An empty payload
+ *      protects nothing — nothing to protect, no ciphertext needed.
+ *      `decryptEntity`'s marker dispatch already returns plaintext
+ *      unchanged, so reading stays uniform.
  *   2. else not encryption-provisioned (roster) AND this device holds no
  *      device wrap table -> return plaintext unchanged, NEVER throw. This
  *      is the permanent, first-class "absence of encryption" mode (hard
@@ -61,7 +72,22 @@ export function isEncrypted(stored: string): boolean {
  *      over them during a failed bootstrap; the unlock gate is what should
  *      prevent reaching this branch in normal use.
  */
+const EMPTY_PAYLOAD_SENTINELS = new Set(['[]', '{}']);
+
 export function encryptEntity(plaintext: string): string {
+  // Step 1b — EMPTY-PAYLOAD SHORT-CIRCUIT, ahead of everything else: the
+  // JSON sentinels '[]' and '{}' (an empty collection — what every
+  // repository's auto-init writes for a fresh store) are ALWAYS stored as
+  // plaintext, with or without a DEK, locked or unlocked. Ciphertext
+  // presence gated the unlock hijack; a fresh store whose only encrypted
+  // values would be empty ones was indistinguishable from one holding real
+  // encrypted data, so its valid session got hijacked to /login on every
+  // reload (user report 2026-09-06). An empty payload protects nothing —
+  // no ciphertext needed. decryptEntity's marker dispatch already passes
+  // plaintext through unchanged, so reading stays uniform.
+  if (EMPTY_PAYLOAD_SENTINELS.has(plaintext)) {
+    return plaintext;
+  }
   const dek = getDek();
   if (dek !== null) {
     const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES));

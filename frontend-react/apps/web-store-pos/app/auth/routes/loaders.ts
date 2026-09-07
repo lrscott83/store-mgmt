@@ -26,9 +26,16 @@ function denyAccess(): Response {
 // NOTE the redirect carries NO logout(): the session and the roster must
 // survive so the re-login can complete offline on a provisioned device.
 // Logging out here would also wipe the roster's usability for this flow.
+//
+// Valid-session fix (user report 2026-09-06): the hijack now applies ONLY
+// when the device actually holds unreadable ciphertext (`hasUnreadable-
+// Ciphertext`). `needsUnlock` alone is true even for a fresh store whose
+// only wrap material came from registration, with zero encrypted data on
+// disk — hijacking there expelled a VALID session to /login on every
+// reload (authLoader) and parked it on /login//register (guestOnlyLoader).
 async function unlockGate(user: UserModel): Promise<Response | null> {
-  const { needsUnlock } = await import('~/shared/lib/offline/unlock-gate');
-  return needsUnlock(user) ? redirect('/login?unlock=1') : null;
+  const { needsUnlock, hasUnreadableCiphertext } = await import('~/shared/lib/offline/unlock-gate');
+  return needsUnlock(user) && hasUnreadableCiphertext() ? redirect('/login?unlock=1') : null;
 }
 
 // device-wrapped-dek design §3 (seams 1/2, WU8): the ONLY two chokepoints
@@ -63,12 +70,14 @@ export async function guestOnlyLoader(): Promise<Response | null> {
     // the latter reaches business-entity storage seams that throw
     // MissingDataKeyError while locked (design §3 seam 2).
     await bootstrapDeviceDekForRoute();
-    // design §5: a locked-but-provisioned visitor at /login must see the
-    // unlock form (return null), NOT get bounced home — resolveUserHomePath
-    // reads business-entity storage seams that throw MissingDataKeyError
-    // while locked, so this check MUST precede it.
-    const { needsUnlock } = await import('~/shared/lib/offline/unlock-gate');
-    if (needsUnlock(user)) return null;
+    // design §5 + valid-session fix (2026-09-06): a locked-but-provisioned
+    // visitor whose device HOLDS unreadable ciphertext must see the unlock
+    // form (return null), NOT get bounced home — resolveUserHomePath reads
+    // business-entity storage seams that throw MissingDataKeyError while
+    // locked, so this check MUST precede it. Without ciphertext, a valid
+    // session bounces home normally.
+    const { needsUnlock, hasUnreadableCiphertext } = await import('~/shared/lib/offline/unlock-gate');
+    if (needsUnlock(user) && hasUnreadableCiphertext()) return null;
     preloadHeavyChunks();
     return redirect(await resolveUserHomePath(user));
   }
