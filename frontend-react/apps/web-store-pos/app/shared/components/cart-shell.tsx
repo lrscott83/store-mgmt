@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { PaymentType } from '@store-mgmt/domain';
+import type { Product } from '@store-mgmt/domain';
 import { useCartStore } from '~/shared/lib/stores/cart-store';
 import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { useClickOutside } from '~/shared/lib/hooks/use-click-outside';
@@ -13,6 +14,8 @@ import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { hasCreditsModuleAvailable, hasInventoryModuleAvailable } from '~/shared/lib/auth/authorization-service';
 import { getOrderTypeText } from '~/sales/lib/order-type-utils';
+import { wholesaleCartDisplay } from '~/sales/lib/wholesale-cart-display';
+import { wholesaleUnitPlural } from '~/sales/lib/wholesale';
 import { getPaymentTypeIconKind, type PaymentTypeIconKind } from '~/shared/lib/payment-type-icon';
 import { getPaymentReturn, getPaymentReturnKind } from '~/shared/lib/payment-return';
 import { validateCartSubmission } from '~/shared/lib/cart-submission-validation';
@@ -63,6 +66,47 @@ function PaymentTypeIcon({ kind }: { kind: PaymentTypeIconKind }) {
   );
 }
 
+/**
+ * Config mayorista del producto (para el paso de +/- en paquetes) sin depender
+ * del orden de imports: getWholesaleConfig puro sobre los campos del Product.
+ */
+function getWholesaleConfigSafe(product: Product) {
+  if (
+    !product.wholesaleEnabled ||
+    !product.wholesalePackSize ||
+    product.wholesalePackSize <= 0 ||
+    !product.wholesaleTiers ||
+    product.wholesaleTiers.length === 0
+  ) {
+    return undefined;
+  }
+  return { packSize: product.wholesalePackSize };
+}
+
+/**
+ * Línea de precio del carrito:
+ * - Venta mayorista: "Cajas: 2 · Precio: $15 840" — cantidad en PAQUETES y el precio
+ *   DEL PAQUETE (unitPrice × packSize).
+ * - Venta normal: "Precio: $5 (10)" — precio unitario + unidades, como siempre.
+ */
+function formatWholesaleLine(item: { product: Product; quantity: number; price?: number }): string {
+  const config = getWholesaleConfigSafe(item.product);
+  if (!config) {
+    return `${intlPriceLabel()}${formatCurrency(item.price ?? item.product.price)} (${item.quantity})`;
+  }
+  const packs = wholesaleCartDisplay.packsFromUnits(item.quantity, item.product);
+  const packPrice = wholesaleCartDisplay.packPrice(item.product, item.price);
+  const unitPlural = wholesaleUnitPlural(item.product.wholesaleUnitLabel?.trim() || 'paquete');
+  const capitalized = unitPlural.charAt(0).toUpperCase() + unitPlural.slice(1);
+  return `${capitalized}: ${packs} · ${intlPriceLabel()}${formatCurrency(packPrice)}`;
+}
+
+/** SHOPPING_CART.PRICE_LABEL necesita intl; helper con lazy access al DOM no funciona —
+ *  usamos el valor literal del mensaje (es.ts: 'Precio: ') como en Angular. */
+function intlPriceLabel(): string {
+  return 'Precio: ';
+}
+
 export function CartShell() {
   const intl = useIntl();
   const [isOpen, setIsOpen] = useState(false);
@@ -94,7 +138,9 @@ export function CartShell() {
   const creditsModuleAvailable = user ? hasCreditsModuleAvailable(user) : false;
   const storeId = user?.selectedStoreId ?? '';
 
-  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+  // Venta mayorista: el badge cuenta PAQUETES (cajas), no unidades. En venta normal
+  // sigue contando unidades (cartBadgeCount cae a la suma por producto sin config).
+  const itemCount = wholesaleCartDisplay.cartBadgeCount(items);
   const totalAmount = total();
   const paymentReturn = getPaymentReturn(payment, totalAmount);
   const paymentReturnKind = getPaymentReturnKind(paymentReturn);
@@ -118,6 +164,15 @@ export function CartShell() {
   // possibly-stale one cached on the cart item) exactly like Angular's
   // productService.getProductById inside addCartItem.
   async function handleQuantityChange(productId: string, currentQuantity: number, delta: number) {
+    // Venta mayorista: los botones +/- trabajan en PAQUETES, no unidades. El paso es
+    // packSize (24 unidades por click) para productos con config mayorista; en normal, 1.
+    const stepProduct = items.find((i) => i.product.id === productId)?.product;
+    const config = stepProduct
+      ? getWholesaleConfigSafe(stepProduct)
+      : undefined;
+    const step = config ? config.packSize : 1;
+    const deltaUnits = delta * step;
+
     const productService = createProductService(storeId);
     const inventoryService = new InventoryOfflineService(
       storeId,
@@ -127,7 +182,7 @@ export function CartShell() {
     const product = lookup.succeeded ? lookup.data : undefined;
     const result = hasAvailableProductToSale({
       product,
-      quantity: delta,
+      quantity: deltaUnits,
       cartQuantity: currentQuantity,
       hasInventoryModule: user ? hasInventoryModuleAvailable(user) : false,
       inventory: inventoryService.getAvailableQuantity(productId),
@@ -140,7 +195,7 @@ export function CartShell() {
       showBlockingError(intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }), message);
       return;
     }
-    updateQuantity(productId, currentQuantity + delta);
+    updateQuantity(productId, currentQuantity + deltaUnits);
   }
 
   function clearCartAfterSuccessfulOrder() {
@@ -414,7 +469,7 @@ export function CartShell() {
                         {item.product.name}
                       </p>
                       <p className="text-xs text-text-muted">
-                        {intl.formatMessage({ id: 'SHOPPING_CART.PRICE_LABEL' })}{formatCurrency(item.price ?? item.product.price)} ({item.quantity})
+                        {formatWholesaleLine(item)}
                       </p>
                     </div>
                     <p className="text-sm text-text whitespace-nowrap">{formatCurrency(round2((item.price ?? item.product.price) * item.quantity))}</p>
