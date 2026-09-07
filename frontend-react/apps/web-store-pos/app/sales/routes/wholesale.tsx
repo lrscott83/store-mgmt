@@ -195,6 +195,11 @@ export function WholesalePage() {
     return inCategory && matchesQuery;
   });
 
+  // Solo categorías con productos mayoristas se muestran como tabs (paridad con
+  // sale.tsx, que oculta categorías sin productos vendibles).
+  const wholesaleCategoryIds = new Set(products.map((p) => p.categoryId));
+  const displayableCategories = categories.filter((c) => wholesaleCategoryIds.has(c.id));
+
   return (
     <Card padding="tight" title={intl.formatMessage({ id: 'SALES.WHOLESALE.HEADER' })}>
       {products.length === 0 ? (
@@ -203,7 +208,19 @@ export function WholesalePage() {
         </InfoBox>
       ) : (
         <>
-          {/* Filtro por categorías — tabs con el pseudo-tab "Todas", igual que /sales/new. */}
+          {/* Búsqueda por nombre — mismo searchbox que /sales/new, arriba de las tabs. */}
+          <input
+            role="searchbox"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={intl.formatMessage({ id: 'SALES.SEARCH_PLACEHOLDER' })}
+            className="mb-3 w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            data-testid="wholesale-search-input"
+          />
+
+          {/* Filtro por categorías — tabs con el pseudo-tab "Todas", igual que /sales/new.
+              Solo categorías con productos mayoristas. */}
           <div className="mb-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -218,7 +235,7 @@ export function WholesalePage() {
             >
               {intl.formatMessage({ id: 'SALES.ALL_CATEGORIES' })}
             </button>
-            {categories.map((category) => (
+            {displayableCategories.map((category) => (
               <button
                 key={category.id}
                 type="button"
@@ -235,17 +252,6 @@ export function WholesalePage() {
               </button>
             ))}
           </div>
-
-          {/* Búsqueda por nombre — mismo searchbox que /sales/new. */}
-          <input
-            role="searchbox"
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={intl.formatMessage({ id: 'SALES.SEARCH_PLACEHOLDER' })}
-            className="mb-3 w-full rounded border border-border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            data-testid="wholesale-search-input"
-          />
 
           {visibleProducts.length === 0 ? (
             <InfoBox variant="info" className="text-center">
@@ -286,7 +292,7 @@ export function WholesalePage() {
                     </div>
 
                     <label className="flex flex-col gap-0.5 text-xs text-muted">
-                      {unitName(product)}
+                      {unitName(product)} ({packSize})
                       <input
                         type="number"
                         min={getWholesaleMinPacks(product)}
@@ -303,10 +309,14 @@ export function WholesalePage() {
                     <button
                       type="button"
                       onClick={() => handleAdd(product)}
-                      className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+                      aria-label={intl.formatMessage({ id: 'SALES.WHOLESALE.ADD' })}
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-card hover:bg-primary-hover transition-colors"
                       data-testid={`wholesale-add-${product.id}`}
                     >
-                      {intl.formatMessage({ id: 'SALES.WHOLESALE.ADD' })}
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
                     </button>
                   </div>
                 );

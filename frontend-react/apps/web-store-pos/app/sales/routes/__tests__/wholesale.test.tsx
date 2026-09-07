@@ -360,8 +360,9 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     render(<Wrapper><WholesalePage /></Wrapper>);
     await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
 
-    // El label del input de packs es la unidad del producto ("caja").
-    expect(screen.getByText('caja')).toBeInTheDocument();
+    // El label del input de packs es la unidad del producto con el packSize:
+    // "caja (24)".
+    expect(screen.getByText('caja (24)')).toBeInTheDocument();
 
     // El popup de rangos usa el plural de la unidad ("Desde 1 cajas").
     fireEvent.click(screen.getByTestId('wholesale-tiers-info-beer-1'));
@@ -382,7 +383,7 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     render(<Wrapper><WholesalePage /></Wrapper>);
     await waitFor(() => expect(screen.getByText('Croquetas')).toBeInTheDocument());
 
-    expect(screen.getByText('paquete')).toBeInTheDocument();
+    expect(screen.getByText('paquete (10)')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('wholesale-tiers-info-croq-1'));
     const [, html] = showBlockingInfoHtmlMock.mock.calls[0];
@@ -413,6 +414,47 @@ describe('WholesalePage — Ventas Mayoristas', () => {
   // ═══════════════════════════════════════════════════════════════════════════
   // Popup de no-disponibilidad con disponibles y faltantes (2026-09-05)
   // ═══════════════════════════════════════════════════════════════════════════
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Paridad de filtros con /sales/new + botón carrito (2026-09-06)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('oculta las categorías sin productos mayoristas', async () => {
+    mockCategories = [makeCategory(), makeCategory({ id: 'cat-2', name: 'Carnes' })];
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+      makeProduct('pan-1', { name: 'Pan', categoryId: 'cat-2' }), // Carnes: sin mayorista
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    expect(screen.getByTestId('wholesale-category-cat-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('wholesale-category-cat-2')).not.toBeInTheDocument();
+  });
+
+  it('mantiene el orden de la venta: buscador arriba, tabs de categorías debajo', async () => {
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    const search = screen.getByTestId('wholesale-search-input');
+    const firstTab = screen.getByTestId('wholesale-category-all');
+    expect(search.compareDocumentPosition(firstTab) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('el botón de agregar es el icono del carrito, sin texto', async () => {
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    const add = screen.getByTestId('wholesale-add-beer-1');
+    expect(add).toHaveAttribute('aria-label', 'Añadir');
+    expect(add.querySelector('svg')).not.toBeNull();
+    expect(add.textContent?.trim()).toBe('');
+  });
 
   it('el popup de no-disponibilidad muestra disponibles y faltantes en unidades', async () => {
     hasInventoryModuleMock.mockReturnValue(true);
