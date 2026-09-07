@@ -174,3 +174,28 @@ describe('PaymentBanner — overdue notice (Vencido outranks trial)', () => {
     ).toBeInTheDocument();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tienda con modo de pago valor 0 (2026-09-06) — el backend envía isInTrial=false
+// cuando el monto efectivo del plan es 0 (100% de descuento), así que el cartel
+// "Probando el plan de pago. Primer cobro..." no debe mostrarse.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('PaymentBanner — tienda con modo de pago valor 0 (sin trial)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('NO muestra el cartel de trial cuando isInTrial=false con estado AlDia (valor 0 del backend)', async () => {
+    mockUser = makeUser({ paymentStatus: 'AlDia', isInTrial: false, paymentDueDate: '2026-10-04' });
+    const { container } = await renderBanner();
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText(/Probando el plan de pago/)).not.toBeInTheDocument();
+  });
+
+  it('el backend contrata isInTrial=true solo con valor real — contrato intacto', async () => {
+    mockUser = makeUser({ paymentStatus: 'AlDia', isInTrial: true, paymentDueDate: '2026-10-04' });
+    await renderBanner();
+    expect(screen.getByText(/Probando el plan de pago/)).toBeInTheDocument();
+  });
+});

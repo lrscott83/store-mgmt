@@ -773,3 +773,81 @@ describe('CartShell — dropdown closes on outside click', () => {
     expect(screen.getByText('Venta actual')).toBeInTheDocument();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Carrito mayorista — badge, línea y paso de +/- en paquetes (2026-09-06)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — venta mayorista mostrada en paquetes', () => {
+  const beer = makeProduct({
+    id: 'beer',
+    name: 'Cerveza',
+    price: 700,
+    wholesaleEnabled: true,
+    wholesalePackSize: 24,
+    wholesaleUnitLabel: 'caja',
+    wholesaleTiers: [{ minPacks: 1, pricePerUnit: 660 }],
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    mockProductLookup = {};
+    localStorage.clear();
+  });
+
+  it('el badge del carrito cuenta paquetes: 72 unidades = 3 cajas', () => {
+    mockCartState({ items: [{ product: beer, quantity: 72 }], total: vi.fn().mockReturnValue(47520) });
+    renderCartShell();
+    expect(screen.getByTestId('cart-badge')).toHaveTextContent('3');
+  });
+
+  it('la línea del carrito muestra la cantidad en cajas y el precio de la caja', () => {
+    // 2 cajas a 660/unidad → precio de caja 660 × 24 = 15 840.
+    mockCartState({ items: [{ product: beer, quantity: 48, price: 660 }], total: vi.fn().mockReturnValue(31680) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Cajas: 2 · Precio: $15 840')).toBeInTheDocument();
+    // Ya no se muestra la cantidad en unidades entre paréntesis.
+    expect(screen.queryByText(/\(48\)/)).not.toBeInTheDocument();
+  });
+
+  it('el botón + agrega un paquete: +24 unidades con un click', async () => {
+    mockProductLookup = { beer };
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product: beer, quantity: 48 }], total: vi.fn().mockReturnValue(31680), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Cerveza'));
+
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer', 72)); // 48 + 24
+  });
+
+  it('el botón − quita un paquete: −24 unidades con un click', async () => {
+    mockProductLookup = { beer };
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product: beer, quantity: 48 }], total: vi.fn().mockReturnValue(31680), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Cerveza'));
+
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer', 24)); // 48 - 24
+  });
+
+  it('un carrito normal sigue mostrando unidades y precio unitario (sin regresión)', () => {
+    const normal = makeProduct({ id: 'n1', name: 'Dulce', price: 5 });
+    mockCartState({ items: [{ product: normal, quantity: 10 }], total: vi.fn().mockReturnValue(50) });
+    renderCartShell();
+    openCart();
+    expect(screen.getByText('Precio: $5 (10)')).toBeInTheDocument();
+  });
+
+  it('el badge de un carrito normal sigue contando unidades', () => {
+    const normal = makeProduct({ id: 'n1', name: 'Dulce', price: 5 });
+    mockCartState({ items: [{ product: normal, quantity: 10 }], total: vi.fn().mockReturnValue(50) });
+    renderCartShell();
+    expect(screen.getByTestId('cart-badge')).toHaveTextContent('10');
+  });
+});

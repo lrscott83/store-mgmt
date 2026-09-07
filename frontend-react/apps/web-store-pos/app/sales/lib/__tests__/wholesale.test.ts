@@ -10,6 +10,7 @@ import {
   wholesaleUnitPlural,
   wholesaleUnits,
 } from '../wholesale';
+import { wholesaleCartDisplay } from '../wholesale-cart-display';
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
@@ -360,3 +361,66 @@ describe('getWholesaleConfig — unitLabel en la config normalizada', () => {
 function round3(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// Carrito mayorista — cantidad en paquetes y precio del paquete (2026-09-06)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('wholesaleCartDisplay — presentación del carrito en paquetes', () => {
+  const beer = makeProduct({
+    id: 'beer',
+    price: 700,
+    wholesaleEnabled: true,
+    wholesalePackSize: 24,
+    wholesaleUnitLabel: 'caja',
+    wholesaleTiers: [
+      { minPacks: 1, pricePerUnit: 680 },
+      { minPacks: 11, pricePerUnit: 660 },
+    ],
+  });
+
+  it('calcula los paquetes desde las unidades: 288 unidades × packSize 24 → 12 paquetes', () => {
+    expect(wholesaleCartDisplay.packsFromUnits(288, beer)).toBe(12);
+  });
+
+  it('devuelve 0 cuando las unidades no son múltiplo exacto del packSize', () => {
+    expect(wholesaleCartDisplay.packsFromUnits(10, beer)).toBe(0); // 10/24 no es exacto
+  });
+
+  it('devuelve 1 para un carrito normal (una unidad = una "unidad" de carrito)', () => {
+    const normal = makeProduct({ id: 'normal', price: 700 });
+    expect(wholesaleCartDisplay.packsFromUnits(5, normal)).toBe(1);
+  });
+
+  it('calcula el precio del paquete: 660 × 24 → 15 840', () => {
+    expect(wholesaleCartDisplay.packPrice(beer, 660)).toBe(15840);
+  });
+
+  it('sin precio de línea usa el primer rango mayorista: 680 × 24 → 16 320', () => {
+    expect(wholesaleCartDisplay.packPrice(beer, undefined)).toBe(16320);
+  });
+
+  it('el precio del paquete de un producto normal es su precio retail', () => {
+    const normal = makeProduct({ id: 'normal', price: 700 });
+    expect(wholesaleCartDisplay.packPrice(normal, 700)).toBe(700);
+  });
+
+  it('calcula el badge del carrito: 3 + 2 paquetes → 5', () => {
+    const items = [
+      { product: beer, quantity: 72 },  // 3 cajas
+      { product: makeProduct({ id: 'beer2', wholesaleEnabled: true, wholesalePackSize: 6, wholesaleTiers: [{ minPacks: 1, pricePerUnit: 100 }] }), quantity: 12 }, // 2 packs de 6
+    ];
+    expect(wholesaleCartDisplay.cartBadgeCount(items)).toBe(5);
+  });
+
+  it('el badge de un carrito normal sigue siendo la suma de unidades', () => {
+    const items = [
+      { product: makeProduct({ id: 'n1', price: 10 }), quantity: 3 },
+      { product: makeProduct({ id: 'n2', price: 10 }), quantity: 4 },
+    ];
+    expect(wholesaleCartDisplay.cartBadgeCount(items)).toBe(7);
+  });
+
+  it('carrito vacío → badge 0', () => {
+    expect(wholesaleCartDisplay.cartBadgeCount([])).toBe(0);
+  });
+});

@@ -129,6 +129,8 @@ Tailwind CSS v4 configured via the `@tailwindcss/vite` plugin — no `tailwind.c
 
 Design system uses a cyan/teal primary palette with Inter font. Use Tailwind utility classes. No component library is installed — build components from Tailwind primitives.
 
+Sidebar/menu items are plain text labels only. NEVER add icons (including emojis) to menu items in `menu-config.ts` — the `MenuItem` interface intentionally has no `icon` property. Do not reintroduce one.
+
 Mobile-first responsive design using Tailwind breakpoints.
 
 ## Environment Variables

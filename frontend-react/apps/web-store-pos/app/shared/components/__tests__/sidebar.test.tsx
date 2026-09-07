@@ -482,6 +482,36 @@ describe('Sidebar — NEW badge on recently added menu items', () => {
   });
 });
 
+describe('Sidebar — no emoji icons on menu items (plain text labels only)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does NOT render an emoji icon on the Almacenes item', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const warehousesLink = screen.getByText('Almacenes').closest('a');
+    expect(warehousesLink).not.toBeNull();
+    // The label span must contain only the text + optional NEW badge — no emoji
+    expect(warehousesLink?.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
+  });
+
+  it('does NOT render any emoji icon on any visible menu item', () => {
+    renderSidebar(makeSuperAdmin());
+
+    const links = screen.getAllByRole('link');
+    const withEmoji = links.filter((l) => /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(l.textContent ?? ''));
+    expect(withEmoji).toHaveLength(0);
+  });
+
+  it('still renders the help "?" button on items with helpContent', () => {
+    renderSidebar(makeSuperAdmin());
+
+    // Removing icons must not remove the help affordance
+    expect(screen.getAllByRole('button', { name: 'Ayuda' }).length).toBeGreaterThan(0);
+  });
+});
+
 describe('Sidebar — SHELL-06: brand logo at the top of the sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();

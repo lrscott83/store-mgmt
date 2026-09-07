@@ -542,6 +542,9 @@ const messages: Record<string, string> = {
   // Warehouses (warehouses-plan) — gestión de almacenes y movimientos.
   'WAREHOUSES.TITLE': 'Almacenes',
   'WAREHOUSES.NEW_WAREHOUSE': 'Nuevo almacén',
+  'WAREHOUSES.EDIT_WAREHOUSE': 'Editar almacén',
+  'WAREHOUSES.PRODUCT_COUNT': 'Productos',
+  'WAREHOUSES.TOTAL_COST': 'Costo total',
   'WAREHOUSES.NAME': 'Nombre',
   'WAREHOUSES.NAME_PLACEHOLDER': 'Ej: Almacén Central',
   'WAREHOUSES.SAVE': 'Guardar',

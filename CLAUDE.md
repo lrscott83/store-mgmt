@@ -82,3 +82,9 @@ dotnet test backend/src/SMCA.WebApi.E2ETests/SMCA.WebApi.E2ETests.csproj
 dotnet test backend/src/Application.Tests/Application.Tests.csproj
 dotnet test backend/src/SMCA.sln
 ```
+
+## Auth redirect invariant — NON-NEGOTIABLE (user-mandated 2026-09-06)
+
+**A user with a valid, unexpired session — authenticated ONLINE or OFFLINE (roster) — must NEVER land on `/login`.** On page reload and on visits to `/login`, the app must redirect them to their role-appropriate home (`resolveUserHomePath`: SuperAdmin/ReSeller → `/admin/owners`; everyone else → `/sales/new` or `/sales/products`). Only a verdict kills the session and sends them to login: expiry, a session rejection (401/404 from `/v1/auth/me`), or an explicit logout. Full contract: `docs/contracts/authenticated-session-redirect.md`.
+
+Before touching `authLoader`, `guestOnlyLoader`, `needsUnlock`, `auth-store` hydration, or any DEK/unlock gate, re-read that contract. Any change that can bounce a validly-authenticated user to `/login` (including via `?unlock=1`) violates this invariant and needs explicit user approval first. Existing E2E that pin this behavior (`login.spec.ts` REQ-1/REQ-7/REQ-14, `superadmin-login.spec.ts`, `login-offline.spec.ts` T10) are untouchable per the rule above — new coverage goes in NEW tests.
