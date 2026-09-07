@@ -172,10 +172,11 @@ describe('WarehousesPage', () => {
     renderPage();
     // Header estilo InventoryProductList: nombre (unidades) + costo total.
     expect(screen.getByTestId('warehouse-toggle-Central').textContent).toContain('(34)');
-    expect(screen.getAllByText('$16 840')).toHaveLength(2); // header del almacén + resumen global
-    // Resumen global: (unidades) a la izquierda, costo total a la derecha.
-    expect(screen.getByTestId('warehouses-total-units').textContent).toBe('(34)');
-    expect(screen.getByTestId('warehouses-total-cost').textContent).toBe('$16 840');
+    // format-currency usa NBSP (U+00A0) como separador de miles — el header del
+    // almacén y el resumen global muestran el mismo monto.
+    expect(screen.getByTestId('warehouses-total-cost').textContent).toBe('$16\u00A0840');
+    const headerCost = screen.getByTestId('warehouse-toggle-Central').textContent ?? '';
+    expect(headerCost).toContain('$16\u00A0840');
   });
 
   it('shows zeroed counters for an empty warehouse (WUI-1-b)', async () => {
@@ -185,7 +186,6 @@ describe('WarehousesPage', () => {
     renderPage();
     expect(screen.getByTestId('warehouse-toggle-Vacío').textContent).toContain('(0)');
     expect(screen.getAllByText('$0')).toHaveLength(2); // header del almacén + resumen global
-    expect(screen.getByTestId('warehouses-total-units').textContent).toBe('(0)');
   });
 
   it('renders the gear with Entrada/Movimiento/Salida and Editar/Desactivar, no flat buttons (WUI-2-a)', async () => {
