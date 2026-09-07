@@ -25,6 +25,7 @@ import {
   wholesaleUnitPlural,
   wholesaleUnits,
 } from '../lib/wholesale';
+import { guardOrderType } from '../lib/order-type-guard';
 import type { ProductCategory } from '@store-mgmt/domain';
 
 // Mismo guard que la venta normal: feature Ventas.
@@ -58,6 +59,9 @@ export function WholesalePage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(ALL_CATEGORIES_ID);
   const [searchQuery, setSearchQuery] = useState('');
   const [packsByProduct, setPacksByProduct] = useState<Record<string, string>>({});
+  // Exclusividad Normal/Mayorista: se leen en cada render (no suscriben re-render).
+  const cartItems = useCartStore((s) => s.items);
+  const cartOrderType = useCartStore((s) => s.orderType);
 
   useEffect(() => {
     if (!storeId) return;
@@ -136,6 +140,16 @@ export function WholesalePage() {
   function handleAdd(product: Product) {
     const packs = parseInt(packsByProduct[product.id] ?? '', 10) || 0;
     if (packs <= 0) return;
+
+    // Exclusividad: no se puede mezclar venta normal y mayorista en el mismo carrito.
+    const typeGuard = guardOrderType({ items: cartItems, cartOrderType, requested: OrderType.Mayorista });
+    if (!typeGuard.succeeded) {
+      showBlockingError(
+        intl.formatMessage({ id: 'GENERAL.RESPONSE.ERROR_TITLE' }),
+        typeGuard.errors[0]?.description ?? '',
+      );
+      return;
+    }
 
     // La cantidad mínima de paquetes es el primer rango de la config mayorista.
     const minPacks = getWholesaleMinPacks(product);

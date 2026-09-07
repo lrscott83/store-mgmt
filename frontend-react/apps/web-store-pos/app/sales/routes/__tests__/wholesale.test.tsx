@@ -26,8 +26,22 @@ vi.mock('~/shared/lib/stores/auth-store', () => {
 
 const addItemMock = vi.hoisted(() => vi.fn());
 const getItemQuantityMock = vi.hoisted(() => vi.fn(() => 0));
+/** Estado compartido del carrito mockeado — mutable desde los tests (exclusividad Normal/Mayorista). */
+const cartStateMock = vi.hoisted(() => ({
+  items: [] as unknown[],
+  orderType: 1 as number, // OrderType.Normal
+}));
 vi.mock('~/shared/lib/stores/cart-store', () => {
-  const state = { addItem: addItemMock, getItemQuantity: getItemQuantityMock };
+  const state = {
+    get items() {
+      return cartStateMock.items;
+    },
+    get orderType() {
+      return cartStateMock.orderType;
+    },
+    addItem: addItemMock,
+    getItemQuantity: getItemQuantityMock,
+  };
   const useCartStore = vi.fn((selector?: (s: typeof state) => unknown) => {
     if (typeof selector === 'function') return selector(state);
     return state;
@@ -116,6 +130,8 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     vi.clearAllMocks();
     hasInventoryModuleMock.mockReturnValue(false);
     inventoryServiceMock.mockReturnValue({ hasEntries: false, available: 0 });
+    cartStateMock.items = [];
+    cartStateMock.orderType = 1; // OrderType.Normal
     mockCategories = [makeCategory()];
     mockProducts = [
       makeProduct('beer-1', {
@@ -454,6 +470,56 @@ describe('WholesalePage — Ventas Mayoristas', () => {
     expect(add).toHaveAttribute('aria-label', 'Añadir');
     expect(add.querySelector('svg')).not.toBeNull();
     expect(add.textContent?.trim()).toBe('');
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Exclusividad Normal/Mayorista — popup de restricción (2026-09-06)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it('bloquea añadir a la venta mayorista cuando hay una venta normal en curso y muestra el popup de restricción', async () => {
+    // Carrito con una venta normal en curso (ítem Normal ya agregado).
+    cartStateMock.items = [{ product: makeProduct('normal-1'), quantity: 2 }];
+    cartStateMock.orderType = 1; // OrderType.Normal
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    expect(addItemMock).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const message = String(showBlockingErrorMock.mock.calls[0]?.[1] ?? '');
+    expect(message).toContain('venta normal');
+    expect(message).toContain('venta mayorista');
+  });
+
+  it('permite la venta mayorista cuando el carrito ya es de venta mayorista', async () => {
+    cartStateMock.items = [{ product: makeProduct('beer-1'), quantity: 24 }];
+    cartStateMock.orderType = 2; // OrderType.Mayorista
+    mockProducts = [
+      makeProduct('beer-1', {
+        name: 'Cerveza',
+        wholesaleEnabled: true,
+        wholesalePackSize: 24,
+        wholesaleTiers: [{ minPacks: 1, pricePerUnit: 680 }],
+      }),
+    ];
+    render(<Wrapper><WholesalePage /></Wrapper>);
+    await waitFor(() => expect(screen.getByText('Cerveza')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('wholesale-packs-input-beer-1'), { target: { value: '12' } });
+    fireEvent.click(screen.getByTestId('wholesale-add-beer-1'));
+
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+    expect(addItemMock).toHaveBeenCalled();
   });
 
   it('el popup de no-disponibilidad muestra disponibles y faltantes en unidades', async () => {
