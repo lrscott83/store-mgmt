@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
-import type { Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
+import type { Product, Warehouse, WarehouseStockLevel, WarehouseStockMovement } from '@store-mgmt/domain';
 import { Result, WarehouseErrors } from '@store-mgmt/domain';
 
 const mockUser = vi.hoisted(() => ({
@@ -39,6 +39,7 @@ const fakeState = vi.hoisted(() => ({
   warehouses: [] as Warehouse[],
   levels: [] as WarehouseStockLevel[],
   movements: [] as WarehouseStockMovement[],
+  products: [] as Array<[string, Record<string, unknown>]>,
   recordMovementImpl: vi.fn(),
   createWarehouseImpl: vi.fn(),
   deactivateImpl: vi.fn(),
@@ -95,6 +96,16 @@ vi.mock('~/inventory/lib/services/inventory-offline-service', () => ({
   InventoryOfflineService: vi.fn().mockImplementation(() => ({})),
 }));
 
+vi.mock('~/sales/lib/repositories/product-repository', () => ({
+  ProductRepository: vi.fn().mockImplementation(() => ({
+    getStorageProductsMap: () => new Map(fakeState.products),
+  })),
+}));
+
+vi.mock('~/sales/lib/repositories/product-category-repository', () => ({
+  ProductCategoryRepository: vi.fn().mockImplementation(() => ({})),
+}));
+
 import { WarehousesPage } from '../warehouses';
 
 function renderPage() {
@@ -111,6 +122,7 @@ describe('WarehousesPage', () => {
     fakeState.warehouses = [];
     fakeState.levels = [];
     fakeState.movements = [];
+    fakeState.products = [];
     fakeState.recordMovementImpl.mockClear();
     fakeState.createWarehouseImpl.mockClear();
     fakeState.deactivateImpl.mockClear();
@@ -137,7 +149,7 @@ describe('WarehousesPage', () => {
     expect(showToastSuccessMock).toHaveBeenCalled();
   });
 
-  it('lists warehouses with their total on-hand', async () => {
+  it('lists warehouses with their unit count in the header', async () => {
     fakeState.warehouses = [
       { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
@@ -146,10 +158,10 @@ describe('WarehousesPage', () => {
     ];
     renderPage();
     expect(screen.getByText('Central')).toBeTruthy();
-    expect(screen.getByText(/Cantidad: 24/)).toBeTruthy();
+    expect(screen.getByTestId('warehouse-toggle-Central').textContent).toContain('(24)');
   });
 
-  it('shows product count and total cost counters in the collapsed header (WUI-1-a)', async () => {
+  it('shows units and total cost in the header plus the global summary row (WUI-1-a)', async () => {
     fakeState.warehouses = [
       { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
@@ -158,9 +170,13 @@ describe('WarehousesPage', () => {
       { id: 'sl-2', warehouseId: 'wh-1', productId: 'prod-2', onHand: 10, costPrice: 100, createdDate: new Date() },
     ];
     renderPage();
-    expect(screen.getByText(/Productos: 2/)).toBeTruthy();
-    expect(screen.getByText(/Costo total: \$16 840/)).toBeTruthy();
-    expect(screen.getByText(/Cantidad: 34/)).toBeTruthy();
+    // Header estilo InventoryProductList: nombre (unidades) + costo total.
+    expect(screen.getByTestId('warehouse-toggle-Central').textContent).toContain('(34)');
+    // format-currency usa NBSP (U+00A0) como separador de miles — el header del
+    // almacén y el resumen global muestran el mismo monto.
+    expect(screen.getByTestId('warehouses-total-cost').textContent).toBe('$16\u00A0840');
+    const headerCost = screen.getByTestId('warehouse-toggle-Central').textContent ?? '';
+    expect(headerCost).toContain('$16\u00A0840');
   });
 
   it('shows zeroed counters for an empty warehouse (WUI-1-b)', async () => {
@@ -168,17 +184,19 @@ describe('WarehousesPage', () => {
       { id: 'wh-1', name: 'Vacío', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
     renderPage();
-    expect(screen.getByText(/Productos: 0/)).toBeTruthy();
-    expect(screen.getByText(/Costo total: \$0/)).toBeTruthy();
-    expect(screen.getByText(/Cantidad: 0/)).toBeTruthy();
+    expect(screen.getByTestId('warehouse-toggle-Vacío').textContent).toContain('(0)');
+    expect(screen.getAllByText('$0')).toHaveLength(2); // header del almacén + resumen global
   });
 
-  it('renders the gear with Editar and Desactivar, no flat buttons (WUI-2-a)', async () => {
+  it('renders the gear with Entrada/Movimiento/Salida and Editar/Desactivar, no flat buttons (WUI-2-a)', async () => {
     fakeState.warehouses = [
       { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
     renderPage();
     fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
+    expect(screen.getByRole('menuitem', { name: 'Entrada' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Movimiento' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Salida' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Editar' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Desactivar' })).toBeTruthy();
     // Flat buttons are gone: the only "Editar"/"Desactivar" texts are menu items.
@@ -186,7 +204,7 @@ describe('WarehousesPage', () => {
     expect(screen.getAllByText('Desactivar')).toHaveLength(1);
   });
 
-  it('shows the movement form and records a sale_out', async () => {
+  it('shows the movement modal and records a sale_out', async () => {
     fakeState.warehouses = [
       { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
     ];
@@ -197,7 +215,10 @@ describe('WarehousesPage', () => {
 
     // expand the warehouse → stock table with action buttons
     fireEvent.click(screen.getByTestId('warehouse-toggle-Central'));
-    fireEvent.click(screen.getByText('Salida a tienda'));
+    fireEvent.click(screen.getAllByText('Salida a tienda')[0]);
+
+    // the movement modal opens (title + warehouse name)
+    expect(screen.getByText(/Salida a tienda — Central/)).toBeTruthy();
 
     fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '12' } });
     fireEvent.change(screen.getByTestId('movement-reason'), { target: { value: 'pedido' } });
@@ -215,6 +236,39 @@ describe('WarehousesPage', () => {
       );
     });
     expect(showToastSuccessMock).toHaveBeenCalled();
+  });
+
+  it('records a purchase_in from the gear with the product selector (modal)', async () => {
+    fakeState.warehouses = [
+      { id: 'wh-1', name: 'Central', isActive: true, createdDate: new Date(), createdByName: 'x' },
+    ];
+    fakeState.products = [
+      ['prod-1', { id: 'prod-1', name: 'Café', isActive: true }],
+    ];
+    renderPage();
+
+    // gear → Entrada opens the modal with an ENABLED product selector
+    fireEvent.click(screen.getByTestId('warehouse-actions-toggle-wh-1'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Entrada' }));
+    expect(screen.getByText(/Entrada al almacén — Central/)).toBeTruthy();
+    expect((screen.getByTestId('movement-product') as HTMLSelectElement).disabled).toBe(false);
+
+    fireEvent.change(screen.getByTestId('movement-product'), { target: { value: 'prod-1' } });
+    fireEvent.change(screen.getByTestId('movement-quantity'), { target: { value: '10' } });
+    fireEvent.change(screen.getByTestId('movement-cost'), { target: { value: '660' } });
+    fireEvent.click(screen.getAllByText('Guardar')[0]);
+
+    await waitFor(() => {
+      expect(fakeState.recordMovementImpl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'purchase_in',
+          warehouseId: 'wh-1',
+          productId: 'prod-1',
+          quantity: 10,
+          costPrice: 660,
+        }),
+      );
+    });
   });
 
   it('blocks deactivation when the warehouse has stock', async () => {
