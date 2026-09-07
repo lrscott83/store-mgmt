@@ -541,6 +541,155 @@ describe('CartShell — in-cart quantity +/- stock validation (Angular parity)',
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Venta mayorista en el carrito — floor del menor rango + re-tier de precio
+// (2026-09-07): el − no puede dejar la línea por debajo del menor rango (la
+// elimina), y los ± recalculan el unitPrice al rango aplicable.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('CartShell — wholesale cart floor rule + tier repricing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUser = { selectedStoreId: 's1', storeModuleIds: [11] };
+    localStorage.clear();
+  });
+
+  /** Producto mayorista: packSize 24, rangos 1→$9, 11→$8, retail $10. */
+  function makeWholesaleBeer(): Product {
+    return makeProduct({
+      id: 'beer-1',
+      name: 'Cerveza',
+      price: 10,
+      wholesaleEnabled: true,
+      wholesalePackSize: 24,
+      wholesaleTiers: [
+        { minPacks: 1, pricePerUnit: 9 },
+        { minPacks: 11, pricePerUnit: 8 },
+      ],
+    });
+  }
+
+  it('WS-CART-01: − en el mínimo del primer rango (minPacks 1) elimina la línea del carrito', async () => {
+    const product = makeWholesaleBeer();
+    mockProductLookup = { 'beer-1': product };
+    const removeItem = vi.fn();
+    const updateQuantity = vi.fn();
+    // 1 paquete (24 unidades) en carrito, primer rango minPacks 1 → packs-1 = 0 < 1.
+    mockCartState({
+      items: [{ product, quantity: 24, price: 9 }],
+      total: vi.fn().mockReturnValue(216),
+      removeItem,
+      updateQuantity,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Cerveza'));
+
+    await waitFor(() => expect(removeItem).toHaveBeenCalledWith('beer-1'));
+    expect(updateQuantity).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('WS-CART-02: − cuando el resultado queda bajo el mínimo de un primer rango > 1 elimina la línea', async () => {
+    const product = makeProduct({
+      id: 'beer-1',
+      name: 'Cerveza',
+      price: 10,
+      wholesaleEnabled: true,
+      wholesalePackSize: 24,
+      wholesaleTiers: [{ minPacks: 5, pricePerUnit: 9 }], // primer rango en 5
+    });
+    mockProductLookup = { 'beer-1': product };
+    const removeItem = vi.fn();
+    const updateQuantity = vi.fn();
+    // 5 paquetes en carrito → packs-1 = 4 < 5 → elimina.
+    mockCartState({
+      items: [{ product, quantity: 120, price: 9 }], // 5 × 24
+      total: vi.fn().mockReturnValue(1080),
+      removeItem,
+      updateQuantity,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Cerveza'));
+
+    await waitFor(() => expect(removeItem).toHaveBeenCalledWith('beer-1'));
+    expect(updateQuantity).not.toHaveBeenCalled();
+  });
+
+  it('WS-CART-03: − por encima del mínimo reduce y recalcula el precio al rango aplicable', async () => {
+    const product = makeWholesaleBeer();
+    mockProductLookup = { 'beer-1': product };
+    const updateQuantity = vi.fn();
+    // 12 paquetes (288 unidades) a $8 (rango 11+) → −1 = 11 paquetes, sigue en
+    // rango 11+ → precio $8; el assert clave es que el precio se pasa al store.
+    mockCartState({
+      items: [{ product, quantity: 288, price: 8 }],
+      total: vi.fn().mockReturnValue(2304),
+      updateQuantity,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Cerveza'));
+
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer-1', 264, 8));
+  });
+
+  it('WS-CART-04: + cruza al rango superior y recalcula el unitPrice al del rango nuevo', async () => {
+    const product = makeWholesaleBeer();
+    mockProductLookup = { 'beer-1': product };
+    const updateQuantity = vi.fn();
+    // 10 paquetes (240 unidades) a $9 → +1 = 11 paquetes cruza al rango 11+ ($8).
+    mockCartState({
+      items: [{ product, quantity: 240, price: 9 }],
+      total: vi.fn().mockReturnValue(2160),
+      updateQuantity,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Cerveza'));
+
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer-1', 264, 8));
+  });
+
+  it('WS-CART-05: − cruzando hacia abajo de rango recalcula el unitPrice al rango menor', async () => {
+    const product = makeWholesaleBeer();
+    mockProductLookup = { 'beer-1': product };
+    const updateQuantity = vi.fn();
+    // 11 paquetes (264 unidades) a $8 → −1 = 10 paquetes, cae del rango 11 al 1 → $9.
+    mockCartState({
+      items: [{ product, quantity: 264, price: 8 }],
+      total: vi.fn().mockReturnValue(2112),
+      updateQuantity,
+    });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Disminuir cantidad de Cerveza'));
+
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer-1', 240, 9));
+  });
+
+  it('WS-CART-06: + en un producto normal actualiza la cantidad SIN tocar el precio', async () => {
+    const product = makeProduct({ id: 'p1', name: 'Coca Cola', price: 5 });
+    mockProductLookup = { p1: product };
+    const updateQuantity = vi.fn();
+    mockCartState({ items: [{ product, quantity: 2 }], total: vi.fn().mockReturnValue(10), updateQuantity });
+
+    renderCartShell();
+    openCart();
+    fireEvent.click(screen.getByLabelText('Aumentar cantidad de Coca Cola'));
+
+    // Producto sin config mayorista: updateQuantity va SIN tercer argumento.
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('p1', 3));
+    expect(updateQuantity.mock.calls[0].length).toBe(2);
+  });
+});
+
 describe('CartShell — createOrder validations (Registrar)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -816,7 +965,7 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     expect(screen.queryByText(/\(48\)/)).not.toBeInTheDocument();
   });
 
-  it('el botón + agrega un paquete: +24 unidades con un click', async () => {
+  it('el botón + agrega un paquete: +24 unidades con un click (y re-tier del precio)', async () => {
     mockProductLookup = { beer };
     const updateQuantity = vi.fn();
     mockCartState({ items: [{ product: beer, quantity: 48 }], total: vi.fn().mockReturnValue(31680), updateQuantity });
@@ -825,10 +974,12 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     openCart();
     fireEvent.click(screen.getByLabelText('Aumentar cantidad de Cerveza'));
 
-    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer', 72)); // 48 + 24
+    // 48 + 24 = 72 units = 3 packs; the tier price (660) is re-threaded on
+    // every wholesale ± (2026-09-07 re-tier rule).
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer', 72, 660));
   });
 
-  it('el botón − quita un paquete: −24 unidades con un click', async () => {
+  it('el botón − quita un paquete: −24 unidades con un click (y re-tier del precio)', async () => {
     mockProductLookup = { beer };
     const updateQuantity = vi.fn();
     mockCartState({ items: [{ product: beer, quantity: 48 }], total: vi.fn().mockReturnValue(31680), updateQuantity });
@@ -837,7 +988,9 @@ describe('CartShell — venta mayorista mostrada en paquetes', () => {
     openCart();
     fireEvent.click(screen.getByLabelText('Disminuir cantidad de Cerveza'));
 
-    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer', 24)); // 48 - 24
+    // 48 - 24 = 24 units = 1 pack; still >= minPacks 1, so the line stays and
+    // the tier price (660) is re-threaded (2026-09-07 re-tier rule).
+    await waitFor(() => expect(updateQuantity).toHaveBeenCalledWith('beer', 24, 660));
   });
 
   it('un carrito normal sigue mostrando unidades y precio unitario (sin regresión)', () => {

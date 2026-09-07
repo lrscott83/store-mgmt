@@ -103,6 +103,25 @@ export function resolveWholesalePrice(
   return { unitPrice, total: round2(wholesaleUnits(packs, config.packSize) * unitPrice) };
 }
 
+/**
+ * Precio por unidad del rango aplicable a `packs` — SIN el fallback retail de
+ * resolveWholesalePrice: para los rangos por debajo del primer escalón
+ * devuelve `undefined` (el fallback retail lo decide el caller). Es la pieza
+ * de recálculo del carrito mayorista: cuando los botones ± mueven la cantidad
+ * a otro rango, la línea debe adoptar el unitPrice del rango nuevo.
+ */
+export function wholesaleTierUnitPrice(
+  product: Pick<Product, 'price' | 'wholesaleEnabled' | 'wholesalePackSize' | 'wholesaleTiers'>,
+  packs: number,
+): number | undefined {
+  const config = getWholesaleConfig(product);
+  if (!config || !(packs > 0)) return undefined;
+  const applicable = [...config.tiers]
+    .filter((tier) => tier.minPacks <= packs)
+    .sort((a, b) => b.minPacks - a.minPacks)[0];
+  return applicable?.pricePerUnit;
+}
+
 const WholesaleErrors = {
   PackSizeInvalid: {
     code: 'Product.WholesalePackSizeInvalid',
