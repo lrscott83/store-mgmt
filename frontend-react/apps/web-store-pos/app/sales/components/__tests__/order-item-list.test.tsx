@@ -77,3 +77,48 @@ describe('OrderItemList — list/table parity sweep (WU6)', () => {
     expect(screen.getByText('$2 000')).toBeInTheDocument();
   });
 });
+
+describe('OrderItemList — a price never wraps across lines (no-cut invariant)', () => {
+  it('renders the line total inside a whitespace-nowrap span', () => {
+    render(
+      <Wrapper>
+        <OrderItemList order={makeOrder()} readOnly />
+      </Wrapper>,
+    );
+    // getByText normalizes NBSP to a regular space, so the text matcher is the
+    // pre-NBSP shape; the structural assertion below is the actual invariant.
+    const total = screen.getByText('$2 000');
+    expect(total.className).toMatch(/whitespace-nowrap/);
+  });
+
+  it('uses the NBSP-grouped formatter output for grouped amounts', () => {
+    render(
+      <Wrapper>
+        <OrderItemList
+          order={makeOrder({
+            orderItems: [
+              {
+                productId: 'prod-1',
+                productName: 'Coca Cola',
+                categoryId: 'cat-1',
+                categoryName: 'Bebidas',
+                name: 'Coca Cola',
+                quantity: 2,
+                price: 23456.7,
+                productBusinessId: 'biz-1',
+                productCosts: [],
+                order: 1,
+              },
+            ],
+          })}
+          readOnly
+        />
+      </Wrapper>,
+    );
+    // 2 × 23 456.70 = 46 913.40 — getByText normalizes the DOM's NBSP to a
+    // regular space, so the matcher uses the plain-space shape; the byte-level
+    // NBSP guarantee itself is pinned in format-currency.test.ts.
+    const total = screen.getByText('$46 913.40');
+    expect(total.className).toMatch(/whitespace-nowrap/);
+  });
+});
