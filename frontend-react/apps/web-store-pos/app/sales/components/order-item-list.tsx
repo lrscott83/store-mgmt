@@ -99,7 +99,7 @@ export function OrderItemList({
                     <span className="text-xs font-semibold text-primary">{item.quantity}</span>
                   </td>
                   <td className="p-2 text-right">
-                    <span className="font-semibold text-text">
+                    <span className="font-semibold text-text whitespace-nowrap">
                       {formatCurrency(round2(item.price * item.quantity))}
                     </span>
                   </td>

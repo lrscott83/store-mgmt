@@ -75,7 +75,7 @@ function ExpansionPanel({
       >
         <span>{title}</span>
         <span className="flex items-center gap-2">
-          <span className={amountClassName}>{amount}</span>
+          <span className={`whitespace-nowrap ${amountClassName}`}>{amount}</span>
           <ChevronDownIcon isExpanded={isOpen} className="text-text-muted" />
         </span>
       </button>
@@ -172,7 +172,7 @@ export function TodayStatsPage() {
         <div className="flex items-center justify-between">
           {/* TODAY_STATS.HEADER */}
           <span>{intl.formatMessage({ id: 'TODAY_STATS.HEADER' })}</span>
-          <span className={`text-lg font-bold ${valueClassName(total)}`}>
+          <span className={`text-lg font-bold whitespace-nowrap ${valueClassName(total)}`}>
             {formatCurrency(total)}
           </span>
         </div>
@@ -192,7 +192,7 @@ export function TodayStatsPage() {
                   <span className="font-bold text-text">Ventas</span>
                 </td>
                 <td className="p-1 text-right">
-                  <span className="font-bold text-success">{formatCurrency(salesCashTotal)}</span>
+                  <span className="font-bold text-success whitespace-nowrap">{formatCurrency(salesCashTotal)}</span>
                 </td>
               </tr>
               {hasCreditsModule && (
@@ -201,7 +201,7 @@ export function TodayStatsPage() {
                     <span className="font-bold text-text">Créditos Pagados</span>
                   </td>
                   <td className="p-1 text-right">
-                    <span className="font-bold text-success">{formatCurrency(paidCreditsCashTotal)}</span>
+                    <span className="font-bold text-success whitespace-nowrap">{formatCurrency(paidCreditsCashTotal)}</span>
                   </td>
                 </tr>
               )}
@@ -211,7 +211,7 @@ export function TodayStatsPage() {
                     <span className="font-bold text-text">Gastos</span>
                   </td>
                   <td className="p-1 text-right">
-                    <span className="font-bold text-danger">{formatCurrency(expensesCashTotal)}</span>
+                    <span className="font-bold text-danger whitespace-nowrap">{formatCurrency(expensesCashTotal)}</span>
                   </td>
                 </tr>
               )}
@@ -244,7 +244,7 @@ export function TodayStatsPage() {
                         {/* Angular renders this via <app-expense-list>, whose payment marker is
                             `<i class="bi …">` — but the bootstrap-icons font is imported nowhere
                             (styles.scss/index.html/angular.json), so no glyph renders. No icon. */}
-                        {formatCurrency(expense.total)}
+                        <span className="whitespace-nowrap">{formatCurrency(expense.total)}</span>
                       </td>
                       <td className="p-1 text-right">
                         <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
@@ -317,7 +317,7 @@ function SaleCreditsTable({ saleCredits }: { saleCredits: SaleCredit[] }) {
               <span className="text-text">{saleCredit.client}</span>
             </td>
             <td className="p-1 text-right">
-              <span className={saleCredit.isPaid ? 'text-success' : 'text-danger'}>
+              <span className={`whitespace-nowrap ${saleCredit.isPaid ? 'text-success' : 'text-danger'}`}>
                 {formatCurrency(saleCredit.total)}
               </span>
             </td>

@@ -89,3 +89,73 @@ describe('OrderList — list/table parity sweep (WU6)', () => {
     expect(screen.getByText('Coca Cola')).toBeInTheDocument();
   });
 });
+
+describe('OrderList — money never wraps (no-cut invariant)', () => {
+  it('renders the panel-header order total inside whitespace-nowrap', () => {
+    const orders: Order[] = [
+      makeOrder({
+        orderItems: [
+          {
+            productId: 'prod-1',
+            productName: 'Coca Cola',
+            categoryId: 'cat-1',
+            categoryName: 'Bebidas',
+            name: 'Coca Cola',
+            quantity: 2,
+            price: 61728.39,
+            productBusinessId: 'biz-1',
+            productCosts: [],
+            order: 1,
+          },
+        ],
+      }),
+    ];
+    render(
+      <Wrapper>
+        <OrderList orders={orders} readOnly />
+      </Wrapper>,
+    );
+    // Header total comes from getOrderTotal = Σ round2(price × qty).
+    // 2 × 61 728.39 = 123 456.78 — NBSP-grouped by the formatter.
+    const header = screen.getByText('$123 456.78');
+    expect(header.className).toMatch(/whitespace-nowrap/);
+  });
+
+  it('renders every expanded order-item line total inside whitespace-nowrap', () => {
+    render(
+      <Wrapper>
+        <OrderList
+          orders={[
+            makeOrder({
+              orderItems: [
+                {
+                  productId: 'prod-1',
+                  productName: 'Coca Cola',
+                  categoryId: 'cat-1',
+                  categoryName: 'Bebidas',
+                  name: 'Coca Cola',
+                  quantity: 2,
+                  price: 23456.7,
+                  productBusinessId: 'biz-1',
+                  productCosts: [],
+                  order: 1,
+                },
+              ],
+            }),
+          ]}
+          readOnly
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByTestId('order-panel-toggle-order-1'));
+    // 2 × 23 456.70 = 46 913.40 — appears BOTH in the collapsed header total
+    // and the expanded line total; every occurrence must carry the guard.
+    const totals = screen.getAllByText('$46 913.40');
+    expect(totals.length).toBeGreaterThan(0);
+    for (const el of totals) {
+      expect(el.className, 'every $46 913.40 must carry whitespace-nowrap').toMatch(
+        /whitespace-nowrap/,
+      );
+    }
+  });
+});

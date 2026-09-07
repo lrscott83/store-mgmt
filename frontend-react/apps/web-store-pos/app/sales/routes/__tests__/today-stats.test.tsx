@@ -463,3 +463,126 @@ describe('TodayStatsPage — succeeded:false on each read (silent-failure idiom,
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
+
+// money-never-wraps — a formatted amount must never split across lines in the
+// Cuadre del día. formatCurrency groups thousands with U+00A0 (NBSP, no break
+// opportunity for the browser), and every money cell/heading carries
+// whitespace-nowrap so narrow layouts never clip a total either. Pinned here
+// per user report: totals were wrapping at the thousands space when panels
+// expanded on narrow screens.
+describe('TodayStatsPage — money never wraps (no-cut invariant)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthState.user.storeModuleIds = [EModules.Expenses, EModules.Credits];
+    mockGetActiveOrdersInDay.mockReturnValue([
+      makeOrder({ id: 'o1', paymentType: PaymentType.Efectivo, isCredit: false, total: 23456.7 }),
+    ]);
+    mockGetCategoryCartItemsView.mockReturnValue(categoryEnvelope([]));
+    mockGetExpensesInDayObservable.mockResolvedValue(
+      expensesEnvelope([makeExpense({ id: 'e1', total: 1234.5 })]),
+    );
+    mockGetUnPaidSaleCreditsInDayObservable.mockResolvedValue(
+      creditsEnvelope([makeCredit({ id: 'c1', total: 98765.4, isPaid: false })]),
+    );
+    mockGetPaidSaleCreditsInDayObservable.mockResolvedValue(
+      creditsEnvelope([makeCredit({ id: 'c2', total: 12345.6, isPaid: true })]),
+    );
+  });
+
+  it('renders the running header total inside a whitespace-nowrap span', async () => {
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+    // total = ordersTotal(0) + paidCredits(12 345.60) - unpaidCredits(98 765.40)
+    //        - expenses(1 234.50) = -87 654.30. Expenses/credits load via
+    // promises — findByText waits for the async state to settle. getByText
+    // normalizes the DOM's NBSP to a regular space, so matchers use the
+    // plain-space shape.
+    const header = await screen.findByText('-$87 654.30');
+    expect(header.className).toMatch(/whitespace-nowrap/);
+  });
+
+  it('renders every ExpansionPanel amount inside whitespace-nowrap', async () => {
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+    await screen.findByRole('button', { name: /Gastos \(1\)/ });
+    // Collapsed panels: each amount renders once in its header. getAllByText
+    // keeps this robust if a figure ever appears in more than one spot.
+    const gastos = screen.getAllByText('$1 234.50'); // expensesTotal
+    const unpaid = screen.getAllByText('$98 765.40'); // creditsTotal
+    const paid = screen.getAllByText('$12 345.60'); // paidSaleCreditsTotal
+    for (const el of [...gastos, ...unpaid, ...paid]) {
+      expect(el.className, 'panel amount must carry whitespace-nowrap').toMatch(
+        /whitespace-nowrap/,
+      );
+    }
+  });
+
+  it('renders cash-table amounts (Ventas/Gastos) with whitespace-nowrap when expanded', async () => {
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Resumen Efectivo/ }));
+    // Ventas row: $23 456.70 (NBSP normalized to space by getByText). The
+    // same figure renders ONLY inside the cash table (cash uses paymentType
+    // filters: only the Efectivo order counts).
+    const ventas = screen.getAllByText('$23 456.70');
+    expect(ventas.length).toBeGreaterThan(0);
+    for (const el of ventas) {
+      expect(el.className, 'cash Ventas amount must carry whitespace-nowrap').toMatch(
+        /whitespace-nowrap/,
+      );
+    }
+  });
+
+  it('renders expanded-panel expense amounts with whitespace-nowrap', async () => {
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Gastos \(1\)/ }));
+    // $1 234.50 renders in the collapsed panel header AND the expanded row —
+    // every occurrence must carry the guard.
+    const amounts = screen.getAllByText('$1 234.50');
+    expect(amounts.length).toBeGreaterThan(0);
+    for (const el of amounts) {
+      expect(el.className, 'Gastos amount must carry whitespace-nowrap').toMatch(
+        /whitespace-nowrap/,
+      );
+    }
+  });
+
+  it('renders expanded-panel credit amounts with whitespace-nowrap', async () => {
+    render(
+      <Wrapper>
+        <TodayStatsPage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Créditos Por Cobrar \(1\)/ }));
+    const unpaid = screen.getAllByText('$98 765.40');
+    expect(unpaid.length).toBeGreaterThan(0);
+    for (const el of unpaid) {
+      expect(el.className, 'Créditos Por Cobrar amount must carry whitespace-nowrap').toMatch(
+        /whitespace-nowrap/,
+      );
+    }
+
+    // Angular parity: this panel's "(...)" slot shows the currency SUM, not a
+    // count — paidSaleCreditsTotal = 12345.6 renders raw via template literal.
+    fireEvent.click(await screen.findByRole('button', { name: /Créditos Pagados \(12345\.6\)/ }));
+    const paid = screen.getAllByText('$12 345.60');
+    for (const el of paid) {
+      expect(el.className, 'Créditos Pagados amount must carry whitespace-nowrap').toMatch(
+        /whitespace-nowrap/,
+      );
+    }
+  });
+});
