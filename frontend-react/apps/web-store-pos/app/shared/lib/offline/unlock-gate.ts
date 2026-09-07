@@ -65,3 +65,61 @@ export function needsUnlock(user: UnlockGateUser | null): boolean {
   if (hasDeviceDekWrap()) return true;
   return provisionedInRoster;
 }
+
+// entity-crypto.ts:23 (ENTITY_ENVELOPE_PREFIX), mirrored as a literal:
+// importing entity-crypto from here would drag `aes-gcm` (@noble/ciphers)
+// into the unlock-gate chunk loaders.ts dynamic-imports on every
+// authenticated navigation. Same discipline roster-fixture.ts applies.
+const ENTITY_ENVELOPE_PREFIX = 'enc:v1:';
+
+// entity storage key shape (storage-keys.ts StorageKeys.entityKey):
+// `lizoft.store-{entity}-{storeId}` — store-scoped, no APP_VERSION prefix.
+const ENTITY_KEY_PREFIX = 'lizoft.store-';
+
+// The daily exchange-rate register is the ONE business entity that is
+// SYSTEM-GENERATED rather than user-authored: every OwnerAdmin
+// authentication backfills it (exchange-rate-daily.ts), values default to
+// 1 / the previous day's, and a lost register is re-ingestable by hand. It
+// must never justify hijacking a valid session — that was the second half
+// of the 2026-09-06 report: EVERY owner session writes this ciphertext at
+// login, so keying the gate on "any ciphertext" re-locked every store on
+// earth the moment its device key vanished.
+const REGENERABLE_ENTITY_KEY_PREFIX = 'lizoft.store-exchangeRates-';
+
+/**
+ * Legacy empty-collection ciphertext: `enc:v1:` + base64 of EXACTLY 30
+ * bytes. AES-GCM adds no padding, so ciphertext length is deterministic:
+ * iv(12) + plaintext(n) + tag(16). The JSON sentinels '[]' and '{}' are
+ * both 2 bytes of plaintext, so their pre-fix ciphertexts (encryptEntity
+ * used to encrypt them) are exactly 30 bytes → 40 base64 chars. No 2-byte
+ * JSON document other than '[]'/'{}' exists (any other value needs ≥3
+ * bytes), so length alone is a sound discriminator — no decryption, no DEK.
+ */
+function isEmptyCollectionCiphertext(value: string): boolean {
+  const payload = value.slice(ENTITY_ENVELOPE_PREFIX.length);
+  return payload.length === 40;
+}
+
+/**
+ * Valid-session fix (user report 2026-09-06): true only when this device
+ * actually HOLDS encrypted USER data (`enc:v1:` values) it currently cannot
+ * read. `needsUnlock` alone says "this device once provisioned a key" —
+ * which is true even for a fresh store whose only wrap came from
+ * registration, with ZERO user ciphertext on disk. Hijacking navigation
+ * there expelled a valid session to /login on every reload and parked it
+ * on /login//register. The hijack is only justified to protect unreadable
+ * USER data; system-regenerable registers and legacy empty collections do
+ * not count.
+ */
+export function hasUnreadableCiphertext(): boolean {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(ENTITY_KEY_PREFIX)) continue;
+    if (key.startsWith(REGENERABLE_ENTITY_KEY_PREFIX)) continue;
+    const value = localStorage.getItem(key);
+    if (value && value.startsWith(ENTITY_ENVELOPE_PREFIX) && !isEmptyCollectionCiphertext(value)) {
+      return true;
+    }
+  }
+  return false;
+}

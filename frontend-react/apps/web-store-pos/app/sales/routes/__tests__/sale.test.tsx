@@ -4,6 +4,7 @@ import { IntlProvider } from 'react-intl';
 import esMessages from '~/shared/lib/i18n/es';
 import type { Product, ProductCategory } from '@store-mgmt/domain';
 import { EModules, OrderType } from '@store-mgmt/domain';
+import { useCartStore } from '~/shared/lib/stores/cart-store';
 
 const mockUser = vi.hoisted(() => ({ selectedStoreId: 's1', storeModuleIds: [] as number[] }));
 
@@ -125,6 +126,11 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     addItemMock.mockClear();
     mockUser.storeModuleIds = [];
     localStorage.clear();
+
+    // Reset del carrito mockeado (el objeto state del factory es compartido entre tests).
+    const cart = useCartStore as unknown as () => { items: unknown[]; orderType: OrderType };
+    cart().items = [];
+    cart().orderType = OrderType.Normal;
 
     saleServiceSpies.getProductsToSaleByCategoryId.mockReset();
     saleServiceSpies.getProductsToSaleByCategoryId.mockImplementation(async (categoryId: string) =>
@@ -278,6 +284,29 @@ describe('SalePage — Angular parity (sale.component.html)', () => {
     expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
     const [, text] = showBlockingErrorMock.mock.calls[0];
     expect(text).toBe('El producto no está disponible en el inventario.');
+  });
+
+  it('bloquea añadir a la venta normal cuando hay una venta mayorista en curso y muestra el popup de restricción', async () => {
+    const cart = useCartStore as unknown as () => { items: unknown[]; orderType: OrderType };
+    cart().items = [{ product: makeProduct({ id: 'other' }), quantity: 1 }];
+    cart().orderType = OrderType.Mayorista;
+
+    mockCategories = [makeCategory({ id: 'c1', name: 'Bebidas' })];
+    mockProducts = [makeProduct({ id: 'p1', name: 'Coca Cola', categoryId: 'c1' })];
+    showBlockingErrorMock.mockClear();
+
+    render(
+      <Wrapper>
+        <SalePage />
+      </Wrapper>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /adicionar/i }));
+
+    expect(addItemMock).not.toHaveBeenCalled();
+    expect(showBlockingErrorMock).toHaveBeenCalledTimes(1);
+    const [, text] = showBlockingErrorMock.mock.calls[0];
+    expect(String(text)).toContain('venta mayorista');
+    expect(String(text)).toContain('venta normal');
   });
 
   it('shows the available quantity in parentheses next to the price when the inventory module is on and discountFromInvantory is set', async () => {

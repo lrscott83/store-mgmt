@@ -18,6 +18,7 @@ import { ProductCategoryRepository } from '~/sales/lib/repositories/product-cate
 import { createProductService } from '../lib/services/product-service.factory';
 import { createProductCategoryService } from '../lib/services/product-category-service.factory';
 import { hasAvailableProductToSale } from '../lib/product-availability';
+import { guardOrderType } from '../lib/order-type-guard';
 import { SaleCategoryProducts } from '../components/sale-category-products';
 import { ScannerModal } from '../components/scanner-modal';
 
@@ -36,6 +37,9 @@ export function SalePage() {
   const storeId = user?.selectedStoreId ?? '';
   const addItem = useCartStore((s) => s.addItem);
   const getCartItemQuantity = useCartStore((s) => s.getItemQuantity);
+  // Exclusividad Normal/Mayorista: se leen en cada render (no suscriben re-render).
+  const cartItems = useCartStore((s) => s.items);
+  const cartOrderType = useCartStore((s) => s.orderType);
 
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -197,6 +201,9 @@ export function SalePage() {
   }
 
   function checkAvailability(productId: string, quantity: number) {
+    // Exclusividad primero: el popup de mezcla de ventas tiene prioridad sobre el de inventario.
+    const typeGuard = guardOrderType({ items: cartItems, cartOrderType, requested: OrderType.Normal });
+    if (!typeGuard.succeeded) return typeGuard;
     const product = displayedProducts.find((p) => p.id === productId);
     return availabilityGate(product, productId, quantity);
   }
@@ -208,6 +215,11 @@ export function SalePage() {
    * the gate is pure, so re-running it here is deterministic).
    */
   function addProductToSale(product: Product, quantity: number, price?: number) {
+    // Exclusividad: no se puede mezclar venta normal y mayorista en el mismo carrito.
+    const typeGuard = guardOrderType({ items: cartItems, cartOrderType, requested: OrderType.Normal });
+    if (!typeGuard.succeeded) {
+      return typeGuard;
+    }
     const availability = availabilityGate(product, product.id, quantity);
     if (!availability.succeeded) {
       return availability;

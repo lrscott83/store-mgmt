@@ -210,8 +210,31 @@ describe('Route Loaders (AUTH-04)', () => {
       expect((result as Response).headers.get('Location')).toBe('/sales/products');
     });
 
-    it('guestOnlyLoader — locked provisioned visitor: v2 roster + no DEK -> renders the form (null, no redirect)', async () => {
+    // entity-crypto.ts:23 + storage-keys.ts entityKey shape, mirrored as
+    // literals — the app source is mocked/partial here, not importable.
+    function plantEncryptedEntity(storeId: string): void {
+      localStorage.setItem(
+        `lizoft.store-products-${storeId}`,
+        'enc:v1:AAAA',
+      );
+    }
+
+    // Valid-session fix (2026-09-06): locked + provisioned + NO ciphertext on
+    // disk -> a valid session bounces home; the hijack only exists to protect
+    // unreadable encrypted data.
+    it('guestOnlyLoader — locked provisioned visitor WITHOUT ciphertext -> redirect home (valid-session fix)', async () => {
       importRoster(makeV2Bundle());
+      setAuthState(makeUser({ login: UNLOCK_LOGIN }));
+
+      const result = await guestOnlyLoader();
+
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).headers.get('Location')).toBe('/sales/products');
+    });
+
+    it('guestOnlyLoader — locked provisioned visitor WITH ciphertext -> renders the form (null, no redirect)', async () => {
+      importRoster(makeV2Bundle());
+      plantEncryptedEntity('s1');
       setAuthState(makeUser({ login: UNLOCK_LOGIN }));
 
       const result = await guestOnlyLoader();
@@ -231,8 +254,35 @@ describe('Route Loaders (AUTH-04)', () => {
       expect((result as Response).headers.get('Location')).toBe('/sales/products');
     });
 
-    it('authLoader — locked-provisioned: redirects to /login?unlock=1 WITHOUT logging out', async () => {
+    // Valid-session fix (2026-09-06): needsUnlock alone must NOT hijack a
+    // valid session — only unreadable ciphertext justifies the redirect.
+    it('authLoader — locked-provisioned WITHOUT ciphertext: passes through WITHOUT redirect or logout (valid-session fix)', async () => {
       importRoster(makeV2Bundle());
+      const user = makeUser({ login: UNLOCK_LOGIN });
+      const logoutSpy = vi.fn();
+      vi.mocked(useAuthStore.getState).mockReturnValue({
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        initialize: vi.fn(),
+        getUserByToken: vi.fn(),
+        setUser: vi.fn(),
+        updateUser: vi.fn(),
+        login: vi.fn(),
+        loginOffline: vi.fn(),
+        logout: logoutSpy,
+      });
+
+      const result = await authLoader();
+
+      expect(result).toBeNull();
+      expect(logoutSpy).not.toHaveBeenCalled();
+    });
+
+    it('authLoader — locked-provisioned WITH ciphertext: redirects to /login?unlock=1 WITHOUT logging out', async () => {
+      importRoster(makeV2Bundle());
+      plantEncryptedEntity('s1');
       const user = makeUser({ login: UNLOCK_LOGIN });
       const logoutSpy = vi.fn();
       vi.mocked(useAuthStore.getState).mockReturnValue({
