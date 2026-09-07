@@ -578,6 +578,13 @@ const messages: Record<string, string> = {
   'WAREHOUSES.CREATED': 'Almacén creado.',
   'WAREHOUSES.UPDATED': 'Almacén actualizado.',
   'WAREHOUSES.MOVEMENT_CREATED': 'Movimiento registrado.',
+  'WAREHOUSES.MENU_ENTRY': 'Entrada',
+  'WAREHOUSES.MENU_MOVEMENT': 'Movimiento',
+  'WAREHOUSES.MENU_SALE_OUT': 'Salida',
+  'WAREHOUSES.MODAL_ENTRY': 'Entrada al almacén',
+  'WAREHOUSES.MODAL_MOVEMENT': 'Movimiento a otro almacén',
+  'WAREHOUSES.MODAL_SALE_OUT': 'Salida a tienda',
+  'WAREHOUSES.SELECT_PRODUCT': 'Seleccione un producto…',
   // Angular INVENTORY_ENTRY.* namespace (vocabs/es.ts:420-426) — today-entries add/edit modal
   // + today-entries empty state (was previously covered by the overloaded INVENTORY.EMPTY_STATE).
   // INVENTORY_ENTRY.TEXT (Angular vocabs/es.ts:421) — used by Swal's DELETE_CONFIRM_MESSAGE_A

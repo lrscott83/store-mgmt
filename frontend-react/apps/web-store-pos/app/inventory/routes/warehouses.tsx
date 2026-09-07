@@ -13,6 +13,7 @@ import { useAuthStore } from '~/shared/lib/stores/auth-store';
 import { Card } from '~/shared/components/ui/card';
 import { InfoBox } from '~/shared/components/ui/info-box';
 import { Button } from '~/shared/components/ui/button';
+import { ChevronDownIcon, PlusIcon } from '~/shared/components/ui/icons';
 import { ActionMenu, ActionMenuItem } from '~/shared/components/ui/action-menu';
 import { showBlockingError } from '~/shared/lib/blocking-alert';
 import { showToastSuccess } from '~/shared/lib/toast';
@@ -23,16 +24,13 @@ import { WarehouseOfflineService } from '../lib/services/warehouse-offline-servi
 import { ProductRepository } from '~/sales/lib/repositories/product-repository';
 import { ProductCategoryRepository } from '~/sales/lib/repositories/product-category-repository';
 import { WarehouseFormModal } from '../components/warehouse-form-modal';
+import {
+  WarehouseMovementModal,
+  type WarehouseMovementFields,
+  type WarehouseMovementMode,
+} from '../components/warehouse-movement-modal';
 
 export const clientLoader = featureLoader([EFeatures.Warehouses]);
-
-type MovementFormMode = 'purchase_in' | 'sale_out' | 'transfer_out' | null;
-
-interface MovementFormState {
-  mode: MovementFormMode;
-  warehouseId: string;
-  productId: string;
-}
 
 const MOVEMENT_TYPE_LABEL: Record<WarehouseMovementType, string> = {
   purchase_in: 'WAREHOUSES.TYPE_PURCHASE_IN',
@@ -44,13 +42,16 @@ const MOVEMENT_TYPE_LABEL: Record<WarehouseMovementType, string> = {
 /**
  * Almacenes — gestión de almacenes y movimientos (warehouses-plan):
  * - CRUD de almacenes (crear / renombrar / desactivar, con bloqueo si hay stock
- *   o movimientos).
+ *   o movimientos) vía WarehouseFormModal.
+ * - Panel global bajo el título: (unidades totales) a la izquierda y costo
+ *   total de todos los almacenes a la derecha.
  * - Paneles colapsables con el mismo diseño que la vista Disponible del
  *   Inventario (InventoryProductList): header "Nombre (N) $Total" con la
  *   flecha a la derecha, y al desplegar las filas de productos con el costo
- *   unitario y el total alineados a la derecha.
- * - Acciones por fila: Entrada (compra), Salida a tienda (crea una
- *   InventoryEntry en la tienda) y Transferir a otro almacén.
+ *   promedio y el total alineados a la derecha.
+ * - Gear por almacén: Entrada / Movimiento / Salida (modal de movimiento) +
+ *   Editar / Desactivar. Acciones por fila equivalentes: Entrada (compra),
+ *   Salida a tienda (crea una InventoryEntry en la tienda) y Transferir.
  * - Histórico de movimientos append-only.
  */
 export function WarehousesPage() {
@@ -66,17 +67,12 @@ export function WarehousesPage() {
   /** Modal state: creating XOR editing (null/undefined = closed). */
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Warehouse | null>(null);
-  const [form, setForm] = useState<MovementFormState>({
-    mode: null,
-    warehouseId: '',
-    productId: '',
-  });
-  const [formFields, setFormFields] = useState({
-    quantity: '',
-    costPrice: '',
-    reason: '',
-    toWarehouseId: '',
-  });
+  /** Modal de movimientos: null = cerrado; productId null = gear (elige producto). */
+  const [movementModal, setMovementModal] = useState<{
+    mode: WarehouseMovementMode;
+    warehouseId: string;
+    productId: string | null;
+  } | null>(null);
   /** Producto elegido por almacén para registrar una entrada (compra) sin stock previo. */
   const [purchaseProduct, setPurchaseProduct] = useState<Record<string, string>>({});
 
@@ -155,28 +151,20 @@ export function WarehousesPage() {
     load();
   }
 
-  function openForm(mode: Exclude<MovementFormMode, null>, warehouseId: string, productId: string) {
-    setForm({ mode, warehouseId, productId });
-    setFormFields({ quantity: '', costPrice: '', reason: '', toWarehouseId: '' });
+  function openMovementModal(mode: WarehouseMovementMode, warehouse: Warehouse, productId: string | null) {
+    setMovementModal({ mode, warehouseId: warehouse.id, productId });
   }
 
-  function handleAddPurchase(warehouseId: string) {
-    const productId = purchaseProduct[warehouseId];
-    if (!productId) return;
-    openForm('purchase_in', warehouseId, productId);
-  }
-
-  function submitMovement() {
-    if (!service || !form.mode) return;
-    const quantity = parseFloat(formFields.quantity);
+  function handleMovementSubmit(fields: WarehouseMovementFields) {
+    if (!service || !movementModal) return;
     const result = service.recordMovement({
-      type: form.mode,
-      warehouseId: form.warehouseId,
-      productId: form.productId,
-      quantity,
-      costPrice: form.mode === 'purchase_in' ? parseFloat(formFields.costPrice) : undefined,
-      reason: formFields.reason || null,
-      toWarehouseId: form.mode === 'transfer_out' ? formFields.toWarehouseId || undefined : undefined,
+      type: movementModal.mode,
+      warehouseId: movementModal.warehouseId,
+      productId: fields.productId,
+      quantity: fields.quantity,
+      costPrice: fields.costPrice,
+      reason: fields.reason,
+      toWarehouseId: fields.toWarehouseId,
     });
     if (!result.succeeded) {
       showBlockingError(
@@ -185,24 +173,39 @@ export function WarehousesPage() {
       );
       return;
     }
-    setForm({ mode: null, warehouseId: '', productId: '' });
+    setMovementModal(null);
     showToastSuccess(intl.formatMessage({ id: 'WAREHOUSES.MOVEMENT_CREATED' }));
     load();
+  }
+
+  function handleAddPurchase(warehouse: Warehouse) {
+    const productId = purchaseProduct[warehouse.id];
+    if (!productId) return;
+    openMovementModal('purchase_in', warehouse, productId);
   }
 
   function stockOf(warehouseId: string): WarehouseStockLevel[] {
     return stockLevels.filter((level) => level.warehouseId === warehouseId);
   }
 
+  /** Unidades totales del almacén — el (N) del header. */
+  const unitsOf = (warehouseId: string) =>
+    stockOf(warehouseId).reduce((sum, level) => sum + level.onHand, 0);
+
   /** Costo total del almacén: Σ(onHand × costo promedio) — el total del header. */
   const totalCostOf = (warehouseId: string) =>
     stockOf(warehouseId).reduce((sum, level) => sum + level.onHand * level.costPrice, 0);
 
-  const totalCost = (warehouseId: string) =>
-    stockOf(warehouseId).reduce((sum, level) => sum + level.onHand * level.costPrice, 0);
+  /** Resumen global: unidades y costo de todos los almacenes. */
+  const totalUnits = stockLevels.reduce((sum, level) => sum + level.onHand, 0);
+  const grandTotalCost = stockLevels.reduce(
+    (sum, level) => sum + level.onHand * level.costPrice,
+    0,
+  );
 
-  const totalOnHand = (warehouseId: string) =>
-    stockOf(warehouseId).reduce((sum, level) => sum + level.onHand, 0);
+  const movementSource = movementModal
+    ? warehouses.find((w) => w.id === movementModal.warehouseId)
+    : undefined;
 
   return (
     <Card
@@ -211,11 +214,9 @@ export function WarehousesPage() {
         <div className="flex items-center justify-between">
           <span data-testid="warehouses-page-title" className="flex items-center gap-2">
             {intl.formatMessage({ id: 'WAREHOUSES.TITLE' })}
-            <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-              ({warehouses.length})
-            </span>
           </span>
           <Button variant="primary" onClick={openCreateModal}>
+            <PlusIcon />
             {intl.formatMessage({ id: 'WAREHOUSES.NEW_WAREHOUSE' })}
           </Button>
         </div>
@@ -231,6 +232,41 @@ export function WarehousesPage() {
           }}
           onSave={handleModalSave}
         />
+
+        {movementSource && movementModal && (
+          <WarehouseMovementModal
+            open
+            mode={movementModal.mode}
+            warehouse={movementSource}
+            targetWarehouses={warehouses.filter(
+              (w) => w.id !== movementSource.id && w.isActive,
+            )}
+            products={
+              movementModal.mode === 'purchase_in' || movementModal.productId
+                ? products
+                : products.filter((p) =>
+                    stockOf(movementSource.id).some((l) => l.productId === p.id),
+                  )
+            }
+            productId={movementModal.productId}
+            onClose={() => setMovementModal(null)}
+            onSubmit={handleMovementSubmit}
+          />
+        )}
+
+        {/* Resumen global bajo el título: (unidades) a la izquierda,
+            costo total de todos los almacenes a la derecha. */}
+        <div className="flex items-center justify-between">
+          <span data-testid="warehouses-total-units" className="text-sm font-semibold text-text-muted">
+            ({totalUnits})
+          </span>
+          <span
+            data-testid="warehouses-total-cost"
+            className="whitespace-nowrap text-sm font-semibold text-primary"
+          >
+            {formatCurrency(grandTotalCost)}
+          </span>
+        </div>
 
         {warehouses.length === 0 && (
           <InfoBox variant="primary" className="text-center">
@@ -264,19 +300,18 @@ export function WarehousesPage() {
                   >
                     <span className="min-w-0 truncate text-sm font-semibold uppercase tracking-wide text-text-muted">
                       <span className="text-text">{warehouse.name}</span>{' '}
-                      ({levels.length})
+                      ({unitsOf(warehouse.id)})
                       {!warehouse.isActive && (
                         <span className="ml-1 text-xs normal-case text-text-muted">
                           ({intl.formatMessage({ id: 'WAREHOUSES.INACTIVE' })})
                         </span>
                       )}
                     </span>
-                    <span className="text-xs text-text-muted">
-                      {intl.formatMessage({ id: 'WAREHOUSES.PRODUCT_COUNT' })}:{' '}
-                      {levels.length} · {intl.formatMessage({ id: 'WAREHOUSES.TOTAL_COST' })}:{' '}
-                      {formatCurrency(totalCost(warehouse.id))} ·{' '}
-                      {intl.formatMessage({ id: 'WAREHOUSES.ON_HAND' })}:{' '}
-                      {totalOnHand(warehouse.id)}
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="whitespace-nowrap text-sm font-semibold text-primary">
+                        {formatCurrency(totalCostOf(warehouse.id))}
+                      </span>
+                      <ChevronDownIcon isExpanded={isExpanded} className="text-text-muted" />
                     </span>
                   </button>
                   <ActionMenu
@@ -284,7 +319,26 @@ export function WarehousesPage() {
                     label={`Acciones de ${warehouse.name}`}
                   >
                     <ActionMenuItem
+                      data-testid={`warehouse-entry-${warehouse.id}`}
+                      onClick={() => openMovementModal('purchase_in', warehouse, null)}
+                    >
+                      {intl.formatMessage({ id: 'WAREHOUSES.MENU_ENTRY' })}
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      data-testid={`warehouse-movement-${warehouse.id}`}
+                      onClick={() => openMovementModal('transfer_out', warehouse, null)}
+                    >
+                      {intl.formatMessage({ id: 'WAREHOUSES.MENU_MOVEMENT' })}
+                    </ActionMenuItem>
+                    <ActionMenuItem
+                      data-testid={`warehouse-sale-out-${warehouse.id}`}
+                      onClick={() => openMovementModal('sale_out', warehouse, null)}
+                    >
+                      {intl.formatMessage({ id: 'WAREHOUSES.MENU_SALE_OUT' })}
+                    </ActionMenuItem>
+                    <ActionMenuItem
                       intent="edit"
+                      separatorBefore
                       data-testid={`warehouse-edit-${warehouse.id}`}
                       onClick={() => openEditModal(warehouse)}
                     >
@@ -321,7 +375,7 @@ export function WarehousesPage() {
                             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
                           >
                             <option value="">
-                              {intl.formatMessage({ id: 'WAREHOUSES.SELECT_WAREHOUSE' })}
+                              {intl.formatMessage({ id: 'WAREHOUSES.SELECT_PRODUCT' })}
                             </option>
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
@@ -333,7 +387,7 @@ export function WarehousesPage() {
                         <Button
                           variant="outline"
                           disabled={!purchaseProduct[warehouse.id]}
-                          onClick={() => handleAddPurchase(warehouse.id)}
+                          onClick={() => handleAddPurchase(warehouse)}
                         >
                           {intl.formatMessage({ id: 'WAREHOUSES.PURCHASE_IN' })}
                         </Button>
@@ -346,10 +400,10 @@ export function WarehousesPage() {
                     )}
                     {levels.length > 0 && (
                       /* Filas de productos — mismo diseño que la vista Disponible
-                         del Inventario: nombre (cantidad) a la izquierda, costo
-                         unitario (success) + total (primary) a la derecha. Las
-                         acciones de movimiento viven al final de cada fila. */
-                      <div className="divide-y divide-border rounded-lg border border-border bg-surface">
+                          del Inventario: nombre (cantidad) a la izquierda, costo
+                          promedio (success) + total (primary) a la derecha. Las
+                          acciones de movimiento viven al final de cada fila. */
+                      <div className="divide-y divide-border border-t border-border bg-surface">
                         {levels.map((level) => (
                           <div
                             key={`${level.warehouseId}:${level.productId}`}
@@ -378,7 +432,7 @@ export function WarehousesPage() {
                               <Button
                                 variant="outline"
                                 onClick={() =>
-                                  openForm('purchase_in', warehouse.id, level.productId)
+                                  openMovementModal('purchase_in', warehouse, level.productId)
                                 }
                               >
                                 {intl.formatMessage({ id: 'WAREHOUSES.PURCHASE_IN' })}
@@ -386,7 +440,7 @@ export function WarehousesPage() {
                               <Button
                                 variant="outline"
                                 onClick={() =>
-                                  openForm('sale_out', warehouse.id, level.productId)
+                                  openMovementModal('sale_out', warehouse, level.productId)
                                 }
                               >
                                 {intl.formatMessage({ id: 'WAREHOUSES.SALE_OUT' })}
@@ -394,7 +448,7 @@ export function WarehousesPage() {
                               <Button
                                 variant="outline"
                                 onClick={() =>
-                                  openForm('transfer_out', warehouse.id, level.productId)
+                                  openMovementModal('transfer_out', warehouse, level.productId)
                                 }
                               >
                                 {intl.formatMessage({ id: 'WAREHOUSES.TRANSFER' })}
@@ -404,99 +458,6 @@ export function WarehousesPage() {
                         ))}
                       </div>
                     )}
-
-                    {form.mode && form.warehouseId === warehouse.id && (
-                        <div
-                          data-testid={`movement-form-${form.mode}`}
-                          className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-background p-3"
-                        >
-                          <div>
-                            <div className="mb-1 text-xs text-text-muted">
-                              {intl.formatMessage({ id: 'WAREHOUSES.QUANTITY' })}
-                            </div>
-                            <input
-                              data-testid="movement-quantity"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={formFields.quantity}
-                              onChange={(e) =>
-                                setFormFields((prev) => ({ ...prev, quantity: e.target.value }))
-                              }
-                              className="w-28 rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
-                            />
-                          </div>
-                          {form.mode === 'purchase_in' && (
-                            <div>
-                              <div className="mb-1 text-xs text-text-muted">
-                                {intl.formatMessage({ id: 'WAREHOUSES.COST_PRICE' })}
-                              </div>
-                              <input
-                                data-testid="movement-cost"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={formFields.costPrice}
-                                onChange={(e) =>
-                                  setFormFields((prev) => ({ ...prev, costPrice: e.target.value }))
-                                }
-                                className="w-28 rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
-                              />
-                            </div>
-                          )}
-                          {form.mode === 'transfer_out' && (
-                            <div>
-                              <div className="mb-1 text-xs text-text-muted">
-                                {intl.formatMessage({ id: 'WAREHOUSES.TO_WAREHOUSE' })}
-                              </div>
-                              <select
-                                data-testid="movement-target"
-                                value={formFields.toWarehouseId}
-                                onChange={(e) =>
-                                  setFormFields((prev) => ({
-                                    ...prev,
-                                    toWarehouseId: e.target.value,
-                                  }))
-                                }
-                                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
-                              >
-                                <option value="">
-                                  {intl.formatMessage({ id: 'WAREHOUSES.SELECT_WAREHOUSE' })}
-                                </option>
-                                {warehouses
-                                  .filter((w) => w.id !== warehouse.id && w.isActive)
-                                  .map((w) => (
-                                    <option key={w.id} value={w.id}>
-                                      {w.name}
-                                    </option>
-                                  ))}
-                              </select>
-                            </div>
-                          )}
-                          <div>
-                            <div className="mb-1 text-xs text-text-muted">
-                              {intl.formatMessage({ id: 'WAREHOUSES.REASON' })}
-                            </div>
-                            <input
-                              data-testid="movement-reason"
-                              value={formFields.reason}
-                              onChange={(e) =>
-                                setFormFields((prev) => ({ ...prev, reason: e.target.value }))
-                              }
-                              className="w-48 rounded-md border border-border bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary"
-                            />
-                          </div>
-                          <Button variant="primary" onClick={submitMovement}>
-                            {intl.formatMessage({ id: 'WAREHOUSES.SAVE' })}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => setForm({ mode: null, warehouseId: '', productId: '' })}
-                          >
-                            {intl.formatMessage({ id: 'WAREHOUSES.CANCEL' })}
-                          </Button>
-                        </div>
-                      )}
                   </div>
                 )}
               </div>
