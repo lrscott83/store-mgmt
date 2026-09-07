@@ -57,6 +57,18 @@ public class BillingService : IBillingService
         var hasPaidModule = modules.Any(m => !m.PriceIncluded);
         var planType = hasPaidModule && store.PaymentStartDate is not null ? "Paid" : "Free";
 
+        // Monto efectivo del plan con los DESCUENTOS del snapshot de la tienda
+        // (StoreModule): mismo cálculo que RegisterStorePaymentCommand usa para el
+        // cobro. Un plan cuyo valor efectivo es 0 (p.ej. todos los módulos de pago
+        // con 100% de descuento) no debe entrar en trial: no hay nada pendiente de
+        // cobro, así que el cartel "Probando el plan de pago. Primer cobro..." no
+        // aplica (2026-09-06).
+        float effectiveAmount = store.StoreModules
+            .Where(sm => sm.IsActive && !sm.ModulePriceIncluded)
+            .Sum(sm => CurrentPriceServiceUtils.GetCurrentPrice(
+                sm.Price, sm.ModulePercentDiscountPrice, sm.ModuleDiscountPrice));
+        var hasBillableAmount = effectiveAmount > 0;
+
         var lastPayment = await _paymentRepository.GetLastByStoreIdAsync(storeId);
         var paidCount = await _paymentRepository.GetPaidMonthsCountAsync(storeId);
 
@@ -70,7 +82,8 @@ public class BillingService : IBillingService
             lastPayment?.PaymentBeforeDate is DateTimeOffset pbd ? DateOnly.FromDateTime(pbd.UtcDateTime) : null);
 
         var today = DateOnly.FromDateTime(_dateTimeProvider.UtcNow.UtcDateTime);
-        var isInTrial = StoreBillingUtils.IsInTrial(store.PaymentStartDate, trialMonths, today);
+        // Gate de valor 0: sin monto efectivo no hay trial (ni cartel de primer cobro).
+        var isInTrial = hasBillableAmount && StoreBillingUtils.IsInTrial(store.PaymentStartDate, trialMonths, today);
         var status = StoreBillingUtils.GetStatus(
             store.PaymentStartDate,
             nextDueDate,
