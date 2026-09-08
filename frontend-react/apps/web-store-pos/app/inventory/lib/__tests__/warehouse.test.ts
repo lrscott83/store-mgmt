@@ -65,12 +65,19 @@ describe('warehouse helpers', () => {
     it('accepts positive quantities (integer and decimal)', () => {
       expect(validateMovementQuantity(1).succeeded).toBe(true);
       expect(validateMovementQuantity(2.5).succeeded).toBe(true);
+      expect(validateMovementQuantity(0.001).succeeded).toBe(true);
     });
 
     it('rejects zero, negative and NaN', () => {
       expect(validateMovementQuantity(0).succeeded).toBe(false);
+      expect(validateMovementQuantity(-1).succeeded).toBe(false);
       expect(validateMovementQuantity(-3).succeeded).toBe(false);
       expect(validateMovementQuantity(Number.NaN).succeeded).toBe(false);
+    });
+
+    it('rejects Infinity and -Infinity (Number.isFinite boundary)', () => {
+      expect(validateMovementQuantity(Number.POSITIVE_INFINITY).succeeded).toBe(false);
+      expect(validateMovementQuantity(Number.NEGATIVE_INFINITY).succeeded).toBe(false);
     });
 
     it('fails with QuantityInvalid error', () => {

@@ -42,7 +42,7 @@ export function computeWeightedCost(
 }
 
 export function validateMovementQuantity(quantity: number): Result {
-  if (!(quantity > 0) || Number.isNaN(quantity)) {
+  if (!Number.isFinite(quantity) || quantity <= 0) {
     return Result.Failure([WarehouseErrors.QuantityInvalid]);
   }
   return Result.Success();
